@@ -3,7 +3,18 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { constants as fsConstants, createReadStream, createWriteStream } from 'node:fs';
-import { access, lstat, mkdir, mkdtemp, realpath, rename, rm } from 'node:fs/promises';
+import {
+	access,
+	lstat,
+	mkdir,
+	mkdtemp,
+	readFile,
+	readdir,
+	realpath,
+	rename,
+	rm,
+	writeFile,
+} from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -25,6 +36,11 @@ const EXPLORER_EXECUTABLE_RELATIVE_PATH = join(
 const DEFAULT_READY_TIMEOUT_MS = 90_000;
 const DEFAULT_STOP_TIMEOUT_MS = 3_000;
 const LYNX_BUNDLE_MAGIC = Object.freeze([0x8b, 0x81, 0x0e, 0x00]);
+const EXTRACTION_LEASE_PREFIX = '.extract-';
+const EXTRACTION_LEASE_OWNER_FILE = '.owner';
+// A launcher removes its own lease on shutdown. This threshold only governs
+// leases abandoned by a killed launcher, whose owner process is already gone.
+const EXTRACTION_LEASE_MAX_AGE_MS = 6 * 60 * 60 * 1_000;
 
 export const LYNX_EXPLORER_ASSETS = Object.freeze({
 	arm64: Object.freeze({
@@ -76,21 +92,19 @@ function resolveConfiguredPath(value, fallback, cwd) {
 }
 
 /**
- * Produce the complete filesystem, server, and process plan without doing I/O.
+ * Produce the archive, cache, and executable plan needed to prepare Explorer.
+ *
+ * Explorer preparation runs before a port exists, so it deliberately takes no
+ * port and cannot describe a server it is not yet able to address.
  */
-export function createNativeDemoPlan({
+export function createExplorerPlan({
 	platform = process.platform,
 	arch = process.arch,
 	env = process.env,
 	homeDirectory = homedir(),
-	workspaceRoot = DEFAULT_WORKSPACE_ROOT,
 	cwd = process.cwd(),
-	port = Number.NaN,
 } = {}) {
 	const asset = selectExplorerAsset({ platform, arch });
-	if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
-		throw new Error(`The Lynx demo port must be an integer from 1 to 65535; received ${port}.`);
-	}
 	const cacheRoot = resolveConfiguredPath(
 		env.OCTANE_LYNX_EXPLORER_CACHE_DIR,
 		join(homeDirectory, 'Library', 'Caches', 'octane', 'lynx-explorer', LYNX_EXPLORER_VERSION),
@@ -103,16 +117,39 @@ export function createNativeDemoPlan({
 			: resolveConfiguredPath(configuredExecutable, '', cwd);
 	const assetRoot = join(cacheRoot, asset.arch);
 	const executablePath = executableOverride ?? join(assetRoot, EXPLORER_EXECUTABLE_RELATIVE_PATH);
-	const bundleUrl = `http://127.0.0.1:${port}/main.lynx.bundle`;
 
 	return {
 		asset,
 		assetRoot,
 		archivePath: join(cacheRoot, asset.archiveName),
-		bundleUrl,
 		cacheRoot,
 		executableOverride: executableOverride !== undefined,
 		executablePath,
+	};
+}
+
+/**
+ * Produce the complete filesystem, server, and process plan without doing I/O.
+ */
+export function createNativeDemoPlan({
+	platform = process.platform,
+	arch = process.arch,
+	env = process.env,
+	homeDirectory = homedir(),
+	workspaceRoot = DEFAULT_WORKSPACE_ROOT,
+	cwd = process.cwd(),
+	port = Number.NaN,
+} = {}) {
+	const explorerPlan = createExplorerPlan({ arch, cwd, env, homeDirectory, platform });
+	if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
+		throw new Error(`The Lynx demo port must be an integer from 1 to 65535; received ${port}.`);
+	}
+	const { executablePath } = explorerPlan;
+	const bundleUrl = `http://127.0.0.1:${port}/main.lynx.bundle`;
+
+	return {
+		...explorerPlan,
+		bundleUrl,
 		demoCommand: {
 			args: ['lynx:demo'],
 			command: 'pnpm',
@@ -389,14 +426,83 @@ function pathIsInside(parent, candidate) {
 	);
 }
 
+function ownerProcessIsRunning(pid) {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return error?.code === 'EPERM';
+	}
+}
+
+/**
+ * @param {string} leasePath
+ * @param {(pid: number) => boolean} isOwnerRunning
+ */
+async function leaseOwnerIsRunning(leasePath, isOwnerRunning) {
+	let owner;
+	try {
+		owner = Number(await readFile(join(leasePath, EXTRACTION_LEASE_OWNER_FILE), 'utf8'));
+	} catch {
+		// A lease with no recorded owner rests on the age threshold alone, so
+		// leases left by an earlier launcher are still reclaimable.
+		return false;
+	}
+	return Number.isSafeInteger(owner) && owner > 0 && isOwnerRunning(owner);
+}
+
+/**
+ * Remove extraction leases abandoned by a launcher that never ran its cleanup.
+ *
+ * A lease is removed only when its owner is gone and it is older than the age
+ * threshold, so a long-running concurrent launcher keeps its own application.
+ * Sweeping never fails a launch.
+ */
+export async function sweepExtractionLeases(
+	cacheRoot,
+	{
+		isOwnerRunning = ownerProcessIsRunning,
+		maxAgeMs = EXTRACTION_LEASE_MAX_AGE_MS,
+		now = Date.now(),
+	} = {},
+) {
+	let entries;
+	try {
+		entries = await readdir(cacheRoot, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	const removed = [];
+	for (const entry of entries) {
+		if (!entry.isDirectory() || !entry.name.startsWith(EXTRACTION_LEASE_PREFIX)) continue;
+		const leasePath = join(cacheRoot, entry.name);
+		try {
+			if (await leaseOwnerIsRunning(leasePath, isOwnerRunning)) continue;
+			if (now - (await lstat(leasePath)).mtimeMs < maxAgeMs) continue;
+			await rm(leasePath, { force: true, recursive: true });
+			removed.push(leasePath);
+		} catch {
+			// A lease being written or removed by another launcher is left alone.
+		}
+	}
+	return removed;
+}
+
 async function extractExplorer(plan, runCommandImpl, signal) {
 	const listing = await runCommandImpl('tar', ['-tzf', plan.archivePath], { signal });
 	validateExplorerArchiveEntries(listing.stdout);
 	await mkdir(plan.cacheRoot, { mode: 0o700, recursive: true });
-	const stagingRoot = await mkdtemp(join(plan.cacheRoot, `.extract-${plan.asset.arch}-`));
+	const stagingRoot = await mkdtemp(
+		join(plan.cacheRoot, `${EXTRACTION_LEASE_PREFIX}${plan.asset.arch}-`),
+	);
 	const stagedExecutable = join(stagingRoot, EXPLORER_EXECUTABLE_RELATIVE_PATH);
 	let retained = false;
 	try {
+		// Record the owner before extracting, so a launcher killed mid-extraction
+		// still leaves a lease the next sweep can attribute and reclaim.
+		await writeFile(join(stagingRoot, EXTRACTION_LEASE_OWNER_FILE), String(process.pid), {
+			mode: 0o600,
+		});
 		await runCommandImpl('tar', ['-xzf', plan.archivePath, '-C', stagingRoot], { signal });
 		await preflightExplorerExecutable(stagedExecutable);
 		const [resolvedStagingRoot, resolvedExecutable] = await Promise.all([
@@ -422,16 +528,22 @@ async function extractExplorer(plan, runCommandImpl, signal) {
 }
 
 /**
- * @param {ReturnType<typeof createNativeDemoPlan>} plan
+ * @param {ReturnType<typeof createExplorerPlan>} plan
  * @param {{
  *   fetchImpl?: typeof fetch;
  *   runCommandImpl?: typeof runCommand;
  *   signal?: AbortSignal;
+ *   sweepImpl?: typeof sweepExtractionLeases;
  * }} [options]
  */
 export async function ensureExplorer(
 	plan,
-	{ fetchImpl = fetch, runCommandImpl = runCommand, signal } = {},
+	{
+		fetchImpl = fetch,
+		runCommandImpl = runCommand,
+		signal,
+		sweepImpl = sweepExtractionLeases,
+	} = {},
 ) {
 	if (plan.executableOverride) {
 		return {
@@ -443,6 +555,9 @@ export async function ensureExplorer(
 	// The per-run extraction prevents a stale executable from bypassing provenance
 	// and lets concurrent launchers coexist without mutating each other's app.
 	await ensureVerifiedArchive(plan, fetchImpl, signal);
+	// A killed launcher never runs its own cleanup, so reclaim what it left
+	// before adding another lease to the same cache.
+	await sweepImpl(plan.cacheRoot);
 	return extractExplorer(plan, runCommandImpl, signal);
 }
 
@@ -479,7 +594,10 @@ export async function waitForBundle(child, url, timeoutMs, fetchImpl) {
 				const response = await fetchImpl(url, {
 					signal: AbortSignal.timeout(1_000),
 				});
-				validBundle = response.ok && isLynxBundle(new Uint8Array(await response.arrayBuffer()));
+				if (response.ok) validBundle = isLynxBundle(await readBundleHeader(response));
+				// Every polled response must release its body. An unread body holds
+				// its connection in the agent pool for the rest of the wait.
+				else await releaseBody(response);
 			} catch {
 				// Rspeedy may still be compiling or binding its server.
 			}
@@ -506,6 +624,44 @@ export function isLynxBundle(content) {
 		content.byteLength >= LYNX_BUNDLE_MAGIC.length &&
 		LYNX_BUNDLE_MAGIC.every((byte, index) => content[index] === byte)
 	);
+}
+
+async function releaseBody(response) {
+	try {
+		await response.body?.cancel();
+	} catch {
+		// A fully read or already errored body needs no release.
+	}
+}
+
+/**
+ * Read only the bytes needed to classify the response.
+ *
+ * The served bundle grows with the application, so the readiness poll must not
+ * download it once per attempt to inspect a four-byte header.
+ */
+export async function readBundleHeader(response) {
+	const body = response.body;
+	if (body === null || body === undefined) return new Uint8Array();
+	const reader = body.getReader();
+	const header = new Uint8Array(LYNX_BUNDLE_MAGIC.length);
+	let filled = 0;
+	try {
+		while (filled < header.length) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			const take = Math.min(value.length, header.length - filled);
+			header.set(value.subarray(0, take), filled);
+			filled += take;
+		}
+	} finally {
+		try {
+			await reader.cancel();
+		} catch {
+			// The stream may already be closed by a complete short response.
+		}
+	}
+	return header.subarray(0, filled);
 }
 
 function childOutcome(child) {
@@ -586,13 +742,7 @@ export async function runNativeDemo({
 		preparationAbort.abort();
 	});
 	try {
-		const preparationPlan = createNativeDemoPlan({
-			arch,
-			env,
-			platform,
-			port: requestedPort ?? 1,
-			workspaceRoot,
-		});
+		const preparationPlan = createExplorerPlan({ arch, env, platform });
 		try {
 			preparedExplorer = await ensureExplorerImpl(preparationPlan, {
 				fetchImpl,

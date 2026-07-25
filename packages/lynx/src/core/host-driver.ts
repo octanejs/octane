@@ -1583,7 +1583,8 @@ function applyListUpdate<Node extends LynxElementRef>(
 	}
 	if (sameListItems(list.items, update.next)) return;
 	list.items = update.next;
-	const nextById = new Map(update.next.map((item) => [item.id, item]));
+	const nextById = new Map<number, LynxListItemDescriptor>();
+	for (const item of update.next) nextById.set(item.id, item);
 	for (const cell of list.attachedByItem.values()) {
 		const item = cell.logicalItemId === null ? undefined : nextById.get(cell.logicalItemId);
 		if (item !== undefined) cell.item = item;

@@ -17,16 +17,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
 	cleanupNativeDemo,
+	createExplorerPlan,
 	createNativeDemoPlan,
 	ensureExplorer,
 	isLynxBundle,
 	LYNX_EXPLORER_ASSETS,
 	parseDemoPort,
 	preflightExplorerExecutable,
+	readBundleHeader,
 	runNativeDemo,
 	selectExplorerAsset,
 	sha256File,
 	stopProcessTree,
+	sweepExtractionLeases,
 	validateExplorerArchiveEntries,
 	verifyFileSha256,
 	waitForBundle,
@@ -150,6 +153,57 @@ describe('macOS Lynx Explorer native demo', () => {
 		);
 	});
 
+	it('prepares Explorer from a plan that describes no development server', () => {
+		// Explorer preparation runs before a port is chosen, so its plan must not
+		// carry a fabricated server address that a later step could act on.
+		const plan = createExplorerPlan({
+			arch: 'arm64',
+			env: { OCTANE_LYNX_EXPLORER_CACHE_DIR: '/tmp/octane-lynx-cache' },
+			platform: 'darwin',
+		});
+
+		expect(plan.archivePath).toBe('/tmp/octane-lynx-cache/LynxExplorer-macos-arm64.app.tar.gz');
+		expect(plan.executablePath).toBe(
+			'/tmp/octane-lynx-cache/arm64/LynxExplorer.app/Contents/MacOS/LynxExplorer',
+		);
+		expect(plan).not.toHaveProperty('bundleUrl');
+		expect(plan).not.toHaveProperty('port');
+		expect(plan).not.toHaveProperty('demoCommand');
+		expect(plan).not.toHaveProperty('explorerCommand');
+	});
+
+	it('reclaims only extraction leases whose owner is gone and which are stale', async () => {
+		const cacheRoot = mkdtempSync(join(tmpdir(), 'octane-lynx-native-sweep-'));
+		temporaryRoots.push(cacheRoot);
+		const abandoned = join(cacheRoot, '.extract-arm64-abandoned');
+		const live = join(cacheRoot, '.extract-arm64-live');
+		// A lease left by a launcher that predates owner records.
+		const ownerless = join(cacheRoot, '.extract-arm64-ownerless');
+		const application = join(cacheRoot, 'arm64');
+		for (const root of [abandoned, live, ownerless, application]) {
+			mkdirSync(root, { recursive: true });
+		}
+		writeFileSync(join(abandoned, '.owner'), '4321');
+		writeFileSync(join(live, '.owner'), '1234');
+		const isOwnerRunning = (pid: number): boolean => pid === 1234;
+
+		// A departed owner alone must not reclaim a lease that a launcher could
+		// still be creating.
+		expect(await sweepExtractionLeases(cacheRoot, { isOwnerRunning })).toEqual([]);
+		expect(existsSync(abandoned)).toBe(true);
+
+		const removed = await sweepExtractionLeases(cacheRoot, {
+			isOwnerRunning,
+			now: Date.now() + 7 * 60 * 60 * 1_000,
+		});
+
+		expect(removed.sort()).toEqual([abandoned, ownerless].sort());
+		expect(existsSync(abandoned)).toBe(false);
+		expect(existsSync(ownerless)).toBe(false);
+		expect(existsSync(live)).toBe(true);
+		expect(existsSync(application)).toBe(true);
+	});
+
 	it('ignores a stale cached app and prepares an isolated checksum-backed executable', async () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-lynx-native-cache-'));
 		temporaryRoots.push(root);
@@ -208,6 +262,10 @@ describe('macOS Lynx Explorer native demo', () => {
 		expect(prepared.executablePath).not.toBe(plan.executablePath);
 		expect(readFileSync(prepared.executablePath, 'utf8')).toBe('verified executable');
 		expect(readFileSync(plan.executablePath, 'utf8')).toBe('stale executable');
+		// The lease records its owner so a killed launcher's leftovers stay
+		// attributable to a process a later sweep can find gone.
+		const lease = readdirSync(root).find((entry) => entry.startsWith('.extract-'))!;
+		expect(readFileSync(join(root, lease, '.owner'), 'utf8')).toBe(String(process.pid));
 		await prepared.dispose();
 		expect(existsSync(prepared.executablePath)).toBe(false);
 	});
@@ -520,6 +578,63 @@ describe('macOS Lynx Explorer native demo', () => {
 		expect(isLynxBundle(new Uint8Array([0x8b, 0x81, 0x0e, 0x00, 0x01]))).toBe(true);
 		expect(isLynxBundle(new TextEncoder().encode('<html>occupied port</html>'))).toBe(false);
 		expect(isLynxBundle(new Uint8Array([0x8b, 0x81, 0x0e]))).toBe(false);
+	});
+
+	it('classifies a served bundle from its header without draining the response', async () => {
+		// The served bundle grows with the application, so a readiness poll that
+		// downloads it once per attempt scales with the demo instead of the header.
+		const totalChunks = 64;
+		let pulled = 0;
+		let cancelled = false;
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				if (pulled === totalChunks) {
+					controller.close();
+					return;
+				}
+				const chunk = new Uint8Array(4_096);
+				if (pulled === 0) chunk.set([0x8b, 0x81, 0x0e, 0x00]);
+				pulled += 1;
+				controller.enqueue(chunk);
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+
+		const header = await readBundleHeader(new Response(body));
+
+		expect(isLynxBundle(header)).toBe(true);
+		expect(pulled).toBeLessThan(totalChunks);
+		expect(cancelled).toBe(true);
+	});
+
+	it('releases the body of every response the readiness poll rejects', async () => {
+		// An unread body keeps its connection checked out of the agent pool for
+		// the rest of the wait, which can stall the poll it belongs to.
+		let cancelled = false;
+		const pending = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				controller.enqueue(new Uint8Array(4_096));
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+		const child = Object.assign(new EventEmitter(), {
+			exitCode: null as number | null,
+			pid: 42,
+			signalCode: null as NodeJS.Signals | null,
+		});
+		let compiling = true;
+
+		await waitForBundle(child, 'http://127.0.0.1:43219/main.lynx.bundle', 5_000, async () => {
+			if (!compiling) return new Response(new Uint8Array([0x8b, 0x81, 0x0e, 0x00]));
+			compiling = false;
+			return new Response(pending, { status: 404 });
+		});
+
+		expect(cancelled).toBe(true);
 	});
 
 	it('rejects a valid response if the demo exits while its body is read', async () => {

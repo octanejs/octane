@@ -17,7 +17,11 @@ import { prepareLynxBackgroundLifecycleReceiver } from './core/background-lifecy
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
 import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
-import { readAmbientQueueMicrotask, readLynxEnvironment } from './core/environment.js';
+import {
+	lynxEnvironmentIsInjected,
+	readAmbientQueueMicrotask,
+	readLynxEnvironment,
+} from './core/environment.js';
 import {
 	createLynxBackgroundFunctionRegistry,
 	installBackgroundCallBridge,
@@ -73,12 +77,14 @@ function readBackgroundGlobals(target: object): LynxBackgroundGlobals {
 }
 
 function defaultBackgroundTarget(): object {
+	// An ordinary global host keeps globalThis as the target: nothing is
+	// allocated, every ambient binding stays reachable, and ambient functions
+	// keep their original receiver. Only the official wrapper's lexical-only
+	// injection needs a synthetic target.
+	if (!lynxEnvironmentIsInjected()) return globalThis;
+	const queueMicrotask = readAmbientQueueMicrotask();
 	const lynx = readLynxEnvironment();
-	if (lynx === undefined) return globalThis;
-	return {
-		lynx,
-		queueMicrotask: readAmbientQueueMicrotask(),
-	};
+	return queueMicrotask === undefined ? { lynx } : { lynx, queueMicrotask };
 }
 
 function resolveContext(

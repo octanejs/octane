@@ -33,6 +33,7 @@ import {
 	useInitData,
 	useInitDataChanged,
 } from '../src/platform.js';
+import { readAmbientQueueMicrotask } from '../src/core/environment.js';
 import { LYNX_NODES_REF_ATTRIBUTE } from '../src/core/nodes-ref.js';
 import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import {
@@ -64,6 +65,10 @@ interface FixtureProps {
 	readonly captureActions: (actions: FixtureActions) => void;
 	readonly captureRow: (id: string, handle: LynxPublicHandle | null) => void;
 	readonly counterRef: (handle: LynxPublicHandle | null) => void;
+}
+
+interface AmbientSchedulerHost {
+	queueMicrotask: (callback: () => void) => void;
 }
 
 interface InstalledEnvironment {
@@ -337,6 +342,33 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 				scheduleMicrotask: (callback) => callback(),
 			}),
 		).toThrow('Octane Lynx roots are available only in the Lynx background runtime.');
+	});
+
+	it('keeps the ambient scheduler callable after a synthetic target stores it', () => {
+		// Lynx publishes no queueMicrotask on its background lynx object, so a
+		// default root falls back to the ambient scheduler. Under the official
+		// wrapper that scheduler is stored on a synthetic target, and hosts
+		// implementing queueMicrotask as a global interface operation reject a
+		// foreign receiver, so the value handed out must stay bound to the global.
+		const host = globalThis as unknown as AmbientSchedulerHost;
+		const ambient = host.queueMicrotask;
+		const scheduled: Array<() => void> = [];
+		host.queueMicrotask = function brandChecked(this: unknown, callback: () => void): void {
+			if (this !== globalThis) {
+				throw new TypeError('Illegal invocation');
+			}
+			scheduled.push(callback);
+		};
+		try {
+			const carrier = { queueMicrotask: readAmbientQueueMicrotask() };
+			const callback = (): void => {};
+
+			expect(carrier.queueMicrotask).toBeTypeOf('function');
+			expect(() => carrier.queueMicrotask!(callback)).not.toThrow();
+			expect(scheduled).toEqual([callback]);
+		} finally {
+			host.queueMicrotask = ambient;
+		}
 	});
 
 	it('applies the Lynx-only className alias in authored host order', async () => {

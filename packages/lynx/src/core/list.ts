@@ -94,6 +94,19 @@ export function lynxListReuseKey(item: LynxListItemDescriptor): string {
 }
 
 /**
+ * Index descriptors by identity.
+ *
+ * A commit plans against the whole list, so these maps are built once per list
+ * per commit. Filling them directly keeps the work proportional to the item
+ * count instead of also allocating an entry pair for every item.
+ */
+function indexById(items: readonly LynxListItemDescriptor[]): Map<number, LynxListItemDescriptor> {
+	const byId = new Map<number, LynxListItemDescriptor>();
+	for (const item of items) byId.set(item.id, item);
+	return byId;
+}
+
+/**
  * Return the IDs forming a longest increasing subsequence of old positions.
  * Those survivors need neither a native removal nor insertion during reorder.
  */
@@ -101,7 +114,10 @@ function stableSurvivors(
 	previous: readonly LynxListItemDescriptor[],
 	next: readonly LynxListItemDescriptor[],
 ): ReadonlySet<number> {
-	const previousIndex = new Map(previous.map((item, index) => [item.id, index]));
+	const previousIndex = new Map<number, number>();
+	for (let index = 0; index < previous.length; index++) {
+		previousIndex.set(previous[index]!.id, index);
+	}
 	const entries: Array<{ readonly id: number; readonly index: number }> = [];
 	for (const item of next) {
 		const index = previousIndex.get(item.id);
@@ -149,8 +165,8 @@ export function planLynxListUpdate(
 	}
 
 	const stable = stableSurvivors(previous, next);
-	const nextById = new Map(next.map((item) => [item.id, item]));
-	const previousById = new Map(previous.map((item) => [item.id, item]));
+	const nextById = indexById(next);
+	const previousById = indexById(previous);
 	const removeAction: number[] = [];
 	for (let index = 0; index < previous.length; index++) {
 		if (!stable.has(previous[index]!.id)) removeAction.push(index);
