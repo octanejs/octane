@@ -19,9 +19,23 @@ function injectedNativeModules(): unknown {
 	return typeof NativeModules === 'undefined' ? undefined : NativeModules;
 }
 
+function globalLynx(): unknown {
+	return (globalThis as unknown as LynxAmbientGlobals).lynx;
+}
+
 /** Read Lynx from the official wrapper or an explicit global host. */
 export function readLynxEnvironment(): unknown {
-	return injectedLynx() ?? (globalThis as unknown as LynxAmbientGlobals).lynx;
+	return injectedLynx() ?? globalLynx();
+}
+
+/**
+ * Report whether the wrapper supplied a lexical `lynx` the global object does
+ * not expose. Only that host needs a synthetic root target; an ordinary global
+ * host keeps `globalThis` itself, so no ambient binding becomes unreachable.
+ */
+export function lynxEnvironmentIsInjected(): boolean {
+	const injected = injectedLynx();
+	return injected !== undefined && injected !== globalLynx();
 }
 
 /** Read Native Modules from the official wrapper or an explicit global host. */
@@ -29,7 +43,12 @@ export function readNativeModulesEnvironment(): unknown {
 	return injectedNativeModules() ?? (globalThis as unknown as LynxAmbientGlobals).NativeModules;
 }
 
-/** Read the ambient scheduler without allocating a wrapper on platform-hook paths. */
+/**
+ * Read the ambient scheduler bound to the global object. Hosts that implement
+ * `queueMicrotask` as a global interface operation brand-check the receiver, so
+ * the function must stay bound when a synthetic target re-homes it.
+ */
 export function readAmbientQueueMicrotask(): ((callback: () => void) => void) | undefined {
-	return (globalThis as unknown as LynxAmbientGlobals).queueMicrotask;
+	const scheduler = (globalThis as unknown as LynxAmbientGlobals).queueMicrotask;
+	return typeof scheduler === 'function' ? scheduler.bind(globalThis) : undefined;
 }
