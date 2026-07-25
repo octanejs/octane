@@ -64,6 +64,24 @@ function allowedRequestOrigin(request, trustProxy, allowedOrigins) {
 }
 
 /**
+ * @param {Response} response
+ * @param {string | null} origin
+ * @returns {Response}
+ */
+function withRpcCors(response, origin) {
+	if (origin === null) return response;
+
+	const headers = new Headers(response.headers);
+	headers.set('Access-Control-Allow-Origin', origin);
+	headers.append('Vary', 'Origin');
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
+}
+
+/**
  * @param {Request} request
  * @param {number} maxBodyBytes
  * @returns {Promise<{ body: string } | { error: Response }>}
@@ -143,6 +161,32 @@ function isInvalidRpcPayload(error) {
  * @returns {Promise<Response>}
  */
 export async function handleRpcRequest(request, options) {
+	if (request.method === 'OPTIONS') {
+		const origin = allowedRequestOrigin(
+			request,
+			options.trustProxy ?? false,
+			options.allowedOrigins ?? [],
+		);
+		const browserOrigin = request.headers.get('origin');
+		if (origin === null || browserOrigin === null || browserOrigin === origin) {
+			return rpcError(403, 'Cross-origin RPC requests are not allowed');
+		}
+		if (request.headers.get('access-control-request-method') !== 'POST') {
+			return rpcError(405, 'RPC requests require POST', { Allow: 'POST' });
+		}
+
+		return new Response(null, {
+			status: 204,
+			headers: {
+				'Access-Control-Allow-Origin': browserOrigin,
+				'Access-Control-Allow-Methods': 'POST',
+				'Access-Control-Allow-Headers':
+					request.headers.get('access-control-request-headers') ?? 'content-type',
+				Vary: 'Origin, Access-Control-Request-Headers',
+			},
+		});
+	}
+
 	if (request.method !== 'POST') {
 		return rpcError(405, 'RPC requests require POST', { Allow: 'POST' });
 	}
@@ -165,13 +209,15 @@ export async function handleRpcRequest(request, options) {
 	if (origin === null) {
 		return rpcError(403, 'Cross-origin RPC requests are not allowed');
 	}
+	const browserOrigin = request.headers.get('origin');
+	const corsOrigin = browserOrigin === origin ? null : browserOrigin;
 
 	const context = createContext(request, {}, options.platform);
 	const store =
 		options.platform === undefined ? { origin } : { origin, platform: options.platform };
 
 	try {
-		return await options.asyncContext.run(store, async () =>
+		const response = await options.asyncContext.run(store, async () =>
 			runMiddlewareChain(
 				context,
 				options.middlewares ?? [],
@@ -200,8 +246,9 @@ export async function handleRpcRequest(request, options) {
 				[],
 			),
 		);
+		return withRpcCors(response, corsOrigin);
 	} catch (error) {
 		console.error('[octane] RPC request error:', error);
-		return rpcError(500, 'Internal Server Error');
+		return withRpcCors(rpcError(500, 'Internal Server Error'), corsOrigin);
 	}
 }

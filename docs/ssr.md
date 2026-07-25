@@ -198,7 +198,10 @@ export default defineConfig({
 ```
 
 Origins must be complete HTTP or HTTPS origins, never wildcard, path, or
-credential-bearing values. Forwarded origin headers are used only when
+credential-bearing values. Explicitly allowed origins receive the browser's
+required `POST` preflight and exact-origin CORS response headers; preflight
+requests never execute authorization middleware or server actions. Forwarded
+origin headers are used only when
 `server.trustProxy` is explicitly enabled behind a trusted proxy. The same
 policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
 

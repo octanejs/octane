@@ -81,6 +81,17 @@ function rpcRequest(
 	});
 }
 
+function rpcPreflight(origin: string, options: { method?: string; requestHeaders?: string } = {}) {
+	return new Request('https://octane.test/_$_ripple_rpc_$_/deadbeef', {
+		method: 'OPTIONS',
+		headers: {
+			Origin: origin,
+			'Access-Control-Request-Method': options.method ?? 'POST',
+			'Access-Control-Request-Headers': options.requestHeaders ?? 'content-type',
+		},
+	});
+}
+
 afterEach(() => {
 	globalThis.fetch = originalFetch;
 	delete (globalThis as typeof globalThis & Record<symbol, unknown>)[FETCH_COORDINATOR_KEY];
@@ -94,6 +105,7 @@ describe('server-function HTTP security', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toContain('application/json');
+		expect(response.headers.has('access-control-allow-origin')).toBe(false);
 		await expect(response.json()).resolves.toEqual({ value: 'ok' });
 		expect(action).toHaveBeenCalledExactlyOnceWith('ok');
 	});
@@ -176,7 +188,105 @@ describe('server-function HTTP security', () => {
 		);
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get('access-control-allow-origin')).toBe('https://trusted.octane.test');
+		expect(response.headers.get('vary')).toBe('Origin');
+		await expect(response.json()).resolves.toEqual({ value: 'ok' });
 		expect(action).toHaveBeenCalledOnce();
+	});
+
+	it('allows browser preflight only for an explicitly trusted RPC origin', async () => {
+		const authorization = vi.fn();
+		const { action, handler } = createRpcHandler({
+			allowedOrigins: ['https://trusted.octane.test'],
+			middlewares: [authorization],
+		});
+		const response = await handler(
+			rpcPreflight('https://trusted.octane.test', {
+				requestHeaders: 'authorization, content-type',
+			}),
+		);
+
+		expect(response.status).toBe(204);
+		expect(response.headers.get('access-control-allow-origin')).toBe('https://trusted.octane.test');
+		expect(response.headers.get('access-control-allow-methods')).toBe('POST');
+		expect(response.headers.get('access-control-allow-headers')).toBe(
+			'authorization, content-type',
+		);
+		expect(response.headers.get('vary')).toBe('Origin, Access-Control-Request-Headers');
+		expect(await response.text()).toBe('');
+		expect(authorization).not.toHaveBeenCalled();
+		expect(action).not.toHaveBeenCalled();
+	});
+
+	it.each(['https://attacker.test', 'null', 'https://trusted.octane.test/path'])(
+		'rejects browser preflight from the untrusted or malformed origin %s',
+		async (origin) => {
+			const authorization = vi.fn();
+			const { action, handler } = createRpcHandler({
+				allowedOrigins: ['https://trusted.octane.test'],
+				middlewares: [authorization],
+			});
+			const response = await handler(rpcPreflight(origin));
+
+			expect(response.status).toBe(403);
+			expect(response.headers.has('access-control-allow-origin')).toBe(false);
+			expect(authorization).not.toHaveBeenCalled();
+			expect(action).not.toHaveBeenCalled();
+		},
+	);
+
+	it('does not allow cross-origin preflight for methods other than POST', async () => {
+		const { action, handler } = createRpcHandler({
+			allowedOrigins: ['https://trusted.octane.test'],
+		});
+		const response = await handler(
+			rpcPreflight('https://trusted.octane.test', { method: 'DELETE' }),
+		);
+
+		expect(response.status).toBe(405);
+		expect(response.headers.get('allow')).toBe('POST');
+		expect(response.headers.has('access-control-allow-origin')).toBe(false);
+		expect(action).not.toHaveBeenCalled();
+	});
+
+	it('preserves authorization middleware responses for a trusted cross-origin request', async () => {
+		const authorization = vi.fn(
+			() => new Response('Unauthorized', { status: 401, headers: { Vary: 'Accept-Encoding' } }),
+		);
+		const { action, handler } = createRpcHandler({
+			allowedOrigins: ['https://trusted.octane.test'],
+			middlewares: [authorization],
+		});
+		const response = await handler(
+			rpcRequest({ headers: { Origin: 'https://trusted.octane.test' } }),
+		);
+
+		expect(response.status).toBe(401);
+		expect(await response.text()).toBe('Unauthorized');
+		expect(response.headers.get('access-control-allow-origin')).toBe('https://trusted.octane.test');
+		expect(response.headers.get('vary')).toBe('Accept-Encoding, Origin');
+		expect(authorization).toHaveBeenCalledOnce();
+		expect(action).not.toHaveBeenCalled();
+	});
+
+	it('exposes only sanitized RPC errors to an explicitly trusted cross-origin browser', async () => {
+		const secret = 'private database password';
+		const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { action, handler } = createRpcHandler({
+			allowedOrigins: ['https://trusted.octane.test'],
+			action: () => {
+				throw new Error(secret);
+			},
+		});
+		const response = await handler(
+			rpcRequest({ headers: { Origin: 'https://trusted.octane.test' } }),
+		);
+
+		expect(response.status).toBe(500);
+		expect(response.headers.get('access-control-allow-origin')).toBe('https://trusted.octane.test');
+		expect(await response.text()).not.toContain(secret);
+		expect(action).toHaveBeenCalledOnce();
+		expect(loggedError).toHaveBeenCalledOnce();
 	});
 
 	it('does not trust forwarded origins by default', async () => {
