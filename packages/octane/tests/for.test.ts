@@ -7,6 +7,7 @@ import {
 	ToggleableEmpty,
 	DepPureList,
 	CallBodyList,
+	PlainCalleeList,
 	setExternal,
 } from './_fixtures/for.tsrx';
 
@@ -147,6 +148,28 @@ describe('forBlock — @empty branch', () => {
 		});
 		expect(r.findAll('.empty')).toHaveLength(0);
 		expect(r.findAll('.row').map((li) => li.textContent)).toEqual(['x', 'y']);
+		r.unmount();
+	});
+});
+
+describe('forBlock — a plain-callee projection stays reactive to its real inputs', () => {
+	it('a body calling a module helper still renders a changed item value', () => {
+		// `{fmtRow(item)}` is the shape of every `{formatPrice(cents)}` in real code.
+		// Unlike an item METHOD call, its receiver cannot hide mutable state behind a
+		// stable ref, so it does not disqualify the region from memoization. What must
+		// hold regardless is the ordinary contract: an unrelated parent re-render keeps
+		// the rendered text, and a real item change reaches the DOM.
+		const r = mount(PlainCalleeList);
+		expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['p1:0', 'p2:0']);
+
+		r.click('#pc-rerender');
+		expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['p1:0', 'p2:0']);
+
+		r.click('#pc-bump');
+		expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['p1:1', 'p2:0']);
+
+		r.click('#pc-bump');
+		expect(r.findAll('.pc-row').map((li) => li.textContent)).toEqual(['p1:2', 'p2:0']);
 		r.unmount();
 	});
 });

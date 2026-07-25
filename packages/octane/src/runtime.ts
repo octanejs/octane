@@ -14566,6 +14566,15 @@ function scopedDeoptKey(
 	// cannot alias a nested child. JSON quoting makes arbitrary user strings data,
 	// never structure, while remaining stable across renders without an intern map.
 	const explicit = isElementDescriptor(item) && item.key != null;
+	// The unwrapped top level — a plain children array or a single-layer Fragment,
+	// which is what every `{items.map(...)}` list and every binding's rendered
+	// output produces — is the hot path: it re-keys EVERY child on EVERY parent
+	// render, including renders where all children go on to bail. Skip the
+	// serializer there. A JSON encoding always begins with '[', so no 'k'/'i'
+	// prefixed key can collide with a nested wrapper path, and the differing
+	// prefixes keep an explicit key="0" distinct from an implicit index 0 — the
+	// same two aliasing properties the serialized form provides.
+	if (path.length === 0) return explicit ? 'k' + String(key) : 'i' + index;
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 

@@ -2618,20 +2618,21 @@ function containsAutoMemoContextRead(root, ctx) {
 }
 
 /**
- * True when the keyed-item body executes any call DURING render:
- * CallExpression / NewExpression / TaggedTemplateExpression in render-value
- * position (holes, attribute values, locals). Such a call can read mutable
- * state that neither the item reference nor the deps tuple changes with —
- * e.g. `header.column.getIsSorted()` on a memoized table-core header — so the
- * PURE/DEP-PURE survivor short-circuit (see the body analysis in makeForCall)
- * would freeze its output where React re-runs the body unconditionally.
+ * True when the body executes a call DURING render: CallExpression /
+ * NewExpression / TaggedTemplateExpression in render-value position (holes,
+ * attribute values, locals).
  *
  * Calls nested inside FUNCTION VALUES (event-handler arrows, function
  * expressions) are deferred to invoke time and close over the same ref-stable
  * item/deps a skipped survivor would have, so they can't go stale at render
  * time — the walk does not descend into function bodies or parameters.
+ *
+ * Passing `memoCtx` admits calls that are provable value projections — see
+ * `plainCalleeIsMemoizable` for the contract and why callee shapes are
+ * classified differently. Callers that need "no call executes here" for a reason
+ * other than memo staleness (SSR item identity) omit it and keep every call.
  */
-function containsRenderCall(stmts) {
+function containsRenderCall(stmts, memoCtx = null) {
 	let found = false;
 	const seen = new WeakSet();
 	function walk(n) {
@@ -2658,6 +2659,12 @@ function containsRenderCall(stmts) {
 			t === 'NewExpression' ||
 			t === 'TaggedTemplateExpression'
 		) {
+			if (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx)) {
+				// The callee is a proven projection; its ARGUMENTS still carry the
+				// render-value contract, so `fmt(row.get())` stays disqualified.
+				walk(n.arguments);
+				return;
+			}
 			found = true;
 			return;
 		}
@@ -2668,6 +2675,179 @@ function containsRenderCall(stmts) {
 	}
 	for (const s of stmts) walk(s);
 	return found;
+}
+
+const HOOK_CALLEE_NAME_RE = /^use[A-Z]/;
+
+function isHookCalleeName(name) {
+	return name === 'use' || HOOK_CALLEE_NAME_RE.test(name);
+}
+
+/**
+ * Is this call a memoizable value projection — `segText(seg, done)`,
+ * `formatPrice(cents)`, `t('key')`?
+ *
+ * autoMemo models React Compiler's pure-render / immutable-snapshot contract,
+ * under which memoizing through a call is the NORMAL case. The blanket call veto
+ * exists for one shape that violates that contract in practice and is pervasive
+ * in library bindings: reading mutable state through an object reachable from
+ * the item or props, where neither the item ref nor any dep witnesses the change
+ * (`header.column.getIsSorted()` flips while `header` stays the memoized
+ * object). That hazard is carried by the RECEIVER, so a member callee always
+ * fails closed.
+ *
+ * A bare identifier callee is admitted ONLY when the binding it resolves to is
+ * a module-scope immutable identity:
+ *
+ *   - an IMPORTED binding. Its body is across a module boundary we cannot read,
+ *     so this is the same pure-projection assumption React Compiler makes for
+ *     any imported helper. Documented in docs/differences-from-react.md.
+ *   - a same-module `function` declaration that is never reassigned AND whose
+ *     own body is a pure projection (see moduleHelperIsPureProjection). Because
+ *     we CAN read that body, we check it: `function sortIcon(h) { return
+ *     h.getIsSorted(); }` is the receiver hazard moved one call frame away and
+ *     must fail closed exactly like the direct member call.
+ *
+ * Everything else fails closed — in particular a COMPONENT-LOCAL callee. A local
+ * `const read = () => item.read()` (or a local function declaration) wraps the
+ * member-callee hazard in an identifier, and the inline hook-memo tier can hand
+ * it a stable identity, so admitting it would let a skipped body freeze a live
+ * accessor result. Unbound globals fail closed for the same reason: nothing
+ * witnesses what they close over.
+ *
+ * `new Foo()` and tagged templates stay disqualified: construction is not a
+ * value projection, and a tag function receives the raw strings array.
+ *
+ * HOOK-shaped callees are also disqualified. `use(promise)` is a suspension
+ * point and `useState`/`useLayoutEffect`/a custom `useThing()` own hook cells,
+ * context subscriptions, and effect lifecycles — none of which are value
+ * projections, and all of which change observable commit/retry behavior when a
+ * region is skipped (a re-suspended boundary must re-run to destroy and
+ * recreate its layout effects). The naming convention is the same signal React
+ * and React Compiler key on, and it is what the blanket call veto was
+ * incidentally covering here.
+ */
+function plainCalleeIsMemoizable(node, ctx) {
+	if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return false;
+	const callee = node.callee;
+	if (callee?.type !== 'Identifier') return false;
+	const name = callee.name;
+	if (isHookCalleeName(name)) return false;
+	// A namespace member (`ns.fn()`) is already a member callee; a namespace used
+	// bare is not callable as a projection.
+	if (ctx?.importNamespaceNames?.has(name)) return false;
+	if (ctx?.importedNames?.has(name)) return true;
+	return moduleHelperIsPureProjection(name, ctx);
+}
+
+/**
+ * Can a same-module `function` helper stand in for the value projection its call
+ * site claims to be? True when its body performs no member-callee call, no
+ * construction, and no tagged template in render-value position, and every plain
+ * call it makes is itself an admitted projection.
+ *
+ * Cycles resolve to false: a recursive helper cannot be proven, and failing
+ * closed is the safe direction. Nested function VALUES inside the helper are not
+ * descended into for the same reason `containsRenderCall` skips them — they run
+ * when invoked, not while the helper projects a value — but a helper that
+ * *invokes* one through `.map(...)` trips the member-callee rule anyway.
+ */
+function moduleHelperIsPureProjection(name, ctx, seen) {
+	const decl = ctx?.moduleFunctionDeclarations?.get(name);
+	if (decl === undefined) return false;
+	const cache = ctx.__moduleHelperProjection ?? (ctx.__moduleHelperProjection = new Map());
+	const cached = cache.get(name);
+	if (cached !== undefined) return cached;
+	const active = seen ?? new Set();
+	if (active.has(name)) return false; // recursion — unprovable, fail closed
+	active.add(name);
+	let pure = true;
+	const nodes = new WeakSet();
+	function walk(n) {
+		if (!pure || !n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (nodes.has(n)) return;
+		nodes.add(n);
+		const t = n.type;
+		if (
+			t === 'ArrowFunctionExpression' ||
+			t === 'FunctionExpression' ||
+			t === 'FunctionDeclaration'
+		) {
+			if (n !== decl) return; // deferred value, not this helper's projection
+		}
+		if (t === 'NewExpression' || t === 'TaggedTemplateExpression') {
+			pure = false;
+			return;
+		}
+		if (t === 'CallExpression' || t === 'OptionalCallExpression') {
+			const callee = n.callee;
+			if (callee?.type !== 'Identifier' || isHookCalleeName(callee.name)) {
+				pure = false;
+				return;
+			}
+			if (
+				!ctx.importedNames?.has(callee.name) &&
+				!moduleHelperIsPureProjection(callee.name, ctx, active)
+			) {
+				pure = false;
+				return;
+			}
+			walk(n.arguments);
+			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	walk(decl.body);
+	active.delete(name);
+	cache.set(name, pure);
+	return pure;
+}
+
+/**
+ * Top-level `function foo() {}` declarations that are never reassigned anywhere
+ * in the module, by name. A function declaration hoists to one immutable identity, so closing
+ * over it cannot make a memo region stale — unlike a module `let`, which the
+ * classifiers correctly refuse to witness. An assignment anywhere in the module
+ * (including inside a nested function that may run later) demotes the name.
+ */
+function collectImmutableModuleFunctions(body) {
+	const declared = new Map();
+	for (const statement of body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
+			declared.set(declaration.id.name, declaration);
+		}
+	}
+	if (declared.size === 0) return declared;
+	const seen = new WeakSet();
+	function walk(n) {
+		if (!n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (seen.has(n)) return;
+		seen.add(n);
+		if (n.type === 'AssignmentExpression' && n.left?.type === 'Identifier') {
+			declared.delete(n.left.name);
+		} else if (n.type === 'UpdateExpression' && n.argument?.type === 'Identifier') {
+			declared.delete(n.argument.name);
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	walk(body);
+	return declared;
 }
 
 // Conservative semantic boundary for compiler-owned component-region memoization.
@@ -5122,6 +5302,13 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			}
 		}
 	}
+	// Module-level `function foo() {}` helpers. The binding is an immutable
+	// identity for the module's lifetime, so a memo region that closes over one
+	// needs no dependency slot to witness it — the same standing the classifiers
+	// already give same-module components and `const X = memo(C)` walls. Names
+	// that are ever assigned (`foo = bar`) are excluded: their identity is then
+	// as mutable as a module `let`, which fails closed.
+	ctx.moduleFunctionDeclarations = collectImmutableModuleFunctions(ast.body);
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
 	// Client prelude `_$vtSeen()` module-load hint (view-transitions plan).
@@ -5192,7 +5379,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 				ctx.importNamespaceNames.has(name) ||
 				(!ctx.importedNames.has(name) &&
 					!ctx.defaultMemoBindings.has(name) &&
-					!ctx.componentInfo.has(name))
+					!ctx.componentInfo.has(name) &&
+					!ctx.moduleFunctionDeclarations.has(name))
 			) {
 				autoMemoCallsitesSafe = false;
 				break;
@@ -5207,7 +5395,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			(compNode.params?.length !== 1 || compNode.params[0]?.type === 'Identifier');
 		let autoMemoSafe =
 			ordinaryPropsParam &&
-			!containsRenderCall(stmts) &&
+			!containsRenderCall(stmts, ctx) &&
 			!containsAutoMemoUnsafeStructure(stmts) &&
 			!containsImportedMemberRead(root, ctx.importedNames);
 		const autoMemoCaptures = [];
@@ -5231,7 +5419,10 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 					// Immutable const wrapper; its default memo contract is the wall.
 					continue;
 				} else if (ctx.componentInfo.has(name)) autoMemoComponentDeps.push(name);
-				else {
+				else if (ctx.moduleFunctionDeclarations?.has(name)) {
+					// Immutable same-module function identity; no dependency slot needed.
+					continue;
+				} else {
 					autoMemoSafe = false;
 					break;
 				}
@@ -18418,7 +18609,7 @@ function makeCompCall(
 					ctx.currentAutoMemoCallsitesSafe !== false &&
 					callSiteOk &&
 					calleeInfo.autoMemoSafe === true &&
-					!containsRenderCall([node]) &&
+					!containsRenderCall([node], ctx) &&
 					!containsAutoMemoUnsafeStructure([node]) &&
 					!containsImportedMemberRead(node, ctx.importedNames)
 				) {
@@ -18445,7 +18636,11 @@ function makeCompCall(
 							depsSafe = false;
 						} else if (ctx.currentComponentLocals.has(name) || ctx.importedNames.has(name)) {
 							if (!callsiteDeps.coveredRoots.has(name)) deps.add(name);
-						} else if (ctx.componentInfo.has(name) || ctx.defaultMemoBindings.has(name)) {
+						} else if (
+							ctx.componentInfo.has(name) ||
+							ctx.defaultMemoBindings.has(name) ||
+							ctx.moduleFunctionDeclarations?.has(name)
+						) {
 							// Same-module FunctionDeclaration identity is immutable.
 							continue;
 						} else {
@@ -18845,13 +19040,14 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			}
 		}
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
-		// A render-time CALL disqualifies the survivor short-circuit entirely: the
-		// call can read state neither the item ref nor the deps tuple witnesses
-		// (`header.column.getIsSorted()` flips while `header` stays the memoized
-		// object), so a skipped body would render stale output — React re-runs
-		// bodies unconditionally. Property reads stay eligible (the measured
+		// A render-time call through a METHOD disqualifies the survivor
+		// short-circuit entirely: it can read state neither the item ref nor the
+		// deps tuple witnesses (`header.column.getIsSorted()` flips while `header`
+		// stays the memoized object), so a skipped body would render stale output —
+		// React re-runs bodies unconditionally. Property reads and plain-callee
+		// projections stay eligible (see plainCalleeIsMemoizable; the measured
 		// js-framework-benchmark/dbmon wins are read-only bodies).
-		const hasRenderCall = containsRenderCall(subStmts);
+		const hasRenderCall = containsRenderCall(subStmts, ctx);
 		itemMemo =
 			ctx.autoMemo === true &&
 			hasNestedComp &&
@@ -18903,7 +19099,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					if (child.autoMemoMayReadContext) itemMemoContextAware = true;
 					continue;
 				}
-				// Ambient globals and module locals are not reactive witnesses. Imported
+				if (ctx.moduleFunctionDeclarations?.has(name)) {
+					// Immutable same-module function identity; no dependency slot needed.
+					continue;
+				}
+				// Ambient globals and module `let`s are not reactive witnesses. Imported
 				// live bindings are handled above; everything else fails closed.
 				itemMemo = false;
 				break;
@@ -18923,8 +19123,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			ctx.autoMemo === true &&
 			isAutoMemoCalculationDependency(node.right) &&
 			!hasHook &&
-			!containsRenderCall(regionStmts) &&
-			!containsRenderCall(node.key ? [node.key] : []) &&
+			!containsRenderCall(regionStmts, ctx) &&
+			!containsRenderCall(node.key ? [node.key] : [], ctx) &&
 			!containsAutoMemoUnsafeStructure(regionStmts) &&
 			!containsAutoMemoUnsafeStructure(node.key ? [node.key] : []) &&
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
@@ -18956,6 +19156,14 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 						witnesses.add(witness);
 					}
 					if (child.autoMemoMayReadContext) listMayReadContext = true;
+					continue;
+				}
+				// Checked LAST, and never for a component: a same-module component is
+				// also a FunctionDeclaration, but its eligibility is decided by the
+				// branch above — an ineligible one (a context consumer, say) must fail
+				// closed here rather than be rescued as a plain helper.
+				if (ctx.moduleFunctionDeclarations?.has(name) && !ctx.componentInfo.has(name)) {
+					// Immutable same-module function identity; no dependency slot needed.
 					continue;
 				}
 				listSafe = false;
