@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { QueryClient } from '@octanejs/tanstack-query';
+import { attachRouterServerSsrUtils } from '@octanejs/tanstack-router/ssr/server';
 import { setupRouterSsrQueryIntegration } from '@octanejs/tanstack-router-ssr-query';
-import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
 import { renderToString } from 'octane/server';
 import { makeSsrRouter } from '../../tanstack-router/tests/_fixtures/ssr.tsrx';
 import { ExistingRouterWrapper, WrappedQueryReader } from './_fixtures/query-reader.tsrx';
