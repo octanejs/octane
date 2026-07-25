@@ -48,7 +48,7 @@ jobs:
       # the privileged job can only execute a release commit that passed CI.
       - name: Resolve validated SHA
         id: release
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const runId = Number(process.env.CI_RUN_ID);
@@ -151,16 +151,16 @@ jobs:
             core.info(`Publishing validated SHA ${run.head_sha} from CI run ${runId}`);
 
       - name: Checkout validated SHA
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ steps.release.outputs.sha }}
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.x
           # Do not enable dependency caching in this privileged workflow.
@@ -173,7 +173,7 @@ jobs:
 
       - name: Publish to npm
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
           publish: pnpm changeset:publish
         env:
