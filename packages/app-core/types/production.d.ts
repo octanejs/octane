@@ -29,6 +29,8 @@ export interface ServerManifest {
 	middlewares: Middleware[];
 	/** Trust X-Forwarded-* headers when deriving origin for RPC fetch */
 	trustProxy?: boolean;
+	/** Validated `module server` origin and body-size policy. */
+	rpc?: Partial<ResolvedOctaneConfig['server']['rpc']>;
 	/** 'streaming' (default) renders via renderToReadableStream; 'buffered' awaits everything via prerender */
 	render?: 'streaming' | 'buffered';
 	/** Resolved server-compiled global boundary components. */

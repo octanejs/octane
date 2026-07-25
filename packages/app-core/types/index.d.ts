@@ -1,4 +1,5 @@
 import type { RuntimePrimitives } from '@ripple-ts/adapter';
+import type { AsyncContext } from '@ripple-ts/adapter/rpc';
 
 // ============================================================================
 // Shared app/config exports
@@ -137,6 +138,21 @@ export function handleServerRoute(
 	globalMiddlewares: Middleware[],
 ): Promise<Response>;
 export function is_rpc_request(pathname: string): boolean;
+
+/** Security policy and execution dependencies for a server-function request. */
+export interface RpcRequestOptions {
+	resolveFunction: (hash: string) => Function | null | Promise<Function | null>;
+	executeServerFunction: (fn: Function, body: string) => Promise<string>;
+	asyncContext: AsyncContext<{ origin?: string; platform?: unknown }>;
+	trustProxy?: boolean;
+	middlewares?: Middleware[];
+	allowedOrigins?: readonly string[];
+	maxBodyBytes?: number;
+	platform?: unknown;
+}
+
+/** Apply Octane's security policy and global middleware to a server function. */
+export function handleRpcRequest(request: Request, options: RpcRequestOptions): Promise<Response>;
 
 // ============================================================================
 // Configuration
@@ -339,6 +355,13 @@ export interface OctaneConfigOptions {
 		 * @default false
 		 */
 		trustProxy?: boolean;
+		/** Security policy for compiler-generated `module server` requests. */
+		rpc?: {
+			/** Additional exact HTTP(S) origins permitted to call server functions. */
+			allowedOrigins?: string[];
+			/** Maximum encoded request size in bytes. @default 1048576 */
+			maxBodyBytes?: number;
+		};
 		/**
 		 * Production SSR mode: 'streaming' (default) flushes the shell at
 		 * first await and streams suspense segments out-of-order (same engine
@@ -378,6 +401,12 @@ export interface ResolvedOctaneConfig {
 	server: {
 		/** @default false */
 		trustProxy: boolean;
+		rpc: {
+			/** Additional normalized HTTP(S) origins. @default [] */
+			allowedOrigins: string[];
+			/** Maximum encoded request size in bytes. @default 1048576 */
+			maxBodyBytes: number;
+		};
 		/** @default 'streaming' */
 		render: 'streaming' | 'buffered';
 	};

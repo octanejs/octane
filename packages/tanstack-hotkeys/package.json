@@ -29,6 +29,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "vitest run --project tanstack-hotkeys",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
   "dependencies": {
     "@tanstack/hotkeys": "0.8.0"
   },

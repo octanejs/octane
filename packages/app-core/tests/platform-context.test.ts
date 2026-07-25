@@ -107,7 +107,8 @@ describe('request platform context', () => {
 		const rpcRequest = () =>
 			new Request('https://octane.test/_$_ripple_rpc_$_/00000000', {
 				method: 'POST',
-				body: '{}',
+				headers: { 'Content-Type': 'application/json' },
+				body: '[]',
 			});
 		const [first, second] = await Promise.all([
 			handler(rpcRequest(), { env: { binding: 'alpha' } }),

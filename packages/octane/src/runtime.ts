@@ -11033,7 +11033,9 @@ const DELEGATED_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched');
 const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
 
 // Invoke one event slot — a bare handler `fn(event)` or a nominal `{ fn, args }` bundle
-// (the compiler's stable-arrow optimisation) as `fn(...args, event)`.
+// (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
+// arrow never observes its native event, so forwarding that event to its callee
+// would change the authored callback's argument list.
 //
 // GUARDED like the platform guards each listener invocation: a throwing handler
 // (or a non-function listener value that arrived through a spread/prop) reports
@@ -11056,16 +11058,16 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 			const a = bundle.args;
 			switch (a.length) {
 				case 0:
-					bundle.fn(event);
+					bundle.fn();
 					break;
 				case 1:
-					bundle.fn(a[0], event);
+					bundle.fn(a[0]);
 					break;
 				case 2:
-					bundle.fn(a[0], a[1], event);
+					bundle.fn(a[0], a[1]);
 					break;
 				default:
-					bundle.fn.apply(null, a.concat(event));
+					bundle.fn.apply(null, a);
 			}
 			return;
 		}

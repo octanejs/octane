@@ -49,3 +49,63 @@ describe('adapter server targets', () => {
 		).toThrow("adapter.serverTarget must be 'node' or 'webworker'");
 	});
 });
+
+describe('server-function security configuration', () => {
+	it('defaults to a one-mebibyte same-origin request policy', () => {
+		expect(resolveOctaneConfig({}).server.rpc).toEqual({
+			allowedOrigins: [],
+			maxBodyBytes: 1_048_576,
+		});
+	});
+
+	it('normalizes configured additional browser origins', () => {
+		expect(
+			resolveOctaneConfig({
+				server: {
+					rpc: {
+						allowedOrigins: ['HTTPS://Trusted.Octane.Test:443'],
+						maxBodyBytes: 4096,
+					},
+				},
+			}).server.rpc,
+		).toEqual({
+			allowedOrigins: ['https://trusted.octane.test'],
+			maxBodyBytes: 4096,
+		});
+	});
+
+	it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+		'rejects the invalid maximum request size %s',
+		(maxBodyBytes) => {
+			expect(() => resolveOctaneConfig({ server: { rpc: { maxBodyBytes } } })).toThrow(
+				'server.rpc.maxBodyBytes must be a positive safe integer',
+			);
+		},
+	);
+
+	it.each([
+		'*',
+		'null',
+		'http://trusted.octane.test/path',
+		'https://trusted.octane.test?token=secret',
+		'https://user:password@trusted.octane.test',
+		'file:///tmp/action',
+	])('rejects the unsafe allowed origin %s', (origin) => {
+		expect(() => resolveOctaneConfig({ server: { rpc: { allowedOrigins: [origin] } } })).toThrow(
+			'server.rpc.allowedOrigins must contain only HTTP or HTTPS origins',
+		);
+	});
+
+	it('rejects a non-array origin allowlist', () => {
+		expect(() =>
+			resolveOctaneConfig({
+				server: {
+					rpc: {
+						// @ts-expect-error JavaScript configuration still receives runtime validation.
+						allowedOrigins: 'https://trusted.octane.test',
+					},
+				},
+			}),
+		).toThrow('server.rpc.allowedOrigins must be an array');
+	});
+});

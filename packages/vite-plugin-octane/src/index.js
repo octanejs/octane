@@ -9,6 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 
 import { octane as octaneCompiler } from 'octane/compiler/vite';
+import { handleRpcRequest as handleServerRpcRequest } from '@octanejs/app-core';
 
 import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
@@ -35,7 +36,7 @@ import {
 } from './project-codegen.js';
 import { createClientAssetMap } from './client-assets.js';
 
-import { patch_global_fetch, is_rpc_request, handle_rpc_request } from '@ripple-ts/adapter/rpc';
+import { patch_global_fetch, is_rpc_request } from '@ripple-ts/adapter/rpc';
 
 import { get_route_entry_path } from './routes.js';
 
@@ -52,6 +53,7 @@ export {
 	get_route_entry_export_name,
 	get_route_entry_id,
 	get_route_entry_path,
+	handleRpcRequest,
 	handleServerRoute,
 	is_rpc_request,
 	runMiddlewareChain,
@@ -956,7 +958,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 		const webRequest = nodeRequestToWebRequest(req);
 		const asyncContext = getDevAsyncContext(config);
 
-		const response = await handle_rpc_request(webRequest, {
+		const response = await handleServerRpcRequest(webRequest, {
 			async resolveFunction(hash) {
 				const rpcModules = /** @type {any} */ (globalThis).rpc_modules;
 				if (!rpcModules) return null;
@@ -974,6 +976,9 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 			},
 			asyncContext,
 			trustProxy,
+			middlewares: config?.middlewares ?? [],
+			allowedOrigins: config?.server?.rpc?.allowedOrigins,
+			maxBodyBytes: config?.server?.rpc?.maxBodyBytes,
 		});
 
 		await sendWebResponse(res, response);
@@ -981,7 +986,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 		console.error('[@octanejs/vite-plugin] RPC error:', error);
 		res.statusCode = 500;
 		res.setHeader('Content-Type', 'application/json');
-		res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'RPC failed' }));
+		res.end(JSON.stringify({ error: 'Internal Server Error' }));
 	}
 }
 

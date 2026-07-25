@@ -24,6 +24,7 @@
 
 import { createRouter } from './router.js';
 import { createContext, runMiddlewareChain } from './middleware.js';
+import { handleRpcRequest } from './rpc.js';
 import { handleServerRoute } from './server-route.js';
 import { composeHtmlStream } from './html-stream.js';
 import {
@@ -48,12 +49,7 @@ import {
 	get_route_entry_export_name,
 	get_route_entry_path,
 } from '../routes.js';
-import {
-	patch_global_fetch,
-	build_rpc_lookup,
-	is_rpc_request,
-	handle_rpc_request,
-} from '@ripple-ts/adapter/rpc';
+import { patch_global_fetch, build_rpc_lookup, is_rpc_request } from '@ripple-ts/adapter/rpc';
 
 export { resolveOctaneConfig } from '../resolve-config.js';
 
@@ -127,6 +123,7 @@ export function createHandler(manifest, deps) {
 	const router = createRouter(manifest.routes);
 	const globalMiddlewares = manifest.middlewares ?? [];
 	const trustProxy = manifest.trustProxy ?? false;
+	const rpcPolicy = manifest.rpc;
 	const runtime = manifest.runtime;
 	validateSsrTemplate(htmlTemplate);
 	// Also pin the built-template contract up front. The marker is emitted by
@@ -158,17 +155,7 @@ export function createHandler(manifest, deps) {
 					headers: { 'Content-Type': 'application/json' },
 				});
 			}
-			/** @type {import('@ripple-ts/adapter/rpc').AsyncContext<{ origin?: string, platform?: unknown }>} */
-			const requestAsyncContext =
-				platform === undefined
-					? asyncContext
-					: {
-							run(store, fn) {
-								return asyncContext.run({ ...store, platform }, fn);
-							},
-							getStore: () => asyncContext.getStore(),
-						};
-			return handle_rpc_request(request, {
+			return handleRpcRequest(request, {
 				resolveFunction(/** @type {string} */ hash) {
 					const entry = rpcLookup.get(hash);
 					if (!entry) return null;
@@ -176,8 +163,12 @@ export function createHandler(manifest, deps) {
 					return typeof fn === 'function' ? fn : null;
 				},
 				executeServerFunction,
-				asyncContext: requestAsyncContext,
+				asyncContext,
 				trustProxy,
+				middlewares: globalMiddlewares,
+				allowedOrigins: rpcPolicy?.allowedOrigins,
+				maxBodyBytes: rpcPolicy?.maxBodyBytes,
+				platform,
 			});
 		}
 

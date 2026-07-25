@@ -43,6 +43,10 @@
     "./types": "./src/types/index.ts",
     "./utils": "./src/utils/index.ts"
   },
+  "scripts": {
+    "test": "vitest run --project tanstack-pacer",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
   "dependencies": {
     "@tanstack/pacer": "0.21.1"
   },

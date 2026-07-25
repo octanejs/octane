@@ -56,6 +56,7 @@ async function callRpc(handler: ReturnType<typeof makeHandler>) {
 	const response = await handler(
 		new Request('http://octane.test/_$_ripple_rpc_$_/deadbeef', {
 			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
 			body: '[]',
 		}),
 	);

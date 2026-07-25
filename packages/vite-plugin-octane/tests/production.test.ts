@@ -626,6 +626,87 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		expect(encoded[encoded[0].value]).toBe('rpc:dev');
 	});
 
+	it('enforces the same server-function security policy in dev and production', async () => {
+		await fetch(devOrigin + '/');
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
+		const cases: Array<{
+			name: string;
+			method: string;
+			headers: HeadersInit;
+			body?: string;
+			status: number;
+		}> = [
+			{
+				name: 'non-POST request',
+				method: 'GET',
+				headers: {},
+				status: 405,
+			},
+			{
+				name: 'non-JSON content type',
+				method: 'POST',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '[[1],"invalid"]',
+				status: 415,
+			},
+			{
+				name: 'cross-origin request',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Origin: 'https://attacker.test',
+				},
+				body: '[[1],"invalid"]',
+				status: 403,
+			},
+			{
+				name: 'malformed JSON',
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '{',
+				status: 400,
+			},
+			{
+				name: 'application authorization rejection',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'x-fixture-rpc-authorization': 'deny',
+				},
+				body: '[[1],"unauthorized"]',
+				status: 401,
+			},
+		];
+
+		for (const target of [
+			{
+				name: 'development',
+				origin: devOrigin,
+				handle: (request: Request) => fetch(request),
+			},
+			{
+				name: 'production',
+				origin: productionOrigin,
+				handle: (request: Request) => handler(request),
+			},
+		]) {
+			for (const scenario of cases) {
+				const response = await target.handle(
+					new Request(`${target.origin}/_$_ripple_rpc_$_/${hash}`, {
+						method: scenario.method,
+						headers: scenario.headers,
+						...(scenario.body === undefined ? {} : { body: scenario.body }),
+					}),
+				);
+				expect(response.status, `${target.name}: ${scenario.name}`).toBe(scenario.status);
+				if (scenario.status === 405) {
+					expect(response.headers.get('allow'), target.name).toBe('POST');
+				}
+			}
+		}
+	});
+
 	it('nodeHandler bridges the same handler for Node-style serverless wrappers', async () => {
 		const { nodeHandler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 		const chunks: Buffer[] = [];

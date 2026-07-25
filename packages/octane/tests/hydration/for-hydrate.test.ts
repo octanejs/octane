@@ -62,10 +62,7 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 		// Per-item handler attached to the adopted button → fires with the row id.
 		const betaPick = rows[1].querySelector('button.pick') as HTMLButtonElement;
 		flushSync(() => betaPick.click());
-		expect(onPick).toHaveBeenCalledTimes(1);
-		// octane's per-row event-bundle optimization calls fn(...args, event),
-		// so the row id is the first argument.
-		expect(onPick.mock.calls[0][0]).toBe(2);
+		expect(onPick).toHaveBeenCalledExactlyOnceWith(2);
 		root.unmount();
 	});
 

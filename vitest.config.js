@@ -604,6 +604,53 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-hotkeys',
+					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-hotkeys$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-hotkeys/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-pacer',
+					include: ['packages/tanstack-pacer/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-pacer$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
+							replacement:
+								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-store',
 					include: [
 						'packages/tanstack-store/tests/conformance/**/*.test.ts',
@@ -1398,6 +1445,38 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-router\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query',
+					include: ['packages/tanstack-router-ssr-query/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router-ssr-query$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-router-ssr-query/src/index.tsrx',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
 						},
 					],
 				},

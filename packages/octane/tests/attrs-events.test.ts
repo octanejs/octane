@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
 import { mount } from './_helpers';
+import { BoundEventArguments } from './_fixtures/attrs-event-arguments';
 import {
 	Classed,
 	WithAttrs,
@@ -204,6 +205,27 @@ describe('events + useState', () => {
 		r.click('button');
 		r.click('button');
 		expect(r.find('button').textContent).toBe('2');
+		r.unmount();
+	});
+
+	it('preserves authored argument lists for bound and direct native event handlers', () => {
+		const calls: unknown[][] = [];
+		const onCall = (...args: unknown[]) => calls.push(args);
+		const r = mount(BoundEventArguments, { value: 'first', onCall });
+
+		r.click('#bound-none');
+		r.click('#bound-one');
+		r.click('#bound-two');
+		r.click('#bound-three');
+		expect(calls).toEqual([[], ['first'], ['first', 'second'], ['first', 'second', 'third']]);
+
+		r.update(BoundEventArguments, { value: 'latest', onCall });
+		r.click('#bound-one');
+		expect(calls[4]).toEqual(['latest']);
+
+		r.click('#direct-native');
+		expect(calls[5]).toHaveLength(1);
+		expect(calls[5][0]).toBeInstanceOf(Event);
 		r.unmount();
 	});
 
