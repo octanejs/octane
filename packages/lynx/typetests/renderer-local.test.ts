@@ -57,6 +57,7 @@ type _BuiltInsRemainExplicit = Assert<
 
 const viewProps: RendererElements['view'] = {
 	className: 'card',
+	'lynx-test-tag': 'account-card',
 	ref(handle) {
 		const generation: number | undefined = handle?.generation;
 		return () => void generation;

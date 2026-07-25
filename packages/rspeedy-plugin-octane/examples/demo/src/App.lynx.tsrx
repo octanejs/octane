@@ -4,7 +4,7 @@ import { useState } from 'octane';
 export function App() @{
 	const [count, setCount] = useState(0);
 
-	<view id="octane-lynx-demo" class="demo-page">
+	<view id="octane-lynx-demo" lynx-test-tag="octane-lynx-demo" class="demo-page">
 		<view class="hero-card">
 			<text class="eyebrow">{'OCTANE + LYNX'}</text>
 			<text class="headline">{'Compiled components. Native canvas.'}</text>
@@ -15,9 +15,12 @@ export function App() @{
 
 		<view class="counter-card">
 			<text class="counter-label">{'NATIVE TAP COUNTER'}</text>
-			<text id="octane-demo-count" class="counter-value">{'Count ' + count}</text>
+			<text id="octane-demo-count" lynx-test-tag="octane-demo-count" class="counter-value">
+				{'Count ' + count}
+			</text>
 			<view
 				id="octane-demo-increment"
+				lynx-test-tag="octane-demo-increment"
 				class="increment-button"
 				bindtap={() => setCount((value) => value + 1)}
 			>

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-23",
+  "scope": "One qualified first-paint run of the Octane demo in the official Lynx 3.9.0 macOS Explorer. This is not Android, iOS, interaction, identity, lifecycle-update, list, Native Module, or performance evidence.",
+  "executionHost": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "productVersion": "26.5.2",
+    "buildVersion": "25F84",
+    "node": "v24.18.0"
+  },
+  "explorer": {
+    "release": "3.9.0",
+    "releaseUrl": "https://github.com/lynx-family/lynx/releases/tag/3.9.0",
+    "asset": "LynxExplorer-macos-arm64.app.tar.gz",
+    "assetUrl": "https://github.com/lynx-family/lynx/releases/download/3.9.0/LynxExplorer-macos-arm64.app.tar.gz",
+    "bytes": 17072100,
+    "sha256": "e540f6b30334e511d1fa2438864fda821fb8ed7ec2a543e57bd8d53f113ebd3e",
+    "bundleIdentifier": "com.lynx.Explorer.LynxExplorer",
+    "launchArgument": "--url=http://127.0.0.1:<isolated-port>/main.lynx.bundle",
+    "signatureQualification": "The release archive matched the committed SHA-256 digest. codesign --verify --deep --strict reported a sealed-resource mismatch in the upstream app archive, so the checksum-pinned app executable was launched directly."
+  },
+  "repositoryCommand": {
+    "command": "pnpm lynx:demo:native",
+    "behavior": "Select the architecture-specific asset, verify and cache its archive, create an isolated per-run extraction, start the Rspeedy demo on a strict port, validate main.lynx.bundle, launch Explorer with --url, and forward shutdown to both process groups before removing the extraction.",
+    "networkFreeOverride": "OCTANE_LYNX_EXPLORER_EXECUTABLE"
+  },
+  "observations": {
+    "visibleText": [
+      "OCTANE + LYNX",
+      "Compiled components. Native canvas.",
+      "Count 0",
+      "Tap to increment"
+    ],
+    "logMarkers": [
+      "App Bundle's engine version: 3.9, lynx sdk version:3.9",
+      "ElementManager::OnPatchFinishForFiber WithPatch!",
+      "EventTarget::DispatchEvent name: __OnAppFirstScreen",
+      "EventTarget::DispatchEvent name: octane-lynx:background-to-main",
+      "EventTarget::DispatchEvent name: octane-lynx:main-to-background"
+    ],
+    "absentOctaneFailures": [
+      "processData is not a function",
+      "Octane Lynx requires __CreateList, __UpdateListCallbacks, and __UpdateListComponents",
+      "Octane Lynx roots are available only in the Lynx background runtime"
+    ]
+  },
+  "gates": {
+    "officialMacosExplorerFirstPaint": "passed",
+    "mainAndBackgroundProgramsObserved": "passed",
+    "octaneRuntimeExceptionObserved": false,
+    "duplicateVisibleTreeObserved": false,
+    "nativeTapCountZeroToOne": "not-run",
+    "reasonNativeTapNotRun": "Synthetic pointer input required macOS accessibility permission, which was not granted for this evidence capture.",
+    "adoptedNativeNodeIdentity": "not-measured",
+    "android": "not-run",
+    "ios": "not-run"
+  }
+}

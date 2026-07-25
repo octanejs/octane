@@ -1,4 +1,5 @@
 import { useLayoutEffect, useSyncExternalStore, withSlot } from 'octane/universal/native';
+import { readLynxEnvironment, readNativeModulesEnvironment } from './core/environment.js';
 
 /** Runtime names used by the Rspeedy main/background specialization. */
 export type LynxRuntime = 'background' | 'main-thread';
@@ -75,11 +76,6 @@ export interface LynxReportErrorOptions {
 	readonly level?: 'error' | 'warning';
 }
 
-interface LynxPlatformGlobals {
-	readonly lynx?: unknown;
-	readonly NativeModules?: unknown;
-}
-
 interface PlatformDataStore<Data extends object> {
 	readonly getSnapshot: () => Data;
 	readonly subscribe: (listener: () => void) => () => void;
@@ -97,12 +93,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function readPlatformGlobals(): LynxPlatformGlobals {
-	return globalThis as unknown as LynxPlatformGlobals;
-}
-
 function readBackgroundLynx(): Lynx {
-	const candidate = readPlatformGlobals().lynx;
+	const candidate = readLynxEnvironment();
 	if (
 		!isObject(candidate) ||
 		typeof (candidate as unknown as { getJSModule?: unknown }).getJSModule !== 'function'
@@ -280,7 +272,7 @@ export function getLynx(): Lynx {
 /** Return the existing background-thread Native Modules registry. */
 export function getNativeModules(): NativeModules {
 	readBackgroundLynx();
-	const modules = readPlatformGlobals().NativeModules;
+	const modules = readNativeModulesEnvironment();
 	if (!isObject(modules)) {
 		throw new Error('Octane Lynx could not find the background-thread NativeModules global.');
 	}

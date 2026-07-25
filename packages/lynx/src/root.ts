@@ -17,6 +17,7 @@ import { prepareLynxBackgroundLifecycleReceiver } from './core/background-lifecy
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
 import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
+import { readAmbientQueueMicrotask, readLynxEnvironment } from './core/environment.js';
 import {
 	createLynxBackgroundFunctionRegistry,
 	installBackgroundCallBridge,
@@ -36,7 +37,7 @@ interface LynxBackgroundGlobals {
 }
 
 export interface CreateLynxRootOptions {
-	/** Background-thread global object. Defaults to the current global object. */
+	/** Background-thread global object. Defaults to the current Lynx wrapper environment. */
 	readonly target?: object;
 	/** Explicit public ContextProxy, primarily for framework bootstrap and tests. */
 	readonly context?: LynxContextProxy;
@@ -69,6 +70,15 @@ function readBackgroundGlobals(target: object): LynxBackgroundGlobals {
 		throw new Error('Octane Lynx roots are available only in the Lynx background runtime.');
 	}
 	return globals;
+}
+
+function defaultBackgroundTarget(): object {
+	const lynx = readLynxEnvironment();
+	if (lynx === undefined) return globalThis;
+	return {
+		lynx,
+		queueMicrotask: readAmbientQueueMicrotask(),
+	};
 }
 
 function resolveContext(
@@ -143,7 +153,7 @@ function batchBackgroundExecutionIds(batch: UniversalHostBatch): Set<string> {
 
 /** Create one background-owned root and its isolated async transport state. */
 export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
-	const target = readBackgroundGlobals(options.target ?? globalThis);
+	const target = readBackgroundGlobals(options.target ?? defaultBackgroundTarget());
 	const context = resolveContext(target, options.context);
 	const scheduleMicrotask = resolveMicrotaskScheduler(target, options.scheduleMicrotask);
 	const createSelectorQuery = target.lynx?.createSelectorQuery;

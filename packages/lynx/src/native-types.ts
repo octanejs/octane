@@ -208,6 +208,7 @@ export interface LynxStyleProperties {
 
 export type LynxStandardProps = LynxStandardEventProps & {
 	id?: string;
+	'lynx-test-tag'?: string;
 	className?: LynxClassValue;
 	class?: LynxClassValue;
 	hidden?: boolean;
