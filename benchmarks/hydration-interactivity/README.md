@@ -2,14 +2,15 @@
 
 A production-built, six-framework comparison of what users can actually do with
 server-rendered HTML while client-side hydration is still blocked. Playwright
-types into a real Chromium input before the hydration chunk is released, then
-verifies DOM adoption, preserved text, focus, caret position, live component
-state, and exactly-once interaction replay.
+types into a real Chromium search input, clicks Send before the hydration chunk
+is released, and verifies DOM adoption, preserved text, focus, caret position,
+live component state, event replay, and whether the exact search query was
+actually delivered exactly once.
 
 | target | production renderer |
 | --- | --- |
 | `octane-tsrx` | Octane SSR, compiler-owned hydration, and the public lightweight early-capture bootstrap |
-| `react` | React 19 `react-dom/server` and `react-dom/client` |
+| `react` | React 19 `react-dom/server`, `react-dom/client`, and real Suspense-boundary event replay |
 | `preact` | native Preact, `preact-render-to-string`, and `preact/compat` flushing |
 | `solid` | Solid 2.0 beta, `@solidjs/web`, and the real Solid hydration script |
 | `svelte` | Svelte 5 server rendering, runes, and strict public hydration |
@@ -41,10 +42,22 @@ uses a sleep as a hydration gate.
   hydration chunk is blocked. Octane's public `interaction()` boundary and
   `initializeHydrationEventCapture()` must replay the click exactly once after
   hydration. Solid 2.0's real server hydration script must also replay the click
-  exactly once. The remaining reference frameworks use their real pre-root
-  behavior: no synthetic early-capture shim is installed and no replay
-  capability is claimed. Every target must process the next real post-hydration
-  click exactly once.
+  exactly once. React installs its actual `hydrateRoot` listeners before the
+  click, leaves a server-rendered Suspense boundary dehydrated until the blocked
+  component chunk arrives, and must replay the native focus event from that
+  exact same user interaction. React 19 cannot replay the blocked discrete click
+  after its lazy component has resolved, so focus and click replay are reported
+  separately rather than incorrectly crediting React with pre-root capture or
+  deferred click replay. The remaining frameworks use their real pre-root
+  behavior without a synthetic early-capture shim. Every target must process
+  the next real post-hydration click exactly once.
+- `search_send_6x_*`: type a real search query into the controlled, still
+  server-rendered search box, click Send before its hydration chunk is
+  released, and report whether hydration preserves the query, replays the
+  discrete click, and submits the exact original query exactly once. Missing
+  replay, overwritten query text, and an incorrect submitted value are recorded
+  explicitly as correctness issues; Octane fails the suite if it loses the
+  query or Send intent.
 
 The typing operations separately report first-character latency, the time to
 type the complete draft, chunk-release-to-hydration latency, synchronous
@@ -67,9 +80,12 @@ A timing is accepted only if the harness proves all of the following:
   visible application state;
 - the page contains exactly 180 correctly adopted article cards;
 - hydration completes exactly once without browser or hydration errors;
-- Octane and Solid 2.0 replay the deferred pre-root click exactly once through
-  their genuine framework mechanisms, while other targets are not incorrectly
-  credited with an unsupported replay; and
+- typing a search and clicking Send before hydration either delivers the exact
+  original query once or appears explicitly as a replay correctness issue;
+- Octane and Solid 2.0 replay the deferred pre-root click exactly once, React
+  replays the associated focus event exactly once through its genuine
+  dehydrated boundary, and remaining targets are not credited with unsupported
+  replay behavior; and
 - every target handles the next actual click exactly once.
 
 A failed gate writes a `failed` result and exits nonzero, matching the unified

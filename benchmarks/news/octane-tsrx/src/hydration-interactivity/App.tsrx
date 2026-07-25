@@ -10,22 +10,40 @@ type HydrationBenchmarkProps = {
 function Editor(props: HydrationBenchmarkProps) @{
 	const [draft, setDraft] = useState(INITIAL_VALUE);
 	const [clicks, setClicks] = useState(0);
+	const [focuses, setFocuses] = useState(0);
+	const [submitted, setSubmitted] = useState(INITIAL_VALUE);
 	const onInput = (event: Event) => setDraft((event.currentTarget as HTMLInputElement).value);
+	const onSend = () => {
+		const input = document.querySelector<HTMLInputElement>('#hydration-input');
+		const query = input?.value ?? INITIAL_VALUE;
+		setDraft(query);
+		setSubmitted(query);
+		setClicks(clicks + 1);
+	};
 
 	<section class="hydration-editor">
-		<label for="hydration-input">{'Your draft'}</label>
+		<label for="hydration-input">{'Search query'}</label>
 		@if (props.controlled) {
-			<input id="hydration-input" autocomplete="off" value={draft} onInput={onInput} />
+			<input
+				id="hydration-input"
+				type="search"
+				autocomplete="off"
+				value={draft}
+				onInput={onInput}
+			/>
 		} @else {
-			<input id="hydration-input" autocomplete="off" onInput={onInput} />
+			<input id="hydration-input" type="search" autocomplete="off" onInput={onInput} />
 		}
 		<output id="hydration-output">{draft as string}</output>
 		<button
 			id="hydration-action"
 			type="button"
-			onClick={() => setClicks(clicks + 1)}
-		>{'Record interaction'}</button>
+			onClick={onSend}
+			onFocus={() => setFocuses(focuses + 1)}
+		>{'Send search'}</button>
 		<output id="hydration-clicks">{String(clicks) as string}</output>
+		<output id="hydration-focuses">{String(focuses) as string}</output>
+		<output id="hydration-submitted">{submitted as string}</output>
 	</section>
 }
 

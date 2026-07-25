@@ -19,6 +19,7 @@ export function startHydrationBootstrap(loadClient, initializeCapture) {
 		hydrationStartedAt: 0,
 		hydratedAt: 0,
 		hydrationCalls: 0,
+		replayRootInitializedAt: 0,
 		inputAttemptAt: 0,
 		firstNativeInputAt: 0,
 		nativeInputCount: 0,

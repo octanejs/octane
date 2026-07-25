@@ -1,3 +1,13 @@
-import { startHydrationBootstrap } from '../../../../hydration-interactivity/shared.js';
+import {
+	hydrationProps,
+	startHydrationBootstrap,
+} from '../../../../hydration-interactivity/shared.js';
 
-startHydrationBootstrap(() => import('./hydration-client.js'));
+startHydrationBootstrap(async () => {
+	if (hydrationProps().deferred) {
+		const { initializeReactReplayRoot } = await import('./replay-root.js');
+		initializeReactReplayRoot();
+	}
+
+	return import('./hydration-client.js');
+});

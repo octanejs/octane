@@ -21,6 +21,7 @@ const noBuild = args.includes('--no-build');
 const positional = args.filter((value) => !value.startsWith('--'));
 const target = TARGETS.includes(positional[0]) ? positional.shift() : 'octane-tsrx';
 const supportsPreRootInteractionReplay = target === 'octane-tsrx' || target === 'solid';
+const supportsHydrationEventReplay = supportsPreRootInteractionReplay || target === 'react';
 const iterations = Number.parseInt(positional[0] ?? '5', 10);
 const warmup = 1;
 
@@ -181,13 +182,21 @@ async function openSample({ cpuRate, controlled = false, interaction = false }) 
 	return { clientGate, context, failures, page };
 }
 
-async function releaseHydration(sample) {
+async function releaseHydration(sample, expectedClicks = 0, expectedFocuses = 0) {
 	const releasedAt = await sample.page.evaluate(() => performance.now());
 	sample.clientGate.open();
 	await sample.page.waitForFunction(() => {
 		const state = window.__hydrationInteractivity;
 		return state?.hydratedAt > 0 || Boolean(state?.error);
 	});
+	if (expectedClicks > 0 || expectedFocuses > 0) {
+		await sample.page.waitForFunction(
+			({ clicks, focuses }) =>
+				Number(document.querySelector('#hydration-clicks')?.textContent) === clicks &&
+				Number(document.querySelector('#hydration-focuses')?.textContent) === focuses,
+			{ clicks: expectedClicks, focuses: expectedFocuses },
+		);
+	}
 
 	const snapshot = await sample.page.evaluate(() => {
 		const state = window.__hydrationInteractivity;
@@ -203,6 +212,7 @@ async function releaseHydration(sample) {
 			).join('\u001e'),
 			cardSame: document.querySelector('#hydration-cards > li') === state.originalCard,
 			clicks: Number(document.querySelector('#hydration-clicks')?.textContent),
+			focuses: Number(document.querySelector('#hydration-focuses')?.textContent),
 			error: state.error,
 			focused: document.activeElement === input,
 			hydratedAt: state.hydratedAt,
@@ -212,6 +222,7 @@ async function releaseHydration(sample) {
 			nativeInputCount: state.nativeInputCount,
 			selectionEnd: input?.selectionEnd,
 			selectionStart: input?.selectionStart,
+			submitted: document.querySelector('#hydration-submitted')?.textContent,
 			value: input?.value,
 		};
 	});
@@ -339,16 +350,30 @@ async function runReplaySample() {
 		await button.click();
 		const before = await sample.page.evaluate(() => ({
 			clicks: Number(document.querySelector('#hydration-clicks')?.textContent),
+			focuses: Number(document.querySelector('#hydration-focuses')?.textContent),
 			hydrationCalls: window.__hydrationInteractivity.hydrationCalls,
+			replayRootInitializedAt: window.__hydrationInteractivity.replayRootInitializedAt,
 		}));
 		ensure(before.clicks === 0, 'the delayed client handled a click before hydration');
+		ensure(before.focuses === 0, 'the delayed client handled focus before hydration');
 		ensure(before.hydrationCalls === 0, 'the interaction bypassed the withheld client chunk');
+		if (target === 'react') {
+			ensure(
+				before.replayRootInitializedAt > 0,
+				'React did not install its real selective-hydration replay root',
+			);
+		}
 
-		const hydrated = await releaseHydration(sample);
 		const expectedReplay = supportsPreRootInteractionReplay ? 1 : 0;
+		const expectedFocusReplay = target === 'react' ? 1 : 0;
+		const hydrated = await releaseHydration(sample, expectedReplay, expectedFocusReplay);
 		ensure(
 			hydrated.clicks === expectedReplay,
 			`expected ${expectedReplay} replayed clicks, observed ${hydrated.clicks}`,
+		);
+		ensure(
+			hydrated.focuses === expectedFocusReplay,
+			`expected ${expectedFocusReplay} replayed focus events, observed ${hydrated.focuses}`,
 		);
 		const actionSame = await sample.page.evaluate(
 			() =>
@@ -368,6 +393,106 @@ async function runReplaySample() {
 			hydration: hydrated.hydratedAt - hydrated.releasedAt,
 			interactionToHydration: hydrated.hydratedAt - clickedAt,
 			replayedClicks: expectedReplay,
+			replayedFocusEvents: expectedFocusReplay,
+		};
+	} finally {
+		await closeSample(sample);
+	}
+}
+
+async function runSearchAndSendSample() {
+	const sample = await openSample({ cpuRate: 6, controlled: true, interaction: true });
+	try {
+		const input = sample.page.locator('#hydration-input');
+		const button = sample.page.locator('#hydration-action');
+		await input.click();
+		const typingStartedAt = await sample.page.evaluate(() => {
+			window.__hydrationInteractivity.inputAttemptAt = performance.now();
+			return window.__hydrationInteractivity.inputAttemptAt;
+		});
+		await input.pressSequentially(PRE_HYDRATION_TEXT);
+
+		const typed = await sample.page.evaluate(() => ({
+			completedAt: performance.now(),
+			firstNativeInputAt: window.__hydrationInteractivity.firstNativeInputAt,
+			hydrationCalls: window.__hydrationInteractivity.hydrationCalls,
+			value: document.querySelector('#hydration-input')?.value,
+		}));
+		ensure(typed.value === PRE_HYDRATION_TEXT, 'search typing lost characters before Send');
+		ensure(typed.hydrationCalls === 0, 'search hydrated before the withheld chunk was released');
+		ensure(typed.firstNativeInputAt > 0, 'search typing did not produce native input events');
+
+		const clickedAt = await sample.page.evaluate(() => performance.now());
+		await button.click();
+		const before = await sample.page.evaluate(() => ({
+			clicks: Number(document.querySelector('#hydration-clicks')?.textContent),
+			focuses: Number(document.querySelector('#hydration-focuses')?.textContent),
+			hydrationCalls: window.__hydrationInteractivity.hydrationCalls,
+			replayRootInitializedAt: window.__hydrationInteractivity.replayRootInitializedAt,
+			submitted: document.querySelector('#hydration-submitted')?.textContent,
+			value: document.querySelector('#hydration-input')?.value,
+		}));
+		ensure(before.value === PRE_HYDRATION_TEXT, 'clicking Send discarded the search query');
+		ensure(before.clicks === 0, 'Send executed before the hydration chunk was released');
+		ensure(before.focuses === 0, 'the Send focus executed before the hydration chunk was released');
+		ensure(before.hydrationCalls === 0, 'Send bypassed the withheld hydration chunk');
+		ensure(before.submitted === '', 'the query was submitted before hydration');
+		if (target === 'react') {
+			ensure(
+				before.replayRootInitializedAt > 0,
+				'React did not install its real selective-hydration replay root',
+			);
+		}
+
+		const expectedClicks = supportsPreRootInteractionReplay ? 1 : 0;
+		const expectedFocuses = target === 'react' ? 1 : 0;
+		const hydrated = await releaseHydration(sample, expectedClicks, expectedFocuses);
+		ensure(
+			hydrated.nativeInputCount === PRE_HYDRATION_TEXT.length,
+			`expected ${PRE_HYDRATION_TEXT.length} native search events, received ${hydrated.nativeInputCount}`,
+		);
+		ensure(
+			hydrated.clicks === expectedClicks,
+			`expected ${expectedClicks} replayed Send clicks, observed ${hydrated.clicks}`,
+		);
+		ensure(
+			hydrated.focuses === expectedFocuses,
+			`expected ${expectedFocuses} replayed Send focus events, observed ${hydrated.focuses}`,
+		);
+		const delivery = {
+			clickReplayed: hydrated.clicks === 1,
+			focusReplayed: hydrated.focuses === 1,
+			searchPreserved: hydrated.value === PRE_HYDRATION_TEXT,
+			submitted: hydrated.submitted,
+			deliveredExactlyOnce: hydrated.clicks === 1 && hydrated.submitted === PRE_HYDRATION_TEXT,
+			issues: [],
+		};
+		if (!delivery.clickReplayed) delivery.issues.push('Send click was not replayed');
+		if (!delivery.searchPreserved) delivery.issues.push('Search text was not preserved');
+		if (delivery.clickReplayed && hydrated.submitted !== PRE_HYDRATION_TEXT) {
+			delivery.issues.push('Replayed Send received the wrong search text');
+		}
+		if (target === 'octane-tsrx') {
+			ensure(delivery.deliveredExactlyOnce, 'the pre-hydration search was not sent exactly once');
+			ensure(delivery.searchPreserved, 'hydration overwrote the pre-hydration search');
+		}
+
+		await button.click();
+		await sample.page.waitForFunction(
+			({ clicks, submitted }) =>
+				Number(document.querySelector('#hydration-clicks')?.textContent) === clicks &&
+				document.querySelector('#hydration-submitted')?.textContent === submitted,
+			{ clicks: expectedClicks + 1, submitted: hydrated.value },
+		);
+		ensure(sample.failures.length === 0, `browser errors: ${sample.failures.join('; ')}`);
+
+		return {
+			firstInput: typed.firstNativeInputAt - typingStartedAt,
+			preHydrationTyping: typed.completedAt - typingStartedAt,
+			hydration: hydrated.hydratedAt - hydrated.releasedAt,
+			hydrationWork: hydrated.hydratedAt - hydrated.hydrationStartedAt,
+			interactionToHydration: hydrated.hydratedAt - clickedAt,
+			delivery,
 		};
 	} finally {
 		await closeSample(sample);
@@ -376,7 +501,14 @@ async function runReplaySample() {
 
 function addSamples(operations, prefix, result) {
 	for (const [name, value] of Object.entries(result)) {
-		if (name === 'replayedClicks' || name === 'preservation') continue;
+		if (
+			name === 'delivery' ||
+			name === 'replayedClicks' ||
+			name === 'replayedFocusEvents' ||
+			name === 'preservation'
+		) {
+			continue;
+		}
 		const operation = `${prefix}_${name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
 		(operations[operation] ??= []).push(value);
 	}
@@ -384,6 +516,8 @@ function addSamples(operations, prefix, result) {
 
 const rawOperations = {};
 const replayCounts = [];
+const focusReplayCounts = [];
+const searchSendResults = [];
 const inputPreservation = {
 	uncontrolled_1x: [],
 	uncontrolled_6x: [],
@@ -398,16 +532,20 @@ try {
 		const slowed = await runTypingSample({ cpuRate: 6, controlled: false });
 		const controlled = await runTypingSample({ cpuRate: 6, controlled: true });
 		const replay = await runReplaySample();
+		const searchAndSend = await runSearchAndSendSample();
 
 		if (index >= warmup) {
 			addSamples(rawOperations, 'uncontrolled_1x', plain);
 			addSamples(rawOperations, 'uncontrolled_6x', slowed);
 			addSamples(rawOperations, 'controlled_6x', controlled);
 			addSamples(rawOperations, 'interaction_6x', replay);
+			addSamples(rawOperations, 'search_send_6x', searchAndSend);
 			inputPreservation.uncontrolled_1x.push(plain.preservation);
 			inputPreservation.uncontrolled_6x.push(slowed.preservation);
 			inputPreservation.controlled_6x.push(controlled.preservation);
 			replayCounts.push(replay.replayedClicks);
+			focusReplayCounts.push(replay.replayedFocusEvents);
+			searchSendResults.push(searchAndSend.delivery);
 		}
 	}
 } catch (error) {
@@ -439,6 +577,9 @@ const payload = {
 				preHydrationText: PRE_HYDRATION_TEXT,
 				postHydrationText: POST_HYDRATION_TEXT,
 				replayedClicks: replayCounts,
+				replayedFocusEvents: focusReplayCounts,
+				searchSendResults,
+				hydrationEventReplay: supportsHydrationEventReplay,
 				preRootInteractionReplay: supportsPreRootInteractionReplay,
 				browser: 'chromium',
 			},
@@ -455,12 +596,25 @@ if (process.env.BENCH_JSON) {
 console.log(`\nHydration interactivity — ${target} (production, real Chromium typing)`);
 console.log(`Server-rendered articles: ${CARD_COUNT}; CPU throttling: 1× and 6×`);
 console.log(
+	`Hydration event replay: ${supportsHydrationEventReplay ? 'supported' : 'not claimed'}`,
+);
+console.log(
 	`Pre-root interaction replay: ${supportsPreRootInteractionReplay ? 'supported' : 'not claimed'}`,
 );
 for (const [scenario, samples] of Object.entries(inputPreservation)) {
 	if (samples.length === 0) continue;
 	console.log(
 		`Pre-hydration input (${scenario}): ${samples.every((sample) => sample.text) ? 'preserved' : 'overwritten'}`,
+	);
+}
+if (searchSendResults.length > 0) {
+	const delivered = searchSendResults.every((sample) => sample.deliveredExactlyOnce);
+	console.log(
+		`Pre-hydration search-and-send: ${
+			delivered
+				? 'query delivered exactly once'
+				: `correctness issue: ${[...new Set(searchSendResults.flatMap((sample) => sample.issues))].join('; ')}`
+		}`,
 	);
 }
 console.log('\nOperation                                  score     median        p95');
