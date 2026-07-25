@@ -2903,7 +2903,10 @@ function containsDeferredRefRead(root) {
 	return found;
 }
 
-function containsImportedMemberRead(root, importedNames, includeJsx = true) {
+// A JSX member chain bottoms out at a JSXIdentifier, so the base test below
+// never matches one. Do not reintroduce a JSX-awareness flag: it cannot change
+// the answer.
+function containsImportedMemberRead(root, importedNames) {
 	let found = false;
 	const seen = new WeakSet();
 	function walk(n) {
@@ -2914,7 +2917,7 @@ function containsImportedMemberRead(root, importedNames, includeJsx = true) {
 		}
 		if (typeof n !== 'object' || seen.has(n)) return;
 		seen.add(n);
-		if (n.type === 'MemberExpression' || (includeJsx && n.type === 'JSXMemberExpression')) {
+		if (n.type === 'MemberExpression' || n.type === 'JSXMemberExpression') {
 			let object = n;
 			while (object?.type === 'MemberExpression' || object?.type === 'JSXMemberExpression') {
 				object = object.object;
@@ -5371,8 +5374,12 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		const root = b.block(stmts);
 		const free = collectFreeIdentifiers(root, locals);
 		const autoMemoImportedComponents = collectImportedComponentReferences(root, ctx.importedNames);
-		let autoMemoCallsitesSafe =
-			!containsDeferredRefRead(root) && !containsImportedMemberRead(root, ctx.importedNames, false);
+		// Both proofs below ask this of the same root. Kept lazy because the
+		// short-circuits ahead of each use skip it entirely for some components.
+		let importedMemberRead = null;
+		const readsImportedMember = () =>
+			(importedMemberRead ??= containsImportedMemberRead(root, ctx.importedNames));
+		let autoMemoCallsitesSafe = !containsDeferredRefRead(root) && !readsImportedMember();
 		for (const name of free) {
 			if (
 				ctx._octaneBoundaryNames.has(name) ||
@@ -5397,7 +5404,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			ordinaryPropsParam &&
 			!containsRenderCall(stmts, ctx) &&
 			!containsAutoMemoUnsafeStructure(stmts) &&
-			!containsImportedMemberRead(root, ctx.importedNames);
+			!readsImportedMember();
 		const autoMemoCaptures = [];
 		const autoMemoComponentDeps = [];
 		if (autoMemoSafe) {

@@ -196,6 +196,46 @@ describe('compiler-owned component-region memoization', () => {
 		expect(transitiveCapture.match(/const __memoDep[\w$]* = \(?live\)?;/g)).toHaveLength(2);
 	});
 
+	it('judges each component in a module on its own imported reads', () => {
+		// Every component is analysed against its own body. Both declaration
+		// orders are checked because a verdict leaking from one component to the
+		// next would only be visible in one direction.
+		const cases = [
+			[
+				'impure declared first',
+				`import { Menu } from './menu';
+				 function Dirty(props) @{ <b>{props.v}<Menu.Item /></b> }
+				 function Clean(props) @{ <i>{props.v}</i> }
+				 export function App(props) @{ <div><Dirty v={props.a} /><Clean v={props.b} /></div> }`,
+			],
+			[
+				'pure declared first',
+				`import { Menu } from './menu';
+				 function Clean(props) @{ <i>{props.v}</i> }
+				 function Dirty(props) @{ <b>{props.v}<Menu.Item /></b> }
+				 export function App(props) @{ <div><Clean v={props.b} /><Dirty v={props.a} /></div> }`,
+			],
+		];
+		for (const [order, source] of cases) {
+			const code = compile(source, 'auto-memo-per-component.tsrx', {
+				hmr: false,
+				autoMemo: true,
+			}).code;
+			expect(
+				/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Clean,/.test(
+					code,
+				),
+				`${order}: the component reading no import should memoize`,
+			).toBe(true);
+			expect(
+				/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Dirty,/.test(
+					code,
+				),
+				`${order}: the component reading an imported member should not memoize`,
+			).toBe(false);
+		}
+	});
+
 	it('falls back for impure calls, refs, and direct Suspense boundaries', () => {
 		const cases = [
 			`function Child(props) @{ <div>{props.read()}</div> }`,
@@ -211,6 +251,12 @@ describe('compiler-owned component-region memoization', () => {
 			`import { ViewTransition as VT } from 'octane'; function Child(props) @{ <VT>{props.value}</VT> }`,
 			`import { ErrorBoundary as Boundary } from 'octane'; function Child(props) @{ <Boundary fallback={null}>{props.value}</Boundary> }`,
 			`let ambient = 'a'; function Child() @{ <div>{ambient}</div> }`,
+			// A JSX member read of an import is caught by the free-identifier check,
+			// not by the member-read predicate: a JSX member chain bottoms out at a
+			// JSXIdentifier, which that predicate's base test does not match.
+			`import { Menu } from './menu'; function Child(props) @{ <div>{props.value}<Menu.Item /></div> }`,
+			`import { Menu } from './menu'; function Child(props) @{ <div>{props.value}<Menu.Item.Deep /></div> }`,
+			`import { Menu } from './menu'; function Child(props) @{ <div title={Menu.label}>{props.value}</div> }`,
 		];
 		for (const child of cases) {
 			const code = compile(
