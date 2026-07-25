@@ -573,6 +573,7 @@ export async function runNativeDemo({
 	spawnImpl = spawn,
 	readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS,
 	stopProcessTreeImpl = stopProcessTree,
+	waitForBundleImpl = waitForBundle,
 	workspaceRoot = DEFAULT_WORKSPACE_ROOT,
 } = {}) {
 	const requestedPort = parseDemoPort(env.OCTANE_LYNX_DEMO_PORT);
@@ -637,13 +638,20 @@ export async function runNativeDemo({
 			env: plan.demoCommand.env,
 			stdio: ['ignore', 'inherit', 'inherit'],
 		});
-		const readiness = await Promise.race([
-			waitForBundle(demo, plan.bundleUrl, readyTimeoutMs, fetchImpl).then(() => ({
+		const bundleReady = waitForBundleImpl(demo, plan.bundleUrl, readyTimeoutMs, fetchImpl).then(
+			() => ({
 				kind: 'ready',
-			})),
+			}),
+		);
+		const readiness = await Promise.race([
+			bundleReady,
 			signals.promise.then((signal) => ({ kind: 'signal', signal })),
 		]);
 		if (readiness.kind === 'signal' || signals.receivedSignal !== undefined) {
+			// Promise.race does not cancel the readiness operation. Observe its
+			// eventual rejection before stopping the demo so cancellation cannot
+			// leave a late process-exit rejection behind.
+			void bundleReady.catch(() => {});
 			const signal = readiness.kind === 'signal' ? readiness.signal : signals.receivedSignal;
 			await stopProcessTreeImpl(demo, { signal });
 			return signalExitCode(signal);

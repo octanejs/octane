@@ -637,6 +637,82 @@ describe('macOS Lynx Explorer native demo', () => {
 		]);
 	});
 
+	it('observes a late readiness rejection when startup cancellation wins', async () => {
+		const demo = Object.assign(new EventEmitter(), {
+			exitCode: null,
+			kill: () => true,
+			pid: 60_000,
+			signalCode: null,
+			stderr: null,
+			stdin: null,
+			stdout: null,
+		}) as unknown as ChildProcess;
+		let receivedSignal: NodeJS.Signals | undefined;
+		let resolveSignal!: (signal: NodeJS.Signals) => void;
+		const signalPromise = new Promise<NodeJS.Signals>((resolve) => {
+			resolveSignal = resolve;
+		});
+		let rejectReadiness!: (error: Error) => void;
+		const readiness = new Promise<void>((_resolve, reject) => {
+			rejectReadiness = reject;
+		});
+		const unhandled: unknown[] = [];
+		const onUnhandled = (reason: unknown) => {
+			unhandled.push(reason);
+		};
+		process.on('unhandledRejection', onUnhandled);
+
+		try {
+			const exitCode = await runNativeDemo({
+				arch: 'arm64',
+				assertPortAvailableImpl: async () => {},
+				ensureExplorerImpl: async () => ({
+					async dispose() {},
+					executablePath: '/tmp/LynxExplorer',
+				}),
+				env: {
+					OCTANE_LYNX_DEMO_PORT: '43219',
+					OCTANE_LYNX_EXPLORER_EXECUTABLE: '/tmp/LynxExplorer',
+				},
+				installSignalHandlersImpl: () => ({
+					dispose() {},
+					get receivedSignal() {
+						return receivedSignal;
+					},
+					promise: signalPromise,
+				}),
+				platform: 'darwin',
+				spawnImpl: (() => demo) as never,
+				stopProcessTreeImpl: async (child) => {
+					if (child === demo) {
+						rejectReadiness(new Error('demo stopped during readiness'));
+						Object.defineProperty(demo, 'exitCode', {
+							configurable: true,
+							value: 0,
+						});
+						demo.emit('exit', 0, null);
+					}
+					return true;
+				},
+				waitForBundleImpl: async () => {
+					queueMicrotask(() => {
+						receivedSignal = 'SIGINT';
+						resolveSignal(receivedSignal);
+					});
+					return readiness;
+				},
+			});
+
+			expect(exitCode).toBe(130);
+			await new Promise<void>((resolveTurn) => {
+				setImmediate(resolveTurn);
+			});
+			expect(unhandled).toEqual([]);
+		} finally {
+			process.off('unhandledRejection', onUnhandled);
+		}
+	});
+
 	it('aborts Explorer preparation before selecting a port or spawning a process', async () => {
 		let receivedSignal: NodeJS.Signals | undefined;
 		let resolveSignal!: (signal: NodeJS.Signals) => void;
