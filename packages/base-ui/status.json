@@ -5,7 +5,7 @@
     "Handlers receive native DOM events (no synthetic layer): visible text controls use per-edit `input`, while the NumberField form-facing number input intentionally observes native `change` commits.",
     "`forwardRef` becomes ref-as-prop; `className` composes via octane's `normalizeClass` (the render-prop string merge matches Base UI exactly)."
   ],
-  "ssr": "No dedicated SSR/hydration tests yet.",
-  "verified": "2026-07-17",
+  "ssr": "Dedicated Node-mode tests cover server snapshots, accessible separators, edge-aligned slider visibility, and closed dialogs; hydration adopts upstream React server markup, transitions to the client snapshot, and preserves interaction. Open overlays and remaining components are not yet covered.",
+  "verified": "2026-07-25",
   "docs": ["docs/base-ui-migration-plan.md"]
 }

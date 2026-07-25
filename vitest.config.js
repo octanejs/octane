@@ -1039,13 +1039,23 @@ export default defineConfig({
 			{
 				test: {
 					name: 'apollo-client',
-					include: ['packages/apollo-client/tests/**/*.test.ts'],
+					include: [
+						'packages/apollo-client/tests/**/*.test.ts',
+						'!packages/apollo-client/tests/ssr/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					globals: false,
 				},
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/apollo-client\/react\/ssr$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/ssr/index.js',
+							),
+						},
 						{
 							find: /^@octanejs\/apollo-client\/testing\/react$/,
 							replacement: resolve(
@@ -1065,6 +1075,48 @@ export default defineConfig({
 							replacement: resolve(
 								import.meta.dirname,
 								'packages/apollo-client/src/testing/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client$/,
+							replacement: resolve(import.meta.dirname, 'packages/apollo-client/src/index.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'apollo-client-ssr',
+					include: ['packages/apollo-client/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react\/ssr$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/ssr/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react\/internal$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/internal/index.js',
 							),
 						},
 						{
@@ -1799,7 +1851,11 @@ export default defineConfig({
 			{
 				test: {
 					name: 'aria',
-					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
+					include: [
+						'packages/aria/tests/**/*.test.ts',
+						'packages/aria/tests/**/*.test.tsx',
+						'!packages/aria/tests/ssr/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// The differential fixtures import the real react-aria consumer modules
 					// (useComboBox/useSelect pull in the whole overlays/listbox/menu graph); the
@@ -1833,8 +1889,37 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'aria-ssr',
+					include: ['packages/aria/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src') + '/$1/index.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'base-ui',
-					include: ['packages/base-ui/tests/**/*.test.ts', 'packages/base-ui/tests/**/*.test.tsx'],
+					include: [
+						'packages/base-ui/tests/**/*.test.ts',
+						'packages/base-ui/tests/**/*.test.tsx',
+						'!packages/base-ui/tests/ssr/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// Differential precompile for base-ui fixtures: rewrites `@octanejs/base-ui/<sub>`
 					// → `@base-ui-components/react/<sub>` so the React side runs real Base UI.
@@ -1848,6 +1933,35 @@ export default defineConfig({
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/base-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/base-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'base-ui-ssr',
+					include: ['packages/base-ui/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
 						{
 							find: /^@octanejs\/base-ui$/,
 							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),

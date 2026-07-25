@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
@@ -706,6 +706,109 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			}
 		}
 	});
+
+	it('enforces cross-origin RPC preflights in a real browser in dev and production', async () => {
+		await fetch(devOrigin + '/');
+		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
+
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({ headless: true });
+		} catch (error) {
+			throw new Error(
+				'[vite-plugin cross-origin RPC] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		try {
+			for (const target of [
+				{ name: 'development', origin: devOrigin, server: devServer!.httpServer! },
+				{ name: 'production', origin: productionOrigin, server: productionServer! },
+			]) {
+				const requests: Array<{ method: string; origin: string | undefined }> = [];
+				const observe = (request: IncomingMessage) => {
+					if (request.url?.startsWith('/_$_ripple_rpc_$_/')) {
+						requests.push({ method: request.method ?? '', origin: request.headers.origin });
+					}
+				};
+				target.server.on('request', observe);
+
+				try {
+					for (const scenario of [
+						{ origin: 'http://127.0.0.1', allowed: true },
+						{ origin: 'http://127.0.0.2', allowed: false },
+					]) {
+						requests.length = 0;
+						const page = await browser.newPage();
+						try {
+							await page.route(`${scenario.origin}/**`, (route) =>
+								route.fulfill({
+									status: 200,
+									contentType: 'text/html',
+									body: '<!doctype html><html><body>RPC CORS probe</body></html>',
+								}),
+							);
+							await page.goto(`${scenario.origin}/`);
+							const result = await page.evaluate(
+								async ({ origin, actionHash }) => {
+									try {
+										const response = await fetch(`${origin}/_$_ripple_rpc_$_/${actionHash}`, {
+											method: 'POST',
+											headers: {
+												'Content-Type': 'application/json',
+												'x-fixture-rpc-authorization': 'allow',
+											},
+											body: '[[1],"browser"]',
+										});
+										return { status: response.status, body: await response.json(), error: null };
+									} catch (error) {
+										return {
+											status: null,
+											body: null,
+											error: error instanceof TypeError ? 'TypeError' : String(error),
+										};
+									}
+								},
+								{ origin: target.origin, actionHash: hash },
+							);
+
+							if (scenario.allowed) {
+								expect(result.status, `${target.name}: allowed origin`).toBe(200);
+								expect(result.error, `${target.name}: allowed origin`).toBeNull();
+								const encoded = result.body as unknown[];
+								const valueIndex = (encoded[0] as { value: number }).value;
+								expect(encoded[valueIndex], `${target.name}: allowed action`).toBe('rpc:browser');
+							} else {
+								expect(result, `${target.name}: rejected origin`).toEqual({
+									status: null,
+									body: null,
+									error: 'TypeError',
+								});
+							}
+
+							expect(requests, `${target.name}: ${scenario.origin}`).toEqual(
+								scenario.allowed
+									? [
+											{ method: 'OPTIONS', origin: scenario.origin },
+											{ method: 'POST', origin: scenario.origin },
+										]
+									: [{ method: 'OPTIONS', origin: scenario.origin }],
+							);
+						} finally {
+							await page.close();
+						}
+					}
+				} finally {
+					target.server.off('request', observe);
+				}
+			}
+		} finally {
+			await browser.close();
+		}
+	}, 120_000);
 
 	it('nodeHandler bridges the same handler for Node-style serverless wrappers', async () => {
 		const { nodeHandler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
