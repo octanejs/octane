@@ -46,6 +46,31 @@ render. Opaque callback creation such as `useEffect(makeEffect())` requires an
 explicit array or `null`, because evaluating it again to construct a dependency
 would change program behavior.
 
+## Automatic memoization and calls in templates
+
+Production builds memoize component regions automatically, on the same
+pure-render, immutable-snapshot contract React Compiler assumes. Rendering a
+value through a plain function call — `{formatPrice(cents)}`, `{t('total')}`,
+`{segText(seg, done)}` — keeps the surrounding region memoizable; the callee is
+a module or imported binding that the region already tracks.
+
+Calling a **method on your data** during render does not. `{header.getIsSorted()}`
+can return a new answer while `header` stays the same object, so neither the
+value nor any dependency witnesses the change. Octane keeps those regions
+unmemoized and re-runs them, matching what React does for an unmemoized
+component. Library bindings that expose table/grid/store instances with live
+accessor methods therefore keep working unchanged.
+
+Hooks are never treated as value projections. `use()` is a suspension point, and
+`use*` calls own hook cells, context subscriptions, and effect lifecycles, so a
+region containing one is always re-entered.
+
+If you want a method-backed value memoized, read it into a local first
+(`const sorted = header.getIsSorted();`) and let the surrounding state own it —
+the same advice React Compiler gives. Conversely, a region *is* allowed to
+memoize past a mutable module-level variable, whether read directly or returned
+by a helper; module state that must drive rendering belongs in state or context.
+
 ## `useState` / `useReducer` current-state getters
 
 Both state hooks have an Octane-only third tuple member: a stable zero-argument
