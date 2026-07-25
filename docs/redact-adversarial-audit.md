@@ -58,9 +58,9 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 | Status | Entries |
 | --- | ---: |
-| planned | 2 |
+| planned | 0 |
 | in progress | 0 |
-| covered | 21 |
+| covered | 23 |
 | documented | 5 |
 | decision required | 1 |
 | blocked | 0 |
@@ -76,8 +76,6 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 | ID | Risk | Area | Contract | Status | Owner |
 | --- | --- | --- | --- | --- | --- |
-| [`RDX-PORT-002`](#rdx-port-002) | high | portal-updates | A stateful portal descendant resolves its foreign host for owned updates | planned | Octane portal host resolution |
-| [`RDX-REC-002`](#rdx-rec-002) | high | reconciliation-placement | Topology transitions use the correct absolute anchor without stable reattachment | planned | Octane reconciler and portal placement |
 | [`RDX-HYD-005`](#rdx-hyd-005) | medium | hydration-errors | Hydration recovery reporting has an explicit public contract | decision required | Octane public root API |
 
 ## Contract ledger
@@ -644,7 +642,7 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 #### RDX-PORT-002 — A stateful portal descendant resolves its foreign host for owned updates
 
-**Disposition:** high risk; adaptable; planned; owner: Octane portal host resolution.
+**Disposition:** high risk; adaptable; covered; owner: Octane portal host resolution.
 
 **Upstream evidence**
 
@@ -658,11 +656,14 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 **Octane references**
 
-- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “compiles and renders an inline host-element body into the target, updating reactively” — Updates state owned outside the portal, so it does not exercise descendant-owned host resolution.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `renderPortalState` — The portal Block stores the foreign target directly as parentNode, so descendant-owned rerenders retain the correct host without an ancestor walk.
+- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “keeps a descendant-owned root replacement inside its portal target” — A portal child owns the update and replaces its host-root kind while the logical root and foreign target siblings retain identity.
 
-**Next action (test).** Render a child component with its own useState inside a portal, schedule its update from that child, and assert the same target and unaffected target siblings retain identity while only the child's host content changes in development and production compile modes.
+**Executable evidence**
 
-Targets: `packages/octane/tests/portal.test.ts`.
+- [keeps a descendant-owned root replacement inside its portal target](../packages/octane/tests/portal.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+
+**Rationale.** Octane does not need Redact's ancestor host resolver: the portal Block captures the supplied target, and each descendant Block captures its actual DOM parent when created. The regression replaces the descendant's host-root kind rather than only updating a text binding, proving that owned rerenders still use the retained foreign-host chain.
 
 
 ### portals
@@ -802,7 +803,7 @@ Targets: `packages/octane/tests/portal.test.ts`.
 
 #### RDX-REC-002 — Topology transitions use the correct absolute anchor without stable reattachment
 
-**Disposition:** high risk; adaptable; planned; owner: Octane reconciler and portal placement.
+**Disposition:** high risk; adaptable; covered; owner: Octane reconciler and portal placement.
 
 **Upstream evidence**
 
@@ -820,13 +821,18 @@ Targets: `packages/octane/tests/portal.test.ts`.
 **Octane references**
 
 - [packages/octane/tests/differential/anchor-order.test.ts](../packages/octane/tests/differential/anchor-order.test.ts) — Covers final source order across control-flow transitions, but differential HTML cannot see host reattachment and has no portal topology case.
-- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “unmounts portal content when the if-branch closes” — Covers removal/recreation, not Portal→ordinary replacement around stable siblings.
+- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “places a Portal-to-element first-child transition before stable later siblings” — Pins portal cleanup, exact absolute order, and identity of the parent plus both later siblings in development and production compilation.
+- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “places a null-to-element first-child transition before stable later siblings” — Pins materialization at index zero while both later siblings retain identity.
+- [packages/octane/tests/browser/portal-placement/portal-placement.test.ts](../packages/octane/tests/browser/portal-placement/portal-placement.test.ts) — “prod preserves absolute order without reattaching stable host nodes” — Real Chromium observes both the logical parent and foreign target and proves a child-topology-equivalent rerender emits zero child-list records.
 
-**Next action (test).** Port Portal→element and null→element first-child transitions with multiple stable later siblings; retain every survivor object, assert exact final order, and use MutationObserver in Chromium to prove a stable rerender produces no child-list records.
+**Executable evidence**
 
-Targets: `packages/octane/tests/portal.test.ts`, `packages/octane/tests/browser`.
+- [places a Portal-to-element first-child transition before stable later siblings](../packages/octane/tests/portal.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+- [places a null-to-element first-child transition before stable later siblings](../packages/octane/tests/portal.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+- [dev preserves absolute order without reattaching stable host nodes](../packages/octane/tests/browser/portal-placement/portal-placement.test.ts) — modes: `client`, `real-browser`; observables: `markup`, `node-identity`, `dom-mutations`
+- [prod preserves absolute order without reattaching stable host nodes](../packages/octane/tests/browser/portal-placement/portal-placement.test.ts) — modes: `production-compile`, `real-browser`; observables: `markup`, `node-identity`, `dom-mutations`
 
-**Rationale.** The existing keyed identity suite proves a different reconciler contract. Redact's topology cases require portal-aware absolute placement plus a mutation-level oracle, so they remain an explicit gap instead of being hidden under RDX-REC-001.
+**Rationale.** This is distinct from keyed-list identity: compiler-owned component anchors reserve the source position while portal or null output has no in-flow host. The regressions prove that later materialization stays inside that range and that the existing absolute-anchor path does not reattach stable hosts.
 
 
 ### redact-specific-surfaces

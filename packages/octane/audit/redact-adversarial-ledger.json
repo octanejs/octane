@@ -1567,24 +1567,34 @@
       "symptom": "A component inside a portal scheduled its own state update, resolved the logical parent as its host, and inserted or replaced DOM outside the portal target.",
       "octaneContract": "A descendant component rendered inside a portal may own and schedule updates while all of its host mutations remain anchored in the supplied portal target and preserve surrounding target siblings.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane portal host resolution",
       "applicableModes": ["client", "production-compile"],
       "observables": ["markup", "node-identity"],
       "octaneReferences": [
         {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "renderPortalState",
+          "note": "The portal Block stores the foreign target directly as parentNode, so descendant-owned rerenders retain the correct host without an ancestor walk."
+        },
+        {
           "kind": "test",
           "file": "packages/octane/tests/portal.test.ts",
-          "testName": "compiles and renders an inline host-element body into the target, updating reactively",
-          "note": "Updates state owned outside the portal, so it does not exercise descendant-owned host resolution."
+          "testName": "keeps a descendant-owned root replacement inside its portal target",
+          "note": "A portal child owns the update and replaces its host-root kind while the logical root and foreign target siblings retain identity."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/tests/portal.test.ts"],
-        "acceptance": "Render a child component with its own useState inside a portal, schedule its update from that child, and assert the same target and unaffected target siblings retain identity while only the child's host content changes in development and production compile modes."
-      }
+      "evidence": [
+        {
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "keeps a descendant-owned root replacement inside its portal target",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        }
+      ],
+      "rationale": "Octane does not need Redact's ancestor host resolver: the portal Block captures the supplied target, and each descendant Block captures its actual DOM parent when created. The regression replaces the descendant's host-root kind rather than only updating a text binding, proving that owned rerenders still use the retained foreign-host chain."
     },
     {
       "id": "RDX-REC-001",
@@ -1672,7 +1682,7 @@
       "symptom": "A Portal-to-element or null-to-element transition inserted new output after the wrong sibling, while a no-op rerender could detach and reinsert otherwise stable DOM.",
       "octaneContract": "When a child changes topology, each newly materialized range lands at its absolute logical anchor around portal and ordinary siblings; a stable rerender emits no child-list mutations and preserves every existing host object.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane reconciler and portal placement",
       "applicableModes": ["client", "production-compile", "real-browser"],
@@ -1686,16 +1696,49 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/portal.test.ts",
-          "testName": "unmounts portal content when the if-branch closes",
-          "note": "Covers removal/recreation, not Portal→ordinary replacement around stable siblings."
+          "testName": "places a Portal-to-element first-child transition before stable later siblings",
+          "note": "Pins portal cleanup, exact absolute order, and identity of the parent plus both later siblings in development and production compilation."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "places a null-to-element first-child transition before stable later siblings",
+          "note": "Pins materialization at index zero while both later siblings retain identity."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/portal-placement/portal-placement.test.ts",
+          "testName": "prod preserves absolute order without reattaching stable host nodes",
+          "note": "Real Chromium observes both the logical parent and foreign target and proves a child-topology-equivalent rerender emits zero child-list records."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/tests/portal.test.ts", "packages/octane/tests/browser"],
-        "acceptance": "Port Portal→element and null→element first-child transitions with multiple stable later siblings; retain every survivor object, assert exact final order, and use MutationObserver in Chromium to prove a stable rerender produces no child-list records."
-      },
-      "rationale": "The existing keyed identity suite proves a different reconciler contract. Redact's topology cases require portal-aware absolute placement plus a mutation-level oracle, so they remain an explicit gap instead of being hidden under RDX-REC-001."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "places a Portal-to-element first-child transition before stable later siblings",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        },
+        {
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "places a null-to-element first-child transition before stable later siblings",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        },
+        {
+          "file": "packages/octane/tests/browser/portal-placement/portal-placement.test.ts",
+          "testName": "dev preserves absolute order without reattaching stable host nodes",
+          "modes": ["client", "real-browser"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/browser/portal-placement/portal-placement.test.ts",
+          "testName": "prod preserves absolute order without reattaching stable host nodes",
+          "modes": ["production-compile", "real-browser"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        }
+      ],
+      "rationale": "This is distinct from keyed-list identity: compiler-owned component anchors reserve the source position while portal or null output has no in-flow host. The regressions prove that later materialization stays inside that range and that the existing absolute-anchor path does not reattach stable hosts."
     },
     {
       "id": "RDX-REF-001",
