@@ -1376,12 +1376,26 @@ export default defineConfig({
 					// pinned bundle contract. Enforced HERE because the compat script's
 					// CLI --exclude flags proved unreliable once `pnpm add
 					// --lockfile=false` re-keys the workspace's vitest instances.
-					exclude:
-						process.env.OCTANE_THREE_COMPAT_VERSION !== undefined
-							? [
-									'packages/three/tests/**/*differential.test.ts',
-									'packages/three/tests/browser/**/*.test.ts',
-								]
+					exclude: [
+						'packages/three/tests/browser/**/*.test.ts',
+						...(process.env.OCTANE_THREE_COMPAT_VERSION !== undefined
+							? ['packages/three/tests/**/*differential.test.ts']
+							: []),
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/three/tests/_react-setup.ts'],
+					globals: false,
+					server: { deps: { inline: ['@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
+			},
+			{
+				test: {
+					name: 'three-browser',
+					include:
+						process.env.OCTANE_THREE_COMPAT_VERSION === undefined
+							? ['packages/three/tests/browser/**/*.test.ts']
 							: [],
 					environment: 'jsdom',
 					globalSetup: ['packages/three/tests/_react-setup.ts'],
@@ -2251,17 +2265,15 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'website',
+					name: 'website-unit',
 					include: ['website/tests/**/*.test.ts'],
+					exclude: [
+						'website/tests/core-apis-docs.test.ts',
+						'website/tests/ssr-smoke.test.ts',
+						'website/tests/ssr-hydration.e2e.test.ts',
+					],
 					environment: 'jsdom',
 					globals: false,
-					// ssr-smoke and ssr-hydration.e2e both run a REAL production
-					// `vite build` into website/.output and the e2e file then serves
-					// that Nitro output. Running the files in parallel
-					// would let one build delete/rewrite artifacts the other is
-					// building or serving, so this project is file-serial by
-					// contract, not by timing.
-					fileParallelism: false,
 				},
 				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
 				// routing, and deployment are owned by @octanejs/tanstack-start; the
@@ -2270,20 +2282,48 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'website-mcp',
+					name: 'website-integration',
+					include: [
+						'website/tests/core-apis-docs.test.ts',
+						'website/tests/ssr-smoke.test.ts',
+						'website/tests/ssr-hydration.e2e.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					// Vitest defaults ordinary tests to five seconds. This project
+					// deliberately owns full-route, build, and browser integration
+					// coverage, so give unannotated integration cases the same
+					// budget as the SSR smoke test.
+					testTimeout: 15_000,
+					// The SSR and browser specs write website/.output, while the
+					// route-level docs test renders the full application. Keep this
+					// integration boundary serial while ordinary tests stay parallel.
+					fileParallelism: false,
+				},
+				plugins: [octaneMdx(websiteMdxOptions), octane()],
+			},
+			{
+				test: {
+					name: 'website-mcp-unit',
 					include: ['website-mcp/tests/**/*.test.ts'],
+					exclude: ['website-mcp/tests/built-handler.e2e.test.ts'],
 					environment: 'node',
 					globals: false,
-					// built-handler.e2e runs a REAL production `vite build` into
-					// website-mcp/dist and website-mcp/.vercel/output and then imports the emitted
-					// server entry; file-serial so parallel test files can't clobber
-					// the artifacts another file is building or importing.
-					fileParallelism: false,
 				},
 				// No app plugins: the website-mcp tests exercise plain .ts modules (the
 				// content snapshot uses only Vite built-ins — ?raw and
-				// import.meta.glob) plus the production build driven through the
-				// vite JS API, which loads the app's own config and plugins itself.
+				// import.meta.glob).
+			},
+			{
+				test: {
+					name: 'website-mcp-integration',
+					include: ['website-mcp/tests/built-handler.e2e.test.ts'],
+					environment: 'node',
+					globals: false,
+					// This spec writes website-mcp/dist and .vercel/output before
+					// importing the emitted server entry.
+					fileParallelism: false,
+				},
 			},
 		],
 	},

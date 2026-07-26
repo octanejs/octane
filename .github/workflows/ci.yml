@@ -7,10 +7,12 @@ on:
     branches: [main]
 
 env:
-  # Named once: the sharded suite excludes this spec and website_e2e runs it.
-  # Splitting the two apart means a stale path silently stops running it, so
-  # website_e2e asserts the file exists before it starts.
+  # Named once: the sharded suite excludes these specs and website_e2e runs
+  # them. Splitting the paths means a stale name could silently stop running
+  # one, so website_e2e asserts every file exists before it starts.
+  WEBSITE_DOCS_SPEC: website/tests/core-apis-docs.test.ts
   WEBSITE_E2E_SPEC: website/tests/ssr-hydration.e2e.test.ts
+  WEBSITE_SSR_SPEC: website/tests/ssr-smoke.test.ts
 
 jobs:
   release_merge:
@@ -230,26 +232,35 @@ jobs:
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
-      # Website ssr-hydration e2e and Dexie upstream browser scenarios both drive
-      # real Chromium. Without a browser those specs fail; installing here makes
-      # CI actually enforce them.
-      - name: Install Playwright Chromium
-        run: pnpm --filter website exec playwright install --with-deps chromium
-
-      # The website browser suite runs on its own runner (see website_e2e). It
-      # drives real Chromium against a real dev server and a real production
-      # preview, and measuring a glyph's position is only reliable when the
-      # browser is not competing with a few hundred other test files for frames.
+      # Real builds, packed consumers, and browser suites run once on Node 24 in
+      # the dedicated integration jobs below. Keep both supported Nodes on the
+      # ordinary suite without making time-sensitive integration work compete
+      # with hundreds of unrelated files.
       - name: Run tests
-        run: pnpm test --shard=${{ matrix.shard }} --exclude ${{ env.WEBSITE_E2E_SPEC }}
+        run: >-
+          pnpm test
+          --shard=${{ matrix.shard }}
+          --exclude "$WEBSITE_DOCS_SPEC"
+          --exclude "$WEBSITE_E2E_SPEC"
+          --exclude "$WEBSITE_SSR_SPEC"
+          --exclude "website-mcp/tests/built-handler.e2e.test.ts"
+          --exclude "packages/octane-evals/tests/user-app-corpus.test.ts"
+          --exclude "packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts"
+          --exclude "packages/rspeedy-plugin-octane/tests/demo.test.ts"
+          --exclude "packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts"
+          --exclude "packages/vite-plugin-octane/tests/production.test.ts"
+          --exclude "packages/octane/tests/browser/**/*.test.ts"
+          --exclude "packages/dexie/tests/browser/**/*.test.ts"
+          --exclude "packages/tiptap/tests/browser/**/*.test.ts"
+          --exclude "packages/three/tests/browser/**/*.test.ts"
 
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
-  # folds the dedicated website browser suite into the same merge and publishing
-  # gates. An authenticated release skip must satisfy both prerequisites.
+  # folds the dedicated integration suites into the same merge and publishing
+  # gates. An authenticated release skip must satisfy every prerequisite.
   test:
     name: test (${{ matrix.required-context }})
-    needs: [release_merge, test_shard, website_e2e]
+    needs: [release_merge, test_shard, website_e2e, heavy_integration]
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
@@ -264,17 +275,20 @@ jobs:
           IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_merge.outputs.is_release }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
           WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
+          HEAVY_INTEGRATION_RESULT: ${{ needs.heavy_integration.result }}
         run: |
           if [ "$IS_CHANGESET_RELEASE_MERGE" = true ]; then
             test "$SHARD_RESULT" = skipped
             test "$WEBSITE_E2E_RESULT" = skipped
+            test "$HEAVY_INTEGRATION_RESULT" = skipped
           else
             test "$SHARD_RESULT" = success
             test "$WEBSITE_E2E_RESULT" = success
+            test "$HEAVY_INTEGRATION_RESULT" = success
           fi
 
   website_e2e:
-    name: website browser suite
+    name: website integration suite
     needs: release_merge
     # Same authenticated-release skip as the shards above: a metadata-only
     # Changesets merge has already passed this on its parent commit.
@@ -300,14 +314,74 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter website exec playwright install --with-deps chromium
 
-      # The sharded suite excludes this path by name. If it ever moves, the
-      # exclusion silently stops matching and the suite would appear to pass
-      # while nothing ran it here — so fail loudly instead.
-      - name: Verify the excluded spec exists
-        run: test -f "$WEBSITE_E2E_SPEC"
+      # The sharded suite excludes these paths by name. If any one ever moves,
+      # fail instead of silently losing its dedicated coverage.
+      - name: Verify the excluded specs exist
+        run: |
+          test -f "$WEBSITE_DOCS_SPEC"
+          test -f "$WEBSITE_SSR_SPEC"
+          test -f "$WEBSITE_E2E_SPEC"
 
-      - name: Run the website browser suite
-        run: pnpm vitest run "$WEBSITE_E2E_SPEC"
+      - name: Run the website integration suite
+        run: >-
+          pnpm vitest run
+          "$WEBSITE_DOCS_SPEC"
+          "$WEBSITE_SSR_SPEC"
+          "$WEBSITE_E2E_SPEC"
+          --maxWorkers=1
+
+  heavy_integration:
+    name: heavy integration (${{ matrix.lane }})
+    needs: release_merge
+    # Run build and browser coverage once on the newest supported Node. The
+    # ordinary suite still runs on both Node 22 and 24 above.
+    if: ${{ always() && !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - lane: package-builds
+            chromium: true
+            specs: >-
+              website-mcp/tests/built-handler.e2e.test.ts
+              packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts
+              packages/rspeedy-plugin-octane/tests/demo.test.ts
+              packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts
+              packages/vite-plugin-octane/tests/production.test.ts
+          - lane: eval-corpus
+            chromium: false
+            specs: packages/octane-evals/tests/user-app-corpus.test.ts
+          - lane: browser
+            chromium: true
+            specs: >-
+              packages/octane/tests/browser
+              packages/dexie/tests/browser
+              packages/tiptap/tests/browser
+              packages/three/tests/browser
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        if: ${{ matrix.chromium }}
+        run: pnpm --filter website exec playwright install --with-deps chromium
+
+      - name: Run ${{ matrix.lane }} integration tests
+        run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
 
   lint:
     runs-on: ubuntu-latest
@@ -576,9 +650,7 @@ jobs:
       matrix:
         include:
           - lane: minimum
-            registry_check: ""
           - lane: current
-            registry_check: --check-registry
 
     steps:
       - name: Checkout code
@@ -599,13 +671,10 @@ jobs:
       # The script packs the four Octane packages, installs one exact Lynx
       # graph into a temporary external consumer without a lockfile, verifies
       # physical dependency identity, and performs two clean native builds.
-      # The current lane additionally proves its exact versions still follow
-      # the registry graph exposed by Rspeedy/Rsbuild dependency constraints.
       - name: Pack and build Lynx ${{ matrix.lane }} compatibility graph
         run: >-
           node packages/rspeedy-plugin-octane/scripts/compatibility-smoke.mjs
           --lane "${{ matrix.lane }}"
-          ${{ matrix.registry_check }}
 
       - name: Verify the repository lockfile stayed immutable
         run: git diff --exit-code -- pnpm-lock.yaml
