@@ -53,7 +53,7 @@ function packWorkspacePackages(directory) {
 			execFileSync('pnpm', ['--dir', packageRoot, 'pack', '--pack-destination', destination], {
 				cwd: WORKSPACE_ROOT,
 				stdio: ['ignore', 'pipe', 'inherit'],
-				timeout: 120_000,
+				timeout: 300_000,
 			});
 			const archives = readdirSync(destination).filter((entry) => entry.endsWith('.tgz'));
 			assert.equal(archives.length, 1, `${name} should produce exactly one archive`);
