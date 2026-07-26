@@ -174,7 +174,13 @@ export function CommandRoot(props: CommandProps) @{
 					if (groupId) allGroups.current.get(groupId)?.delete(id);
 					const selectedItem = getSelectedItem();
 
-					scheduleFromTeardown(4, () => {
+					// Keyed per ITEM, not per teardown path. The batcher is a Map, so a
+					// shared key means the last teardown in a multi-item removal
+					// overwrites the others — and the callback that survives captured a
+					// different `selectedItem`, so nothing notices the selected item
+					// left. Removing the selected item alongside any sibling then
+					// stranded the selection on a node that no longer exists.
+					scheduleFromTeardown(`item-remove:${id}`, () => {
 						filterItems();
 						if (selectedItem?.getAttribute('id') === id) selectFirstItem();
 						store.emit();
@@ -202,7 +208,10 @@ export function CommandRoot(props: CommandProps) @{
 					// nothing until the user arrows away.
 					const selectedItem = getSelectedItem();
 
-					scheduleFromTeardown(8, () => {
+					// Per item for the same reason as the plain path, and distinct from
+					// the mount emit above, which also used key 8 — a mount and a
+					// teardown in one pass cancelled each other out.
+					scheduleFromTeardown(`force-remove:${id}`, () => {
 						if (selectedItem?.getAttribute('id') === id) selectFirstItem();
 						store.emit();
 					});
@@ -268,7 +277,7 @@ export function CommandRoot(props: CommandProps) @{
  * where the synchronous update is both correct and load-bearing (the search →
  * filter → select-first chain has to settle inside the same commit).
  */
-	function scheduleFromTeardown(id: number, cb: () => void) {
+	function scheduleFromTeardown(id: string | number, cb: () => void) {
 		queueMicrotask(() => schedule(id, cb));
 	}
 
@@ -331,37 +340,77 @@ export function CommandRoot(props: CommandProps) @{
 	}
 
 	/**
- * Append `node` to `container`, carrying the comment markers that fence it.
- *
- * cmdk's sort is DOM-authoritative: it puts matches in score order by
- * physically relocating item nodes. That is safe under React, which re-parents
- * the nodes it owns on the next render. Octane instead delimits each
- * component's DOM with a pair of comment markers and tracks the range between
- * them, so appending the element alone strands it outside its own markers —
- * the runtime's bookkeeping then describes a range that no longer contains the
- * node, and the next update or teardown works off stale references (observed
- * as "Cannot read properties of undefined" from an unmount cleanup, and
- * "insertBefore ... not a child of this node" from the following render).
- *
- * Moving the flanking comment nodes with the element keeps the range intact.
- * This does couple the port to how octane fences a component; it is the
- * narrowest thing that works today, and the durable fix belongs upstream —
- * either a supported way to relocate a component's range, or a teardown path
- * that tolerates externally-moved nodes. Covered by the search → narrow →
- * clear → unmount regression test.
+ * Inline styles this component applied, mapped to the values that were there
+ * before, so clearing a search restores the consumer's own inline styling
+ * rather than deleting it.
  */
-	function moveWithMarkers(container: Element, node: Element) {
-		const before = node.previousSibling;
-		const after = node.nextSibling;
-		if (before !== null && before.nodeType === Node.COMMENT_NODE) container.appendChild(before);
-		container.appendChild(node);
-		if (after !== null && after.nodeType === Node.COMMENT_NODE) container.appendChild(after);
+	const styled = useLazyRef<Map<HTMLElement, Record<string, string>>>(() => new Map());
+
+	function setStyle(element: HTMLElement, property: string, value: string) {
+		const previous = styled.current.get(element) ?? {};
+		if (!(property in previous)) {
+			previous[property] = element.style.getPropertyValue(property);
+			styled.current.set(element, previous);
+		}
+		element.style.setProperty(property, value);
 	}
 
-	/** Sorts items by score, and groups by highest item score, by reordering the
- * real DOM nodes (cmdk's DOM-authoritative model). */
+	/** Restore every inline style this component set, in one pass. */
+	function clearStyles() {
+		styled.current.forEach((previous, element) => {
+			for (const property of Object.keys(previous)) {
+				if (previous[property]) element.style.setProperty(property, previous[property]);
+				else element.style.removeProperty(property);
+			}
+		});
+		styled.current.clear();
+	}
+
+	/** The direct child of `container` that positions `item` — the item itself, or
+ * the wrapper element it sits inside. */
+	function positionedNode(item: Element, container: Element): HTMLElement | null {
+		const node =
+			item.parentElement === container ? item : item.closest(`${GROUP_ITEMS_SELECTOR} > *`);
+		return node instanceof HTMLElement ? node : null;
+	}
+
+	/** Make `container` order its children by the `order` property. */
+	function asOrderedContainer(container: Element) {
+		if (!(container instanceof HTMLElement)) return;
+		setStyle(container, 'display', 'flex');
+		setStyle(container, 'flex-direction', 'column');
+	}
+
+	/**
+ * Order items by score, and groups by their best item score, using CSS `order`.
+ *
+ * OCTANE DIVERGENCE: cmdk's sort is DOM-authoritative — it puts matches in
+ * score order by physically relocating item nodes into the list sizer. Octane
+ * fences every component's DOM with a pair of comment markers and tracks the
+ * range between them, and a template construct like `@for` or `@if` wraps each
+ * item in a SECOND, outer range. Relocating a node carries it out of every one
+ * of those ranges at once: the loop later clears a range that is now empty and
+ * the real node is orphaned in the list forever (observed as every item
+ * surviving a removal, stacked above a "No results found." empty state).
+ *
+ * Carrying the flanking markers along only ever repairs the innermost range,
+ * so it breaks again at each new nesting construct. Expressing the order
+ * declaratively removes the class of bug instead of an instance of it: no node
+ * is ever moved, so no range is ever violated, and clearing the search
+ * restores true source order for free — physical reordering left a scrambled
+ * residue that accumulated across searches and never recovered.
+ *
+ * The cost is that the sizer and each group's item container become flex
+ * columns while a filter is active, so a consumer who relies on physical DOM
+ * order (`:nth-child` styling, drag handles) or on a custom container
+ * `display` sees a divergence from upstream. Recorded in status.json.
+ */
 	function sort() {
-		if (!state.current.search || propsRef.current.shouldFilter === false) return;
+		if (!state.current.search || propsRef.current.shouldFilter === false) {
+			// No active filter: source order is the answer, so drop everything we set.
+			clearStyles();
+			return;
+		}
 
 		const scores = state.current.filtered.items;
 
@@ -379,30 +428,29 @@ export function CommandRoot(props: CommandProps) @{
 		const listInsertionElement = listInnerRef.current;
 		if (!listInsertionElement) return;
 
-		// OCTANE DIVERGENCE: only reorder items that will stay visible (score > 0).
-		// Upstream also pushes the non-matching items to the bottom before they
-		// unmount, but moving a node and then unmounting it orphans it in an
-		// octane HYDRATED tree (the node is carried out of its hydration-marker
-		// range, so its removal leaves an empty host behind). The non-matches
-		// unmount from their original positions anyway, so the visible result —
-		// matching items in score order — is identical.
+		clearStyles();
+		asOrderedContainer(listInsertionElement);
+
+		// Ungrouped items and group hosts are siblings in the sizer, so their ranks
+		// share one space and must not collide. Upstream appends the ranked items
+		// first and the ranked groups after them, which puts groups below any
+		// directly-listed item; `topLevel` reserves that many slots so the group
+		// ranks below continue past them instead of tying.
+		let topLevel = 0;
+
+		// Only matching items get a rank; the rest unmount anyway, and leaving their
+		// `order` at the initial value keeps them out of the ranked band.
 		getValidItems().filter((item) => (scores.get(item.getAttribute('id') ?? '') ?? 0) > 0).sort(
 			(a, b) =>
 				(scores.get(b.getAttribute('id') ?? '') ?? 0) -
 					(scores.get(a.getAttribute('id') ?? '') ?? 0),
-		).forEach((item) => {
+		).forEach((item, rank) => {
 			const group = item.closest(GROUP_ITEMS_SELECTOR);
-			if (group) {
-				const node =
-					item.parentElement === group ? item : item.closest(`${GROUP_ITEMS_SELECTOR} > *`);
-				if (node) moveWithMarkers(group, node);
-			} else {
-				const node =
-					item.parentElement === listInsertionElement
-						? item
-						: item.closest(`${GROUP_ITEMS_SELECTOR} > *`);
-				if (node) moveWithMarkers(listInsertionElement, node);
-			}
+			const container = group ?? listInsertionElement;
+			if (group) asOrderedContainer(group);
+			else topLevel += 1;
+			const node = positionedNode(item, container);
+			if (node) setStyle(node, 'order', String(rank + 1));
 		});
 
 		// OCTANE DIVERGENCE: upstream looks each group element up by
@@ -414,20 +462,11 @@ export function CommandRoot(props: CommandProps) @{
 		// attribute directly also avoids escaping problems for values containing
 		// quotes (upstream encodes the selector but writes `data-value` raw).
 		const groupElements = Array.from(listInsertionElement.querySelectorAll(GROUP_SELECTOR));
-		groups.sort((a, b) => b[1] - a[1]).forEach(([groupId]) => {
+		groups.sort((a, b) => b[1] - a[1]).forEach(([groupId], rank) => {
 			const groupValue = ids.current.get(groupId)?.value;
 			if (!groupValue) return;
 			const element = groupElements.find((el) => el.getAttribute(VALUE_ATTR) === groupValue);
-			// Carry the markers, exactly as the item branch does. A `Command.Group`
-			// is a component too, so relocating its host with a bare `appendChild`
-			// strands it outside its own fence: when that group later unmounts, the
-			// runtime removes the heading and items it still tracks but leaves the
-			// host `<div cmdk-group>` (and its empty `cmdk-group-items`) orphaned in
-			// the list — a visible empty block for anyone styling `[cmdk-group]`, an
-			// `aria-labelledby` pointing at a removed id, and a ghost that keeps its
-			// `data-value` so the lookup above can match it instead of a live group
-			// of the same name.
-			if (element?.parentElement) moveWithMarkers(element.parentElement, element);
+			if (element instanceof HTMLElement) setStyle(element, 'order', String(topLevel + rank + 1));
 		});
 	}
 
@@ -435,8 +474,45 @@ export function CommandRoot(props: CommandProps) @{
 		return listInnerRef.current?.querySelector(`${ITEM_SELECTOR}[aria-selected="true"]`);
 	}
 
-	function getValidItems() {
-		return Array.from(listInnerRef.current?.querySelectorAll(VALID_ITEM_SELECTOR) || []);
+	/** Element children of `container`, in the order they are painted. */
+	function orderedChildren(container: Element): HTMLElement[] {
+		return Array.from(container.children).filter(
+			(child): child is HTMLElement => child instanceof HTMLElement,
+		).map((child, index) => ({ child, index, order: Number(child.style.order) || 0 })).sort(
+			(a, b) => a.order - b.order || a.index - b.index,
+		).map(({ child }) => child);
+	}
+
+	/**
+ * Selectable items in the order the user sees them.
+ *
+ * Selection and arrow-key navigation both read this, so it has to agree with
+ * what is on screen. While a filter is active the ranking lives in CSS `order`
+ * rather than in DOM order (see `sort()`), and the two disagree — walking the
+ * DOM would select and navigate in source order behind a differently-ordered
+ * list. Descending through the ranked containers keeps group ranking and
+ * within-group ranking composed in the right order.
+ *
+ * With no filter active nothing carries an `order`, so DOM order already IS
+ * visual order and the flat query is both correct and cheaper.
+ */
+	function getValidItems(): Element[] {
+		const root = listInnerRef.current;
+		if (!root) return [];
+		if (styled.current.size === 0) return Array.from(root.querySelectorAll(VALID_ITEM_SELECTOR));
+
+		const items: Element[] = [];
+		const walk = (container: Element) => {
+			for (const child of orderedChildren(container)) {
+				if (child.matches(ITEM_SELECTOR)) {
+					if (child.matches(VALID_ITEM_SELECTOR)) items.push(child);
+					continue;
+				}
+				walk(child);
+			}
+		};
+		walk(root);
+		return items;
 	}
 
 	function updateSelectedToIndex(index: number) {

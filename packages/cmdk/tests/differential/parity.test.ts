@@ -63,11 +63,29 @@ const activeDescendant = (mount: { find(selector: string): Element }): string | 
  * (see the documented divergence below). Everything else must still match
  * exactly — this is the full rig normalisation, minus that one attribute.
  */
+/**
+ * OCTANE DIVERGENCE: upstream ranks matches by physically relocating item nodes;
+ * the port assigns CSS `order` inside a flex container instead, because moving a
+ * node carries it out of the comment-fenced ranges octane tracks and orphans it
+ * (see `sort()` in command.tsrx). The rendered result is the same list in the
+ * same visible order, but the port's markup carries the ranking declarations and
+ * upstream's does not.
+ *
+ * Only those exact declarations are removed — any other inline style, and every
+ * other attribute and node, still has to match byte-for-byte.
+ */
+function stripRankingStyles(html: string): string {
+	return html
+		.replace(/(?:order:\s*\d+|display:\s*flex|flex-direction:\s*column);?\s*/g, '')
+		.replace(/ style="\s*"/g, '');
+}
+
 function expectEqualIgnoringActiveDescendant(
 	octane: { container: HTMLElement },
 	react: { container: HTMLElement },
 ): void {
-	const strip = (html: string) => html.replace(/ aria-activedescendant="[^"]*"/g, '');
+	const strip = (html: string) =>
+		stripRankingStyles(html.replace(/ aria-activedescendant="[^"]*"/g, ''));
 	expect(normaliseHtml(strip(octane.container.innerHTML))).toBe(
 		normaliseHtml(strip(react.container.innerHTML)),
 	);
@@ -130,20 +148,18 @@ describe('differential: @octanejs/cmdk vs cmdk@1.1.1', () => {
 			await octane.input('[cmdk-input]', '');
 			await react.input('[cmdk-input]', '');
 			await settle();
-			// Both restore every item...
+			// Both restore every item, in SOURCE order. This checkpoint used to pin a
+			// divergence: upstream's sort() relocates matching nodes, React's
+			// reconciler puts them back when the search clears, and octane's leaves
+			// externally-moved nodes where they are — so the port's list stayed
+			// scrambled. The port no longer moves nodes at all (it ranks with CSS
+			// `order` and drops that on clear), so the residue cannot form and the
+			// two runtimes agree exactly.
 			const values = (mount: typeof octane) =>
 				mount.findAll('[cmdk-item]').map((el) => el.textContent);
-			expect([...values(octane)].sort()).toEqual(['Apple', 'Banana', 'Cherry']);
-			expect([...values(react)].sort()).toEqual(['Apple', 'Banana', 'Cherry']);
-
-			// OCTANE DIVERGENCE (found by this suite): cmdk's sort() imperatively
-			// appendChild's matching items while filtering. When the search clears,
-			// React's reconciler repositions the nodes it owns and the source order
-			// comes back; octane's reconciler leaves externally-moved nodes where
-			// they are, so the item sort() relocated stays at the end. Same items,
-			// same selection — only the residual order differs.
 			expect(values(react)).toEqual(['Apple', 'Banana', 'Cherry']);
-			expect(values(octane)).toEqual(['Apple', 'Cherry', 'Banana']);
+			expect(values(octane)).toEqual(['Apple', 'Banana', 'Cherry']);
+			expectEqualIgnoringActiveDescendant(octane, react);
 		});
 
 		differential.unmount();

@@ -328,3 +328,19 @@ export function DialogMenu(props: { open: boolean }) @{
 		</Command.List>
 	</Command.Dialog>
 }
+
+// The same growing data source as AsyncItemsMenu, but WITHOUT an explicit
+// `value` prop — the shape every upstream cmdk example uses, where the value is
+// inferred from the item's text. This is the real async-results flow: items
+// arrive while a search is already active.
+export function AsyncItemsNoValueMenu(props: { items: string[] }) @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			@for (const label of props.items; key label) {
+				<Command.Item>{label as string}</Command.Item>
+			}
+		</Command.List>
+	</Command>
+}

@@ -15,6 +15,7 @@ import {
 	DuplicateValueMenu,
 	DynamicValueMenu,
 	AsyncItemsMenu,
+	AsyncItemsNoValueMenu,
 	ForceMountMenu,
 	ForceMountSwapMenu,
 	GroupSwapMenu,
@@ -37,6 +38,22 @@ async function settle(): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 0));
 	flushEffects();
 	flushSync(() => {});
+}
+
+/**
+ * Ranked order as the user sees it. `sort()` no longer relocates DOM nodes —
+ * it assigns CSS `order` inside a flex container — so the visible sequence is
+ * source order re-sorted by that property, and DOM order stays source order.
+ */
+function inVisualOrder<T extends Element>(elements: T[]): T[] {
+	return elements
+		.map((el, index) => ({
+			el,
+			index,
+			order: Number((el as unknown as HTMLElement).style.order) || 0,
+		}))
+		.sort((a, b) => a.order - b.order || a.index - b.index)
+		.map(({ el }) => el);
 }
 
 function type(input: HTMLInputElement, value: string): void {
@@ -181,9 +198,81 @@ describe('@octanejs/cmdk — score ordering (Phase 2)', () => {
 		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
 		await settle();
 
-		// Apple (word-start match) ranks above Salad and moves to the top.
-		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple', 'Salad']);
+		// Apple (word-start match) ranks above Salad and is ordered to the top.
+		expect(inVisualOrder(app.findAll('[cmdk-item]')).map((el) => el.textContent)).toEqual([
+			'Apple',
+			'Salad',
+		]);
 		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Apple');
+
+		app.unmount();
+	});
+
+	it('renders an item that arrives while a search is active, with no explicit value', async () => {
+		// The real async-results flow: results land while the user is already
+		// typing, and — as in every upstream example — the value is inferred from
+		// the item's text rather than passed as a prop. A never-scored item used to
+		// deadlock: it rendered null, so `ref.current` stayed null, so `useValue`
+		// had no textContent to read, so it registered empty and scored zero
+		// forever. It was invisible for as long as the search was non-empty.
+		const app = mount(AsyncItemsNoValueMenu, { items: ['Apple'] });
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'ap');
+		await settle();
+		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple']);
+
+		app.update(AsyncItemsNoValueMenu, { items: ['Apple', 'Apricot'] });
+		await settle();
+		// Apple outranks Apricot for "ap", matching cmdk@1.1.1 on React.
+		expect(inVisualOrder(app.findAll('[cmdk-item]')).map((el) => el.textContent)).toEqual([
+			'Apple',
+			'Apricot',
+		]);
+
+		app.unmount();
+	});
+
+	it('moves the selection on when the selected item is removed alongside a sibling', async () => {
+		// Every item teardown scheduled its follow-up under the SAME batcher key, and
+		// the batcher is a Map — so removing two items in one update let the second
+		// teardown overwrite the first, and the callback that survived had captured a
+		// different item. The selection was left pointing at a node that no longer
+		// exists: nothing renders `aria-selected`, the combobox's
+		// `aria-activedescendant` dangles at a removed id, and Enter does nothing.
+		const app = mount(AsyncItemsNoValueMenu, { items: ['Apple', 'Banana', 'Cherry'] });
+		await settle();
+		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Apple');
+
+		// Drop the selected item together with a sibling.
+		app.update(AsyncItemsNoValueMenu, { items: ['Cherry'] });
+		await settle();
+
+		const selected = app.find('[cmdk-item][aria-selected="true"]');
+		expect(selected?.textContent).toBe('Cherry');
+
+		// ...and the combobox must not be left pointing at a node that has been
+		// removed from the document — the accessibility half of the same bug.
+		const active = app.find('[cmdk-input]').getAttribute('aria-activedescendant');
+		expect(active).toBe(selected!.getAttribute('id'));
+
+		app.unmount();
+	});
+
+	it('leaves no orphaned nodes when a ranked @for list is emptied', async () => {
+		// A `@for` iteration wraps each item in a SECOND comment-fenced range on top
+		// of the component's own. Ranking by physically relocating the node carried
+		// it out of both at once, so the loop later cleared an empty range and every
+		// item survived the removal — stacked above "No results found.".
+		const app = mount(AsyncItemsNoValueMenu, { items: ['Salad', 'Apple', 'Banana'] });
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
+		await settle();
+		expect(app.findAll('[cmdk-item]').length).toBe(3);
+
+		app.update(AsyncItemsNoValueMenu, { items: [] });
+		await settle();
+		expect(app.findAll('[cmdk-item]')).toHaveLength(0);
+		expect(app.find('[cmdk-list]').textContent).toBe('No results found.');
 
 		app.unmount();
 	});
@@ -194,7 +283,10 @@ describe('@octanejs/cmdk — score ordering (Phase 2)', () => {
 
 		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
 		await settle();
-		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple', 'Salad']);
+		expect(inVisualOrder(app.findAll('[cmdk-item]')).map((el) => el.textContent)).toEqual([
+			'Apple',
+			'Salad',
+		]);
 
 		// Narrow so only Apple matches — Salad must fully unmount from the DOM.
 		type(app.find('[cmdk-input]') as HTMLInputElement, 'appl');
@@ -262,7 +354,9 @@ describe('@octanejs/cmdk — groups, separator, loading (Phase 3)', () => {
 		const app = mount(ScoredGroupsMenu);
 		await settle();
 		const headings = () =>
-			app.findAll('[cmdk-group]').map((g) => g.querySelector('[cmdk-group-heading]')?.textContent);
+			inVisualOrder(app.findAll('[cmdk-group]')).map(
+				(g) => g.querySelector('[cmdk-group-heading]')?.textContent,
+			);
 
 		expect(headings()).toEqual(['Beta', 'Alpha']);
 
@@ -276,21 +370,22 @@ describe('@octanejs/cmdk — groups, separator, loading (Phase 3)', () => {
 	});
 
 	it('leaves no empty group behind when a reordered group is removed', async () => {
-		// `sort()` relocates group hosts to put the best-scoring group first. A
-		// Group is a component, so moving its host without the comment markers that
-		// fence it strands the node: the later unmount removes the heading and items
-		// the runtime still tracks and leaves an empty `<div cmdk-group>` in the
-		// list — a visible block for anyone styling `[cmdk-group]`, an
-		// `aria-labelledby` pointing at a removed id, and a ghost that keeps its
-		// `data-value` so the group lookup can match it over a live group.
+		// Ranking a group and then removing it must not leave a shell behind. This
+		// used to be a live hazard: `sort()` relocated group hosts, which strands a
+		// component's node outside the comment markers that fence it, so the later
+		// unmount removed the heading and items the runtime still tracked and left
+		// an empty `<div cmdk-group>` in the list. Ordering is declarative now, so
+		// nothing moves — the test stays as the guard against regressing to it.
 		const app = mount(RemovableSortedGroupsMenu, { showBeta: true });
 		await settle();
 		const headings = () =>
-			app.findAll('[cmdk-group]').map((g) => g.querySelector('[cmdk-group-heading]')?.textContent);
+			inVisualOrder(app.findAll('[cmdk-group]')).map(
+				(g) => g.querySelector('[cmdk-group-heading]')?.textContent,
+			);
 		expect(headings()).toEqual(['Beta', 'Alpha', 'Gamma']);
 
 		// "a": Apple and Avocado are word-start matches, Zebra matches late, so
-		// Alpha and Gamma sort above Beta — every group host gets relocated.
+		// Alpha and Gamma rank above Beta — every group host gets re-ranked.
 		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
 		await settle();
 		expect(headings()).toEqual(['Alpha', 'Gamma', 'Beta']);
@@ -692,10 +787,10 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 	});
 
 	it('restores every item when the search is cleared', async () => {
-		// OCTANE DIVERGENCE: the items all come back and the selection is right,
-		// but they stay in the order `sort()` left them rather than returning to
-		// source order — octane's reconciler does not reposition nodes it did not
-		// move. Pinned here so a change in either direction is visible.
+		// Clearing the search returns the list to SOURCE order. Ranking is applied
+		// as CSS `order` and dropped when the filter goes away, so no residue can
+		// accumulate — the physical-reordering approach this replaced left the list
+		// permanently scrambled, differently after every search.
 		const app = mount(BasicMenu);
 		await settle();
 		const input = app.find('[cmdk-input]') as HTMLInputElement;
@@ -707,8 +802,12 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		type(input, '');
 		await settle();
 		const texts = app.findAll('[cmdk-item]').map((el) => el.textContent);
-		expect([...texts].sort()).toEqual(['Apple', 'Banana', 'Cherry']);
-		expect(texts).toEqual(['Banana', 'Cherry', 'Apple']);
+		expect(texts).toEqual(['Apple', 'Banana', 'Cherry']);
+		expect(inVisualOrder(app.findAll('[cmdk-item]')).map((el) => el.textContent)).toEqual([
+			'Apple',
+			'Banana',
+			'Cherry',
+		]);
 
 		app.unmount();
 	});
