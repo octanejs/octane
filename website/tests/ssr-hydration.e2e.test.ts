@@ -378,32 +378,32 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		// Put the pointer on a keyword in the SOURCE pane and report what the
 		// output pane shows. `click` additionally asks to be taken there, which
 		// is the only interaction allowed to move the output pane's scroll.
-		// `occurrence` picks among repeats: an example that introduces its own
-		// directives in a prose comment has the comment first, and a comment is
-		// correctly unmapped.
-		const probeKeyword = async (keyword: string, action: 'hover' | 'click', occurrence = 0) => {
+		// `nth` picks among repeats, negative counting from the end. An example
+		// that introduces its own directives in a prose comment mentions each
+		// one before using it, and a comment is correctly unmapped.
+		const probeKeyword = async (keyword: string, action: 'hover' | 'click', nth = 0) => {
 			const point = await page.evaluate(
-				({ word, nth }) => {
+				({ word, index }) => {
 					const content = document.querySelectorAll('.pg-editor .cm-content')[0];
 					const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-					let remaining = nth;
+					const hits: { node: Node; at: number }[] = [];
 					while (walker.nextNode()) {
 						const node = walker.currentNode;
 						const at = node.textContent!.indexOf(word);
-						if (at === -1) continue;
-						if (remaining-- > 0) continue;
-						const range = document.createRange();
-						range.setStart(node, at + 1);
-						range.setEnd(node, at + 2);
-						// CodeMirror renders only around its scroll position; bring the
-						// keyword into view so the measured point is real.
-						(node.parentElement as HTMLElement)?.scrollIntoView({ block: 'center' });
-						const rect = range.getBoundingClientRect();
-						return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+						if (at !== -1) hits.push({ node, at });
 					}
-					return null;
+					const hit = hits.at(index);
+					if (!hit) return null;
+					const range = document.createRange();
+					range.setStart(hit.node, hit.at + 1);
+					range.setEnd(hit.node, hit.at + 2);
+					// CodeMirror renders only around its scroll position; bring the
+					// keyword into view so the measured point is real.
+					(hit.node.parentElement as HTMLElement)?.scrollIntoView({ block: 'center' });
+					const rect = range.getBoundingClientRect();
+					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 				},
-				{ word: keyword, nth: occurrence },
+				{ word: keyword, index: nth },
 			);
 			if (!point) return null;
 			const before = await page.evaluate(
@@ -619,9 +619,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 
 		// `@try` and its clauses lower to boundary ELEMENTS in the type-only
 		// output: `@try` names the boundary it became, and each clause names the
-		// `fallback` prop it fills. They live in the Suspense example, which
-		// introduces all three in a prose comment first — hence the occurrence
-		// index.
+		// `fallback` prop it fills. They live in the Suspense example, whose
+		// opening comment names all three before the block uses them — so probe
+		// the LAST occurrence of each, which is the directive.
 		await page.selectOption('.pg-select', 'suspense');
 		await page.waitForFunction(
 			() => (document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('@pending'),
@@ -642,13 +642,13 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			['@pending', 'fallback'],
 			['@catch', 'fallback'],
 		]) {
-			const clicked = await probeKeyword(keyword, 'click', 1);
+			const clicked = await probeKeyword(keyword, 'click', -1);
 			expect(clicked, `${keyword} not found in the source pane`).not.toBeNull();
 			expect(
 				clicked!.output,
 				`${keyword} in types: source ${JSON.stringify(clicked!.source)}`,
 			).toContain(expected);
-			const hovered = await probeKeyword(keyword, 'hover', 1);
+			const hovered = await probeKeyword(keyword, 'hover', -1);
 			expect(
 				hovered!.source,
 				`hovering ${keyword} in types marked nothing in the SOURCE pane`,
