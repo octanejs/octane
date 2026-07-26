@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount } from './_helpers';
 import {
 	ProviderChildrenDialectFlip,
 	ProviderChildrenDialectFlipWithState,
 	ProviderChildrenDialectFlipWithSiblings,
+	ProviderDialectFlipCleanupThrows,
+	IfBranchSwapCleanupThrows,
 } from './_fixtures/provider-children-dialect.tsrx';
 
 // A Provider accepts its children in either dialect: the compiled children-block function a
@@ -59,5 +61,40 @@ describe('context Provider — children dialect changes', () => {
 		expect(m.container.querySelector('.val')?.textContent).toBe('ctx');
 
 		m.unmount();
+	});
+
+	it('routes a cleanup that throws during the flip to the enclosing boundary', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const m = mount(ProviderDialectFlipCleanupThrows);
+		try {
+			expect(m.container.querySelector('.throwing')).not.toBe(null);
+
+			m.click('.toggle');
+
+			// The remount tears the old children down mid-render. A deletion-phase throw has to
+			// reach the boundary rather than be logged and swallowed — the same contract an
+			// ordinary mid-render deletion gets, pinned by the `@if` control below.
+			expect(m.container.querySelector('.caught')).not.toBe(null);
+			expect(error.mock.calls.filter((c) => String(c[0]).includes('cleanup-boom'))).toHaveLength(0);
+		} finally {
+			error.mockRestore();
+			m.unmount();
+		}
+	});
+
+	it('handles that cleanup throw the same way an ordinary branch swap does', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const m = mount(IfBranchSwapCleanupThrows);
+		try {
+			m.click('.toggle');
+
+			// The control: an `@if` swap deleting the identical component. The Provider flip is a
+			// deletion like any other, so it must not invent its own error-routing behavior.
+			expect(m.container.querySelector('.caught')).not.toBe(null);
+			expect(error.mock.calls.filter((c) => String(c[0]).includes('cleanup-boom'))).toHaveLength(0);
+		} finally {
+			error.mockRestore();
+			m.unmount();
+		}
 	});
 });

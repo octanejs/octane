@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, useState } from 'octane';
+import { createContext, createElement, useContext, useLayoutEffect, useState } from 'octane';
 
 const Ctx = createContext('none');
 
@@ -60,5 +60,49 @@ export function ProviderChildrenDialectFlipWithSiblings() @{
 			<Reader />
 		</DialectRoot>
 		<span class="after">after</span>
+	</div>
+}
+
+// A cleanup that throws while the Provider swaps dialects. The deletion happens mid-render rather
+// than through the normal unmount path, so this checks the teardown error still reaches the
+// enclosing boundary instead of being logged and swallowed.
+function ThrowingCleanup() @{
+	useLayoutEffect(() => {
+		return () => {
+			throw new Error('cleanup-boom');
+		};
+	}, []);
+	<span class="throwing" />
+}
+
+export function ProviderDialectFlipCleanupThrows() @{
+	const [wrapped, setWrapped, getWrapped] = useState(false);
+	<div>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		@try {
+			<DialectRoot wrapped={wrapped} value="ctx">
+				<ThrowingCleanup />
+			</DialectRoot>
+		} @catch (err) {
+			<span class="caught">{(err.message ?? String(err)) as string}</span>
+		}
+	</div>
+}
+
+// Control: the SAME throwing cleanup torn down by an ordinary mid-render branch swap. Whatever
+// the runtime does here is the established contract for a deletion that happens during render.
+export function IfBranchSwapCleanupThrows() @{
+	const [shown, setShown, getShown] = useState(true);
+	<div>
+		<button class="toggle" onClick={() => setShown(!getShown())}>toggle</button>
+		@try {
+			@if (shown) {
+				<ThrowingCleanup />
+			} @else {
+				<span class="other" />
+			}
+		} @catch (err) {
+			<span class="caught">{(err.message ?? String(err)) as string}</span>
+		}
 	</div>
 }

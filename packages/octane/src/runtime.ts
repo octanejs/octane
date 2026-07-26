@@ -5094,24 +5094,39 @@ const CHILDREN_DIALECT_SLOT = Symbol('octane.childrenDialect') as HookSlot;
  * no hooks of its own, so every hook in the map belongs to the children being replaced.
  */
 function resetScopeChildren(scope: Scope): void {
-	unmountScopeChildrenAndSlots(scope, true);
-
-	// Child scopes and slots detach their own DOM above, but a compiled body also creates host
-	// nodes directly in the Block's range. Clear whatever is left of it. `removeRange` stops
-	// BEFORE the end marker, so borrowed markers survive for their owning slot; a null start or
-	// end means the Block runs to that edge of its parent (marker elision).
+	// This deletion runs mid-render rather than through `unmountBlock`, so it has to install the
+	// same teardown bracket that path does — otherwise a cleanup that throws would find no handler
+	// and be logged instead of reaching the boundary enclosing the deletion.
 	const block = scope.block;
-	const start = block.startMarker;
-	removeRange(start !== null ? start.nextSibling : block.parentNode.firstChild, block.endMarker);
+	if (TEARDOWN_DEPTH === 0) {
+		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+	}
+	TEARDOWN_DEPTH++;
+	// The bracket spans the WHOLE reset, not just the teardown call: a queued error is dispatched
+	// when the depth returns to zero, and its handler re-renders the enclosing boundary. Running
+	// that while the scope is half torn down would have the handler walk a scope whose DOM range
+	// and slot arrays disagree, so the scope is left consistent first.
+	try {
+		unmountScopeChildrenAndSlots(scope, true);
 
-	// Drop the collections rather than emptying them: the lazily-allocated ones go back to null,
-	// and `slots` gets a fresh array (compiled bodies index it directly, so it stays non-null).
-	scope.children = null;
-	scope.cleanups = null;
-	scope._slots = null;
-	scope.effectSlots = null;
-	scope.hooks = null;
-	scope.slots = [];
+		// Child scopes and slots detach their own DOM above, but a compiled body also creates host
+		// nodes directly in the Block's range. Clear whatever is left of it. `removeRange` stops
+		// BEFORE the end marker, so borrowed markers survive for their owning slot; a null start or
+		// end means the Block runs to that edge of its parent (marker elision).
+		const start = block.startMarker;
+		removeRange(start !== null ? start.nextSibling : block.parentNode.firstChild, block.endMarker);
+
+		// Drop the collections rather than emptying them: the lazily-allocated ones go back to null,
+		// and `slots` gets a fresh array (compiled bodies index it directly, so it stays non-null).
+		scope.children = null;
+		scope.cleanups = null;
+		scope._slots = null;
+		scope.effectSlots = null;
+		scope.hooks = null;
+		scope.slots = [];
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
+	}
 }
 
 // ---------------------------------------------------------------------------
