@@ -1,5 +1,29 @@
 [
   {
+    "suite": "lifecycle-memory",
+    "op": "cycle",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 3,
+    "note": "Same-run production Chromium effectful mount/update/unmount cycles with exact listener, subscription, interval, effect-cleanup, and post-teardown correctness gates. A verified quick run measured below 2x; 3x leaves real-browser noise headroom."
+  },
+  {
+    "suite": "controlled-form",
+    "op": "typing",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2,
+    "note": "Same-run Playwright typing into 512 controlled fields while preserving the input, focus, insertion caret, and latest validation. A verified quick run measured about 1.01x; 2x leaves browser and keyboard-event noise headroom."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "broad_write",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2,
+    "note": "Same-run 512-subscriber useSyncExternalStore fan-out, gated on complete visible updates, rapid-write consistency, and exact listener teardown. A verified quick run measured about 1.01x; 2x leaves real-browser scheduling headroom."
+  },
+  {
     "suite": "hydration-interactivity",
     "op": "uncontrolled_6x_hydration",
     "target": "octane-tsrx",

@@ -250,6 +250,17 @@ const SUITES = [
 			args: (n) => [target, String(n)],
 		})),
 	},
+	...['lifecycle-memory', 'controlled-form', 'external-store-fanout'].map((name) => ({
+		name,
+		cwd: name,
+		servers: [],
+		iter: name === 'lifecycle-memory' ? { normal: 84, quick: 2 } : { normal: 8, quick: 2 },
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
+			label: target,
+			script: 'run.mjs',
+			args: (n) => [target, String(n)],
+		})),
+	})),
 	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
