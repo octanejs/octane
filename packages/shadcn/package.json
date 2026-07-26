@@ -40,9 +40,9 @@
     "typecheck": "node scripts/typecheck.mjs"
   },
   "dependencies": {
-    "@octanejs/lucide": "0.1.8",
-    "@octanejs/radix": "0.1.12",
-    "@octanejs/sonner": "0.1.8",
+    "@octanejs/lucide": "workspace:*",
+    "@octanejs/radix": "workspace:*",
+    "@octanejs/sonner": "workspace:*",
     "class-variance-authority": "catalog:default",
     "clsx": "catalog:default",
     "tailwind-merge": "catalog:default"
