@@ -4964,7 +4964,23 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		//     into `props.children` (a descriptor, an array, or text — never a function).
 		// `childrenAsBody` normalizes either shape to a callable body, so both dialects
 		// render their children inside the Provider's scope (and thus under its context).
+		//
+		// The two dialects both claim `scope.slots[0]` — a compiled body stores its binding
+		// bag there, while the descriptor path's `childSlot(scope, 0, …)` stores a childSlot
+		// record. A parent that wraps its children conditionally (common in ported React
+		// bindings) flips between them across renders, so the incoming dialect would read the
+		// outgoing one's record as its own and corrupt the tree. Remount the children on a
+		// flip instead: the two sides are structurally different code, which is the same
+		// contract React gives an element-type change.
 		if (props.children != null) {
+			// Steady state is one map read and an integer compare — the write happens only on the
+			// first render and on an actual flip.
+			const dialect = typeof props.children === 'function' ? 1 : 2;
+			const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+			if (previous !== dialect) {
+				if (previous !== undefined) resetScopeChildren(scope);
+				ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+			}
 			childrenAsBody(props.children)(undefined, scope, undefined);
 		}
 	} as Context<T>;
@@ -5050,6 +5066,43 @@ function childrenAsBody(children: unknown): ComponentBody {
 	return (_p, s) => {
 		childSlot(s, 0, s.block.parentNode, children, s.block.endMarker);
 	};
+}
+
+/**
+ * Records which children dialect (1 = compiled body, 2 = descriptor) a scope last rendered, so a
+ * flip can be detected. Lives in the hook map, whose Symbol keys are disjoint from the numeric
+ * `slots` indices the two dialects contend over.
+ */
+const CHILDREN_DIALECT_SLOT = Symbol('octane.childrenDialect') as HookSlot;
+
+/**
+ * Tear down everything a scope rendered and hand it back empty, so a caller can re-render it from
+ * scratch in the same Block. Used when a scope's children switch dialect: the outgoing dialect's
+ * `slots`/`_slots`/child-scope state is meaningless to the incoming one, and leaving it in place
+ * would have the incoming dialect adopt records of the wrong kind.
+ *
+ * The scope's own hook state goes with it. That is correct for the one caller — a Provider keeps
+ * no hooks of its own, so every hook in the map belongs to the children being replaced.
+ */
+function resetScopeChildren(scope: Scope): void {
+	unmountScopeChildrenAndSlots(scope, true);
+
+	// Child scopes and slots detach their own DOM above, but a compiled body also creates host
+	// nodes directly in the Block's range. Clear whatever is left of it. `removeRange` stops
+	// BEFORE the end marker, so borrowed markers survive for their owning slot; a null start or
+	// end means the Block runs to that edge of its parent (marker elision).
+	const block = scope.block;
+	const start = block.startMarker;
+	removeRange(start !== null ? start.nextSibling : block.parentNode.firstChild, block.endMarker);
+
+	// Truncate the eagerly-allocated arrays in place rather than replacing them: same empty
+	// result, no garbage, and the Scope keeps the backing store it already sized.
+	scope.children.length = 0;
+	scope.cleanups.length = 0;
+	scope.slots.length = 0;
+	scope._slots = null;
+	scope.effectSlots = null;
+	scope.hooks = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -12374,12 +12427,6 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 		el.hasAttribute('disabled')
 	)
 		return null;
-	// An aria-hidden control is a form-interop MIRROR (AT-hidden and, by the
-	// pattern's contract, focus-excluded — e.g. the hidden "bubble inputs"
-	// radix-style libraries render behind a custom control): users cannot reach
-	// it, so handler-less controlled props are the intended wiring, not the
-	// authoring mistake this diagnostic exists to catch.
-	if (el.getAttribute('aria-hidden') === 'true') return null;
 
 	const hasInput =
 		isUsableEventSlot(host.$$input as EventSlot) ||

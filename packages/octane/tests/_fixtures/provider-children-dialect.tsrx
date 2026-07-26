@@ -1,0 +1,64 @@
+import { createContext, createElement, useContext, useState } from 'octane';
+
+const Ctx = createContext('none');
+
+export function Reader() @{
+	<span class="val">{useContext(Ctx) as string}</span>
+}
+
+function Passthrough(props) {
+	return props.children ?? null;
+}
+
+// A plain-`.ts` component that forwards its children into a Provider, wrapping them in another
+// component only in one of the two states. The Provider's `children` prop therefore alternates
+// between the compiled children-block FUNCTION its `.tsrx` consumer passed and an element
+// DESCRIPTOR — the two dialects a Provider must accept.
+function DialectRoot(props) {
+	return createElement(Ctx.Provider, {
+		value: props.value,
+		children: props.wrapped
+			? createElement(Passthrough, { children: props.children })
+			: props.children,
+	});
+}
+
+export function ProviderChildrenDialectFlip() @{
+	const [wrapped, setWrapped, getWrapped] = useState(false);
+	<div>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<DialectRoot wrapped={wrapped} value="ctx">
+			<Reader />
+		</DialectRoot>
+	</div>
+}
+
+// The same flip with live state inside the children, so a remount is observable as a reset.
+function Counter() @{
+	const [n, setN, getN] = useState(0);
+	<button class="count" onClick={() => setN(getN() + 1)}>{'n' + n as string}</button>
+}
+
+export function ProviderChildrenDialectFlipWithState() @{
+	const [wrapped, setWrapped, getWrapped] = useState(false);
+	<div>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<DialectRoot wrapped={wrapped} value="ctx">
+			<Counter />
+		</DialectRoot>
+	</div>
+}
+
+// The flip happening next to siblings in the same parent element: tearing the Provider's range
+// down must not disturb anything outside it.
+export function ProviderChildrenDialectFlipWithSiblings() @{
+	const [wrapped, setWrapped, getWrapped] = useState(false);
+	<div>
+		<span class="before">before</span>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		<DialectRoot wrapped={wrapped} value="ctx">
+			<Reader />
+		</DialectRoot>
+		<span class="after">after</span>
+	</div>
+}
