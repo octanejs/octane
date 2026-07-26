@@ -65,7 +65,7 @@ allowBuilds:
 esrap_common: &esrap_common ^2.3.0
 
 overrides:
-  esrap: *esrap_common
+  esrap: ^2.3.0
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls an older
   # beta preset transitively. Keep the transform on the beta.20 line required
   # by @tsrx/solid so generated SSR helpers match the installed runtime.
@@ -243,7 +243,7 @@ catalogs:
     devalue: ^5.8.2
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
-    esrap: *esrap_common
+    esrap: ^2.3.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
     happy-dom: ^20.11.0
@@ -378,6 +378,8 @@ minimumReleaseAgeExclude:
   - '@tsrx/vite-plugin-solid@0.0.80'
   - 'ripple@0.3.112'
   - '@lynx-js/types@4.1.0'
+  - '@tanstack/react-table@9.0.0-beta.58'
+  - '@tanstack/table-core@9.0.0-beta.58'
   # shadcn CLI + Tailwind v4 for the playground's registry-mode consumption of
   # @octanejs/shadcn (the CLI ships days-fresh; pinned exact above).
   - 'shadcn@4.14.1'

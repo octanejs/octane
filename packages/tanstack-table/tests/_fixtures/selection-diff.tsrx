@@ -1,4 +1,6 @@
-import { getCoreRowModel, useReactTable } from '@octanejs/tanstack-table';
+import { rowSelectionFeature, tableFeatures, useTable } from '@octanejs/tanstack-table';
+
+const features = tableFeatures({ rowSelectionFeature });
 
 // Differential fixture: row selection with an enableRowSelection predicate.
 // Checkboxes use the controlled-forms precedent — `checked={...}` with
@@ -17,11 +19,11 @@ const columns = [
 ];
 
 export function SelectionTable() @{
-	const table = useReactTable({
+	const table = useTable({
+		features,
 		data,
 		columns,
 		enableRowSelection: (row: any) => row.original.age > 20,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	<div>
 		<input

@@ -24,11 +24,25 @@ const pkg = JSON.parse(await readFile(join(PKG_ROOT, 'package.json'), 'utf8'));
 // pinned to the exact tested version (maintainer pinning policy), public npm
 // deps by bare name (upstream registry convention). `octane` itself is a peer,
 // like react upstream, and is deliberately not emitted.
+async function installableDependencySpec(name, version) {
+	if (!name.startsWith('@octanejs/')) return name;
+	if (!version.startsWith('workspace:')) return `${name}@${version}`;
+
+	const siblingPath = join(PKG_ROOT, '..', name.slice('@octanejs/'.length), 'package.json');
+	const sibling = JSON.parse(await readFile(siblingPath, 'utf8'));
+	if (sibling.name !== name) {
+		throw new Error(`registry: workspace dependency "${name}" resolved to "${sibling.name}"`);
+	}
+	return `${name}@${sibling.version}`;
+}
+
 const DEP_SPECS = Object.fromEntries(
-	Object.entries(pkg.dependencies).map(([name, version]) => [
-		name,
-		name.startsWith('@octanejs/') ? `${name}@${version}` : name,
-	]),
+	await Promise.all(
+		Object.entries(pkg.dependencies).map(async ([name, version]) => [
+			name,
+			await installableDependencySpec(name, version),
+		]),
+	),
 );
 
 function toConsumerSource(source) {

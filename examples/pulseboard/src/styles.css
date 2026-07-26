@@ -989,6 +989,51 @@ main#main-content {
 .selection-cell input {
 	accent-color: #7055ef;
 }
+
+/* ── Cell selection ─────────────────────────────────────────────────────── */
+.table-scroll:focus-visible {
+	outline: 2px solid #7558f6;
+	outline-offset: -2px;
+}
+.cell-selectable {
+	cursor: cell;
+	/* a drag across cells must not turn into a native text selection */
+	user-select: none;
+	/* Each side is its own custom property so the four edge classes compose.
+	   They could not if each set `box-shadow` directly — the last one would win.
+	   Insets are used so the outline never affects layout. */
+	--cell-edge-top: 0 0 0 0 transparent;
+	--cell-edge-right: 0 0 0 0 transparent;
+	--cell-edge-bottom: 0 0 0 0 transparent;
+	--cell-edge-left: 0 0 0 0 transparent;
+	box-shadow:
+		inset var(--cell-edge-top),
+		inset var(--cell-edge-right),
+		inset var(--cell-edge-bottom),
+		inset var(--cell-edge-left);
+}
+.cell-selected {
+	background: #efeaff;
+}
+/* The focused (anchor) cell reads as a slightly deeper fill rather than its own
+   border, so it sits inside the range outline instead of competing with it. */
+.cell-focused {
+	background: #ddd2ff;
+}
+/* Only the sides getSelectionEdges() reports get a border, so a union of
+   rectangles reads as one continuous outline instead of a grid of boxes. */
+.cell-edge-top {
+	--cell-edge-top: 0 2px 0 0 #7055ef;
+}
+.cell-edge-right {
+	--cell-edge-right: -2px 0 0 0 #7055ef;
+}
+.cell-edge-bottom {
+	--cell-edge-bottom: 0 -2px 0 0 #7055ef;
+}
+.cell-edge-left {
+	--cell-edge-left: 2px 0 0 0 #7055ef;
+}
 .table-scroll td:nth-child(2) {
 	color: #343247;
 	font-weight: 700;

@@ -52,12 +52,20 @@ const nodeTypesVersion = viteToolRequire('@types/node/package.json').version;
 const packedExampleCanaries = [
 	{
 		artifacts: ['dist/index.html'],
-		dependencyEdges: [['@octanejs/visx', '@octanejs/floating-ui']],
+		dependencyEdges: [
+			['@octanejs/visx', '@octanejs/floating-ui'],
+			// The table binding reads its state through @octanejs/tanstack-store's
+			// useSelector, so a second copy would mean a second @tanstack/store and
+			// atom identities that no longer match the table's.
+			['@octanejs/tanstack-table', '@octanejs/tanstack-store'],
+		],
 		directory: 'pulseboard',
 		label: 'Pulseboard client example',
 		packages: [
 			'octane',
 			'@octanejs/tanstack-table',
+			'@octanejs/tanstack-store',
+			'@octanejs/tanstack-hotkeys',
 			'@octanejs/tanstack-virtual',
 			'@octanejs/visx',
 			'@octanejs/floating-ui',

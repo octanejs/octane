@@ -635,7 +635,9 @@ describe('manifest-declared manual hook slots', () => {
 		// removing the flag from a listed one) means its .ts/.js sources double-slot the
 		// moment ANOTHER project imports them — the exact drift the declaration
 		// exists to prevent. Redux, Recharts, and Hook Form are auto-slotted by
-		// design and therefore carry no flag.
+		// design and therefore carry no flag. Bindings whose hooks all live in
+		// .tsrx (tanstack-form, tanstack-hotkeys, tanstack-ai, tanstack-table) are
+		// fully compiled, so they hand-forward nothing and carry no flag either.
 		const packagesDir = join(process.cwd(), 'packages');
 		const declared = readdirSync(packagesDir)
 			.filter((dir) => {
@@ -668,7 +670,6 @@ describe('manifest-declared manual hook slots', () => {
 			'tanstack-router',
 			'tanstack-start',
 			'tanstack-store',
-			'tanstack-table',
 			'tanstack-virtual',
 			'testing-library',
 			'three',

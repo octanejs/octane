@@ -714,12 +714,17 @@
       "directory": "examples/pulseboard",
       "id": "pulseboard",
       "title": "Pulseboard",
-      "summary": "A production-built analytics console proving responsive Visx SVG measurement, accessible TanStack Table state, measured TanStack Virtual logs, keyboard navigation, and deterministic recovery.",
+      "summary": "A production-built analytics console proving responsive Visx SVG measurement, accessible TanStack Table state with cell range selection, measured TanStack Virtual logs, TanStack Hotkeys keyboard navigation, and deterministic recovery.",
       "status": "active",
       "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
-      "bindings": ["@octanejs/tanstack-table", "@octanejs/tanstack-virtual", "@octanejs/visx"],
+      "bindings": [
+        "@octanejs/tanstack-hotkeys",
+        "@octanejs/tanstack-table",
+        "@octanejs/tanstack-virtual",
+        "@octanejs/visx"
+      ],
       "octaneFeatures": [
         "async-recovery",
         "keyed-reconciliation",
@@ -748,6 +753,13 @@
         {
           "id": "accessible-campaign-table",
           "title": "Sort, filter, select, empty, and restore an accessible TanStack campaign report",
+          "kind": "golden",
+          "spec": "e2e/pulseboard.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "cell-range-selection",
+          "title": "Select campaign cell ranges by click, shift-click, drag, and TanStack Hotkeys keyboard navigation",
           "kind": "golden",
           "spec": "e2e/pulseboard.spec.ts",
           "critical": true

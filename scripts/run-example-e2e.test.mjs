@@ -18,7 +18,7 @@ describe('example E2E shard planning', () => {
 		assert.equal(new Set(scheduledIds).size, apps.length);
 		assert.deepEqual(
 			plan.shards.map((shard) => shard.estimatedWeight).sort((left, right) => left - right),
-			[28, 29, 30],
+			[29, 29, 30],
 		);
 		assert.deepEqual(
 			plan.shards.map((shard) => shard.apps.length).sort((left, right) => left - right),

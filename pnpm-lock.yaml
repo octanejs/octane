@@ -240,9 +240,6 @@ catalogs:
     '@tanstack/react-store':
       specifier: ^0.11.0
       version: 0.11.0
-    '@tanstack/react-table':
-      specifier: 8.21.3
-      version: 8.21.3
     '@tanstack/react-virtual':
       specifier: 3.14.5
       version: 3.14.5
@@ -252,9 +249,6 @@ catalogs:
     '@tanstack/store':
       specifier: ^0.9.3
       version: 0.9.3
-    '@tanstack/table-core':
-      specifier: 8.21.3
-      version: 8.21.3
     '@tanstack/virtual-core':
       specifier: 3.17.3
       version: 3.17.3
@@ -3412,6 +3406,9 @@ importers:
 
   examples/pulseboard:
     dependencies:
+      '@octanejs/tanstack-hotkeys':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-hotkeys
       '@octanejs/tanstack-table':
         specifier: workspace:*
         version: link:../../packages/tanstack-table
@@ -4979,13 +4976,16 @@ importers:
 
   packages/tanstack-table:
     dependencies:
+      '@octanejs/tanstack-store':
+        specifier: workspace:*
+        version: link:../tanstack-store
       '@tanstack/table-core':
-        specifier: catalog:default
-        version: 8.21.3
+        specifier: 9.0.0-beta.58
+        version: 9.0.0-beta.58
     devDependencies:
       '@tanstack/react-table':
-        specifier: catalog:default
-        version: 8.21.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: 9.0.0-beta.58
+        version: 9.0.0-beta.58(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.50(react@19.2.7)
@@ -9368,6 +9368,12 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
+  '@tanstack/react-table@9.0.0-beta.58':
+    resolution: {integrity: sha512-pvacQiA9pymAivt2dOOsOcnNEp5FMPvX2hjbnkWsh0lvlBtf6mh9bnZ7q14iAakGMiGs+o+/tbSr5jT19XfTgg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      react: '>=18'
+
   '@tanstack/react-virtual@3.14.5':
     resolution: {integrity: sha512-4EKRXh7zBLkbKbFmG3AUVkircuHd+7OdT1pocJSepxtfBd3qnrJgJ5rtPkRYyo9fmyVb2+pI2xPy5oYvMLQy6A==}
     peerDependencies:
@@ -9522,6 +9528,10 @@ packages:
   '@tanstack/table-core@8.21.3':
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
+
+  '@tanstack/table-core@9.0.0-beta.58':
+    resolution: {integrity: sha512-iP2N6AA4iU6NbLF/DOHoA/mJUDspz5cRIvPkqfTtuoURcjNp4MxbJPxTRUizuX8JejDL2PDfmLUMj3zU+znhyA==}
+    engines: {node: '>=20'}
 
   '@tanstack/virtual-core@3.17.3':
     resolution: {integrity: sha512-8Np/TFELpI0ySuJoVmjvOrQYXH/8sTX0Biv9szhFhY39xOdAAY+smrMxjxOum/ux3eM8MUJQsEJ0/R0UpvC8dw==}
@@ -20540,11 +20550,13 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
-  '@tanstack/react-table@8.21.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@tanstack/react-table@9.0.0-beta.58(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@tanstack/table-core': 8.21.3
+      '@tanstack/react-store': 0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@tanstack/table-core': 9.0.0-beta.58
       react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+    transitivePeerDependencies:
+      - react-dom
 
   '@tanstack/react-virtual@3.14.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -20807,6 +20819,10 @@ snapshots:
   '@tanstack/store@0.9.3': {}
 
   '@tanstack/table-core@8.21.3': {}
+
+  '@tanstack/table-core@9.0.0-beta.58':
+    dependencies:
+      '@tanstack/store': 0.11.0
 
   '@tanstack/virtual-core@3.17.3': {}
 
@@ -24034,7 +24050,7 @@ snapshots:
 
   happy-dom@20.11.0:
     dependencies:
-      '@types/node': 24.13.3
+      '@types/node': 25.9.5
       '@types/whatwg-mimetype': 3.0.2
       '@types/ws': 8.18.1
       buffer-image-size: 0.6.4

@@ -6,14 +6,7 @@
   "engines": {
     "node": ">=22"
   },
-  "octane": {
-    "hookSlots": {
-      "manual": [
-        "src"
-      ]
-    }
-  },
-  "description": "TanStack Table bindings for the octane renderer — reuses the framework-agnostic @tanstack/table-core and swaps the ~100-line React adapter (useReactTable, flexRender) for an octane port.",
+  "description": "TanStack Table v9 bindings for the octane renderer — reuses the framework-agnostic @tanstack/table-core (atom-based reactivity, tree-shakeable features) and ports the adapter (useTable, Subscribe, FlexRender, createTableHook) onto octane.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -34,19 +27,24 @@
     "README.md"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./flex-render": "./src/flex-render.ts",
+    "./static-functions": "./src/static-functions.ts",
+    "./experimental-worker-plugin": "./src/experimental-worker-plugin.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/table-core": "catalog:default"
+    "@octanejs/tanstack-store": "workspace:*",
+    "@tanstack/table-core": "9.0.0-beta.58"
   },
   "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/react-table": "catalog:default",
+    "@tanstack/react-table": "9.0.0-beta.58",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",

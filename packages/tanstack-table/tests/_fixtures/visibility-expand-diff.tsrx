@@ -1,9 +1,17 @@
 import {
+	columnVisibilityFeature,
+	createExpandedRowModel,
 	flexRender,
-	getCoreRowModel,
-	getExpandedRowModel,
-	useReactTable,
+	rowExpandingFeature,
+	tableFeatures,
+	useTable,
 } from '@octanejs/tanstack-table';
+
+const features = tableFeatures({
+	columnVisibilityFeature,
+	rowExpandingFeature,
+	expandedRowModel: createExpandedRowModel(),
+});
 
 // Differential fixture: column visibility toggles (buttons calling
 // toggleVisibility() directly — the checkbox-handler form reads
@@ -33,12 +41,11 @@ const columns = [
 ];
 
 export function VisExpand() @{
-	const table = useReactTable({
+	const table = useTable({
+		features,
 		data,
 		columns,
 		getSubRows: (row: any) => row.subRows,
-		getCoreRowModel: getCoreRowModel(),
-		getExpandedRowModel: getExpandedRowModel(),
 	});
 	<div>
 		@for (const col of table.getAllLeafColumns(); key col.id) {

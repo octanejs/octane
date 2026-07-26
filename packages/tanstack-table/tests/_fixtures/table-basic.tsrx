@@ -1,22 +1,24 @@
 import { useState } from 'octane';
 import {
+	createSortedRowModel,
 	flexRender,
-	getCoreRowModel,
-	getSortedRowModel,
-	useReactTable,
+	rowSortingFeature,
+	sortFns,
+	tableFeatures,
+	useTable,
 } from '@octanejs/tanstack-table';
 
 // Core-wiring fixtures. Data/columns are module-level (referentially stable)
 // so table-core's row-model memoization isn't perturbed and render-count
 // probes measure only the state wiring.
 
-export const renders = { basic: 0, sorting: 0, controlled: 0 };
+export const renders = { basic: 0, sorting: 0, controlled: 0, selected: 0 };
 export const captured: {
 	table?: unknown;
 	tables: unknown[];
 	sortingStates: unknown[];
-	stateChanges: unknown[];
-} = { tables: [], sortingStates: [], stateChanges: [] };
+	selectedStates: unknown[];
+} = { tables: [], sortingStates: [], selectedStates: [] };
 
 export const defaultData = [
 	{ firstName: 'tanner', lastName: 'linsley', age: 29 },
@@ -42,14 +44,23 @@ const altColumns = [
 	{ accessorKey: 'age', header: 'Only Age' },
 ];
 
+// v9 always builds the core row model, so a plain table opts into no features.
+const coreFeatures = tableFeatures({});
+
+const sortingFeatures = tableFeatures({
+	rowSortingFeature,
+	sortedRowModel: createSortedRowModel(),
+	sortFns,
+});
+
 // Full-markup table (thead/tbody/tfoot, all through flexRender), used both
 // standalone and by the swap harness below.
 export function BasicTable(props: { data?: any; columns?: any }) @{
 	renders.basic++;
-	const table = useReactTable({
+	const table = useTable({
+		features: coreFeatures,
 		data: props.data ?? defaultData,
 		columns: props.columns ?? defaultColumns,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	captured.table = table;
 	captured.tables.push(table);
@@ -70,7 +81,7 @@ export function BasicTable(props: { data?: any; columns?: any }) @{
 		<tbody>
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<tr>
-					@for (const cell of row.getVisibleCells(); key cell.id) {
+					@for (const cell of row.getAllCells(); key cell.id) {
 						<td id={'td-' + cell.id}>{flexRender(
 							cell.column.columnDef.cell,
 							cell.getContext(),
@@ -113,23 +124,16 @@ export function SwapApp() @{
 }
 
 // Uncontrolled sorting + render-count probe + double-toggle (functional
-// updater) button. `onStateChange` here is a passthrough SPY: with no
-// feature-level onSortingChange, table-core routes the sorting update through
-// setState → the wrapped onStateChange, which applies internal state FIRST and
-// then calls this user handler (upstream composition order).
+// updater) button. Deliberately NO `onSortingChange`: in v9 the feature's
+// DEFAULT handler is `makeStateUpdater('sorting', table)`, which writes the
+// sorting atom, so supplying one REPLACES that writer and makes the slice
+// controlled (see ControlledSortingTable).
 export function SortingTable() @{
 	renders.sorting++;
-	const table = useReactTable({
+	const table = useTable({
+		features: sortingFeatures,
 		data: defaultData,
 		columns: defaultColumns,
-		onStateChange: (updater: any) => {
-			captured.stateChanges.push(typeof updater);
-		},
-		// Keep the render-count probe clean: without this, table-core queues a
-		// SECOND state update (pageIndex auto-reset) after every sorting change.
-		autoResetPageIndex: false,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel(),
 	});
 	captured.table = table;
 	<div>
@@ -149,24 +153,13 @@ export function SortingTable() @{
 			<tbody>
 				@for (const row of table.getRowModel().rows; key row.id) {
 					<tr>
-						@for (const cell of row.getVisibleCells(); key cell.id) {
+						@for (const cell of row.getAllCells(); key cell.id) {
 							<td class="s-cell">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
 						}
 					</tr>
 				}
 			</tbody>
 		</table>
-		<button
-			id="double-toggle"
-			onClick={() => {
-				// Two functional updates queued in ONE event — both must apply
-				// (asc, then asc→desc) before the single re-render.
-				table.getColumn('age')!.toggleSorting();
-				table.getColumn('age')!.toggleSorting();
-			}}
-		>
-			double
-		</button>
 	</div>
 }
 
@@ -176,13 +169,12 @@ export function ControlledSortingTable() @{
 	renders.controlled++;
 	const [sorting, setSorting] = useState([] as any);
 	captured.sortingStates.push(sorting);
-	const table = useReactTable({
+	const table = useTable({
+		features: sortingFeatures,
 		data: defaultData,
 		columns: defaultColumns,
 		state: { sorting },
 		onSortingChange: setSorting,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel(),
 	});
 	<table>
 		<thead>
@@ -200,11 +192,34 @@ export function ControlledSortingTable() @{
 		<tbody>
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<tr>
-					@for (const cell of row.getVisibleCells(); key cell.id) {
+					@for (const cell of row.getAllCells(); key cell.id) {
 						<td class="c-cell">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
 					}
 				</tr>
 			}
 		</tbody>
 	</table>
+}
+
+// v9-only adapter surface: the second `useTable` argument projects from
+// `table.store`, and that projection — not the whole table state — is what
+// lands on `table.state`.
+export function SelectorTable() @{
+	renders.selected++;
+	const table = useTable(
+		{
+			features: sortingFeatures,
+			data: defaultData,
+			columns: defaultColumns,
+		},
+		(state) => ({ sortCount: state.sorting?.length ?? 0 }),
+	);
+	captured.table = table;
+	captured.selectedStates.push(table.state);
+	<div>
+		<span id="sel-state">{'n=' + table.state.sortCount}</span>
+		<button id="sel-sort" onClick={() => table.getColumn('firstName')!.toggleSorting()}>
+			sort
+		</button>
+	</div>
 }

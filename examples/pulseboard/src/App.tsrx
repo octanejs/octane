@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
 import {
+	cellSelectionFeature,
+	columnFilteringFeature,
+	createColumnHelper,
+	createFilteredRowModel,
+	createSortedRowModel,
+	filterFns,
 	flexRender,
-	getCoreRowModel,
-	getFilteredRowModel,
-	getSortedRowModel,
-	useReactTable,
+	globalFilteringFeature,
+	rowSelectionFeature,
+	rowSortingFeature,
+	sortFns,
+	tableFeatures,
+	useTable,
 } from '@octanejs/tanstack-table';
-import type { ColumnDef } from '@octanejs/tanstack-table';
+import type { Cell, CellSelectionBounds, CellSelectionState, Row } from '@octanejs/tanstack-table';
+import { useHotkeys } from '@octanejs/tanstack-hotkeys';
 import { useVirtualizer } from '@octanejs/tanstack-virtual';
 import { ParentSize } from '@octanejs/visx/responsive';
 import { scaleLinear, scalePoint } from '@octanejs/visx/scale';
@@ -452,39 +461,205 @@ function TrendPanel(props: {
 	</section>;
 }
 
-const CAMPAIGN_COLUMNS: ColumnDef<CampaignRow>[] = [
-	{ accessorKey: 'campaign', header: 'Campaign' },
-	{ accessorKey: 'channel', header: 'Channel' },
-	{
-		accessorKey: 'sessions',
+const CAMPAIGN_FEATURES = tableFeatures({
+	cellSelectionFeature,
+	columnFilteringFeature,
+	globalFilteringFeature,
+	rowSortingFeature,
+	rowSelectionFeature,
+	filteredRowModel: createFilteredRowModel(),
+	sortedRowModel: createSortedRowModel(),
+	filterFns,
+	sortFns,
+});
+
+const columnHelper = createColumnHelper<typeof CAMPAIGN_FEATURES, CampaignRow>();
+
+const CAMPAIGN_COLUMNS = columnHelper.columns([
+	columnHelper.accessor('campaign', {
+		header: 'Campaign',
+	}),
+	columnHelper.accessor('channel', {
+		header: 'Channel',
+	}),
+	columnHelper.accessor('sessions', {
 		header: 'Sessions',
 		cell: (info) => formatInteger(info.getValue<number>()),
-	},
-	{
-		accessorKey: 'conversionRate',
+	}),
+	columnHelper.accessor('conversionRate', {
 		header: 'Conversion',
 		cell: (info) => `${info.getValue<number>().toFixed(1)}%`,
-	},
-	{
-		accessorKey: 'revenue',
+	}),
+	columnHelper.accessor('revenue', {
 		header: 'Revenue',
 		cell: (info) => formatCurrency(info.getValue<number>()),
-	},
-	{ accessorKey: 'status', header: 'Status' },
-];
+	}),
+	columnHelper.accessor('status', {
+		header: 'Status',
+	}),
+]);
+
+// Serializing a selection for the clipboard is a userland concern: the table
+// hands back `getSelectedCellRangesData()` as raw values, and the delimiter, the
+// null representation, and the quoting rules are all yours to pick. This is the
+// spreadsheet-flavored version.
+function escapeTsvValue(value: unknown) {
+	const text =
+		value == null ? '' : String(value);
+	const safeText =
+		typeof value === 'string' && /^[\t\r ]*[=+@-]/.test(value) ? `'${text}` : text;
+
+	// spreadsheets expect a field to be quoted once it contains a delimiter, a
+	// newline, or a quote, with inner quotes doubled
+	return /["\t\n\r]/.test(safeText) ? `"${safeText.replace(/"/g, '""')}"` : safeText;
+}
+
+function toTsv(ranges: Array<Array<Array<unknown>>>) {
+	return ranges.map(
+		(grid) => grid.map((row) => row.map(escapeTsvValue).join('\t')).join('\n'),
+	).join('\n\n'); // blank line between disjoint rectangles
+}
+
+/**
+ * The narrowest value a row's appearance depends on: whether its own cells fall
+ * inside a range, whether the rows immediately above and below do (that decides
+ * its top and bottom edges), and whether it owns the focused cell.
+ *
+ * Rows in the middle of a growing range produce an unchanged key, so the row's
+ * <Subscribe> skips re-rendering them during a drag.
+ */
+function rowSelectionKey(
+	ranges: CellSelectionState,
+	bounds: Array<CellSelectionBounds>,
+	rowIndex: number,
+	rowId: string,
+) {
+	const active = ranges[ranges.length - 1];
+	let key =
+		ranges.length > 0 && active.anchorRowId === rowId ? `f${active.anchorColumnId}` : '';
+
+	for (const bound of bounds) {
+		const self = rowIndex >= bound.minRowIndex && rowIndex <= bound.maxRowIndex;
+		const above = rowIndex - 1 >= bound.minRowIndex && rowIndex - 1 <= bound.maxRowIndex;
+		const below = rowIndex + 1 >= bound.minRowIndex && rowIndex + 1 <= bound.maxRowIndex;
+
+		if (self || above || below) {
+			key += `|${self ? 1 : 0}${above ? 1 : 0}${
+				below ? 1 : 0
+			}:${bound.minColumnIndex}-${bound.maxColumnIndex}`;
+		}
+	}
+
+	return key;
+}
+
+// Each cell draws only the sides getSelectionEdges() reports as the boundary of
+// the selection, so a union of rectangles gets one continuous outline.
+function getCellClassName(cell: Cell<typeof CAMPAIGN_FEATURES, CampaignRow>) {
+	const statusClass =
+		cell.column.id === 'status'
+			? `status-cell status-cell--${String(cell.getValue()).toLowerCase()}`
+			: '';
+
+	// Most cells are unselected, so bail before asking for edges: getSelectionEdges()
+	// would otherwise resolve the cell's position a second time just to discover it
+	// is not selected.
+	if (!cell.getIsSelected()) {
+		return [statusClass, 'cell-selectable', cell.getIsFocused() && 'cell-focused'].filter(
+			Boolean,
+		).join(' ');
+	}
+
+	const edges = cell.getSelectionEdges();
+
+	return [
+		statusClass,
+		'cell-selectable',
+		'cell-selected',
+		cell.getIsFocused() && 'cell-focused',
+		edges.top && 'cell-edge-top',
+		edges.right && 'cell-edge-right',
+		edges.bottom && 'cell-edge-bottom',
+		edges.left && 'cell-edge-left',
+	].filter(Boolean).join(' ');
+}
+
+/**
+ * One campaign row. Extracted into a component because the cell `@for` is a
+ * template directive: it cannot be authored inside the render-prop arrow that
+ * <table.Subscribe> takes, and a child component gives each row its own scope.
+ */
+function CampaignRowView(props: { row: Row<typeof CAMPAIGN_FEATURES, CampaignRow> }) @{
+	const row = props.row;
+	<tr class={{ 'campaign-row': true, 'campaign-row--selected': row.getIsSelected() }}>
+		<td class="selection-cell">
+			<input
+				type="checkbox"
+				aria-label={`Select ${row.original.campaign}`}
+				checked={row.getIsSelected()}
+				onClick={row.getToggleSelectedHandler()}
+			/>
+		</td>
+		@for (const cell of row.getAllCells(); key cell.id) {
+			<td
+				class={getCellClassName(cell)}
+				tabIndex={cell.getTabIndex()}
+				onMouseDown={cell.getSelectionStartHandler()}
+				onMouseEnter={cell.getSelectionExtendHandler()}
+			>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+		}
+	</tr>
+}
 
 function CampaignTable() @{
 	const [query, setQuery] = useState('');
-	const table = useReactTable({
-		data: CAMPAIGNS,
-		columns: CAMPAIGN_COLUMNS,
-		getRowId: (row) => row.id,
-		getCoreRowModel: getCoreRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
-		getSortedRowModel: getSortedRowModel(),
-	});
+	const gridRef = useRef<HTMLDivElement | null>(null);
+	const table = useTable(
+		{
+			features: CAMPAIGN_FEATURES,
+			data: CAMPAIGNS,
+			columns: CAMPAIGN_COLUMNS,
+			getRowId: (row) => row.id,
+			enableCellSelection: true,
+		},
+		// Every slice this component's own markup reads has to be listed here.
+		// `cellSelection` is the deliberate exception: it is read through
+		// <Subscribe> below instead, so dragging a range re-renders only the rows
+		// whose outline actually changed rather than the whole panel.
+		(state) => ({
+			sorting: state.sorting,
+			globalFilter: state.globalFilter,
+			rowSelection: state.rowSelection,
+		}),
+	);
 	const rows = table.getRowModel().rows;
 	const selectedCount = table.getSelectedRowModel().rows.length;
+
+	// table-core ships no keydown handling of its own — keyboard navigation is
+	// TanStack Hotkeys driving the table's imperative selection APIs. Scoping the
+	// registrations to `gridRef` keeps them off the rest of the dashboard, so
+	// typing in the campaign search never moves a cell selection.
+	useHotkeys(
+		[
+			{ hotkey: 'ArrowUp', callback: () => table.moveCellSelection('up') },
+			{ hotkey: 'ArrowDown', callback: () => table.moveCellSelection('down') },
+			{ hotkey: 'ArrowLeft', callback: () => table.moveCellSelection('left') },
+			{ hotkey: 'ArrowRight', callback: () => table.moveCellSelection('right') },
+			{ hotkey: 'Shift+ArrowUp', callback: () => table.extendCellSelection('up') },
+			{ hotkey: 'Shift+ArrowDown', callback: () => table.extendCellSelection('down') },
+			{ hotkey: 'Shift+ArrowLeft', callback: () => table.extendCellSelection('left') },
+			{ hotkey: 'Shift+ArrowRight', callback: () => table.extendCellSelection('right') },
+			{ hotkey: 'Mod+A', callback: () => table.selectAllCells() },
+			{ hotkey: 'Escape', callback: () => table.resetCellSelection(true) },
+			{
+				hotkey: 'Mod+C',
+				callback: () => {
+					void navigator.clipboard?.writeText(toTsv(table.getSelectedCellRangesData()));
+				},
+			},
+		],
+		{ target: gridRef, preventDefault: true },
+	);
 
 	<section
 		class="panel table-panel"
@@ -514,7 +689,7 @@ function CampaignTable() @{
 				/>
 			</label>
 		</header>
-		<div class="table-scroll">
+		<div class="table-scroll" ref={gridRef} tabIndex={0}>
 			<table>
 				<caption class="sr-only">Deterministic campaign performance report</caption>
 				<thead>
@@ -575,23 +750,17 @@ function CampaignTable() @{
 						</tr>
 					} @else {
 						@for (const row of rows; key row.id) {
-							<tr class={{ 'campaign-row': true, 'campaign-row--selected': row.getIsSelected() }}>
-								<td class="selection-cell">
-									<input
-										type="checkbox"
-										aria-label={`Select ${row.original.campaign}`}
-										checked={row.getIsSelected()}
-										onClick={row.getToggleSelectedHandler()}
-									/>
-								</td>
-								@for (const cell of row.getVisibleCells(); key cell.id) {
-									<td
-										class={cell.column.id === 'status'
-											? `status-cell status-cell--${String(cell.getValue()).toLowerCase()}`
-											: undefined}
-									>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-								}
-							</tr>
+							<table.Subscribe
+								source={table.atoms.cellSelection}
+								selector={(ranges) => rowSelectionKey(
+									ranges,
+									table.getCellSelectionBounds(),
+									row.getDisplayIndex(),
+									row.id,
+								)}
+							>
+								{() => <CampaignRowView row={row} />}
+							</table.Subscribe>
 						}
 					}
 				</tbody>
