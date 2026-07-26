@@ -728,3 +728,57 @@ export function PopoverHoverCloseDelay() @{
 		</Popover.Root>
 	</div>
 }
+
+// Dialog.Viewport — the scrollable positioning container between the portal and the popup.
+// It carries role="presentation", `hidden` while unmounted, and the nested/open state attributes.
+export function DialogViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Dialog.Root defaultOpen>
+			<Dialog.Portal container={containerRef}>
+				<Dialog.Backdrop className="dlg-backdrop" />
+				<Dialog.Viewport className="dlg-viewport">
+					<Dialog.Popup className="dlg-popup">
+						<Dialog.Title className="dlg-title">Title</Dialog.Title>
+						<Dialog.Close className="dlg-close">Close</Dialog.Close>
+					</Dialog.Popup>
+				</Dialog.Viewport>
+			</Dialog.Portal>
+		</Dialog.Root>
+	</div>
+}
+
+// A closed Dialog.Viewport stays mounted only when the portal keeps it mounted; by default the
+// whole subtree unmounts, so this renders just the trigger.
+export function DialogViewportClosed() @{
+	<Dialog.Root>
+		<Dialog.Trigger className="dlg-trigger">Open</Dialog.Trigger>
+		<Dialog.Portal>
+			<Dialog.Viewport className="dlg-viewport">
+				<Dialog.Popup className="dlg-popup">Body</Dialog.Popup>
+			</Dialog.Viewport>
+		</Dialog.Portal>
+	</Dialog.Root>
+}
+
+// Popover.Viewport — the content-transition container inside the popup. With a single trigger it
+// never transitions, so it renders the current-content container around the children.
+export function PopoverViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Popover.Root open modal>
+			<Popover.Portal container={containerRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Viewport className="pop-viewport">
+							<Popover.Title className="pop-title">Title</Popover.Title>
+							<Popover.Close className="pop-close">Close</Popover.Close>
+						</Popover.Viewport>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}

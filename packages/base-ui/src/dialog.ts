@@ -33,7 +33,11 @@ import { useDismiss } from './utils/floating/useDismiss';
 import { useScrollLock } from './utils/useScrollLock';
 import { useOpenChangeComplete } from './utils/useOpenChangeComplete';
 import { useOpenMethodTriggerProps } from './utils/useOpenInteractionType';
-import { triggerOpenStateMapping, popupStateMapping } from './utils/popupStateMapping';
+import {
+	triggerOpenStateMapping,
+	popupStateMapping,
+	CommonPopupDataAttributes,
+} from './utils/popupStateMapping';
 import { transitionStatusMapping } from './utils/useTransitionStatus';
 import type { StateAttributesMapping } from './utils/getStateAttributesProps';
 import { EMPTY_OBJECT } from './utils/empty';
@@ -844,6 +848,73 @@ function DialogClose(componentProps: any): any {
 	);
 }
 
+// --- Viewport ----------------------------------------------------------------
+
+export const DialogViewportDataAttributes = {
+	open: CommonPopupDataAttributes.open,
+	closed: CommonPopupDataAttributes.closed,
+	startingStyle: CommonPopupDataAttributes.startingStyle,
+	endingStyle: CommonPopupDataAttributes.endingStyle,
+	nested: 'data-nested',
+	nestedDialogOpen: 'data-nested-dialog-open',
+} as const;
+
+const viewportStateAttributesMapping: StateAttributesMapping<any> = {
+	...(popupStateMapping as StateAttributesMapping<any>),
+	...(transitionStatusMapping as StateAttributesMapping<any>),
+	nested(value: boolean) {
+		return value ? { [DialogViewportDataAttributes.nested]: '' } : null;
+	},
+	nestedDialogOpen(value: boolean) {
+		return value ? { [DialogViewportDataAttributes.nestedDialogOpen]: '' } : null;
+	},
+};
+
+// A positioning container for the dialog popup that can be made scrollable.
+function DialogViewport(componentProps: any): any {
+	const slot = S('DialogViewport');
+	const { render, className, style, children, ref, ...elementProps } = componentProps;
+
+	const keepMounted = useDialogPortalContext();
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const nested = store.useState('nested', subSlot(slot, 'nested'));
+	const transitionStatus = store.useState('transitionStatus', subSlot(slot, 'ts'));
+	const nestedOpenDialogCount = store.useState('nestedOpenDialogCount', subSlot(slot, 'nodc'));
+	const mounted = store.useState('mounted', subSlot(slot, 'mounted'));
+
+	const setViewportElement = store.useStateSetter('viewportElement', subSlot(slot, 'sve'));
+
+	const state = {
+		open,
+		nested,
+		transitionStatus,
+		nestedDialogOpen: nestedOpenDialogCount > 0,
+	};
+
+	return useRenderElement(
+		'div',
+		{ render, className, style },
+		{
+			enabled: keepMounted || mounted,
+			state,
+			ref: [ref, setViewportElement],
+			stateAttributesMapping: viewportStateAttributesMapping,
+			props: [
+				{
+					role: 'presentation',
+					hidden: !mounted,
+					style: { pointerEvents: !open ? 'none' : undefined },
+					children,
+				},
+				elementProps,
+			],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
 // --- Namespace ---------------------------------------------------------------
 
 export const Dialog = {
@@ -852,6 +923,7 @@ export const Dialog = {
 	Portal: DialogPortal,
 	Backdrop: DialogBackdrop,
 	Popup: DialogPopup,
+	Viewport: DialogViewport,
 	Title: DialogTitle,
 	Description: DialogDescription,
 	Close: DialogClose,

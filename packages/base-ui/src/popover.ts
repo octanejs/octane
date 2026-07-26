@@ -51,6 +51,7 @@ import {
 	type UseAnchorPositioningSharedParameters,
 } from './utils/useAnchorPositioning';
 import { usePositioner } from './utils/usePositioner';
+import { usePopupViewport } from './utils/usePopupViewport';
 import { useAnchoredPopupScrollLock } from './utils/useAnchoredPopupScrollLock';
 import { adaptiveOrigin } from './utils/adaptiveOriginMiddleware';
 import { InternalBackdrop } from './utils/InternalBackdrop';
@@ -1210,6 +1211,58 @@ function PopoverClose(componentProps: any): any {
 	);
 }
 
+// --- Viewport ----------------------------------------------------------------
+
+export const PopoverViewportCssVars = {
+	/**
+	 * The width of the parent popup when the previous content was rendered. Placed on the
+	 * 'previous' container so the popup's dimensions can be frozen while content animates.
+	 */
+	popupWidth: '--popup-width',
+	/** The height of the parent popup when the previous content was rendered. */
+	popupHeight: '--popup-height',
+} as const;
+
+const viewportStateAttributesMapping: StateAttributesMapping<any> = {
+	activationDirection: (value: string | undefined) =>
+		value ? { 'data-activation-direction': value } : null,
+};
+
+// A viewport for displaying content transitions. Only needed when one popup can be opened by
+// multiple triggers, its content changes per trigger, and switching between them is animated.
+function PopoverViewport(componentProps: any): any {
+	const slot = S('PopoverViewport');
+	const { render, className, style, children, ref, ...elementProps } = componentProps;
+
+	const { store } = usePopoverRootContext() as PopoverRootContextValue;
+	const { side } = usePopoverPositionerContext();
+
+	const instantType = store.useState('instantType', subSlot(slot, 'instant'));
+
+	const { children: childrenToRender, state: viewportState } = usePopupViewport(
+		{ store, side, cssVars: PopoverViewportCssVars, children },
+		subSlot(slot, 'vp'),
+	);
+
+	const state = {
+		activationDirection: viewportState.activationDirection,
+		transitioning: viewportState.transitioning,
+		instant: instantType,
+	};
+
+	return useRenderElement(
+		'div',
+		{ render, className, style },
+		{
+			state,
+			ref,
+			props: [elementProps, { children: childrenToRender }],
+			stateAttributesMapping: viewportStateAttributesMapping,
+		},
+		subSlot(slot, 're'),
+	);
+}
+
 // --- Namespace ---------------------------------------------------------------
 
 export const Popover = {
@@ -1218,6 +1271,7 @@ export const Popover = {
 	Portal: PopoverPortal,
 	Positioner: PopoverPositioner,
 	Popup: PopoverPopup,
+	Viewport: PopoverViewport,
 	Arrow: PopoverArrow,
 	Backdrop: PopoverBackdrop,
 	Title: PopoverTitle,

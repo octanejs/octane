@@ -461,4 +461,21 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+	it('Dialog.Viewport: open (role=presentation container wrapping the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'DialogViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Dialog.Viewport: closed (unmounted with the rest of the portal subtree)', async () => {
+		const d = await mountDifferential(FIXTURE, 'DialogViewportClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Popover.Viewport: open (current-content container inside the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PopoverViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });
