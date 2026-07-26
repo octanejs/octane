@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 39 `@octanejs/*` framework bindings.
+The central status table for the 40 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -421,12 +421,13 @@ SSR / hydration: Tier 1 is fully server-rendered and tested (17 families through
 
 Scope/evidence last checked: 2026-07-25.
 
-- Differential parity: badge, button, tabs, dialog, and dropdown-menu run through the shared differential rig against the VENDORED pinned upstream React sources (real radix-ui + lucide-react on the React side), byte-comparing innerHTML across 15 render/interaction steps — zero divergences surfaced; the primitive layer beneath is separately differential-verified in @octanejs/radix.
+- Differential parity: dialog, dropdown-menu and tabs run against references vendored byte-identical from the pinned upstream sources (upstream fidelity); button and badge run against hand-authored references carrying the same maintainer-supplied class strings the port ships (runtime equivalence between octane and React, not upstream fidelity). Portal'd content is excluded from the byte compare — overlay/menu content parity is covered behaviorally.
 - Distribution is hybrid per the port plan: this package publishes importable source now via the package entry, and a generated shadcn-CLI-compatible registry (packages/shadcn/registry, with a freshness check) awaits website hosting + the CLI e2e (Phase 4 remainder).
 - Sibling bindings are pinned to published versions (maintainer policy from the cmdk review): @octanejs/radix@0.1.12, @octanejs/lucide@0.1.8.
 - Upstream-fidelity notes (parity, not divergence): progress.tsx at the pin does not forward `value` to the primitive (the root stays data-state=indeterminate; the indicator transform carries the value) — ported byte-for-byte and contract-tested; an unvalued Slider renders two thumbs from upstream's [min, max] seed while the primitive state defaults to [min], identical to upstream React; SheetPortal/SheetOverlay are internal because upstream defines but does not export them; the data-slot attribute upstream passes to Portal parts is accepted and dropped by the Portal primitives, as in upstream React.
 - Observation for the radix binding (not this package): with delayDuration=0, re-opening a Tooltip after a close logs the dev-only 'Cannot update a component (Root) while rendering a different component (Presence)' warning from @octanejs/radix 0.1.12 — behavior and DOM contract are unaffected; worth an upstream radix-binding fix.
 - Migrated (utilities-inlined) components style with any Tailwind v4 build directly; the remaining cn-*-hooked components still require a shadcn style sheet (e.g. style-nova) until their flavors are supplied.
+- Type checking: the package's .tsrx sources are checked by `tsrx-tsc` via `pnpm --dir packages/shadcn typecheck` (plain tsgo cannot parse .tsrx). Diagnostics are gated to src/; dependency sources are reported but not gated, since octane bindings ship raw sources a consumer's program must include and skipLibCheck does not cover.
 
 See also: [`docs/shadcn-port-plan.md`](shadcn-port-plan.md)
 
