@@ -42,6 +42,26 @@ an application-specific workaround, a weakened test, generated output, or
 test-only behavior, and keep the real integration scenario as end-to-end
 evidence.
 
+## The workflows live in skills, so load the skill first
+
+This file does not carry the branch, PR, issue, bug, or audit procedure. Each of
+those is a skill, and a skill only helps if it is loaded before the work starts
+rather than after the work is already done a different way. Load one as soon as
+the task reaches its trigger, including when the trigger is a step you arrived at
+yourself rather than the thing you were asked for:
+
+- `create-a-pr`: any branch, commit, changeset, or PR, including a PR you decided
+  to open at the end of a task that was about something else.
+- `handle-issue`: a GitHub issue number or link.
+- `bug-hunter`: a failing test, a regression, or behavior that differs from
+  expectation.
+- `octane-core-extend`: before editing `packages/octane/src`.
+- `performance-audit`: a change that can move render, SSR, hydration, compiler
+  output, or bundle cost.
+- `react-library-port`: a new or existing `@octanejs/*` binding.
+- `authoring-tsrx`: writing a new `.tsrx` file.
+- `triage`: the owning area is unclear.
+
 ## Your React instincts are the main failure mode here
 
 Octane is React-shaped and deliberately different in specific places. Reading the

@@ -25,7 +25,7 @@ Use this to inspect an issue, triage it, propose a solution, and optionally impl
    - severity and likely user impact.
 
 3. **Check project rules**
-   - Read `AGENTS.md`, `AGENTS.md`, and relevant docs.
+   - Read `AGENTS.md`, `docs/packages.md`, and relevant docs.
    - For React-behavior issues, check `docs/differences-from-react.md` and classify intentional divergence vs bug.
 
 4. **Reproduce or validate claim**
