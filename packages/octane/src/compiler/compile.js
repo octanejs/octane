@@ -2722,6 +2722,17 @@ function hasOnlyComponentItemBoundaries(stmts) {
 	return hasComponent && !disallowed;
 }
 
+// Tag name when this element renders an imported component, else null.
+function importedComponentTag(node, importedNames) {
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return null;
+	if (!isComponentTag(node)) return null;
+	const tag = node.openingElement?.name || node.id || node.name;
+	return (tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') &&
+		importedNames.has(tag.name)
+		? tag.name
+		: null;
+}
+
 function collectImportedComponentReferences(root, importedNames) {
 	const components = new Set();
 	const seen = new WeakSet();
@@ -2733,15 +2744,8 @@ function collectImportedComponentReferences(root, importedNames) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
-		if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
-			const tag = node.openingElement?.name || node.id || node.name;
-			if (
-				(tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') &&
-				importedNames.has(tag.name)
-			) {
-				components.add(tag.name);
-			}
-		}
+		const imported = importedComponentTag(node, importedNames);
+		if (imported !== null) components.add(imported);
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
 			walk(node[key]);
@@ -3041,6 +3045,16 @@ function isRefCurrentMember(n) {
 					n.property.quasis?.[0]?.value?.cooked === 'current');
 }
 
+// A computed access may be a disguised ref read (`ref[key]`), so it counts too.
+function isDeferredRefRead(node) {
+	if (node.type === 'MemberExpression') return node.computed || isRefCurrentMember(node);
+	if (node.type !== 'ObjectPattern') return false;
+	return (node.properties || []).some(
+		(property) =>
+			property.computed || property.key?.name === 'current' || property.key?.value === 'current',
+	);
+}
+
 function containsDeferredRefRead(root) {
 	let found = false;
 	const seen = new WeakSet();
@@ -3052,22 +3066,7 @@ function containsDeferredRefRead(root) {
 		}
 		if (typeof n !== 'object' || seen.has(n)) return;
 		seen.add(n);
-		if (n.type === 'MemberExpression' && (n.computed || isRefCurrentMember(n))) {
-			// Without type information, an arbitrary computed access may be a disguised
-			// ref read (`ref[key]`, where key is "current"). Decline rather than cache a
-			// mutable value behind a stable object identity.
-			found = true;
-			return;
-		}
-		if (
-			n.type === 'ObjectPattern' &&
-			(n.properties || []).some(
-				(property) =>
-					property.computed ||
-					property.key?.name === 'current' ||
-					property.key?.value === 'current',
-			)
-		) {
+		if (isDeferredRefRead(n)) {
 			found = true;
 			return;
 		}
@@ -3078,6 +3077,32 @@ function containsDeferredRefRead(root) {
 	}
 	walk(root);
 	return found;
+}
+
+// Both probes visit the identical node set, so one pass answers both. The ref
+// probe loses its early exit; it finds nothing in 97% of components anyway.
+function scanComponentBody(root, importedNames) {
+	const importedComponents = new Set();
+	let readsDeferredRef = false;
+	const seen = new WeakSet();
+	function walk(node) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (!readsDeferredRef && isDeferredRefRead(node)) readsDeferredRef = true;
+		const imported = importedComponentTag(node, importedNames);
+		if (imported !== null) importedComponents.add(imported);
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
+	walk(root);
+	return { importedComponents, readsDeferredRef };
 }
 
 // A JSX member chain bottoms out at a JSXIdentifier, so the base test below
@@ -5499,13 +5524,16 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		if (compNode.body.render) stmts.push(compNode.body.render);
 		const root = b.block(stmts);
 		const free = collectFreeIdentifiers(root, locals);
-		const autoMemoImportedComponents = collectImportedComponentReferences(root, ctx.importedNames);
+		const { importedComponents: autoMemoImportedComponents, readsDeferredRef } = scanComponentBody(
+			root,
+			ctx.importedNames,
+		);
 		// Both proofs below ask this of the same root. Kept lazy because the
 		// short-circuits ahead of each use skip it entirely for some components.
 		let importedMemberRead = null;
 		const readsImportedMember = () =>
 			(importedMemberRead ??= containsImportedMemberRead(root, ctx.importedNames));
-		let autoMemoCallsitesSafe = !containsDeferredRefRead(root) && !readsImportedMember();
+		let autoMemoCallsitesSafe = !readsDeferredRef && !readsImportedMember();
 		for (const name of free) {
 			if (
 				ctx._octaneBoundaryNames.has(name) ||
