@@ -3,7 +3,12 @@ import { defineConfig, RenderRoute, OCTANE_NONCE_STATE_KEY } from '@octanejs/vit
 export default defineConfig({
 	server: {
 		rpc: {
-			allowedOrigins: ['http://127.0.0.1'],
+			allowedOrigins: [
+				'http://127.0.0.1',
+				...(process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN === undefined
+					? []
+					: [process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN]),
+			],
 		},
 	},
 	compiler: {
