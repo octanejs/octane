@@ -12572,9 +12572,20 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const fc = ctx._foldCtx;
 			const ifNode =
 				t === 'JSXIfExpression'
-					? inheritOriginLoc(b.if(child.test, child.consequent, child.alternate || null), child)
+					? Object.assign(
+							inheritOriginLoc(b.if(child.test, child.consequent, child.alternate || null), child),
+							// The clause keyword's own span — `@else` starts before its
+							// block, so it is the only authored range that names the arm.
+							{ alternateKeyword: child.alternateKeyword ?? null },
+						)
 					: child;
 			const ic = makeIfCall(ifNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
+			// Claim the clause keyword for the arm's own DEFINITION before the
+			// rewrite below renames it to a `props.hN` read: the renderer-side
+			// read is a member expression whose tokens (`props`, `hN`) name
+			// nothing, so the definition is both the only matchable text and the
+			// place a click should land.
+			registerClauseOrigin(ctx, ifNode.alternateKeyword, [ic.elseHelper]);
 			const condHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(condHole, rewriteJsxValues(ic.condTest, ctx)));
 			const thenHole = `h${holeProps.length}`;
@@ -12618,10 +12629,13 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 								key: child.key || null,
 								index: child.index || null,
 								empty: child.empty || null,
+								emptyKeyword: child.emptyKeyword ?? null,
 							},
 						)
 					: child;
 			const rec = makeForCall(forNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
+			// See the `@else` claim above — the same rewrite happens here.
+			registerClauseOrigin(ctx, forNode.emptyKeyword, [rec.emptyHelper]);
 			const itemsHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
 			const bodyHole = `h${holeProps.length}`;
@@ -12711,17 +12725,26 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const fc = ctx._foldCtx;
 			const tryNode =
 				t === 'JSXTryExpression'
-					? inheritOriginLoc(
-							b.try(
-								child.block,
-								child.handler || null,
-								child.finalizer || null,
-								child.pending || null,
+					? Object.assign(
+							inheritOriginLoc(
+								b.try(
+									child.block,
+									child.handler || null,
+									child.finalizer || null,
+									child.pending || null,
+								),
+								child,
 							),
-							child,
+							{
+								pendingKeyword: child.pendingKeyword ?? null,
+								handlerKeyword: child.handlerKeyword ?? null,
+							},
 						)
 					: child;
 			const rec = makeTryCall(tryNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
+			// See the `@else` claim above — the same rewrite happens here.
+			registerClauseOrigin(ctx, tryNode.handlerKeyword, [rec.catchHelper]);
+			registerClauseOrigin(ctx, tryNode.pendingKeyword, [rec.pendingHelper]);
 			const tryHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(tryHole, b.id(rec.tryHelper)));
 			rec.tryHelper = `props.${tryHole}`;

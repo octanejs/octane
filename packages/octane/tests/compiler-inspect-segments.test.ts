@@ -234,6 +234,33 @@ describe.each([
 		expect(claimsFor(loop)).toContain('@for');
 	});
 
+	it('claims clause keywords when the directive is folded into a renderer', () => {
+		// A directive used as a SETUP VALUE is folded: its arms compile on the
+		// component side and the hoisted renderer reads them back as `props.hN`.
+		// The clause has to claim the arm's DEFINITION — the renderer-side read
+		// is a member expression whose tokens name nothing.
+		const FOLDED = `export default function App(props: { on: boolean; items: string[] }) @{
+	const branch = @if (props.on) { <p>y</p> } @else { <p>n</p> };
+	const list = @for (const i of props.items; key i) { <li>{i}</li> } @empty { <li>x</li> };
+	const guard = @try { <b>t</b> } @pending { <i>p</i> } @catch (e) { <s>c</s> };
+	<div>{branch}{list}{guard}</div>
+}
+`;
+		const result = compile(FOLDED, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
+			typeof compile
+		> & { inspect: { segments: Segment[] } };
+		// Folding never changes what ships.
+		expect(compile(FOLDED, 'App.tsrx', options).code).toBe(result.code);
+		const claimed = new Set(
+			result.inspect.segments
+				.filter((segment) => segment.exact === true && segment.srcEnd !== null)
+				.map((segment) => FOLDED.slice(segment.srcStart, segment.srcEnd!)),
+		);
+		for (const keyword of ['@if', '@else', '@for', '@empty', '@try', '@pending', '@catch']) {
+			expect(claimed.has(keyword), `${keyword} is unreachable on the fold path`).toBe(true);
+		}
+	});
+
 	it('claims a keyword for each arm function the directive hoists', () => {
 		const { segments, text } = inspect();
 		const armClaims = segments
