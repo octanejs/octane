@@ -52,7 +52,6 @@ export interface LynxListPAPI<Node extends LynxElementRef = LynxElementRef> {
 		enqueueComponent: LynxListEnqueueComponent<Node>,
 		componentAtIndexes: LynxListComponentAtIndexes<Node>,
 	): void;
-	updateComponents(list: Node, components: readonly string[]): void;
 }
 
 /**
@@ -83,7 +82,6 @@ export interface LynxElementPAPIGlobals<Node extends LynxElementRef = LynxElemen
 		enqueueComponent: LynxListEnqueueComponent<Node>,
 		componentAtIndexes?: LynxListComponentAtIndexes<Node>,
 	): void;
-	__UpdateListComponents?(list: Node, components: readonly string[]): void;
 	__GetElementUniqueID(node: Node): number;
 	__GetParent?(node: Node): Node | null | undefined;
 	__ElementIsEqual?(first: Node, second: Node): boolean;
@@ -155,19 +153,14 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 	const listGlobals = target as LynxElementPAPIGlobals<Node>;
 	const createListValue = listGlobals.__CreateList;
 	const updateListCallbacksValue = listGlobals.__UpdateListCallbacks;
-	const updateListComponentsValue = listGlobals.__UpdateListComponents;
-	const listFunctionCount = [
-		createListValue,
-		updateListCallbacksValue,
-		updateListComponentsValue,
-	].filter((value) => typeof value === 'function').length;
-	if (listFunctionCount !== 0 && listFunctionCount !== 3) {
-		throw new Error(
-			'Octane Lynx requires __CreateList, __UpdateListCallbacks, and __UpdateListComponents together.',
-		);
+	const listFunctionCount = [createListValue, updateListCallbacksValue].filter(
+		(value) => typeof value === 'function',
+	).length;
+	if (listFunctionCount === 1) {
+		throw new Error('Octane Lynx requires __CreateList and __UpdateListCallbacks together.');
 	}
 	const list =
-		listFunctionCount === 3
+		listFunctionCount === 2
 			? Object.freeze({
 					create(
 						parentComponentUniqueId: number,
@@ -197,9 +190,6 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 							enqueueComponent,
 							componentAtIndexes,
 						);
-					},
-					updateComponents(listNode: Node, components: readonly string[]) {
-						updateListComponentsValue!.call(target, listNode, components);
 					},
 				})
 			: undefined;

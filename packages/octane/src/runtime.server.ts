@@ -59,6 +59,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { headOwnershipSuffix } from './head-ownership.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
@@ -143,6 +144,8 @@ interface HeadBuffer {
 	html: string;
 	/** Resource-hint dedupe keys emitted into `html` during this pass. */
 	hints: Set<string>;
+	/** Precomputed caller root namespace, unaffected by streamed useId subspaces. */
+	rootSuffix: string;
 }
 let HEAD: HeadBuffer | null = null;
 
@@ -437,8 +440,17 @@ interface ElementDescriptor {
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
-	const own = Object.getOwnPropertyDescriptor(config, 'key');
-	if (own?.get != null && (own.get as any).isReactWarning) return false;
+	// React's development-only props.key warning getter is not a real key, and
+	// must not be INVOKED (calling it emits React's warning). The reflective probe
+	// allocates a descriptor object, so reach it only when a `key` is actually
+	// present — the common no-key call now costs one lookup. Deliberately NOT
+	// gated on the build mode the way the client twin is: an SSR bundle does not
+	// always fold the dev-mode env check away, and reading it per call would cost
+	// more than the allocation it saves.
+	if (Object.prototype.hasOwnProperty.call(config, 'key')) {
+		const own = Object.getOwnPropertyDescriptor(config, 'key');
+		if (own?.get != null && (own.get as any).isReactWarning) return false;
+	}
 	return config.key !== undefined;
 }
 
@@ -602,21 +614,24 @@ function flattenSsrChildContainer(
 }
 
 function prepareSsrDeoptList(value: any, includeKeyedSingle: boolean): PreparedSsrDeoptList | null {
-	const items: any[] = [];
-	const keys: any[] = [];
+	// Asked for EVERY serialized child, and the non-list answer (a lone component
+	// descriptor, text, null) is the common one — build the two output arrays only
+	// once a list regime is established. Mirrors prepareDeoptList in runtime.ts.
 	if (isFragmentDescriptor(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
 		flattenSsrChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
 		return { items, keys };
 	}
 	if (Array.isArray(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		flattenSsrChildContainer(items, keys, value, ssrDeoptWrapperKind(value), []);
 		return { items, keys };
 	}
 	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		items.push(value);
-		keys.push(scopedSsrDeoptKey([], value, 0, value.key));
-		return { items, keys };
+		return { items: [value], keys: [scopedSsrDeoptKey([], value, 0, value.key)] };
 	}
 	return null;
 }
@@ -1711,7 +1726,12 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		// must not emit the literal string "true").
 		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
-		out += styleName(k) + ':' + cssStyleValue(k, val) + ';';
+		const serialized = cssStyleValue(k, val);
+		// An empty result would serialize as `color:;`, which the client never
+		// produces: setProperty with an empty value removes the declaration. Emitting
+		// it would make the server markup unhydratable.
+		if (serialized === '') continue;
+		out += styleName(k) + ':' + serialized + ';';
 	}
 	return out;
 }
@@ -4533,10 +4553,11 @@ export function injectStyle(id: string, css: string): void {
 }
 
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
-// anywhere in a component). Serializes the element — prefixed with a `<!--key-->`
-// marker the client's headBlock adopts — into the active render pass's head
-// buffer (null-guarded like injectStyle, so it only collects during a
-// synchronous pass). Returned as RenderResult.head and injected at <!--ssr-head-->.
+// anywhere in a component). Serializes the element inside a paired ownership
+// marker interval that the client's headBlock adopts and appends it to the active
+// render-pass head buffer (null-guarded like injectStyle, so it only collects
+// during a synchronous pass). Returned as RenderResult.head and injected at
+// <!--ssr-head-->.
 const HEAD_VOID_ELEMENTS = new Set(['meta', 'link', 'base']);
 
 export function ssrHeadEl(
@@ -4546,9 +4567,11 @@ export function ssrHeadEl(
 	text: unknown,
 ): void {
 	if (HEAD === null) return;
-	// The `<!--key-->` prefix is the client headBlock's adoption marker; static
-	// markup is non-hydratable, so it's omitted there.
-	let s = (MARKERS ? '<!--' + key + '-->' : '') + '<' + tag;
+	// Paired ownership comments bound the exact adoption interval; static markup
+	// is non-hydratable, so both are omitted there.
+	const rootSuffix = HEAD.rootSuffix;
+	const ownershipKey = MARKERS ? (rootSuffix === '' ? key : key + rootSuffix) : '';
+	let s = (MARKERS ? '<!--' + ownershipKey + '-->' : '') + '<' + tag;
 	if (attrs !== null) {
 		for (const k in attrs) {
 			// Hoisted metadata must share ordinary-host value filtering and DEV
@@ -4562,6 +4585,7 @@ export function ssrHeadEl(
 	} else {
 		s += '>' + (text == null ? '' : escapeHtml(text)) + '</' + tag + '>';
 	}
+	if (MARKERS) s += '<!--/' + ownershipKey + '-->';
 	HEAD.html += s;
 }
 
@@ -4945,7 +4969,11 @@ function runFullFramedPass(
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	const cssMap = (CSS = new Map<string, string>());
-	const headBuf = (HEAD = { html: '', hints: new Set() });
+	const headBuf = (HEAD = {
+		html: '',
+		hints: new Set(),
+		rootSuffix: markers ? headOwnershipSuffix(identifierPrefix) : '',
+	});
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
@@ -5037,7 +5065,7 @@ function runDiscoveryRound(
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	CSS = new Map();
-	HEAD = { html: '', hints: new Set() };
+	HEAD = { html: '', hints: new Set(), rootSuffix: headOwnershipSuffix(identifierPrefix) };
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);

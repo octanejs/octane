@@ -11,8 +11,8 @@
  * rewrite `@octanejs/tanstack-table` → `@tanstack/react-table`, so the React
  * side of each fixture runs the REAL react-table adapter (the byte-for-byte
  * oracle) over the SAME `@tanstack/table-core` instance. The public API
- * matches 1:1 (`useReactTable`, `flexRender`, core re-exports), so a flat
- * import rewrite is all it takes.
+ * matches 1:1 (`useTable`, `flexRender`, `Subscribe`, core re-exports), so a
+ * flat import rewrite is all it takes.
  */
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';

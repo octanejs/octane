@@ -43,6 +43,7 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { headOwnershipKey } from './head-ownership.js';
 import {
 	__profileBail,
 	__profileBeginRender,
@@ -54,6 +55,15 @@ import {
 	__profileTrackComponent,
 	type ProfileFrame,
 } from './profiling.js';
+import {
+	__devtoolsRegisterRoot,
+	__devtoolsUnregisterRoot,
+	__devtoolsNotifyFlush,
+	__devtoolsSetNameResolver,
+	__devtoolsSetTransitionCount,
+	__devtoolsSetBoundaryState,
+	__devtoolsClearBoundary,
+} from './devtools-hook.js';
 import type {
 	HydrateProps,
 	HydrationPrefetchFunction,
@@ -1550,6 +1560,8 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 function tickTransitionCount(delta: number): void {
 	TRANSITION_PENDING_COUNT += delta;
 	if (TRANSITION_PENDING_COUNT < 0) TRANSITION_PENDING_COUNT = 0;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__devtoolsSetTransitionCount(TRANSITION_PENDING_COUNT);
 	TRANSITION_LISTENER_PUBLISH_DEPTH++;
 	try {
 		for (const fn of TRANSITION_LISTENERS) {
@@ -2072,6 +2084,8 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__devtoolsNotifyFlush();
 		if (clearViewTransitionTypes) viewTransitionDriver!.clearTypes();
 	}
 }
@@ -2397,6 +2411,8 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__devtoolsNotifyFlush();
 		}
 		if (QUEUE.length > 0 && !scheduled) {
 			scheduled = true;
@@ -3575,7 +3591,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 					d.key ?? undefined,
 					true,
 					undefined,
-					activeHydration() !== null && KEYED_ELEMENT_DESCRIPTORS.has(d),
+					activeHydration() !== null && elementKeyWasProvided(d),
 				),
 			);
 		} else {
@@ -3589,7 +3605,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 				d.key ?? undefined,
 				true,
 				undefined,
-				activeHydration() !== null && KEYED_ELEMENT_DESCRIPTORS.has(d),
+				activeHydration() !== null && elementKeyWasProvided(d),
 			);
 		}
 	} else {
@@ -4084,6 +4100,10 @@ function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
 						clearTimeout(val.transitionTimeoutId);
 						val.transitionTimeoutId = null;
 					}
+					// The DevTools boundary registry follows the TrySlot lifetime.
+					// Reset through the shared branch mutation point so profile
+					// builds remove this slot from the registry on teardown.
+					setTryBranch(val, -1);
 				} else if (k === 'portalSlotSlot' && val.target) {
 					unregisterDelegationTarget(val.target);
 				}
@@ -5908,6 +5928,48 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
 }
 
+function cloneHydrationReplayEvent(event: Event, target: Element): Event {
+	// Event constructors are realm-specific, so the clone is always built with the
+	// TARGET's constructors: hydrating an iframe-owned root from its parent realm
+	// must still replay an event the iframe's own code recognizes. A detached
+	// synthetic Document has no defaultView and falls back to the ambient realm.
+	const realm = target.ownerDocument.defaultView ?? globalThis;
+	// Same-realm replay is the overwhelmingly common case, so it stays a plain
+	// constructor walk: no brand string, no comparisons beyond `instanceof`.
+	// PointerEvent extends MouseEvent, so it must be tested first or pointer-
+	// specific metadata (pressure, pointerId, tilt, etc.) is discarded.
+	if (realm.PointerEvent !== undefined && event instanceof realm.PointerEvent) {
+		return new realm.PointerEvent(event.type, event);
+	}
+	if (realm.KeyboardEvent !== undefined && event instanceof realm.KeyboardEvent) {
+		return new realm.KeyboardEvent(event.type, event);
+	}
+	if (realm.MouseEvent !== undefined && event instanceof realm.MouseEvent) {
+		return new realm.MouseEvent(event.type, event);
+	}
+	if (realm.FocusEvent !== undefined && event instanceof realm.FocusEvent) {
+		return new realm.FocusEvent(event.type, event);
+	}
+	// Cold: a programmatic dispatch may cross realms, where the original event
+	// came from a parent Window while its target belongs to an iframe Window (or
+	// the reverse). No local constructor claims it, but Web IDL's toStringTag
+	// still reports the platform family across that identity boundary.
+	const brand = Object.prototype.toString.call(event);
+	if (realm.PointerEvent !== undefined && brand === '[object PointerEvent]') {
+		return new realm.PointerEvent(event.type, event);
+	}
+	if (realm.KeyboardEvent !== undefined && brand === '[object KeyboardEvent]') {
+		return new realm.KeyboardEvent(event.type, event);
+	}
+	if (realm.MouseEvent !== undefined && brand === '[object MouseEvent]') {
+		return new realm.MouseEvent(event.type, event);
+	}
+	if (realm.FocusEvent !== undefined && brand === '[object FocusEvent]') {
+		return new realm.FocusEvent(event.type, event);
+	}
+	return new realm.Event(event.type, event);
+}
+
 function notifyHydrateBoundary(state: HydrateSlot): void {
 	if (state.didNotify || !state.hydrated) return;
 	state.didNotify = true;
@@ -5939,14 +6001,8 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
 			// `click` is the platform exception among untrusted events: dispatching
 			// the clone still runs its native activation behavior, so links navigate
 			// and submit controls submit unless a hydrated handler prevents default.
-			// Keep dispatchEvent here to preserve the original mouse-event metadata.
-			target.dispatchEvent(
-				typeof MouseEvent !== 'undefined' && event instanceof MouseEvent
-					? new MouseEvent(event.type, event)
-					: typeof FocusEvent !== 'undefined' && event instanceof FocusEvent
-						? new FocusEvent(event.type, event)
-						: new Event(event.type, event),
-			);
+			// Keep dispatchEvent here to preserve native activation and cancellation.
+			target.dispatchEvent(cloneHydrationReplayEvent(event, target));
 		}
 	}
 }
@@ -8627,6 +8683,10 @@ export function setHTML(el: Element, value: any): void {
 }
 
 const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
+// Latched the first time any host actually takes ownership of its children via
+// dangerouslySetInnerHTML. Every childSlot call has to ask whether raw HTML owns
+// its parent; an app that never uses the feature skips the DOM read entirely.
+let DANGER_HTML_EVER_ACTIVE = false;
 const DANGER_HTML_STATIC_CHILD = '__oct_dangerChild';
 const DANGER_HTML_SPREAD_CHILD = '__oct_dangerSpreadChild';
 const DANGER_HTML_RESOLVED_VALUE = '__oct_dangerResolved';
@@ -8665,6 +8725,7 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 		throw dangerHtmlChildrenError();
 	}
 	(el as any)[DANGER_HTML_ACTIVE] = true;
+	DANGER_HTML_EVER_ACTIVE = true;
 	setHTML(el, value.__html);
 }
 
@@ -8746,6 +8807,7 @@ export function markDangerouslySetInnerHTMLChildren(el: Element): void {
  * child reconciliation in that case so it cannot erase the raw HTML.
  */
 function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean {
+	if (!DANGER_HTML_EVER_ACTIVE) return false;
 	if (parent.nodeType !== 1 || (parent as any)[DANGER_HTML_ACTIVE] !== true) return false;
 	if (value !== null && value !== undefined) throw dangerHtmlChildrenError();
 	return true;
@@ -10370,7 +10432,7 @@ const _injectedStyles = new Set<string>();
 // and text are re-applied each render (so `<title>{state}</title>` is reactive),
 // and it is removed from <head> when the owning scope unmounts (so a route swap
 // replaces the page's metadata). On a hydrated page the server wrote
-// `<!--key-->` + the element into <head> (ssrHeadEl → RenderResult.head →
+// paired key markers + the element into <head> (ssrHeadEl → RenderResult.head →
 // <!--ssr-head-->); headBlock ADOPTS that element rather than appending a copy.
 // ---------------------------------------------------------------------------
 
@@ -10380,30 +10442,51 @@ interface HeadSlot {
 	handlers?: Map<string, EventListener>;
 }
 
-// Find the server-rendered `tag` inside `key`'s marker interval in <head>, remove
-// the marker so a later mount can't re-match it, and return the element. A foreign
+// Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
+// remove the pair so a later mount can't re-match it, and return the element. A foreign
 // node can be injected between the marker and the server element (extensions,
 // analytics, or document transforms); never claim or mutate it merely because it
-// is adjacent. The next Octane head marker closes this ownership interval.
+// is adjacent. Nested, missing, or reordered delimiters make the interval
+// unprovable, so recovery creates fresh metadata without claiming a same-tag node.
 // Returns null on a fresh client render or when the expected element is missing.
 function adoptServerHeadEl(key: string, tag: string): Element | null {
+	const closeKey = '/' + key;
 	for (let n: Node | null = document.head.firstChild; n !== null; n = n.nextSibling) {
 		if (n.nodeType === 8 && (n as Comment).data === key) {
 			let candidate: Node | null = n.nextSibling;
-			(n as Comment).remove();
+			let match: Element | null = null;
+			let end: Comment | null = null;
+			let matches = 0;
 			while (candidate !== null) {
-				if (candidate.nodeType === 8 && (candidate as Comment).data.startsWith('rnh-')) {
-					break;
+				if (candidate.nodeType === 8) {
+					const marker = (candidate as Comment).data;
+					if (marker === closeKey) {
+						end = candidate as Comment;
+						break;
+					}
+					// A nested/reordered ownership marker means this interval cannot
+					// prove which same-tag node belongs to the requested entry. Leaving
+					// `end` unset below is what makes that case adopt nothing.
+					if (marker.startsWith('rnh-') || marker.startsWith('/rnh-')) break;
 				}
 				if (candidate.nodeType === 1 && (candidate as Element).localName === tag) {
-					return candidate as Element;
+					if (matches++ === 0) match = candidate as Element;
 				}
 				candidate = candidate.nextSibling;
 			}
-			return null;
+			(n as Comment).remove();
+			if (end === null) return null;
+			end.remove();
+			// Two same-tag candidates are as unprovable as none.
+			return matches === 1 ? match : null;
 		}
 	}
 	return null;
+}
+
+function rootIdentifierPrefix(block: Block): string {
+	while (block.parentBlock !== null) block = block.parentBlock;
+	return block.idState.prefix;
 }
 
 export function headBlock(
@@ -10416,11 +10499,11 @@ export function headBlock(
 ): void {
 	if (typeof document === 'undefined') return;
 	// State lives in the dense `slots` array (like every other slot) so the scope
-	// shape stays monomorphic; `key` is only the content hash used to adopt the
+	// shape stays monomorphic; `key` is only the ownership hash used to adopt the
 	// matching server-rendered head element on hydration.
 	let state = scope.slots[slot] as HeadSlot | undefined;
 	if (state === undefined) {
-		let el = adoptServerHeadEl(key, tag);
+		let el = adoptServerHeadEl(headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		if (el === null) {
 			el = document.createElement(tag);
 			document.head.appendChild(el);
@@ -10956,7 +11039,9 @@ const DELEGATED_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched');
 const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
 
 // Invoke one event slot — a bare handler `fn(event)` or a nominal `{ fn, args }` bundle
-// (the compiler's stable-arrow optimisation) as `fn(...args, event)`.
+// (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
+// arrow never observes its native event, so forwarding that event to its callee
+// would change the authored callback's argument list.
 //
 // GUARDED like the platform guards each listener invocation: a throwing handler
 // (or a non-function listener value that arrived through a spread/prop) reports
@@ -10979,16 +11064,16 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 			const a = bundle.args;
 			switch (a.length) {
 				case 0:
-					bundle.fn(event);
+					bundle.fn();
 					break;
 				case 1:
-					bundle.fn(a[0], event);
+					bundle.fn(a[0]);
 					break;
 				case 2:
-					bundle.fn(a[0], a[1], event);
+					bundle.fn(a[0], a[1]);
 					break;
 				default:
-					bundle.fn.apply(null, a.concat(event));
+					bundle.fn.apply(null, a);
 			}
 			return;
 		}
@@ -12289,6 +12374,12 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 		el.hasAttribute('disabled')
 	)
 		return null;
+	// An aria-hidden control is a form-interop MIRROR (AT-hidden and, by the
+	// pattern's contract, focus-excluded — e.g. the hidden "bubble inputs"
+	// radix-style libraries render behind a custom control): users cannot reach
+	// it, so handler-less controlled props are the intended wiring, not the
+	// authoring mistake this diagnostic exists to catch.
+	if (el.getAttribute('aria-hidden') === 'true') return null;
 
 	const hasInput =
 		isUsableEventSlot(host.$$input as EventSlot) ||
@@ -12803,7 +12894,14 @@ const ELEMENT_TAG = Symbol.for('octane.element');
 // of band. This lets hydration keep an explicit `key={undefined}` as an
 // independent reconciliation boundary without adding an observable descriptor
 // field or penalizing unkeyed descriptors with extra object shape.
+//
+// A non-null `key` already proves presence, so only the AMBIGUOUS nullish-key
+// case is recorded here — every `key={id}` element in a list would otherwise pay
+// a WeakSet insert per render. Read presence through `elementKeyWasProvided`.
 const KEYED_ELEMENT_DESCRIPTORS = new WeakSet<object>();
+function elementKeyWasProvided(descriptor: ElementDescriptor): boolean {
+	return descriptor.key !== null || KEYED_ELEMENT_DESCRIPTORS.has(descriptor);
+}
 // Children.map/toArray synthesize stable traversal keys. Keep the original
 // missing-key validation state out of band so rebasing an unkeyed element from
 // a dynamic collection does not accidentally silence the renderer warning.
@@ -12839,10 +12937,15 @@ export type OctaneNode = unknown;
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
-	const own = Object.getOwnPropertyDescriptor(config, 'key');
 	// React's development-only props.key warning getter is not a real key. This
 	// matters when an element's props object is fed back into createElement.
-	if (own?.get != null && (own.get as any).isReactWarning) return false;
+	// Gated exactly like React's hasValidKey: the reflective probe allocates a
+	// descriptor object on every call, and only a React DEV build can install
+	// such a getter — so production reaches the key with one property read.
+	if (process.env.NODE_ENV !== 'production' && hasOwnProp.call(config, 'key')) {
+		const own = Object.getOwnPropertyDescriptor(config, 'key');
+		if (own?.get != null && (own.get as any).isReactWarning) return false;
+	}
 	return config.key !== undefined;
 }
 
@@ -12907,8 +13010,6 @@ export function createElement<P>(
 	// createElement is callable userland API, so it must snapshot config even on
 	// the common two-argument path. Mutating the caller's object after creation
 	// must not retroactively mutate the element.
-	const keyWasProvided =
-		src != null && (typeof src === 'object' || typeof src === 'function') && 'key' in src;
 	const p = copyElementConfig(src);
 	if (hasPositional) p.children = kids;
 	applyElementDefaultProps(type, p);
@@ -12921,7 +13022,16 @@ export function createElement<P>(
 		ref: p.ref !== undefined ? p.ref : null,
 		children: kids ?? null,
 	};
-	if (keyWasProvided) KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	// Only a NULLISH `key` leaves presence ambiguous (`key` is non-null exactly when
+	// `hasKey`), so the prototype-chain probe stays off the keyed-list hot path.
+	if (
+		key === null &&
+		src != null &&
+		(typeof src === 'object' || typeof src === 'function') &&
+		'key' in src
+	) {
+		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	}
 	return finalizeElementDescriptor(descriptor);
 }
 function isElementDescriptor(v: any): v is ElementDescriptor {
@@ -12995,9 +13105,11 @@ export function cloneElement<P>(
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
 	};
+	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
-		KEYED_ELEMENT_DESCRIPTORS.has(element) ||
-		(config != null && Object.prototype.hasOwnProperty.call(config, 'key'))
+		key === null &&
+		(elementKeyWasProvided(element) ||
+			(config != null && Object.prototype.hasOwnProperty.call(config, 'key')))
 	) {
 		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
 	}
@@ -13019,7 +13131,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 		ref: element.ref,
 		children: element.children,
 	};
-	KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
 	return finalizeElementDescriptor(descriptor);
 }
@@ -14487,6 +14599,15 @@ function scopedDeoptKey(
 	// cannot alias a nested child. JSON quoting makes arbitrary user strings data,
 	// never structure, while remaining stable across renders without an intern map.
 	const explicit = isElementDescriptor(item) && item.key != null;
+	// The unwrapped top level — a plain children array or a single-layer Fragment,
+	// which is what every `{items.map(...)}` list and every binding's rendered
+	// output produces — is the hot path: it re-keys EVERY child on EVERY parent
+	// render, including renders where all children go on to bail. Skip the
+	// serializer there. A JSON encoding always begins with '[', so no 'k'/'i'
+	// prefixed key can collide with a nested wrapper path, and the differing
+	// prefixes keep an explicit key="0" distinct from an implicit index 0 — the
+	// same two aliasing properties the serialized form provides.
+	if (path.length === 0) return explicit ? 'k' + String(key) : 'i' + index;
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 
@@ -14547,26 +14668,27 @@ function prepareDeoptList(
 	forceSingle: boolean = false,
 	includeKeyedSingle: boolean = true,
 ): PreparedDeoptList | null {
-	const items: any[] = [];
-	const keys: any[] = [];
+	// childSlot calls this for EVERY renderable hole on every render, and the
+	// non-list answer (a lone component descriptor, text, null) is the common one
+	// — build the two output arrays only once a list regime is established.
 	if (isFragmentDescriptor(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
 		flattenReactChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
 		return { items, keys };
 	}
 	if (Array.isArray(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		flattenReactChildContainer(items, keys, value, deoptWrapperKind(value), []);
 		return { items, keys };
 	}
 	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		items.push(value);
-		keys.push(scopedDeoptKey([], value, 0, value.key));
-		return { items, keys };
+		return { items: [value], keys: [scopedDeoptKey([], value, 0, value.key)] };
 	}
 	if (forceSingle) {
-		items.push(value);
-		keys.push(scopedDeoptKey([], value, 0, deoptKeyPositional(value, 0)));
-		return { items, keys };
+		return { items: [value], keys: [scopedDeoptKey([], value, 0, deoptKeyPositional(value, 0))] };
 	}
 	return null;
 }
@@ -15401,11 +15523,17 @@ export function childSlot(
 	// in another one-item list.
 	includeKeyedSingle: boolean = true,
 ): void {
+	// Reading the host's tag costs two DOM accessors and this runs for every
+	// renderable hole on every render, so lead with the cheap facts. A de-opt list
+	// ITEM (`includeKeyedSingle === false`, passed only by deoptItemBody) shares
+	// the domParent its list's own childSlot already validated against a non-null
+	// list value, so re-reading the tag once per item proves nothing new.
 	if (
+		value != null &&
+		includeKeyedSingle &&
 		domParent.nodeType === 1 &&
 		VOID_ELEMENTS.has((domParent as Element).localName) &&
-		!isPortalTarget(parentScope.block, domParent) &&
-		value != null
+		!isPortalTarget(parentScope.block, domParent)
 	) {
 		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}
@@ -16772,6 +16900,25 @@ interface TrySlot {
 	passthrough: boolean;
 }
 
+// Single mutation point for `TrySlot.branch`. The bare assignment is the hot
+// path; the devtools probe is fully behind the profile gate (dead-code
+// eliminated in non-profile builds), so this adds only a boolean-guarded call
+// over the plain assignment and no allocation/closure when unobserved.
+function setTryBranch(slot: TrySlot, next: -1 | 0 | 1 | 2): void {
+	slot.branch = next;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		if (next === -1) {
+			__devtoolsClearBoundary(slot);
+		} else {
+			const label =
+				slot.parentBlock !== null && slot.parentBlock !== undefined
+					? componentName(slot.parentBlock)
+					: 'Suspense';
+			__devtoolsSetBoundaryState(slot, next, slot.hasResolved, label);
+		}
+	}
+}
+
 function clearPassthroughTry(state: TrySlot): void {
 	const visible = state.block;
 	const persistent = state.tryBlock;
@@ -16784,7 +16931,7 @@ function clearPassthroughTry(state: TrySlot): void {
 function mountPassthroughCatch(state: TrySlot, error: unknown): void {
 	clearPassthroughTry(state);
 	state.pendingThenable = null;
-	state.branch = 0;
+	setTryBranch(state, 0);
 	state.err = error;
 	if (state.catchBody === null) throw error;
 	const block = createBlock(
@@ -16803,7 +16950,7 @@ function mountPassthroughCatch(state: TrySlot, error: unknown): void {
 
 function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unknown>): void {
 	clearPassthroughTry(state);
-	state.branch = 2;
+	setTryBranch(state, 2);
 	state.pendingThenable = thenable;
 	if (state.pendingBody !== null) {
 		const block = createBlock(
@@ -16822,7 +16969,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 	const retry = () => {
 		if (state.pendingThenable !== thenable || state.parentBlock.disposed) return;
 		state.pendingThenable = null;
-		state.branch = -1;
+		setTryBranch(state, -1);
 		scheduleRender(state.parentBlock);
 	};
 	thenable.then(retry, retry);
@@ -16859,7 +17006,7 @@ function renderPassthroughTry(state: TrySlot): void {
 		);
 		state.tryBlock = block;
 		state.block = block;
-		state.branch = 1;
+		setTryBranch(state, 1);
 		(block as any).$$tryHandler = (error: unknown) => {
 			try {
 				mountPassthroughCatch(state, error);
@@ -17053,7 +17200,7 @@ function mountTry(state: TrySlot): void {
 	state.block = null;
 	state.hiddenDom = null;
 	state.hasResolved = false;
-	state.branch = 1;
+	setTryBranch(state, 1);
 	let bStart: Node;
 	let bEnd: Node;
 	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
@@ -17487,7 +17634,7 @@ function hideTryContentAndMountPending(
 	// not as the visible arm, so its already-detached refs are not detached twice.
 	const previousArm = state.block !== null && state.block !== state.tryBlock ? state.block : null;
 	state.block = null;
-	state.branch = 2;
+	setTryBranch(state, 2);
 	if (previousArm !== null) {
 		unmountBlock(previousArm);
 		if (state.parentBlock.disposed || state.block !== null || state.branch !== 2) return false;
@@ -17653,7 +17800,7 @@ function commitResumeInner(state: TrySlot): void {
 				showTryBlock(state);
 			}
 			state.block = tryBlock;
-			state.branch = 1;
+			setTryBranch(state, 1);
 			tryBlock.body = state.tryBody;
 			// Preserve transition priority on the retry render — the retry is a
 			// continuation of the same transition, so a re-suspend on a different
@@ -18018,7 +18165,7 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 			unmountBlock(state.block);
 		}
 		state.block = tryBlock;
-		state.branch = 1;
+		setTryBranch(state, 1);
 		state.hasResolved = true;
 		// Invalidate the wired resume: when the original thenable eventually
 		// settles, its retry sees a mismatched pendingThenable and no-ops.
@@ -18769,7 +18916,7 @@ function requestReset(state: TrySlot): void {
 	// then let the normal commit cycle decide what to render. The currently
 	// visible catch block stays mounted for one tick; mountTry's teardown
 	// (state.block != null branch) removes it on the next render.
-	state.branch = -1;
+	setTryBranch(state, -1);
 	state.err = null;
 	state.hasResolved = false;
 	state.detachedRefs = null;
@@ -18864,7 +19011,7 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	// owns a catch arm (including primitive and null rejection reasons).
 	const hydrationRejection = hydration?.isRejection(err) === true;
 	const caughtError = hydrationRejection ? err.reason : err;
-	state.branch = 0;
+	setTryBranch(state, 0);
 	state.err = caughtError;
 	const adopting = adoptedStart !== undefined && adoptedEnd !== undefined;
 	const bStart = adoptedStart ?? document.createComment('catch-b');
@@ -21820,6 +21967,12 @@ function makeRoot(
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
 			registerRootDisposer(rootBlock);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__devtoolsSetNameResolver(componentName);
+				__devtoolsRegisterRoot(
+					rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+				);
+			}
 			currentBody = body;
 			currentKey = nextKey;
 			// React parity: render() inside a transition never commits synchronously
@@ -21887,6 +22040,10 @@ function makeRoot(
 			try {
 				if (rootBlock) {
 					DOM_ROOT_DISPOSERS.delete(rootBlock);
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__devtoolsUnregisterRoot(
+							rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+						);
 					// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
 					// Block in the tree). Run cleanups + scope teardown only, then clear
 					// the container in one shot. Portals self-detach during the recursive
@@ -22026,6 +22183,10 @@ export function hydrateRoot(
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__devtoolsSetNameResolver(componentName);
+		__devtoolsRegisterRoot(rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike);
+	}
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',
 		next: 0,

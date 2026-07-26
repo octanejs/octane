@@ -63,6 +63,11 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 			await r.click('#th-firstName');
 			await settle();
 		});
+		await d.step('double toggle in one event (Updater<T> composition)', async (i, r) => {
+			await i.click('#double-toggle');
+			await r.click('#double-toggle');
+			await settle();
+		});
 		d.unmount();
 	});
 

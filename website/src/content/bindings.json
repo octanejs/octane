@@ -36,6 +36,7 @@
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
       "@octanejs/cmdk",
+      "@octanejs/shadcn",
       "@octanejs/lucide",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer"
@@ -75,7 +76,8 @@
       "@octanejs/stylex",
       "@octanejs/styled-components",
       "@octanejs/testing-library",
-      "@octanejs/tanstack-devtools"
+      "@octanejs/tanstack-devtools",
+      "@octanejs/devtools"
     ]
   }
 ]

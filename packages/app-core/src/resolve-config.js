@@ -15,7 +15,34 @@
 
 import { normalizeRendererConfig } from 'octane/compiler/renderers';
 
-import { DEFAULT_OUTDIR } from './constants.js';
+import { DEFAULT_OUTDIR, DEFAULT_RPC_MAX_BODY_BYTES } from './constants.js';
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalize_rpc_origin(value) {
+	if (typeof value !== 'string') {
+		throw new Error('[octane] server.rpc.allowedOrigins must contain only HTTP or HTTPS origins.');
+	}
+
+	try {
+		const origin = new URL(value);
+		if (
+			(origin.protocol !== 'http:' && origin.protocol !== 'https:') ||
+			origin.username !== '' ||
+			origin.password !== '' ||
+			origin.pathname !== '/' ||
+			origin.search !== '' ||
+			origin.hash !== ''
+		) {
+			throw new Error('Not an HTTP or HTTPS origin');
+		}
+		return origin.origin;
+	} catch {
+		throw new Error('[octane] server.rpc.allowedOrigins must contain only HTTP or HTTPS origins.');
+	}
+}
 
 /**
  * @param {unknown} route
@@ -176,6 +203,24 @@ export function resolveOctaneConfig(raw, options = {}) {
 		throw new Error("[octane] server.render must be 'streaming' or 'buffered'.");
 	}
 
+	const rawRpc = raw.server?.rpc;
+	if (
+		rawRpc !== undefined &&
+		(rawRpc === null || typeof rawRpc !== 'object' || Array.isArray(rawRpc))
+	) {
+		throw new Error('[octane] server.rpc must be an object when provided.');
+	}
+	if (
+		rawRpc?.maxBodyBytes !== undefined &&
+		(!Number.isSafeInteger(rawRpc.maxBodyBytes) || rawRpc.maxBodyBytes <= 0)
+	) {
+		throw new Error('[octane] server.rpc.maxBodyBytes must be a positive safe integer.');
+	}
+	if (rawRpc?.allowedOrigins !== undefined && !Array.isArray(rawRpc.allowedOrigins)) {
+		throw new Error('[octane] server.rpc.allowedOrigins must be an array.');
+	}
+	const allowedRpcOrigins = [...new Set((rawRpc?.allowedOrigins ?? []).map(normalize_rpc_origin))];
+
 	// ------------------------------------------------------------------
 	// Apply defaults
 	// ------------------------------------------------------------------
@@ -201,6 +246,10 @@ export function resolveOctaneConfig(raw, options = {}) {
 		server: {
 			trustProxy: raw.server?.trustProxy ?? false,
 			render: raw.server?.render ?? 'streaming',
+			rpc: {
+				allowedOrigins: allowedRpcOrigins,
+				maxBodyBytes: rawRpc?.maxBodyBytes ?? DEFAULT_RPC_MAX_BODY_BYTES,
+			},
 		},
 	};
 }

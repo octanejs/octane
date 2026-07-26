@@ -16,3 +16,4 @@ export {
 	is_rpc_request,
 	runMiddlewareChain,
 } from './middleware.js';
+export { handleRpcRequest } from './server/rpc.js';

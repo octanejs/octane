@@ -1,8 +1,16 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 import { octane } from 'octane/compiler/vite';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [octane()],
+	plugins: [octane(), tailwindcss()],
+
+	resolve: {
+		// The shadcn CLI installs registry components importing via the `@/`
+		// alias (components.json `aliases`); mirror it for Vite.
+		alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+	},
 
 	server: {
 		port: 5173,
@@ -22,7 +30,9 @@ export default defineConfig({
 		// stale output and require `vite --force` on every workspace edit.
 		//
 		// The bindings are the same shape: they ship `.tsrx`/`.ts` sources that the
-		// octane plugin has to compile, so they must not be pre-bundled either.
-		exclude: ['octane', '@octanejs/cmdk', '@octanejs/radix'],
+		// octane plugin has to compile, so they must not be pre-bundled either. That
+		// covers both the cmdk demo and the registry-installed shadcn components,
+		// which build on the raw-source radix and lucide bindings.
+		exclude: ['octane', '@octanejs/cmdk', '@octanejs/radix', '@octanejs/lucide'],
 	},
 });

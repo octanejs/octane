@@ -52,6 +52,21 @@ describe('executeServerFunction', () => {
 		await expect(executeServerFunction(boom, clientCall([]))).rejects.toThrow('nope');
 	});
 
+	it.each(['{', '{}', 'null', '"value"', '[999]'])(
+		'rejects malformed or non-array server-function payload %s before invocation',
+		async (body) => {
+			let invoked = false;
+			const fn = () => {
+				invoked = true;
+			};
+
+			await expect(executeServerFunction(fn, body)).rejects.toMatchObject({
+				code: 'OCTANE_INVALID_RPC_PAYLOAD',
+			});
+			expect(invoked).toBe(false);
+		},
+	);
+
 	it('is NOT plain-JSON compatible (the devalue graph format is intentional)', async () => {
 		const first = (...args: unknown[]) => args.length;
 		const response = await executeServerFunction(first, clientCall([1, 2]));

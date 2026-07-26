@@ -239,6 +239,8 @@ export default defineConfig({
 					exclude: [
 						...configDefaults.exclude,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -316,6 +318,8 @@ export default defineConfig({
 					exclude: [
 						...configDefaults.exclude,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -390,7 +394,11 @@ export default defineConfig({
 				// the entire Octane suite a third time.
 				test: {
 					name: 'octane-profile',
-					include: ['packages/octane/tests/profiling-runtime.test.tsrx'],
+					include: [
+						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
+					],
 					environment: 'jsdom',
 					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
 					globals: false,
@@ -596,6 +604,53 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-hotkeys',
+					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-hotkeys$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-hotkeys/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-pacer',
+					include: ['packages/tanstack-pacer/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-pacer$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
+							replacement:
+								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-store',
 					include: [
 						'packages/tanstack-store/tests/conformance/**/*.test.ts',
@@ -788,6 +843,37 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'devtools',
+					include: ['packages/devtools/tests/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					// The @tanstack/devtools-event-client index folds to a no-op unless
+					// NODE_ENV === 'development'; the plugin only runs in dev anyway.
+					env: { NODE_ENV: 'development' },
+					// Starts a ClientEventBus so emit()/on() deliver over the window bus
+					// (the devtools host provides it in production).
+					setupFiles: ['packages/devtools/tests/setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -953,13 +1039,23 @@ export default defineConfig({
 			{
 				test: {
 					name: 'apollo-client',
-					include: ['packages/apollo-client/tests/**/*.test.ts'],
+					include: [
+						'packages/apollo-client/tests/**/*.test.ts',
+						'!packages/apollo-client/tests/ssr/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					globals: false,
 				},
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/apollo-client\/react\/ssr$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/ssr/index.js',
+							),
+						},
 						{
 							find: /^@octanejs\/apollo-client\/testing\/react$/,
 							replacement: resolve(
@@ -979,6 +1075,48 @@ export default defineConfig({
 							replacement: resolve(
 								import.meta.dirname,
 								'packages/apollo-client/src/testing/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client$/,
+							replacement: resolve(import.meta.dirname, 'packages/apollo-client/src/index.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'apollo-client-ssr',
+					include: ['packages/apollo-client/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react\/ssr$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/ssr/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react\/internal$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/internal/index.js',
 							),
 						},
 						{
@@ -1238,12 +1376,26 @@ export default defineConfig({
 					// pinned bundle contract. Enforced HERE because the compat script's
 					// CLI --exclude flags proved unreliable once `pnpm add
 					// --lockfile=false` re-keys the workspace's vitest instances.
-					exclude:
-						process.env.OCTANE_THREE_COMPAT_VERSION !== undefined
-							? [
-									'packages/three/tests/**/*differential.test.ts',
-									'packages/three/tests/browser/**/*.test.ts',
-								]
+					exclude: [
+						'packages/three/tests/browser/**/*.test.ts',
+						...(process.env.OCTANE_THREE_COMPAT_VERSION !== undefined
+							? ['packages/three/tests/**/*differential.test.ts']
+							: []),
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/three/tests/_react-setup.ts'],
+					globals: false,
+					server: { deps: { inline: ['@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
+			},
+			{
+				test: {
+					name: 'three-browser',
+					include:
+						process.env.OCTANE_THREE_COMPAT_VERSION === undefined
+							? ['packages/three/tests/browser/**/*.test.ts']
 							: [],
 					environment: 'jsdom',
 					globalSetup: ['packages/three/tests/_react-setup.ts'],
@@ -1359,6 +1511,38 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-router\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query',
+					include: ['packages/tanstack-router-ssr-query/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router-ssr-query$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-router-ssr-query/src/index.tsrx',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
 						},
 					],
 				},
@@ -1680,8 +1864,65 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'shadcn',
+					include: [
+						'packages/shadcn/tests/**/*.test.ts',
+						'packages/shadcn/tests/**/*.test.tsx',
+						'!packages/shadcn/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// Differential precompile for shadcn fixtures: rewrites
+					// `@octanejs/shadcn` → the vendored pinned upstream React sources
+					// (shadcn has no npm runtime package to rewrite to).
+					globalSetup: ['packages/shadcn/tests/differential/_setup.ts'],
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/shadcn$/,
+							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
+						},
+						// @octanejs/radix deliberately carries no alias: it resolves through
+						// node_modules like any other dependency. That used to mean the pinned
+						// published release (maintainer policy from the cmdk review); since the
+						// package moved to `workspace:*` it means packages/radix, so these
+						// tests now cover the sibling source this repo actually ships.
+					],
+				},
+			},
+			{
+				test: {
+					name: 'shadcn-ssr',
+					include: ['packages/shadcn/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/shadcn$/,
+							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'aria',
-					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
+					include: [
+						'packages/aria/tests/**/*.test.ts',
+						'packages/aria/tests/**/*.test.tsx',
+						'!packages/aria/tests/ssr/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// The differential fixtures import the real react-aria consumer modules
 					// (useComboBox/useSelect pull in the whole overlays/listbox/menu graph); the
@@ -1715,8 +1956,37 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'aria-ssr',
+					include: ['packages/aria/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src') + '/$1/index.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'base-ui',
-					include: ['packages/base-ui/tests/**/*.test.ts', 'packages/base-ui/tests/**/*.test.tsx'],
+					include: [
+						'packages/base-ui/tests/**/*.test.ts',
+						'packages/base-ui/tests/**/*.test.tsx',
+						'!packages/base-ui/tests/ssr/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// Differential precompile for base-ui fixtures: rewrites `@octanejs/base-ui/<sub>`
 					// → `@base-ui-components/react/<sub>` so the React side runs real Base UI.
@@ -1730,6 +2000,35 @@ export default defineConfig({
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/base-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/base-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'base-ui-ssr',
+					include: ['packages/base-ui/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
 						{
 							find: /^@octanejs\/base-ui$/,
 							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
@@ -2064,17 +2363,15 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'website',
+					name: 'website-unit',
 					include: ['website/tests/**/*.test.ts'],
+					exclude: [
+						'website/tests/core-apis-docs.test.ts',
+						'website/tests/ssr-smoke.test.ts',
+						'website/tests/ssr-hydration.e2e.test.ts',
+					],
 					environment: 'jsdom',
 					globals: false,
-					// ssr-smoke and ssr-hydration.e2e both run a REAL production
-					// `vite build` into website/.output and the e2e file then serves
-					// that Nitro output. Running the files in parallel
-					// would let one build delete/rewrite artifacts the other is
-					// building or serving, so this project is file-serial by
-					// contract, not by timing.
-					fileParallelism: false,
 				},
 				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
 				// routing, and deployment are owned by @octanejs/tanstack-start; the
@@ -2083,20 +2380,48 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'website-mcp',
+					name: 'website-integration',
+					include: [
+						'website/tests/core-apis-docs.test.ts',
+						'website/tests/ssr-smoke.test.ts',
+						'website/tests/ssr-hydration.e2e.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					// Vitest defaults ordinary tests to five seconds. This project
+					// deliberately owns full-route, build, and browser integration
+					// coverage, so give unannotated integration cases the same
+					// budget as the SSR smoke test.
+					testTimeout: 15_000,
+					// The SSR and browser specs write website/.output, while the
+					// route-level docs test renders the full application. Keep this
+					// integration boundary serial while ordinary tests stay parallel.
+					fileParallelism: false,
+				},
+				plugins: [octaneMdx(websiteMdxOptions), octane()],
+			},
+			{
+				test: {
+					name: 'website-mcp-unit',
 					include: ['website-mcp/tests/**/*.test.ts'],
+					exclude: ['website-mcp/tests/built-handler.e2e.test.ts'],
 					environment: 'node',
 					globals: false,
-					// built-handler.e2e runs a REAL production `vite build` into
-					// website-mcp/dist and website-mcp/.vercel/output and then imports the emitted
-					// server entry; file-serial so parallel test files can't clobber
-					// the artifacts another file is building or importing.
-					fileParallelism: false,
 				},
 				// No app plugins: the website-mcp tests exercise plain .ts modules (the
 				// content snapshot uses only Vite built-ins — ?raw and
-				// import.meta.glob) plus the production build driven through the
-				// vite JS API, which loads the app's own config and plugins itself.
+				// import.meta.glob).
+			},
+			{
+				test: {
+					name: 'website-mcp-integration',
+					include: ['website-mcp/tests/built-handler.e2e.test.ts'],
+					environment: 'node',
+					globals: false,
+					// This spec writes website-mcp/dist and .vercel/output before
+					// importing the emitted server entry.
+					fileParallelism: false,
+				},
 			},
 		],
 	},

@@ -1,0 +1,10 @@
+{
+  "upstream": { "package": "octane", "version": "workspace" },
+  "surface": "Octane-native DevTools plugin (not an upstream port): renders live runtime diagnostics into a TanStack Devtools host via @tanstack/devtools-event-client. P1 ships the Components tree + state inspector.",
+  "divergences": [],
+  "ssr": "The plugin renders no anchor of its own; it is a client-only panel plugged into @octanejs/tanstack-devtools. Include it only in dev.",
+  "notes": [
+    "Reads the dev-only globalThis.__OCTANE_DEVTOOLS__ hook (present only in profile/devtools builds)."
+  ],
+  "verified": "2026-07-24"
+}

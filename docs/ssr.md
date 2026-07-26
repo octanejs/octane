@@ -174,6 +174,37 @@ devalue-encoded argument array in, a devalue-encoded `{ value }` envelope out.
 The Vite plugin loads it via `ssrLoadModule('octane/server')` so the executor
 and the resolved server function share one SSR runtime.
 
+Server-function requests accept only JSON `POST` bodies, require the browser's
+origin to match the application, and default to a one-mebibyte encoded body
+limit. Global Octane middleware runs before each action, so authentication and
+authorization policies apply to server functions as well as ordinary routes.
+Invalid requests never invoke the action, and internal exception messages are
+not exposed in HTTP responses.
+
+Configure larger bodies or explicitly trusted additional origins in
+`octane.config.ts`:
+
+```ts
+import { defineConfig } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+	server: {
+		rpc: {
+			maxBodyBytes: 2 * 1024 * 1024,
+			allowedOrigins: ['https://admin.example.com'],
+		},
+	},
+});
+```
+
+Origins must be complete HTTP or HTTPS origins, never wildcard, path, or
+credential-bearing values. Explicitly allowed origins receive the browser's
+required `POST` preflight and exact-origin CORS response headers; preflight
+requests never execute authorization middleware or server actions. Forwarded
+origin headers are used only when
+`server.trustProxy` is explicitly enabled behind a trusted proxy. The same
+policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
+
 ## How it works
 
 - Server-compiled components are string emitters: static HTML interleaved with

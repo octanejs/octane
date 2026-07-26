@@ -85,3 +85,40 @@ benchmarks instead.
 Use the shared test harnesses for compilation, SSR, hydration, and differential
 execution. Do not copy ad-hoc generated-module rewriting or `new Function`
 loaders into another test file.
+
+## Where tests live
+
+`packages/octane/tests/` is organized as:
+
+- top-level `*.test.ts`: feature and unit tests for runtime and compiler
+  behavior.
+- `conformance/`: ports of `facebook/react` behaviors. Each `it` cites its
+  source, like `// Per ReactHooksWithNoopRenderer-test.js:1885`.
+- `differential/`: the parity proof. `_rig.ts` runs the same `.tsrx` fixture
+  through both Octane and `@tsrx/react`, drives identical events, and asserts
+  byte-equal `innerHTML` after each step. It compares only final HTML, so it
+  cannot see DOM move patterns, effect timing, or focus.
+- `hydration/`: server-render then `hydrateRoot()` adoption tests, including
+  `prod-mode-hydrate.test.ts`, which compiles with explicit prod options.
+- `_fixtures/`: shared `.tsrx` fixtures. Helpers live in `tests/_helpers.ts`
+  (`mount`, `act`, `flushEffects`, `createLog`) and `tests/conformance/_helpers/`.
+
+Run one file while iterating:
+
+```bash
+./node_modules/.bin/vitest run packages/octane/tests/<file>.test.ts --reporter=verbose
+```
+
+Two regression layers sit beyond the `octane` project:
+
+- The **`octane-prod`** vitest project re-runs the same files with the plugin
+  forced to `hmr: false`, so the production compile branch gets runtime
+  coverage. Tests asserting dev-only warnings check
+  `process.env.OCTANE_TEST_COMPILE_MODE === 'prod'`.
+- **`website/tests/ssr-hydration.e2e.test.ts`** boots the real Vite dev server
+  and the production `octane-preview` server and drives every route in headless
+  Chromium, failing on hydration-mismatch warnings or page errors.
+
+`scripts/scaffold-react-port.mjs` turns a React test file into a triage skeleton
+of in-scope `it.todo`s plus out-of-scope reasons. Resolve or remove every todo
+before committing the port.

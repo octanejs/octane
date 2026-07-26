@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-07-20",
-  "purpose": "Exact Milestone 0 Lynx toolchain/native SDK pin, extended with the Milestone 5 framework-neutral source/build compatibility set.",
+  "recordedAt": "2026-07-23",
+  "purpose": "Exact Milestone 0 Lynx toolchain/native SDK pin, extended with the Milestone 5 framework-neutral source/build compatibility set and Milestone 11 macOS Explorer assets.",
   "nativeSdk": {
     "name": "Lynx",
     "version": "3.9.0",
@@ -31,6 +31,16 @@
         "name": "LynxExplorer-noasan-release.apk",
         "role": "Android Explorer",
         "sha256": "48a2e19c0fd370a373100b346f81e6670d73bc050f9b1722973c73f70b5bbe82"
+      },
+      {
+        "name": "LynxExplorer-macos-arm64.app.tar.gz",
+        "role": "macOS arm64 Explorer",
+        "sha256": "e540f6b30334e511d1fa2438864fda821fb8ed7ec2a543e57bd8d53f113ebd3e"
+      },
+      {
+        "name": "LynxExplorer-macos-x64.app.tar.gz",
+        "role": "macOS x64 Explorer",
+        "sha256": "7ea655bc9a92427af6f4a202ee9686c4dd2e68f9df35f22c202c57af49162fab"
       }
     ]
   },

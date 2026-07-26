@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -10,6 +10,7 @@ import {
 	areaForPath,
 	BENCHMARK_SUITES,
 	BUNDLED_SKILLS,
+	REPO_SKILLS,
 	createServer,
 	engineeringPlanFor,
 	isOctaneRepo,
@@ -173,20 +174,50 @@ describe('@octanejs/mcp-server helpers', () => {
 		}
 	});
 
-	it('advertises the engineering gates during MCP initialization', async () => {
+	it('routes to the engineering gates without restating them at initialization', async () => {
+		// Initialization instructions are injected into every session, so they stay
+		// short and point at the tool. The gates themselves must still be reachable
+		//: that is the contract, not any particular wording.
 		const server = createServer({ repoRoot: resolve(PACKAGE_ROOT, '../..') });
 		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });
 		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
 		try {
 			await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
-			expect(client.getInstructions()).toContain(
-				'Before creating or materially changing Octane software',
-			);
-			expect(client.getInstructions()).toContain('establish a relevant baseline before editing');
+			const instructions = client.getInstructions();
+			expect(instructions).toContain('octane_engineering_plan');
+			expect(instructions.length).toBeLessThan(600);
 
 			const tools = await client.listTools();
 			expect(tools.tools.map((tool) => tool.name)).toContain('octane_engineering_plan');
+
+			const plan = await client.callTool({
+				name: 'octane_engineering_plan',
+				arguments: { scope: 'framework-core', changeKind: 'performance' },
+			});
+			const body = plan.content[0].text;
+			expect(body).toContain('Identify hot paths and record a relevant baseline before editing.');
+			expect(body).toContain('build-octane-software');
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
+
+	it('serves the project map from both generated, CI-gated sources', async () => {
+		// A hand-written map is the copy free to drift, which is why the old one
+		// did. Both halves here are regenerated and checked by CI.
+		const server = createServer({ repoRoot: resolve(PACKAGE_ROOT, '../..') });
+		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+		try {
+			await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+			const map = (await client.callTool({ name: 'octane_project_map', arguments: {} })).content[0]
+				.text;
+			expect(map).toContain('Your React instincts are the main failure mode here');
+			expect(map).toContain('Package inventory (generated)');
+			expect(map).toContain('framework binding');
 		} finally {
 			await client.close();
 			await server.close();
@@ -204,6 +235,26 @@ describe('@octanejs/mcp-server helpers', () => {
 			expect(existsSync(resolve(PACKAGE_ROOT, file))).toBe(true);
 			const body = await readFile(resolve(PACKAGE_ROOT, file), 'utf8');
 			expect(body).toMatch(/^# Skill:/);
+		}
+	});
+
+	it('serves every RuleSync skill, and only skills that exist', async () => {
+		// Checking that each mapped path resolves catches a dangling entry but not
+		// a missing one, which is how authoring-tsrx was added to .rulesync and
+		// stayed unreachable through octane_skill. Compare both directions.
+		const repoRoot = resolve(PACKAGE_ROOT, '../..');
+		const onDisk = readdirSync(resolve(repoRoot, '.rulesync/skills'), { withFileTypes: true })
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.sort();
+
+		expect(Object.keys(REPO_SKILLS).sort()).toEqual(onDisk);
+
+		for (const file of Object.values(REPO_SKILLS)) {
+			expect(file.startsWith('.rulesync/skills/')).toBe(true);
+			expect(existsSync(resolve(repoRoot, file))).toBe(true);
+			const body = await readFile(resolve(repoRoot, file), 'utf8');
+			expect(body).toMatch(/^---\n[\s\S]*?\ndescription: /);
 		}
 	});
 

@@ -32,8 +32,6 @@ export interface ModuleGraph {
 	/** Dependency order — every module precedes its importers. */
 	modules: { name: string; code: string }[];
 	warnings: { file: string; diagnostic: CompileDiagnostic }[];
-	/** Per-file compiled output (pre-rewrite), for the "Compiled output" pane. */
-	compiled: Map<string, string>;
 }
 
 export interface ModuleGraphFailure {
@@ -95,6 +93,19 @@ async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 	return result;
 }
 
+/**
+ * The memoized compile for one file, if the graph already produced it for this
+ * exact source. The compiled-output pane uses it to show `.react.tsx` files —
+ * the octane compiler cannot compile them at all (they are Sucrase's), and
+ * recompiling them a second time just for the pane would duplicate the work
+ * `buildModuleGraph` has already done. Never compiles; a miss means the next
+ * graph build fills it.
+ */
+export function peekCompiledFile(file: PlaygroundFile): CachedCompile | null {
+	const cached = compileCache.get(file.name);
+	return cached && cached.source === file.source ? cached.result : null;
+}
+
 /** Resolve `./Name[.ext]` against the file set, with extension inference. */
 function resolveSibling(specifier: string, names: Set<string>): string | null {
 	const base = specifier.slice(2);
@@ -123,7 +134,6 @@ export async function buildModuleGraph(
 	const { init, parse } = await import('es-module-lexer');
 	await init;
 
-	const compiled = new Map<string, string>();
 	const rewritten = new Map<string, string>();
 	const siblingDeps = new Map<string, string[]>();
 	const warnings: ModuleGraph['warnings'] = [];
@@ -131,7 +141,6 @@ export async function buildModuleGraph(
 	for (const file of files) {
 		const out = await compileFile(file);
 		if (!out.ok) return { ok: false, error: out.error };
-		compiled.set(file.name, out.code);
 		for (const diagnostic of out.warnings) warnings.push({ file: file.name, diagnostic });
 
 		let imports;
@@ -235,6 +244,5 @@ export async function buildModuleGraph(
 		entryKind: isReactHostFile(entry) ? 'react' : 'octane',
 		modules,
 		warnings,
-		compiled,
 	};
 }
