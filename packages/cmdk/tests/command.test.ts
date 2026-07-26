@@ -28,6 +28,8 @@ import {
 	LoadingMenu,
 	LoopMenu,
 	MenuWithSelect,
+	MixedItemsAndGroupsMenu,
+	WrappedItemMenu,
 	RemovableMenu,
 	RemovableSortedGroupsMenu,
 	ReorderMenu,
@@ -317,6 +319,46 @@ describe('@octanejs/cmdk — score ordering (Phase 2)', () => {
 			'Apricot',
 			'Always Here',
 		]);
+
+		app.unmount();
+	});
+
+	it('keeps ungrouped items and group hosts in disjoint rank spaces', async () => {
+		// Ungrouped items and group hosts are siblings in the sizer, so their CSS
+		// `order` values share one space. An ungrouped item numbered by its GLOBAL
+		// rank among all items skips ahead whenever a grouped item outranks it, and
+		// can then tie a group host — at which point the two paint in DOM order
+		// rather than ranked order.
+		const app = mount(MixedItemsAndGroupsMenu);
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'ap');
+		await settle();
+
+		const sizer = app.find('[cmdk-list-sizer]');
+		const label = (el: Element) =>
+			el.getAttribute('cmdk-group') === '' ? 'group' : (el.textContent ?? '');
+		const children = Array.from(sizer.children).filter(
+			(el) => el.hasAttribute('cmdk-group') || el.hasAttribute('cmdk-item'),
+		);
+		// Upstream order: the directly-listed item, then the group.
+		expect(inVisualOrder(children).map(label)).toEqual(['Snap', 'group']);
+
+		app.unmount();
+	});
+
+	it('ranks an item through the wrapper element the sizer actually lays out', async () => {
+		const app = mount(WrappedItemMenu);
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'ap');
+		await settle();
+
+		const sizer = app.find('[cmdk-list-sizer]');
+		const children = Array.from(sizer.children).filter(
+			(el) => el.hasAttribute('cmdk-item') || el.getAttribute('data-testid') === 'wrapper',
+		);
+		// Apple (0.9899) outranks Snap (0.1700), so the wrapper holding Snap must
+		// paint after it rather than jumping ahead as an unranked child.
+		expect(inVisualOrder(children).map((el) => el.textContent)).toEqual(['Apple', 'Snap']);
 
 		app.unmount();
 	});

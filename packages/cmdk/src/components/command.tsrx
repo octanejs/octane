@@ -380,8 +380,14 @@ export function CommandRoot(props: CommandProps) @{
 	/** The direct child of `container` that positions `item` — the item itself, or
  * the wrapper element it sits inside. */
 	function positionedNode(item: Element, container: Element): HTMLElement | null {
-		const node =
-			item.parentElement === container ? item : item.closest(`${GROUP_ITEMS_SELECTOR} > *`);
+		// Walk up to the child the container actually lays out. `order` applies to
+		// a flex CHILD, so an item nested in a wrapper has to rank through that
+		// wrapper — resolving only the item itself leaves the wrapper unranked, and
+		// an unranked flex child keeps `order: 0` and paints ahead of every ranked
+		// one. Upstream resolves a single level (`closest(GROUP_ITEMS > *)`), which
+		// covers a wrapper inside a group but not one directly under the list.
+		let node: Element | null = item;
+		while (node && node.parentElement !== container) node = node.parentElement;
 		return node instanceof HTMLElement ? node : null;
 	}
 
@@ -473,9 +479,15 @@ export function CommandRoot(props: CommandProps) @{
 			const group = item.closest(GROUP_ITEMS_SELECTOR);
 			const container = group ?? listInsertionElement;
 			if (group) asOrderedContainer(group);
-			else topLevel += 1;
 			const node = positionedNode(item, container);
-			if (node) setStyle(node, 'order', String(rank + 1));
+			if (!node) return;
+			// A grouped item is ranked against its own container's children, so the
+			// global rank works there — it is sparse but monotonic. A sizer child
+			// shares one rank space with the group hosts numbered below, so it needs
+			// a DENSE counter: the global rank skips ahead whenever a grouped item
+			// outranks it, which let an ungrouped item tie a group host and leave the
+			// two painting in DOM order.
+			setStyle(node, 'order', String(group ? rank + 1 : topLevel += 1));
 		});
 
 		// OCTANE DIVERGENCE: upstream looks each group element up by
@@ -491,7 +503,13 @@ export function CommandRoot(props: CommandProps) @{
 			const groupValue = ids.current.get(groupId)?.value;
 			if (!groupValue) return;
 			const element = groupElements.find((el) => el.getAttribute(VALUE_ATTR) === groupValue);
-			if (element instanceof HTMLElement) setStyle(element, 'order', String(topLevel + rank + 1));
+			// Through the positioned node for the same reason items do: a group
+			// wrapped in another element is not itself the sizer's flex child, so
+			// ordering the group host would do nothing and leave the wrapper
+			// unranked at `order: 0`, ahead of everything.
+			const node =
+				element ? positionedNode(element, listInsertionElement) : null;
+			if (node) setStyle(node, 'order', String(topLevel + rank + 1));
 		});
 	}
 
@@ -572,11 +590,14 @@ export function CommandRoot(props: CommandProps) @{
 		if (!root) return [];
 		const groups = Array.from(root.querySelectorAll(GROUP_SELECTOR));
 		if (styled.current.size === 0) return groups;
+		// Read the rank off the positioned node, not the group host: a wrapped group
+		// carries its `order` on the wrapper, so reading the host would see 0 for
+		// every such group and collapse navigation back to DOM order.
 		return groups.map(
 			(group, index) => ({
 				group,
 				index,
-				order: Number((group as HTMLElement).style.order) || 0,
+				order: Number(positionedNode(group, root)?.style.order) || 0,
 			}),
 		).sort((a, b) => a.order - b.order || a.index - b.index).map(({ group }) => group);
 	}

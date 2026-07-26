@@ -381,3 +381,37 @@ export function ForceMountAfterMatchMenu() @{
 		</Command.List>
 	</Command>
 }
+
+// A group and an ungrouped item as SIBLINGS in the sizer, where the grouped
+// item outranks the ungrouped one. Upstream appends every ranked item first
+// (so the ungrouped one lands in the sizer) and only then appends the ranked
+// group hosts, which puts groups after any directly-listed item regardless of
+// score. That makes this the shape where the item rank space and the group rank
+// space have to stay disjoint.
+export function MixedItemsAndGroupsMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Group heading="Fruits">
+				<Command.Item>Apple</Command.Item>
+			</Command.Group>
+			<Command.Item>Snap</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+// An item wrapped in a plain element directly under the list. The flex child
+// the sizer lays out is the WRAPPER, not the item, so the rank has to land on
+// the wrapper — an item whose positioned node cannot be resolved gets no
+// `order` at all, and an unranked flex child paints ahead of every ranked one.
+export function WrappedItemMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Item>Apple</Command.Item>
+			<div data-testid="wrapper">
+				<Command.Item>Snap</Command.Item>
+			</div>
+		</Command.List>
+	</Command>
+}
