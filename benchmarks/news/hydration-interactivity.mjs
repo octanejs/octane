@@ -449,10 +449,10 @@ async function runSearchAndSendSample() {
 			deliveredExactlyOnce: hydrated.clicks === 1 && hydrated.submitted === PRE_HYDRATION_TEXT,
 			issues: [],
 		};
-		if (!delivery.clickDelivered) delivery.issues.push('Send click was not replayed');
+		if (!delivery.clickDelivered) delivery.issues.push('Send click was not delivered');
 		if (!delivery.searchPreserved) delivery.issues.push('Search text was not preserved');
 		if (delivery.clickDelivered && hydrated.submitted !== PRE_HYDRATION_TEXT) {
-			delivery.issues.push('Replayed Send received the wrong search text');
+			delivery.issues.push('Delivered Send received the wrong search text');
 		}
 		ensure(delivery.searchPreserved, 'hydration overwrote the pre-hydration search');
 		if (target === 'octane-tsrx') {
@@ -650,7 +650,7 @@ if (userExperience.samples > 0) {
 	);
 	if (userExperience.incorrectSubmissions > 0) {
 		console.log(
-			`  Replayed Sends with the wrong query: ${userExperience.incorrectSubmissions}/${userExperience.samples}`,
+			`  Delivered Sends with the wrong query: ${userExperience.incorrectSubmissions}/${userExperience.samples}`,
 		);
 	}
 	if (userExperience.focusOnlyReplays > 0) {
