@@ -86,9 +86,17 @@ describe('@octanejs/shadcn — registry emit', () => {
 	});
 
 	it('pins cross-binding npm dependencies to exact versions', () => {
-		const button = JSON.parse(readFileSync(join(REGISTRY, 'button.json'), 'utf8'));
-		expect(button.dependencies).toContain('@octanejs/radix@0.1.12');
-		const spinner = JSON.parse(readFileSync(join(REGISTRY, 'spinner.json'), 'utf8'));
-		expect(spinner.dependencies).toContain('@octanejs/lucide@0.1.8');
+		for (const [itemName, dependencyName] of [
+			['button', '@octanejs/radix'],
+			['spinner', '@octanejs/lucide'],
+			['sonner', '@octanejs/sonner'],
+		] as const) {
+			const item = JSON.parse(readFileSync(join(REGISTRY, `${itemName}.json`), 'utf8'));
+			const siblingName = dependencyName.slice('@octanejs/'.length);
+			const sibling = JSON.parse(
+				readFileSync(join(PKG_ROOT, '..', siblingName, 'package.json'), 'utf8'),
+			);
+			expect(item.dependencies).toContain(`${dependencyName}@${sibling.version}`);
+		}
 	});
 });

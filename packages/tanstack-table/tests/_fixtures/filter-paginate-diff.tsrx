@@ -1,9 +1,20 @@
 import {
-	getCoreRowModel,
-	getFilteredRowModel,
-	getPaginationRowModel,
-	useReactTable,
+	columnFilteringFeature,
+	createFilteredRowModel,
+	createPaginatedRowModel,
+	filterFns,
+	rowPaginationFeature,
+	tableFeatures,
+	useTable,
 } from '@octanejs/tanstack-table';
+
+const features = tableFeatures({
+	columnFilteringFeature,
+	rowPaginationFeature,
+	filteredRowModel: createFilteredRowModel(),
+	paginatedRowModel: createPaginatedRowModel(),
+	filterFns,
+});
 
 // Differential fixture: column filter (controlled text input via onInput —
 // octane has no synthetic onChange; React fires its synthetic change from the
@@ -24,12 +35,10 @@ const columns = [
 ];
 
 export function FilterPaginate() @{
-	const table = useReactTable({
+	const table = useTable({
+		features,
 		data,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
 	});
 	<div>
 		<input
@@ -37,7 +46,7 @@ export function FilterPaginate() @{
 			value={table.getColumn('name')!.getFilterValue() as string ?? ''}
 			onInput={(e) => table.getColumn('name')!.setFilterValue((e.target as HTMLInputElement).value)}
 		/>
-		<span id="pi">{table.getState().pagination.pageIndex + '/' + table.getPageCount()}</span>
+		<span id="pi">{table.state.pagination.pageIndex + '/' + table.getPageCount()}</span>
 		<button id="prev" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
 			prev
 		</button>
