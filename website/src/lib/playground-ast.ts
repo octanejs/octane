@@ -20,6 +20,10 @@ export interface PlaygroundAstNode {
 export interface PreparedPlaygroundAst {
 	root: PlaygroundAstNode;
 	rangeNodes: PlaygroundAstNode[];
+	/** `rangeNodes` ordered by `range.from` — the cursor-lookup index. */
+	byStart: PlaygroundAstNode[];
+	/** Running maximum of `range.to` over `byStart[0..i]`. */
+	maxEnd: Int32Array;
 }
 
 const primitiveText = (value: unknown): string => {
@@ -44,15 +48,20 @@ export function preparePlaygroundAst(value: unknown): PreparedPlaygroundAst {
 	// structural field always owns its expanded representation even when an
 	// earlier sibling's metadata.path points to it.
 	const canonicalPaths = new WeakMap<object, string>();
-	const discoverCanonicalPaths = (current: unknown, path: string) => {
-		if (!current || typeof current !== 'object' || canonicalPaths.has(current)) return;
+	const discoverCanonicalPaths = (current: object, path: string) => {
 		canonicalPaths.set(current, path);
-		for (const [key, child] of Object.entries(current)) {
+		const array = Array.isArray(current);
+		for (const key in current) {
 			if (key === 'metadata') continue;
-			discoverCanonicalPaths(child, childPath(path, key, Array.isArray(current)));
+			// Only objects can own a canonical path — skipping primitives here
+			// keeps the discovery pass from allocating a path string per leaf.
+			const child = (current as Record<string, unknown>)[key];
+			if (child && typeof child === 'object' && !canonicalPaths.has(child)) {
+				discoverCanonicalPaths(child, childPath(path, key, array));
+			}
 		}
 	};
-	discoverCanonicalPaths(value, '$');
+	if (value && typeof value === 'object') discoverCanonicalPaths(value, '$');
 
 	const seen = new WeakMap<object, string>();
 	const rangeNodes: PlaygroundAstNode[] = [];
@@ -63,6 +72,7 @@ export function preparePlaygroundAst(value: unknown): PreparedPlaygroundAst {
 		path: string,
 		parent: PlaygroundAstNode | null,
 		depth: number,
+		structural: boolean,
 	): PlaygroundAstNode => {
 		if (current === null || typeof current !== 'object') {
 			return {
@@ -119,37 +129,103 @@ export function preparePlaygroundAst(value: unknown): PreparedPlaygroundAst {
 			parent,
 			children: [],
 		};
-		if (range) rangeNodes.push(node);
+		// Only STRUCTURAL nodes are indexed for cursor lookup. `metadata` holds
+		// back-references into a pre-transform copy of the tree; those clones are
+		// distinct objects (so the canonical-path pass above cannot fold them
+		// into references) carrying the same authored ranges, and they sit far
+		// deeper than the real node — which is exactly what the deepest-node tie
+		// break would select. Indexing them makes a click resolve to a
+		// `…id.metadata.path[3]…` branch instead of the syntax it points at.
+		// They remain fully browsable in the tree.
+		if (range && structural) rangeNodes.push(node);
+		const array = Array.isArray(current);
 		for (const [childKey, child] of Object.entries(current)) {
 			node.children.push(
 				visit(
 					child,
-					Array.isArray(current) ? null : childKey,
-					childPath(path, childKey, Array.isArray(current)),
+					array ? null : childKey,
+					childPath(path, childKey, array),
 					node,
 					depth + 1,
+					structural && childKey !== 'metadata',
 				),
 			);
 		}
 		return node;
 	};
 
-	return { root: visit(value, null, '$', null, 0), rangeNodes };
+	const root = visit(value, null, '$', null, 0, true);
+	// Cursor lookup runs per mousemove, so the containing-range search is
+	// indexed once here instead of scanning every range node per event.
+	const byStart = [...rangeNodes].sort((a, b) => a.range!.from - b.range!.from);
+	const maxEnd = new Int32Array(byStart.length);
+	let running = -1;
+	for (let i = 0; i < byStart.length; i++) {
+		running = Math.max(running, byStart[i].range!.to);
+		maxEnd[i] = running;
+	}
+	return { root, rangeNodes, byStart, maxEnd };
 }
 
-/** Select the narrowest AST node whose half-open range contains `offset`. */
+/**
+ * Collect every authored range the tree carries, without building the display
+ * tree — the position-mapping passes need the ranges alone (see
+ * playground-mapping.ts).
+ */
+export function collectAuthoredRanges(value: unknown): AstRange[] {
+	const ranges: AstRange[] = [];
+	const seen = new WeakSet<object>();
+	const visit = (current: unknown) => {
+		if (!current || typeof current !== 'object' || seen.has(current)) return;
+		seen.add(current);
+		const record = current as Record<string, unknown>;
+		const from = record.start;
+		const to = record.end;
+		if (typeof from === 'number' && typeof to === 'number' && from < to) {
+			ranges.push({ from, to });
+		}
+		for (const key in record) {
+			if (key === 'metadata' || key === 'loc') continue;
+			visit(record[key]);
+		}
+	};
+	visit(value);
+	return ranges;
+}
+
+/**
+ * Select the narrowest AST node whose half-open range contains `offset`.
+ * Ties go to the deeper node, so a zero-width-difference wrapper never hides
+ * the node it wraps.
+ */
 export function findDeepestAstNode(
 	prepared: PreparedPlaygroundAst,
 	offset: number,
 ): PlaygroundAstNode | null {
+	const { byStart, maxEnd } = prepared;
+	// Last node starting at or before the offset — nothing after it can contain
+	// it, and the prefix maximum stops the backwards scan as soon as no earlier
+	// node can still reach.
+	let lo = 0;
+	let hi = byStart.length - 1;
+	let found = -1;
+	while (lo <= hi) {
+		const mid = (lo + hi) >> 1;
+		if (byStart[mid].range!.from <= offset) {
+			found = mid;
+			lo = mid + 1;
+		} else {
+			hi = mid - 1;
+		}
+	}
 	let best: PlaygroundAstNode | null = null;
 	let bestWidth = Number.POSITIVE_INFINITY;
-	for (const node of prepared.rangeNodes) {
-		const range = node.range!;
-		if (offset < range.from || offset >= range.to) continue;
+	for (let i = found; i >= 0 && maxEnd[i] > offset; i--) {
+		const range = byStart[i].range!;
+		if (offset >= range.to) continue;
 		const width = range.to - range.from;
-		if (width < bestWidth || (width === bestWidth && node.depth > (best?.depth ?? -1))) {
-			best = node;
+		if (width < bestWidth || (width === bestWidth && byStart[i].depth > (best?.depth ?? -1))) {
+			best = byStart[i];
 			bestWidth = width;
 		}
 	}
@@ -185,6 +261,11 @@ export function createAstPreview(
 	let destroyed = false;
 	let activeNodes: PlaygroundAstNode[] = [];
 	let pinnedNode: PlaygroundAstNode | null = null;
+	// What the tree currently SHOWS. Pointer tracking re-resolves the same node
+	// for most of a mousemove stream; re-applying it would re-open ancestors,
+	// rewrite dataset markers, and force a lazy branch render per event.
+	let activeLeaf: PlaygroundAstNode | null = null;
+	let activePinned = false;
 	const elements = new Map<PlaygroundAstNode, HTMLLIElement>();
 	let renderedBranches = new WeakSet<PlaygroundAstNode>();
 
@@ -202,6 +283,10 @@ export function createAstPreview(
 	host.replaceChildren(shell);
 
 	const setActiveNodes = (node: PlaygroundAstNode | null, scroll: boolean) => {
+		const wantPinned = node !== null && node === pinnedNode;
+		if (node === activeLeaf && wantPinned === activePinned && !scroll) return;
+		activeLeaf = node;
+		activePinned = wantPinned;
 		for (const active of activeNodes) {
 			const element = elements.get(active);
 			if (element) {
@@ -239,7 +324,7 @@ export function createAstPreview(
 		const leaf = elements.get(node);
 		if (leaf) {
 			leaf.dataset.astLeaf = 'true';
-			if (node === pinnedNode) leaf.dataset.astPinned = 'true';
+			if (wantPinned) leaf.dataset.astPinned = 'true';
 			if (scroll) leaf.scrollIntoView({ block: 'center' });
 		}
 		activeNodes = path;
@@ -342,6 +427,8 @@ export function createAstPreview(
 		renderedBranches = new WeakSet<PlaygroundAstNode>();
 		activeNodes = [];
 		pinnedNode = null;
+		activeLeaf = null;
+		activePinned = false;
 		status.textContent = `${label} · ${filename}`;
 		if (unavailable) {
 			scrollHost.textContent = unavailable;
@@ -375,8 +462,11 @@ export function createAstPreview(
 			renderAst();
 		},
 		reveal(offset, scroll) {
-			pinnedNode = null;
 			const node = prepared ? findDeepestAstNode(prepared, offset) : null;
+			// Same target as the last pointer sample and nothing pinned to undo:
+			// the tree and the editor already show exactly this.
+			if (!scroll && pinnedNode === null && node === activeLeaf) return;
+			pinnedNode = null;
 			setActiveNodes(node, scroll);
 			options.onNodeRange(node?.range ?? null, false);
 		},
