@@ -2290,6 +2290,11 @@ export default defineConfig({
 					],
 					environment: 'jsdom',
 					globals: false,
+					// Vitest defaults ordinary tests to five seconds. This project
+					// deliberately owns full-route, build, and browser integration
+					// coverage, so give unannotated integration cases the same
+					// budget as the SSR smoke test.
+					testTimeout: 15_000,
 					// The SSR and browser specs write website/.output, while the
 					// route-level docs test renders the full application. Keep this
 					// integration boundary serial while ordinary tests stay parallel.
