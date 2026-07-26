@@ -10,7 +10,7 @@
     "i18n server serializer: hoisted-string variable names stay valid identifiers past 26 entries (upstream's `common.size + 97` yields `{`, `|`, \u2026 \u2014 a SyntaxError in the emitted inline script).",
     "useDefaultLocale, SSR branch: `direction` derives from the server-injected locale via `isRTL` (upstream hardcodes 'ltr' even for an injected RTL locale, disagreeing with its own getDefaultLocale)."
   ],
-  "ssr": "Dedicated Node-mode coverage verifies SSRProvider, hydration-safe labelled relationships, server snapshots, and injected LTR/RTL locales; real upstream React server markup is hydrated in place and remains interactive. Overlay and collection SSR registration remain planned for Phase 8.",
+  "ssr": "Dedicated Node-mode coverage verifies SSRProvider, hydration-safe labelled relationships, server snapshots, and injected LTR/RTL locales; real Vite-compiled Octane server markup is hydrated in place and remains interactive. Overlay and collection SSR registration remain planned for Phase 8.",
   "verified": "2026-07-25",
   "docs": ["docs/aria-migration-plan.md"]
 }

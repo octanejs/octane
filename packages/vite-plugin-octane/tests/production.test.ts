@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
-import type { IncomingMessage, Server } from 'node:http';
+import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
@@ -57,15 +57,49 @@ function listFiles(root: string, current = root): string[] {
 	});
 }
 
+async function startBrowserProbeOrigin(): Promise<{ server: Server; origin: string }> {
+	const server = createHttpServer((_request, response) => {
+		response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+		response.end('<!doctype html><html><body>RPC CORS probe</body></html>');
+	});
+	server.listen(0, '127.0.0.1');
+	await once(server, 'listening');
+	const address = server.address();
+	if (!address || typeof address !== 'object') {
+		throw new Error('browser probe server has no address');
+	}
+	return { server, origin: `http://127.0.0.1:${address.port}` };
+}
+
+async function closeNodeServer(server: Server | null): Promise<void> {
+	if (server === null) return;
+	await new Promise<void>((resolve, reject) => {
+		server.close((error) => (error ? reject(error) : resolve()));
+	});
+}
+
 let devServer: ViteDevServer | null = null;
 let devOrigin = '';
 let productionServer: Server | null = null;
 let productionOrigin = '';
+let trustedBrowserOriginServer: Server | null = null;
+let trustedBrowserOrigin = '';
+let hostileBrowserOriginServer: Server | null = null;
+let hostileBrowserOrigin = '';
+const previousTrustedRpcOrigin = process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN;
 
 beforeAll(async () => {
 	linkPackage('octane', path.join(repoRoot, 'packages/octane'));
 	linkPackage('@octanejs/vite-plugin', packageRoot);
 	linkPackage('vite', path.join(packageRoot, 'node_modules/vite'));
+
+	const trustedProbe = await startBrowserProbeOrigin();
+	trustedBrowserOriginServer = trustedProbe.server;
+	trustedBrowserOrigin = trustedProbe.origin;
+	const hostileProbe = await startBrowserProbeOrigin();
+	hostileBrowserOriginServer = hostileProbe.server;
+	hostileBrowserOrigin = hostileProbe.origin;
+	process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN = trustedBrowserOrigin;
 
 	fs.rmSync(distDir, { recursive: true, force: true });
 
@@ -76,12 +110,12 @@ beforeAll(async () => {
 	devServer = await createServer({
 		root: fixtureRoot,
 		logLevel: 'silent',
-		server: { port: 0 },
+		server: { cors: false, host: '127.0.0.1', port: 0 },
 	});
 	await devServer.listen();
 	const address = devServer.httpServer?.address();
 	if (!address || typeof address !== 'object') throw new Error('dev server has no address');
-	devOrigin = `http://localhost:${address.port}`;
+	devOrigin = `http://127.0.0.1:${address.port}`;
 
 	const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 	productionServer = createNodeServer(handler, {
@@ -92,16 +126,19 @@ beforeAll(async () => {
 	if (!productionAddress || typeof productionAddress !== 'object') {
 		throw new Error('production server has no address');
 	}
-	productionOrigin = `http://localhost:${productionAddress.port}`;
+	productionOrigin = `http://127.0.0.1:${productionAddress.port}`;
 }, 180_000);
 
 afterAll(async () => {
-	if (productionServer !== null) {
-		await new Promise<void>((resolve, reject) => {
-			productionServer!.close((error) => (error ? reject(error) : resolve()));
-		});
-	}
+	await closeNodeServer(productionServer);
 	await devServer?.close();
+	await closeNodeServer(trustedBrowserOriginServer);
+	await closeNodeServer(hostileBrowserOriginServer);
+	if (previousTrustedRpcOrigin === undefined) {
+		delete process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN;
+	} else {
+		process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN = previousTrustedRpcOrigin;
+	}
 	fs.rmSync(distDir, { recursive: true, force: true });
 	fs.rmSync(path.join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
 });
@@ -738,19 +775,12 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 
 				try {
 					for (const scenario of [
-						{ origin: 'http://127.0.0.1', allowed: true },
-						{ origin: 'http://127.0.0.2', allowed: false },
+						{ origin: trustedBrowserOrigin, allowed: true },
+						{ origin: hostileBrowserOrigin, allowed: false },
 					]) {
 						requests.length = 0;
 						const page = await browser.newPage();
 						try {
-							await page.route(`${scenario.origin}/**`, (route) =>
-								route.fulfill({
-									status: 200,
-									contentType: 'text/html',
-									body: '<!doctype html><html><body>RPC CORS probe</body></html>',
-								}),
-							);
 							await page.goto(`${scenario.origin}/`);
 							const result = await page.evaluate(
 								async ({ origin, actionHash }) => {
