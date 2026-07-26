@@ -130,8 +130,13 @@ source code in the document title, so that case throws instead.
 Three things are declared once and apply everywhere, because the component that
 knows them is rarely the one that renders a page:
 
-- **`site`** absolute-ises `canonical`, `og:url`, and image URLs. Scrapers do not
-  resolve those relative to the page.
+- **`site`** absolute-ises the URLs a consumer reads without a base: `canonical`,
+  `link rel="alternate"` hreflang addresses, `og:url`, `og:image`, and
+  `twitter:image`. It deliberately does **not** touch subresources the browser
+  fetches, so `preload`, `prefetch`, `modulepreload`, `stylesheet`, `icon`, and
+  `manifest` keep resolving against the document actually serving the response.
+  Rewriting those would make a preview deploy carrying the production `site` pull
+  fonts, CSS, and modules from production.
 - **`titleTemplate`** wraps each page's title, so `%s · Acme` applies to a page
   that only sets `title: 'Pricing'`.
 - **The Open Graph and Twitter shell.** Declare `openGraph`/`twitter` once and

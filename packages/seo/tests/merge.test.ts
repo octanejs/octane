@@ -140,15 +140,18 @@ describe('expandSeo', () => {
 		).toBe('Hello · Site');
 	});
 
-	it('absolute-ises image urls, which scrapers do not resolve themselves', () => {
+	it('leaves image urls as authored, for applyConfig to absolute-ise', () => {
+		// One place decides which origin applies, so a page's relative URL and the
+		// app's `site` cannot disagree.
 		const out = expandSeo({
-			site: 'https://x.dev',
 			openGraph: { images: [{ url: '/og.png', alt: 'A', width: 1200, height: 630 }] },
 		});
-		expect(out.find((d) => d.key === 'meta:property=og:image[0]')?.attrs.content).toBe(
+		expect(out.find((d) => d.key === 'meta:property=og:image[0]')?.attrs.content).toBe('/og.png');
+		expect(out.find((d) => d.key === 'meta:property=og:image:alt[0]')?.attrs.content).toBe('A');
+		const resolved = applyConfig(mergeDescriptors(out), { site: 'https://x.dev' });
+		expect(resolved.find((d) => d.key === 'meta:property=og:image[0]')?.attrs.content).toBe(
 			'https://x.dev/og.png',
 		);
-		expect(out.find((d) => d.key === 'meta:property=og:image:alt[0]')?.attrs.content).toBe('A');
 	});
 
 	it('keeps multiple images rather than collapsing them', () => {

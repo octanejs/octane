@@ -47,12 +47,27 @@ export interface SeoConfig {
 }
 
 /**
- * Attributes holding a URL that scrapers will not resolve relative to the page,
- * so they are absolute-ised against the configured origin at emit time, once the
- * whole tree's config is known.
+ * `<link>` rels whose `href` is an ADDRESS rather than a subresource, so it
+ * belongs to the canonical site and must be absolute.
+ *
+ * Everything else a `<link>` can point at, resource hints, stylesheets, icons,
+ * the manifest, is fetched by the browser and has to resolve against the
+ * document actually serving the response. Rewriting those to `site` would make a
+ * preview or staging deploy pull fonts, CSS, and modules from production.
+ */
+const SITE_ABSOLUTE_LINK_RELS = new Set(['canonical', 'alternate']);
+
+/**
+ * The attribute holding a URL that a consumer will not resolve relative to the
+ * page, so it is absolute-ised against the configured origin at emit time, once
+ * the whole tree's config is known. Scrapers fetch `og:image` and read `og:url`
+ * without a base, and crawlers expect absolute canonical and hreflang addresses.
  */
 function urlAttribute(descriptor: SeoDescriptor): string | null {
-	if (descriptor.tag === 'link') return 'href';
+	if (descriptor.tag === 'link') {
+		const rel = descriptor.attrs.rel;
+		return typeof rel === 'string' && SITE_ABSOLUTE_LINK_RELS.has(rel) ? 'href' : null;
+	}
 	if (descriptor.tag !== 'meta') return null;
 	const property = descriptor.attrs.property;
 	if (property === 'og:url' || property === 'og:image') return 'content';

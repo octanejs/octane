@@ -194,10 +194,10 @@ describe('open graph image shapes', () => {
 		expect(
 			contentOf(finish({ openGraph: { images: '/a.png' } }), 'meta:property=og:image[0]'),
 		).toBe('/a.png');
-		const mixed = finish({
-			site: 'https://x.dev',
-			openGraph: { images: ['/a.png', { url: '/b.png', alt: 'B' }] },
-		});
+		const mixed = finish(
+			{ openGraph: { images: ['/a.png', { url: '/b.png', alt: 'B' }] } },
+			{ site: 'https://x.dev' },
+		);
 		expect(contentOf(mixed, 'meta:property=og:image[0]')).toBe('https://x.dev/a.png');
 		expect(contentOf(mixed, 'meta:property=og:image[1]')).toBe('https://x.dev/b.png');
 		expect(contentOf(mixed, 'meta:property=og:image:alt[1]')).toBe('B');
@@ -207,5 +207,44 @@ describe('open graph image shapes', () => {
 		expect(finish({ openGraph: { images: [] } }).some((d) => d.key.includes('og:image'))).toBe(
 			false,
 		);
+	});
+});
+
+// `site` is the canonical identity of the app, not the origin serving this
+// response. Addresses crawlers consume (canonical, hreflang alternates) must be
+// absolute; subresources the BROWSER fetches must stay relative to the serving
+// document, or a preview deploy carrying the production `site` would pull fonts,
+// CSS, and modules from production.
+describe('site never rewrites subresource URLs', () => {
+	const withSite = (attrs: Record<string, string>) =>
+		applyConfig(mergeDescriptors([{ tag: 'link', key: linkKey(attrs), attrs }]), {
+			site: 'https://production.example',
+		})[0].attrs.href;
+
+	it('leaves resource hints and stylesheets on the serving origin', () => {
+		expect(withSite({ rel: 'preload', as: 'font', href: '/f.woff2' })).toBe('/f.woff2');
+		expect(withSite({ rel: 'modulepreload', href: '/assets/app.js' })).toBe('/assets/app.js');
+		expect(withSite({ rel: 'stylesheet', href: '/assets/app.css' })).toBe('/assets/app.css');
+		expect(withSite({ rel: 'prefetch', href: '/next.js' })).toBe('/next.js');
+	});
+
+	it('leaves icons and the manifest on the serving origin', () => {
+		expect(withSite({ rel: 'icon', sizes: '32x32', href: '/icon.png' })).toBe('/icon.png');
+		expect(withSite({ rel: 'apple-touch-icon', href: '/touch.png' })).toBe('/touch.png');
+		expect(withSite({ rel: 'manifest', href: '/site.webmanifest' })).toBe('/site.webmanifest');
+	});
+
+	it('still absolute-ises the addresses crawlers consume', () => {
+		expect(withSite({ rel: 'canonical', href: '/p' })).toBe('https://production.example/p');
+		expect(withSite({ rel: 'alternate', hreflang: 'de', href: '/de/p' })).toBe(
+			'https://production.example/de/p',
+		);
+	});
+
+	it('still absolute-ises social image and url metas', () => {
+		const out = applyConfig(mergeDescriptors(expandSeo({ openGraph: { images: '/og.png' } })), {
+			site: 'https://production.example',
+		});
+		expect(contentOf(out, 'meta:property=og:image[0]')).toBe('https://production.example/og.png');
 	});
 });

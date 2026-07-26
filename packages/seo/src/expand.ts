@@ -3,7 +3,7 @@
  * engine works on. Kept renderer-free and pure so precedence, URL resolution,
  * and title templating are unit-testable without a render.
  */
-import { linkKey, metaKey, resolveUrl, type SeoDescriptor } from './descriptors.js';
+import { linkKey, metaKey, type SeoDescriptor } from './descriptors.js';
 
 export interface OpenGraphImage {
 	url: string;
@@ -102,7 +102,6 @@ function normalizeImages(images: OpenGraphInput['images']): OpenGraphImage[] {
 
 export function expandSeo(input: SeoInput): SeoDescriptor[] {
 	const out: SeoDescriptor[] = [];
-	const site = input.site;
 
 	// The RAW title. `titleTemplate` is app-level config applied after the merge,
 	// so the social mirror always sees the untemplated value regardless of which
@@ -117,7 +116,7 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 		out.push(meta({ name: 'robots', content: formatRobots(input.robots) }));
 	}
 	if (input.canonical !== undefined) {
-		out.push(link({ rel: 'canonical', href: resolveUrl(input.canonical, site) }));
+		out.push(link({ rel: 'canonical', href: input.canonical }));
 	}
 
 	const og = input.openGraph;
@@ -136,7 +135,7 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 			out.push(meta({ property: 'og:description', content: ogDescription }));
 		}
 		if (ogUrl !== undefined) {
-			out.push(meta({ property: 'og:url', content: resolveUrl(ogUrl, site) }));
+			out.push(meta({ property: 'og:url', content: ogUrl }));
 		}
 		if (og.locale !== undefined) out.push(meta({ property: 'og:locale', content: og.locale }));
 		if (og.publishedTime !== undefined) {
@@ -145,12 +144,12 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 		if (og.modifiedTime !== undefined) {
 			out.push(meta({ property: 'article:modified_time', content: og.modifiedTime }));
 		}
-		// Scrapers do not reliably resolve relative image URLs, so these are always
-		// absolute-ised when a site origin is known.
+		// URLs stay as authored here. `applyConfig` absolute-ises them after the
+		// merge, so one place decides which origin applies.
 		const images = normalizeImages(og.images);
 		for (let i = 0; i < images.length; i++) {
 			const image = images[i];
-			const url = resolveUrl(image.url, site);
+			const url = image.url;
 			// Repeated og:image tags are legitimate, so each gets its own identity.
 			out.push({
 				tag: 'meta',
@@ -204,7 +203,7 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 			out.push(meta({ name: 'twitter:description', content: twitterDescription }));
 		}
 		if (twitter.image !== undefined) {
-			out.push(meta({ name: 'twitter:image', content: resolveUrl(twitter.image, site) }));
+			out.push(meta({ name: 'twitter:image', content: twitter.image }));
 		}
 		if (twitter.imageAlt !== undefined) {
 			out.push(meta({ name: 'twitter:image:alt', content: twitter.imageAlt }));
@@ -213,7 +212,7 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 
 	if (input.languages !== undefined) {
 		for (const [hreflang, href] of Object.entries(input.languages)) {
-			out.push(link({ rel: 'alternate', hreflang, href: resolveUrl(href, site) }));
+			out.push(link({ rel: 'alternate', hreflang, href }));
 		}
 	}
 
