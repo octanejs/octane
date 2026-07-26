@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+	collectAuthoredRanges,
 	createAstPreview,
 	findDeepestAstNode,
 	preparePlaygroundAst,
 	type PlaygroundAstNode,
 } from '../src/lib/playground-ast.ts';
-import { compileRuntimeAst, compileTypes } from '../src/lib/playground.ts';
+import { compileRuntime, compileTypes } from '../src/lib/playground.ts';
 
 const nodeTypes = (root: PlaygroundAstNode): Set<string> => {
 	const types = new Set<string>();
@@ -63,6 +64,38 @@ describe('playground AST preparation', () => {
 		expect(actual.type).toBe('Identifier');
 	});
 
+	it('resolves the cursor to structural syntax, never a metadata back-reference', () => {
+		// The compiler's copy-on-write transforms leave `metadata.path` holding
+		// CLONES of the pre-transform tree: distinct objects carrying the same
+		// authored ranges, so the canonical-path pass cannot fold them into
+		// references. They also sit far deeper than the syntax they mirror,
+		// which is exactly what the deepest-node tie-break selects. Indexing
+		// them makes a click land inside `…metadata.path[0]…` instead of on the
+		// node the cursor is actually over.
+		const prepared = preparePlaygroundAst({
+			type: 'Program',
+			start: 0,
+			end: 20,
+			body: [
+				{
+					type: 'Statement',
+					start: 2,
+					end: 12,
+					metadata: {
+						path: [
+							{ type: 'StaleClone', start: 2, end: 12, inner: { type: 'Deep', start: 4, end: 6 } },
+						],
+					},
+				},
+			],
+		});
+
+		expect(findDeepestAstNode(prepared, 5)?.type).toBe('Statement');
+		expect(prepared.rangeNodes.map((node) => node.type)).toEqual(['Program', 'Statement']);
+		// The clone is still browsable in the tree — only the cursor index skips it.
+		expect(nodeTypes(prepared.root)).toContain('StaleClone');
+	});
+
 	it('finds the narrowest containing node with half-open AST ranges', () => {
 		const prepared = preparePlaygroundAst({
 			type: 'Program',
@@ -88,6 +121,91 @@ describe('playground AST preparation', () => {
 		expect(findDeepestAstNode(prepared, 6)?.type).toBe('ExpressionStatement');
 		expect(findDeepestAstNode(prepared, 10)).toBeNull();
 		expect(prepared.rangeNodes.some((node) => node.type === 'EmptyNode')).toBe(false);
+	});
+
+	it('keeps the narrowest-node answer as the tree grows wide and deep', () => {
+		// The lookup is indexed rather than scanned, so the ordering of siblings
+		// and the depth at which the answer sits must not change the result.
+		const leaves = Array.from({ length: 200 }, (_, index) => ({
+			type: 'Leaf' + index,
+			start: index * 10,
+			end: index * 10 + 4,
+		}));
+		const prepared = preparePlaygroundAst({
+			type: 'Program',
+			start: 0,
+			end: 2000,
+			// Reversed, so source order and discovery order disagree.
+			body: [...leaves].reverse(),
+			nested: {
+				type: 'Wrapper',
+				start: 500,
+				end: 520,
+				inner: { type: 'Inner', start: 502, end: 504 },
+			},
+		});
+
+		expect(findDeepestAstNode(prepared, 0)?.type).toBe('Leaf0');
+		expect(findDeepestAstNode(prepared, 1003)?.type).toBe('Leaf100');
+		// Between two leaves only the Program contains the offset.
+		expect(findDeepestAstNode(prepared, 1005)?.type).toBe('Program');
+		expect(findDeepestAstNode(prepared, 503)?.type).toBe('Inner');
+		// 506 sits between two leaves but inside the wrapper.
+		expect(findDeepestAstNode(prepared, 506)?.type).toBe('Wrapper');
+		expect(findDeepestAstNode(prepared, 2000)).toBeNull();
+		expect(findDeepestAstNode(prepared, -1)).toBeNull();
+	});
+
+	it('collects authored ranges without building the display tree', () => {
+		const ranges = collectAuthoredRanges({
+			type: 'Program',
+			start: 0,
+			end: 20,
+			body: [
+				{ type: 'Text', start: 4, end: 9 },
+				{ type: 'Empty', start: 9, end: 9 },
+			],
+			// Back-references and non-structural metadata must not duplicate or
+			// re-walk the tree.
+			loc: { start: { line: 1, column: 0 } },
+			metadata: { path: [{ type: 'Ghost', start: 100, end: 200 }] },
+		});
+		expect(ranges).toEqual([
+			{ from: 0, to: 20 },
+			{ from: 4, to: 9 },
+		]);
+	});
+
+	it('re-reveals only when the resolved node or its pin actually changes', () => {
+		const host = document.createElement('div');
+		const ranges: Array<{ from: number; to: number } | null> = [];
+		const preview = createAstPreview(host, {
+			onNodeRange(range) {
+				ranges.push(range);
+			},
+		});
+		preview.setAst(
+			{
+				type: 'Program',
+				start: 0,
+				end: 10,
+				body: [{ type: 'Identifier', start: 4, end: 6, name: 'x' }],
+			},
+			'App.tsrx',
+		);
+
+		preview.reveal(4, false);
+		expect(ranges.at(-1)).toEqual({ from: 4, to: 6 });
+		const settled = ranges.length;
+		// Every offset inside the same node resolves to it; a pointer stream
+		// must not re-emit or re-render for each sample.
+		preview.reveal(5, false);
+		expect(ranges.length).toBe(settled);
+
+		preview.reveal(0, false);
+		expect(ranges.length).toBe(settled + 1);
+		expect(ranges.at(-1)).toEqual({ from: 0, to: 10 });
+		preview.destroy();
 	});
 
 	it('drops source ranges when the current AST becomes unavailable', () => {
@@ -177,7 +295,7 @@ export function App() {
 	});
 
 	it('uses the client Program and template IR without reparsing emitted code', () => {
-		const result = compileRuntimeAst(source, filename, 'client');
+		const result = compileRuntime(source, filename, 'client');
 		if (!result.ok) throw new Error(result.error);
 		const inspection = result.ast as {
 			program: { type: string; start: number; end: number };
@@ -193,7 +311,7 @@ export function App() {
 
 it('uses compiler template origins as authored source ranges', () => {
 	const source = `export function App() @{ <button>Styled</button> }`;
-	const result = compileRuntimeAst(source, 'App.tsrx', 'client');
+	const result = compileRuntime(source, 'App.tsrx', 'client');
 	if (!result.ok) throw new Error(result.error);
 	const prepared = preparePlaygroundAst(result.ast);
 	const start = source.indexOf('button');
@@ -206,7 +324,7 @@ it('uses compiler template origins as authored source ranges', () => {
 
 it('uses the server Program exposed by compiler inspection', () => {
 	const source = `export function App() @{ <h1>{'Rendered on the server'}</h1> }`;
-	const result = compileRuntimeAst(source, 'App.tsrx', 'server');
+	const result = compileRuntime(source, 'App.tsrx', 'server');
 	if (!result.ok) throw new Error(result.error);
 	const inspection = result.ast as {
 		program: { type: string; start: number; end: number };

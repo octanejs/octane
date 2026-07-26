@@ -352,3 +352,232 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		expect(hostSlices.sort()).toEqual(['section', 'section']);
 	});
 });
+
+// Origins must name what the AUTHOR wrote. Two ways that can go wrong: a span
+// that has its own authored spelling being reported as another one's, and a
+// span the compiler synthesized being reported as authored at all.
+describe.each([
+	['client dev', { dev: true }],
+	['client prod', { hmr: false as const }],
+])('authored-origin fidelity — %s', (_label, options) => {
+	const CLOSE_SOURCE = `export function App() @{
+	<div class="demo">
+		<button onClick={() => {}}>Increment</button>
+		<style>.demo { color: red; }</style>
+	</div>
+}
+`;
+
+	function templatesOf(source: string): InspectTemplate[] {
+		const result = compile(source, 'origins.tsrx', { ...options, inspect: true });
+		expect(result.inspect).toBeDefined();
+		// Origin recording never changes what ships.
+		expect(compile(source, 'origins.tsrx', options).code).toBe(result.code);
+		return result.inspect.templates as InspectTemplate[];
+	}
+
+	it('points a closing tag at its own name, not at the opening one', () => {
+		const [template] = templatesOf(CLOSE_SOURCE);
+		for (const tag of ['div', 'button']) {
+			const open = template.origins.find(
+				(o) => o.kind === 'tag-open' && template.html.slice(o.start, o.end) === tag,
+			)!;
+			const close = template.origins.find(
+				(o) => o.kind === 'tag-close' && template.html.slice(o.start, o.end) === tag,
+			)!;
+			expect(open, tag).toBeDefined();
+			expect(close, tag).toBeDefined();
+			expect(CLOSE_SOURCE.slice(open.srcStart, open.srcEnd)).toBe(tag);
+			expect(CLOSE_SOURCE.slice(close.srcStart, close.srcEnd)).toBe(tag);
+			// The two authored spellings are distinct positions, and the closing
+			// one is the name inside `</tag>`.
+			expect(close.srcStart).toBeGreaterThan(open.srcStart);
+			expect(CLOSE_SOURCE.slice(close.srcStart - 2, close.srcStart)).toBe('</');
+		}
+	});
+
+	it('falls back to the opening name when the source spells no closing tag', () => {
+		const source = `export function App() @{ <div><span /></div> }`;
+		const [template] = templatesOf(source);
+		const close = template.origins.find(
+			(o) => o.kind === 'tag-close' && template.html.slice(o.start, o.end) === 'span',
+		);
+		// A self-closing element still serializes a close tag in the HTML; with
+		// no authored `</span>` the opening name is the only spelling there is.
+		if (close) expect(source.slice(close.srcStart, close.srcEnd)).toBe('span');
+	});
+
+	it('claims no authored range for the scoped class it injects', () => {
+		const [template] = templatesOf(CLOSE_SOURCE);
+		// `<button>` has no authored class, so the compiler adds one. Reporting
+		// the opening tag as its origin made a hover on `onClick` resolve to it.
+		expect(template.html).toContain('<button class="tsrx-');
+		for (const origin of template.origins) {
+			const authored = CLOSE_SOURCE.slice(origin.srcStart, origin.srcEnd);
+			expect(authored, `${origin.kind} claims ${JSON.stringify(authored)}`).not.toContain(
+				'onClick',
+			);
+		}
+		// The authored `class="demo"` on <div> IS still reported, widened to the
+		// merged value the compiler emits.
+		const value = template.origins.find((o) => o.kind === 'attr-value')!;
+		expect(value).toBeDefined();
+		expect(CLOSE_SOURCE.slice(value.srcStart, value.srcEnd)).toBe('"demo"');
+		expect(template.html.slice(value.start, value.end)).toMatch(/^demo tsrx-/);
+	});
+
+	it('keeps the authored NAME of a bare class while dropping the injected value', () => {
+		const source = `export function App() @{
+	<div class>
+		<style>div { color: red; }</style>
+	</div>
+}
+`;
+		const [template] = templatesOf(source);
+		const name = template.origins.find((o) => o.kind === 'attr-name');
+		expect(name).toBeDefined();
+		expect(source.slice(name!.srcStart, name!.srcEnd)).toBe('class');
+		// The hash is the compiler's, so no attr-value origin is reported.
+		expect(template.origins.some((o) => o.kind === 'attr-value')).toBe(false);
+	});
+});
+
+// SSR bakes its static HTML inline (one template-literal quasi per run) rather
+// than hoisting a `_t$N`, so an inspection entry is a RUN: `html` is what the
+// origins index into and `raw` is the bytes the printed module contains for it,
+// which is how a consumer locates the run without re-escaping anything.
+describe.each([
+	['server', { mode: 'server' as const }],
+	['server dev', { mode: 'server' as const, dev: true }],
+])('SSR static-run origins — %s', (_label, options) => {
+	const SSR_SOURCE = `export default function App() @{
+	<div class="demo">
+		<h2 title="t">Count</h2>
+		<button>Increment</button>
+		<button>Add</button>
+	</div>
+}
+`;
+
+	function inspectServer(source = SSR_SOURCE) {
+		const result = compile(source, 'origins.tsrx', { ...options, inspect: true });
+		expect(result.inspect).toBeDefined();
+		// Recording never changes what ships.
+		expect(compile(source, 'origins.tsrx', options).code).toBe(result.code);
+		return { code: result.code, templates: result.inspect.templates as InspectTemplate[] };
+	}
+
+	it('is absent from a normal compile', () => {
+		const plain = compile(SSR_SOURCE, 'origins.tsrx', options) as { inspect?: unknown };
+		expect(plain.inspect).toBeUndefined();
+	});
+
+	it('records every run verbatim in the emitted module', () => {
+		const { code, templates } = inspectServer();
+		expect(templates.length).toBeGreaterThan(0);
+		for (const template of templates) {
+			expect(typeof template.raw).toBe('string');
+			expect(code, JSON.stringify(template.raw)).toContain(template.raw);
+			expect(template.origins.length).toBeGreaterThan(0);
+		}
+	});
+
+	it('slices every origin cleanly out of both the run and the source', () => {
+		const { templates } = inspectServer();
+		for (const template of templates) {
+			for (const origin of template.origins) {
+				expect(origin.start).toBeGreaterThanOrEqual(0);
+				expect(origin.end).toBeGreaterThan(origin.start);
+				expect(origin.end).toBeLessThanOrEqual(template.html.length);
+				expect(origin.srcEnd).toBeGreaterThan(origin.srcStart);
+				expect(SSR_SOURCE.slice(origin.srcStart, origin.srcEnd).length).toBe(
+					origin.srcEnd - origin.srcStart,
+				);
+			}
+		}
+	});
+
+	it('covers tag names, static attributes and static text', () => {
+		const { templates } = inspectServer();
+		const found = new Map<string, string[]>();
+		for (const template of templates) {
+			for (const origin of template.origins) {
+				const authored = SSR_SOURCE.slice(origin.srcStart, origin.srcEnd);
+				(found.get(origin.kind) ?? found.set(origin.kind, []).get(origin.kind)!).push(authored);
+			}
+		}
+		expect(found.get('tag-open')?.sort()).toEqual(['button', 'button', 'div', 'h2']);
+		expect(found.get('tag-close')?.sort()).toEqual(['button', 'button', 'div', 'h2']);
+		expect(found.get('attr-name')?.sort()).toEqual(['class', 'title']);
+		expect(found.get('attr-value')?.sort()).toEqual(['"demo"', '"t"']);
+		expect(found.get('text')?.sort()).toEqual(['Add', 'Count', 'Increment']);
+	});
+
+	it('records the attributes the form-control writers bake themselves', () => {
+		// `<select multiple>` and `<option value>` are serialized by dedicated
+		// writers (they also feed the option-projection scope), NOT by the shared
+		// static-attribute path. An attribute that reaches the run through its
+		// own writer is still an authored span in the output.
+		const source = `export default function App() @{
+	<select multiple title="pick">
+		<option value="a">A</option>
+		<option value={2}>B</option>
+	</select>
+}
+`;
+		const { templates } = inspectServer(source);
+		const named = new Map<string, string[]>();
+		for (const template of templates) {
+			for (const origin of template.origins) {
+				const authored = source.slice(origin.srcStart, origin.srcEnd);
+				(named.get(origin.kind) ?? named.set(origin.kind, []).get(origin.kind)!).push(authored);
+			}
+		}
+		// The bare-boolean `multiple` has a name and no value; each `value` has
+		// both. `title` proves the shared path still records alongside them.
+		expect(named.get('attr-name')?.sort()).toEqual(['multiple', 'title', 'value', 'value']);
+		expect(named.get('attr-value')?.sort()).toEqual(['"a"', '"pick"', '2']);
+	});
+
+	it('separates the two identical runs of repeated markup', () => {
+		const { code, templates } = inspectServer();
+		// Both `<button>` elements bake the same bytes, so the entries are only
+		// told apart by their authored ranges — which is what lets a consumer
+		// pair the k-th occurrence in the output with the k-th in the source.
+		const buttons = templates.filter((t) => t.raw === '<button>');
+		expect(buttons.length).toBe(2);
+		const starts = buttons.map((t) => t.origins[0].srcStart).sort((a, b) => a - b);
+		expect(starts[0]).toBeLessThan(starts[1]);
+		expect(SSR_SOURCE.slice(starts[0], starts[0] + 6)).toBe('button');
+		expect(SSR_SOURCE.slice(starts[1], starts[1] + 6)).toBe('button');
+		// And the output really does contain it twice, so the pairing is total.
+		expect(code.split('<button>').length - 1).toBe(2);
+	});
+
+	it('reports the closing tag at its own authored range', () => {
+		const { templates } = inspectServer();
+		const close = templates
+			.flatMap((t) => t.origins)
+			.find((o) => o.kind === 'tag-close' && SSR_SOURCE.slice(o.srcStart, o.srcEnd) === 'h2')!;
+		expect(close).toBeDefined();
+		expect(SSR_SOURCE.slice(close.srcStart - 2, close.srcStart)).toBe('</');
+	});
+
+	it('claims no authored range for the scoped class it injects', () => {
+		const source = `export default function App() @{
+	<div>
+		<button>Go</button>
+		<style>div { color: red; }</style>
+	</div>
+}
+`;
+		const { templates } = inspectServer(source);
+		for (const template of templates) {
+			for (const origin of template.origins) {
+				expect(source.slice(origin.srcStart, origin.srcEnd)).not.toContain('<');
+			}
+		}
+		// The hash still reaches the HTML — it is just not attributed to source.
+		expect(templates.some((t) => t.html.includes('tsrx-'))).toBe(true);
+	});
+});

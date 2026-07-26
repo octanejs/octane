@@ -11,6 +11,7 @@ import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import {
+	compileRuntime,
 	compilePlayground,
 	compileTypes,
 	createPreview,
@@ -118,8 +119,35 @@ describe('playground compile pipeline', () => {
 		expect(result.code).toContain('/** @jsxImportSource octane */');
 		expect(result.code).toContain('return');
 		expect(result.code).not.toContain('@{');
-		// Token mappings power source↔types navigation.
-		expect(result.mappings.length).toBeGreaterThan(0);
+		// Position artifacts power source↔types navigation.
+		expect(result.segments.length).toBeGreaterThan(0);
+	});
+
+	it('yields code, the final Program and position artifacts from one compile', () => {
+		// The compiled pane flips between Code and AST and maps positions between
+		// the editors; all three come from a single inspection compile, and the
+		// emitted code stays byte-identical to the preview's own compile.
+		const source = `export function App() @{ <button onClick={() => {}}>Go</button> }`;
+		const inspected = compileRuntime(source, 'App.tsrx', 'client');
+		const plain = compilePlayground(source, 'App.tsrx', 'client');
+		expect(inspected.ok && plain.ok).toBe(true);
+		if (!inspected.ok || !plain.ok) return;
+
+		expect(inspected.code).toBe(plain.code);
+		expect(inspected.ast).toMatchObject({ program: { type: 'Program' } });
+		expect(inspected.segments.length).toBeGreaterThan(0);
+		expect(inspected.templates[0].html).toContain('<button');
+		expect(inspected.templates[0].origins.some((origin) => origin.kind === 'text')).toBe(true);
+	});
+
+	it('reports a broken source as a runtime-inspection failure instead of throwing', () => {
+		const result = compileRuntime(
+			'export function App() @{ <div>{oops</div> }',
+			'App.tsrx',
+			'client',
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).toBeTruthy();
 	});
 
 	it('never throws on broken sources in the types pipeline', () => {
