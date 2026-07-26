@@ -4786,6 +4786,50 @@ export function compileForBundler(source, filename, options) {
 	return { result, hydrateAst: metadata.hydrateAst };
 }
 
+// Template directives are lowered where they appear as output or as a setup
+// value. Inside a JSX attribute they reach neither pass, so without this they
+// survive to the printer and surface as an internal "Not implemented" error.
+function assertNoDirectiveInAttributeValue(ast, filename) {
+	const seen = new WeakSet();
+	walk(ast, false);
+
+	function walk(node, inAttributeValue) {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child, inAttributeValue);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		const type = node.type;
+		if (inAttributeValue && SETUP_VALUE_DIRECTIVE_TYPES.has(type) && type !== 'JSXCodeBlock') {
+			const start = node.loc && node.loc.start;
+			const at = start ? ` (${filename}:${start.line}:${start.column})` : '';
+			throw new Error(
+				`A template directive cannot be used directly as a JSX attribute value.${at} ` +
+					`Assign it to a local first and pass that: ` +
+					`\`const body = @if (…) { … }\` then \`<Comp body={body} />\`.`,
+			);
+		}
+		const attributeValue =
+			inAttributeValue ||
+			type === 'JSXAttribute' ||
+			type === 'Attribute' ||
+			type === 'JSXSpreadAttribute' ||
+			type === 'SpreadAttribute';
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			// An element nested in an attribute value opens a fresh child position,
+			// where directives are ordinary output again.
+			const nested =
+				attributeValue && key === 'children' && (type === 'JSXElement' || type === 'Element')
+					? false
+					: attributeValue;
+			walk(node[key], nested);
+		}
+	}
+}
+
 function compileAuthored(source, filename, options, bundlerMetadata) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
@@ -4794,6 +4838,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const cleanFilename = cleanCompileFilename(filename);
 	const analyzedAst = parseModule(source, cleanFilename);
 	analyzeTsrx(analyzedAst, cleanFilename);
+	assertNoDirectiveInAttributeValue(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
 	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
@@ -5017,6 +5062,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	ast = annotatePureLazyCalls(ast);
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
+	// <ErrorBoundary> only becomes a directive node here, so it needs the same
+	// attribute-position check the authored directives already got.
+	assertNoDirectiveInAttributeValue(ast, cleanCompileFilename(filename));
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
 	// A null-only shorthand guard is template control flow, not an arbitrary
 	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
@@ -6052,6 +6100,9 @@ function compileServer(source, filename, options, analyzedAst = null) {
 	ast = annotatePureLazyCalls(ast);
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
+	// <ErrorBoundary> only becomes a directive node here, so it needs the same
+	// attribute-position check the authored directives already got.
+	assertNoDirectiveInAttributeValue(ast, cleanCompileFilename(filename));
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.

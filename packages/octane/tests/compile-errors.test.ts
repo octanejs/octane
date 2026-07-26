@@ -7,6 +7,107 @@ import { compile } from 'octane/compiler';
 // the user-facing contract, not the throw itself.
 
 describe('compile errors — rejected authoring patterns', () => {
+	describe('template directives at a JSX attribute value', () => {
+		// Directives are lowered where they appear as output or as a setup value.
+		// Inside an attribute they reach neither pass, so they used to survive to
+		// the printer and surface as an internal "Not implemented" error.
+		const PRELUDE = `
+			function Leaf() @{ <b>{'leaf'}</b> }
+			function Slot(props) @{ <section>{props.body}</section> }
+		`;
+		const REJECTED = /template directive cannot be used directly as a JSX attribute value/;
+		const modes = ['client', 'server'] as const;
+
+		const positions: Array<[string, string]> = [
+			['a component prop', `<Slot body={DIRECTIVE} />`],
+			['a host attribute', `<span title={DIRECTIVE} />`],
+			['a spread attribute object', `<Slot {...{ body: DIRECTIVE }} />`],
+			['an array literal', `<Slot body={[DIRECTIVE]} />`],
+			['a member read of an array', `<Slot body={[DIRECTIVE].length} />`],
+			['a ternary arm', `<Slot body={props.on ? DIRECTIVE : null} />`],
+			['an arrow body', `<Slot body={() => DIRECTIVE} />`],
+			['the second of two attributes', `<Slot k={1} body={DIRECTIVE} />`],
+			['an attribute of a nested element', `<Slot body={<span title={DIRECTIVE} />} />`],
+		];
+		const directives: Array<[string, string]> = [
+			['@if', `@if (props.on) { <Leaf /> } @else { <i>{'n'}</i> }`],
+			['@for', `@for (const x of props.xs; key x.id) { <Leaf /> }`],
+			['@switch', `@switch (props.k) { @case 'a': { <Leaf /> } @default: { <i>{'d'}</i> } }`],
+			['@try', `@try { <Leaf /> } @catch (error) { <i>{'c'}</i> }`],
+		];
+
+		for (const [where, shape] of positions) {
+			it(`rejects a directive in ${where}`, () => {
+				for (const [name, directive] of directives) {
+					const src = `${PRELUDE}export function App(props) @{ <div>${shape.replace('DIRECTIVE', directive)}</div> }`;
+					for (const mode of modes) {
+						expect(
+							() => compile(src, 'directive-in-attr.tsrx', { mode }),
+							`${name} in ${where} (${mode})`,
+						).toThrow(REJECTED);
+					}
+				}
+			});
+		}
+
+		it('names the working form in the message', () => {
+			const src = `${PRELUDE}export function App(props) @{ <div><Slot body={@if (props.on) { <Leaf /> }} /></div> }`;
+			expect(() => compile(src, 'directive-in-attr.tsrx')).toThrow(/const body =/);
+			expect(() => compile(src, 'directive-in-attr.tsrx')).toThrow(
+				/directive-in-attr\.tsrx:\d+:\d+/,
+			);
+		});
+
+		it('rejects an <ErrorBoundary> used as an attribute value', () => {
+			// It only becomes a directive node once the boundary lowering runs, so it
+			// needs the same rejection after that pass rather than at parse time.
+			const src = `
+				import { ErrorBoundary } from 'octane';
+				${PRELUDE}
+				export function App() @{
+					<div><Slot body={<ErrorBoundary fallback={'c'}><Leaf /></ErrorBoundary>} /></div>
+				}
+			`;
+			for (const mode of modes) {
+				expect(() => compile(src, 'boundary-in-attr.tsrx', { mode })).toThrow(REJECTED);
+			}
+		});
+
+		const allowed: Array<[string, string]> = [
+			[
+				'assigned to a local first',
+				`const body = @if (props.on) { <Leaf /> } @else { <i>{'n'}</i> };
+				 <div><Slot body={body} /></div>`,
+			],
+			[
+				'an <ErrorBoundary> assigned to a local first',
+				`const body = <ErrorBoundary fallback={'c'}><Leaf /></ErrorBoundary>;
+				 <div><Slot body={body} /></div>`,
+			],
+			[
+				'a child of an element nested in an attribute',
+				`<div><Slot body={<span>@if (props.on) { <Leaf /> }</span>} /></div>`,
+			],
+			[
+				'a child of a fragment nested in an attribute',
+				`<div><Slot body={<span><>@if (props.on) { <Leaf /> }</></span>} /></div>`,
+			],
+			['ordinary output', `<div>@if (props.on) { <Leaf /> }</div>`],
+		];
+		for (const [what, body] of allowed) {
+			it(`allows a directive ${what}`, () => {
+				const src = `
+					import { ErrorBoundary } from 'octane';
+					${PRELUDE}
+					export function App(props) @{ ${body} }
+				`;
+				for (const mode of modes) {
+					expect(() => compile(src, 'directive-allowed.tsrx', { mode })).not.toThrow();
+				}
+			});
+		}
+	});
+
 	it('rejects multiple `ref={…}` attributes on a single element', () => {
 		const src = `
       import { useRef } from 'octane';
