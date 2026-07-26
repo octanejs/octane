@@ -85,8 +85,8 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/button"
+        "@octane/button",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -104,8 +104,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -121,9 +121,6 @@
       "title": "Aspect Ratio",
       "dependencies": [
         "@octanejs/radix@0.1.12"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
       ],
       "files": [
         {
@@ -160,8 +157,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -199,8 +196,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -215,8 +212,8 @@
       "type": "registry:ui",
       "title": "Card",
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -251,9 +248,6 @@
       "title": "Collapsible",
       "dependencies": [
         "@octanejs/radix@0.1.12"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
       ],
       "files": [
         {
@@ -291,8 +285,8 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/button"
+        "@octane/button",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -347,9 +341,9 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
         "@octane/label",
-        "@octane/separator"
+        "@octane/separator",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -382,8 +376,8 @@
       "type": "registry:ui",
       "title": "Input",
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -402,8 +396,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/separator"
+        "@octane/separator",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -418,8 +412,8 @@
       "type": "registry:ui",
       "title": "Kbd",
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -512,8 +506,8 @@
         "@octanejs/lucide@0.1.8"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/button"
+        "@octane/button",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -642,8 +636,8 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/button"
+        "@octane/button",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -663,14 +657,14 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
         "@octane/button",
         "@octane/input",
         "@octane/separator",
         "@octane/sheet",
         "@octane/skeleton",
         "@octane/tooltip",
-        "@octane/use-mobile"
+        "@octane/use-mobile",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -685,8 +679,8 @@
       "type": "registry:ui",
       "title": "Skeleton",
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -721,9 +715,6 @@
       "dependencies": [
         "@octanejs/lucide@0.1.8",
         "@octanejs/sonner@0.1.8"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
       ],
       "files": [
         {
@@ -808,8 +799,8 @@
       "type": "registry:ui",
       "title": "Textarea",
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/types"
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -828,8 +819,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils",
-        "@octane/toggle"
+        "@octane/toggle",
+        "@octane/utils"
       ],
       "files": [
         {

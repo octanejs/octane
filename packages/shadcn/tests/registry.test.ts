@@ -16,6 +16,30 @@ describe('@octanejs/shadcn — registry emit', () => {
 		).not.toThrow();
 	});
 
+	it('claims a registry dependency only when the emitted source actually imports it', () => {
+		// An unconditional dependency makes the CLI install files the component
+		// never uses — for @octane/utils that also drags in clsx and
+		// tailwind-merge, which a consumer of e.g. aspect-ratio does not need.
+		const files = readdirSync(REGISTRY).filter(
+			(file) => file.endsWith('.json') && file !== 'registry.json',
+		);
+		for (const file of files) {
+			const item = JSON.parse(readFileSync(join(REGISTRY, file), 'utf8'));
+			if (item.type !== 'registry:ui') continue;
+			const content = item.files.map((entry: { content: string }) => entry.content).join('\n');
+			const declared: string[] = item.registryDependencies ?? [];
+			for (const [dep, specifier] of [
+				['@octane/utils', "'@/lib/utils'"],
+				['@octane/types', "'@/lib/types'"],
+			] as const) {
+				expect(
+					declared.includes(dep),
+					`${item.name} declares ${dep}=${declared.includes(dep)} but imports it=${content.includes(specifier)}`,
+				).toBe(content.includes(specifier));
+			}
+		}
+	});
+
 	it('emits schema-shaped items whose registryDependencies resolve within the registry', () => {
 		const files = readdirSync(REGISTRY).filter((file) => file.endsWith('.json'));
 		const index = JSON.parse(readFileSync(join(REGISTRY, 'registry.json'), 'utf8'));

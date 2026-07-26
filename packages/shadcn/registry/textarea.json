@@ -12,7 +12,7 @@
     }
   ],
   "registryDependencies": [
-    "@octane/utils",
-    "@octane/types"
+    "@octane/types",
+    "@octane/utils"
   ]
 }

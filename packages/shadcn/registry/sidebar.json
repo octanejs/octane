@@ -17,13 +17,13 @@
     "class-variance-authority"
   ],
   "registryDependencies": [
-    "@octane/utils",
     "@octane/button",
     "@octane/input",
     "@octane/separator",
     "@octane/sheet",
     "@octane/skeleton",
     "@octane/tooltip",
-    "@octane/use-mobile"
+    "@octane/use-mobile",
+    "@octane/utils"
   ]
 }

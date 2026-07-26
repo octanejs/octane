@@ -150,13 +150,14 @@ async function buildItems() {
 			],
 		};
 		if (npm.length) item.dependencies = npm;
+		// Derived from the imports the source actually has — a component that
+		// never imports `cn` must not drag lib/utils (and its clsx +
+		// tailwind-merge npm deps) into the consumer's project.
+		//
 		// Namespace-qualified: bare names would resolve against the DEFAULT
 		// @shadcn registry, not this one (the namespace protocol's rule for
 		// third-party registries).
-		item.registryDependencies = [
-			'@octane/utils',
-			...registry.filter((dep) => dep !== 'utils').map((dep) => `@octane/${dep}`),
-		];
+		if (registry.length) item.registryDependencies = registry.map((dep) => `@octane/${dep}`);
 		items.push(item);
 	}
 
