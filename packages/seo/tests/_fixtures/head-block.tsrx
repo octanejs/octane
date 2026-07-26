@@ -139,3 +139,42 @@ export function HostileTitle() @{
 		</>
 	</Head>
 }
+
+/** The app declares only the social shell; the page declares only its content. */
+function ContentPage() @{
+	<Head>
+		<Seo title="Go somewhere, slowly" description="City breaks, slowly." canonical="/" />
+	</Head>
+}
+
+export function SocialShell() @{
+	<Head>
+		<>
+			<Seo
+				site="https://x.dev"
+				openGraph={{ type: 'website', siteName: 'Wayfinder' }}
+				twitter={{ card: 'summary_large_image' }}
+			/>
+			<ContentPage />
+		</>
+	</Head>
+}
+
+/**
+ * An openGraph block that emits no `og:` tag at all. Opting in is about having
+ * declared the family, so the page title must still be mirrored.
+ */
+function TitleOnlyPage() @{
+	<Head>
+		<Seo title="Post" />
+	</Head>
+}
+
+export function OpenGraphWithoutOgTags() @{
+	<Head>
+		<>
+			<Seo openGraph={{ publishedTime: '2026-01-01' }} />
+			<TitleOnlyPage />
+		</>
+	</Head>
+}

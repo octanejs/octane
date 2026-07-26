@@ -66,6 +66,10 @@ export interface SeoInput {
  * rewriting the served document title; a function replacement is inserted
  * verbatim.
  */
+function jsonLdKeyPart(value: string): string {
+	return value.replace(/[\\#]/g, (character) => '\\' + character);
+}
+
 export function applyTitleTemplate(template: string, title: string): string {
 	return template.replace('%s', () => title);
 }
@@ -238,8 +242,9 @@ export function jsonLdDescriptor(data: unknown, explicitKey?: string): SeoDescri
 	if (key === undefined) {
 		const record = (data ?? {}) as Record<string, unknown>;
 		const type = typeof record['@type'] === 'string' ? (record['@type'] as string) : 'graph';
-		const id = typeof record['@id'] === 'string' ? '#' + (record['@id'] as string) : '';
-		key = type + id;
+		const id = typeof record['@id'] === 'string' ? (record['@id'] as string) : '';
+		// Escaped so a `@type` containing `#` cannot forge a different graph's key.
+		key = jsonLdKeyPart(type) + '#' + jsonLdKeyPart(id);
 	}
 	return {
 		tag: 'script',

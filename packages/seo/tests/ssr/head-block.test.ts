@@ -9,7 +9,9 @@ import {
 	HostileTitle,
 	LinkOverride,
 	Nested,
+	OpenGraphWithoutOgTags,
 	RawScript,
+	SocialShell,
 } from '../_fixtures/head-block.tsrx';
 
 async function render(Component: any) {
@@ -96,5 +98,27 @@ describe('titles carrying regex replacement patterns', () => {
 		const { head } = await render(HostileTitle);
 		// Escaped for HTML, but not rewritten by `%s` substitution.
 		expect(head).toContain("<title>Deals: 50% off $&amp; and $' plus $1 · Shop</title>");
+	});
+});
+
+// An app that declares the Open Graph and Twitter shell once, and pages that
+// declare only their own title/description/canonical. The social tags must pick
+// those up; a card with og:type but no og:title is useless.
+describe('social fill-in across registrations', () => {
+	it('fills og and twitter from the page title, description, and canonical', async () => {
+		const { head } = await render(SocialShell);
+		expect(head).toContain('property="og:title" content="Go somewhere, slowly"');
+		expect(head).toContain('property="og:description" content="City breaks, slowly."');
+		expect(head).toContain('property="og:url" content="https://x.dev/"');
+		expect(head).toContain('name="twitter:title" content="Go somewhere, slowly"');
+		expect(head).toContain('name="twitter:description" content="City breaks, slowly."');
+	});
+
+	it('fills from an openGraph block that emitted no og: tag of its own', async () => {
+		// `openGraph: { publishedTime }` produces only `article:published_time`, so
+		// scanning emitted keys for an `og:` prefix would miss the opt-in entirely.
+		const { head } = await render(OpenGraphWithoutOgTags);
+		expect(head).toContain('property="article:published_time"');
+		expect(head).toContain('property="og:title" content="Post"');
 	});
 });

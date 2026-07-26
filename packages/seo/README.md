@@ -114,9 +114,7 @@ other are reported in development.
 compile to a children block (a function), and coercing one to a string would put
 source code in the document title, so that case throws instead.
 
-`<Seo>` is the object form and expands to the tags above, filling in Open Graph
-and Twitter from `title`/`description` unless you override them, and making
-`canonical`, `og:url`, and image URLs absolute against `site`:
+`<Seo>` is the object form and expands to the tags above:
 
 ```tsx
 <Seo
@@ -132,6 +130,38 @@ and Twitter from `title`/`description` unless you override them, and making
 	jsonLd={{ '@type': 'Article', headline: 'Post title' }}
 />
 ```
+
+## App-level settings
+
+Three things are declared once and apply everywhere, because the component that
+knows them is rarely the one that renders a page:
+
+- **`site`** absolute-ises `canonical`, `og:url`, and image URLs. Scrapers do not
+  resolve those relative to the page.
+- **`titleTemplate`** wraps each page's title, so `%s · Acme` applies to a page
+  that only sets `title: 'Pricing'`.
+- **The Open Graph and Twitter shell.** Declare `openGraph`/`twitter` once and
+  `og:title`, `og:description`, `og:url`, `twitter:title`, and
+  `twitter:description` are mirrored from whatever page renders, unless that page
+  names them itself. Only families you actually declared are filled, so an app
+  that never asked for Open Graph never emits it.
+
+```tsx
+// once, near the root
+<Seo
+	site="https://example.com"
+	titleTemplate="%s · Example"
+	openGraph={{ type: 'website', siteName: 'Example' }}
+	twitter={{ card: 'summary_large_image' }}
+/>
+
+// and in a page, anywhere below
+<Seo title="Pricing" description="Plans and limits." canonical="/pricing" />
+```
+
+All three are applied after the merge, once the whole tree has registered. The
+social mirror uses the raw title rather than the templated one, since
+`og:site_name` already carries what a template adds.
 
 ## Server rendering
 

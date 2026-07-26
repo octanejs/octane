@@ -6,6 +6,7 @@ import {
 	applyConfig,
 	expandSeo,
 	formatRobots,
+	jsonLdDescriptor,
 	linkKey,
 	mergeDescriptors,
 	metaKey,
@@ -247,5 +248,99 @@ describe('title templating treats the title as data', () => {
 	it('leaves a template containing dollar patterns alone', () => {
 		const out = expandSeo({ title: 'Widgets', titleTemplate: '%s — $100 & up' });
 		expect(out.find((d) => d.tag === 'title')?.text).toBe('Widgets — $100 & up');
+	});
+});
+
+// The fill mirrors page values into families the author opted into. Opting in
+// means having declared at least one tag of that family; an app that never asked
+// for Open Graph must not start emitting it.
+describe('social fill-in opt-in boundary', () => {
+	const page = () =>
+		mergeDescriptors(expandSeo({ title: 'Page', description: 'Desc', canonical: '/p' }));
+
+	it('adds nothing when no social family was declared', () => {
+		const out = applyConfig(page(), {});
+		expect(out.some((d) => d.key.startsWith('meta:property=og:'))).toBe(false);
+		expect(out.some((d) => d.key.startsWith('meta:name=twitter:'))).toBe(false);
+	});
+
+	it('fills only the declared family', () => {
+		const withOg = applyConfig(
+			mergeDescriptors([...expandSeo({ openGraph: { type: 'website' } }), ...page()]),
+			{},
+		);
+		expect(withOg.find((d) => d.key === 'meta:property=og:title')?.attrs.content).toBe('Page');
+		expect(withOg.some((d) => d.key.startsWith('meta:name=twitter:'))).toBe(false);
+	});
+
+	it('never overrides a value the author named', () => {
+		const out = applyConfig(
+			mergeDescriptors([
+				...expandSeo({ openGraph: { type: 'website', title: 'Explicit social' } }),
+				...page(),
+			]),
+			{},
+		);
+		expect(out.find((d) => d.key === 'meta:property=og:title')?.attrs.content).toBe(
+			'Explicit social',
+		);
+	});
+
+	it('mirrors the raw title, not the templated one', () => {
+		// og:site_name already carries the suffix a template adds.
+		const out = applyConfig(
+			mergeDescriptors([...expandSeo({ openGraph: { type: 'website' } }), ...page()]),
+			{ titleTemplate: '%s · Site' },
+		);
+		expect(out.find((d) => d.tag === 'title')?.text).toBe('Page · Site');
+		expect(out.find((d) => d.key === 'meta:property=og:title')?.attrs.content).toBe('Page');
+	});
+
+	it('absolute-ises an og:url it mirrored from the canonical', () => {
+		const out = applyConfig(
+			mergeDescriptors([...expandSeo({ openGraph: { type: 'website' } }), ...page()]),
+			{ site: 'https://x.dev' },
+		);
+		expect(out.find((d) => d.key === 'meta:property=og:url')?.attrs.content).toBe(
+			'https://x.dev/p',
+		);
+	});
+});
+
+// Keys are built by joining author-controlled attribute values with `|` and `=`.
+// A value containing those delimiters must not be able to forge another tag's
+// key, or one of the two is silently dropped from the document. Same class of
+// bug as treating a title as a replacement pattern: data must stay data.
+describe('identity keys cannot be forged through delimiters', () => {
+	it('keeps a link whose attribute value contains the key delimiters', () => {
+		const forged = linkKey({ rel: 'alternate', hreflang: 'de|type=x' });
+		const real = linkKey({ rel: 'alternate', hreflang: 'de', type: 'x' });
+		expect(forged).not.toBe(real);
+	});
+
+	it('keeps JSON-LD graphs whose @type and @id straddle the delimiter', () => {
+		const forged = jsonLdDescriptor({ '@type': 'Article#x', '@id': 'y' });
+		const real = jsonLdDescriptor({ '@type': 'Article', '@id': 'x#y' });
+		expect(forged.key).not.toBe(real.key);
+	});
+});
+
+// Opting into Open Graph is about having declared the family, not about which
+// particular tags that produced. `openGraph: { publishedTime }` emits only
+// `article:published_time`, which no `og:` sniff would recognise.
+describe('social fill-in recognises every way of opting in', () => {
+	it('still fills from hand-written og tags with no <Seo> involved', () => {
+		const out = applyConfig(
+			mergeDescriptors([
+				{
+					tag: 'meta',
+					key: metaKey({ property: 'og:type' }),
+					attrs: { property: 'og:type', content: 'website' },
+				},
+				...expandSeo({ title: 'Post' }),
+			]),
+			{},
+		);
+		expect(out.find((d) => d.key === 'meta:property=og:title')?.attrs.content).toBe('Post');
 	});
 });

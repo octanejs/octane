@@ -202,6 +202,11 @@ export function JsonLd(props: { data: unknown; seoKey?: string }) {
  * root is enough. A page that names its own still overrides them.
  */
 export function Seo(props: SeoInput) {
-	useRegisterSeo(expandSeo(props), { site: props.site, titleTemplate: props.titleTemplate });
+	useRegisterSeo(expandSeo(props), {
+		site: props.site,
+		titleTemplate: props.titleTemplate,
+		declaredOpenGraph: props.openGraph !== undefined,
+		declaredTwitter: props.twitter !== undefined,
+	});
 	return null;
 }

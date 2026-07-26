@@ -41,12 +41,19 @@ function sameDescriptors(a: readonly SeoDescriptor[], b: readonly SeoDescriptor[
 		const x = a[i];
 		const y = b[i];
 		if (x.key !== y.key || x.tag !== y.tag || x.text !== y.text) return false;
+		if (x.templated !== y.templated) return false;
 		const xa = x.attrs;
 		const ya = y.attrs;
 		const xk = Object.keys(xa);
 		if (xk.length !== Object.keys(ya).length) return false;
 		for (const k of xk) if (xa[k] !== ya[k]) return false;
 	}
+	return true;
+}
+
+function sameConfig(a: SeoConfig, b: SeoConfig): boolean {
+	const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof SeoConfig>;
+	for (const key of keys) if (a[key] !== b[key]) return false;
 	return true;
 }
 
@@ -78,13 +85,9 @@ export function createSeoRegistry(): SeoRegistry {
 		},
 		configure(sourceId, config) {
 			const previous = configs.get(sourceId);
-			if (
-				previous !== undefined &&
-				previous.site === config.site &&
-				previous.titleTemplate === config.titleTemplate
-			) {
-				return;
-			}
+			// Compared field-by-field over the union of keys, so adding a SeoConfig
+			// field cannot silently escape this check and stop invalidating.
+			if (previous !== undefined && sameConfig(previous, config)) return;
 			configs.set(sourceId, config);
 			invalidate();
 		},
@@ -100,6 +103,9 @@ export function createSeoRegistry(): SeoRegistry {
 				for (const config of configs.values()) {
 					if (config.site !== undefined) effective.site = config.site;
 					if (config.titleTemplate !== undefined) effective.titleTemplate = config.titleTemplate;
+					// Declaring a social family anywhere opts the whole tree in.
+					if (config.declaredOpenGraph === true) effective.declaredOpenGraph = true;
+					if (config.declaredTwitter === true) effective.declaredTwitter = true;
 				}
 				snapshot = applyConfig(mergeDescriptors(flat), effective);
 			}

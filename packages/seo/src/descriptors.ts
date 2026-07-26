@@ -38,6 +38,14 @@ export interface SeoConfig {
 	site?: string;
 	/** `%s` is replaced by the page title, e.g. `'%s · Acme'`. */
 	titleTemplate?: string;
+	/**
+	 * Whether an `openGraph`/`twitter` block was declared. Opting in is about
+	 * having asked for the family, not about which tags that produced:
+	 * `openGraph: { publishedTime }` emits only `article:published_time`, which no
+	 * `og:` prefix scan would recognise.
+	 */
+	declaredOpenGraph?: boolean;
+	declaredTwitter?: boolean;
 }
 
 /**
@@ -55,17 +63,95 @@ function urlAttribute(descriptor: SeoDescriptor): string | null {
 }
 
 /**
- * Apply app-level config to the merged set. Deferred to emit time because a page
- * registers its title and canonical before, or without ever seeing, the root's
- * `site` and `titleTemplate`.
+ * Social tags that mirror a page value when the author has opted into that
+ * family but has not named them. `og:type` without `og:title` produces a useless
+ * card, and the page that owns the title is usually not the component that
+ * declared the Open Graph shell.
+ */
+const SOCIAL_FILL: readonly {
+	readonly key: string;
+	readonly family: 'og' | 'twitter';
+	readonly attrs: (value: string) => MetaAttributes;
+	readonly source: 'title' | 'description' | 'canonical';
+}[] = [
+	{
+		key: 'meta:property=og:title',
+		family: 'og',
+		attrs: (content) => ({ property: 'og:title', content }),
+		source: 'title',
+	},
+	{
+		key: 'meta:property=og:description',
+		family: 'og',
+		attrs: (content) => ({ property: 'og:description', content }),
+		source: 'description',
+	},
+	{
+		key: 'meta:property=og:url',
+		family: 'og',
+		attrs: (content) => ({ property: 'og:url', content }),
+		source: 'canonical',
+	},
+	{
+		key: 'meta:name=twitter:title',
+		family: 'twitter',
+		attrs: (content) => ({ name: 'twitter:title', content }),
+		source: 'title',
+	},
+	{
+		key: 'meta:name=twitter:description',
+		family: 'twitter',
+		attrs: (content) => ({ name: 'twitter:description', content }),
+		source: 'description',
+	},
+];
+
+/**
+ * Finish the merged set: mirror page values into the social families the author
+ * opted into, apply the title template, and absolute-ise URLs.
+ *
+ * All three are deferred to emit time for the same reason: a page registers its
+ * title, description, and canonical without ever seeing the root's `site`,
+ * `titleTemplate`, or Open Graph shell, and the root registers its shell without
+ * seeing which page will render.
+ *
+ * Order matters. The social fill reads the RAW title, before the template is
+ * applied, because `og:site_name` already carries the suffix that a template
+ * adds. URL resolution runs last so an `og:url` mirrored from the canonical is
+ * absolute-ised too.
  */
 export function applyConfig(
 	descriptors: readonly SeoDescriptor[],
 	config: SeoConfig,
 ): SeoDescriptor[] {
 	const { site, titleTemplate } = config;
-	if (site === undefined && titleTemplate === undefined) return descriptors as SeoDescriptor[];
-	return descriptors.map((descriptor) => {
+	const present = new Set(descriptors.map((descriptor) => descriptor.key));
+	const sources = {
+		title: descriptors.find((d) => d.tag === 'title')?.text,
+		description: stringAttr(descriptors, 'meta:name=description', 'content'),
+		canonical: stringAttr(descriptors, 'link:canonical', 'href'),
+	};
+	// Opted in either by declaring the block through `<Seo>` or by hand-writing a
+	// tag of that family. Nobody who never asked for Open Graph starts emitting it.
+	const optedIn = {
+		og: config.declaredOpenGraph === true,
+		twitter: config.declaredTwitter === true,
+	};
+	for (const descriptor of descriptors) {
+		if (descriptor.key.startsWith('meta:property=og:')) optedIn.og = true;
+		else if (descriptor.key.startsWith('meta:name=twitter:')) optedIn.twitter = true;
+	}
+
+	const filled: SeoDescriptor[] = [...descriptors];
+	for (const entry of SOCIAL_FILL) {
+		if (!optedIn[entry.family] || present.has(entry.key)) continue;
+		const value = sources[entry.source];
+		if (value === undefined || value === '') continue;
+		filled.push({ tag: 'meta', key: entry.key, attrs: entry.attrs(value) });
+	}
+
+	if (site === undefined && titleTemplate === undefined) return filled;
+	return filled.map((descriptor) => {
 		if (
 			titleTemplate !== undefined &&
 			descriptor.tag === 'title' &&
@@ -73,8 +159,8 @@ export function applyConfig(
 			descriptor.text !== undefined &&
 			descriptor.text !== ''
 		) {
-			// Function replacement: see applyTitleTemplate. The title is data, so its
-			// dollar patterns must not expand against the `%s` match.
+			// Function replacement: the title is data, so its dollar patterns must not
+			// expand against the `%s` match.
 			return {
 				...descriptor,
 				text: titleTemplate.replace('%s', () => descriptor.text as string),
@@ -93,6 +179,15 @@ export function applyConfig(
 		}
 		return descriptor;
 	});
+}
+
+function stringAttr(
+	descriptors: readonly SeoDescriptor[],
+	key: string,
+	attr: string,
+): string | undefined {
+	const value = descriptors.find((descriptor) => descriptor.key === key)?.attrs[attr];
+	return typeof value === 'string' ? value : undefined;
 }
 
 /**
@@ -123,6 +218,16 @@ const SLOT_KEYED_LINK_RELS = new Map<string, readonly string[]>([
 
 const URL_KEYED_LINK_ATTRS = ['href', 'as', 'media', 'type', 'hreflang', 'sizes'] as const;
 
+/**
+ * Escape a value before it becomes part of an identity key. Keys join
+ * author-controlled values with `|` and `=`, so an unescaped value containing
+ * those could forge another tag's key and one of the two would be silently
+ * dropped from the document. Data stays data.
+ */
+function keyPart(value: string): string {
+	return value.replace(/[\\|=#]/g, (character) => '\\' + character);
+}
+
 function attrString(attrs: MetaAttributes, name: string): string | null {
 	const value = attrs[name];
 	if (value === null || value === undefined || value === false) return null;
@@ -140,7 +245,7 @@ export function metaKey(attrs: MetaAttributes): string {
 		const value = attrString(attrs, naming);
 		if (value !== null) {
 			const channel = naming === 'httpEquiv' ? 'http-equiv' : naming;
-			return 'meta:' + channel + '=' + value;
+			return 'meta:' + channel + '=' + keyPart(value);
 		}
 	}
 	// No naming attribute: keep every such tag by giving it a content-derived
@@ -158,7 +263,7 @@ export function linkKey(attrs: MetaAttributes): string {
 		for (const name of slotAttrs) {
 			const value = attrString(attrs, name);
 			if (value !== null) {
-				key += '|' + name + '=' + value;
+				key += '|' + name + '=' + keyPart(value);
 				named = true;
 			}
 		}
@@ -168,7 +273,7 @@ export function linkKey(attrs: MetaAttributes): string {
 	}
 	for (const name of URL_KEYED_LINK_ATTRS) {
 		const value = attrString(attrs, name);
-		if (value !== null) key += '|' + name + '=' + value;
+		if (value !== null) key += '|' + name + '=' + keyPart(value);
 	}
 	return key;
 }
