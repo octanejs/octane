@@ -5,32 +5,12 @@ import {
 	Observable,
 	type FetchResult,
 } from '@apollo/client';
-import {
-	ApolloProvider as ReactApolloProvider,
-	useQuery as useReactQuery,
-} from '@apollo/client/react';
-import { createElement as createReactElement } from 'react';
-import { renderToString as renderReactToString } from 'react-dom/server';
 import { flushSync, hydrateRoot } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../octane/tests/_helpers';
+import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';
 import { ApolloServerFixture, GET_SERVER_VALUE } from './ssr/_fixtures/server.tsx';
-
-function ReactServerValue(props: { client: ApolloClient }) {
-	const result = useReactQuery(GET_SERVER_VALUE);
-	const value = (result.data as { value?: string } | undefined)?.value;
-	return createReactElement(
-		'main',
-		{ id: 'apollo-server' },
-		createReactElement(
-			'output',
-			{ id: 'apollo-server-value' },
-			result.loading ? 'loading' : result.error ? 'error' : 'data:' + (value ?? '-'),
-		),
-		createReactElement('button', { id: 'apollo-update-cache' }, 'Update cache'),
-	);
-}
 
 async function settle(): Promise<void> {
 	for (let index = 0; index < 3; index += 1) {
@@ -41,12 +21,18 @@ async function settle(): Promise<void> {
 }
 
 describe('@octanejs/apollo-client hydration', () => {
-	it('adopts cached server markup without fetching the restored query again', async () => {
+	it('adopts cached Octane server markup without fetching the restored query again', async () => {
 		const serverClient = new ApolloClient({
 			cache: new InMemoryCache(),
 			link: ApolloLink.empty(),
 		});
 		serverClient.writeQuery({ query: GET_SERVER_VALUE, data: { value: 'restored' } });
+		const serverResult = await renderHydrationFixture(
+			'apollo-client',
+			'packages/apollo-client/tests/ssr/_fixtures/server.tsx',
+			'ApolloServerFixture',
+			{ client: serverClient },
+		);
 
 		const operations: string[] = [];
 		const client = new ApolloClient({
@@ -62,12 +48,7 @@ describe('@octanejs/apollo-client hydration', () => {
 		});
 
 		const container = document.createElement('div');
-		container.innerHTML = renderReactToString(
-			createReactElement(ReactApolloProvider, {
-				client,
-				children: createReactElement(ReactServerValue, { client }),
-			}),
-		);
+		container.innerHTML = serverResult.html;
 		document.body.appendChild(container);
 		const serverMain = container.querySelector('#apollo-server');
 		const serverValue = container.querySelector('#apollo-server-value');
