@@ -67,9 +67,9 @@ esrap_common: &esrap_common ^2.3.0
 overrides:
   esrap: *esrap_common
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls an older
-  # beta preset transitively. Keep the transform on the beta.15 line required
+  # beta preset transitively. Keep the transform on the beta.20 line required
   # by @tsrx/solid so generated SSR helpers match the installed runtime.
-  babel-preset-solid: '2.0.0-beta.15'
+  babel-preset-solid: '2.0.0-beta.20'
   babel-plugin-jsx-dom-expressions: '0.50.0-next.14'
   # INTERIM: @tanstack/devtools (the Solid UI core reused by
   # @octanejs/tanstack-devtools) targets Solid 1.x and imports `solid-js/web`,
@@ -77,12 +77,12 @@ overrides:
   # workspace otherwise pins Solid 2.0-beta for @tsrx/solid, so isolate the
   # devtools island — and every Solid package it shares an owner with — on a
   # single Solid 1.x copy. Remove once @tanstack/devtools ships a Solid-2 build.
-  '@tanstack/devtools>solid-js': '1.9.9'
-  '@tanstack/devtools-ui>solid-js': '1.9.9'
-  '@tanstack/devtools-client>solid-js': '1.9.9'
-  '@solid-primitives/event-listener>solid-js': '1.9.9'
-  '@solid-primitives/keyboard>solid-js': '1.9.9'
-  '@solid-primitives/resize-observer>solid-js': '1.9.9'
+  '@tanstack/devtools>solid-js': '1.9.14'
+  '@tanstack/devtools-ui>solid-js': '1.9.14'
+  '@tanstack/devtools-client>solid-js': '1.9.14'
+  '@solid-primitives/event-listener>solid-js': '1.9.14'
+  '@solid-primitives/keyboard>solid-js': '1.9.14'
+  '@solid-primitives/resize-observer>solid-js': '1.9.14'
 
 # Rspeedy exposes Rsbuild/Rspack-backed plugin state but does not declare
 # @rspack/core itself. Make the audited Lynx instance explicit so a newer
@@ -165,7 +165,7 @@ catalogs:
     '@playwright/test': ^1.61.1
     '@ripple-ts/adapter': ^0.3.112
     '@ripple-ts/vite-plugin': ^0.3.112
-    '@solidjs/web': '2.0.0-beta.15'
+    '@solidjs/web': '2.0.0-beta.20'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
     '@tanstack/ai': 0.41.0
@@ -326,7 +326,7 @@ catalogs:
     ripple: ^0.3.112
     rxjs: ^7.8.2
     rulesync: ^8.32.0
-    solid-js: '2.0.0-beta.15'
+    solid-js: '2.0.0-beta.20'
     sonner: 2.0.7
     styled-components: 6.4.3
     stylis: ^4.4.0
@@ -342,12 +342,12 @@ catalogs:
     vite: ^8.1.5
     vite-plugin-solid: '3.0.0-next.5'
     # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with
-    # vapor; pinned to a beta the way solid-js pins its 2.0 beta. The fixtures
+    # vapor; pinned to a 3.6 prerelease like solid-js's 2.0 beta. The fixtures
     # alias `vue` to a shim over @vue/runtime-dom + @vue/runtime-vapor (see
     # their vite.config.js), so those are direct deps at the same pin.
-    vue: 3.6.0-beta.17
-    '@vue/runtime-dom': 3.6.0-beta.17
-    '@vue/runtime-vapor': 3.6.0-beta.17
+    vue: 3.6.0-rc.1
+    '@vue/runtime-dom': 3.6.0-rc.1
+    '@vue/runtime-vapor': 3.6.0-rc.1
     '@vitejs/plugin-vue': ^6.0.8
     vitest: ^4.1.10
     yjs: ^13.6.31
