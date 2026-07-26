@@ -19,16 +19,38 @@ const SCHEMA = 'https://ui.shadcn.com/schema/registry-item.json';
 
 const pkg = JSON.parse(await readFile(join(PKG_ROOT, 'package.json'), 'utf8'));
 
+// Siblings are declared as `workspace:*`, a protocol that means nothing to a
+// consumer installing from npm, so resolve it to the sibling's current version:
+// the same substitution `pnpm pack` makes in the published manifest.
+async function resolveSiblingVersions() {
+	const versions = new Map();
+	for (const entry of await readdir(join(PKG_ROOT, '..'), { withFileTypes: true })) {
+		if (!entry.isDirectory()) continue;
+		const manifestPath = join(PKG_ROOT, '..', entry.name, 'package.json');
+		if (!existsSync(manifestPath)) continue;
+		const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+		if (manifest.name) versions.set(manifest.name, manifest.version);
+	}
+	return versions;
+}
+
+const siblingVersions = await resolveSiblingVersions();
+
+function depSpec(name, range) {
+	if (!name.startsWith('@octanejs/')) return name;
+	if (!range.startsWith('workspace:')) return `${name}@${range}`;
+	const version = siblingVersions.get(name);
+	if (!version) throw new Error(`registry: cannot resolve the workspace version of "${name}"`);
+	return `${name}@${version}`;
+}
+
 // Installable dependency spec per import, derived from package.json so a new
 // import can never silently ship without its dependency: @octanejs/* siblings
 // pinned to the exact tested version (maintainer pinning policy), public npm
 // deps by bare name (upstream registry convention). `octane` itself is a peer,
 // like react upstream, and is deliberately not emitted.
 const DEP_SPECS = Object.fromEntries(
-	Object.entries(pkg.dependencies).map(([name, version]) => [
-		name,
-		name.startsWith('@octanejs/') ? `${name}@${version}` : name,
-	]),
+	Object.entries(pkg.dependencies).map(([name, range]) => [name, depSpec(name, range)]),
 );
 
 function toConsumerSource(source) {
