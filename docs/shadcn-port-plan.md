@@ -203,9 +203,14 @@ stamp updated in place (cmdk-plan convention).
   the byte-fidelity provenance test (ported class strings/data-slots vs pinned
   upstream sources). *Exit:* behavioral coverage per component + provenance
   test green + an SSR test rendering each without browser globals.
-  **Status: shipped 2026-07-24.** 16 families (upstream's 2026 sources have no
-  standalone typography item), behavioral + SSR coverage per family, plus
-  hydration adoption tests for representative shapes. Surfaced the
+  **Status: shipped 2026-07-24; exit criterion AMENDED 2026-07-26.** 16 families
+  (upstream's 2026 sources have no standalone typography item), behavioral + SSR
+  coverage per family, plus hydration adoption tests for representative shapes.
+  The planned byte-fidelity provenance test was made unwritable by the
+  styling-flavor pivot below — the shipped class strings are maintainer-supplied
+  and have no upstream file to diff against. Fidelity for the flavors that DO
+  have an upstream counterpart is proven by the differential rig instead; this
+  criterion is retired rather than left silently unmet. Surfaced the
   opaque-children rule: a bare `{children}` hole cannot render compiled
   children — `children ?? fallback` and slot-adjacent forwarding go through
   the createElement/props.children channel (breadcrumb/pagination precedents,
@@ -248,6 +253,24 @@ stamp updated in place (cmdk-plan convention).
   registry payloads install verbatim only outside the CLI's transform. The
   hosted-serving design must resolve `cn-*` against the requested style
   (`{style}` URL placeholder) exactly as upstream does.
+  **`.tsrx` through the CLI is SAFE — measured 2026-07-26.** `shadcn@4.14.1`
+  manipulates installed files with ts-morph but performs **no type-aware pass**
+  (`getPreEmitDiagnostics`, `getTypeChecker`, `createProgram`,
+  `getSemanticDiagnostics`, `getSourceFile` all absent from `dist`); it only
+  calls `createSourceFile` and `forEachDescendant`. Probing ts-morph 26 against
+  the real sources: parsing `.tsrx` as TSX yields parse errors but the
+  incremental printer re-prints only MODIFIED nodes, so both an import/alias
+  rewrite and a `className` attribute edit inside `@{ … }` bodies leave the rest
+  of the file byte-identical (verified on button/sheet/field/sidebar/tabs/select;
+  sidebar exposes 28 `className` attributes, 4 edited, body intact). Only the
+  type-aware path throws on the `.tsrx` extension, and the CLI never takes it.
+  Conclusion: ship `.tsrx` verbatim — a pragma-`.tsx` fallback is unnecessary.
+  Residual risk stays with `transformStyle`, which EDITS the class strings it
+  recognises: the five semantic hooks still in the payloads (`cn-rtl-flip` ×7,
+  `cn-font-heading` ×6, `cn-toast`, `cn-native-select`, `cn-native-select-icon`)
+  are what per-style server resolution must cover. `cn-native-select` and
+  `cn-native-select-icon` additionally have NO definition in
+  `src/styles/theme.css`, so they install as dead classes today.
 - **Phase 5 — SSR/hydration hardening.** `-ssr` vitest project (node env,
   `octane({ ssr: true })`, sonner-project pattern `vitest.config.js:1761-1781`)
   plus `hydrateRoot` adoption tests for the overlay components; `status.json`
@@ -314,9 +337,42 @@ for a brand-new binding unless the port fixes something inside `packages/octane`
    fix at root cause in `packages/octane` with regression tests + changeset —
    never in-binding workarounds (hook-form precedent).
 
+## Multi-base support (Base UI / React Aria) — measured gap, 2026-07-26
+
+Upstream ships each component against three primitive bases. The Radix base is
+what this package ports today; the blocker for the other two is binding
+coverage, not the shadcn layer. Measured against the pinned upstreams actually
+installed in this repo (`@base-ui/react@1.6.0`, `react-aria@3.50.0`):
+
+**React Aria — one gap.** `@octanejs/aria` already covers every area the aria
+base needs (interactions, focus, overlays, menu, listbox, select, tabs,
+tooltip, dialog, table/tree, i18n, stately). The only missing module is
+**`toast`**. That base is one port away from viable.
+
+**Base UI — 22 of 44 public subpaths ported, 22 missing.** The missing set
+splits three ways:
+
+| Bucket | Modules | Why it matters |
+| --- | --- | --- |
+| Blocks components this package already ships (12) | `accordion`, `button`, `collapsible`, `context-menu`, `menu`, `menubar`, `navigation-menu`, `preview-card`, `scroll-area`, `select`, `tabs`, `tooltip` | Required before a Base UI base can reach today's component parity. `button` may already be satisfied by the ported `use-render`; confirm against the base-ui-base `button` source before scoping it. |
+| Blocks components that are out of scope anyway (6) | `autocomplete`, `combobox`, `drawer`, `otp-field`, `toast`, `toolbar` | Track with the other out-of-scope bindings; not on the critical path. |
+| Infrastructure / type-only (4) | `csp-provider`, `direction-provider`, `types`, `unstable-use-media-query` | Small, but `direction-provider` is needed for the RTL work item below. |
+
+Sequencing (maintainer's call, 2026-07-26): land the binding ports as their own
+PRs, in parallel with finishing the Radix base here — do **not** grow this PR.
+Recommended order: `@octanejs/aria` `toast` first (single module, unblocks a
+whole base), then the 12 Base UI modules. `packages/base-ui/status.json` and
+`packages/aria/status.json` both understate current coverage; refresh them in
+the PR that moves each surface, not here.
+
+Deferred until at least one alternate base exists: the registry namespace shape
+for per-base variants (`@octane/base-ui/select` vs a `base` field on the item).
+Designing it now would be speculative — the first real consumer decides it.
+
 ## Follow-up
 
-1. Base UI base over `@octanejs/base-ui`; React Aria base over `@octanejs/aria`.
+1. Base UI base over `@octanejs/base-ui`; React Aria base over `@octanejs/aria`
+   — gated on the binding gaps measured above.
 2. New bindings unlocking out-of-scope components: day-picker, embla-carousel,
    input-otp, resizable-panels (each its own port plan).
 3. The style matrix (8 styles), presets, RTL/`Direction`, `menuColor`/`menuAccent`.

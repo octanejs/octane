@@ -61,20 +61,18 @@ export function BreadcrumbPage({ className, ...props }: Props) @{
 	/>
 }
 
-export function BreadcrumbSeparator({ children, className, ...props }: Props & {
-	children?: OctaneNode;
-}) {
-	return createElement(
-		'li',
-		{
-			'data-slot': 'breadcrumb-separator',
-			role: 'presentation',
-			'aria-hidden': 'true',
-			className: cn('[&>svg]:size-3.5', className),
-			...props,
-		},
-		children ?? createElement(ChevronRightIcon, { className: 'cn-rtl-flip' }),
-	);
+export function BreadcrumbSeparator(props: Props & { children?: OctaneNode }) @{
+	const { className, children: _children, ...rest } = props;
+
+	<li
+		data-slot="breadcrumb-separator"
+		role="presentation"
+		aria-hidden="true"
+		className={cn('[&>svg]:size-3.5', className)}
+		{...rest}
+	>
+		{props.children ?? <ChevronRightIcon className="cn-rtl-flip" />}
+	</li>
 }
 
 export function BreadcrumbEllipsis({ className, ...props }: Props) @{

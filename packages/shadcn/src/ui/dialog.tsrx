@@ -3,8 +3,8 @@
 // lucide-react → @octanejs/lucide, radix-ui → @octanejs/radix. DialogContent
 // composes Portal > Overlay + Content with createElement (radix's Portal
 // slots its child — descriptors required); consumer children flow through
-// the props.children channel (ChildrenHost beside sibling descriptors);
-// template parts use the {props.children} lowering.
+// the props.children channel. Template parts use the {props.children}
+// lowering.
 import { createElement, type OctaneNode } from 'octane';
 import { Dialog as DialogPrimitive } from '@octanejs/radix';
 import { XIcon } from '@octanejs/lucide';
@@ -13,12 +13,6 @@ import { cn } from '../lib/utils';
 import { Button } from './button.tsrx';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
-
-// Opaque compiled children cannot sit directly inside a children ARRAY next to
-// sibling descriptors — route them through a pass-through component.
-function ChildrenHost(props: { children?: OctaneNode }): OctaneNode {
-	return props.children as OctaneNode;
-}
 
 export function Dialog(props: Record<string, unknown>) @{
 	<DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -72,7 +66,7 @@ export function DialogContent({
 				),
 				...props,
 			},
-			createElement(ChildrenHost, { key: 'children', children }),
+			children,
 			showCloseButton
 				? createElement(
 						DialogPrimitive.Close,

@@ -186,7 +186,7 @@ describe('@octanejs/shadcn — AlertDialog', () => {
 		expect(content.getAttribute('data-size')).toBe('sm');
 		expect(content.className).toContain('bg-popover');
 		expect(content.className).toContain('group/alert-dialog-content');
-		expect($('[data-slot="alert-dialog-overlay"]')!.className).toContain('fixed inset-0');
+		expect($('[data-slot="alert-dialog-overlay"]')!.className).toContain('fixed');
 		expect($('[data-slot="alert-dialog-header"]')!.className).toContain('place-items-center');
 		expect($('[data-slot="alert-dialog-media"]')!.className).toContain('bg-muted');
 		expect($('[data-slot="alert-dialog-footer"]')!.className).toContain('border-t');
@@ -265,20 +265,20 @@ describe('@octanejs/shadcn — Sheet', () => {
 		expect(content.getAttribute('data-side')).toBe('left');
 		expect(content.getAttribute('role')).toBe('dialog');
 		expect(content.getAttribute('data-state')).toBe('open');
-		expect(content.className).toContain('cn-sheet-content');
-		expect($('[data-slot="sheet-overlay"]')!.className).toContain('cn-sheet-overlay');
-		expect($('[data-slot="sheet-header"]')!.className).toContain('cn-sheet-header');
-		expect($('[data-slot="sheet-footer"]')!.className).toContain('cn-sheet-footer');
+		expect(content.className).toContain('fixed');
+		expect($('[data-slot="sheet-overlay"]')!.className).toContain('bg-black/10');
+		expect($('[data-slot="sheet-header"]')!.className).toContain('flex');
+		expect($('[data-slot="sheet-footer"]')!.className).toContain('flex');
 
 		const title = $('[data-slot="sheet-title"]')!;
 		const desc = $('[data-slot="sheet-description"]')!;
-		expect(title.className).toContain('cn-sheet-title');
+		expect(title.className).toContain('text-foreground');
 		expect(content.getAttribute('aria-labelledby')).toBe(title.getAttribute('id'));
 		expect(content.getAttribute('aria-describedby')).toBe(desc.getAttribute('id'));
 
 		// The default close button: a ghost icon-sm Button with icon + sr-only label.
-		const iconClose = $$('[data-slot="sheet-close"]').find((el) =>
-			el.className.includes('cn-sheet-close'),
+		const iconClose = $$('[data-slot="sheet-content"] button').find(
+			(el) => el.querySelector('.sr-only')?.textContent === 'Close',
 		)!;
 		expect(iconClose).not.toBe(undefined);
 		expect(iconClose.className).toContain('hover:bg-muted');
@@ -330,7 +330,7 @@ describe('@octanejs/shadcn — Tooltip', () => {
 		const content = $('[data-slot="tooltip-content"]')!;
 		expect(content).not.toBe(null);
 		expect(document.body.contains(content)).toBe(true);
-		expect(content.className).toContain('cn-tooltip-content');
+		expect(content.className).toContain('z-50');
 		expect(content.className).toContain('extra-tip');
 		expect(content.closest('[data-radix-popper-content-wrapper]')).not.toBe(null);
 		expect(content.textContent).toContain('Tip text');
@@ -343,7 +343,7 @@ describe('@octanejs/shadcn — Tooltip', () => {
 		expect(vh.textContent).toContain('Tip text');
 
 		// The arrow renders once — the copy inside the hidden a11y clone is suppressed.
-		expect($$('.cn-tooltip-arrow').length).toBe(1);
+		expect($$('[data-slot="tooltip-content"] svg').length).toBe(1);
 		r.unmount();
 	});
 
@@ -389,7 +389,7 @@ describe('@octanejs/shadcn — Popover', () => {
 		expect(content).not.toBe(null);
 		expect(content.getAttribute('role')).toBe('dialog');
 		expect(content.getAttribute('data-state')).toBe('open');
-		expect(content.className).toContain('cn-popover-content');
+		expect(content.className).toContain('z-50');
 		expect(content.className).toContain('extra-pop');
 		expect(document.body.contains(content)).toBe(true);
 		expect(content.closest('[data-radix-popper-content-wrapper]')).not.toBe(null);
@@ -398,13 +398,13 @@ describe('@octanejs/shadcn — Popover', () => {
 		// The static parts render inside the portaled content.
 		const header = $('[data-slot="popover-header"]')!;
 		expect(content.contains(header)).toBe(true);
-		expect(header.className).toContain('cn-popover-header');
+		expect(header.className).toContain('gap-0.5');
 		const title = $('[data-slot="popover-title"]')!;
 		expect(title.tagName).toBe('DIV'); // upstream renders a div despite the h2 prop type
-		expect(title.className).toContain('cn-popover-title');
+		expect(title.className).toContain('font-medium');
 		const desc = $('[data-slot="popover-description"]')!;
 		expect(desc.tagName).toBe('P');
-		expect(desc.className).toContain('cn-popover-description');
+		expect(desc.className).toContain('text-muted-foreground');
 
 		// Toggle closed via the trigger.
 		press(trigger);
@@ -472,7 +472,7 @@ describe('@octanejs/shadcn — HoverCard', () => {
 		const content = $('[data-slot="hover-card-content"]')!;
 		expect(content).not.toBe(null);
 		expect(document.body.contains(content)).toBe(true);
-		expect(content.className).toContain('cn-hover-card-content');
+		expect(content.className).toContain('z-50');
 		expect(content.className).toContain('extra-card');
 		expect(content.getAttribute('data-state')).toBe('open');
 		expect(content.closest('[data-radix-popper-content-wrapper]')).not.toBe(null);

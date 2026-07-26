@@ -13,7 +13,13 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "plugins": [
+      {
+        "name": "@tsrx/typescript-plugin"
+      }
+    ],
+    "allowImportingTsExtensions": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

@@ -21,6 +21,19 @@
       ]
     },
     {
+      "name": "types",
+      "type": "registry:lib",
+      "title": "Types",
+      "description": "Host-element prop bases shared by the components.",
+      "files": [
+        {
+          "path": "lib/types.ts",
+          "type": "registry:lib",
+          "target": "lib/types.ts"
+        }
+      ]
+    },
+    {
       "name": "theme",
       "type": "registry:file",
       "title": "Theme tokens",
@@ -91,7 +104,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -146,7 +160,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -184,7 +199,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -199,7 +215,8 @@
       "type": "registry:ui",
       "title": "Card",
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -365,7 +382,8 @@
       "type": "registry:ui",
       "title": "Input",
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -400,7 +418,8 @@
       "type": "registry:ui",
       "title": "Kbd",
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -666,7 +685,8 @@
       "type": "registry:ui",
       "title": "Skeleton",
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {
@@ -788,7 +808,8 @@
       "type": "registry:ui",
       "title": "Textarea",
       "registryDependencies": [
-        "@octane/utils"
+        "@octane/utils",
+        "@octane/types"
       ],
       "files": [
         {

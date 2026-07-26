@@ -1,26 +1,21 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
-// apps/v4/registry/bases/radix/ui/menubar.tsx (the `"use client"` directive is
-// dropped — octane has no RSC axis). IconPlaceholder resolves to lucide (see
-// spinner.tsrx).
-//
-// MenubarContent wraps MenubarPortal+Content, and the checkbox/radio/
-// sub-trigger items compose an indicator/chevron with the consumer's children
-// — radix's Portal (Slot) and any child reordering need real element
-// DESCRIPTORS, so those parts are composed with createElement (the cmdk
-// Command.Dialog precedent); the consumer's children flow through the ordinary
-// props.children channel.
+// Menubar — maintainer-supplied default-Tailwind flavor, class strings
+// verbatim. Octane adaptations: "use client" dropped, lucide-react →
+// @octanejs/lucide, radix-ui → @octanejs/radix. Content composes through the
+// local MenubarPortal wrapper with createElement (radix's Portal slots its
+// child); parts interleaving consumer children with sibling descriptors use
+// the {props.children} lowering in template JSX.
 import { createElement, type OctaneNode } from 'octane';
 import { Menubar as MenubarPrimitive } from '@octanejs/radix';
 import { CheckIcon, ChevronRightIcon } from '@octanejs/lucide';
 
 import { cn } from '../lib/utils';
 
-type Props = { className?: string } & Record<string, unknown>;
+type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 
 export function Menubar({ className, ...props }: Props) @{
 	<MenubarPrimitive.Root
 		data-slot="menubar"
-		className={cn('cn-menubar flex items-center', className)}
+		className={cn('flex h-8 items-center gap-0.5 rounded-lg border p-[3px]', className)}
 		{...props}
 	/>
 }
@@ -33,9 +28,6 @@ export function MenubarGroup(props: Record<string, unknown>) @{
 	<MenubarPrimitive.Group data-slot="menubar-group" {...props} />
 }
 
-// OCTANE DIVERGENCE: radix's Portal slots its child, which requires a real
-// element descriptor — opaque compiled .tsrx children are not accepted here.
-// Compose Portal children with createElement (see MenubarContent).
 export function MenubarPortal(props: Record<string, unknown>) @{
 	<MenubarPrimitive.Portal data-slot="menubar-portal" {...props} />
 }
@@ -47,7 +39,10 @@ export function MenubarRadioGroup(props: Record<string, unknown>) @{
 export function MenubarTrigger({ className, ...props }: Props) @{
 	<MenubarPrimitive.Trigger
 		data-slot="menubar-trigger"
-		className={cn('cn-menubar-trigger flex items-center outline-hidden select-none', className)}
+		className={cn(
+			'flex items-center rounded-sm px-1.5 py-[2px] text-sm font-medium outline-hidden select-none hover:bg-muted aria-expanded:bg-muted',
+			className,
+		)}
 		{...props}
 	/>
 }
@@ -58,21 +53,17 @@ export function MenubarContent({
 	alignOffset = -4,
 	sideOffset = 8,
 	...props
-}: Props & {
-	align?: 'start' | 'center' | 'end';
-	alignOffset?: number;
-	sideOffset?: number;
-}) {
+}: Props & { align?: string; alignOffset?: number; sideOffset?: number }) {
 	return createElement(
 		MenubarPortal,
-		null,
+		{},
 		createElement(MenubarPrimitive.Content, {
 			'data-slot': 'menubar-content',
 			align,
 			alignOffset,
 			sideOffset,
 			className: cn(
-				'cn-menubar-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-menubar-content-transform-origin) overflow-hidden',
+				'z-50 min-w-36 origin-(--radix-menubar-content-transform-origin) overflow-hidden rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
 				className,
 			),
 			...props,
@@ -89,72 +80,68 @@ export function MenubarItem({ className, inset, variant = 'default', ...props }:
 		data-inset={inset}
 		data-variant={variant}
 		className={cn(
-			'cn-menubar-item group/menubar-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
+			'group/menubar-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive!',
 			className,
 		)}
 		{...props}
 	/>
 }
 
-export function MenubarCheckboxItem({ className, children, checked, inset, ...props }: Props & {
-	children?: OctaneNode;
+export function MenubarCheckboxItem(props: Props & {
 	checked?: boolean | 'indeterminate';
 	inset?: boolean;
-}) {
-	return createElement(
-		MenubarPrimitive.CheckboxItem,
-		{
-			'data-slot': 'menubar-checkbox-item',
-			'data-inset': inset,
-			className: cn(
-				'cn-menubar-checkbox-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
-				className,
-			),
-			checked,
-			...props,
-		},
-		createElement(
-			'span',
-			{
-				className: 'cn-menubar-checkbox-item-indicator pointer-events-none absolute flex items-center justify-center',
-			},
-			createElement(MenubarPrimitive.ItemIndicator, null, createElement(CheckIcon, {})),
-		),
-		children,
-	);
+}) @{
+	const { className, children: _children, checked, inset, ...rest } = props;
+
+	<MenubarPrimitive.CheckboxItem
+		data-slot="menubar-checkbox-item"
+		data-inset={inset}
+		className={cn(
+			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-1.5 pl-7 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
+			className,
+		)}
+		checked={checked}
+		{...rest}
+	>
+		<span
+			className="pointer-events-none absolute left-1.5 flex size-4 items-center justify-center [&_svg:not([class*='size-'])]:size-4"
+		>
+			<MenubarPrimitive.ItemIndicator>
+				<CheckIcon />
+			</MenubarPrimitive.ItemIndicator>
+		</span>
+		{props.children}
+	</MenubarPrimitive.CheckboxItem>
 }
 
-export function MenubarRadioItem({ className, children, inset, ...props }: Props & {
-	children?: OctaneNode;
-	inset?: boolean;
-}) {
-	return createElement(
-		MenubarPrimitive.RadioItem,
-		{
-			'data-slot': 'menubar-radio-item',
-			'data-inset': inset,
-			className: cn(
-				'cn-menubar-radio-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
-				className,
-			),
-			...props,
-		},
-		createElement(
-			'span',
-			{
-				className: 'cn-menubar-radio-item-indicator pointer-events-none absolute flex items-center justify-center',
-			},
-			createElement(MenubarPrimitive.ItemIndicator, null, createElement(CheckIcon, {})),
-		),
-		children,
-	);
+export function MenubarRadioItem(props: Props & { inset?: boolean }) @{
+	const { className, children: _children, inset, ...rest } = props;
+
+	<MenubarPrimitive.RadioItem
+		data-slot="menubar-radio-item"
+		data-inset={inset}
+		className={cn(
+			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-1.5 pl-7 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			className,
+		)}
+		{...rest}
+	>
+		<span
+			className="pointer-events-none absolute left-1.5 flex size-4 items-center justify-center [&_svg:not([class*='size-'])]:size-4"
+		>
+			<MenubarPrimitive.ItemIndicator>
+				<CheckIcon />
+			</MenubarPrimitive.ItemIndicator>
+		</span>
+		{props.children}
+	</MenubarPrimitive.RadioItem>
 }
 
 export function MenubarLabel({ className, inset, ...props }: Props & { inset?: boolean }) @{
 	<MenubarPrimitive.Label
 		data-slot="menubar-label"
 		data-inset={inset}
-		className={cn('cn-menubar-label', className)}
+		className={cn('px-1.5 py-1 text-sm font-medium data-inset:pl-7', className)}
 		{...props}
 	/>
 }
@@ -162,7 +149,7 @@ export function MenubarLabel({ className, inset, ...props }: Props & { inset?: b
 export function MenubarSeparator({ className, ...props }: Props) @{
 	<MenubarPrimitive.Separator
 		data-slot="menubar-separator"
-		className={cn('cn-menubar-separator -mx-1 my-1 h-px', className)}
+		className={cn('-mx-1 my-1 h-px bg-border', className)}
 		{...props}
 	/>
 }
@@ -170,7 +157,10 @@ export function MenubarSeparator({ className, ...props }: Props) @{
 export function MenubarShortcut({ className, ...props }: Props) @{
 	<span
 		data-slot="menubar-shortcut"
-		className={cn('cn-menubar-shortcut ml-auto', className)}
+		className={cn(
+			'ml-auto text-xs tracking-widest text-muted-foreground group-focus/menubar-item:text-accent-foreground',
+			className,
+		)}
 		{...props}
 	/>
 }
@@ -179,31 +169,28 @@ export function MenubarSub(props: Record<string, unknown>) @{
 	<MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />
 }
 
-export function MenubarSubTrigger({ className, inset, children, ...props }: Props & {
-	inset?: boolean;
-	children?: OctaneNode;
-}) {
-	return createElement(
-		MenubarPrimitive.SubTrigger,
-		{
-			'data-slot': 'menubar-sub-trigger',
-			'data-inset': inset,
-			className: cn(
-				'cn-menubar-sub-trigger flex cursor-default items-center outline-none select-none',
-				className,
-			),
-			...props,
-		},
-		children,
-		createElement(ChevronRightIcon, { className: 'cn-rtl-flip ml-auto size-4' }),
-	);
+export function MenubarSubTrigger(props: Props & { inset?: boolean }) @{
+	const { className, children: _children, inset, ...rest } = props;
+
+	<MenubarPrimitive.SubTrigger
+		data-slot="menubar-sub-trigger"
+		data-inset={inset}
+		className={cn(
+			'flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-none select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-open:bg-accent data-open:text-accent-foreground [&_svg:not([class*=\'size-\'])]:size-4',
+			className,
+		)}
+		{...rest}
+	>
+		{props.children}
+		<ChevronRightIcon className="cn-rtl-flip ml-auto size-4" />
+	</MenubarPrimitive.SubTrigger>
 }
 
 export function MenubarSubContent({ className, ...props }: Props) @{
 	<MenubarPrimitive.SubContent
 		data-slot="menubar-sub-content"
 		className={cn(
-			'cn-menubar-sub-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-menubar-content-transform-origin) overflow-hidden',
+			'z-50 min-w-32 origin-(--radix-menubar-content-transform-origin) overflow-hidden rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
 			className,
 		)}
 		{...props}

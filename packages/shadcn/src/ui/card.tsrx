@@ -1,8 +1,9 @@
 // Default-Tailwind (package canonical) card — user-supplied flavor, class strings verbatim (uses the
 // --card-spacing custom-property pattern and the nova cn-font-heading hook).
 import { cn } from '../lib/utils';
+import type { DivProps } from '../lib/types';
 
-type Props = { className?: string } & Record<string, unknown>;
+type Props = DivProps;
 
 export interface CardProps extends Props {
 	size?: 'default' | 'sm';

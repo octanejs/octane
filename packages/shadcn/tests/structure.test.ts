@@ -263,10 +263,10 @@ describe('@octanejs/shadcn — ScrollArea', () => {
 	it('renders root + viewport and places consumer children inside the viewport content wrapper', () => {
 		const { container, unmount } = mount(ScrollAreaFixture);
 		const root = slot(container, 'scroll-area');
-		expect(root.className).toContain('cn-scroll-area');
+		expect(root.className).toContain('relative');
 		expect(root.className).toContain('extra-scroll');
 		const viewport = slot(container, 'scroll-area-viewport');
-		expect(viewport.className).toContain('cn-scroll-area-viewport');
+		expect(viewport.className).toContain('size-full');
 		expect(viewport.getAttribute('data-radix-scroll-area-viewport')).toBe('');
 		expect(viewport.parentElement).toBe(root);
 		const content = container.querySelector('[data-testid="scroll-content"]') as HTMLElement;
@@ -287,7 +287,7 @@ describe('@octanejs/shadcn — ScrollArea', () => {
 		const horizontal = Array.from(bars).find(
 			(b) => b.getAttribute('data-orientation') === 'horizontal',
 		) as HTMLElement;
-		expect(horizontal.className).toContain('cn-scroll-area-scrollbar');
+		expect(horizontal.className).toContain('touch-none');
 		expect(horizontal.className).toContain('extra-bar');
 		expect(horizontal.getAttribute('data-state')).toBe('visible');
 		unmount();

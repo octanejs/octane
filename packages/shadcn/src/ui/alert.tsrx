@@ -3,6 +3,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '../lib/utils';
+import type { DivProps } from '../lib/types';
 
 export const alertVariants = cva(
 	'group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*=\'size-\'])]:size-4',
@@ -19,8 +20,7 @@ export const alertVariants = cva(
 	},
 );
 
-export interface AlertProps extends Record<string, unknown> {
-	className?: string;
+export interface AlertProps extends DivProps {
 	variant?: VariantProps<typeof alertVariants>['variant'];
 }
 

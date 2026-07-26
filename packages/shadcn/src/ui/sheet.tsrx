@@ -1,14 +1,9 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
-// apps/v4/registry/bases/radix/ui/sheet.tsx (the `"use client"` directive is
-// dropped — octane has no RSC axis). Sheet is the radix Dialog primitive with
-// side variants. IconPlaceholder resolves to lucide (see spinner.tsrx).
-//
-// SheetContent renders Portal > Overlay + Content: radix's Portal enumerates
-// its children with Children.map, which needs real element DESCRIPTORS — so
-// the trio is composed with createElement (the cmdk Command.Dialog precedent);
-// the consumer's children flow into the Content primitive through the ordinary
-// props.children channel, routed through a pass-through host so they can sit
-// in an array next to the close-button descriptor (see dialog.tsrx).
+// Sheet — maintainer-supplied default-Tailwind flavor, class strings verbatim.
+// Octane adaptations: "use client" dropped, lucide-react → @octanejs/lucide,
+// radix-ui Dialog → @octanejs/radix. SheetContent composes Portal > Overlay +
+// Content with createElement (radix's Portal slots its child, so children must
+// be real element descriptors); consumer children flow through the ordinary
+// props.children channel.
 import { createElement, type OctaneNode } from 'octane';
 import { Dialog as SheetPrimitive } from '@octanejs/radix';
 import { XIcon } from '@octanejs/lucide';
@@ -16,14 +11,7 @@ import { XIcon } from '@octanejs/lucide';
 import { cn } from '../lib/utils';
 import { Button } from './button.tsrx';
 
-type Props = { className?: string } & Record<string, unknown>;
-
-// Opaque compiled children cannot sit directly inside a children ARRAY (the
-// runtime's list renderers ignore render functions) — route them through a
-// pass-through component descriptor (the radix Tooltip ChildrenHost pattern).
-function ChildrenHost(props: { children?: OctaneNode }): OctaneNode {
-	return props.children as OctaneNode;
-}
+type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 
 export function Sheet(props: Record<string, unknown>) @{
 	<SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -37,26 +25,22 @@ export function SheetClose(props: Record<string, unknown>) @{
 	<SheetPrimitive.Close data-slot="sheet-close" {...props} />
 }
 
-// SheetPortal/SheetOverlay are internal upstream (defined but not exported) —
-// kept unexported for export-name fidelity.
-function SheetPortal(props: Record<string, unknown>) @{
+export function SheetPortal(props: Record<string, unknown>) @{
 	<SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
-function SheetOverlay({ className, ...props }: Props) @{
+export function SheetOverlay({ className, ...props }: Props) @{
 	<SheetPrimitive.Overlay
 		data-slot="sheet-overlay"
 		className={cn(
-			'cn-sheet-overlay fixed inset-0 z-50 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+			'fixed inset-0 z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
 			className,
 		)}
 		{...props}
 	/>
 }
 
-export interface SheetContentProps extends Record<string, unknown> {
-	className?: string;
-	children?: OctaneNode;
+export interface SheetContentProps extends Props {
 	side?: 'top' | 'right' | 'bottom' | 'left';
 	showCloseButton?: boolean;
 }
@@ -68,50 +52,47 @@ export function SheetContent({
 	showCloseButton = true,
 	...props
 }: SheetContentProps) {
-	return createElement(SheetPortal, {
-		children: [
-			createElement(SheetOverlay, { key: 'overlay' }),
-			createElement(SheetPrimitive.Content, {
+	return createElement(
+		SheetPrimitive.Portal,
+		{ 'data-slot': 'sheet-portal' },
+		createElement(SheetOverlay, { key: 'overlay' }),
+		createElement(
+			SheetPrimitive.Content,
+			{
 				key: 'content',
 				'data-slot': 'sheet-content',
 				'data-side': side,
 				className: cn(
-					'cn-sheet-content data-open:animate-in data-open:fade-in-0 data-[side=bottom]:data-open:slide-in-from-bottom-10 data-[side=left]:data-open:slide-in-from-left-10 data-[side=right]:data-open:slide-in-from-right-10 data-[side=top]:data-open:slide-in-from-top-10 data-closed:animate-out data-closed:fade-out-0 data-[side=bottom]:data-closed:slide-out-to-bottom-10 data-[side=left]:data-closed:slide-out-to-left-10 data-[side=right]:data-closed:slide-out-to-right-10 data-[side=top]:data-closed:slide-out-to-top-10',
+					'fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-[side=bottom]:data-open:slide-in-from-bottom-10 data-[side=left]:data-open:slide-in-from-left-10 data-[side=right]:data-open:slide-in-from-right-10 data-[side=top]:data-open:slide-in-from-top-10 data-closed:animate-out data-closed:fade-out-0 data-[side=bottom]:data-closed:slide-out-to-bottom-10 data-[side=left]:data-closed:slide-out-to-left-10 data-[side=right]:data-closed:slide-out-to-right-10 data-[side=top]:data-closed:slide-out-to-top-10',
 					className,
 				),
 				...props,
-				children: [
-					createElement(ChildrenHost, { key: 'children', children }),
-					showCloseButton
-						? createElement(
-								SheetPrimitive.Close,
-								{ key: 'close', 'data-slot': 'sheet-close', asChild: true },
-								createElement(
-									Button,
-									{ variant: 'ghost', className: 'cn-sheet-close', size: 'icon-sm' },
-									createElement(XIcon, { key: 'icon' }),
-									createElement('span', { key: 'label', className: 'sr-only' }, 'Close'),
-								),
-							)
-						: null,
-				],
-			}),
-		],
-	});
+			},
+			children,
+			showCloseButton
+				? createElement(
+						SheetPrimitive.Close,
+						{ key: 'close', 'data-slot': 'sheet-close', asChild: true },
+						createElement(
+							Button,
+							{ variant: 'ghost', className: 'absolute top-3 right-3', size: 'icon-sm' },
+							createElement(XIcon, { key: 'icon' }),
+							createElement('span', { key: 'sr', className: 'sr-only' }, 'Close'),
+						),
+					)
+				: null,
+		),
+	);
 }
 
 export function SheetHeader({ className, ...props }: Props) @{
-	<div
-		data-slot="sheet-header"
-		className={cn('cn-sheet-header flex flex-col', className)}
-		{...props}
-	/>
+	<div data-slot="sheet-header" className={cn('flex flex-col gap-0.5 p-4', className)} {...props} />
 }
 
 export function SheetFooter({ className, ...props }: Props) @{
 	<div
 		data-slot="sheet-footer"
-		className={cn('cn-sheet-footer mt-auto flex flex-col', className)}
+		className={cn('mt-auto flex flex-col gap-2 p-4', className)}
 		{...props}
 	/>
 }
@@ -119,7 +100,7 @@ export function SheetFooter({ className, ...props }: Props) @{
 export function SheetTitle({ className, ...props }: Props) @{
 	<SheetPrimitive.Title
 		data-slot="sheet-title"
-		className={cn('cn-sheet-title cn-font-heading', className)}
+		className={cn('cn-font-heading text-base font-medium text-foreground', className)}
 		{...props}
 	/>
 }
@@ -127,7 +108,7 @@ export function SheetTitle({ className, ...props }: Props) @{
 export function SheetDescription({ className, ...props }: Props) @{
 	<SheetPrimitive.Description
 		data-slot="sheet-description"
-		className={cn('cn-sheet-description', className)}
+		className={cn('text-sm text-muted-foreground', className)}
 		{...props}
 	/>
 }

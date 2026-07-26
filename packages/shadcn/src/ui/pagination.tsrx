@@ -1,14 +1,10 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
-// apps/v4/registry/bases/radix/ui/pagination.tsx. IconPlaceholder resolves to
-// lucide (see spinner.tsrx).
-//
-// PaginationLink is upstream's `<Button asChild><a …>` — Slot needs a real
-// element DESCRIPTOR as its child, so the Button/anchor pair is composed with
-// createElement (the cmdk Command.Dialog precedent); the link's own children
-// flow through as the anchor's children prop.
-import { createElement } from 'octane';
+// Pagination — maintainer-supplied default-Tailwind flavor, class strings
+// verbatim. Octane adaptations: lucide-react → @octanejs/lucide; PaginationLink
+// is upstream's `<Button asChild><a …>` — Slot needs a real element descriptor
+// as its child, so the Button/anchor pair composes with createElement and the
+// link's children flow through the anchor's children prop.
+import { createElement, type OctaneNode } from 'octane';
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';
-import type { OctaneNode } from 'octane';
 
 import { cn } from '../lib/utils';
 import { Button, type ButtonProps } from './button.tsrx';
@@ -20,7 +16,7 @@ export function Pagination({ className, ...props }: Props) @{
 		role="navigation"
 		aria-label="pagination"
 		data-slot="pagination"
-		className={cn('cn-pagination mx-auto flex w-full justify-center', className)}
+		className={cn('mx-auto flex w-full justify-center', className)}
 		{...props}
 	/>
 }
@@ -28,7 +24,7 @@ export function Pagination({ className, ...props }: Props) @{
 export function PaginationContent({ className, ...props }: Props) @{
 	<ul
 		data-slot="pagination-content"
-		className={cn('cn-pagination-content flex items-center', className)}
+		className={cn('flex items-center gap-0.5', className)}
 		{...props}
 	/>
 }
@@ -57,7 +53,7 @@ export function PaginationLink({
 			asChild: true,
 			variant: isActive ? 'outline' : 'ghost',
 			size,
-			className: cn('cn-pagination-link', className),
+			className: cn(className),
 		},
 		createElement('a', {
 			'aria-current': isActive ? 'page' : undefined,
@@ -73,15 +69,17 @@ export function PaginationPrevious({
 	className,
 	text = 'Previous',
 	...props
-}: PaginationLinkProps & { text?: string }) @{
+}: PaginationLinkProps & {
+	text?: string;
+}) @{
 	<PaginationLink
 		aria-label="Go to previous page"
 		size="default"
-		className={cn('cn-pagination-previous', className)}
+		className={cn('pl-1.5!', className)}
 		{...props}
 	>
 		<ChevronLeftIcon data-icon="inline-start" className="cn-rtl-flip" />
-		<span className="cn-pagination-previous-text hidden sm:block">{text as string}</span>
+		<span className="hidden sm:block">{text as string}</span>
 	</PaginationLink>
 }
 
@@ -91,10 +89,10 @@ export function PaginationNext({ className, text = 'Next', ...props }: Paginatio
 	<PaginationLink
 		aria-label="Go to next page"
 		size="default"
-		className={cn('cn-pagination-next', className)}
+		className={cn('pr-1.5!', className)}
 		{...props}
 	>
-		<span className="cn-pagination-next-text hidden sm:block">{text as string}</span>
+		<span className="hidden sm:block">{text as string}</span>
 		<ChevronRightIcon data-icon="inline-end" className="cn-rtl-flip" />
 	</PaginationLink>
 }
@@ -103,7 +101,10 @@ export function PaginationEllipsis({ className, ...props }: Props) @{
 	<span
 		aria-hidden="true"
 		data-slot="pagination-ellipsis"
-		className={cn('cn-pagination-ellipsis flex items-center justify-center', className)}
+		className={cn(
+			'flex size-8 items-center justify-center [&_svg:not([class*=\'size-\'])]:size-4',
+			className,
+		)}
 		{...props}
 	>
 		<MoreHorizontalIcon />

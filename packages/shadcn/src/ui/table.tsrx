@@ -4,6 +4,8 @@
 // table-container wrapper div.
 import { cn } from '../lib/utils';
 
+// Multi-host family (div/table/thead/tbody/tr/th/td/caption): no single host
+// prop table applies, so the shared alias stays structural.
 type Props = { className?: string } & Record<string, unknown>;
 
 export function Table({ className, ...props }: Props) @{
@@ -40,7 +42,7 @@ export function TableRow({ className, ...props }: Props) @{
 	<tr
 		data-slot="table-row"
 		className={cn(
-			'hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors',
+			'border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted',
 			className,
 		)}
 		{...props}

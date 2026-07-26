@@ -1,21 +1,16 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
-// apps/v4/registry/bases/radix/ui/context-menu.tsx (the `"use client"`
-// directive is dropped — octane has no RSC axis). IconPlaceholder resolves to
-// lucide (see spinner.tsrx).
-//
-// ContextMenuContent wraps Portal+Content, and the checkbox/radio/sub-trigger
-// items compose an indicator/chevron with the consumer's children — radix's
-// Portal (Slot) and any child reordering need real element DESCRIPTORS, so
-// those parts are composed with createElement (the cmdk Command.Dialog
-// precedent); the consumer's children flow through the ordinary props.children
-// channel.
+// ContextMenu — maintainer-supplied default-Tailwind flavor, class strings
+// verbatim. Octane adaptations: "use client" dropped, lucide-react →
+// @octanejs/lucide, radix-ui → @octanejs/radix. Content composes its Portal
+// subtree with createElement (radix's Portal slots its child); parts that
+// interleave consumer children with sibling descriptors use the
+// {props.children} lowering in template JSX.
 import { createElement, type OctaneNode } from 'octane';
 import { ContextMenu as ContextMenuPrimitive } from '@octanejs/radix';
 import { CheckIcon, ChevronRightIcon } from '@octanejs/lucide';
 
 import { cn } from '../lib/utils';
 
-type Props = { className?: string } & Record<string, unknown>;
+type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 
 export function ContextMenu(props: Record<string, unknown>) @{
 	<ContextMenuPrimitive.Root data-slot="context-menu" {...props} />
@@ -24,7 +19,7 @@ export function ContextMenu(props: Record<string, unknown>) @{
 export function ContextMenuTrigger({ className, ...props }: Props) @{
 	<ContextMenuPrimitive.Trigger
 		data-slot="context-menu-trigger"
-		className={cn('cn-context-menu-trigger select-none', className)}
+		className={cn('select-none', className)}
 		{...props}
 	/>
 }
@@ -33,9 +28,6 @@ export function ContextMenuGroup(props: Record<string, unknown>) @{
 	<ContextMenuPrimitive.Group data-slot="context-menu-group" {...props} />
 }
 
-// OCTANE DIVERGENCE: radix's Portal slots its child, which requires a real
-// element descriptor — opaque compiled .tsrx children are not accepted here.
-// Compose Portal children with createElement (see ContextMenuContent).
 export function ContextMenuPortal(props: Record<string, unknown>) @{
 	<ContextMenuPrimitive.Portal data-slot="context-menu-portal" {...props} />
 }
@@ -57,7 +49,7 @@ export function ContextMenuContent({ className, ...props }: Props & {
 		createElement(ContextMenuPrimitive.Content, {
 			'data-slot': 'context-menu-content',
 			className: cn(
-				'cn-context-menu-content cn-menu-target cn-menu-translucent z-50 max-h-(--radix-context-menu-content-available-height) origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto',
+				'z-50 max-h-(--radix-context-menu-content-available-height) min-w-36 origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
 				className,
 			),
 			...props,
@@ -74,99 +66,95 @@ export function ContextMenuItem({ className, inset, variant = 'default', ...prop
 		data-inset={inset}
 		data-variant={variant}
 		className={cn(
-			'cn-context-menu-item group/context-menu-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+			'group/context-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 focus:*:[svg]:text-accent-foreground data-[variant=destructive]:*:[svg]:text-destructive',
 			className,
 		)}
 		{...props}
 	/>
 }
 
-export function ContextMenuSubTrigger({ className, inset, children, ...props }: Props & {
-	inset?: boolean;
-	children?: OctaneNode;
-}) {
-	return createElement(
-		ContextMenuPrimitive.SubTrigger,
-		{
-			'data-slot': 'context-menu-sub-trigger',
-			'data-inset': inset,
-			className: cn(
-				'cn-context-menu-sub-trigger flex cursor-default items-center outline-hidden select-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
-				className,
-			),
-			...props,
-		},
-		children,
-		createElement(ChevronRightIcon, { className: 'cn-rtl-flip ml-auto' }),
-	);
+export function ContextMenuSubTrigger(props: Props & { inset?: boolean }) @{
+	const { className, children: _children, inset, ...rest } = props;
+
+	<ContextMenuPrimitive.SubTrigger
+		data-slot="context-menu-sub-trigger"
+		data-inset={inset}
+		className={cn(
+			'flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			className,
+		)}
+		{...rest}
+	>
+		{props.children}
+		<ChevronRightIcon className="cn-rtl-flip ml-auto" />
+	</ContextMenuPrimitive.SubTrigger>
 }
 
 export function ContextMenuSubContent({ className, ...props }: Props) @{
 	<ContextMenuPrimitive.SubContent
 		data-slot="context-menu-sub-content"
 		className={cn(
-			'cn-context-menu-sub-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-context-menu-content-transform-origin) overflow-hidden',
+			'z-50 min-w-32 origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
 			className,
 		)}
 		{...props}
 	/>
 }
 
-export function ContextMenuCheckboxItem({ className, children, checked, inset, ...props }: Props & {
-	children?: OctaneNode;
+export function ContextMenuCheckboxItem(props: Props & {
 	checked?: boolean | 'indeterminate';
 	inset?: boolean;
-}) {
-	return createElement(
-		ContextMenuPrimitive.CheckboxItem,
-		{
-			'data-slot': 'context-menu-checkbox-item',
-			'data-inset': inset,
-			className: cn(
-				'cn-context-menu-checkbox-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
-				className,
-			),
-			checked,
-			...props,
-		},
-		createElement(
-			'span',
-			{ className: 'cn-context-menu-item-indicator pointer-events-none' },
-			createElement(ContextMenuPrimitive.ItemIndicator, null, createElement(CheckIcon, {})),
-		),
-		children,
-	);
+}) @{
+	const { className, children: _children, checked, inset, ...rest } = props;
+
+	<ContextMenuPrimitive.CheckboxItem
+		data-slot="context-menu-checkbox-item"
+		data-inset={inset}
+		className={cn(
+			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			className,
+		)}
+		checked={checked}
+		{...rest}
+	>
+		<span className="pointer-events-none absolute right-2">
+			<ContextMenuPrimitive.ItemIndicator>
+				<CheckIcon />
+			</ContextMenuPrimitive.ItemIndicator>
+		</span>
+		{props.children}
+	</ContextMenuPrimitive.CheckboxItem>
 }
 
-export function ContextMenuRadioItem({ className, children, inset, ...props }: Props & {
-	children?: OctaneNode;
-	inset?: boolean;
-}) {
-	return createElement(
-		ContextMenuPrimitive.RadioItem,
-		{
-			'data-slot': 'context-menu-radio-item',
-			'data-inset': inset,
-			className: cn(
-				'cn-context-menu-radio-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
-				className,
-			),
-			...props,
-		},
-		createElement(
-			'span',
-			{ className: 'cn-context-menu-item-indicator pointer-events-none' },
-			createElement(ContextMenuPrimitive.ItemIndicator, null, createElement(CheckIcon, {})),
-		),
-		children,
-	);
+export function ContextMenuRadioItem(props: Props & { inset?: boolean }) @{
+	const { className, children: _children, inset, ...rest } = props;
+
+	<ContextMenuPrimitive.RadioItem
+		data-slot="context-menu-radio-item"
+		data-inset={inset}
+		className={cn(
+			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			className,
+		)}
+		{...rest}
+	>
+		<span className="pointer-events-none absolute right-2">
+			<ContextMenuPrimitive.ItemIndicator>
+				<CheckIcon />
+			</ContextMenuPrimitive.ItemIndicator>
+		</span>
+		{props.children}
+	</ContextMenuPrimitive.RadioItem>
 }
 
 export function ContextMenuLabel({ className, inset, ...props }: Props & { inset?: boolean }) @{
 	<ContextMenuPrimitive.Label
 		data-slot="context-menu-label"
 		data-inset={inset}
-		className={cn('cn-context-menu-label', className)}
+		className={cn(
+			'px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7',
+			className,
+		)}
 		{...props}
 	/>
 }
@@ -174,7 +162,7 @@ export function ContextMenuLabel({ className, inset, ...props }: Props & { inset
 export function ContextMenuSeparator({ className, ...props }: Props) @{
 	<ContextMenuPrimitive.Separator
 		data-slot="context-menu-separator"
-		className={cn('cn-context-menu-separator', className)}
+		className={cn('-mx-1 my-1 h-px bg-border', className)}
 		{...props}
 	/>
 }
@@ -182,7 +170,10 @@ export function ContextMenuSeparator({ className, ...props }: Props) @{
 export function ContextMenuShortcut({ className, ...props }: Props) @{
 	<span
 		data-slot="context-menu-shortcut"
-		className={cn('cn-context-menu-shortcut', className)}
+		className={cn(
+			'ml-auto text-xs tracking-widest text-muted-foreground group-focus/context-menu-item:text-accent-foreground',
+			className,
+		)}
 		{...props}
 	/>
 }

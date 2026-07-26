@@ -61,24 +61,22 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		expect(sidebar.getAttribute('data-side')).toBe('left');
 
 		const gap = slot(container, 'sidebar-gap');
-		expect(gap.className).toContain('cn-sidebar-gap');
+		expect(gap.className).toContain('relative');
 		const sidebarContainer = slot(container, 'sidebar-container');
 		expect(sidebarContainer.getAttribute('data-side')).toBe('left');
 		const inner = slot(container, 'sidebar-inner');
 		expect(inner.getAttribute('data-sidebar')).toBe('sidebar');
-		expect(inner.className).toContain('cn-sidebar-inner');
+		expect(inner.className).toContain('bg-sidebar');
 
 		// Structural parts, each with its data-sidebar name and cn- class.
 		expect(slot(container, 'sidebar-header').getAttribute('data-sidebar')).toBe('header');
 		expect(slot(container, 'sidebar-footer').getAttribute('data-sidebar')).toBe('footer');
-		expect(slot(container, 'sidebar-content').className).toContain('cn-sidebar-content');
-		expect(slot(container, 'sidebar-group').className).toContain('cn-sidebar-group');
+		expect(slot(container, 'sidebar-content').className).toContain('flex');
+		expect(slot(container, 'sidebar-group').className).toContain('relative');
 		expect(slot(container, 'sidebar-group-label').textContent).toBe('Platform');
 		const groupAction = slot(container, 'sidebar-group-action');
 		expect(groupAction.tagName).toBe('BUTTON');
-		expect(slot(container, 'sidebar-group-content').className).toContain(
-			'cn-sidebar-group-content',
-		);
+		expect(slot(container, 'sidebar-group-content').className).toContain('text-sm');
 		expect(slot(container, 'sidebar-menu').tagName).toBe('UL');
 		expect(slot(container, 'sidebar-menu-item').tagName).toBe('LI');
 		expect(slot(container, 'sidebar-menu-badge').textContent).toBe('3');
@@ -89,13 +87,13 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		const input = slot(container, 'sidebar-input') as HTMLInputElement;
 		expect(input.tagName).toBe('INPUT');
 		expect(input.getAttribute('data-sidebar')).toBe('input');
-		expect(input.className).toContain('cn-sidebar-input');
+		expect(input.className).toContain('bg-background');
 		expect(input.className).toContain('border-input');
 
 		// SidebarSeparator keeps the Separator host with its own slot name.
 		const separator = slot(container, 'sidebar-separator');
 		expect(separator.getAttribute('data-sidebar')).toBe('separator');
-		expect(separator.className).toContain('cn-sidebar-separator');
+		expect(separator.className).toContain('bg-sidebar-border');
 
 		// Menu button: variant/size classes and the active/size data attrs.
 		const menuButton = container.querySelector('[data-testid="menu-button"]') as HTMLElement;
@@ -103,9 +101,9 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		expect(menuButton.getAttribute('data-slot')).toBe('sidebar-menu-button');
 		expect(menuButton.getAttribute('data-size')).toBe('default');
 		expect(menuButton.getAttribute('data-active')).toBe('true');
-		expect(menuButton.className).toContain('cn-sidebar-menu-button');
-		expect(menuButton.className).toContain('cn-sidebar-menu-button-variant-default');
-		expect(menuButton.className).toContain('cn-sidebar-menu-button-size-default');
+		expect(menuButton.className).toContain('peer/menu-button');
+		expect(menuButton.className).toContain('peer/menu-button');
+		expect(menuButton.className).toContain('peer/menu-button');
 
 		const menuAction = container.querySelector('[data-testid="menu-action"]') as HTMLElement;
 		expect(menuAction.getAttribute('data-slot')).toBe('sidebar-menu-action');
@@ -130,7 +128,7 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		expect(trigger.getAttribute('data-slot')).toBe('sidebar-trigger');
 		expect(trigger.getAttribute('data-sidebar')).toBe('trigger');
 		expect(trigger.className).toContain('hover:bg-muted');
-		expect(trigger.className).toContain('size-7');
+		expect(trigger.className).toContain('group/button');
 		expect(trigger.querySelector('svg')).not.toBeNull();
 		expect(trigger.querySelector('.sr-only')!.textContent).toBe('Toggle Sidebar');
 		expect(slot(container, 'sidebar-inset').tagName).toBe('MAIN');
@@ -219,7 +217,7 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		expect(host.getAttribute('data-sidebar')).toBe('menu-button');
 		expect(host.getAttribute('data-size')).toBe('lg');
 		expect(host.getAttribute('data-active')).toBe('true');
-		expect(host.className).toContain('cn-sidebar-menu-button-size-lg');
+		expect(host.className).toContain('peer/menu-button');
 		expect(host.textContent).toBe('Home');
 		unmount();
 	});
@@ -325,25 +323,27 @@ describe('@octanejs/shadcn — Field', () => {
 		const legend = slot(container, 'field-legend');
 		expect(legend.tagName).toBe('LEGEND');
 		expect(legend.getAttribute('data-variant')).toBe('label');
-		expect(slot(container, 'field-group').className).toContain('cn-field-group');
+		expect(slot(container, 'field-group').className).toContain('flex');
 
 		const vertical = container.querySelector('[data-testid="field-vertical"]') as HTMLElement;
 		expect(vertical.getAttribute('role')).toBe('group');
 		expect(vertical.getAttribute('data-slot')).toBe('field');
 		expect(vertical.getAttribute('data-orientation')).toBe('vertical');
-		expect(vertical.className).toContain('cn-field-orientation-vertical');
+		expect(vertical.className).toContain('flex-col');
 
 		const horizontal = container.querySelector('[data-testid="field-horizontal"]') as HTMLElement;
 		expect(horizontal.getAttribute('data-orientation')).toBe('horizontal');
-		expect(horizontal.className).toContain('cn-field-orientation-horizontal');
+		expect(horizontal.className).toContain('flex-row');
 
-		expect(slot(container, 'field-content').className).toContain('cn-field-content');
+		expect(slot(container, 'field-content').className).toContain('flex');
 		// FieldTitle intentionally shares upstream's data-slot="field-label".
 		const titles = container.querySelectorAll('[data-slot="field-label"]');
-		const title = Array.from(titles).find((el) => el.className.includes('cn-field-title'));
+		// Upstream FieldTitle deliberately reuses data-slot="field-label"; its own
+		// `items-center` utility is what distinguishes it from FieldLabel.
+		const title = Array.from(titles).find((el) => !el.className.includes('group/field-label'));
 		expect(title).not.toBeUndefined();
 		expect(title!.textContent).toBe('Notifications');
-		expect(slot(container, 'field-description').className).toContain('cn-field-description');
+		expect(slot(container, 'field-description').className).toContain('text-sm');
 		unmount();
 	});
 
@@ -352,8 +352,8 @@ describe('@octanejs/shadcn — Field', () => {
 		const label = container.querySelector('label[data-slot="field-label"]') as HTMLLabelElement;
 		expect(label).not.toBeNull();
 		expect(label.getAttribute('for')).toBe('display-name');
-		expect(label.className).toContain('cn-field-label');
-		expect(label.className).toContain('leading-none'); // the composed Label contract
+		expect(label.className).toContain('flex');
+		expect(label.className).toContain('font-medium'); // the composed Label contract
 		unmount();
 	});
 
@@ -372,7 +372,7 @@ describe('@octanejs/shadcn — Field', () => {
 		) as HTMLElement;
 		expect(contentSpan).not.toBeNull();
 		expect(contentSpan.textContent).toBe('or');
-		expect(contentSpan.className).toContain('cn-field-separator-content');
+		expect(contentSpan.className).toContain('bg-background');
 		unmount();
 	});
 
@@ -382,7 +382,7 @@ describe('@octanejs/shadcn — Field', () => {
 		});
 		const error = slot(container, 'field-error');
 		expect(error.getAttribute('role')).toBe('alert');
-		expect(error.className).toContain('cn-field-error');
+		expect(error.className).toContain('text-sm');
 		expect(error.textContent).toBe('Required');
 		expect(error.querySelector('ul')).toBeNull();
 		unmount();

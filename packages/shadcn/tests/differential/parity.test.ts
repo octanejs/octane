@@ -1,11 +1,19 @@
 /**
  * Differential parity: the SAME `.tsrx` fixture runs through @octanejs/shadcn
- * (octane) AND the vendored pinned upstream shadcn React sources (the setup
- * rewrites `@octanejs/shadcn` → the precompiled upstream barrel and `octane` →
+ * (octane) AND a vendored React reference (the setup rewrites
+ * `@octanejs/shadcn` → the precompiled upstream barrel and `octane` →
  * `react`). octane's `mountDifferential` mounts both, drives identical events,
  * and asserts byte-identical innerHTML after each step (useId/radix-id tokens
- * canonicalised — see the rig). This proves the port renders what upstream
- * shadcn renders on React — not just "passes my tests".
+ * canonicalised — see the rig).
+ *
+ * WHAT EACH FIXTURE PROVES — the references differ in provenance:
+ *   - dialog, dropdown-menu, tabs: vendored byte-identical from the pinned
+ *     upstream sources, so these prove UPSTREAM FIDELITY (octane renders what
+ *     upstream shadcn renders on React).
+ *   - button, badge: the reference was hand-authored to carry the same
+ *     maintainer-supplied class strings the port ships, since no upstream file
+ *     has that flavor. These prove RUNTIME EQUIVALENCE (octane and React agree
+ *     given identical source), NOT upstream fidelity.
  *
  * Portal'd content (dialog content/overlay, dropdown menu content) lands on
  * document.body on BOTH runtimes, so — exactly like radix's parity suite — the

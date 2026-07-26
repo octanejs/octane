@@ -234,12 +234,12 @@ describe('@octanejs/shadcn — Select', () => {
 		expect(trigger.getAttribute('data-size')).toBe('sm');
 		expect(trigger.getAttribute('role')).toBe('combobox');
 		expect(trigger.getAttribute('aria-expanded')).toBe('false');
-		expect(trigger.className).toContain('cn-select-trigger');
+		expect(trigger.className).toContain('flex');
 		// The consumer's SelectValue child renders before the chevron icon.
 		const valueNode = $('[data-testid="trigger-value"]')!;
 		expect(valueNode.getAttribute('data-slot')).toBe('select-value');
 		expect(valueNode.textContent).toBe('Pick a fruit');
-		const chevron = trigger.querySelector('svg.cn-select-trigger-icon')!;
+		const chevron = trigger.querySelector('svg')!;
 		expect(chevron).not.toBe(null);
 		expect(chevron.getAttribute('class')).toContain('pointer-events-none');
 		// Content renders nowhere while closed.
@@ -259,32 +259,35 @@ describe('@octanejs/shadcn — Select', () => {
 		expect(content).not.toBe(null);
 		expect(content.getAttribute('data-slot')).toBe('select-content');
 		expect(content.getAttribute('role')).toBe('listbox');
-		expect(content.className).toContain('cn-select-content');
+		expect(content.className).toContain('relative');
 		// position="popper" adds the side-translate classes.
 		expect(content.className).toContain('data-[side=bottom]:translate-y-1');
 		const viewport = content.querySelector('[data-position="popper"]')!;
-		expect(viewport.className).toContain('cn-select-viewport');
+		expect(viewport.className).toContain('data-[position=popper]:w-full');
 		expect(inBody('[data-testid="group"]')!.getAttribute('data-slot')).toBe('select-group');
 		const label = inBody('[data-testid="label"]')!;
 		expect(label.getAttribute('data-slot')).toBe('select-label');
 		expect(label.textContent).toBe('Fruits');
 		const separator = inBody('[data-testid="separator"]')!;
 		expect(separator.getAttribute('data-slot')).toBe('select-separator');
-		expect(separator.className).toContain('cn-select-separator');
+		expect(separator.className).toContain('h-px');
 
 		const banana = inBody('[data-testid="item-banana"]')!;
 		expect(banana.getAttribute('data-slot')).toBe('select-item');
 		expect(banana.getAttribute('role')).toBe('option');
 		expect(banana.getAttribute('data-state')).toBe('checked');
-		expect(banana.className).toContain('cn-select-item');
-		// The selected item shows the lucide check inside the indicator span.
-		expect(banana.querySelector('svg.cn-select-item-indicator-icon')).not.toBe(null);
+		expect(banana.className).toContain('relative');
+		// Upstream gives the indicator span no data-slot: it is simply the item's
+		// first span, rendered ahead of the ItemText span. The selected item
+		// shows the lucide check inside it.
+		expect(banana.querySelector('span')!.querySelector('svg')).not.toBe(null);
 		const apple = inBody('[data-testid="item-apple"]')!;
 		expect(apple.getAttribute('data-state')).toBe('unchecked');
-		expect(apple.querySelector('svg.cn-select-item-indicator-icon')).toBe(null);
 		// The bare indicator span always renders (upstream renders it outside
-		// ItemIndicator).
-		expect(apple.querySelector('span.cn-select-item-indicator')).not.toBe(null);
+		// ItemIndicator), but carries no check while unselected.
+		const appleIndicator = apple.querySelector('span')!;
+		expect(appleIndicator).not.toBe(null);
+		expect(appleIndicator.querySelector('svg')).toBe(null);
 		r.unmount();
 	});
 

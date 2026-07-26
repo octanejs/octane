@@ -1,11 +1,9 @@
 // Default-Tailwind (package canonical) input — user-supplied flavor, class string verbatim.
 // OCTANE DIVERGENCE: per-keystroke handling is the native onInput event.
 import { cn } from '../lib/utils';
+import type { HostProps } from '../lib/types';
 
-export interface InputProps extends Record<string, unknown> {
-	className?: string;
-	type?: string;
-}
+export interface InputProps extends HostProps<'input'> {}
 
 export function Input({ className, type, ...props }: InputProps) @{
 	<input

@@ -36,6 +36,7 @@ function toConsumerSource(source) {
 	// rewrites on install; the package-internal relative layout is ours only.
 	return source
 		.replaceAll("'../lib/utils'", "'@/lib/utils'")
+		.replaceAll("'../lib/types'", "'@/lib/types'")
 		.replaceAll(/'\.\/([\w-]+)\.tsrx'/g, "'@/components/ui/$1'")
 		.replaceAll(/'\.\.\/hooks\/([\w-]+)'/g, "'@/hooks/$1'");
 }
@@ -51,6 +52,7 @@ function collectDeps(source) {
 			// CLI — fail the build instead of shipping a broken item.
 			throw new Error(`registry: undeclared dependency "${spec}" imported by a component`);
 		} else if (spec === '../lib/utils') registry.add('utils');
+		else if (spec === '../lib/types') registry.add('types');
 		else if (spec.startsWith('./')) registry.add(spec.slice(2).replace(/\.tsrx$/, ''));
 		else if (spec.startsWith('../hooks/')) registry.add(spec.slice('../hooks/'.length));
 	}
@@ -70,6 +72,18 @@ async function buildItems() {
 		dependencies: ['clsx', 'tailwind-merge'],
 		files: [
 			{ path: 'lib/utils.ts', type: 'registry:lib', target: 'lib/utils.ts', content: utilsSource },
+		],
+	});
+
+	const typesSource = await readFile(join(PKG_ROOT, 'src', 'lib', 'types.ts'), 'utf8');
+	items.push({
+		$schema: SCHEMA,
+		name: 'types',
+		type: 'registry:lib',
+		title: 'Types',
+		description: 'Host-element prop bases shared by the components.',
+		files: [
+			{ path: 'lib/types.ts', type: 'registry:lib', target: 'lib/types.ts', content: typesSource },
 		],
 	});
 

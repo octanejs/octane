@@ -13,10 +13,7 @@ export interface NativeSelectProps extends Record<string, unknown> {
 
 export function NativeSelect({ className, size = 'default', ...props }: NativeSelectProps) @{
 	<div
-		className={cn(
-			'cn-native-select-wrapper group/native-select relative w-fit has-[select:disabled]:opacity-50',
-			className,
-		)}
+		className={cn('bg-[Canvas] text-[CanvasText]', className)}
 		data-slot="native-select-wrapper"
 		data-size={size}
 	>

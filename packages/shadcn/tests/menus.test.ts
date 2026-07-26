@@ -72,8 +72,8 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 		expect(content).not.toBe(null);
 		expect(content.getAttribute('role')).toBe('menu');
 		expect(content.getAttribute('data-slot')).toBe('dropdown-menu-content');
-		expect(content.className).toContain('cn-dropdown-menu-content');
-		expect(content.className).toContain('cn-menu-target');
+		expect(content.className).toContain('z-50');
+		expect(content.className).toContain('z-50');
 		expect(content.className).toContain('extra-content');
 		// Portal'd out of the app container into the popper wrapper on body.
 		expect(r.container.contains(content)).toBe(false);
@@ -82,7 +82,7 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 		const label = $('[data-testid="label"]')!;
 		expect(label.getAttribute('data-slot')).toBe('dropdown-menu-label');
 		expect(label.getAttribute('data-inset')).toBe('true');
-		expect(label.className).toContain('cn-dropdown-menu-label');
+		expect(label.className).toContain('text-muted-foreground');
 
 		expect($('[data-testid="group"]')!.getAttribute('data-slot')).toBe('dropdown-menu-group');
 
@@ -90,11 +90,11 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 		expect(copy.getAttribute('role')).toBe('menuitem');
 		expect(copy.getAttribute('data-slot')).toBe('dropdown-menu-item');
 		expect(copy.getAttribute('data-variant')).toBe('default');
-		expect(copy.className).toContain('cn-dropdown-menu-item');
+		expect(copy.className).toContain('rounded-md');
 		const shortcut = $('[data-testid="shortcut"]')!;
 		expect(copy.contains(shortcut)).toBe(true);
 		expect(shortcut.getAttribute('data-slot')).toBe('dropdown-menu-shortcut');
-		expect(shortcut.className).toContain('cn-dropdown-menu-shortcut');
+		expect(shortcut.className).toContain('text-xs');
 
 		const del = $('[data-testid="item-delete"]')!;
 		expect(del.getAttribute('data-variant')).toBe('destructive');
@@ -102,7 +102,7 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 
 		const separator = $('[data-testid="separator"]')!;
 		expect(separator.getAttribute('data-slot')).toBe('dropdown-menu-separator');
-		expect(separator.className).toContain('cn-dropdown-menu-separator');
+		expect(separator.className).toContain('bg-border');
 		r.unmount();
 	});
 
@@ -122,7 +122,7 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 			'[data-slot="dropdown-menu-checkbox-item-indicator"]',
 		)!;
 		expect(checkIndicator).not.toBe(null);
-		expect(checkIndicator.className).toContain('cn-dropdown-menu-item-indicator');
+		expect(checkIndicator.className).toContain('pointer-events-none');
 		expect(checkIndicator.querySelector('svg')).toBe(null);
 
 		expect($('[data-testid="radio-group"]')!.getAttribute('data-slot')).toBe(
@@ -195,7 +195,7 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 		expect(subTrigger.getAttribute('data-slot')).toBe('dropdown-menu-sub-trigger');
 		expect(subTrigger.getAttribute('data-inset')).toBe('true');
 		expect(subTrigger.getAttribute('aria-haspopup')).toBe('menu');
-		expect(subTrigger.className).toContain('cn-dropdown-menu-sub-trigger');
+		expect(subTrigger.className).toContain('flex');
 		// Trailing chevron icon appended after the consumer children.
 		const chevron = subTrigger.querySelector('svg')!;
 		expect(chevron).not.toBe(null);
@@ -210,7 +210,7 @@ describe('@octanejs/shadcn — DropdownMenu', () => {
 		expect(subContent).not.toBe(null);
 		expect(subContent.getAttribute('role')).toBe('menu');
 		expect(subContent.getAttribute('data-slot')).toBe('dropdown-menu-sub-content');
-		expect(subContent.className).toContain('cn-dropdown-menu-sub-content');
+		expect(subContent.className).toContain('rounded-lg');
 
 		click('[data-testid="item-email"]');
 		await settle();
@@ -245,7 +245,7 @@ describe('@octanejs/shadcn — ContextMenu', () => {
 		await settle();
 		const trigger = $('[data-testid="trigger"]')!;
 		expect(trigger.getAttribute('data-slot')).toBe('context-menu-trigger');
-		expect(trigger.className).toContain('cn-context-menu-trigger');
+		expect(trigger.className).toContain('select-none');
 		expect(trigger.className).toContain('select-none');
 		expect($('[data-testid="content"]')).toBe(null);
 
@@ -257,8 +257,8 @@ describe('@octanejs/shadcn — ContextMenu', () => {
 		expect(content).not.toBe(null);
 		expect(content.getAttribute('role')).toBe('menu');
 		expect(content.getAttribute('data-slot')).toBe('context-menu-content');
-		expect(content.className).toContain('cn-context-menu-content');
-		expect(content.className).toContain('cn-menu-target');
+		expect(content.className).toContain('z-50');
+		expect(content.className).toContain('z-50');
 		expect(r.container.contains(content)).toBe(false);
 
 		const label = $('[data-testid="label"]')!;
@@ -270,10 +270,10 @@ describe('@octanejs/shadcn — ContextMenu', () => {
 		expect(reload.getAttribute('role')).toBe('menuitem');
 		expect(reload.getAttribute('data-slot')).toBe('context-menu-item');
 		expect(reload.getAttribute('data-variant')).toBe('default');
-		expect(reload.className).toContain('cn-context-menu-item');
+		expect(reload.className).toContain('rounded-md');
 		const shortcut = $('[data-testid="shortcut"]')!;
 		expect(shortcut.getAttribute('data-slot')).toBe('context-menu-shortcut');
-		expect(shortcut.className).toContain('cn-context-menu-shortcut');
+		expect(shortcut.className).toContain('text-xs');
 		expect($('[data-testid="separator"]')!.getAttribute('data-slot')).toBe(
 			'context-menu-separator',
 		);
@@ -296,7 +296,7 @@ describe('@octanejs/shadcn — ContextMenu', () => {
 		expect(check.getAttribute('data-slot')).toBe('context-menu-checkbox-item');
 		expect(check.getAttribute('aria-checked')).toBe('true');
 		// Initially checked: the indicator span renders the check icon.
-		const indicator = check.querySelector('.cn-context-menu-item-indicator')!;
+		const indicator = check.querySelector('span.pointer-events-none')!;
 		expect(indicator).not.toBe(null);
 		expect(indicator.querySelector('svg')).not.toBe(null);
 
@@ -304,11 +304,11 @@ describe('@octanejs/shadcn — ContextMenu', () => {
 		expect(pedro.getAttribute('role')).toBe('menuitemradio');
 		expect(pedro.getAttribute('data-slot')).toBe('context-menu-radio-item');
 		expect(pedro.getAttribute('aria-checked')).toBe('true');
-		expect(pedro.querySelector('.cn-context-menu-item-indicator svg')).not.toBe(null);
+		expect(pedro.querySelector('span.pointer-events-none svg')).not.toBe(null);
 
 		const subTrigger = $('[data-testid="sub-trigger"]')!;
 		expect(subTrigger.getAttribute('data-slot')).toBe('context-menu-sub-trigger');
-		expect(subTrigger.className).toContain('cn-context-menu-sub-trigger');
+		expect(subTrigger.className).toContain('flex');
 		const chevron = subTrigger.querySelector('svg')!;
 		expect(chevron.getAttribute('class')).toContain('cn-rtl-flip');
 
@@ -317,7 +317,7 @@ describe('@octanejs/shadcn — ContextMenu', () => {
 		const subContent = $('[data-testid="sub-content"]')!;
 		expect(subContent).not.toBe(null);
 		expect(subContent.getAttribute('data-slot')).toBe('context-menu-sub-content');
-		expect(subContent.className).toContain('cn-context-menu-sub-content');
+		expect(subContent.className).toContain('rounded-lg');
 
 		// Unchecking routes through onCheckedChange.
 		click('[data-testid="item-check"]');
@@ -345,13 +345,13 @@ describe('@octanejs/shadcn — Menubar', () => {
 		const menubar = $('[data-testid="menubar"]')!;
 		expect(menubar.getAttribute('role')).toBe('menubar');
 		expect(menubar.getAttribute('data-slot')).toBe('menubar');
-		expect(menubar.className).toContain('cn-menubar');
+		expect(menubar.className).toContain('rounded-lg');
 		expect(menubar.className).toContain('extra-bar');
 
 		const fileTrigger = $('[data-testid="trigger-file"]')!;
 		expect(fileTrigger.getAttribute('role')).toBe('menuitem');
 		expect(fileTrigger.getAttribute('data-slot')).toBe('menubar-trigger');
-		expect(fileTrigger.className).toContain('cn-menubar-trigger');
+		expect(fileTrigger.className).toContain('rounded-sm');
 		expect(fileTrigger.getAttribute('data-state')).toBe('closed');
 		expect($('[data-testid="content-file"]')).toBe(null);
 
@@ -361,25 +361,25 @@ describe('@octanejs/shadcn — Menubar', () => {
 		expect(content).not.toBe(null);
 		expect(content.getAttribute('role')).toBe('menu');
 		expect(content.getAttribute('data-slot')).toBe('menubar-content');
-		expect(content.className).toContain('cn-menubar-content');
+		expect(content.className).toContain('z-50');
 		expect(content.getAttribute('aria-labelledby')).toBe(fileTrigger.id);
 		expect(r.container.contains(content)).toBe(false); // portal'd to body
 
 		const item = $('[data-testid="item-new"]')!;
 		expect(item.getAttribute('data-slot')).toBe('menubar-item');
 		expect(item.getAttribute('data-variant')).toBe('default');
-		expect(item.className).toContain('cn-menubar-item');
+		expect(item.className).toContain('rounded-md');
 		const shortcut = $('[data-testid="shortcut"]')!;
 		expect(shortcut.getAttribute('data-slot')).toBe('menubar-shortcut');
-		expect(shortcut.className).toContain('cn-menubar-shortcut');
+		expect(shortcut.className).toContain('text-xs');
 		expect(shortcut.className).toContain('ml-auto');
 		const separator = $('[data-testid="separator"]')!;
 		expect(separator.getAttribute('data-slot')).toBe('menubar-separator');
-		expect(separator.className).toContain('cn-menubar-separator');
+		expect(separator.className).toContain('bg-border');
 
 		const subTrigger = $('[data-testid="sub-trigger"]')!;
 		expect(subTrigger.getAttribute('data-slot')).toBe('menubar-sub-trigger');
-		expect(subTrigger.className).toContain('cn-menubar-sub-trigger');
+		expect(subTrigger.className).toContain('flex');
 		const chevron = subTrigger.querySelector('svg')!;
 		expect(chevron.getAttribute('class')).toContain('cn-rtl-flip');
 		expect(chevron.getAttribute('class')).toContain('size-4');
@@ -405,7 +405,7 @@ describe('@octanejs/shadcn — Menubar', () => {
 		const subContent = $('[data-testid="sub-content"]')!;
 		expect(subContent).not.toBe(null);
 		expect(subContent.getAttribute('data-slot')).toBe('menubar-sub-content');
-		expect(subContent.className).toContain('cn-menubar-sub-content');
+		expect(subContent.className).toContain('rounded-lg');
 
 		// Hovering another top-level trigger switches the open menu.
 		flushSync(() => {
@@ -426,7 +426,7 @@ describe('@octanejs/shadcn — Menubar', () => {
 		expect(wrap.getAttribute('role')).toBe('menuitemcheckbox');
 		expect(wrap.getAttribute('data-slot')).toBe('menubar-checkbox-item');
 		expect(wrap.getAttribute('aria-checked')).toBe('false');
-		const wrapIndicator = wrap.querySelector('.cn-menubar-checkbox-item-indicator')!;
+		const wrapIndicator = wrap.querySelector('span.pointer-events-none')!;
 		expect(wrapIndicator).not.toBe(null);
 		expect(wrapIndicator.querySelector('svg')).toBe(null);
 
@@ -434,7 +434,7 @@ describe('@octanejs/shadcn — Menubar', () => {
 		expect(radio.getAttribute('role')).toBe('menuitemradio');
 		expect(radio.getAttribute('data-slot')).toBe('menubar-radio-item');
 		expect(radio.getAttribute('aria-checked')).toBe('true');
-		expect(radio.querySelector('.cn-menubar-radio-item-indicator svg')).not.toBe(null);
+		expect(radio.querySelector('span.pointer-events-none svg')).not.toBe(null);
 
 		click('[data-testid="item-wrap"]');
 		await settle();
@@ -449,8 +449,8 @@ describe('@octanejs/shadcn — NavigationMenu', () => {
 	});
 
 	it('exports navigationMenuTriggerStyle (the upstream cva)', () => {
-		expect(navigationMenuTriggerStyle()).toContain('cn-navigation-menu-trigger');
-		expect(navigationMenuTriggerStyle()).toContain('group/navigation-menu-trigger');
+		expect(navigationMenuTriggerStyle()).toContain('inline-flex');
+		expect(navigationMenuTriggerStyle()).toContain('w-max');
 	});
 
 	it('renders nav/list/item/trigger with the shadcn contract and the trigger chevron', async () => {
@@ -462,32 +462,32 @@ describe('@octanejs/shadcn — NavigationMenu', () => {
 		expect(root.tagName).toBe('NAV');
 		expect(root.getAttribute('data-slot')).toBe('navigation-menu');
 		expect(root.getAttribute('data-viewport')).toBe('true');
-		expect(root.className).toContain('cn-navigation-menu');
+		expect(root.className).toContain('group/navigation-menu');
 		expect(root.getAttribute('aria-label')).toBe('Main');
 
 		const list = q('[data-testid="list"]')!;
 		expect(list.tagName).toBe('UL');
 		expect(list.getAttribute('data-slot')).toBe('navigation-menu-list');
-		expect(list.className).toContain('cn-navigation-menu-list');
+		expect(list.className).toContain('list-none');
 
 		const item = q('[data-testid="item-one"]')!;
 		expect(item.getAttribute('data-slot')).toBe('navigation-menu-item');
-		expect(item.className).toContain('cn-navigation-menu-item');
+		expect(item.className).toContain('relative');
 
 		const trigger = q('[data-testid="trigger-one"]')!;
 		expect(trigger.tagName).toBe('BUTTON');
 		expect(trigger.getAttribute('data-slot')).toBe('navigation-menu-trigger');
-		expect(trigger.className).toContain('cn-navigation-menu-trigger');
+		expect(trigger.className).toContain('h-9');
 		expect(trigger.className).toContain('group');
 		expect(trigger.getAttribute('data-state')).toBe('closed');
 		const chevron = trigger.querySelector('svg')!;
 		expect(chevron).not.toBe(null);
-		expect(chevron.getAttribute('class')).toContain('cn-navigation-menu-trigger-icon');
+		expect(chevron.getAttribute('class')).toContain('transition');
 		expect(chevron.getAttribute('aria-hidden')).toBe('true');
 
 		// The viewport wrapper renders inside the root; the viewport itself is
 		// Presence-gated while closed.
-		expect(root.querySelector('.cn-navigation-menu-viewport-wrapper')).not.toBe(null);
+		expect(root.querySelector('div.absolute.top-full')).not.toBe(null);
 		expect(q('[data-slot="navigation-menu-viewport"]')).toBe(null);
 		expect(q('[data-testid="content-one"]')).toBe(null);
 		r.unmount();
@@ -512,25 +512,25 @@ describe('@octanejs/shadcn — NavigationMenu', () => {
 		const content = q('[data-testid="content-one"]')!;
 		expect(content).not.toBe(null);
 		expect(content.getAttribute('data-slot')).toBe('navigation-menu-content');
-		expect(content.className).toContain('cn-navigation-menu-content');
+		expect(content.className).toContain('top-0');
 
 		const viewport = q('[data-slot="navigation-menu-viewport"]')!;
 		expect(viewport).not.toBe(null);
-		expect(viewport.className).toContain('cn-navigation-menu-viewport');
+		expect(viewport.className).toContain('rounded-lg');
 		expect(viewport.contains(content)).toBe(true);
 
 		const link = q('[data-testid="link-one"]')!;
 		expect(link.tagName).toBe('A');
 		expect(link.getAttribute('data-slot')).toBe('navigation-menu-link');
-		expect(link.className).toContain('cn-navigation-menu-link');
+		expect(link.className).toContain('rounded-lg');
 
 		// Indicator: Presence-mounts while open, portal'd into the indicator track,
 		// with the upstream arrow div.
 		const indicator = q('[data-testid="indicator"]')!;
 		expect(indicator).not.toBe(null);
 		expect(indicator.getAttribute('data-slot')).toBe('navigation-menu-indicator');
-		expect(indicator.className).toContain('cn-navigation-menu-indicator');
-		expect(indicator.querySelector('.cn-navigation-menu-indicator-arrow')).not.toBe(null);
+		expect(indicator.className).toContain('flex');
+		expect(indicator.querySelector('div.rotate-45')).not.toBe(null);
 
 		flushSync(() => {
 			link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -549,7 +549,7 @@ describe('@octanejs/shadcn — NavigationMenu', () => {
 
 		const root = q('[data-testid="root"]')!;
 		expect(root.getAttribute('data-viewport')).toBe('false');
-		expect(root.querySelector('.cn-navigation-menu-viewport-wrapper')).toBe(null);
+		expect(root.querySelector('div.absolute.top-full')).toBe(null);
 
 		flushSync(() => {
 			q('[data-testid="trigger-one"]')!.dispatchEvent(

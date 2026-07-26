@@ -108,10 +108,10 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 
 	it('Empty: media variant attr and upstream empty-icon slot name', () => {
 		const { container, unmount } = mount(EmptyFixture);
-		expect(slot(container, 'empty').className).toContain('cn-empty');
+		expect(slot(container, 'empty').className).toContain('flex');
 		const media = slot(container, 'empty-icon');
 		expect(media.getAttribute('data-variant')).toBe('icon');
-		expect(media.className).toContain('cn-empty-media-icon');
+		expect(media.className).toContain('bg-muted');
 		expect(slot(container, 'empty-title').textContent).toBe('No results');
 		unmount();
 	});
@@ -133,10 +133,10 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		expect(items.length).toBe(2);
 		expect(items[0].getAttribute('data-variant')).toBe('outline');
 		expect(items[0].getAttribute('data-size')).toBe('sm');
-		expect(items[0].className).toContain('cn-item-variant-outline');
+		expect(items[0].className).toContain('border');
 		expect(items[1].getAttribute('data-variant')).toBe('default');
 		const sep = slot(container, 'item-separator');
-		expect(sep.className).toContain('cn-item-separator');
+		expect(sep.className).toContain('my-2');
 		// Decorative horizontal separator: hidden from ATs (the radix contract).
 		expect(sep.getAttribute('role')).toBe('none');
 		unmount();
@@ -156,7 +156,7 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const label = slot(container, 'label');
 		expect(label.tagName).toBe('LABEL');
 		expect(label.getAttribute('for')).toBe('name');
-		expect(label.className).toContain('leading-none');
+		expect(label.className).toContain('font-medium');
 		unmount();
 	});
 
@@ -188,10 +188,10 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		expect(active.getAttribute('data-active')).toBe('true');
 		expect(active.className).toContain('group/button');
 		expect(active.className).toContain('border-border');
-		expect(active.className).toContain('cn-pagination-link');
+		expect(active.className).toContain('size-8');
 		const prev = container.querySelector('[aria-label="Go to previous page"]') as HTMLElement;
 		expect(prev.className).toContain('hover:bg-muted');
-		expect(prev.className).toContain('cn-pagination-previous');
+		expect(prev.className).toContain('pl-1.5!');
 		expect(prev.querySelector('svg')).not.toBeNull();
 		expect(prev.textContent).toContain('Previous');
 		const ellipsis = slot(container, 'pagination-ellipsis');

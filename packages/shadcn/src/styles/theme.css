@@ -79,3 +79,26 @@
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.439 0 0);
 }
+
+/*
+ * The three semantic hooks that survive in otherwise utilities-inlined
+ * components, because they appear verbatim in the upstream sources: upstream
+ * defines them in its style layer, so a package that ships those class strings
+ * must ship their definitions too or they are inert. Kept framework-free (no
+ * Tailwind @apply) so this file stands alone.
+ */
+.cn-font-heading {
+	font-family: var(--font-heading, inherit);
+}
+
+/* Directional icons (chevrons, arrows) mirror in RTL. */
+[dir='rtl'] .cn-rtl-flip {
+	transform: scaleX(-1);
+}
+
+/* Sonner's toast host: the Toaster wrapper tags every toast with this class so
+ * consumers have one stable selector; the toast's own visual styling comes
+ * from sonner and the theme tokens above. */
+.cn-toast {
+	border-radius: calc(var(--radius) * 0.8);
+}
