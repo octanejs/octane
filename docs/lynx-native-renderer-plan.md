@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–10 have private source/test/build, demo-harness, or repository-stabilization implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–10 have private source/test/build, demo-harness, or repository-stabilization implementations but their formal exits remain blocked; Milestone 11 adds a pinned macOS native runner and first-paint evidence without closing the Android/iOS or native-event gates**
 
 Upstream audit date: **2026-07-22**
 
@@ -23,6 +23,8 @@ Milestone 8 source/test/build evidence date: **2026-07-22**
 Milestone 9 repository-stabilization evidence date: **2026-07-22**
 
 Milestone 10 one-command demo source/build evidence date: **2026-07-22**
+
+Milestone 11 macOS Explorer execution evidence date: **2026-07-23**
 
 Post-Milestone-9 public page-destroy source/test evidence date: **2026-07-22**
 
@@ -561,8 +563,8 @@ form a distinct host contract.
 
 Do not force list recycling through generic `insert`/`move` commands if that
 causes eager native item allocation. Milestone 4 keeps item virtualization in
-the Lynx host because the public `__CreateList`, `__UpdateListComponents`, and
-`__UpdateListCallbacks` contract is renderer-specific. The host stores logical
+the Lynx host because the public `__CreateList` and `__UpdateListCallbacks`
+contract is renderer-specific. The host stores logical
 `list-item` descriptors, materializes a physical cell only when Lynx requests
 an index, and partitions reuse by `reuse-identifier`. The Octane
 `@for (...; key ...)` identity and the mandatory unique `item-key` remain the
@@ -1077,9 +1079,9 @@ evidence.
 > port, fetches `main.lynx.bundle`, proves the process tree releases the server,
 > and decodes the production artifact. It checks both thread programs and CSS,
 > verifies target SDK `3.9`, and rejects React, Preact, ReactLynx, and DOM runtime
-> leakage. No compatible Explorer or device was available on the evidence host,
-> so this is not yet proof of native first paint, tap delivery, adoption, or live
-> reload.
+> leakage. Milestone 11 subsequently captured first paint in the official
+> macOS Explorer 3.9 asset. Native tap delivery, adopted-node identity, live
+> reload, Android, and iOS remain unverified.
 
 - Keep the primary repository command discoverable and independent of global
   Rspeedy installs.
@@ -1097,6 +1099,54 @@ Lynx `3.9.0` Explorer can load; the screen appears once without a duplicate
 tree or runtime error; tapping the control changes `Count 0` to `Count 1`; and
 server teardown leaves no development process behind. Android and iOS each
 need captured evidence before this milestone can claim both native platforms.
+
+### Milestone 11 — pinned macOS Explorer runner and real-host compatibility (1 engineer-week)
+
+> **Progress (2026-07-23): macOS runner and first-paint gate implemented; wider
+> native exit blocked.** `pnpm lynx:demo:native` selects the official Explorer
+> 3.9 arm64 or x64 macOS archive, verifies its committed SHA-256 digest on every
+> launch, builds a disposable per-run application from that archive, starts the
+> existing demo on an isolated or requested strict loopback port, validates the
+> served Lynx binary header, launches Explorer's leased executable with the
+> bundle URL, and tears down both process groups before removing the extraction.
+> Concurrent launchers use independent application leases, and cancellation
+> covers download and extraction preparation. An executable override keeps
+> local and CI tests network-free.
+>
+> Running the exact arm64 release exposed three host-contract gaps hidden by the
+> JavaScript test environment. Rspeedy's RuntimeWrapper passes `lynx` and
+> `NativeModules` as lexical bundle-factory parameters rather than `globalThis`
+> properties, so the background root and platform APIs now resolve the injected
+> values with an explicit-global fallback. The published
+> `@lynx-js/type-element-api@0.0.8` list contract contains `__CreateList` and
+> `__UpdateListCallbacks`, not the testing environment's additional
+> `__UpdateListComponents` helper. Finally, Lynx invokes a global `processData`
+> hook before its public lifecycle dispatch, so Octane's generated main-thread
+> entry installs an identity processor for its no-processor contract.
+>
+> The official app reported engine/SDK 3.9,
+> `OnPatchFinishForFiber WithPatch!`, `__OnAppFirstScreen`, and Octane
+> background/main transport traffic while visibly painting the styled `Count 0`
+> demo once. No Octane exception or `processData` failure remained. The demo now
+> carries stable `lynx-test-tag` values for future device automation. macOS
+> accessibility permission was not granted to synthetic input, so this evidence
+> does not claim that a native tap changed the counter.
+
+- Keep download provenance architecture-specific and checksum-verified; never
+  execute an unverified archive or infer support from a similarly named asset.
+- Exercise the command and process-cleanup paths with fakes, while keeping the
+  real native observation separately qualified in committed evidence.
+- Preserve the official wrapper's lexical environment and ambient microtask
+  fallback without adding undocumented `renderPage` or update globals.
+- Treat macOS first paint as one pinned native lane, not a substitute for
+  Android/iOS, list, worklet, Native Module, or performance gates.
+
+Exit: from a clean macOS arm64 or x64 checkout,
+`pnpm lynx:demo:native` downloads or reuses the verified Explorer 3.9 asset,
+serves and launches the demo, visibly reaches `Count 0` without an Octane
+runtime exception, and releases the development server on shutdown. Automated
+`Count 0` to `Count 1` interaction, Android, and iOS remain later native
+acceptance milestones.
 
 ## Validation strategy
 

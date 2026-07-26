@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
-import type { Server } from 'node:http';
+import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
@@ -57,15 +57,49 @@ function listFiles(root: string, current = root): string[] {
 	});
 }
 
+async function startBrowserProbeOrigin(): Promise<{ server: Server; origin: string }> {
+	const server = createHttpServer((_request, response) => {
+		response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+		response.end('<!doctype html><html><body>RPC CORS probe</body></html>');
+	});
+	server.listen(0, '127.0.0.1');
+	await once(server, 'listening');
+	const address = server.address();
+	if (!address || typeof address !== 'object') {
+		throw new Error('browser probe server has no address');
+	}
+	return { server, origin: `http://127.0.0.1:${address.port}` };
+}
+
+async function closeNodeServer(server: Server | null): Promise<void> {
+	if (server === null) return;
+	await new Promise<void>((resolve, reject) => {
+		server.close((error) => (error ? reject(error) : resolve()));
+	});
+}
+
 let devServer: ViteDevServer | null = null;
 let devOrigin = '';
 let productionServer: Server | null = null;
 let productionOrigin = '';
+let trustedBrowserOriginServer: Server | null = null;
+let trustedBrowserOrigin = '';
+let hostileBrowserOriginServer: Server | null = null;
+let hostileBrowserOrigin = '';
+const previousTrustedRpcOrigin = process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN;
 
 beforeAll(async () => {
 	linkPackage('octane', path.join(repoRoot, 'packages/octane'));
 	linkPackage('@octanejs/vite-plugin', packageRoot);
 	linkPackage('vite', path.join(packageRoot, 'node_modules/vite'));
+
+	const trustedProbe = await startBrowserProbeOrigin();
+	trustedBrowserOriginServer = trustedProbe.server;
+	trustedBrowserOrigin = trustedProbe.origin;
+	const hostileProbe = await startBrowserProbeOrigin();
+	hostileBrowserOriginServer = hostileProbe.server;
+	hostileBrowserOrigin = hostileProbe.origin;
+	process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN = trustedBrowserOrigin;
 
 	fs.rmSync(distDir, { recursive: true, force: true });
 
@@ -76,12 +110,12 @@ beforeAll(async () => {
 	devServer = await createServer({
 		root: fixtureRoot,
 		logLevel: 'silent',
-		server: { port: 0 },
+		server: { cors: false, host: '127.0.0.1', port: 0 },
 	});
 	await devServer.listen();
 	const address = devServer.httpServer?.address();
 	if (!address || typeof address !== 'object') throw new Error('dev server has no address');
-	devOrigin = `http://localhost:${address.port}`;
+	devOrigin = `http://127.0.0.1:${address.port}`;
 
 	const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 	productionServer = createNodeServer(handler, {
@@ -92,16 +126,19 @@ beforeAll(async () => {
 	if (!productionAddress || typeof productionAddress !== 'object') {
 		throw new Error('production server has no address');
 	}
-	productionOrigin = `http://localhost:${productionAddress.port}`;
+	productionOrigin = `http://127.0.0.1:${productionAddress.port}`;
 }, 180_000);
 
 afterAll(async () => {
-	if (productionServer !== null) {
-		await new Promise<void>((resolve, reject) => {
-			productionServer!.close((error) => (error ? reject(error) : resolve()));
-		});
-	}
+	await closeNodeServer(productionServer);
 	await devServer?.close();
+	await closeNodeServer(trustedBrowserOriginServer);
+	await closeNodeServer(hostileBrowserOriginServer);
+	if (previousTrustedRpcOrigin === undefined) {
+		delete process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN;
+	} else {
+		process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN = previousTrustedRpcOrigin;
+	}
 	fs.rmSync(distDir, { recursive: true, force: true });
 	fs.rmSync(path.join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
 });
@@ -625,6 +662,183 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		const encoded = JSON.parse(await response.text());
 		expect(encoded[encoded[0].value]).toBe('rpc:dev');
 	});
+
+	it('enforces the same server-function security policy in dev and production', async () => {
+		await fetch(devOrigin + '/');
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
+		const cases: Array<{
+			name: string;
+			method: string;
+			headers: HeadersInit;
+			body?: string;
+			status: number;
+		}> = [
+			{
+				name: 'non-POST request',
+				method: 'GET',
+				headers: {},
+				status: 405,
+			},
+			{
+				name: 'non-JSON content type',
+				method: 'POST',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '[[1],"invalid"]',
+				status: 415,
+			},
+			{
+				name: 'cross-origin request',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Origin: 'https://attacker.test',
+				},
+				body: '[[1],"invalid"]',
+				status: 403,
+			},
+			{
+				name: 'malformed JSON',
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '{',
+				status: 400,
+			},
+			{
+				name: 'application authorization rejection',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'x-fixture-rpc-authorization': 'deny',
+				},
+				body: '[[1],"unauthorized"]',
+				status: 401,
+			},
+		];
+
+		for (const target of [
+			{
+				name: 'development',
+				origin: devOrigin,
+				handle: (request: Request) => fetch(request),
+			},
+			{
+				name: 'production',
+				origin: productionOrigin,
+				handle: (request: Request) => handler(request),
+			},
+		]) {
+			for (const scenario of cases) {
+				const response = await target.handle(
+					new Request(`${target.origin}/_$_ripple_rpc_$_/${hash}`, {
+						method: scenario.method,
+						headers: scenario.headers,
+						...(scenario.body === undefined ? {} : { body: scenario.body }),
+					}),
+				);
+				expect(response.status, `${target.name}: ${scenario.name}`).toBe(scenario.status);
+				if (scenario.status === 405) {
+					expect(response.headers.get('allow'), target.name).toBe('POST');
+				}
+			}
+		}
+	});
+
+	it('enforces cross-origin RPC preflights in a real browser in dev and production', async () => {
+		await fetch(devOrigin + '/');
+		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
+
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({ headless: true });
+		} catch (error) {
+			throw new Error(
+				'[vite-plugin cross-origin RPC] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		try {
+			for (const target of [
+				{ name: 'development', origin: devOrigin, server: devServer!.httpServer! },
+				{ name: 'production', origin: productionOrigin, server: productionServer! },
+			]) {
+				const requests: Array<{ method: string; origin: string | undefined }> = [];
+				const observe = (request: IncomingMessage) => {
+					if (request.url?.startsWith('/_$_ripple_rpc_$_/')) {
+						requests.push({ method: request.method ?? '', origin: request.headers.origin });
+					}
+				};
+				target.server.on('request', observe);
+
+				try {
+					for (const scenario of [
+						{ origin: trustedBrowserOrigin, allowed: true },
+						{ origin: hostileBrowserOrigin, allowed: false },
+					]) {
+						requests.length = 0;
+						const page = await browser.newPage();
+						try {
+							await page.goto(`${scenario.origin}/`);
+							const result = await page.evaluate(
+								async ({ origin, actionHash }) => {
+									try {
+										const response = await fetch(`${origin}/_$_ripple_rpc_$_/${actionHash}`, {
+											method: 'POST',
+											headers: {
+												'Content-Type': 'application/json',
+												'x-fixture-rpc-authorization': 'allow',
+											},
+											body: '[[1],"browser"]',
+										});
+										return { status: response.status, body: await response.json(), error: null };
+									} catch (error) {
+										return {
+											status: null,
+											body: null,
+											error: error instanceof TypeError ? 'TypeError' : String(error),
+										};
+									}
+								},
+								{ origin: target.origin, actionHash: hash },
+							);
+
+							if (scenario.allowed) {
+								expect(result.status, `${target.name}: allowed origin`).toBe(200);
+								expect(result.error, `${target.name}: allowed origin`).toBeNull();
+								const encoded = result.body as unknown[];
+								const valueIndex = (encoded[0] as { value: number }).value;
+								expect(encoded[valueIndex], `${target.name}: allowed action`).toBe('rpc:browser');
+							} else {
+								expect(result, `${target.name}: rejected origin`).toEqual({
+									status: null,
+									body: null,
+									error: 'TypeError',
+								});
+							}
+
+							expect(requests, `${target.name}: ${scenario.origin}`).toEqual(
+								scenario.allowed
+									? [
+											{ method: 'OPTIONS', origin: scenario.origin },
+											{ method: 'POST', origin: scenario.origin },
+										]
+									: [{ method: 'OPTIONS', origin: scenario.origin }],
+							);
+						} finally {
+							await page.close();
+						}
+					}
+				} finally {
+					target.server.off('request', observe);
+				}
+			}
+		} finally {
+			await browser.close();
+		}
+	}, 120_000);
 
 	it('nodeHandler bridges the same handler for Node-style serverless wrappers', async () => {
 		const { nodeHandler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);

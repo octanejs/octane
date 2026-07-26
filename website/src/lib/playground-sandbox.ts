@@ -24,6 +24,9 @@
 //   parent → iframe  { type: 'run', gen, entry, entryKind, modules }
 //                                                compiled user module graph in
 //                                                dependency order
+//   parent → iframe  { type: 'theme', theme }    'light' | 'dark' — keeps the
+//                                                preview canvas aligned with
+//                                                the site's ThemeToggle
 //   iframe → parent  { type: 'boot' }            bootstrap script is listening
 //   iframe → parent  { type: 'ready', error? }   runtime imported (or failed)
 //   iframe → parent  { type: 'result', gen, error }
@@ -113,6 +116,12 @@ window.addEventListener('message', async (event) => {
 	if (event.source !== window.parent) return;
 	const msg = event.data;
 	if (!msg || msg[KEY] !== true) return;
+
+	if (msg.type === 'theme') {
+		if (msg.theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+		else if (msg.theme === 'dark') document.documentElement.removeAttribute('data-theme');
+		return;
+	}
 
 	if (msg.type === 'init' && !octane && msg.manifest) {
 		try {
@@ -245,21 +254,29 @@ post({ type: 'boot' });
  * bootstrap needs — inline classic script + import map + blob modules + module
  * loads from esm.sh + inline styles (octane's `injectStyle` writes `<style>`
  * tags) — and nothing else: no fetch/XHR, no form submission, no plugins.
+ *
+ * `theme` sets the initial canvas; later flips arrive as `theme` protocol
+ * messages (the bootstrap toggles `data-theme` on the sandbox's own root).
  */
-export function sandboxSrcdoc(): string {
+export function sandboxSrcdoc(theme: 'dark' | 'light' = 'dark'): string {
 	return `<!doctype html>
-<html>
+<html${theme === 'light' ? ' data-theme="light"' : ''}>
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob: https://esm.sh; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; form-action 'none'; base-uri 'none'">
 <style>
 	:root { color-scheme: dark; }
+	:root[data-theme='light'] { color-scheme: light; }
 	body {
 		margin: 0;
 		padding: 1.25rem;
 		background: #16181d;
 		color: #f4eee8;
 		font-family: system-ui, sans-serif;
+	}
+	:root[data-theme='light'] body {
+		background: #ffffff;
+		color: #1c2027;
 	}
 </style>
 </head>

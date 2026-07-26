@@ -218,6 +218,11 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 			expect(
 				Array.from(container.querySelectorAll('#hydration-text'), (node) => node.textContent),
 			).toEqual(['replaced']);
+			const recoveredAction = container.querySelector<HTMLButtonElement>(
+				'#hydration-recovered-action',
+			)!;
+			flushSync(() => recoveredAction.click());
+			expect(recoveredAction.textContent?.trim()).toBe('recovered:1');
 			expect(container.querySelector('#hydration-outside')).toBe(outside);
 			flushSync(() => outside.click());
 			expect(outside.textContent?.trim()).toBe('outside:2');

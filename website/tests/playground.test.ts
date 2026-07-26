@@ -11,7 +11,9 @@ import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import {
+	compileRuntime,
 	compilePlayground,
+	compileTypes,
 	createPreview,
 	PREVIEW_READY_TIMEOUT_MS,
 	PREVIEW_RUN_TIMEOUT_MS,
@@ -64,6 +66,19 @@ describe('playground compile pipeline', () => {
 		}
 	});
 
+	it('compiles playground source to server runtime code on demand', () => {
+		const source = `export function App() @{ <h1>{'Rendered on the server'}</h1> }`;
+		const result = compilePlayground(source, 'App.tsrx', 'server');
+		const client = compilePlayground(source, 'App.tsrx');
+		expect(result.ok).toBe(true);
+		expect(client.ok).toBe(true);
+		if (result.ok && client.ok) {
+			expect(result.warnings).toEqual([]);
+			expect(result.code).not.toBe(client.code);
+			expect(result.code).toContain('Rendered on the server');
+		}
+	});
+
 	it('reports compile errors instead of throwing', () => {
 		const result = compilePlayground('export function App() @{ <div>{oops</div> }', 'App.tsrx');
 		expect(result.ok).toBe(false);
@@ -93,6 +108,53 @@ describe('playground compile pipeline', () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.warnings).toEqual([]);
+	});
+
+	it('generates the typed virtual TSX for the default TSRX workspace', () => {
+		const result = compileTypes(DEFAULT_WORKSPACES.tsrx.files[0].source, 'App.tsrx');
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		// The types view is the language-service TSX, not the runtime emit: the
+		// @{ … } body desugars to an ordinary typed return.
+		expect(result.code).toContain('/** @jsxImportSource octane */');
+		expect(result.code).toContain('return');
+		expect(result.code).not.toContain('@{');
+		// Position artifacts power source↔types navigation.
+		expect(result.segments.length).toBeGreaterThan(0);
+	});
+
+	it('yields code, the final Program and position artifacts from one compile', () => {
+		// The compiled pane flips between Code and AST and maps positions between
+		// the editors; all three come from a single inspection compile, and the
+		// emitted code stays byte-identical to the preview's own compile.
+		const source = `export function App() @{ <button onClick={() => {}}>Go</button> }`;
+		const inspected = compileRuntime(source, 'App.tsrx', 'client');
+		const plain = compilePlayground(source, 'App.tsrx', 'client');
+		expect(inspected.ok && plain.ok).toBe(true);
+		if (!inspected.ok || !plain.ok) return;
+
+		expect(inspected.code).toBe(plain.code);
+		expect(inspected.ast).toMatchObject({ program: { type: 'Program' } });
+		expect(inspected.segments.length).toBeGreaterThan(0);
+		expect(inspected.templates[0].html).toContain('<button');
+		expect(inspected.templates[0].origins.some((origin) => origin.kind === 'text')).toBe(true);
+	});
+
+	it('reports a broken source as a runtime-inspection failure instead of throwing', () => {
+		const result = compileRuntime(
+			'export function App() @{ <div>{oops</div> }',
+			'App.tsrx',
+			'client',
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).toBeTruthy();
+	});
+
+	it('never throws on broken sources in the types pipeline', () => {
+		const result = compileTypes('export function App() @{ <div>{oops</div> }', 'App.tsrx');
+		// Loose parsing may yield partial output or a reported failure — either
+		// way the caller gets a result object, not an exception.
+		expect(typeof result.ok).toBe('boolean');
 	});
 });
 
@@ -218,6 +280,18 @@ describe('playground sandbox boundary', () => {
 		expect(csp).toContain("form-action 'none'");
 		expect(csp).toContain("base-uri 'none'");
 		expect(csp).not.toContain('connect-src');
+	});
+
+	it('theming the srcdoc never varies the security posture', () => {
+		const dark = sandboxSrcdoc();
+		const light = sandboxSrcdoc('light');
+		// The theme only stamps the initial data-theme attribute on <html>…
+		expect(dark).toContain('<html>');
+		expect(light).toContain('<html data-theme="light">');
+		// …the CSP is byte-identical either way.
+		const cspOf = (srcdoc: string) =>
+			srcdoc.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
+		expect(cspOf(light)).toBe(cspOf(dark));
 	});
 
 	it('createPreview mounts a sandboxed iframe WITHOUT allow-same-origin', () => {
@@ -348,7 +422,7 @@ describe('/playground route', () => {
 		// Result view switch — live preview vs compiled output.
 		const viewGroup = container.querySelector('[aria-label="Result view"]');
 		const viewButtons = Array.from(viewGroup?.querySelectorAll('button') ?? []);
-		expect(viewButtons.map((b) => b.textContent?.trim())).toEqual(['Preview', 'Compiled output']);
+		expect(viewButtons.map((b) => b.textContent?.trim())).toEqual(['Preview', 'Compiled']);
 
 		// Both panels exist; preview is the visible one by default; the file tab
 		// strip only appears for multi-file workspaces.
@@ -360,7 +434,7 @@ describe('/playground route', () => {
 		// The mobile pane toggle exists (CSS shows it only under 980px).
 		const paneGroup = container.querySelector('.pg-mobile-toggle');
 		const paneButtons = Array.from(paneGroup?.querySelectorAll('button') ?? []);
-		expect(paneButtons.map((b) => b.textContent?.trim())).toEqual(['Editor', 'Result']);
+		expect(paneButtons.map((b) => b.textContent?.trim())).toEqual(['Code', 'Preview', 'Inspect']);
 
 		// The nav carries the playground link.
 		const navLink = Array.from(container.querySelectorAll('a.nav-link')).find(

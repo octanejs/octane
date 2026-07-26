@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  # Named once: the sharded suite excludes this spec and website_e2e runs it.
+  # Splitting the two apart means a stale path silently stops running it, so
+  # website_e2e asserts the file exists before it starts.
+  WEBSITE_E2E_SPEC: website/tests/ssr-hydration.e2e.test.ts
+
 jobs:
   release_merge:
     name: classify changeset release
@@ -24,7 +30,7 @@ jobs:
       # Any missing or unexpected data falls back to the full test matrix.
       - name: Identify a generated Changesets release merge
         id: classify
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             core.setOutput("is_release", "false");
@@ -210,13 +216,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: "pnpm"
@@ -230,15 +236,20 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter website exec playwright install --with-deps chromium
 
+      # The website browser suite runs on its own runner (see website_e2e). It
+      # drives real Chromium against a real dev server and a real production
+      # preview, and measuring a glyph's position is only reliable when the
+      # browser is not competing with a few hundred other test files for frames.
       - name: Run tests
-        run: pnpm test --shard=${{ matrix.shard }}
+        run: pnpm test --shard=${{ matrix.shard }} --exclude ${{ env.WEBSITE_E2E_SPEC }}
 
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
-  # lets an authenticated release skip satisfy the contexts publishing expects.
+  # folds the dedicated website browser suite into the same merge and publishing
+  # gates. An authenticated release skip must satisfy both prerequisites.
   test:
     name: test (${{ matrix.required-context }})
-    needs: [release_merge, test_shard]
+    needs: [release_merge, test_shard, website_e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
@@ -248,33 +259,72 @@ jobs:
         required-context: [22, 24]
 
     steps:
-      - name: Verify all test shards passed
+      - name: Verify all test suites passed
         env:
           IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_merge.outputs.is_release }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
+          WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
         run: |
           if [ "$IS_CHANGESET_RELEASE_MERGE" = true ]; then
             test "$SHARD_RESULT" = skipped
+            test "$WEBSITE_E2E_RESULT" = skipped
           else
             test "$SHARD_RESULT" = success
+            test "$WEBSITE_E2E_RESULT" = success
           fi
+
+  website_e2e:
+    name: website browser suite
+    needs: release_merge
+    # Same authenticated-release skip as the shards above: a metadata-only
+    # Changesets merge has already passed this on its parent commit.
+    if: ${{ always() && !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter website exec playwright install --with-deps chromium
+
+      # The sharded suite excludes this path by name. If it ever moves, the
+      # exclusion silently stops matching and the suite would appear to pass
+      # while nothing ran it here — so fail loudly instead.
+      - name: Verify the excluded spec exists
+        run: test -f "$WEBSITE_E2E_SPEC"
+
+      - name: Run the website browser suite
+        run: pnpm vitest run "$WEBSITE_E2E_SPEC"
 
   lint:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # The production-error catalog is append-only. Its check compares the
           # current tree with the PR base or previous main commit.
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -288,13 +338,18 @@ jobs:
       # Two-layer sync check for the RuleSync-generated agent files. The root
       # `prepare` script already re-ran `rulesync generate || true` during
       # install, so if the committed files were stale they are now MODIFIED in
-      # the working tree — `git diff` is what actually catches that. The
+      # the working tree, and `git diff` is what actually catches that. The
       # explicit `rules:check` still matters for the case where prepare's
       # rulesync invocation failed silently (it is `|| true` by design).
+      #
+      # The diff is deliberately unfiltered. An enumerated path list silently
+      # stops covering whatever RuleSync starts emitting next, which is exactly
+      # how the skill and instruction outputs escaped it. `prepare` runs nothing
+      # but rulesync, so a dirty tree here is a stale generated file.
       - name: Check AI rule files are in sync
         run: |
           pnpm rules:check
-          git diff --exit-code -- AGENTS.md CLAUDE.md GEMINI.md .github/copilot-instructions.md .cursor/rules/
+          git diff --exit-code
 
       # 0.x alpha: changesets must stay on the patch track. release/publish
       # already enforce this, but checking on PRs surfaces a stray major/minor
@@ -307,6 +362,19 @@ jobs:
       # fail with setup instructions instead of silently turning CI green.
       - name: Disallow skipped and expected-failure tests
         run: pnpm test:markers:check
+
+      # Packages ship their `src/` directly, so an ambient `declare module
+      # '*.tsrx'` in one reaches consumers and turns THEIR .tsrx imports into
+      # `any`. Benchmarks, playground apps, and test directories are unpublished
+      # and stay allowed.
+      - name: Disallow wildcard .tsrx declarations in published sources
+        run: pnpm tsrx-decls:check
+
+      # The root rule and every skill description load on EVERY agent session.
+      # Path-scoped rules under .rulesync carry `globs` and load only when a
+      # matching file is opened, so they are deliberately not budgeted.
+      - name: Check always-loaded agent context is within budget
+        run: pnpm context:budget:check
 
       # docs/parity-gaps.md audits executable expected-failure pins and should
       # remain at zero under the committed-test policy above.
@@ -364,19 +432,19 @@ jobs:
       - name: Build octane package and verify dist
         run: pnpm build
 
-  typecheck_run:
-    name: typecheck packages, website, and examples
+  typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -390,7 +458,7 @@ jobs:
       - name: Validate example catalog and orchestration
         run: pnpm examples:static:check
 
-  examples:
+  example_shard:
     name: example apps (${{ matrix.shard }})
     runs-on: ubuntu-latest
 
@@ -404,13 +472,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -424,22 +492,20 @@ jobs:
       - name: Run example browser journeys
         run: pnpm examples:e2e -- --shard=${{ matrix.shard }}
 
-  # Keep the existing protected `typecheck` context stable while the actual
-  # typecheck and browser-heavy example gate run in parallel. `always()` turns
-  # either failed dependency into a failed required check instead of a skip.
-  typecheck:
-    needs: [typecheck_run, examples]
+  # Keep browser journeys behind their own stable aggregate check so the
+  # protected `typecheck` context can finish as soon as typechecking does.
+  # `always()` makes a failed shard produce a failed example check, not a skip.
+  examples:
+    name: examples
+    needs: example_shard
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify typecheck and example apps passed
+      - name: Verify all example shards passed
         env:
-          TYPECHECK_RESULT: ${{ needs.typecheck_run.result }}
-          EXAMPLES_RESULT: ${{ needs.examples.result }}
-        run: |
-          test "$TYPECHECK_RESULT" = success
-          test "$EXAMPLES_RESULT" = success
+          EXAMPLE_SHARD_RESULT: ${{ needs.example_shard.result }}
+        run: test "$EXAMPLE_SHARD_RESULT" = success
 
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
@@ -460,13 +526,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -516,13 +582,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -550,13 +616,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"

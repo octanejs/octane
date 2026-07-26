@@ -125,6 +125,12 @@ export const vendorLabel = ' with split assets';
 
 export default defineConfig({
 	build: { outDir: 'build', minify: false },
+	middlewares: [
+		(context, next) =>
+			context.request.headers.get('x-fixture-rpc-authorization') === 'deny'
+				? new Response('Unauthorized', { status: 401 })
+				: next(),
+	],
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: '/src/Page.tsrx' }),
@@ -517,6 +523,69 @@ export function App() @{
 			expect(rpcResponse.status, id).toBe(200);
 			const encoded = JSON.parse(await rpcResponse.text());
 			expect(encoded[encoded[0].value]).toBe(expected);
+		}
+
+		const projectRpcHash = createHash('sha256')
+			.update('/src/actions.tsrx#projectRpc')
+			.digest('hex')
+			.slice(0, 8);
+		const rpcSecurityScenarios: Array<{
+			name: string;
+			method: string;
+			headers: HeadersInit;
+			body?: string;
+			status: number;
+		}> = [
+			{
+				name: 'non-POST request',
+				method: 'GET',
+				headers: {},
+				status: 405,
+			},
+			{
+				name: 'non-JSON content type',
+				method: 'POST',
+				headers: { 'Content-Type': 'text/plain' },
+				body: '[[1],"invalid"]',
+				status: 415,
+			},
+			{
+				name: 'cross-origin request',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Origin: 'https://attacker.test',
+				},
+				body: '[[1],"invalid"]',
+				status: 403,
+			},
+			{
+				name: 'malformed JSON',
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '{',
+				status: 400,
+			},
+			{
+				name: 'application authorization rejection',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'x-fixture-rpc-authorization': 'deny',
+				},
+				body: '[[1],"unauthorized"]',
+				status: 401,
+			},
+		];
+		for (const scenario of rpcSecurityScenarios) {
+			const rpcResponse = await server.handler(
+				new Request(`http://example.test/_$_ripple_rpc_$_/${projectRpcHash}`, {
+					method: scenario.method,
+					headers: scenario.headers,
+					...(scenario.body === undefined ? {} : { body: scenario.body }),
+				}),
+			);
+			expect(rpcResponse.status, scenario.name).toBe(scenario.status);
 		}
 	}, 120_000);
 

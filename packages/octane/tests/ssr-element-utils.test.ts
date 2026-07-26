@@ -37,6 +37,29 @@ describe('octane/server element utilities', () => {
 		expect(isValidElement('li')).toBe(false);
 	});
 
+	it('lifts key out of props with the same nullish rules as the client entry', () => {
+		// `key` is never a real prop, a nullish key still stringifies (React's
+		// shape), and an explicitly-undefined key is treated as absent.
+		expect(createElement('li', { key: 12, class: 'row' }).key).toBe('12');
+		expect(createElement('li', { key: 12, class: 'row' }).props).toEqual({ class: 'row' });
+		expect(createElement('li', { key: null }).key).toBe('null');
+		expect(createElement('li', { key: undefined, class: 'row' }).key).toBe(null);
+		expect(createElement('li', { class: 'row' }).key).toBe(null);
+	});
+
+	it('never invokes a React warning getter standing in for key', () => {
+		// A React DEV build installs a non-enumerable `key` getter on props that
+		// WARNS when read and yields undefined. Feeding such a props object back
+		// through createElement must neither treat it as a real key nor trigger
+		// the warning, so the getter has to stay uncalled.
+		const props: any = {};
+		const keyGetter: any = vi.fn(() => undefined);
+		keyGetter.isReactWarning = true;
+		Object.defineProperty(props, 'key', { enumerable: false, get: keyGetter });
+		expect(createElement('li', props).key).toBe(null);
+		expect(keyGetter).not.toHaveBeenCalled();
+	});
+
 	it('cloneElement merges props under config, overrides key, keeps children', () => {
 		const base = createElement('text', { x: 1, fill: 'red', key: 'a' }, 'label');
 		const clone = cloneElement(base, { x: 2, y: 3, key: 'b' });

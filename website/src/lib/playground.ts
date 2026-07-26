@@ -14,16 +14,20 @@
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile, type CompileDiagnostic } from 'octane/compiler';
+import { compileTypesInspection } from 'octane/compiler/volar';
 import {
 	sandboxSrcdoc,
 	RUNTIME_MANIFEST_PATH,
 	PROTOCOL_KEY,
 	type RuntimeManifest,
 } from './playground-sandbox.ts';
+import type { InspectAlias, InspectSegment, InspectTemplate } from './playground-mapping.ts';
 
 export type { CompileDiagnostic };
 
 export type PlaygroundLang = 'tsrx' | 'tsx';
+export type PlaygroundRuntimeTarget = 'client' | 'server';
+export type PlaygroundOutputTarget = PlaygroundRuntimeTarget | 'types' | 'source';
 
 export interface CompileSuccess {
 	ok: true;
@@ -44,10 +48,101 @@ export interface CompileFailure {
 export function compilePlayground(
 	source: string,
 	filename: string,
+	mode: PlaygroundRuntimeTarget = 'client',
 ): CompileSuccess | CompileFailure {
 	try {
-		const out = compile(source, filename, { mode: 'client' });
+		const out = compile(source, filename, { mode });
 		return { ok: true, code: out.code, warnings: out.diagnostics };
+	} catch (error) {
+		return { ok: false, error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+export interface TypesSuccess {
+	ok: true;
+	/** The typed virtual TSX the language service analyses. */
+	code: string;
+	/** Position artifacts for the code pane (see playground-mapping.ts). */
+	segments: InspectSegment[];
+	/** Authored parser tree and the exact Program printed as typed virtual TSX. */
+	sourceAst: unknown;
+	generatedAst: unknown;
+}
+
+export interface RuntimeSuccess {
+	ok: true;
+	/** The emitted module — byte-identical to a non-inspect compile. */
+	code: string;
+	warnings: CompileDiagnostic[];
+	/** The final Program plus hoisted template IR, for the AST pane. */
+	ast: unknown;
+	/** Position artifacts for the code pane (see playground-mapping.ts). */
+	segments: InspectSegment[];
+	templates: InspectTemplate[];
+	aliases: InspectAlias[];
+}
+
+/**
+ * Compile one file for the COMPILED PANE with inspection enabled: one compile
+ * yields the emitted code, the final Program, and the position artifacts, so
+ * flipping between Code and AST (or hovering for a mapping) never recompiles.
+ * The preview's module graph keeps using `compilePlayground`, so a run that
+ * never opens the pane still pays no inspection cost. Never throws.
+ */
+export function compileRuntime(
+	source: string,
+	filename: string,
+	mode: PlaygroundRuntimeTarget,
+): RuntimeSuccess | CompileFailure {
+	try {
+		const result = compile(source, filename, { mode, inspect: true });
+		if (!result.inspect) throw new Error('Compiler inspection result is unavailable.');
+		const { ast, templates, segments, aliases } = result.inspect;
+		return {
+			ok: true,
+			code: result.code,
+			warnings: result.diagnostics,
+			ast: {
+				program: ast,
+				// Only hoisted CLIENT templates carry IR. The server's entries are
+				// static runs — position data for the code pane, with no tree to
+				// show — so they are left out of the AST view rather than filling
+				// it with `{ name: null, ast: null }` rows.
+				templates: templates
+					.filter((template) => template.ast != null)
+					.map(({ name, ast: tree }) => ({ name, ast: tree })),
+			},
+			segments: segments as InspectSegment[],
+			aliases: (aliases ?? []) as InspectAlias[],
+			templates: templates.map(({ html, raw, origins }) => ({ html, raw, origins })),
+		};
+	} catch (error) {
+		return { ok: false, error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+/**
+ * Generate the TYPES view of a playground file: the same typed virtual TSX the
+ * IDE language service sees, not the runtime emit.
+ *
+ * Uses the NAVIGATION entry, not `compileToVolarMappings`. The editor's
+ * mappings carry Volar capability data and are shaped for its position
+ * queries; this pane wants exact authored ranges — including the END a Volar
+ * mapping cannot express — and must not be able to perturb the editor to get
+ * them. Same parse, same transform, same output bytes; only the position
+ * artifact differs, so it is the same `segments` shape the runtime targets use.
+ * Never throws.
+ */
+export function compileTypes(source: string, filename: string): TypesSuccess | CompileFailure {
+	try {
+		const out = compileTypesInspection(source, filename);
+		return {
+			ok: true,
+			code: out.code,
+			segments: out.segments as InspectSegment[],
+			sourceAst: out.sourceAst,
+			generatedAst: out.generatedAst,
+		};
 	} catch (error) {
 		return { ok: false, error: error instanceof Error ? error.message : String(error) };
 	}
@@ -84,6 +179,8 @@ export function createPreview(
 ): Preview {
 	const doc = container.ownerDocument;
 	const win = doc.defaultView!;
+	const currentTheme = (): 'light' | 'dark' =>
+		doc.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 
 	const iframe = doc.createElement('iframe');
 	// allow-scripts WITHOUT allow-same-origin: the sandbox document gets an
@@ -92,7 +189,7 @@ export function createPreview(
 	iframe.setAttribute('sandbox', 'allow-scripts allow-forms');
 	iframe.setAttribute('title', 'Playground preview');
 	iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;';
-	iframe.srcdoc = sandboxSrcdoc();
+	iframe.srcdoc = sandboxSrcdoc(currentTheme());
 	container.appendChild(iframe);
 	const frameWindow = iframe.contentWindow;
 
@@ -145,6 +242,9 @@ export function createPreview(
 					switch (msg.type) {
 						case 'boot':
 							bootReceived = true;
+							// The srcdoc carried the theme at creation time; re-send it in
+							// case the toggle flipped before the sandbox started listening.
+							send({ type: 'theme', theme: currentTheme() });
 							// Sandbox is listening — hand it the runtime chunk manifest (it
 							// cannot fetch same-origin resources itself; see sandbox notes).
 							fetch(RUNTIME_MANIFEST_PATH)
@@ -184,6 +284,19 @@ export function createPreview(
 			})
 		: Promise.resolve('Preview iframe is unavailable in this browser environment.');
 
+	// Keep the sandbox's theme in sync with the site's ThemeToggle (it flips
+	// `data-theme` on <html>; an opaque-origin iframe can't observe the parent).
+	let themeObserver: MutationObserver | null = null;
+	if (typeof win.MutationObserver === 'function') {
+		themeObserver = new win.MutationObserver(() => {
+			send({ type: 'theme', theme: currentTheme() });
+		});
+		themeObserver.observe(doc.documentElement, {
+			attributes: true,
+			attributeFilter: ['data-theme'],
+		});
+	}
+
 	return {
 		async run(payload) {
 			const gen = ++generation;
@@ -215,6 +328,7 @@ export function createPreview(
 		destroy() {
 			destroyed = true;
 			settleReady(null);
+			themeObserver?.disconnect();
 			cleanupListener?.();
 			for (const gen of pending.keys()) settlePending(gen, { error: null });
 			iframe.remove();

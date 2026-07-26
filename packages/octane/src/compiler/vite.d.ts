@@ -59,8 +59,12 @@ export interface OctaneVitePluginOptions {
 	hmr?: boolean;
 	/** Force every transform to server (`true`) or client (`false`) code generation. */
 	ssr?: boolean;
-	/** Enable component profiling metadata in client transforms. */
-	profile?: boolean;
+	/**
+	 * Enable component profiling metadata in client transforms. `'auto'` enables
+	 * it only while Vite is serving (dev), not in `vite build` — used by
+	 * `@octanejs/vite-plugin`'s `devtools` option.
+	 */
+	profile?: boolean | 'auto';
 	/**
 	 * Path fragments excluded from Octane's plain `.ts`/`.js` hook-slot pass.
 	 * Prefer package manifest `octane.hookSlots.manual` declarations for bindings.

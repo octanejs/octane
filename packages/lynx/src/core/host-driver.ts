@@ -1450,9 +1450,7 @@ function createNativeListNode<Node extends LynxElementRef>(
 ): Node {
 	const listPAPI = state.papi.list;
 	if (listPAPI === undefined) {
-		throw hostError(
-			'<list> requires __CreateList, __UpdateListCallbacks, and __UpdateListComponents.',
-		);
+		throw hostError('<list> requires __CreateList and __UpdateListCallbacks.');
 	}
 	let listState: LynxNativeListState<Node> | undefined;
 	const componentAtIndex: LynxListComponentAtIndex<Node> = (
@@ -1567,10 +1565,6 @@ function createNativeListNode<Node extends LynxElementRef>(
 	state.lists.set(record.handle.id, listState);
 	const initialItems = listItems((id) => state.records.get(id), record.handle.id);
 	listState.items = initialItems;
-	listPAPI.updateComponents(
-		node,
-		Object.freeze(initialItems.map((item) => `${item.type}:${item.reuseIdentifier}`)),
-	);
 	const initialUpdate = planLynxListUpdate([], initialItems);
 	if (hasListUpdate(initialUpdate))
 		state.papi.setAttribute(node, 'update-list-info', initialUpdate);
@@ -1589,7 +1583,8 @@ function applyListUpdate<Node extends LynxElementRef>(
 	}
 	if (sameListItems(list.items, update.next)) return;
 	list.items = update.next;
-	const nextById = new Map(update.next.map((item) => [item.id, item]));
+	const nextById = new Map<number, LynxListItemDescriptor>();
+	for (const item of update.next) nextById.set(item.id, item);
 	for (const cell of list.attachedByItem.values()) {
 		const item = cell.logicalItemId === null ? undefined : nextById.get(cell.logicalItemId);
 		if (item !== undefined) cell.item = item;
@@ -1621,10 +1616,6 @@ function applyListUpdate<Node extends LynxElementRef>(
 		else destroyListCell(state, list, cell);
 	}
 	const listPAPI = state.papi.list!;
-	listPAPI.updateComponents(
-		list.node,
-		Object.freeze(update.next.map((item) => `${item.type}:${item.reuseIdentifier}`)),
-	);
 	listPAPI.updateCallbacks(
 		list.node,
 		list.componentAtIndex,

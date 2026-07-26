@@ -10,6 +10,7 @@ import {
 	detectVanillaCore,
 	scanSource,
 	KNOWN_BINDINGS,
+	KNOWN_NATIVE_BINDINGS,
 	KNOWN_BINDING_PACKAGE_DIRS,
 } from './bridge.js';
 
@@ -267,7 +268,7 @@ describe('KNOWN_BINDINGS', () => {
 		// metaframeworks and infrastructure cannot drift into the binding catalog.
 		const bindings = getBindingPackages();
 		expect(bindings.length).toBeGreaterThan(0);
-		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(
+		expect(new Set([...Object.values(KNOWN_BINDINGS), ...KNOWN_NATIVE_BINDINGS])).toEqual(
 			new Set(bindings.map(({ name }) => name)),
 		);
 		expect(KNOWN_BINDING_PACKAGE_DIRS).toEqual(new Set(bindings.map(({ dir }) => dir)));

@@ -4,8 +4,10 @@ import { mount } from './_helpers';
 import {
 	DangerHtml,
 	BareInnerHtml,
+	SpreadDangerPlusHole,
 	SpreadDanger,
 	DeoptDanger,
+	setDangerChild,
 	setHtml,
 } from './_fixtures/danger-html.tsx';
 
@@ -55,5 +57,26 @@ it('de-opt host path (createElement return) applies raw HTML and keeps it across
 	// Update flows through patchDeoptProps + the same skip.
 	flushSync(() => setHtml('.b{color:blue}'));
 	expect(el.textContent).toBe('.b{color:blue}');
+	r.unmount();
+});
+
+// Raw HTML OWNS its host's content, so a coexisting renderable hole must not be
+// allowed to reconcile into it. That question is asked for every hole on every
+// render, and short-circuited when no host in the page has ever taken raw-HTML
+// ownership — these pin that the check still arms once one has.
+const RAW = { dangerouslySetInnerHTML: { __html: '<b class="r">raw</b>' } };
+
+it('rejects a non-nullish child coexisting with spread-supplied raw HTML', () => {
+	expect(() => mount(SpreadDangerPlusHole as any, { attrs: RAW, child: 'kid' })).toThrow(
+		/dangerouslySetInnerHTML/,
+	);
+});
+
+it('accepts a nullish coexisting child and keeps the raw HTML', () => {
+	const r = mount(SpreadDangerPlusHole as any, { attrs: RAW, child: null });
+	const el = r.find('#sdh') as HTMLElement;
+	expect(el.querySelector('b.r')?.textContent).toBe('raw');
+	// Filling the hole on a LATER render is rejected just the same.
+	expect(() => flushSync(() => setDangerChild('kid'))).toThrow(/dangerouslySetInnerHTML/);
 	r.unmount();
 });

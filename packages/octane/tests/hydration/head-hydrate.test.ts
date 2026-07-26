@@ -4,6 +4,12 @@ import { join, relative, sep } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync, delegateEvents } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import {
+	loadCompiledFixtureSource,
+	loadServerFixture,
+	type CompiledFixtureModule,
+} from '../_server-fixture.js';
+import { activateStreamedMarkup, deferred, resetStreamRuntimeGlobals } from '../_server-stream.js';
 import { Page } from './_fixtures/head.tsrx';
 
 // Hoisted document metadata (React-19 model): inline `<title>`/`<meta>` are
@@ -20,32 +26,111 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/h
 // ids so client/server builds (and installed symlink layouts) hash the same
 // logical module path. Mirror that id for this manually evaluated server copy.
 const VITE_FILENAME = '/' + relative(process.cwd(), FIXTURE).split(sep).join('/');
-function serverModule(): Record<string, any> {
-	// Compile with the SAME root-relative module id the client gets from the Vite plugin, so the
-	// CSS scope hash (which includes the filename) matches both sides — exactly as in a real
-	// app where client + server compile the same path. (A short name here desynced the hash,
-	// which the structural-mismatch static-attribute check would then flag + rebuild.)
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), VITE_FILENAME, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+// Compile with the SAME root-relative module id the client gets from the Vite
+// plugin, so CSS and head ownership hashes match both sides.
+const server = loadServerFixture(FIXTURE, { id: VITE_FILENAME });
+
+interface OwnershipModule extends CompiledFixtureModule {
+	Page: (props: { label: string }) => unknown;
 }
-const server = serverModule();
+
+interface StreamedHeadModule extends CompiledFixtureModule {
+	Page: (props: { value: Promise<string> }) => unknown;
+}
+
+const OWNERSHIP_SOURCE = `
+export function Page(props: { label: string }) @{
+	<>
+		<title>{props.label as string}</title>
+		<main data-label={props.label}>{props.label as string}</main>
+	</>
+}
+`;
+
+const STREAMED_BOUNDARY_HEAD_SOURCE = `
+import { use } from 'octane';
+
+export function Page(props: { value: Promise<string> }) @{
+	<section id="streamed-boundary-head">
+		@try {
+			<BoundaryContent value={props.value} />
+		} @pending {
+			<main data-state="pending">pending</main>
+		}
+	</section>
+}
+
+function BoundaryContent(props: { value: Promise<string> }) @{
+	<>
+		<title>streamed boundary title</title>
+		<main data-state="ready">{use(props.value) as string}</main>
+	</>
+}
+`;
+
+function ownershipModule(id: string, mode: 'client' | 'server'): OwnershipModule {
+	return loadCompiledFixtureSource<OwnershipModule>(OWNERSHIP_SOURCE, { id, mode });
+}
+
+function compilerHeadKey(source: string, id: string, mode: 'client' | 'server'): string {
+	const { code } = compile(source, id, { mode });
+	const match = code.match(/["'](rnh-[a-z0-9-]+)["']/);
+	if (match === null) throw new Error(`No compiler-emitted head key in ${id} (${mode})`);
+	return match[1];
+}
 
 let container: HTMLElement;
+let extraContainers: HTMLElement[];
 beforeEach(() => {
 	container = document.createElement('div');
 	document.body.appendChild(container);
+	extraContainers = [];
 });
 afterEach(() => {
 	container.remove();
+	for (const extra of extraContainers) extra.remove();
 	// Reset the document head between tests (title + any adopted/mounted nodes).
 	document.head.innerHTML = '';
-	document.title = '';
+	resetStreamRuntimeGlobals();
 });
+
+function appendRoot(
+	serverPage: OwnershipModule['Page'],
+	label: string,
+	options?: ServerRT.RenderOptions,
+): { container: HTMLElement; title: HTMLTitleElement } {
+	const { html } = ServerRT.renderToString(serverPage, { label }, options);
+	return appendRenderedRoot(html);
+}
+
+function appendRenderedRoot(html: string): {
+	container: HTMLElement;
+	title: HTMLTitleElement;
+} {
+	const target = document.createElement('div');
+	document.body.appendChild(target);
+	extraContainers.push(target);
+	const bodyStart = html.indexOf('<main');
+	if (bodyStart === -1) throw new Error('Expected ownership fixture body markup');
+	document.head.insertAdjacentHTML('beforeend', html.slice(0, bodyStart));
+	target.innerHTML = html.slice(bodyStart);
+	const title = document.head.lastElementChild;
+	if (!(title instanceof HTMLTitleElement))
+		throw new Error('Expected server title in document.head');
+	return { container: target, title };
+}
+
+function openingMarkerFor(title: HTMLTitleElement): Comment {
+	const marker = title.previousSibling;
+	if (!(marker instanceof Comment)) throw new Error('Expected title ownership opening marker');
+	return marker;
+}
+
+function closingMarkerFor(title: HTMLTitleElement): Comment {
+	const marker = title.nextSibling;
+	if (!(marker instanceof Comment)) throw new Error('Expected title ownership closing marker');
+	return marker;
+}
 
 describe('hoisted document metadata — compile', () => {
 	it('client: single-root body template (no <octane-frag>) + headBlock', () => {
@@ -70,17 +155,37 @@ describe('hoisted document metadata — compile', () => {
 			serverCode.includes(`ssrHeadEl("${key}"`) || serverCode.includes(`ssrHeadEl('${key}'`),
 		).toBe(true);
 	});
+
+	it('emits fixed-size module/tag-aware keys with query-insensitive client/server parity', () => {
+		const titleSource = `export function Page() @{ <title>same position</title> }`;
+		const metaSource = `export function Page() @{ <meta content="same position" /> }`;
+		const titleA = compilerHeadKey(titleSource, '/workspace/src/a.tsrx', 'client');
+		const titleAServer = compilerHeadKey(titleSource, '/workspace/src/a.tsrx', 'server');
+		const titleAQuery = compilerHeadKey(
+			titleSource,
+			'/workspace/src/a.tsrx?client=1#fragment',
+			'client',
+		);
+		const titleB = compilerHeadKey(titleSource, '/workspace/src/b.tsrx', 'client');
+		const metaA = compilerHeadKey(metaSource, '/workspace/src/a.tsrx', 'client');
+
+		expect(titleA).toMatch(/^rnh-[0-9a-f]{8}$/);
+		expect(titleAServer).toBe(titleA);
+		expect(titleAQuery).toBe(titleA);
+		expect(titleB).not.toBe(titleA);
+		expect(metaA).not.toBe(titleA);
+		expect(titleA).not.toContain('workspace');
+	});
 });
 
 describe('hoisted document metadata — SSR', () => {
-	it('html carries the title + meta (each marker-prefixed) folded to the front; body is single-root', () => {
+	it('folds the title and meta before a single-root body', () => {
 		const { html, css } = ServerRT.renderToString(server.Page, { params: {} });
 		expect(html).toContain('<title>TSRX Page</title>');
 		expect(html).toContain('name="description"');
 		expect(html).toContain('content="A test page"');
-		// Head metadata folds to the FRONT of html (a body-only render has no
-		// <head> to splice into), each still prefixed by its adoption marker.
-		expect(html).toMatch(/^<!--rnh-/);
+		// A body-only render has no <head> to splice into, so metadata folds to
+		// the front while preserving the authored body as a single root.
 		expect(html.indexOf('<title')).toBeLessThan(html.indexOf('<section'));
 		// Body is the single <section>, NOT a <octane-frag> multi-root.
 		expect(html).toContain('<section id="body"');
@@ -88,10 +193,78 @@ describe('hoisted document metadata — SSR', () => {
 		// The <style> still routes to CSS.
 		expect(css).toContain('rebeccapurple');
 	});
+
+	it('keeps streamed head ownership byte-compatible with client hydration', async () => {
+		const client = ownershipModule('/src/streamed-head.tsrx', 'client');
+		const serverModule = ownershipModule('/src/streamed-head.tsrx', 'server');
+		const stream = await ServerRT.renderToReadableStream(
+			serverModule.Page,
+			{ label: 'streamed' },
+			{ identifierPrefix: 'stream-' },
+		);
+		const page = appendRenderedRoot(await new Response(stream).text());
+		const root = hydrateRoot(
+			page.container,
+			client.Page,
+			{ label: 'streamed' },
+			{ identifierPrefix: 'stream-' },
+		);
+		flushSync(() => {});
+
+		expect(document.head.querySelector('title')).toBe(page.title);
+		expect(page.title.textContent).toBe('streamed');
+		root.unmount();
+		expect(page.title.isConnected).toBe(false);
+	});
+
+	it('uses the root namespace for a head entry emitted before a streamed boundary suspends', async () => {
+		const client = loadCompiledFixtureSource<StreamedHeadModule>(STREAMED_BOUNDARY_HEAD_SOURCE, {
+			id: '/src/streamed-boundary-head.tsrx',
+			mode: 'client',
+		});
+		const serverModule = loadCompiledFixtureSource<StreamedHeadModule>(
+			STREAMED_BOUNDARY_HEAD_SOURCE,
+			{
+				id: '/src/streamed-boundary-head.tsrx',
+				mode: 'server',
+			},
+		);
+		const value = deferred<string>();
+		const stream = await ServerRT.renderToReadableStream(
+			serverModule.Page,
+			{ value: value.promise },
+			{ identifierPrefix: 'stream-root-' },
+		);
+		const htmlPromise = new Response(stream).text();
+		value.resolve('ready');
+		const html = await htmlPromise;
+		const bodyStart = html.indexOf('<section id="streamed-boundary-head"');
+		if (bodyStart === -1) throw new Error('Expected authored streamed-boundary root');
+		document.head.innerHTML = html.slice(0, bodyStart);
+		container.innerHTML = html.slice(bodyStart);
+		activateStreamedMarkup(container);
+		const title = document.head.querySelector('title')!;
+		const ready = container.querySelector('[data-state="ready"]');
+		expect(ready?.textContent).toBe('ready');
+
+		const root = hydrateRoot(
+			container,
+			client.Page,
+			{ value: new Promise<string>(() => {}) },
+			{ identifierPrefix: 'stream-root-' },
+		);
+		flushSync(() => {});
+
+		expect(document.head.querySelector('title')).toBe(title);
+		expect(document.head.querySelectorAll('title')).toHaveLength(1);
+		expect(container.querySelector('[data-state="ready"]')).toBe(ready);
+		root.unmount();
+		expect(title.isConnected).toBe(false);
+	});
 });
 
 describe('hoisted document metadata — hydration', () => {
-	it('adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount', () => {
+	it('adopts the server head and single-root body, then removes owned nodes on unmount', () => {
 		const { html } = ServerRT.renderToString(server.Page, { params: {} });
 		// html folds head metadata to the front + body after. A document places the
 		// head part in <head> and the body part in the app container — split there.
@@ -109,14 +282,10 @@ describe('hoisted document metadata — hydration', () => {
 		const root = hydrateRoot(container, Page, { params: {} });
 		flushSync(() => {});
 
-		// Head: title + meta ADOPTED (no duplication), adoption markers removed.
+		// Head: title + meta ADOPTED without duplication.
 		expect(document.title).toBe('TSRX Page');
 		expect(document.head.querySelectorAll('title').length).toBe(1);
 		expect(document.head.querySelectorAll('meta[name="description"]').length).toBe(1);
-		const markerComments = Array.from(document.head.childNodes).filter(
-			(n) => n.nodeType === 8 && (n as Comment).data.startsWith('rnh-'),
-		);
-		expect(markerComments.length).toBe(0);
 
 		// Body: single-root <section> ADOPTED (same node), no <octane-frag>, interactive.
 		expect(container.querySelector('#body')).toBe(section);
@@ -190,5 +359,143 @@ describe('hoisted document metadata — hydration', () => {
 		expect(createdTitle.isConnected).toBe(false);
 		expect(meta.isConnected).toBe(false);
 		expect(foreign.isConnected).toBe(true);
+	});
+
+	it('keeps cross-module same-tag ownership stable when roots hydrate out of order', () => {
+		const clientA = ownershipModule('/src/head-a.tsrx', 'client');
+		const serverA = ownershipModule('/src/head-a.tsrx', 'server');
+		const clientB = ownershipModule('/src/head-b.tsrx', 'client');
+		const serverB = ownershipModule('/src/head-b.tsrx', 'server');
+		const a = appendRoot(serverA.Page, 'module-a');
+		const b = appendRoot(serverB.Page, 'module-b');
+
+		const rootB = hydrateRoot(b.container, clientB.Page, { label: 'module-b' });
+		const rootA = hydrateRoot(a.container, clientA.Page, { label: 'module-a' });
+		flushSync(() => {});
+
+		expect(a.title.textContent).toBe('module-a');
+		expect(b.title.textContent).toBe('module-b');
+		expect(a.title.isConnected).toBe(true);
+		expect(b.title.isConnected).toBe(true);
+
+		rootB.unmount();
+		expect(a.title.isConnected).toBe(true);
+		expect(b.title.isConnected).toBe(false);
+		rootA.unmount();
+		expect(a.title.isConnected).toBe(false);
+	});
+
+	it('uses existing identifierPrefix semantics to isolate same-module sibling roots', () => {
+		const client = ownershipModule('/src/repeated-head.tsrx', 'client');
+		const serverModule = ownershipModule('/src/repeated-head.tsrx', 'server');
+		// These distinct prefixes collide under the former single-lane djb2 hash.
+		const a = appendRoot(serverModule.Page, 'root-a', { identifierPrefix: 'ar' });
+		const b = appendRoot(serverModule.Page, 'root-b', { identifierPrefix: 'c0' });
+
+		const rootB = hydrateRoot(
+			b.container,
+			client.Page,
+			{ label: 'root-b' },
+			{ identifierPrefix: 'c0' },
+		);
+		const rootA = hydrateRoot(
+			a.container,
+			client.Page,
+			{ label: 'root-a' },
+			{ identifierPrefix: 'ar' },
+		);
+		flushSync(() => {});
+
+		expect(a.title.textContent).toBe('root-a');
+		expect(b.title.textContent).toBe('root-b');
+		rootB.unmount();
+		expect(a.title.isConnected).toBe(true);
+		expect(b.title.isConnected).toBe(false);
+		rootA.unmount();
+	});
+
+	it.each(['opening', 'closing'])(
+		'does not claim or delete a server title when its %s ownership marker is missing',
+		(missing) => {
+			const client = ownershipModule('/src/missing-marker.tsrx', 'client');
+			const serverModule = ownershipModule('/src/missing-marker.tsrx', 'server');
+			const page = appendRoot(serverModule.Page, 'server-title');
+			(missing === 'opening'
+				? openingMarkerFor(page.title)
+				: closingMarkerFor(page.title)
+			).remove();
+
+			const root = hydrateRoot(page.container, client.Page, { label: 'client-title' });
+			flushSync(() => {});
+
+			const createdTitle = Array.from(document.head.querySelectorAll('title')).find(
+				(title) => title !== page.title,
+			);
+			expect(createdTitle?.textContent).toBe('client-title');
+			expect(page.title.textContent).toBe('server-title');
+			expect(page.title.isConnected).toBe(true);
+
+			root.unmount();
+			expect(createdTitle?.isConnected).toBe(false);
+			expect(page.title.isConnected).toBe(true);
+		},
+	);
+
+	it('treats a duplicate ownership marker as ambiguous instead of claiming a server title', () => {
+		const client = ownershipModule('/src/duplicate-marker.tsrx', 'client');
+		const serverModule = ownershipModule('/src/duplicate-marker.tsrx', 'server');
+		const page = appendRoot(serverModule.Page, 'server-title');
+		const marker = openingMarkerFor(page.title);
+		document.head.insertBefore(marker.cloneNode(), marker);
+
+		const root = hydrateRoot(page.container, client.Page, { label: 'client-title' });
+		flushSync(() => {});
+
+		const createdTitle = Array.from(document.head.querySelectorAll('title')).find(
+			(title) => title !== page.title,
+		);
+		expect(createdTitle?.textContent).toBe('client-title');
+		expect(page.title.textContent).toBe('server-title');
+		expect(page.title.isConnected).toBe(true);
+
+		root.unmount();
+		expect(createdTitle?.isConnected).toBe(false);
+		expect(page.title.isConnected).toBe(true);
+	});
+
+	it('contains reordered ownership markers without cross-claiming same-tag server entries', () => {
+		const clientA = ownershipModule('/src/reordered-a.tsrx', 'client');
+		const serverA = ownershipModule('/src/reordered-a.tsrx', 'server');
+		const clientB = ownershipModule('/src/reordered-b.tsrx', 'client');
+		const serverB = ownershipModule('/src/reordered-b.tsrx', 'server');
+		const a = appendRoot(serverA.Page, 'server-a');
+		const b = appendRoot(serverB.Page, 'server-b');
+		const markerA = openingMarkerFor(a.title);
+		const markerB = openingMarkerFor(b.title);
+		const markerAData = markerA.data;
+		markerA.data = markerB.data;
+		markerB.data = markerAData;
+
+		const rootB = hydrateRoot(b.container, clientB.Page, { label: 'client-b' });
+		const rootA = hydrateRoot(a.container, clientA.Page, { label: 'client-a' });
+		flushSync(() => {});
+
+		const createdTitles = Array.from(document.head.querySelectorAll('title')).filter(
+			(title) => title !== a.title && title !== b.title,
+		);
+		expect(createdTitles.map((title) => title.textContent).sort()).toEqual([
+			'client-a',
+			'client-b',
+		]);
+		expect(a.title.textContent).toBe('server-a');
+		expect(b.title.textContent).toBe('server-b');
+		expect(a.title.isConnected).toBe(true);
+		expect(b.title.isConnected).toBe(true);
+
+		rootB.unmount();
+		rootA.unmount();
+		expect(createdTitles.every((title) => !title.isConnected)).toBe(true);
+		expect(a.title.isConnected).toBe(true);
+		expect(b.title.isConnected).toBe(true);
 	});
 });

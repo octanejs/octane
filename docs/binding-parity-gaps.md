@@ -18,6 +18,7 @@ surface and evidence.
 | `@octanejs/apollo-client` | 0 |
 | `@octanejs/aria` | 0 |
 | `@octanejs/base-ui` | 0 |
+| `@octanejs/devtools` | 0 |
 | `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |
 | `@octanejs/floating-ui` | 0 |
