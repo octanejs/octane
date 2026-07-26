@@ -16,6 +16,7 @@ import {
 	DynamicValueMenu,
 	AsyncItemsMenu,
 	AsyncItemsNoValueMenu,
+	ForceMountAfterMatchMenu,
 	ForceMountMenu,
 	ForceMountSwapMenu,
 	GroupSwapMenu,
@@ -23,6 +24,7 @@ import {
 	NoFilterMenu,
 	ReorderedGroupsMenu,
 	GroupedMenu,
+	InterleavedGroupsMenu,
 	LoadingMenu,
 	LoopMenu,
 	MenuWithSelect,
@@ -127,6 +129,12 @@ describe('@octanejs/cmdk — Command (Phase 1)', () => {
 
 function press(el: Element, key: string): void {
 	el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+}
+
+function pressAlt(el: Element, key: string): void {
+	el.dispatchEvent(
+		new KeyboardEvent('keydown', { key, altKey: true, bubbles: true, cancelable: true }),
+	);
 }
 
 describe('@octanejs/cmdk — keyboard navigation (Phase 2)', () => {
@@ -254,6 +262,61 @@ describe('@octanejs/cmdk — score ordering (Phase 2)', () => {
 		// removed from the document — the accessibility half of the same bug.
 		const active = app.find('[cmdk-input]').getAttribute('aria-activedescendant');
 		expect(active).toBe(selected!.getAttribute('id'));
+
+		app.unmount();
+	});
+
+	it('alt+arrow moves between groups in ranked order, not DOM order', async () => {
+		// Group navigation walked `nextElementSibling`, which is DOM order. Ranking
+		// is expressed as CSS `order`, so under an active filter the DOM order and
+		// the on-screen order disagree and alt+arrow landed on the wrong group — or,
+		// when the visually-next group was DOM-previous, on no group at all.
+		const app = mount(InterleavedGroupsMenu);
+		await settle();
+		const input = app.find('[cmdk-input]');
+		const selectedText = () => app.find('[cmdk-item][aria-selected="true"]').textContent;
+
+		// "ap": Apple (0.9899) outranks Snap (0.1700) outranks Grape (0.1683), so
+		// the ranked group order interleaves with the source order.
+		type(input as HTMLInputElement, 'ap');
+		await settle();
+		expect(
+			inVisualOrder(app.findAll('[cmdk-group]')).map(
+				(g) => g.querySelector('[cmdk-group-heading]')?.textContent,
+			),
+		).toEqual(['Second', 'First', 'Third']);
+		expect(selectedText()).toBe('Apple');
+
+		// Visually next after Second is First — which is DOM-BEFORE it, while a DOM
+		// sibling (Third) still exists in the other direction, so the old sibling
+		// walk returned a real but wrong group instead of falling through.
+		pressAlt(input, 'ArrowDown');
+		await settle();
+		expect(selectedText()).toBe('Snap');
+
+		pressAlt(input, 'ArrowUp');
+		await settle();
+		expect(selectedText()).toBe('Apple');
+
+		app.unmount();
+	});
+
+	it('keeps a force-mounted non-match below the ranked matches', async () => {
+		// A force-mounted item never scores and never unmounts, so it is the only
+		// item that stays rendered without a rank. Upstream sorts every valid item by
+		// score and appends them, which pushes a zero-scoring item to the BOTTOM.
+		// Leaving it unranked instead puts it at the top of a flex column, because
+		// the initial `order` of 0 sorts ahead of every ranked match.
+		const app = mount(ForceMountAfterMatchMenu);
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'ap');
+		await settle();
+
+		expect(inVisualOrder(app.findAll('[cmdk-item]')).map((el) => el.textContent)).toEqual([
+			'Apple',
+			'Apricot',
+			'Always Here',
+		]);
 
 		app.unmount();
 	});

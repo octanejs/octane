@@ -5,7 +5,6 @@ import { useLayoutEffect, useMemo, useRef } from 'octane';
 import { CommandContext, StoreContext } from '../context.tsrx';
 import { useAsRef, useId, useLazyRef, useScheduleLayoutEffect } from '../hooks.tsrx';
 import { defaultFilter } from '../filter';
-import { findNextSibling, findPreviousSibling } from '../lib/dom';
 import {
 	GROUP_HEADING_SELECTOR,
 	GROUP_ITEMS_SELECTOR,
@@ -319,6 +318,18 @@ export function CommandRoot(props: CommandProps) @{
 		state.current.filtered.groups = new Set();
 		let itemCount = 0;
 
+		// Only filterable items carry a filter score. Force-mounted items and
+		// groups register their value through the same `useValue` hook, so
+		// `context.value` scores them too — against whatever the search was at
+		// registration time, and nothing refreshes it because the loop below walks
+		// `allItems`, which holds neither. A force-mounted item registered before
+		// the user typed therefore kept the score of the EMPTY search (0.99, higher
+		// than a genuine prefix match) for the rest of its life, and outranked
+		// every real match once ranking read these scores.
+		for (const id of state.current.filtered.items.keys()) {
+			if (!allItems.current.has(id)) state.current.filtered.items.delete(id);
+		}
+
 		for (const id of allItems.current) {
 			const value = ids.current.get(id)?.value ?? '';
 			const keywords = ids.current.get(id)?.keywords ?? [];
@@ -438,13 +449,27 @@ export function CommandRoot(props: CommandProps) @{
 		// ranks below continue past them instead of tying.
 		let topLevel = 0;
 
-		// Only matching items get a rank; the rest unmount anyway, and leaving their
-		// `order` at the initial value keeps them out of the ranked band.
-		getValidItems().filter((item) => (scores.get(item.getAttribute('id') ?? '') ?? 0) > 0).sort(
-			(a, b) =>
-				(scores.get(b.getAttribute('id') ?? '') ?? 0) -
-					(scores.get(a.getAttribute('id') ?? '') ?? 0),
-		).forEach((item, rank) => {
+		// EVERY valid item gets a rank, not just the matches. A non-match usually
+		// unmounts and never needs one, but a force-mounted item never scores and
+		// never unmounts — and an unranked child keeps the initial `order` of 0,
+		// which sorts it AHEAD of every ranked match instead of out of the way. So
+		// a mid-list forceMount jumped to the top of its container whenever the
+		// search did not match it. Ranking everything puts zero-scoring items last,
+		// which is also what upstream does: it sorts all valid items by score and
+		// appends them, so the zero-scorers end up at the bottom.
+		//
+		// The sort is stable on the DOM index, so items that score equally keep
+		// their source order.
+		getValidItems().map(
+			(item, index) => ({
+				item,
+				index,
+				score: scores.get(item.getAttribute('id') ?? '') ?? 0,
+			}),
+		).sort((a, b) => b.score - a.score || a.index - b.index).map(({ item }) => item).forEach((
+			item,
+			rank,
+		) => {
 			const group = item.closest(GROUP_ITEMS_SELECTOR);
 			const container = group ?? listInsertionElement;
 			if (group) asOrderedContainer(group);
@@ -539,16 +564,42 @@ export function CommandRoot(props: CommandProps) @{
 		if (newSelected) store.setState('value', newSelected.getAttribute(VALUE_ATTR) || '');
 	}
 
+	/** Groups in the order they are painted, for the same reason `getValidItems`
+ * exists: while a filter is active the ranking lives in CSS `order`, so DOM
+ * order and on-screen order disagree. */
+	function getOrderedGroups(): Element[] {
+		const root = listInnerRef.current;
+		if (!root) return [];
+		const groups = Array.from(root.querySelectorAll(GROUP_SELECTOR));
+		if (styled.current.size === 0) return groups;
+		return groups.map(
+			(group, index) => ({
+				group,
+				index,
+				order: Number((group as HTMLElement).style.order) || 0,
+			}),
+		).sort((a, b) => a.order - b.order || a.index - b.index).map(({ group }) => group);
+	}
+
 	function updateSelectedByGroup(change: 1 | -1) {
 		const selected = getSelectedItem();
-		let group = selected?.closest(GROUP_SELECTOR);
-		let item: Element | null | undefined;
+		const group = selected?.closest(GROUP_SELECTOR);
 
-		while (group && !item) {
-			group = change > 0
-				? findNextSibling(group, GROUP_SELECTOR)
-				: findPreviousSibling(group, GROUP_SELECTOR);
-			item = group?.querySelector(VALID_ITEM_SELECTOR);
+		// Step through the groups as the user sees them, and take each candidate's
+		// first item in RANKED order too — `querySelector` would return whichever
+		// item happens to come first in the DOM, which is a different item once a
+		// filter is active.
+		const groups = getOrderedGroups();
+		const items = getValidItems();
+		let index =
+			group ? groups.indexOf(group) : -1;
+		let item: Element | undefined;
+
+		while (index >= 0 && !item) {
+			index += change;
+			const candidate = groups[index];
+			if (!candidate) break;
+			item = items.find((element) => element.closest(GROUP_SELECTOR) === candidate);
 		}
 
 		if (item) {

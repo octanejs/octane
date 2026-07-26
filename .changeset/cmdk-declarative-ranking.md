@@ -15,3 +15,11 @@ removing the selected item alongside a sibling left nothing selected.
 since made every sibling edge resolve through the workspace — an exact range
 builds against a stale copy of source that lives in this checkout, and
 `changeset version` rewrites it on release, desyncing the lockfile.
+
+Group navigation (alt+arrow) and the ranking itself follow the ranked order too:
+group stepping walked DOM siblings, and only matching items were ranked, which
+left a force-mounted non-match at the top of its container. Force-mounted items
+and groups also no longer keep a stale filter score — they register their value
+through the same hook as items, so they were scored once against the empty
+search and never refreshed, which let them outrank genuine matches.
+

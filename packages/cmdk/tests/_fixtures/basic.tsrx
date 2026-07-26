@@ -344,3 +344,40 @@ export function AsyncItemsNoValueMenu(props: { items: string[] }) @{
 		</Command.List>
 	</Command>
 }
+
+// Group ranking that INTERLEAVES with source order. For "ap" the scorer gives
+// Apple 0.9899, Snap 0.1700 and Grape 0.1683, so the middle group ranks first
+// and the FIRST group ranks second — the group that is visually next after
+// Apple is the one DOM-BEFORE it, while a DOM sibling still exists in the other
+// direction. That is the shape where walking `nextElementSibling` returns a
+// real but wrong group instead of falling through to the item-level fallback.
+export function InterleavedGroupsMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Group heading="First">
+				<Command.Item>Snap</Command.Item>
+			</Command.Group>
+			<Command.Group heading="Second">
+				<Command.Item>Apple</Command.Item>
+			</Command.Group>
+			<Command.Group heading="Third">
+				<Command.Item>Grape</Command.Item>
+			</Command.Group>
+		</Command.List>
+	</Command>
+}
+
+// A force-mounted item that sits AFTER a matching one in source order. It never
+// unmounts and never scores, so it is the one item that stays rendered without a
+// rank — the case that reveals where unranked items land relative to matches.
+export function ForceMountAfterMatchMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Item>Apple</Command.Item>
+			<Command.Item forceMount>Always Here</Command.Item>
+			<Command.Item>Apricot</Command.Item>
+		</Command.List>
+	</Command>
+}
