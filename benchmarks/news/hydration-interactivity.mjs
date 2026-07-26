@@ -562,6 +562,28 @@ const operations = Object.fromEntries(
 	]),
 );
 
+const userExperience = {
+	status:
+		searchSendResults.length === 0
+			? 'not-run'
+			: searchSendResults.every((sample) => sample.deliveredExactlyOnce)
+				? 'pass'
+				: 'fail',
+	samples: searchSendResults.length,
+	replayedSendClicks: searchSendResults.filter((sample) => sample.clickReplayed).length,
+	droppedSendClicks: searchSendResults.filter((sample) => !sample.clickReplayed).length,
+	preservedSearches: searchSendResults.filter((sample) => sample.searchPreserved).length,
+	lostSearches: searchSendResults.filter((sample) => !sample.searchPreserved).length,
+	exactDeliveries: searchSendResults.filter((sample) => sample.deliveredExactlyOnce).length,
+	incorrectSubmissions: searchSendResults.filter(
+		(sample) => sample.clickReplayed && sample.submitted !== PRE_HYDRATION_TEXT,
+	).length,
+	focusOnlyReplays: searchSendResults.filter(
+		(sample) => sample.focusReplayed && !sample.clickReplayed,
+	).length,
+	issues: [...new Set(searchSendResults.flatMap((sample) => sample.issues))],
+};
+
 const payload = {
 	suite: 'hydration-interactivity',
 	iterations,
@@ -579,6 +601,7 @@ const payload = {
 				replayedClicks: replayCounts,
 				replayedFocusEvents: focusReplayCounts,
 				searchSendResults,
+				userExperience,
 				hydrationEventReplay: supportsHydrationEventReplay,
 				preRootInteractionReplay: supportsPreRootInteractionReplay,
 				browser: 'chromium',
@@ -607,15 +630,33 @@ for (const [scenario, samples] of Object.entries(inputPreservation)) {
 		`Pre-hydration input (${scenario}): ${samples.every((sample) => sample.text) ? 'preserved' : 'overwritten'}`,
 	);
 }
-if (searchSendResults.length > 0) {
-	const delivered = searchSendResults.every((sample) => sample.deliveredExactlyOnce);
+if (userExperience.samples > 0) {
+	console.log(`Pre-hydration search-and-send UX: ${userExperience.status.toUpperCase()}`);
 	console.log(
-		`Pre-hydration search-and-send: ${
-			delivered
-				? 'query delivered exactly once'
-				: `correctness issue: ${[...new Set(searchSendResults.flatMap((sample) => sample.issues))].join('; ')}`
-		}`,
+		`  Send clicks replayed: ${userExperience.replayedSendClicks}/${userExperience.samples}`,
 	);
+	console.log(
+		`  Send clicks dropped: ${userExperience.droppedSendClicks}/${userExperience.samples}`,
+	);
+	console.log(
+		`  Search queries preserved: ${userExperience.preservedSearches}/${userExperience.samples}`,
+	);
+	console.log(
+		`  Exact search deliveries: ${userExperience.exactDeliveries}/${userExperience.samples}`,
+	);
+	if (userExperience.incorrectSubmissions > 0) {
+		console.log(
+			`  Replayed Sends with the wrong query: ${userExperience.incorrectSubmissions}/${userExperience.samples}`,
+		);
+	}
+	if (userExperience.focusOnlyReplays > 0) {
+		console.log(
+			`  Focus-only replays without Send: ${userExperience.focusOnlyReplays}/${userExperience.samples}`,
+		);
+	}
+	if (userExperience.issues.length > 0) {
+		console.log(`  UX correctness issues: ${userExperience.issues.join('; ')}`);
+	}
 }
 console.log('\nOperation                                  score     median        p95');
 for (const [name, stats] of Object.entries(operations)) {

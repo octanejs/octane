@@ -56,8 +56,18 @@ uses a sleep as a hydration gate.
   released, and report whether hydration preserves the query, replays the
   discrete click, and submits the exact original query exactly once. Missing
   replay, overwritten query text, and an incorrect submitted value are recorded
-  explicitly as correctness issues; Octane fails the suite if it loses the
-  query or Send intent.
+  explicitly as user-experience correctness failures; Octane fails the suite
+  if it loses the query or Send intent.
+
+The unified runner prints a six-framework UX correctness table after the
+timings. Each framework receives an explicit `PASS` or `FAIL`, together with
+the measured fractions of replayed Send clicks, preserved search queries, and
+exactly-once deliveries. A replayed focus does not turn a dropped Send into a
+success, and a replayed Send does not pass if it submits an overwritten query.
+The machine-readable `meta.userExperience` result additionally records the
+counts of dropped clicks, lost searches, incorrect submissions, focus-only
+replays, and the exact correctness issues. Reference-framework failures remain
+visible comparison results; Octane's UX correctness remains a hard suite gate.
 
 The typing operations separately report first-character latency, the time to
 type the complete draft, chunk-release-to-hydration latency, synchronous
