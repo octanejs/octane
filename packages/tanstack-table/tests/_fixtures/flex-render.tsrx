@@ -1,5 +1,5 @@
 import { memo } from 'octane';
-import { flexRender, getCoreRowModel, useReactTable } from '@octanejs/tanstack-table';
+import { flexRender, tableFeatures, useTable } from '@octanejs/tanstack-table';
 
 // flexRender triage fixtures: string header, render-fn cell, component cell
 // (props captured), pre-created descriptor passthrough, undefined renderer,
@@ -7,6 +7,8 @@ import { flexRender, getCoreRowModel, useReactTable } from '@octanejs/tanstack-t
 // needed exotic-component sniffing for).
 
 export const cellProps: unknown[] = [];
+
+const features = tableFeatures({});
 
 function NameCell(props: any) @{
 	cellProps.push(props);
@@ -36,10 +38,10 @@ const columns = [
 ];
 
 export function FlexTable() @{
-	const table = useReactTable({
+	const table = useTable({
+		features,
 		data,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	<table>
 		<thead>
@@ -58,7 +60,7 @@ export function FlexTable() @{
 		<tbody>
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<tr>
-					@for (const cell of row.getVisibleCells(); key cell.id) {
+					@for (const cell of row.getAllCells(); key cell.id) {
 						<td id={'f-td-' + cell.id}>{flexRender(
 							cell.column.columnDef.cell,
 							cell.getContext(),
