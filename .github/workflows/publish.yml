@@ -9,13 +9,12 @@ on:
     types: [completed]
     branches: [main]
 
-  # Recovery path for a Version Packages CI run whose validation jobs passed
-  # but whose former inline publish job failed. The job below validates the run
-  # and derives its SHA; callers cannot supply an arbitrary commit to publish.
+  # Recovery path for any successful main CI run. The job below validates the
+  # run and derives its SHA; callers cannot supply an arbitrary commit.
   workflow_dispatch:
     inputs:
       ci_run_id:
-        description: CI run ID containing the validated Version Packages SHA
+        description: Successful CI push run ID for the main SHA to reconcile
         required: true
         type: string
 
@@ -31,8 +30,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (
         github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.event == 'push' &&
-        contains(github.event.workflow_run.head_commit.message, 'Version Packages')
+        github.event.workflow_run.event == 'push'
       )
     runs-on: ubuntu-latest
     permissions:
@@ -84,9 +82,6 @@ jobs:
               }
             }
 
-            if (!run.head_commit?.message.includes("Version Packages")) {
-              throw new Error(`CI run ${runId} is not a Version Packages run`);
-            }
             if (!/^[0-9a-f]{40}$/.test(run.head_sha)) {
               throw new Error(`CI run ${runId} returned an invalid head SHA`);
             }
@@ -120,36 +115,11 @@ jobs:
             }
 
             if (run.conclusion !== "success") {
-              const unexpected = jobs.filter(
-                (job) =>
-                  job.conclusion !== "success" &&
-                  !(
-                    job.name === "publish validated SHA" &&
-                    job.conclusion === "failure"
-                  ),
-              );
-              if (unexpected.length > 0) {
-                throw new Error(
-                  `CI run ${runId} has non-publish failures: ${unexpected
-                    .map((job) => `${job.name} (${job.conclusion})`)
-                    .join(", ")}`,
-                );
-              }
-
-              const failedLegacyPublish = jobs.some(
-                (job) =>
-                  job.name === "publish validated SHA" &&
-                  job.conclusion === "failure",
-              );
-              if (!failedLegacyPublish) {
-                throw new Error(
-                  `CI run ${runId} failed for a reason other than the legacy publisher`,
-                );
-              }
+              throw new Error(`CI run ${runId} concluded ${run.conclusion}, expected success`);
             }
 
             core.setOutput("sha", run.head_sha);
-            core.info(`Publishing validated SHA ${run.head_sha} from CI run ${runId}`);
+            core.info(`Reconciling validated SHA ${run.head_sha} from CI run ${runId}`);
 
       - name: Checkout validated SHA
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -172,8 +142,25 @@ jobs:
       - name: Disallow major and minor bumps in changesets
         run: pnpm changeset:check
 
+      # Check the complete workspace before Changesets starts. npm publishing is
+      # not atomic across packages, so discovering a new unbootstrapped package
+      # inside `changeset publish` would otherwise repeat the partial release
+      # that stranded the July 2026 versions.
+      - name: Preflight npm release state
+        id: npm_release
+        run: pnpm release:preflight
+
+      # changesets/action creates a version PR instead of running its publish
+      # command whenever any pending changeset document exists. release.yml
+      # already owns version PRs, so hide those documents in this ephemeral
+      # checkout and force this action to perform only npm reconciliation.
+      - name: Isolate pending changesets from npm reconciliation
+        if: steps.npm_release.outputs.needs_publish == 'true'
+        run: pnpm release:prepare-publish
+
       - name: Publish to npm
         id: changesets
+        if: steps.npm_release.outputs.needs_publish == 'true'
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
           publish: pnpm changeset:publish
