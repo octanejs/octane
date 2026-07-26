@@ -699,6 +699,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The privileged publish workflow uses this network-free contract to
+      # classify registry state before Changesets is allowed to publish.
+      - name: Test npm release reconciliation
+        run: pnpm release:preflight:test
+
       # Pack the live, discovered package set instead of a hand-maintained
       # allowlist. The validator checks the post-pnpm manifest and tar contents,
       # including exports/bin/types and workspace/catalog protocol replacement,
