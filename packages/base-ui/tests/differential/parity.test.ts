@@ -396,4 +396,69 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+	it('Button: native button (type=button from useButton)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: disabled (native disabled attribute)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: focusableWhenDisabled (aria-disabled + stays a tab stop)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonFocusableWhenDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: nativeButton={false} render target (role + tabindex on the span)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonNonNative', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: disabled non-native render target (aria-disabled, no attribute)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonNonNativeDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('DirectionProvider: useDirection defaults to ltr with no provider', async () => {
+		const d = await mountDifferential(FIXTURE, 'DirectionDefault', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('DirectionProvider: provides the configured direction to descendants', async () => {
+		const d = await mountDifferential(FIXTURE, 'DirectionRtl', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('DirectionProvider: the nearest provider wins when nested', async () => {
+		const d = await mountDifferential(FIXTURE, 'DirectionNested', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('CSPProvider: renders no DOM of its own and passes children through', async () => {
+		const d = await mountDifferential(FIXTURE, 'CspTransparent', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('useMediaQuery: reports the live matchMedia snapshot', async () => {
+		const d = await mountDifferential(FIXTURE, 'MediaQueryProbe', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('useMediaQuery: the live snapshot overrides defaultMatches', async () => {
+		const d = await mountDifferential(FIXTURE, 'MediaQueryDefaultMatches', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });

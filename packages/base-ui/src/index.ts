@@ -5,6 +5,11 @@
 export { Separator } from './separator';
 export { AlertDialog } from './alert-dialog';
 export { Avatar } from './avatar';
+export { Button } from './button';
+export { CSPProvider } from './csp-provider';
+export { DirectionProvider, useDirection } from './direction-provider';
+export type { TextDirection } from './direction-provider';
+export { useMediaQuery } from './unstable-use-media-query';
 export { Checkbox } from './checkbox';
 export { CheckboxGroup } from './checkbox-group';
 export { Dialog } from './dialog';

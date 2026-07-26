@@ -20,6 +20,10 @@ import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Button } from '@octanejs/base-ui/button';
+import { CSPProvider } from '@octanejs/base-ui/csp-provider';
+import { DirectionProvider, useDirection } from '@octanejs/base-ui/direction-provider';
+import { useMediaQuery } from '@octanejs/base-ui/unstable-use-media-query';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -29,6 +33,21 @@ const hrFn = (props) => <hr {...props} />;
 const boldFn = (props) => <b {...props} />;
 const orientClass = (state) => 'sep-' + state.orientation;
 const legendSection = (props) => <section {...props} />;
+const buttonSpanFn = (props) => <span {...props} />;
+
+// Phase-3a probes: these hooks return values with no DOM of their own, so each probe
+// renders the value as text and the rig compares it byte-for-byte.
+function DirectionProbe() @{
+	<span className="dir">{useDirection() as string}</span>
+}
+
+function MediaProbe(props) @{
+	<span className="mq">{(useMediaQuery('(min-width: 600px)', {
+		defaultMatches: props.defaultMatches,
+	})
+		? 'true'
+		: 'false') as string}</span>
+}
 
 // Default (horizontal) — proves the intrinsic-tag render + state→data-* + role/aria.
 export function SeparatorDefault() @{
@@ -602,4 +621,70 @@ export function FormBasic() @{
 			<Field.Control className="f-ctrl" name="email" />
 		</Field.Root>
 	</Form>
+}
+
+// ── Phase 3a ────────────────────────────────────────────────────────────────
+
+// Button — a native <button> with type="button" from useButton.
+export function ButtonBasic() @{
+	<Button className="btn">Click me</Button>
+}
+
+// Disabled button — the native `disabled` attribute, no aria-disabled.
+export function ButtonDisabled() @{
+	<Button className="btn" disabled>Click me</Button>
+}
+
+// focusableWhenDisabled — the native attribute is dropped in favour of
+// aria-disabled + a real tab stop, so the button stays reachable.
+export function ButtonFocusableWhenDisabled() @{
+	<Button className="btn" disabled focusableWhenDisabled>Click me</Button>
+}
+
+// Non-native render target — `nativeButton={false}` adds role/tabindex to the <span>.
+export function ButtonNonNative() @{
+	<Button className="btn" nativeButton={false} render={buttonSpanFn}>Click me</Button>
+}
+
+// A disabled non-native button reports aria-disabled instead of the attribute.
+export function ButtonNonNativeDisabled() @{
+	<Button className="btn" nativeButton={false} disabled render={buttonSpanFn}>Click me</Button>
+}
+
+// useDirection defaults to 'ltr' with no provider above it.
+export function DirectionDefault() @{
+	<DirectionProbe />
+}
+
+// DirectionProvider feeds the configured direction to descendants.
+export function DirectionRtl() @{
+	<DirectionProvider direction="rtl">
+		<DirectionProbe />
+	</DirectionProvider>
+}
+
+// Nested providers — the nearest one wins.
+export function DirectionNested() @{
+	<DirectionProvider direction="rtl">
+		<DirectionProvider direction="ltr">
+			<DirectionProbe />
+		</DirectionProvider>
+	</DirectionProvider>
+}
+
+// CSPProvider renders no DOM of its own and passes children straight through.
+export function CspTransparent() @{
+	<CSPProvider nonce="test-nonce">
+		<span className="csp-child">child</span>
+	</CSPProvider>
+}
+
+// useMediaQuery — jsdom's matchMedia never matches, so both renderers report false.
+export function MediaQueryProbe() @{
+	<MediaProbe />
+}
+
+// `defaultMatches` is only the pre-subscription value; the live snapshot still wins.
+export function MediaQueryDefaultMatches() @{
+	<MediaProbe defaultMatches={true} />
 }
