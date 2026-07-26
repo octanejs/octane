@@ -8,6 +8,11 @@ export function setHtml(h: string) {
 	if (_set) _set(h);
 }
 
+let _setChild: ((v: unknown) => void) | null = null;
+export function setDangerChild(v: unknown) {
+	if (_setChild) _setChild(v);
+}
+
 // Fast path: only child, no spread → htmlOnlyChild assignment (with update diff).
 export function DangerHtml(props: { html: string }) {
 	const [html, set] = useState(props.html);
@@ -23,6 +28,21 @@ export function BareInnerHtml(props: { html: string }) {
 // Spread CARRYING dangerouslySetInnerHTML → setSpread → setAttribute's danger path.
 export function SpreadDanger(props: { attrs: Record<string, unknown> }) {
 	return <div id="s" {...props.attrs} />;
+}
+
+// A compiled host carrying BOTH a spread and a dynamic child hole. Only the
+// spread can supply dangerouslySetInnerHTML here, so the compiler cannot reject
+// the pairing and the raw HTML wins the element at runtime — the hole must then
+// refuse to reconcile a non-nullish child into content it does not own, and
+// accept a nullish one without erasing the HTML.
+export function SpreadDangerPlusHole(props: { attrs: Record<string, unknown>; child: unknown }) {
+	const [child, set] = useState(props.child);
+	_setChild = set as (v: unknown) => void;
+	return (
+		<div id="sdh" {...props.attrs}>
+			{child}
+		</div>
+	);
 }
 
 // De-opt host path: a component RETURNING createElement(tag, {dangerouslySetInnerHTML})

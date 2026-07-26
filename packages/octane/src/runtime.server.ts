@@ -440,8 +440,17 @@ interface ElementDescriptor {
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
-	const own = Object.getOwnPropertyDescriptor(config, 'key');
-	if (own?.get != null && (own.get as any).isReactWarning) return false;
+	// React's development-only props.key warning getter is not a real key, and
+	// must not be INVOKED (calling it emits React's warning). The reflective probe
+	// allocates a descriptor object, so reach it only when a `key` is actually
+	// present — the common no-key call now costs one lookup. Deliberately NOT
+	// gated on the build mode the way the client twin is: an SSR bundle does not
+	// always fold the dev-mode env check away, and reading it per call would cost
+	// more than the allocation it saves.
+	if (Object.prototype.hasOwnProperty.call(config, 'key')) {
+		const own = Object.getOwnPropertyDescriptor(config, 'key');
+		if (own?.get != null && (own.get as any).isReactWarning) return false;
+	}
 	return config.key !== undefined;
 }
 
@@ -605,21 +614,24 @@ function flattenSsrChildContainer(
 }
 
 function prepareSsrDeoptList(value: any, includeKeyedSingle: boolean): PreparedSsrDeoptList | null {
-	const items: any[] = [];
-	const keys: any[] = [];
+	// Asked for EVERY serialized child, and the non-list answer (a lone component
+	// descriptor, text, null) is the common one — build the two output arrays only
+	// once a list regime is established. Mirrors prepareDeoptList in runtime.ts.
 	if (isFragmentDescriptor(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
 		flattenSsrChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
 		return { items, keys };
 	}
 	if (Array.isArray(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		flattenSsrChildContainer(items, keys, value, ssrDeoptWrapperKind(value), []);
 		return { items, keys };
 	}
 	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		items.push(value);
-		keys.push(scopedSsrDeoptKey([], value, 0, value.key));
-		return { items, keys };
+		return { items: [value], keys: [scopedSsrDeoptKey([], value, 0, value.key)] };
 	}
 	return null;
 }
