@@ -700,13 +700,13 @@ function printHydrationInteractivityUx(result) {
 	if (measured.length === 0) return;
 
 	console.error('\n  Pre-hydration search-and-Send UX correctness');
-	console.error('  framework       outcome  Send replay   query saved   delivered');
+	console.error('  framework       outcome  Send handled  query saved   delivered');
 	for (const target of measured) {
 		const ux = target.meta.userExperience;
 		const fraction = (count) => `${count}/${ux.samples}`;
 		console.error(
 			`  ${target.name.padEnd(15)} ${ux.status.toUpperCase().padEnd(8)} ${fraction(
-				ux.replayedSendClicks,
+				ux.deliveredSendClicks,
 			).padEnd(13)} ${fraction(ux.preservedSearches).padEnd(13)} ${fraction(ux.exactDeliveries)}`,
 		);
 		if (ux.issues.length > 0) {
