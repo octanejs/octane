@@ -268,9 +268,11 @@ stamp updated in place (cmdk-plan convention).
   Residual risk stays with `transformStyle`, which EDITS the class strings it
   recognises: the five semantic hooks still in the payloads (`cn-rtl-flip` ×7,
   `cn-font-heading` ×6, `cn-toast`, `cn-native-select`, `cn-native-select-icon`)
-  are what per-style server resolution must cover. `cn-native-select` and
-  `cn-native-select-icon` additionally have NO definition in
-  `src/styles/theme.css`, so they install as dead classes today.
+  are what per-style server resolution must cover. All three ARE upstream's own
+  semantic classes — they appear in the maintainer-supplied sources — and all
+  three are defined in `src/styles/theme.css`, so nothing installs dead.
+  (`cn-native-select`/`cn-native-select-icon` were ours, not upstream's, and
+  were removed when native-select took its utilities-inlined source.)
 - **Phase 5 — SSR/hydration hardening.** `-ssr` vitest project (node env,
   `octane({ ssr: true })`, sonner-project pattern `vitest.config.js:1761-1781`)
   plus `hydrateRoot` adoption tests for the overlay components; `status.json`

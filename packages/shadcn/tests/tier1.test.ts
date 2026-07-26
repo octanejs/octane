@@ -166,9 +166,11 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		expect(wrapper.className).toContain('pick');
 		expect(wrapper.getAttribute('data-size')).toBe('sm');
 		const select = slot(container, 'native-select') as HTMLSelectElement;
-		expect(select.className).toBe(
-			'cn-native-select outline-none disabled:pointer-events-none disabled:cursor-not-allowed',
-		);
+		// The consumer className lands on the wrapper, never on the <select>,
+		// which keeps its fixed classes.
+		expect(select.className).not.toContain('pick');
+		expect(select.className).toContain('appearance-none');
+		expect(select.className).toContain('data-[size=sm]:h-7');
 		expect(select.getAttribute('aria-label')).toBe('Fruit');
 		expect(slot(container, 'native-select-option').tagName).toBe('OPTION');
 		const icon = slot(container, 'native-select-icon');
