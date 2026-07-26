@@ -535,7 +535,13 @@ export function mappingFromInspection(
 	);
 }
 
-/** Lend each alias the generated ranges its target already claims. */
+/**
+ * Lend each alias the generated ranges its target already claims — with the
+ * target's own provenance, not an asserted one. A target position can carry
+ * several segments (an `injectStyle(hash, css)` call claims three), and only
+ * the ones the forward filter would accept for the target should answer for
+ * the alias, or the alias resolves to strictly more than the thing it aliases.
+ */
 function appendAliasSegments(segments: Segment[], aliases: readonly InspectAlias[]): void {
 	const byTarget = new Map<number, Segment[]>();
 	for (const segment of segments) {
@@ -552,7 +558,7 @@ function appendAliasSegments(segments: Segment[], aliases: readonly InspectAlias
 				gen: segment.gen,
 				srcLen: alias.srcEnd - alias.srcStart,
 				genLen: segment.genLen,
-				exact: true,
+				exact: segment.exact,
 			});
 		}
 	}

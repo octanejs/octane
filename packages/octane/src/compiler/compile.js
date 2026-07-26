@@ -240,9 +240,7 @@ function anchorPropKey(ctx, key, nameNode) {
 }
 
 /**
- * The authored `<style>` element(s) one CSS injection came from. A component's
- * styles may be split across several blocks that share a single scope hash and
- * therefore a single `injectStyle` call, so every block points at it. Only
+ * The authored `<style>` element(s) one CSS injection came from. Only
  * positioned blocks qualify: an origin the print cannot stamp a location from
  * is worse than the module fallback, which at least maps somewhere real.
  */
@@ -253,6 +251,25 @@ function cssOrigins(injection) {
 			? [injection.origin]
 			: [];
 	return nodes.filter((node) => node != null && node.start != null && node.loc != null);
+}
+
+/**
+ * Claim one CSS injection for the block(s) it came from, and return the block
+ * the emitted call should carry the location of.
+ *
+ * A component's styles may be split across several `<style>` blocks that share
+ * one scope hash and therefore ONE `injectStyle` call. The call can only carry
+ * one location, so the first block anchors it and the rest alias onto that
+ * block — an exact claim on a source offset the print never emits at would
+ * refine nothing, leaving every block but the first unreachable.
+ */
+function claimCssOrigins(ctx, injection) {
+	const origins = cssOrigins(injection);
+	const anchor = origins[0];
+	if (anchor === undefined) return null;
+	registerExactOrigin(ctx, anchor, anchor.end, [JSON.stringify(injection.css)]);
+	for (let i = 1; i < origins.length; i++) registerOriginAlias(ctx, origins[i], anchor);
+	return anchor;
 }
 
 /** Mark a synthesized attribute whole — name and value alike. */
@@ -5826,9 +5843,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// Point the authored `<style>` block at the CSS this injection carries.
 		// Both sides are whole units — the block and the stylesheet it became —
 		// which is the useful pairing for a scoped style.
-		for (const origin of cssOrigins(i)) {
-			registerExactOrigin(ctx, origin, origin.end, [JSON.stringify(i.css)]);
-		}
+		const anchor = claimCssOrigins(ctx, i);
 		return inheritOriginLoc(
 			b.stmt(
 				b.call(
@@ -5837,7 +5852,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 					b.literal(i.css, JSON.stringify(i.css)),
 				),
 			),
-			cssOrigins(i)[0] ?? moduleOrigin,
+			anchor ?? moduleOrigin,
 		);
 	});
 	const templateNodes = ctx.hoistedTemplates.map((t) => {
@@ -6651,10 +6666,7 @@ function ssrCompileBody(
 	if (cssEntries && cssEntries.length) {
 		ctx.runtimeNeeded.add('injectStyle');
 		for (const entry of cssEntries) {
-			for (const styleOrigin of cssOrigins(entry)) {
-				registerExactOrigin(ctx, styleOrigin, styleOrigin.end, [JSON.stringify(entry.css)]);
-			}
-			const origin = cssOrigins(entry)[0] ?? node;
+			const origin = claimCssOrigins(ctx, entry) ?? node;
 			body.push(
 				inheritOriginLoc(
 					b.stmt(
@@ -7038,6 +7050,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			litOrigins.push({ start, end, srcStart: node.start, srcEnd: node.end, kind });
 		}
 	};
+	// Bake one attribute into the run. Every attribute that reaches `lit` goes
+	// through here so its authored name/value spans are recorded at append time
+	// — the offsets are only derivable while the chunk's position is known, and
+	// a writer that appends directly is a silently unmapped attribute.
+	const bakeLit = (chunk, attrName, nameNode, valueNode) => {
+		if (litOrigins !== null) {
+			recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, nameNode, valueNode);
+		}
+		lit += chunk;
+	};
 	const openNameNode = node.id || node.openingElement?.name;
 	const closeNameNode = node.closingElement?.name ?? openNameNode;
 	if (tag !== 'option') recordLit('tag-open', openNameNode, 1, 1 + tag.length);
@@ -7334,15 +7356,17 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			// expression evaluates once.
 			if (val == null) {
 				selMultiple = inheritOriginLoc(b.literal(true, 'true'), attr);
-				lit += ' multiple';
+				bakeLit(' multiple', 'multiple', attr.name, null);
 				continue;
 			}
 			const mInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (mInner.type === 'Literal' && !isAfterSpread) {
 				selMultiple = inheritOriginLoc(b.literal(!!mInner.value), mInner);
-				if (mInner.value === true) lit += ' multiple';
-				else if (typeof mInner.value === 'string') lit += ` multiple="${escapeAttr(mInner.value)}"`;
-				else if (typeof mInner.value === 'number') lit += ` multiple="${mInner.value}"`;
+				if (mInner.value === true) bakeLit(' multiple', 'multiple', attr.name, mInner);
+				else if (typeof mInner.value === 'string')
+					bakeLit(` multiple="${escapeAttr(mInner.value)}"`, 'multiple', attr.name, mInner);
+				else if (typeof mInner.value === 'number')
+					bakeLit(` multiple="${mInner.value}"`, 'multiple', attr.name, mInner);
 				continue;
 			}
 			const tmp = bindAttributeEvaluation(tsrxExprNode(mInner, ctx, name, inlinedSubs));
@@ -7380,15 +7404,17 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			// compare — a dynamic value binds to a temp for single evaluation.
 			if (val == null) {
 				optValue = inheritOriginLoc(b.literal('', '""'), attr);
-				lit += ' value';
+				bakeLit(' value', 'value', attr.name, null);
 				continue;
 			}
 			const oInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (oInner.type === 'Literal' && !isAfterSpread) {
 				optValue = inheritOriginLoc(b.literal(String(oInner.value)), oInner);
-				if (typeof oInner.value === 'string') lit += ` value="${escapeAttr(oInner.value)}"`;
-				else if (typeof oInner.value === 'number') lit += ` value="${oInner.value}"`;
-				else if (oInner.value === true) lit += ' value';
+				if (typeof oInner.value === 'string')
+					bakeLit(` value="${escapeAttr(oInner.value)}"`, 'value', attr.name, oInner);
+				else if (typeof oInner.value === 'number')
+					bakeLit(` value="${oInner.value}"`, 'value', attr.name, oInner);
+				else if (oInner.value === true) bakeLit(' value', 'value', attr.name, oInner);
 				continue;
 			}
 			const tmp = bindAttributeEvaluation(tsrxExprNode(oInner, ctx, name, inlinedSubs));
@@ -7445,13 +7471,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 					),
 				);
 			} else {
-				{
-					const chunk = bakeStaticAttr(attrName, true, tag, selfNs);
-					if (litOrigins !== null) {
-						recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, null);
-					}
-					lit += chunk;
-				}
+				bakeLit(bakeStaticAttr(attrName, true, tag, selfNs), attrName, attr.name, null);
 			}
 			continue;
 		}
@@ -7461,24 +7481,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		if (attrName === 'style') {
 			inner = resolveStyleExpr(inner, cssHash);
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
-				{
-					const chunk = ` style="${escapeAttr(inner.value)}"`;
-					if (litOrigins !== null) {
-						recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, inner);
-					}
-					lit += chunk;
-				}
+				bakeLit(` style="${escapeAttr(inner.value)}"`, attrName, attr.name, inner);
 				continue;
 			}
 			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
 				const css = staticObjectToCssString(inner);
-				if (css) {
-					const chunk = ` style="${escapeAttr(css)}"`;
-					if (litOrigins !== null) {
-						recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, inner);
-					}
-					lit += chunk;
-				}
+				if (css) bakeLit(` style="${escapeAttr(css)}"`, attrName, attr.name, inner);
 				continue;
 			}
 			flush();
@@ -7501,13 +7509,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			inner.type === 'Literal' &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, selfNs))
 		) {
-			{
-				const chunk = bakeStaticAttr(attrName, inner.value, tag, selfNs);
-				if (litOrigins !== null) {
-					recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, inner);
-				}
-				lit += chunk;
-			}
+			bakeLit(bakeStaticAttr(attrName, inner.value, tag, selfNs), attrName, attr.name, inner);
 			continue;
 		}
 

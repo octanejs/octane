@@ -466,6 +466,9 @@ describe('scoped styles map to the stylesheet they became', () => {
 		<style>
 			.demo { display: grid; }
 		</style>
+		<style>
+			p { margin: 0; }
+		</style>
 	</div>
 }
 `;
@@ -485,6 +488,17 @@ describe('scoped styles map to the stylesheet they became', () => {
 		expect(textAt(code, pair!.output[0])).toContain('.demo');
 		// A rule inside the block resolves through the same pairing.
 		expect(mapping.pairFromSource(source.indexOf('.demo {') + 2)).not.toBeNull();
+
+		// Several blocks share one scope hash and therefore ONE injection. The
+		// call carries the first block's location, so the rest reach it by alias
+		// — and must answer with the same thing, not with more.
+		const second = mapping.pairFromSource(source.indexOf('<style>', at + 1) + 2);
+		expect(second, 'the second style block did not resolve').not.toBeNull();
+		expect(textAt(source, second!.source[0]).startsWith('<style>')).toBe(true);
+		expect(second!.output.map((range) => textAt(code, range))).toEqual(
+			pair!.output.map((range) => textAt(code, range)),
+		);
+		expect(mapping.pairFromSource(source.indexOf('p { margin') + 2)).not.toBeNull();
 	});
 });
 

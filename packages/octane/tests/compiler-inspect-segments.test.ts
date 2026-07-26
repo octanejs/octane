@@ -432,24 +432,36 @@ describe.each([
 		const result = compile(SOURCE, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
 			typeof compile
 		> & {
-			inspect: { segments: Array<{ srcStart: number; srcEnd: number | null; exact?: boolean }> };
+			inspect: {
+				segments: Array<{ srcStart: number; srcEnd: number | null; exact?: boolean }>;
+				aliases: Array<{ srcStart: number; srcEnd: number; ofStart: number }>;
+			};
 		};
 		// Inspection never changes what ships.
 		expect(compile(SOURCE, 'App.tsrx', options).code).toBe(result.code);
 
-		// Both blocks share one scope hash and therefore one injection, so both
-		// claim it — hovering either one resolves.
-		for (const [nth, from] of [0, SOURCE.indexOf('<style>', 1)].entries()) {
-			const at = SOURCE.indexOf('<style>', from);
-			const claims = result.inspect.segments
-				.filter((segment) => segment.exact === true && segment.srcStart === at)
-				.map((segment) => SOURCE.slice(segment.srcStart, segment.srcEnd!));
-			expect(claims.length, `style block ${nth} has no exact segment`).toBeGreaterThan(0);
-			// The whole element, so a position anywhere inside a rule resolves too.
-			for (const claim of claims) {
-				expect(claim.startsWith('<style>')).toBe(true);
-				expect(claim.endsWith('</style>')).toBe(true);
-			}
+		const first = SOURCE.indexOf('<style>');
+		const second = SOURCE.indexOf('<style>', first + 1);
+		expect(second).toBeGreaterThan(first);
+
+		// The first block anchors the call…
+		const claims = result.inspect.segments
+			.filter((segment) => segment.exact === true && segment.srcStart === first)
+			.map((segment) => SOURCE.slice(segment.srcStart, segment.srcEnd!));
+		expect(claims.length, 'the style block has no exact segment').toBeGreaterThan(0);
+		// …over its whole element, so a position inside a rule resolves too.
+		for (const claim of claims) {
+			expect(claim.startsWith('<style>')).toBe(true);
+			expect(claim.endsWith('</style>')).toBe(true);
 		}
+
+		// …and every other block aliases onto it. One call can carry only one
+		// location, so without the alias the second block claims a source offset
+		// the print never emits at and stays unreachable.
+		expect(result.inspect.aliases).toContainEqual({
+			srcStart: second,
+			srcEnd: SOURCE.indexOf('</style>', second) + '</style>'.length,
+			ofStart: first,
+		});
 	});
 });

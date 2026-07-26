@@ -513,6 +513,32 @@ describe.each([
 		expect(found.get('text')?.sort()).toEqual(['Add', 'Count', 'Increment']);
 	});
 
+	it('records the attributes the form-control writers bake themselves', () => {
+		// `<select multiple>` and `<option value>` are serialized by dedicated
+		// writers (they also feed the option-projection scope), NOT by the shared
+		// static-attribute path. An attribute that reaches the run through its
+		// own writer is still an authored span in the output.
+		const source = `export default function App() @{
+	<select multiple title="pick">
+		<option value="a">A</option>
+		<option value={2}>B</option>
+	</select>
+}
+`;
+		const { templates } = inspectServer(source);
+		const named = new Map<string, string[]>();
+		for (const template of templates) {
+			for (const origin of template.origins) {
+				const authored = source.slice(origin.srcStart, origin.srcEnd);
+				(named.get(origin.kind) ?? named.set(origin.kind, []).get(origin.kind)!).push(authored);
+			}
+		}
+		// The bare-boolean `multiple` has a name and no value; each `value` has
+		// both. `title` proves the shared path still records alongside them.
+		expect(named.get('attr-name')?.sort()).toEqual(['multiple', 'title', 'value', 'value']);
+		expect(named.get('attr-value')?.sort()).toEqual(['"a"', '"pick"', '2']);
+	});
+
 	it('separates the two identical runs of repeated markup', () => {
 		const { code, templates } = inspectServer();
 		// Both `<button>` elements bake the same bytes, so the entries are only
