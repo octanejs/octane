@@ -1,5 +1,14 @@
 # @octanejs/tanstack-hotkeys
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [16dc385]
+- Updated dependencies [7fa4075]
+  - octane@0.1.15
+  - @octanejs/tanstack-store@0.0.9
+
 ## 0.0.3
 
 ### Patch Changes

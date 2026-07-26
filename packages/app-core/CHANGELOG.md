@@ -1,5 +1,13 @@
 # @octanejs/app-core
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [16dc385]
+- Updated dependencies [7fa4075]
+  - octane@0.1.15
+
 ## 0.0.10
 
 ### Patch Changes
