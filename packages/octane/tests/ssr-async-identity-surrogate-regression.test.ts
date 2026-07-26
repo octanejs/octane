@@ -48,4 +48,42 @@ describe('SSR async identity string encoding', () => {
 			expect(result.html).toContain(`data-label="${label}">${label}:${value}</span>`);
 		}
 	});
+
+	// The encoder resolves ASCII code units through a prebuilt table and falls back
+	// to per-unit formatting above it, so U+007F/U+0080 straddle that split. These
+	// keys keep the fixed-width encoding exercised on BOTH sides of it — the
+	// surrogate case above only reaches the fallback.
+	it('encodes keys on both sides of the ASCII split', async () => {
+		const mod = evalServer(
+			`import { use } from 'octane';
+			 export function App(props) @{
+				<main>
+					@for (const item of props.items; key item.key) {
+						const value = use(item.promise);
+						<span data-label={item.label}>{item.label + ':' + value as string}</span>
+					}
+				</main>
+			 }`,
+			'ssr-async-identity-ascii-split.tsrx',
+		);
+		const cases = [
+			['ascii-nul', '\u0000', 'NUL'],
+			['ascii-max', '\u007f', 'DEL'],
+			['above-ascii', '\u0080', 'PAD'],
+			['mixed', 'a\u0080b', 'MIXED'],
+			['plain', 'plain-key', 'PLAIN'],
+		] as const;
+
+		const result = await prerender(mod.App, {
+			items: cases.map(([label, key, value]) => ({
+				label,
+				key,
+				promise: Promise.resolve(value),
+			})),
+		});
+
+		for (const [label, , value] of cases) {
+			expect(result.html).toContain(`data-label="${label}">${label}:${value}</span>`);
+		}
+	});
 });
