@@ -922,4 +922,5 @@ export const Dialog = {
 	Description: DialogDescription,
 	Close: DialogClose,
 	createHandle: createDialogHandle,
+	Handle: DialogHandle,
 };

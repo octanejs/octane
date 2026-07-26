@@ -524,4 +524,9 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+	it("AlertDialog.Viewport: open (Dialog's viewport reached through the AlertDialog namespace)", async () => {
+		const d = await mountDifferential(FIXTURE, 'AlertDialogViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });

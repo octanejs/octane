@@ -1271,4 +1271,5 @@ export const Popover = {
 	Description: PopoverDescription,
 	Close: PopoverClose,
 	createHandle: createPopoverHandle,
+	Handle: PopoverHandle,
 };

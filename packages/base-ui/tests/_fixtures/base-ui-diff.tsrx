@@ -952,3 +952,23 @@ export function TooltipsWithoutProvider() @{
 		</Tooltip.Root>
 	</div>
 }
+
+// AlertDialog re-uses Dialog's Viewport, so it must be reachable through the AlertDialog
+// namespace too — Base UI lists it in AlertDialog's anatomy.
+export function AlertDialogViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<AlertDialog.Root defaultOpen>
+			<AlertDialog.Portal container={containerRef}>
+				<AlertDialog.Backdrop className="ad-backdrop" />
+				<AlertDialog.Viewport className="ad-viewport">
+					<AlertDialog.Popup className="ad-popup">
+						<AlertDialog.Title className="ad-title">Confirm</AlertDialog.Title>
+						<AlertDialog.Close className="ad-close">OK</AlertDialog.Close>
+					</AlertDialog.Popup>
+				</AlertDialog.Viewport>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
+	</div>
+}
