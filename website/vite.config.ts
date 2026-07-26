@@ -210,7 +210,7 @@ const PREBUNDLED = [
 	// host's lazy mount chunk on a hash consistent with its entry (no
 	// mid-mount re-optimize → no "504 Outdated Optimize Dep") and bundles the
 	// CJS dep dayjs with a synthesized `default` export. solid-js is pinned to
-	// 1.9.9 for this island via the pnpm override (Solid 2 dropped
+	// 1.9.14 for this island via the pnpm override (Solid 2 dropped
 	// solid-js/web); remove this block once @tanstack/devtools ships Solid 2.
 	'@tanstack/devtools',
 	'@tanstack/devtools-ui',
