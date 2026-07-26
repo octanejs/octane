@@ -37,7 +37,8 @@ if (rootBytes > ROOT_RULE_MAX_BYTES) {
 }
 
 const skillsRoot = path.join(REPO, '.rulesync', 'skills');
-for (const name of readdirSync(skillsRoot)) {
+const skillNames = readdirSync(skillsRoot);
+for (const name of skillNames) {
 	const file = path.join(skillsRoot, name, 'SKILL.md');
 	const frontmatter = /^---\n([\s\S]*?)\n---/.exec(readFileSync(file, 'utf8'));
 	if (!frontmatter) {
@@ -59,8 +60,29 @@ for (const name of readdirSync(skillsRoot)) {
 	}
 }
 
+// A description alone does not route a skill that only becomes relevant late in
+// a task, so the root rule names every trigger. That list is hand-written, and a
+// hand-written inventory in the root rule is exactly what drifted before.
+const ROUTING_HEADING = '## The workflows live in skills, so load the skill first';
+const routingSection = rootRule.split(ROUTING_HEADING)[1]?.split('\n## ')[0];
+
+if (routingSection === undefined) {
+	failures.push(`CLAUDE.md has no "${ROUTING_HEADING}" section, so no skill is routed.`);
+} else {
+	for (const name of skillNames) {
+		if (!routingSection.includes(`\`${name}\``)) {
+			failures.push(`.rulesync/skills/${name} is not named in the root rule's routing list.`);
+		}
+	}
+	for (const [, name] of routingSection.matchAll(/^- `([a-z-]+)`:/gm)) {
+		if (!skillNames.includes(name)) {
+			failures.push(`The root rule routes to \`${name}\`, which is not a skill.`);
+		}
+	}
+}
+
 if (failures.length > 0) {
-	console.error('Always-loaded agent context is over budget:');
+	console.error('Always-loaded agent context needs attention:');
 	for (const failure of failures) console.error(`  ${failure}`);
 	console.error(
 		'\nMove path-specific content into a .rulesync rule with `globs` so it loads only when a',
@@ -69,6 +91,8 @@ if (failures.length > 0) {
 		'matching file is opened, or into a skill body. Keep the root rule to what no agent can',
 	);
 	console.error('derive by reading the repo: above all, the intentional divergences from React.');
+	console.error('For an unrouted skill, add its trigger to the root rule instead: an unrouted');
+	console.error('skill is one an agent finds only after it has already improvised the workflow.');
 	process.exit(1);
 }
 
