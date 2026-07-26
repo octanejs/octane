@@ -733,12 +733,10 @@ function SavedPage(props: SavedPageProps) @{
 	);
 	<main id="main-content" class="saved-page">
 		<Head>
-			<>
-				<Title text="Saved journeys" />
-				<Meta name="description" content="A small shelf of routes stored only in this browser." />
-				{/* A private list is not worth indexing, but its links are worth following. */}
-				<Meta name="robots" content="noindex, follow" />
-			</>
+			<Title text="Saved journeys" />
+			<Meta name="description" content="A small shelf of routes stored only in this browser." />
+			{/* A private list is not worth indexing, but its links are worth following. */}
+			<Meta name="robots" content="noindex, follow" />
 		</Head>
 		<div class="saved-heading">
 			<p class="eyebrow eyebrow-accent">Kept for later</p>

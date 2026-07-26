@@ -54,9 +54,7 @@ function TagList(props: { tags: Tag[] }) @{
 
 export function DynamicList(props: { tags: Tag[] }) @{
 	<Head>
-		<>
-			<TagList tags={props.tags} />
-			<main>list</main>
-		</>
+		<TagList tags={props.tags} />
+		<main>list</main>
 	</Head>
 }

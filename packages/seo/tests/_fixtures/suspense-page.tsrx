@@ -15,19 +15,15 @@ function Deferred(props: { value: Promise<string> }) @{
 
 export function SuspensePage(props: { value: Promise<string> }) @{
 	<Head>
-		<>
-			<Head>
-				<>
-					<Title text="Suspense page" />
-					<Meta name="description" content="static description" />
-				</>
-			</Head>
-			@try {
-				<Deferred value={props.value} />
-			} @pending {
-				<p>loading</p>
-			}
-			<main>body</main>
-		</>
+		<Head>
+			<Title text="Suspense page" />
+			<Meta name="description" content="static description" />
+		</Head>
+		@try {
+			<Deferred value={props.value} />
+		} @pending {
+			<p>loading</p>
+		}
+		<main>body</main>
 	</Head>
 }

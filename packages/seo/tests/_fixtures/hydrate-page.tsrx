@@ -19,14 +19,10 @@ function Inner() @{
 
 export function HydratePage() @{
 	<Head>
-		<>
-			<Head>
-				<>
-					<Title text="Layout default" />
-					<Meta name="theme-color" content="#000000" />
-				</>
-			</Head>
-			<Inner />
-		</>
+		<Head>
+			<Title text="Layout default" />
+			<Meta name="theme-color" content="#000000" />
+		</Head>
+		<Inner />
 	</Head>
 }

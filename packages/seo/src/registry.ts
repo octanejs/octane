@@ -41,7 +41,6 @@ function sameDescriptors(a: readonly SeoDescriptor[], b: readonly SeoDescriptor[
 		const x = a[i];
 		const y = b[i];
 		if (x.key !== y.key || x.tag !== y.tag || x.text !== y.text) return false;
-		if (x.templated !== y.templated) return false;
 		const xa = x.attrs;
 		const ya = y.attrs;
 		const xk = Object.keys(xa);

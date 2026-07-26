@@ -9,10 +9,10 @@
  * fails, copy the values it reports back into this file.
  */
 export const SERVER_HEAD =
-	'<!--rnh-1f1a8fc2--><title>Count 0</title><!--/rnh-1f1a8fc2--><!--rnh-cc322685--><meta name' +
-	'="theme-color" content="#000000"><!--/rnh-cc322685--><!--rnh-cc322685--><meta name="descri' +
-	'ption" content="page description"><!--/rnh-cc322685--><!--rnh-37078ec4--><link rel="canoni' +
-	'cal" href="https://example.com/counter"><!--/rnh-37078ec4-->';
+	'<!--rnh-700b6de4--><title>Count 0</title><!--/rnh-700b6de4--><!--rnh-7877c718--><meta name' +
+	'="theme-color" content="#000000"><!--/rnh-7877c718--><!--rnh-7877c718--><meta name="descri' +
+	'ption" content="page description"><!--/rnh-7877c718--><!--rnh-82c0a63a--><link rel="canoni' +
+	'cal" href="https://example.com/counter"><!--/rnh-82c0a63a-->';
 
 export const SERVER_BODY =
 	'<!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--[--><!--]--><!--[--><!' +

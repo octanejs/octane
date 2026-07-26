@@ -130,9 +130,14 @@ describe('expandSeo', () => {
 		expect(out.find((d) => d.key === 'meta:property=og:title')?.attrs.content).toBe('Social title');
 	});
 
-	it('applies the title template only to the title', () => {
+	it('leaves the title raw, since the template is applied after the merge', () => {
+		// Templating at expand time would leak the suffix into the social mirror,
+		// which reads the title before `applyConfig` templates it.
 		const out = expandSeo({ title: 'Hello', titleTemplate: '%s · Site', description: 'Desc' });
-		expect(out.find((d) => d.tag === 'title')?.text).toBe('Hello · Site');
+		expect(out.find((d) => d.tag === 'title')?.text).toBe('Hello');
+		expect(
+			applyConfig(out, { titleTemplate: '%s · Site' }).find((d) => d.tag === 'title')?.text,
+		).toBe('Hello · Site');
 	});
 
 	it('absolute-ises image urls, which scrapers do not resolve themselves', () => {
@@ -233,21 +238,17 @@ describe('overriding a repeatable link', () => {
 describe('title templating treats the title as data', () => {
 	const HOSTILE = "Deals: 50% off $& and $' and $` and $1";
 
-	it('preserves dollar patterns when the template is on the same <Seo>', () => {
-		const out = expandSeo({ title: HOSTILE, titleTemplate: '%s · Shop' });
-		expect(out.find((d) => d.tag === 'title')?.text).toBe(HOSTILE + ' · Shop');
+	const titleOf = (title: string, template: string) =>
+		applyConfig(mergeDescriptors(expandSeo({ title })), { titleTemplate: template }).find(
+			(d) => d.tag === 'title',
+		)?.text;
+
+	it('preserves dollar patterns in the title', () => {
+		expect(titleOf(HOSTILE, '%s · Shop')).toBe(HOSTILE + ' · Shop');
 	});
 
-	it('preserves dollar patterns when the template is app-level', () => {
-		const merged = applyConfig(mergeDescriptors(expandSeo({ title: HOSTILE })), {
-			titleTemplate: '%s · Shop',
-		});
-		expect(merged.find((d) => d.tag === 'title')?.text).toBe(HOSTILE + ' · Shop');
-	});
-
-	it('leaves a template containing dollar patterns alone', () => {
-		const out = expandSeo({ title: 'Widgets', titleTemplate: '%s — $100 & up' });
-		expect(out.find((d) => d.tag === 'title')?.text).toBe('Widgets — $100 & up');
+	it('leaves dollar patterns in the template alone', () => {
+		expect(titleOf('Widgets', '%s - $100 & up')).toBe('Widgets - $100 & up');
 	});
 });
 

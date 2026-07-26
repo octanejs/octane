@@ -4,10 +4,8 @@ import { Head, Title } from '@octanejs/seo';
 /** A conditionally rendered child that retitles the page. */
 function TabPanel() @{
 	<Head>
-		<>
-			<Title text="ZZZ" />
-			<section>tab</section>
-		</>
+		<Title text="ZZZ" />
+		<section>tab</section>
 	</Head>
 }
 
@@ -19,15 +17,13 @@ function TabPanel() @{
 export function SiblingHeads() @{
 	const [open, setOpen] = useState(false);
 	<Head>
-		<>
-			<Head>
-				<Title text="XYZ" />
-			</Head>
-			<button id="toggle" onClick={() => setOpen(!open)}>toggle</button>
-			@if (open) {
-				<TabPanel />
-			}
-		</>
+		<Head>
+			<Title text="XYZ" />
+		</Head>
+		<button id="toggle" onClick={() => setOpen(!open)}>toggle</button>
+		@if (open) {
+			<TabPanel />
+		}
 	</Head>
 }
 
@@ -36,13 +32,11 @@ export function NestedHeads() @{
 	const [open, setOpen] = useState(false);
 	<Head>
 		<Head>
-			<>
-				<Title text="XYZ" />
-				<button id="toggle" onClick={() => setOpen(!open)}>toggle</button>
-				@if (open) {
-					<TabPanel />
-				}
-			</>
+			<Title text="XYZ" />
+			<button id="toggle" onClick={() => setOpen(!open)}>toggle</button>
+			@if (open) {
+				<TabPanel />
+			}
 		</Head>
 	</Head>
 }
@@ -62,13 +56,11 @@ function RightPane() @{
 
 export function DistantSiblings() @{
 	<Head>
-		<>
-			<aside>
-				<LeftPane />
-			</aside>
-			<main>
-				<RightPane />
-			</main>
-		</>
+		<aside>
+			<LeftPane />
+		</aside>
+		<main>
+			<RightPane />
+		</main>
 	</Head>
 }

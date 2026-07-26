@@ -5,13 +5,17 @@ import { prerender } from 'octane/static';
 import {
 	AppLevelConfig,
 	Bare,
+	ConfiguredPage,
 	Grouped,
+	HostileMarkup,
+	QuoteBreakout,
 	HostileTitle,
 	LinkOverride,
 	Nested,
 	OpenGraphWithoutOgTags,
 	RawScript,
 	SocialShell,
+	TemplateOnPage,
 } from '../_fixtures/head-block.tsrx';
 
 async function render(Component: any) {
@@ -120,5 +124,74 @@ describe('social fill-in across registrations', () => {
 		const { head } = await render(OpenGraphWithoutOgTags);
 		expect(head).toContain('property="article:published_time"');
 		expect(head).toContain('property="og:title" content="Post"');
+	});
+
+	it('mirrors the raw title even when the template sits on the same <Seo>', async () => {
+		const { head } = await render(TemplateOnPage);
+		expect(head).toContain('<title>Pricing · Acme</title>');
+		expect(head).toContain('property="og:title" content="Pricing"');
+		expect(head).toContain('name="twitter:title" content="Pricing"');
+	});
+});
+
+describe('per-request isolation of app-level config', () => {
+	it("does not let one render inherit another's site, template, or opt-in", async () => {
+		const [a, b] = await Promise.all([
+			prerender(
+				ConfiguredPage,
+				{ site: 'https://a.dev', suffix: ' · A', title: 'Alpha' },
+				{ headChannel: 'separate' },
+			),
+			prerender(
+				ConfiguredPage,
+				{ site: 'https://b.dev', suffix: ' · B', title: 'Beta' },
+				{ headChannel: 'separate' },
+			),
+		]);
+		expect(a.head).toContain('<title>Alpha · A</title>');
+		expect(a.head).toContain('href="https://a.dev/p"');
+		expect(a.head).toContain('property="og:title" content="Alpha"');
+		expect(a.head).not.toContain('b.dev');
+		expect(a.head).not.toContain('Beta');
+
+		expect(b.head).toContain('<title>Beta · B</title>');
+		expect(b.head).toContain('href="https://b.dev/p"');
+		expect(b.head).not.toContain('a.dev');
+		expect(b.head).not.toContain('Alpha');
+	});
+});
+
+describe('escaping in the served bytes', () => {
+	it('cannot inject an element or a second attribute', async () => {
+		const { head } = await render(HostileMarkup);
+		// Parse the real bytes: string matching cannot tell a legitimate closing
+		// tag from an injected one, and the DOM is the oracle that matters.
+		const { JSDOM } = await import('jsdom');
+		const dom = new JSDOM('<!doctype html><html><head>' + head + '</head><body></body></html>');
+		const doc = dom.window.document;
+
+		// Text content escaping: the title carries the markup as TEXT, and no
+		// element was created from it.
+		expect(doc.head.querySelectorAll('title')).toHaveLength(1);
+		expect(doc.title).toBe('</title><script>alert(1)</script>');
+		expect(doc.querySelectorAll('script')).toHaveLength(0);
+
+		// Attribute escaping: the quote is neutralised, so no second attribute
+		// appears and the value survives intact.
+		const meta = doc.head.querySelector('meta[name="description"]')!;
+		expect(meta.getAttribute('content')).toBe('a "quoted" & <b>bold</b> value');
+		expect(meta.getAttributeNames().sort()).toEqual(['content', 'name']);
+	});
+
+	it('closes the attribute-breakout vector', async () => {
+		// The classic vector: a value that tries to end the attribute and start an
+		// event handler.
+		const { head } = await render(QuoteBreakout);
+		const { JSDOM } = await import('jsdom');
+		const doc = new JSDOM('<!doctype html><html><head>' + head + '</head></html>').window.document;
+		const meta = doc.head.querySelector('meta[name="description"]')!;
+		expect(meta.getAttributeNames().sort()).toEqual(['content', 'name']);
+		expect(meta.getAttribute('onload')).toBeNull();
+		expect(meta.getAttribute('content')).toBe('x" onload="alert(1)');
 	});
 });

@@ -24,8 +24,6 @@ export interface SeoDescriptor {
 	attrs: MetaAttributes;
 	/** Text content, for `<title>` and for script bodies. */
 	text?: string;
-	/** A title that already had a template applied, so it is not templated twice. */
-	templated?: boolean;
 }
 
 /**
@@ -115,10 +113,11 @@ const SOCIAL_FILL: readonly {
  * `titleTemplate`, or Open Graph shell, and the root registers its shell without
  * seeing which page will render.
  *
- * Order matters. The social fill reads the RAW title, before the template is
- * applied, because `og:site_name` already carries the suffix that a template
- * adds. URL resolution runs last so an `og:url` mirrored from the canonical is
- * absolute-ised too.
+ * Order matters, and this is the ONLY place the template is applied. The social
+ * fill reads the title before that happens, because `og:site_name` already
+ * carries the suffix a template adds; templating anywhere earlier would leak the
+ * suffix into `og:title`. URL resolution runs last so an `og:url` mirrored from
+ * the canonical is absolute-ised too.
  */
 export function applyConfig(
 	descriptors: readonly SeoDescriptor[],
@@ -155,7 +154,6 @@ export function applyConfig(
 		if (
 			titleTemplate !== undefined &&
 			descriptor.tag === 'title' &&
-			descriptor.templated !== true &&
 			descriptor.text !== undefined &&
 			descriptor.text !== ''
 		) {
@@ -164,7 +162,6 @@ export function applyConfig(
 			return {
 				...descriptor,
 				text: titleTemplate.replace('%s', () => descriptor.text as string),
-				templated: true,
 			};
 		}
 		const attr = site === undefined ? null : urlAttribute(descriptor);

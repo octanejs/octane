@@ -49,29 +49,27 @@ function Renaming() @{
 export function NavApp() @{
 	const [route, setRoute] = useState('home');
 	<Head>
-		<>
-			<Title text="Site default" />
-			<Link rel="icon" href="/favicon.ico" />
-			<nav>
-				<button id="to-home" onClick={() => setRoute('home')}>home</button>
-				<button id="to-article" onClick={() => setRoute('article')}>article</button>
-				<button id="to-toggling" onClick={() => setRoute('toggling')}>toggling</button>
-				<button id="to-renaming" onClick={() => setRoute('renaming')}>renaming</button>
-			</nav>
-			@switch (route) {
-				@case 'home': {
-					<Home />
-				}
-				@case 'article': {
-					<Article />
-				}
-				@case 'toggling': {
-					<Toggling />
-				}
-				@default: {
-					<Renaming />
-				}
+		<Title text="Site default" />
+		<Link rel="icon" href="/favicon.ico" />
+		<nav>
+			<button id="to-home" onClick={() => setRoute('home')}>home</button>
+			<button id="to-article" onClick={() => setRoute('article')}>article</button>
+			<button id="to-toggling" onClick={() => setRoute('toggling')}>toggling</button>
+			<button id="to-renaming" onClick={() => setRoute('renaming')}>renaming</button>
+		</nav>
+		@switch (route) {
+			@case 'home': {
+				<Home />
 			}
-		</>
+			@case 'article': {
+				<Article />
+			}
+			@case 'toggling': {
+				<Toggling />
+			}
+			@default: {
+				<Renaming />
+			}
+		}
 	</Head>
 }

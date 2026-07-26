@@ -46,7 +46,11 @@ export interface RobotsInput {
 
 export interface SeoInput {
 	title?: string;
-	/** `%s` is replaced by `title`. Applies only when `title` is present. */
+	/**
+	 * `%s` is replaced by the page title. App-level: declaring it once applies it
+	 * to whichever page renders, and it is applied after the merge, so social tags
+	 * still mirror the untemplated title.
+	 */
 	titleTemplate?: string;
 	description?: string;
 	canonical?: string;
@@ -61,17 +65,11 @@ export interface SeoInput {
 }
 
 /**
- * Substitute `%s` treating the title as DATA. A string replacement would expand
- * `$&`, `` $` ``, `$'` and `$1` in an author-controlled title against the match,
- * rewriting the served document title; a function replacement is inserted
- * verbatim.
+ * Escape a key component so a `@type` containing `#` cannot forge the key of a
+ * different graph and silently replace it.
  */
 function jsonLdKeyPart(value: string): string {
 	return value.replace(/[\\#]/g, (character) => '\\' + character);
-}
-
-export function applyTitleTemplate(template: string, title: string): string {
-	return template.replace('%s', () => title);
 }
 
 function meta(attrs: Record<string, string>): SeoDescriptor {
@@ -106,18 +104,11 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 	const out: SeoDescriptor[] = [];
 	const site = input.site;
 
+	// The RAW title. `titleTemplate` is app-level config applied after the merge,
+	// so the social mirror always sees the untemplated value regardless of which
+	// `<Seo>` declared the template.
 	if (input.title !== undefined) {
-		const text =
-			input.titleTemplate !== undefined
-				? applyTitleTemplate(input.titleTemplate, input.title)
-				: input.title;
-		out.push({
-			tag: 'title',
-			key: 'title',
-			attrs: {},
-			text,
-			templated: input.titleTemplate !== undefined,
-		});
+		out.push({ tag: 'title', key: 'title', attrs: {}, text: input.title });
 	}
 	if (input.description !== undefined) {
 		out.push(meta({ name: 'description', content: input.description }));
@@ -227,7 +218,8 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 	}
 
 	if (input.jsonLd !== undefined) {
-		out.push(jsonLdDescriptor(input.jsonLd));
+		const descriptor = jsonLdDescriptor(input.jsonLd);
+		if (descriptor !== null) out.push(descriptor);
 	}
 
 	return out;
@@ -237,19 +229,35 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
  * JSON-LD identity is its `@type` (plus `@id` when present), so a page-level
  * Article replaces a layout-level Article but coexists with a BreadcrumbList.
  */
-export function jsonLdDescriptor(data: unknown, explicitKey?: string): SeoDescriptor {
+export function jsonLdDescriptor(data: unknown, explicitKey?: string): SeoDescriptor | null {
+	// Serialization is the one place author data can take the whole render down:
+	// a cyclic graph or a BigInt makes JSON.stringify throw, and that would 500 a
+	// page over one structured-data object. Degrade instead, loudly. A graph that
+	// cannot serialize cannot be valid structured data either, so emitting nothing
+	// is better than emitting something broken.
+	let text: string;
+	try {
+		text = JSON.stringify(data);
+	} catch (error) {
+		console.error(
+			'[@octanejs/seo] Could not serialize JSON-LD, so no structured data was ' +
+				'emitted for it. Values such as cycles and BigInt cannot be represented: ' +
+				(error instanceof Error ? error.message : String(error)),
+		);
+		return null;
+	}
+	if (text === undefined) return null;
 	let key = explicitKey;
 	if (key === undefined) {
 		const record = (data ?? {}) as Record<string, unknown>;
 		const type = typeof record['@type'] === 'string' ? (record['@type'] as string) : 'graph';
 		const id = typeof record['@id'] === 'string' ? (record['@id'] as string) : '';
-		// Escaped so a `@type` containing `#` cannot forge a different graph's key.
 		key = jsonLdKeyPart(type) + '#' + jsonLdKeyPart(id);
 	}
 	return {
 		tag: 'script',
 		key: 'jsonLd:' + key,
 		attrs: { type: 'application/ld+json' },
-		text: JSON.stringify(data),
+		text,
 	};
 }

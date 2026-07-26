@@ -8,27 +8,21 @@ import { Head, Link, Meta, Script, Title } from '@octanejs/seo';
 
 function App() @{
 	<Head>
-		<>
-			<Head>
-				<>
-					<Title text="Acme" />
-					<Meta name="description" content="Widgets for everyone" />
-				</>
-			</Head>
-			<Router />
-		</>
+		<Head>
+			<Title text="Acme" />
+			<Meta name="description" content="Widgets for everyone" />
+		</Head>
+		<Router />
 	</Head>
 }
 
 function ProductPage(props: { product: Product }) @{
 	<>
 		<Head>
-			<>
-				<Title text={props.product.name} />
-				<Meta name="description" content={props.product.blurb} />
-				<Link rel="canonical" href={'/p/' + props.product.slug} />
-				<Script type="application/ld+json" json={{ '@type': 'Product', name: props.product.name }} />
-			</>
+			<Title text={props.product.name} />
+			<Meta name="description" content={props.product.blurb} />
+			<Link rel="canonical" href={'/p/' + props.product.slug} />
+			<Script type="application/ld+json" json={{ '@type': 'Product', name: props.product.name }} />
 		</Head>
 		<main>…</main>
 	</>

@@ -7,6 +7,10 @@ import { expandSeo, jsonLdDescriptor, type SeoInput } from './expand.ts';
 import { useRegisterSeo } from './useRegister.ts';
 import { useStrayOwnerDiagnostic } from './useStrayOwnerDiagnostic.ts';
 
+// Shared so a dropped descriptor registers a stable empty set rather than a new
+// array each render, which would invalidate the merge every time.
+const EMPTY: readonly SeoDescriptor[] = [];
+
 /**
  * One rendered head element.
  *
@@ -175,7 +179,7 @@ export function Script(props: {
 	// two `useRegisterSeo` calls would give a `<Script>` that switches between
 	// `json` and `text` a second slot, and the abandoned branch's source would
 	// stay registered, a stale script no unmount ever removes.
-	const descriptor: SeoDescriptor =
+	const descriptor: SeoDescriptor | null =
 		json !== undefined
 			? jsonLdDescriptor(json, seoKey)
 			: {
@@ -184,13 +188,14 @@ export function Script(props: {
 					attrs: { ...attrs as MetaAttributes, type },
 					text: text ?? '',
 				};
-	useRegisterSeo([descriptor]);
+	useRegisterSeo(descriptor === null ? EMPTY : [descriptor]);
 	return null;
 }
 
 /** Structured data. Identity is `@type` (plus `@id`) unless `seoKey` is given. */
 export function JsonLd(props: { data: unknown; seoKey?: string }) {
-	useRegisterSeo([jsonLdDescriptor(props.data, props.seoKey)]);
+	const descriptor = jsonLdDescriptor(props.data, props.seoKey);
+	useRegisterSeo(descriptor === null ? EMPTY : [descriptor]);
 	return null;
 }
 
