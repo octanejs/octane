@@ -1429,7 +1429,13 @@ const ASCII_ASYNC_IDENTITY_UNITS: string[] = [];
 for (let code = 0; code < 128; code++) {
 	ASCII_ASYNC_IDENTITY_UNITS.push(code.toString(16).padStart(4, '0'));
 }
-function encodeAsyncIdentityString(value: string): string {
+/**
+ * @internal Exported for direct testing: a conflating or wrong-width encoding is
+ * invisible through `prerender`, because occurrence tracking assigns list items
+ * distinct scopes independently of the key bytes. Not re-exported from
+ * `octane/server`.
+ */
+export function encodeAsyncIdentityString(value: string): string {
 	let encoded = '';
 	for (let i = 0; i < value.length; i++) {
 		const code = value.charCodeAt(i);
