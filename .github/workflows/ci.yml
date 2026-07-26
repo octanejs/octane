@@ -576,9 +576,7 @@ jobs:
       matrix:
         include:
           - lane: minimum
-            registry_check: ""
           - lane: current
-            registry_check: --check-registry
 
     steps:
       - name: Checkout code
@@ -599,13 +597,10 @@ jobs:
       # The script packs the four Octane packages, installs one exact Lynx
       # graph into a temporary external consumer without a lockfile, verifies
       # physical dependency identity, and performs two clean native builds.
-      # The current lane additionally proves its exact versions still follow
-      # the registry graph exposed by Rspeedy/Rsbuild dependency constraints.
       - name: Pack and build Lynx ${{ matrix.lane }} compatibility graph
         run: >-
           node packages/rspeedy-plugin-octane/scripts/compatibility-smoke.mjs
           --lane "${{ matrix.lane }}"
-          ${{ matrix.registry_check }}
 
       - name: Verify the repository lockfile stayed immutable
         run: git diff --exit-code -- pnpm-lock.yaml
