@@ -279,9 +279,6 @@ catalogs:
     '@tiptap/starter-kit':
       specifier: 3.28.0
       version: 3.28.0
-    '@tsrx/core':
-      specifier: ^0.1.48
-      version: 0.1.48
     '@tsrx/prettier-plugin':
       specifier: ^0.3.110
       version: 0.3.110
@@ -759,6 +756,7 @@ catalogs:
       version: 5.9.3
 
 overrides:
+  '@tsrx/core': link:../ripple/packages/tsrx
   esrap: ^2.3.0
   babel-preset-solid: 2.0.0-beta.15
   babel-plugin-jsx-dom-expressions: 0.50.0-next.14
@@ -4139,8 +4137,8 @@ importers:
   packages/octane:
     dependencies:
       '@tsrx/core':
-        specifier: catalog:default
-        version: 0.1.48
+        specifier: link:../../../ripple/packages/tsrx
+        version: link:../../../ripple/packages/tsrx
       '@types/react':
         specifier: catalog:default
         version: 19.2.17
@@ -4179,8 +4177,8 @@ importers:
   packages/octane-evals:
     devDependencies:
       '@tsrx/core':
-        specifier: catalog:default
-        version: 0.1.48
+        specifier: link:../../../ripple/packages/tsrx
+        version: link:../../../ripple/packages/tsrx
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -5410,8 +5408,8 @@ importers:
         specifier: catalog:default
         version: 3.23.0
       '@tsrx/core':
-        specifier: catalog:default
-        version: 0.1.48
+        specifier: link:../../ripple/packages/tsrx
+        version: link:../../ripple/packages/tsrx
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.3.110(prettier@3.9.6)
@@ -9552,9 +9550,6 @@ packages:
 
   '@toon-format/toon@2.3.0':
     resolution: {integrity: sha512-/Ew9etdRQKVMnm9fDaCG0JjyAOK/O7T0M97oum1aW4W+UR8ZhVVPBanIV7oWgHBiGlnVxV9M55PWQCHofDV07w==}
-
-  '@tsrx/core@0.1.48':
-    resolution: {integrity: sha512-IgkkLjApPKCGvBvwcOtLT6bACFglB5RBKW9fYErYMXJC6bxk/GM1lVAnuV9FiadiZ5jXrTw9uTxbZULncycSQQ==}
 
   '@tsrx/prettier-plugin@0.3.110':
     resolution: {integrity: sha512-nLSYYowJiX31cYq0Z9IgQW4IYnU4P9XBHByDOzB6l9IW7d6ytkJst0+YwQS7SdFyylYToCQiopHGK75w3r9v6w==}
@@ -17351,7 +17346,8 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@noble/hashes@2.2.0': {}
+  '@noble/hashes@2.2.0':
+    optional: true
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -20427,31 +20423,14 @@ snapshots:
 
   '@toon-format/toon@2.3.0': {}
 
-  '@tsrx/core@0.1.48':
-    dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
-      '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.11(acorn@8.17.0)
-      '@types/estree': 1.0.9
-      '@types/estree-jsx': 1.0.5
-      acorn: 8.17.0
-      esrap: 2.3.0
-      is-reference: 3.0.3
-      magic-string: 0.30.21
-      zimmerframe: 1.1.4
-    transitivePeerDependencies:
-      - '@typescript-eslint/types'
-
   '@tsrx/prettier-plugin@0.3.110(prettier@3.9.6)':
     dependencies:
-      '@tsrx/core': 0.1.48
+      '@tsrx/core': link:../ripple/packages/tsrx
       prettier: 3.9.6
-    transitivePeerDependencies:
-      - '@typescript-eslint/types'
 
   '@tsrx/react@0.2.48(react@19.2.7)':
     dependencies:
-      '@tsrx/core': 0.1.48
+      '@tsrx/core': link:../ripple/packages/tsrx
       esrap: 2.3.0
       react: 19.2.7
       zimmerframe: 1.1.4
@@ -20460,7 +20439,7 @@ snapshots:
 
   '@tsrx/ripple@0.1.49':
     dependencies:
-      '@tsrx/core': 0.1.48
+      '@tsrx/core': link:../ripple/packages/tsrx
       esrap: 2.3.0
       is-reference: 3.0.3
       zimmerframe: 1.1.4
@@ -20470,7 +20449,7 @@ snapshots:
   '@tsrx/solid@0.1.48(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)':
     dependencies:
       '@solidjs/web': 2.0.0-beta.15(solid-js@2.0.0-beta.15)
-      '@tsrx/core': 0.1.48
+      '@tsrx/core': link:../ripple/packages/tsrx
       esrap: 2.3.0
       solid-js: 2.0.0-beta.15
       zimmerframe: 1.1.4
@@ -25124,7 +25103,7 @@ snapshots:
 
   octane@0.1.13(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@tsrx/core': 0.1.48
+      '@tsrx/core': link:../ripple/packages/tsrx
       '@types/react': 19.2.17
       devalue: 5.8.2
       esrap: 2.3.0
@@ -26117,7 +26096,7 @@ snapshots:
 
   ripple@0.3.110:
     dependencies:
-      '@tsrx/core': 0.1.48
+      '@tsrx/core': link:../ripple/packages/tsrx
       '@tsrx/ripple': 0.1.49
       clsx: 2.1.1
       devalue: 5.8.2

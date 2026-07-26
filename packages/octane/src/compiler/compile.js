@@ -40,6 +40,7 @@ import {
 } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
+import { buildFatSegments } from './fat-segments.js';
 import { applyHookDependencies } from './hook-deps.js';
 import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
 import {
@@ -212,6 +213,163 @@ function inheritOriginLoc(root, origin) {
 		return null;
 	});
 	return root;
+}
+
+// Inspection-only marker. A node the COMPILER synthesized still needs a loc so
+// the print's source map points somewhere sensible inside the construct that
+// produced it (see inheritOriginLoc) — but that loc is not an authored origin,
+// and reporting it as one makes inspection claim source the user never wrote.
+// Freshly built nodes only; adopted parser ASTs are frozen and never authored
+// by us in the first place.
+function markSynthesized(node) {
+	if (node != null) (node.metadata ??= {}).tsrx_synthesized_origin = true;
+	return node;
+}
+
+/**
+ * A component prop's KEY is the authored attribute name — `label` in
+ * `<Chip label="x"/>` — emitted as a quoted object key. Anchor it there and
+ * claim the pair: the key's generated text carries quotes the authored name
+ * does not, so it never looks like a faithful reproduction on its own.
+ */
+function anchorPropKey(ctx, key, nameNode) {
+	if (!ctx.inspect || nameNode == null || nameNode.start == null) return key;
+	const name = typeof nameNode.name === 'string' ? nameNode.name : null;
+	if (name !== null) registerExactOrigin(ctx, nameNode, nameNode.end, [`'${name}'`, `"${name}"`]);
+	return inheritOriginLoc(key, nameNode);
+}
+
+/**
+ * The authored `<style>` element(s) one CSS injection came from. A component's
+ * styles may be split across several blocks that share a single scope hash and
+ * therefore a single `injectStyle` call, so every block points at it. Only
+ * positioned blocks qualify: an origin the print cannot stamp a location from
+ * is worse than the module fallback, which at least maps somewhere real.
+ */
+function cssOrigins(injection) {
+	const nodes = Array.isArray(injection.origins)
+		? injection.origins
+		: injection.origin != null
+			? [injection.origin]
+			: [];
+	return nodes.filter((node) => node != null && node.start != null && node.loc != null);
+}
+
+/** Mark a synthesized attribute whole — name and value alike. */
+function markSynthesizedAttr(attr) {
+	markSynthesized(attr.name);
+	markSynthesized(attr.value);
+	return attr;
+}
+
+// Curated exact origins (`inspect: true`). A generated token whose authored
+// counterpart the compiler KNOWS — the `$$click` slot key of an `onClick`, the
+// block helper an `@if`/`@for` lowers to — but which the module map alone
+// reports imprecisely, because the map carries only a start and the smallest
+// AST node starting there is the whole attribute value or the whole directive.
+// Keyed by authored start; the generated text disambiguates the one token being
+// claimed from every other token the same construct emitted.
+function registerExactOrigin(ctx, node, end, texts) {
+	if (!ctx.inspect || node == null || node.start == null || !(end > node.start)) return;
+	const existing = ctx.exactOrigins.get(node.start);
+	if (existing) {
+		for (const text of texts) existing.texts.add(text);
+		return;
+	}
+	ctx.exactOrigins.set(node.start, { end, texts: new Set(texts) });
+}
+
+/**
+ * A control-flow directive lowers to a helper call plus one hoisted function per
+ * arm. The map anchors every token of that lowering at the directive's start, so
+ * without this the only authored range on offer is the WHOLE block. Claim just
+ * the keyword — `@if`, `@for` — for the tokens that name the lowering.
+ */
+function registerDirectiveOrigin(ctx, origin, names) {
+	if (!ctx.inspect || origin == null) return;
+	const keyword = DIRECTIVE_KEYWORDS[origin.type];
+	// The directive is normalized to its plain-statement type before it reaches
+	// codegen, and the SAME lowering runs for statements that never had a
+	// keyword (a synthesized `if (!cond)`, a lowered ternary). Confirm the
+	// authored spelling is really there before claiming those bytes.
+	if (keyword === undefined || !ctx.mapSource.startsWith(keyword, origin.start)) return;
+	const texts = [];
+	for (const name of names) {
+		if (typeof name === 'string' && name !== '' && name !== 'null') texts.push(name);
+	}
+	registerExactOrigin(ctx, origin, origin.start + keyword.length, texts);
+}
+
+/**
+ * The `$$click` slot key an event attribute lowers to, anchored at the AUTHORED
+ * attribute name. Everything else in the binding maps to the handler
+ * expression, which would leave `onClick` itself unreachable from the output.
+ */
+function slotKeyLiteral(bind) {
+	return inheritOriginLoc(b.literal(bind.slotKey), bind.slotKeyOrigin ?? null);
+}
+
+/**
+ * An ALIAS: an authored range that emits nothing of its own but means the same
+ * thing as one that does. A component's closing tag is the case — `</Card>` is
+ * pure syntax, while the opening name became the emitted component reference —
+ * and so is a `@{ … }` block header. Recorded as a pair of authored offsets;
+ * the consumer lends the target's generated ranges to the alias.
+ */
+function registerOriginAlias(ctx, span, target) {
+	if (!ctx.inspect || span == null || target == null) return;
+	if (span.start == null || span.end == null || target.start == null) return;
+	if (!(span.end > span.start) || span.start === target.start) return;
+	ctx.originAliases.push({ srcStart: span.start, srcEnd: span.end, ofStart: target.start });
+}
+
+/**
+ * The directive keyword as a standalone origin, so the body helper it hoists
+ * can be anchored on `@if` / `@for` rather than on the first statement of the
+ * block. One line by construction, so the end column is arithmetic.
+ */
+function directiveKeywordOrigin(ctx, node) {
+	if (!ctx.inspect || node == null || node.start == null || node.loc == null) return null;
+	const keyword = DIRECTIVE_KEYWORDS[node.type];
+	if (keyword === undefined || !ctx.mapSource.startsWith(keyword, node.start)) return null;
+	return {
+		start: node.start,
+		end: node.start + keyword.length,
+		loc: {
+			start: node.loc.start,
+			end: { ...node.loc.start, column: node.loc.start.column + keyword.length },
+		},
+	};
+}
+
+/**
+ * A directive CLAUSE (`@empty`, and the other keyword-introduced arms) has no
+ * node of its own — the clause is a plain BlockStatement starting at its `{` —
+ * so the parser records the keyword's span separately. Claim it for the arm
+ * function the clause lowered to.
+ */
+function registerClauseOrigin(ctx, span, names) {
+	if (!ctx.inspect || span == null || typeof span.start !== 'number') return;
+	const texts = [];
+	for (const name of names) {
+		if (typeof name === 'string' && name !== '' && name !== 'null') texts.push(name);
+	}
+	if (texts.length > 0) registerExactOrigin(ctx, { start: span.start }, span.end, texts);
+}
+
+/** The authored keyword each lowered JSX control-flow directive opens with. */
+const DIRECTIVE_KEYWORDS = {
+	IfStatement: '@if',
+	ForOfStatement: '@for',
+	ForInStatement: '@for',
+	ForStatement: '@for',
+	TryStatement: '@try',
+	SwitchStatement: '@switch',
+};
+
+/** Does this node carry an AUTHORED range inspection may report? */
+function hasAuthoredOrigin(node) {
+	return node != null && node.start != null && node.metadata?.tsrx_synthesized_origin !== true;
 }
 
 // React parity: a void element must neither have children nor use
@@ -3970,59 +4128,6 @@ function encodeMappings(decodedLines) {
 	return groups.join(';');
 }
 
-/**
- * Inspection-only (`inspect: true`): enrich the module print's decoded mapping
- * lines into "fat segments" `{ genLine, genCol, genEndCol, srcStart, srcEnd }`
- * with absolute source offsets. `srcEnd` is resolved through a
- * smallest-node-at-offset index over the parsed AST (read-only walk via
- * mapAst), so a segment pointing at an identifier gets exactly that
- * identifier's range.
- */
-/** @param {number[][][]} decodedLines @param {string} source @param {any} parsedAst */
-function buildFatSegments(decodedLines, source, parsedAst) {
-	const lineStarts = [0];
-	for (let i = 0; i < source.length; i++) {
-		if (source.charCodeAt(i) === 10) lineStarts.push(i + 1);
-	}
-	/** @type {Map<number, number>} */
-	const smallestEndAt = new Map();
-	mapAst(parsedAst, (/** @type {any} */ node) => {
-		if (typeof node.start === 'number' && typeof node.end === 'number') {
-			const prev = smallestEndAt.get(node.start);
-			if (prev === undefined || node.end < prev) smallestEndAt.set(node.start, node.end);
-		}
-		return null;
-	});
-	const fat = [];
-	for (let genLine = 0; genLine < decodedLines.length; genLine++) {
-		for (const seg of decodedLines[genLine]) {
-			const lineStart = lineStarts[seg[2]];
-			if (lineStart === undefined) continue;
-			const srcStart = lineStart + seg[3];
-			fat.push({
-				genLine,
-				genCol: seg[0],
-				genEndCol: null,
-				srcStart,
-				srcEnd: smallestEndAt.get(srcStart) ?? null,
-			});
-		}
-	}
-	fat.sort(
-		(/** @type {any} */ a, /** @type {any} */ b) => a.genLine - b.genLine || a.genCol - b.genCol,
-	);
-	for (let i = 0; i < fat.length; i++) {
-		// Deduped by encodeMappings on the encoded side; keep raw here but give
-		// each segment the next DISTINCT column on its line as its end.
-		let j = i + 1;
-		while (j < fat.length && fat[j].genLine === fat[i].genLine && fat[j].genCol === fat[i].genCol) {
-			j++;
-		}
-		if (j < fat.length && fat[j].genLine === fat[i].genLine) fat[i].genEndCol = fat[j].genCol;
-	}
-	return fat;
-}
-
 function buildSourceMap(source, sourceName, segments) {
 	const byLine = new Map();
 	let maxLine = -1;
@@ -4920,6 +5025,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		],
 		consumedRuntimeLocals,
 		inspect: inspectEnabled, // template-origin recording (see above)
+		exactOrigins: new Map(), // see registerExactOrigin
+		originAliases: [], // see registerOriginAlias
 		hoistedTemplates: [], // { name, ast, html, ns, frag, origins }
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
@@ -5515,8 +5622,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			),
 		);
 	}
-	const styleNodes = ctx.cssInjections.map((i) =>
-		inheritOriginLoc(
+	const styleNodes = ctx.cssInjections.map((i) => {
+		// Point the authored `<style>` block at the CSS this injection carries.
+		// Both sides are whole units — the block and the stylesheet it became —
+		// which is the useful pairing for a scoped style.
+		for (const origin of cssOrigins(i)) {
+			registerExactOrigin(ctx, origin, origin.end, [JSON.stringify(i.css)]);
+		}
+		return inheritOriginLoc(
 			b.stmt(
 				b.call(
 					'_$injectStyle',
@@ -5524,9 +5637,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 					b.literal(i.css, JSON.stringify(i.css)),
 				),
 			),
-			moduleOrigin,
-		),
-	);
+			cssOrigins(i)[0] ?? moduleOrigin,
+		);
+	});
 	const templateNodes = ctx.hoistedTemplates.map((t) => {
 		const args = [b.literal(t.html, JSON.stringify(t.html))];
 		if (t.ns || t.frag) args.push(b.literal(t.ns | 0));
@@ -5799,7 +5912,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// there. `genEndCol` is the next segment's column on the same
 			// generated line (null on the line's last segment — consumers clamp
 			// to the line end).
-			segments: buildFatSegments(printed.mappings, source, parsedAst),
+			segments: buildFatSegments(
+				printed.mappings,
+				source,
+				parsedAst,
+				printed.code,
+				ctx.exactOrigins,
+			),
+			aliases: ctx.originAliases,
 		};
 	}
 	return result;
@@ -5883,6 +6003,13 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		userRuntimeDefaults: new Set(),
 		consumedRuntimeLocals,
 		inspect: !!(options && options.inspect),
+		exactOrigins: new Map(), // see registerExactOrigin
+		originAliases: [], // see registerOriginAlias
+		// One entry per static HTML run the SSR emit bakes into a quasi, with the
+		// authored origins of the spans inside it (inspection only — see
+		// ssrHtmlTemplate). The server has no hoisted templates, so this is the
+		// SSR counterpart of the client's `ctx.hoistedTemplates` origins.
+		ssrTemplates: [],
 		hoistedHelpers: [],
 		cssInjections: [],
 		moduleCssInjections: [],
@@ -5991,8 +6118,18 @@ function compileServer(source, filename, options, analyzedAst = null) {
 	if (ctx.inspect) {
 		result.inspect = {
 			ast: printed.ast,
-			templates: [],
-			segments: buildFatSegments(printed.mappings, source, parsedAst),
+			// SSR bakes its HTML inline, so a "template" here is one printed quasi;
+			// `raw` is the bytes the module contains for it, so a consumer locates
+			// the run and then indexes `origins` into `html`.
+			templates: ctx.ssrTemplates,
+			segments: buildFatSegments(
+				printed.mappings,
+				source,
+				parsedAst,
+				printed.code,
+				ctx.exactOrigins,
+			),
+			aliases: ctx.originAliases,
 		};
 	}
 	return result;
@@ -6314,6 +6451,10 @@ function ssrCompileBody(
 	if (cssEntries && cssEntries.length) {
 		ctx.runtimeNeeded.add('injectStyle');
 		for (const entry of cssEntries) {
+			for (const styleOrigin of cssOrigins(entry)) {
+				registerExactOrigin(ctx, styleOrigin, styleOrigin.end, [JSON.stringify(entry.css)]);
+			}
+			const origin = cssOrigins(entry)[0] ?? node;
 			body.push(
 				inheritOriginLoc(
 					b.stmt(
@@ -6323,10 +6464,10 @@ function ssrCompileBody(
 								b.literal(entry.hash, JSON.stringify(entry.hash)),
 								b.literal(entry.css, JSON.stringify(entry.css)),
 							],
-							node,
+							origin,
 						),
 					),
-					node,
+					origin,
 				),
 			);
 		}
@@ -6386,23 +6527,72 @@ function hasTextNeighbor(kinds, i) {
 	return false;
 }
 
+// A static SSR contribution that carries authored origins (`inspect: true`).
+// Without inspection every static contribution stays a bare string, so the
+// normal server path allocates nothing extra and `ssrHtmlTemplate` takes its
+// original `typeof part === 'string'` branch unchanged.
+function ssrStatic(text, origins) {
+	return origins !== null && origins.length > 0 ? { ssrStatic: true, text, origins } : text;
+}
+
+/** The static text of a part, or `null` when the part is an expression. */
+function ssrStaticText(part) {
+	if (typeof part === 'string') return part;
+	return part !== null && typeof part === 'object' && part.ssrStatic === true ? part.text : null;
+}
+
 // Build one server HTML template literal. Static HTML runs live in quasis;
 // runtime-produced strings remain expressions. Adjacent static runs are folded
 // before construction so the generated tree stays compact.
-function ssrHtmlTemplate(parts, origin) {
+//
+// Inspection (`inspect: true`) rides the same fold: a quasi IS the unit the
+// generated document contains verbatim, so each completed run is registered as
+// one entry with its origins rebased into that run. Registration is the SSR
+// counterpart of the client's hoisted-template origins — the server bakes its
+// HTML inline instead of hoisting it, so the run, not a `_t$N`, is the thing to
+// point at.
+function ssrHtmlTemplate(parts, origin, ctx) {
 	const quasis = [];
 	const expressions = [];
+	const collect = ctx != null && ctx.inspect === true;
 	let staticRun = '';
+	let runOrigins = collect ? [] : null;
+	const closeRun = (tail) => {
+		const quasi = b.quasi(staticRun, tail);
+		if (collect && runOrigins.length > 0) {
+			ctx.ssrTemplates.push({
+				name: null,
+				ast: null,
+				html: staticRun,
+				// The bytes the printed module contains for this run. Consumers
+				// locate the run by this, then index `origins` into `html`.
+				raw: quasi.value?.raw ?? staticRun,
+				origins: runOrigins,
+			});
+		}
+		if (collect) runOrigins = [];
+		staticRun = '';
+		return quasi;
+	};
 	for (const part of parts) {
-		if (typeof part === 'string') {
-			staticRun += part;
+		const text = ssrStaticText(part);
+		if (text !== null) {
+			if (collect && part.ssrStatic === true) {
+				for (const entry of part.origins) {
+					runOrigins.push({
+						...entry,
+						start: entry.start + staticRun.length,
+						end: entry.end + staticRun.length,
+					});
+				}
+			}
+			staticRun += text;
 			continue;
 		}
-		quasis.push(b.quasi(staticRun, false));
+		quasis.push(closeRun(false));
 		expressions.push(part);
-		staticRun = '';
 	}
-	quasis.push(b.quasi(staticRun, true));
+	quasis.push(closeRun(true));
 	return inheritOriginLoc(b.template(quasis, expressions), origin);
 }
 
@@ -6506,7 +6696,11 @@ function ssrEmitNodes(
 			prevText = kind === 'other' ? null : kind;
 		}
 	}
-	return ssrHtmlTemplate(parts, nodes.find((child) => child?.loc != null) ?? ctx._moduleOrigin);
+	return ssrHtmlTemplate(
+		parts,
+		nodes.find((child) => child?.loc != null) ?? ctx._moduleOrigin,
+		ctx,
+	);
 }
 
 function ssrEmitNode(
@@ -6527,7 +6721,23 @@ function ssrEmitNode(
 				// first-child position of a newline-eating tag, protect a leading '\n'
 				// by doubling it (the parser eats the first — see ssrEmitNodes).
 				const guard = nlGuard && expr.value.charCodeAt(0) === 10 ? '\n' : '';
-				return guard + escapeHtml(expr.value);
+				const escaped = escapeHtml(expr.value);
+				// Static text is the one span an SSR reader most wants to trace back,
+				// and it is baked here rather than in ssrEmitElement's attribute run.
+				return ssrStatic(
+					guard + escaped,
+					ctx.inspect && hasAuthoredOrigin(expr)
+						? [
+								{
+									start: guard.length,
+									end: guard.length + escaped.length,
+									srcStart: expr.start,
+									srcEnd: expr.end,
+									kind: 'text',
+								},
+							]
+						: null,
+				);
 			}
 			// `{x as string}` / literals / templates / `+`-concats → definite TEXT.
 			// Everything else (`{children}`, `{<Comp/>}`, possibly-renderable values)
@@ -6618,10 +6828,24 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// mark it ` selected` (see the option branch at the bottom).
 	const parts = [];
 	let lit = tag === 'option' ? '' : '<' + tag;
+	// Authored origins for the CURRENT run, offsets relative to `lit` — recorded
+	// where each span is appended, never re-lexed off the assembled string.
+	// `null` outside inspection, which is what keeps the normal path allocation-
+	// free (see ssrStatic).
+	let litOrigins = ctx.inspect ? [] : null;
+	const recordLit = (kind, node, start, end) => {
+		if (litOrigins !== null && hasAuthoredOrigin(node)) {
+			litOrigins.push({ start, end, srcStart: node.start, srcEnd: node.end, kind });
+		}
+	};
+	const openNameNode = node.id || node.openingElement?.name;
+	const closeNameNode = node.closingElement?.name ?? openNameNode;
+	if (tag !== 'option') recordLit('tag-open', openNameNode, 1, 1 + tag.length);
 	const flush = () => {
 		if (lit) {
-			parts.push(lit);
+			parts.push(ssrStatic(lit, litOrigins));
 			lit = '';
+			if (litOrigins !== null) litOrigins = [];
 		}
 	};
 
@@ -6694,7 +6918,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// Wrap the assembled string in an IIFE that binds the spread temps when any
 	// exist (so the temp names resolve); otherwise return the bare concatenation.
 	const finalize = () => {
-		let body = ssrHtmlTemplate(parts, node);
+		let body = ssrHtmlTemplate(parts, node, ctx);
 		if (spreadTemps.length > 0) {
 			const declarations = spreadTemps.map((temp) =>
 				inheritOriginLoc(
@@ -7021,7 +7245,13 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 					),
 				);
 			} else {
-				lit += bakeStaticAttr(attrName, true, tag, selfNs);
+				{
+					const chunk = bakeStaticAttr(attrName, true, tag, selfNs);
+					if (litOrigins !== null) {
+						recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, null);
+					}
+					lit += chunk;
+				}
 			}
 			continue;
 		}
@@ -7031,12 +7261,24 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		if (attrName === 'style') {
 			inner = resolveStyleExpr(inner, cssHash);
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
-				lit += ` style="${escapeAttr(inner.value)}"`;
+				{
+					const chunk = ` style="${escapeAttr(inner.value)}"`;
+					if (litOrigins !== null) {
+						recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, inner);
+					}
+					lit += chunk;
+				}
 				continue;
 			}
 			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
 				const css = staticObjectToCssString(inner);
-				if (css) lit += ` style="${escapeAttr(css)}"`;
+				if (css) {
+					const chunk = ` style="${escapeAttr(css)}"`;
+					if (litOrigins !== null) {
+						recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, inner);
+					}
+					lit += chunk;
+				}
 				continue;
 			}
 			flush();
@@ -7059,7 +7301,13 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			inner.type === 'Literal' &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, selfNs))
 		) {
-			lit += bakeStaticAttr(attrName, inner.value, tag, selfNs);
+			{
+				const chunk = bakeStaticAttr(attrName, inner.value, tag, selfNs);
+				if (litOrigins !== null) {
+					recordBakedAttrOrigins(litOrigins, lit.length, chunk, attrName, attr.name, inner);
+				}
+				lit += chunk;
+			}
 			continue;
 		}
 
@@ -7217,7 +7465,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	let childrenExpr;
 	if (authoredStaticScriptContent !== undefined) {
 		const content = escapeInlineScriptContent(authoredStaticScriptContent);
-		childrenExpr = ssrHtmlTemplate(content === '' ? [] : [content], node);
+		childrenExpr = ssrHtmlTemplate(content === '' ? [] : [content], node, ctx);
 	} else if (
 		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
@@ -7351,7 +7599,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			);
 		}
 		flush();
-		const attrsExpr = ssrHtmlTemplate(parts, node);
+		const attrsExpr = ssrHtmlTemplate(parts, node, ctx);
 		parts.length = 0;
 		ctx.runtimeNeeded.add('ssrOption');
 		let optionValueExpr = optValue ?? ssrVoid(node);
@@ -7391,12 +7639,14 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		flush();
 		parts.push(childrenExpr);
 	}
+	recordLit('tag-close', closeNameNode, lit.length + 2, lit.length + 2 + tag.length);
 	lit += `</${tag}>`;
 	flush();
 	return finalize();
 }
 
 function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
+	registerOriginAlias(ctx, node.closingElement?.name, node.id || node.openingElement?.name);
 	// M3 inherit-range: consume the body-root flag ONCE, before this component's
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
@@ -7429,7 +7679,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		if (val == null) {
 			propNodes.push(
 				inheritOriginLoc(
-					b.prop('init', b.literal(attrName, JSON.stringify(attrName)), b.literal(true, 'true')),
+					b.prop(
+						'init',
+						anchorPropKey(ctx, b.literal(attrName, JSON.stringify(attrName)), attr.name),
+						b.literal(true, 'true'),
+					),
 					attr,
 				),
 			);
@@ -7445,7 +7699,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			inheritOriginLoc(
 				b.prop(
 					'init',
-					b.literal(attrName, JSON.stringify(attrName)),
+					anchorPropKey(ctx, b.literal(attrName, JSON.stringify(attrName)), attr.name),
 					inner.type === 'Literal' ? inner : tsrxExprNode(inner, ctx, name, inlinedSubs),
 				),
 				attr,
@@ -7602,19 +7856,27 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
 	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(thenSub.fn);
-	let elseCall = ssrHtmlTemplate([], node);
+	let elseCall = ssrHtmlTemplate([], node, ctx);
+	let elseFnName = null;
 	if (node.alternate) {
 		// An `else if` arrives as an IfStatement; wrap it so it recurses through
 		// ssrEmitNode and gets its own marker.
 		const elseStmts =
 			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
 		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
+		elseFnName = elseSub.fnName;
 		inlinedSubs.push(elseSub.fn);
-		elseCall = ssrSubCall(elseSub.fnName, [b.id('undefined')], node.alternate);
+		registerClauseOrigin(ctx, node.alternateKeyword, [elseSub.fnName]);
+		elseCall = ssrSubCall(
+			elseSub.fnName,
+			[b.id('undefined')],
+			node.alternateKeyword ?? node.alternate,
+		);
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrControl');
 	ctx.runtimeNeeded.add('ssrArm');
+	registerDirectiveOrigin(ctx, node, ['_$ssrControl', '_$ssrArm', thenSub.fnName, elseFnName]);
 	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
@@ -7643,7 +7905,7 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 				],
 				node.alternate,
 			)
-		: ssrHtmlTemplate([], node);
+		: ssrHtmlTemplate([], node, ctx);
 	return ssrCall(
 		'ssrBlock',
 		[
@@ -7724,23 +7986,33 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		componentNs,
 	);
 	inlinedSubs.push(itemSub.fn);
-	let emptyCall = ssrHtmlTemplate([], node);
+	let emptyCall = ssrHtmlTemplate([], node, ctx);
+	let emptyFnName = null;
 	if (node.empty) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
 		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs, componentNs);
+		emptyFnName = emptySub.fnName;
 		inlinedSubs.push(emptySub.fn);
+		const emptyOrigin = node.emptyKeyword ?? node.empty;
 		emptyCall = ssrCall(
 			'ssrArm',
 			[
 				b.literal('empty', '"empty"'),
-				ssrThunk(ssrSubCall(emptySub.fnName, [b.id('undefined')], node.empty), node.empty),
+				ssrThunk(ssrSubCall(emptySub.fnName, [b.id('undefined')], emptyOrigin), emptyOrigin),
 			],
-			node.empty,
+			emptyOrigin,
 		);
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrForBlock');
 	ctx.runtimeNeeded.add('ssrControl');
+	registerDirectiveOrigin(ctx, node, [
+		'_$ssrForBlock',
+		'_$ssrControl',
+		itemSub.fnName,
+		emptyFnName,
+	]);
+	registerClauseOrigin(ctx, node.emptyKeyword, [emptyFnName]);
 	let itemKey = inheritOriginLoc(
 		b.conditional(
 			b.logical(
@@ -7842,7 +8114,7 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
 	const arms = [];
-	let defaultCall = ssrHtmlTemplate([], node);
+	let defaultCall = ssrHtmlTemplate([], node, ctx);
 	let caseIndex = 0;
 	for (const c of node.cases || []) {
 		const sub = ssrCompileSub(
@@ -7855,15 +8127,22 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 			componentNs,
 		);
 		inlinedSubs.push(sub.fn);
+		// `@case` / `@default` is the arm's only authored keyword; the arm node
+		// itself starts before it, so anchor the arm on the keyword when known.
+		const armOrigin = c.keyword ?? c;
+		registerClauseOrigin(ctx, c.keyword, [sub.fnName]);
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
 		const renderedArm = ssrCall(
 			'ssrArm',
 			[
 				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
-				ssrThunk(ssrCall('ssrBlock', [ssrSubCall(sub.fnName, [b.id('undefined')], c)], c), c),
+				ssrThunk(
+					ssrCall('ssrBlock', [ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin)], armOrigin),
+					armOrigin,
+				),
 			],
-			c,
+			armOrigin,
 		);
 		if (c.test == null) defaultCall = renderedArm;
 		else {
@@ -7878,6 +8157,7 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrControl');
 	ctx.runtimeNeeded.add('ssrArm');
+	registerDirectiveOrigin(ctx, node, ['_$ssrControl', '_$ssrArm']);
 	// First case matching by strict-equality wins (no JS fall-through); else default.
 	let selector = defaultCall;
 	for (let i = arms.length - 1; i >= 0; i--) {
@@ -7915,7 +8195,8 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			componentNs,
 		);
 		inlinedSubs.push(pendSub.fn);
-		pendFn = inheritOriginLoc(b.id(pendSub.fnName), node.pending);
+		registerClauseOrigin(ctx, node.pendingKeyword, [pendSub.fnName]);
+		pendFn = inheritOriginLoc(b.id(pendSub.fnName), node.pendingKeyword ?? node.pending);
 	}
 	let catchFn = inheritOriginLoc(b.literal(null), node); // no @catch → rethrow
 	if (node.handler) {
@@ -7935,16 +8216,19 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		// A no-param @catch simply ignores the error argument ssrTry passes.
 		// ssrTry keeps the SSR scope second; adapt the authored reset parameter
 		// around that ABI instead of shifting existing one-parameter helpers.
+		registerClauseOrigin(ctx, node.handlerKeyword, [catchSub.fnName]);
+		const catchOrigin = node.handlerKeyword ?? node.handler;
 		catchFn = node.handler.resetParam
 			? inheritOriginLoc(
 					b.arrow(
 						[b.id('__error'), b.id('__scope'), b.id('__reset')],
 						b.call(catchSub.fnName, b.id('__error'), b.id('__reset'), b.id('__scope')),
 					),
-					node.handler,
+					catchOrigin,
 				)
-			: inheritOriginLoc(b.id(catchSub.fnName), node.handler);
+			: inheritOriginLoc(b.id(catchSub.fnName), catchOrigin);
 	}
+	registerDirectiveOrigin(ctx, node, ['_$ssrTry', trySub.fnName]);
 	ctx.runtimeNeeded.add('ssrTry');
 	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
 	// suspension renders the @pending fallback (plus, in STREAMING renders, the
@@ -8098,7 +8382,15 @@ function applyStyleMap(stmt, ctx) {
 			analyzeCss(sheet);
 			prepareStylesheetForRender(sheet, true);
 			const css = renderStylesheets([sheet]);
-			ctx.cssInjections.push({ hash, css, order: styleNode.start ?? stmt.start ?? 0 });
+			ctx.cssInjections.push({
+				hash,
+				css,
+				order: styleNode.start ?? stmt.start ?? 0,
+				// The authored `<style>` element. `injectStyle` is emitted at module
+				// scope, so without this the whole block maps to the module origin
+				// and neither the tag nor its CSS is reachable from the output.
+				origin: styleNode,
+			});
 			ctx.runtimeNeeded.add('injectStyle');
 			// Replace the JSXStyleElement init with the class-map ObjectExpression
 			// (built loc-less by the core helper — it maps to the authored <style>).
@@ -8230,12 +8522,19 @@ function addHashClassToElement(element, hash, classAttrName) {
 	);
 	let newAttrs;
 	if (index === -1) {
-		// A synthesized class attribute maps to the element's opening tag.
+		// A synthesized class attribute maps to the element's opening tag — the
+		// loc keeps generated positions inside the element for source maps, but
+		// there is no authored `class` here, so it is marked NOT AUTHORED. Left
+		// unmarked, inspection reports the whole opening tag as the origin of the
+		// scoped class, and a hover on any attribute in that tag (`onClick`, …)
+		// resolves to the class the compiler added.
 		newAttrs = [
 			...attrs,
-			inheritOriginLoc(
-				b.jsx_attribute(b.jsx_id(classAttrName), b.literal(hash, JSON.stringify(hash))),
-				openingElement,
+			markSynthesizedAttr(
+				inheritOriginLoc(
+					b.jsx_attribute(b.jsx_id(classAttrName), b.literal(hash, JSON.stringify(hash))),
+					openingElement,
+				),
 			),
 		];
 	} else {
@@ -8243,9 +8542,10 @@ function addHashClassToElement(element, hash, classAttrName) {
 		const value = existing.value;
 		let newAttr;
 		if (!value) {
+			// The NAME is authored (`class`), the value is not.
 			newAttr = {
 				...existing,
-				value: inheritOriginLoc(b.literal(hash, JSON.stringify(hash)), existing),
+				value: markSynthesized(inheritOriginLoc(b.literal(hash, JSON.stringify(hash)), existing)),
 			};
 		} else if (value.type === 'Literal' && typeof value.value === 'string') {
 			const merged = `${value.value} ${hash}`;
@@ -8471,6 +8771,10 @@ function applyCssScoping(componentNode, ctx) {
 		hash: cssHash,
 		css,
 		order: styles[0]?.sheet.start ?? styles[0]?.node.start ?? componentNode.start ?? 0,
+		// The authored `<style>` element(s) this stylesheet came from.
+		// `injectStyle` is emitted at module scope, so without an origin the
+		// block maps to the module and neither the tag nor its CSS is reachable.
+		origins: styles.map((style) => style.node).filter(Boolean),
 	});
 	ctx.runtimeNeeded.add('injectStyle');
 	// Rebuild every owned render root copy-on-write: add the canonical hash
@@ -13334,6 +13638,11 @@ function normalizeChildren(nodes, inSvg = false) {
 				id: n.openingElement.name,
 				attributes: n.openingElement.attributes || [],
 				openingElement: n.openingElement,
+				// Retained for inspection only: a closing tag has its OWN authored
+				// range, and reporting the opening name for it (the shape before
+				// this) makes `</div>` unreachable from the source. Always assigned
+				// so every normalized Element keeps one object shape.
+				closingElement: n.closingElement,
 				children: n.children || [],
 				selfClosing: n.openingElement.selfClosing,
 				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
@@ -13362,7 +13671,14 @@ function normalizeChildren(nodes, inSvg = false) {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
 			// `alternate` are already BlockStatements per the new AST.
-			out.push(inheritOriginLoc(b.if(n.test, n.consequent, n.alternate || null), n));
+			// Clause keyword spans ride along: a clause is a plain BlockStatement
+			// starting at its `{`, so the parser's span is its only authored
+			// spelling and inspection has nothing else to point at.
+			out.push(
+				Object.assign(inheritOriginLoc(b.if(n.test, n.consequent, n.alternate || null), n), {
+					alternateKeyword: n.alternateKeyword ?? null,
+				}),
+			);
 		} else if (n.type === 'JSXForExpression') {
 			// `@for (const x of items; index i; key x.id) { ... }` — lower to
 			// ForOfStatement plus the `key` and `index` fields the new AST gives
@@ -13373,6 +13689,7 @@ function normalizeChildren(nodes, inSvg = false) {
 					key: n.key || null,
 					index: n.index || null,
 					empty: n.empty || null,
+					emptyKeyword: n.emptyKeyword ?? null,
 				}),
 			);
 		} else if (n.type === 'JSXTryExpression') {
@@ -13385,7 +13702,11 @@ function normalizeChildren(nodes, inSvg = false) {
 						b.try(n.block, n.handler || null, n.finalizer || null, n.pending || null),
 						n,
 					),
-					{ propagateSuspense: n.propagateSuspense === true },
+					{
+						propagateSuspense: n.propagateSuspense === true,
+						pendingKeyword: n.pendingKeyword ?? null,
+						handlerKeyword: n.handlerKeyword ?? null,
+					},
 				),
 			);
 		} else if (n.type === 'JSXSwitchExpression') {
@@ -14664,6 +14985,8 @@ function planJsx(
 		ctx.runtimeNeeded.add('forBlock');
 		const slotIndex = fc.slotIndex;
 		const org = fc.origin ?? planOrigin;
+		registerDirectiveOrigin(ctx, org, ['_$forBlock', fc.keyHelper, fc.bodyHelper, fc.emptyHelper]);
+		registerClauseOrigin(ctx, fc.emptyKeyword, [fc.emptyHelper]);
 		// Control-flow-only bodies have no bag: the host is __block.parentNode directly.
 		const hostExpr = () => hostNodeFor(`_for$${fc.id}`);
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
@@ -14719,8 +15042,11 @@ function planJsx(
 		if (flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor) tailArgs.push(flagsExpr);
 		if (hasDeps) tailArgs.push(b.array(fc.depNames.map(depNode)));
 		else if (hasEmpty || hasAnchor) tailArgs.push(undefinedNode());
-		if (hasEmpty) tailArgs.push(helperRefNode(fc.emptyHelper));
-		else if (hasAnchor) tailArgs.push(nullNode());
+		// Anchor the `@empty` arm at its own keyword: every other token of the
+		// lowering maps to the `@for`, which would leave `@empty` unreachable.
+		if (hasEmpty) {
+			tailArgs.push(inheritOriginLoc(helperRefNode(fc.emptyHelper), fc.emptyKeyword));
+		} else if (hasAnchor) tailArgs.push(nullNode());
 		if (hasAnchor) tailArgs.push(anchorExpr);
 		// A dedicated template `<!>` is already a durable comment at exactly the
 		// list's trailing boundary. Let forBlock reuse it as its end marker instead
@@ -14798,6 +15124,8 @@ function planJsx(
 			continue;
 		}
 		ctx.runtimeNeeded.add('ifBlock');
+		registerDirectiveOrigin(ctx, org, ['_$ifBlock', ic.thenHelper, ic.elseHelper]);
+		registerClauseOrigin(ctx, ic.alternateKeyword, [ic.elseHelper]);
 		pushAfterStmt(
 			ic.id,
 			org,
@@ -14809,7 +15137,7 @@ function planJsx(
 					hostExpr,
 					ic.condExpr,
 					helperRefNode(ic.thenHelper),
-					helperRefNode(ic.elseHelper ?? 'null'),
+					inheritOriginLoc(helperRefNode(ic.elseHelper ?? 'null'), ic.alternateKeyword),
 					...trailing,
 				),
 			),
@@ -15205,6 +15533,9 @@ function planJsx(
 		const slotIndex = tc.slotIndex;
 		const org = tc.origin ?? planOrigin;
 		ctx.runtimeNeeded.add('tryBlock');
+		registerDirectiveOrigin(ctx, org, ['_$tryBlock', tc.tryHelper]);
+		registerClauseOrigin(ctx, tc.handlerKeyword, [tc.catchHelper]);
+		registerClauseOrigin(ctx, tc.pendingKeyword, [tc.pendingHelper]);
 		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @try).
 		const tryAnchor = anchorNodeFor(tc, 'tryAnchor');
@@ -15223,8 +15554,8 @@ function planJsx(
 					b.literal(slotIndex),
 					hostNodeFor(`_tryHost$${tc.id}`),
 					helperRefNode(tc.tryHelper),
-					helperRefNode(tc.catchHelper),
-					helperRefNode(tc.pendingHelper),
+					inheritOriginLoc(helperRefNode(tc.catchHelper), tc.handlerKeyword),
+					inheritOriginLoc(helperRefNode(tc.pendingHelper), tc.pendingKeyword),
 					...trailing,
 				),
 			),
@@ -15234,6 +15565,9 @@ function planJsx(
 		const slotIndex = sc.slotIndex;
 		const org = sc.origin ?? planOrigin;
 		ctx.runtimeNeeded.add('switchBlock');
+		registerDirectiveOrigin(ctx, org, ['_$switchBlock', sc.defaultHelper]);
+		registerClauseOrigin(ctx, sc.defaultKeyword, [sc.defaultHelper]);
+		for (const arm of sc.caseRecords ?? []) registerClauseOrigin(ctx, arm.keyword, [arm.helper]);
 		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @switch).
 		const switchAnchor = anchorNodeFor(sc, 'switchAnchor');
@@ -15253,7 +15587,7 @@ function planJsx(
 					hostNodeFor(`_switchHost$${sc.id}`),
 					sc.discExpr,
 					sc.casesExpr,
-					helperRefNode(sc.defaultHelper),
+					inheritOriginLoc(helperRefNode(sc.defaultHelper), sc.defaultKeyword),
 					...trailing,
 				),
 			),
@@ -15785,7 +16119,7 @@ function emitBindingMount(bind, elVar, bag) {
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
 			const slotAssign = b.stmt(
-				b.assignment('=', b.member(el(), b.literal(bind.slotKey), true), value),
+				b.assignment('=', b.member(el(), slotKeyLiteral(bind), true), value),
 			);
 			if (bind.mountOnly) return st(slotAssign);
 			return [st(b.stmt(b.assignment('=', local(`_el$${bind.id}`), el()))), st(slotAssign)];
@@ -15811,7 +16145,7 @@ function emitBindingMount(bind, elVar, bag) {
 			// per event, so the mutation is observed without re-assignment).
 			const n = bind.argExprs.length;
 			const helper = n <= 2 ? `_$evt${n}` : '_$evtN';
-			const args = [el(), b.literal(bind.slotKey), bind.fnExpr];
+			const args = [el(), slotKeyLiteral(bind), bind.fnExpr];
 			if (n <= 2) args.push(...bind.argExprs);
 			else args.push(b.array(bind.argExprs.slice()));
 			const call = b.call(helper, ...args);
@@ -16100,9 +16434,7 @@ function emitBindingUpdate(bind, bag) {
 			const value = bind.dev
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
-			return st(
-				b.stmt(b.assignment('=', b.member(F('_el'), b.literal(bind.slotKey), true), value)),
-			);
+			return st(b.stmt(b.assignment('=', b.member(F('_el'), slotKeyLiteral(bind), true), value)));
 		}
 		case 'formAction': {
 			return st(
@@ -16442,7 +16774,7 @@ function recordBakedAttrOrigins(origins, base, chunk, attrName, nameNode, valueN
 	if (chunk === '') return;
 	const nameStart = base + 1; // past the leading space
 	const nameEnd = nameStart + attrName.length;
-	if (nameNode != null && nameNode.start != null) {
+	if (hasAuthoredOrigin(nameNode)) {
 		origins.push({
 			start: nameStart,
 			end: nameEnd,
@@ -16454,7 +16786,7 @@ function recordBakedAttrOrigins(origins, base, chunk, attrName, nameNode, valueN
 	if (chunk.length <= 1 + attrName.length) return; // bare ` name` form
 	const valueStart = nameEnd + 2; // past `="`
 	const valueEnd = base + chunk.length - 1; // before the closing quote
-	if (valueEnd > valueStart && valueNode != null && valueNode.start != null) {
+	if (valueEnd > valueStart && hasAuthoredOrigin(valueNode)) {
 		origins.push({
 			start: valueStart,
 			end: valueEnd,
@@ -17157,6 +17489,10 @@ function emitElementHtml(
 			}
 			const eventName = rest === 'DoubleClick' ? 'dblclick' : rest.toLowerCase();
 			const slotKey = capture ? `$$capture:${eventName}` : `$$${eventName}`;
+			// `onClick` → the `'$$click'` slot key. Without this the attribute name
+			// is unreachable from the output: the key's map position resolves to
+			// the HANDLER expression, and the name itself emits nothing.
+			registerExactOrigin(ctx, attr.name, attr.name?.end, [`'${slotKey}'`, `"${slotKey}"`]);
 			if (capture) ctx.capturedEvents.add(eventName);
 			else ctx.delegatedEvents.add(eventName);
 			// Hot-path optimisation: `() => fn(arg, …)` arrows with zero params get
@@ -17172,6 +17508,7 @@ function emitElementHtml(
 					path,
 					eventName,
 					slotKey,
+					slotKeyOrigin: attr.name,
 					ns: hostNs,
 					fnExpr: tsrxExprNode(bundleInfo.callee, ctx, componentName, inlinedSubs),
 					argExprs: bundleInfo.args.map((a) => tsrxExprNode(a, ctx, componentName, inlinedSubs)),
@@ -17185,6 +17522,7 @@ function emitElementHtml(
 					kind: 'event',
 					name: attrName,
 					expr,
+					slotKeyOrigin: attr.name,
 					path,
 					eventName,
 					slotKey,
@@ -17734,17 +18072,19 @@ function emitElementHtml(
 		});
 	}
 
-	// The close tag maps to the element's tag name: normalized Elements don't
-	// retain the closing identifier, and the opening name is the navigation
-	// target either way.
+	// The close tag maps to the CLOSING identifier when the source had one, so
+	// `</div>` resolves to itself rather than jumping to the opening tag.
+	// Self-closing and normalized-away forms fall back to the opening name,
+	// which is then the only authored spelling of the tag.
+	const closeNameNode = node.closingElement?.name ?? originNameNode;
 	const closeOrigins =
-		!isVoid && ctx.inspect && originNameNode != null && originNameNode.start != null
+		!isVoid && ctx.inspect && closeNameNode != null && closeNameNode.start != null
 			? [
 					{
 						start: 2,
 						end: 2 + tag.length,
-						srcStart: originNameNode.start,
-						srcEnd: originNameNode.end,
+						srcStart: closeNameNode.start,
+						srcEnd: closeNameNode.end,
 						kind: 'tag-close',
 					},
 				]
@@ -17849,7 +18189,17 @@ function unionEnv(ctx, bodies) {
 // lexically (component children `__children$N` still use this: they are
 // invoked through props, not through a construct block, so there is no
 // block.extra channel to ride).
-function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssHash, envNames) {
+function hoistBodyHelper(
+	ctx,
+	inlinedSubs,
+	prefix,
+	stmts,
+	params,
+	parentNs,
+	cssHash,
+	envNames,
+	idOrigin = null,
+) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
 	const ownEnv = new Set(ownEnvNames || []);
@@ -17883,7 +18233,11 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	const fake = inheritOriginLoc(
 		{
 			type: 'Component',
-			id: b.id(helperName, fakeOrigin ?? undefined),
+			// The DECLARATION's name is the useful jump target for a directive
+			// clause — `function __case$0(…)` is the arm's implementation, while
+			// the identifier in the helper table is just where it is passed. Give
+			// it the clause keyword's origin so both sides are reachable.
+			id: b.id(helperName, idOrigin ?? fakeOrigin ?? undefined),
 			params: params || [],
 			body: bodyStmts,
 		},
@@ -17952,6 +18306,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		parentNs,
 		cssHash,
 		envNames,
+		directiveKeywordOrigin(ctx, node),
 	);
 
 	let elseHelperName = null;
@@ -17965,6 +18320,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 			parentNs,
 			cssHash,
 			envNames,
+			node.alternateKeyword ?? null,
 		);
 	}
 
@@ -17977,6 +18333,8 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
+		// `@else`'s own keyword — the clause is a BlockStatement starting at `{`.
+		alternateKeyword: node.alternateKeyword ?? null,
 		hostPath: null,
 	};
 }
@@ -18266,6 +18624,9 @@ function makeCompCall(
 	const id = ctx.nextHelperId++;
 	const compName = tagBindingName(node);
 	const compNode = tagExprNode(node);
+	// `</Card>` emits nothing — lend it the opening name's generated ranges so a
+	// closing tag is reachable for components the way it is for host elements.
+	registerOriginAlias(ctx, node.closingElement?.name, node.id || node.openingElement?.name);
 
 	// Build the props object literal from JSX attributes. `<Foo {...rest}/>`
 	// becomes a spread element in the object literal — works because component
@@ -18299,7 +18660,13 @@ function makeCompCall(
 			continue;
 		}
 		if (val == null) {
-			propNodes.push(b.prop('init', b.literal(attrName), b.literal(true, 'true', attr)));
+			propNodes.push(
+				b.prop(
+					'init',
+					anchorPropKey(ctx, b.literal(attrName), attr.name),
+					b.literal(true, 'true', attr),
+				),
+			);
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -18311,7 +18678,7 @@ function makeCompCall(
 		propNodes.push(
 			b.prop(
 				'init',
-				b.literal(attrName),
+				anchorPropKey(ctx, b.literal(attrName), attr.name),
 				inner.type === 'Literal' ? inner : tsrxExprNode(inner, ctx, componentName, inlinedSubs),
 			),
 		);
@@ -18566,6 +18933,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		parentNs,
 		cssHash,
 		envNames,
+		directiveKeywordOrigin(ctx, node),
 	);
 
 	let pendingHelperName = 'null';
@@ -18579,6 +18947,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			parentNs,
 			cssHash,
 			envNames,
+			node.pendingKeyword ?? null,
 		);
 	}
 
@@ -18593,6 +18962,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			parentNs,
 			cssHash,
 			envNames,
+			node.handlerKeyword ?? null,
 		);
 	}
 	return {
@@ -18603,6 +18973,9 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,
+		// `@catch` / `@pending` keywords — each clause starts at its own `{`.
+		handlerKeyword: node.handlerKeyword ?? null,
+		pendingKeyword: node.pendingKeyword ?? null,
 		propagateSuspense: node.propagateSuspense === true,
 		hostPath: null,
 	};
@@ -18621,6 +18994,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	const caseRecords = [];
 	let defaultHelper = 'null';
+	let defaultKeyword = null;
 	// Phase 2: one shared env tuple across every case + default (see unionEnv).
 	const envNames = unionEnv(
 		ctx,
@@ -18638,13 +19012,17 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 			parentNs,
 			cssHash,
 			envNames,
+			c.keyword ?? null,
 		);
 		if (isDefault) {
 			defaultHelper = helperName;
+			defaultKeyword = c.keyword ?? null;
 		} else {
 			caseRecords.push({
 				testNode: c.test,
 				helper: helperName,
+				// `@case`'s own keyword — the arm node starts before it.
+				keyword: c.keyword ?? null,
 			});
 		}
 	}
@@ -18652,7 +19030,9 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	// the whole array with a `props.hN` hole (the component-side hole carries the
 	// tests, which interleave component-scope expressions with the helper fns).
 	const casesExpr = inheritOriginLoc(
-		b.array(caseRecords.map((r) => b.array([r.testNode, b.id(r.helper)]))),
+		b.array(
+			caseRecords.map((r) => b.array([r.testNode, inheritOriginLoc(b.id(r.helper), r.keyword)])),
+		),
 		node,
 	);
 	return {
@@ -18665,6 +19045,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		casesExpr,
 		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
+		defaultKeyword,
 		hostPath: null,
 	};
 }
@@ -19017,6 +19398,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			parentNs,
 			cssHash,
 			envNames,
+			node.emptyKeyword ?? null,
 		);
 	}
 	const itemHelperName = hoistBodyHelper(
@@ -19028,6 +19410,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		parentNs,
 		cssHash,
 		envNames,
+		directiveKeywordOrigin(ctx, node),
 	);
 
 	// Single-root detection: when the body emits exactly one Element root and
@@ -19115,6 +19498,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		indexIndependent: !node.index,
 		// `@empty` branch helper name (or literal 'null' when none).
 		emptyHelper: emptyHelperName,
+		// The authored `@empty` keyword. The clause is a plain BlockStatement
+		// starting at its `{`, so this span is its only spelling — and the emit
+		// anchors the arm reference on it, otherwise every token of the lowering
+		// maps to the `@for` and the clause is unreachable from the output.
+		emptyKeyword: node.emptyKeyword ?? null,
 		hostPath: null,
 	};
 }

@@ -65,6 +65,13 @@ allowBuilds:
 esrap_common: &esrap_common ^2.3.0
 
 overrides:
+  # TEMPORARY — remove once the fix ships as a published @tsrx/core.
+  # `JSXForExpression`'s range excluded its `@empty` clause (the clause is
+  # parsed after the node is finished, unlike `@else`/`@catch`), so anything
+  # slicing a `@for` by its range truncated it. Fixed locally in
+  # ../ripple/packages/tsrx/src/plugin.js; requires the ripple checkout to be a
+  # sibling of this one.
+  '@tsrx/core': link:../ripple/packages/tsrx
   esrap: *esrap_common
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls an older
   # beta preset transitively. Keep the transform on the beta.15 line required
