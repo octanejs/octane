@@ -1,5 +1,59 @@
 # octane
 
+## 0.1.16
+
+### Patch Changes
+
+- 85a1c6d: The auto-memo analysis no longer walks each component body twice to collect the
+  imported components it renders and to look for a deferred ref read. Both
+  questions are answered by one traversal, halving the node visits and visited-set
+  allocations those two passes cost. Compiler output is unchanged.
+- f4c97d8: Extend the opt-in compiler inspection surface (`compile(source, file, { inspect:
+true })`) so source↔output navigation reaches constructs that leave no trace of
+  themselves in the emit. `result.inspect.segments` entries now carry `exact`,
+  marking a segment the compiler itself anchored on an authored span rather than
+  one inferred from the print's map; control-flow directive keywords (`@if`,
+  `@else`, `@for`, `@empty`, `@switch`, `@case`, `@default`, `@try`, `@pending`,
+  `@catch`), event-attribute names, and scoped `<style>` blocks claim the code
+  they lowered to through it. `result.inspect.templates` gains SSR entries (each
+  static run's exact bytes plus its origins) and `result.inspect.aliases` relates
+  an authored span to the origin that owns its emission. `octane/compiler/volar`
+  adds `compileTypesInspection`, a navigation-only sibling of
+  `compileToVolarMappings`: same parse, same transform, same output bytes, without
+  the Volar mapping layer, so nothing here can perturb the language server.
+  Emitted code and source maps remain byte-identical with the option on or off,
+  and normal compiles skip all recording.
+- f3543bf: The compiler's copy-on-write AST rewriter no longer recurses into properties that
+  cannot be rewritten. Only object-valued properties can produce a replacement, but
+  every `type`, `name` and `raw` string was still passed to a recursive call that
+  returned it unchanged, which was 61% of the walk. Compiles are measurably faster
+  with byte-identical output.
+- dfa6d29: Server rendering no longer emits a style declaration whose value serializes to
+  nothing. `style={{ color: '' }}` produced `style="color:;"` on the server while
+  the client produced no style attribute at all, so the markup could not be
+  hydrated and the element was rebuilt. Empty, whitespace-only and
+  empty-after-unit-handling values are now skipped, matching the client and React.
+- 9fbf31a: Cut the per-render cost of value-position element descriptors, the shape every
+  `@octanejs/*` binding and every `createElement`/`.map()` child tree produces.
+  `createElement` no longer allocates a property descriptor per call to detect
+  React's DEV-only `key` warning getter (that probe is now DEV-gated exactly as in
+  React's `hasValidKey`), a keyed element no longer pays a WeakSet insert to record
+  key presence that its non-null `key` already proves, `prepareDeoptList` builds
+  its output arrays only once a list regime is established, and every renderable
+  hole no longer re-reads its host's tag from the DOM to re-check a void-element
+  constraint its enclosing list already validated.
+
+  On the `memo-wall` benchmark (1000 `memo(Row)` children reached through a
+  `{rows}` children hole) this drops a parent re-render absorbed by 1000 prop bails
+  from 0.272ms to 0.177ms, a single-row change amid the wall from 0.275ms to
+  0.184ms, and a context bump through the wall from 0.610ms to 0.517ms. Exact
+  render counts and compiled-work counts are unchanged, and `memo-wall` now carries
+  ratio guards for all three wall-B operations.
+
+  The server runtime gets the same two allocation fixes that apply to it (the key
+  probe and the deferred child-list arrays) so the client and server descriptor
+  paths stay in step; `ssr-throughput` shows no measurable change from them.
+
 ## 0.1.15
 
 ### Patch Changes
