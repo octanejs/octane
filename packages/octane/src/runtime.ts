@@ -4987,7 +4987,14 @@ export function createContext<T>(defaultValue: T): Context<T> {
 			const dialect = typeof props.children === 'function' ? 1 : 2;
 			const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 			if (previous !== dialect) {
-				if (previous !== undefined) resetScopeChildren(scope);
+				if (previous !== undefined) {
+					resetScopeChildren(scope);
+					// The reset runs user cleanups, so it can throw into the enclosing boundary and
+					// switch it to its catch arm — which disposes this block. Rendering children
+					// into a disposed block writes into the catch range, so bail out here, as every
+					// other mid-render teardown site does after `unmountBlock`.
+					if (scope.block.disposed) return;
+				}
 				ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
 			}
 			childrenAsBody(props.children)(undefined, scope, undefined);

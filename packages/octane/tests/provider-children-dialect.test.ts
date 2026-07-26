@@ -72,10 +72,10 @@ describe('context Provider — children dialect changes', () => {
 
 			m.click('.toggle');
 
-			// The remount tears the old children down mid-render. A deletion-phase throw has to
-			// reach the boundary rather than be logged and swallowed — the same contract an
-			// ordinary mid-render deletion gets, pinned by the `@if` control below.
-			expect(m.container.querySelector('.caught')).not.toBe(null);
+			// The remount tears the old children down mid-render. The boundary has to receive the
+			// cleanup's own error — which also means the Provider stopped rendering once the
+			// teardown disposed its block, instead of writing children into the catch range.
+			expect(m.container.querySelector('.caught')?.textContent).toBe('cleanup-boom');
 			expect(error.mock.calls.filter((c) => String(c[0]).includes('cleanup-boom'))).toHaveLength(0);
 		} finally {
 			error.mockRestore();
@@ -89,8 +89,10 @@ describe('context Provider — children dialect changes', () => {
 		try {
 			m.click('.toggle');
 
-			// The control: an `@if` swap deleting the identical component. The Provider flip is a
-			// deletion like any other, so it must not invent its own error-routing behavior.
+			// The control: an `@if` swap deleting the identical component. It reaches the boundary
+			// too, so the Provider flip is not inventing its own routing. This arm asserts only
+			// that the boundary engages — `@if` currently surfaces a follow-on DOM error rather
+			// than the cleanup's own, a separate pre-existing gap that is not this PR's to close.
 			expect(m.container.querySelector('.caught')).not.toBe(null);
 			expect(error.mock.calls.filter((c) => String(c[0]).includes('cleanup-boom'))).toHaveLength(0);
 		} finally {
