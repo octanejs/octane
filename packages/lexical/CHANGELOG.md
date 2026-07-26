@@ -1,5 +1,26 @@
 # @octanejs/lexical
 
+## 0.1.15
+
+### Patch Changes
+
+- cca6ee5: Type the component exports. The package typechecked with `tsgo`, which cannot
+  read `.tsrx`, and an ambient `declare module '*.tsrx'` silenced the resulting
+  resolution errors. That made all 32 exported components (`LexicalComposer`,
+  `ContentEditable`, the plugins) resolve to `any`, both inside the package and in
+  what it re-exports.
+
+  It now typechecks with `tsrx-tsc`, which reads `.tsrx` directly, so the shim is
+  gone and the components carry their real prop types.
+
+- Updated dependencies [85a1c6d]
+- Updated dependencies [f4c97d8]
+- Updated dependencies [f3543bf]
+- Updated dependencies [dfa6d29]
+- Updated dependencies [9fbf31a]
+  - octane@0.1.16
+  - @octanejs/floating-ui@0.1.15
+
 ## 0.1.14
 
 ### Patch Changes
