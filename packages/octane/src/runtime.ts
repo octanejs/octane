@@ -201,7 +201,12 @@ export interface Scope {
 	 * `undefined` when null, identical to a Map.get miss.
 	 */
 	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[];
+	/**
+	 * Teardown callbacks (ref detaches, listener removal, slot cleanup). Lazily allocated by
+	 * `pushCleanup` — most scopes never register one, so the array is only paid for on demand,
+	 * matching `hooks` / `effectSlots` / `_slots`.
+	 */
+	cleanups: Cleanup[] | null;
 	/**
 	 * This scope's effect slots in hook DECLARATION order (first-enqueue order —
 	 * the order the hooks ran in the scope's first render). unmountScope walks it
@@ -218,8 +223,10 @@ export interface Scope {
 	 * (NOT a Map): iteration is a plain indexed for-loop, and lookups are linear
 	 * scans — faster than `Map.get` for the typical N ≤ 8 case (most components
 	 * have a handful of static sub-component calls at most).
+	 *
+	 * Lazily allocated when the first child scope registers: a leaf component has none.
 	 */
-	children: ChildScope[];
+	children: ChildScope[] | null;
 	mounted: boolean;
 	/**
 	 * Slot objects owned by this scope (ifBlockSlot, forBlockSlot, etc.).
@@ -3147,9 +3154,9 @@ class BlockImpl {
 	inactive: boolean;
 	// Hooks + cleanups (per-block state).
 	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[];
+	cleanups: Cleanup[] | null;
 	effectSlots: EffectSlot[] | null;
-	children: ChildScope[];
+	children: ChildScope[] | null;
 	_slots: any[] | null;
 	refFields: string[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
@@ -3237,9 +3244,9 @@ class BlockImpl {
 		this.currentRenderDeferred = false;
 		this.inactive = false;
 		this.hooks = null;
-		this.cleanups = [];
+		this.cleanups = null;
 		this.effectSlots = null;
-		this.children = [];
+		this.children = null;
 		this._slots = null;
 		this.refFields = null;
 		this.$$ctxValues = null;
@@ -3284,9 +3291,9 @@ class ScopeImpl {
 	block: Block;
 	parent: Scope | null;
 	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[];
+	cleanups: Cleanup[] | null;
 	effectSlots: EffectSlot[] | null;
-	children: ChildScope[];
+	children: ChildScope[] | null;
 	_slots: any[] | null;
 	refFields: string[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
@@ -3301,9 +3308,9 @@ class ScopeImpl {
 		this.block = block;
 		this.parent = parent;
 		this.hooks = null;
-		this.cleanups = [];
+		this.cleanups = null;
 		this.effectSlots = null;
-		this.children = [];
+		this.children = null;
 		this._slots = null;
 		this.refFields = null;
 		this.slots = [];
@@ -3794,7 +3801,7 @@ export function componentSlotLite<P>(
 		}
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
-		parentScope.children.push({ key: slotKey, scope });
+		(parentScope.children ??= []).push({ key: slotKey, scope });
 	} else {
 		// Re-render: the parent's host/anchor are stable across renders so no
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
@@ -4003,20 +4010,22 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // so its recursive cleanup must not manufacture a matching detach.
 function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
 	const c = scope.cleanups;
-	for (let i = c.length - 1; i >= 0; i--) {
-		try {
-			runEffectLifecycleCallback(c[i]);
-		} catch (err) {
-			// Route to the boundary enclosing the DELETION (collected + dispatched
-			// after the walk — see reportTeardownError); React parity: an error in a
-			// deletion-phase cleanup reaches the nearest still-mounted boundary
-			// instead of being swallowed (ReactErrorBoundaries:1927).
-			reportTeardownError(err);
+	if (c !== null)
+		for (let i = c.length - 1; i >= 0; i--) {
+			try {
+				runEffectLifecycleCallback(c[i]);
+			} catch (err) {
+				// Route to the boundary enclosing the DELETION (collected + dispatched
+				// after the walk — see reportTeardownError); React parity: an error in a
+				// deletion-phase cleanup reaches the nearest still-mounted boundary
+				// instead of being swallowed (ReactErrorBoundaries:1927).
+				reportTeardownError(err);
+			}
 		}
-	}
 	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
+	if (children !== null)
+		for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
 	// Walk slot-stashed child Blocks (ifBlock / forBlock / componentSlot / portal).
 	const slots = scope._slots;
 	if (slots !== null) {
@@ -4883,7 +4892,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
 		const cell = s;
-		scope.cleanups.push(() => {
+		(scope.cleanups ??= []).push(() => {
 			cell.active = false;
 		});
 	} else {
@@ -4964,7 +4973,30 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		//     into `props.children` (a descriptor, an array, or text — never a function).
 		// `childrenAsBody` normalizes either shape to a callable body, so both dialects
 		// render their children inside the Provider's scope (and thus under its context).
+		//
+		// The two dialects both claim `scope.slots[0]` — a compiled body stores its binding
+		// bag there, while the descriptor path's `childSlot(scope, 0, …)` stores a childSlot
+		// record. A parent that wraps its children conditionally (common in ported React
+		// bindings) flips between them across renders, so the incoming dialect would read the
+		// outgoing one's record as its own and corrupt the tree. Remount the children on a
+		// flip instead: the two sides are structurally different code, which is the same
+		// contract React gives an element-type change.
 		if (props.children != null) {
+			// Steady state is one map read and an integer compare — the write happens only on the
+			// first render and on an actual flip.
+			const dialect = typeof props.children === 'function' ? 1 : 2;
+			const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+			if (previous !== dialect) {
+				if (previous !== undefined) {
+					resetScopeChildren(scope);
+					// The reset runs user cleanups, so it can throw into the enclosing boundary and
+					// switch it to its catch arm — which disposes this block. Rendering children
+					// into a disposed block writes into the catch range, so bail out here, as every
+					// other mid-render teardown site does after `unmountBlock`.
+					if (scope.block.disposed) return;
+				}
+				ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+			}
 			childrenAsBody(props.children)(undefined, scope, undefined);
 		}
 	} as Context<T>;
@@ -5050,6 +5082,63 @@ function childrenAsBody(children: unknown): ComponentBody {
 	return (_p, s) => {
 		childSlot(s, 0, s.block.parentNode, children, s.block.endMarker);
 	};
+}
+
+/**
+ * Records which children dialect (1 = compiled body, 2 = descriptor) a scope last rendered, so a
+ * flip can be detected. Lives in the hook map, whose Symbol keys are disjoint from the numeric
+ * `slots` indices the two dialects contend over.
+ */
+const CHILDREN_DIALECT_SLOT = Symbol('octane.childrenDialect') as HookSlot;
+
+/**
+ * Tear down everything a scope rendered and hand it back empty, so a caller can re-render it from
+ * scratch in the same Block. Used when a scope's children switch dialect: the outgoing dialect's
+ * `slots`/`_slots`/child-scope state is meaningless to the incoming one, and leaving it in place
+ * would have the incoming dialect adopt records of the wrong kind.
+ *
+ * The scope's own hook state goes with it. That is correct for the one caller — a Provider keeps
+ * no hooks of its own, so every hook in the map belongs to the children being replaced.
+ */
+function resetScopeChildren(scope: Scope): void {
+	// This deletion runs mid-render rather than through `unmountBlock`, so it has to install the
+	// same teardown bracket that path does — otherwise a cleanup that throws would find no handler
+	// and be logged instead of reaching the boundary enclosing the deletion.
+	const block = scope.block;
+	if (TEARDOWN_DEPTH === 0) {
+		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+	}
+	TEARDOWN_DEPTH++;
+	// The bracket spans the WHOLE reset, not just the teardown call: a queued error is dispatched
+	// when the depth returns to zero, and its handler re-renders the enclosing boundary. Running
+	// that while the scope is half torn down would have the handler walk a scope whose DOM range
+	// and slot arrays disagree, so the scope is left consistent first.
+	try {
+		unmountScopeChildrenAndSlots(scope, true);
+
+		// Child scopes and slots detach their own DOM above, but a compiled body also creates host
+		// nodes directly in the Block's range. Clear whatever is left of it. `removeRange` stops
+		// BEFORE the end marker, so borrowed markers survive for their owning slot; a null start or
+		// end means the Block runs to that edge of its parent (marker elision).
+		const start = block.startMarker;
+		removeRange(start !== null ? start.nextSibling : block.parentNode.firstChild, block.endMarker);
+
+		// Drop the collections rather than emptying them: the lazily-allocated ones go back to null,
+		// and `slots` gets a fresh array (compiled bodies index it directly, so it stays non-null).
+		scope.children = null;
+		scope.cleanups = null;
+		scope._slots = null;
+		scope.effectSlots = null;
+		scope.hooks = null;
+		scope.slots = [];
+		// The compiled ref manifest describes the OUTGOING body's binding bag. A compiled body
+		// re-stamps its own on mount, but the descriptor dialect never does — it would leave the
+		// old manifest pointed at a `childSlot` record, which `detachSubtreeRefs` would then read
+		// as a bag.
+		scope.refFields = null;
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -6389,7 +6478,7 @@ export function bindRendererRegionOwner(props: unknown): void {
 	RENDERER_REGION_DOM_OWNERS.set(root, bridge);
 	root.$$ctxCache?.clear();
 	if (previous === undefined) {
-		root.cleanups.push(() => {
+		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
 			if (current === undefined) return;
 			current.release();
@@ -9371,7 +9460,7 @@ export function mountFragmentRef(
 	// `ref`) so a ref the compiler re-points via the update path is honored, and
 	// so the detach cleanup always releases whatever ref is current on unmount.
 	queueRefAttach(scope, () => attachRef(fi._currentRef, fi));
-	scope.cleanups.push(() => {
+	(scope.cleanups ??= []).push(() => {
 		// Detach at commit, not inline (queueRefDetach) — unmount cleanups run
 		// mid-render, and a state-setter ref firing null synchronously can render
 		// before a replacement's attach. The instance is destroyed now; the queued
@@ -10512,7 +10601,7 @@ export function headBlock(
 		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
-		scope.cleanups.push(() => {
+		(scope.cleanups ??= []).push(() => {
 			state!.el.remove();
 			scope.slots[slot] = undefined;
 		});
@@ -14459,9 +14548,9 @@ export function hostComponent(
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
 		const childScope = new ScopeImpl(scope, block);
 		state.childScope = childScope;
-		scope.children.push({ key: slot, scope: childScope });
+		(scope.children ??= []).push({ key: slot, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
-		scope.cleanups.push(() => queueRefDetach(state!.ref, state!.el));
+		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
@@ -18470,7 +18559,7 @@ export function useTransition(
 			}
 		};
 		TRANSITION_LISTENERS.add(listener);
-		scope.cleanups.push(() => TRANSITION_LISTENERS.delete(listener));
+		(scope.cleanups ??= []).push(() => TRANSITION_LISTENERS.delete(listener));
 	}
 	return [s.isPending, s.start];
 }
@@ -18640,7 +18729,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 		s = { form: null, listener: null };
 		const slotRef = s;
 		ensureHooks(scope).set(slot, slotRef);
-		scope.cleanups.push(() => {
+		(scope.cleanups ??= []).push(() => {
 			if (slotRef.form && slotRef.listener)
 				FORM_STATUS_LISTENERS.get(slotRef.form)?.delete(slotRef.listener);
 		});
@@ -18762,7 +18851,7 @@ export function useOptimistic<S, V = S>(
 			if (TRANSITION_PENDING_COUNT === 0 && slotRef.armed) clear();
 		};
 		TRANSITION_LISTENERS.add(listener);
-		scope.cleanups.push(() => TRANSITION_LISTENERS.delete(listener));
+		(scope.cleanups ??= []).push(() => TRANSITION_LISTENERS.delete(listener));
 	}
 	s.updateFn = updateFn;
 	let optimistic = passthrough;
@@ -19849,7 +19938,7 @@ function forEachSubtreeChild(
 	includeHiddenTry: boolean = true,
 ): void {
 	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
+	if (children !== null) for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
 	const slots = scope._slots;
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
@@ -21089,7 +21178,7 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	// head/tail only AFTER this returns, so the chain still covers exactly the
 	// old items here.
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		if (b.cleanups.length > 0 || b.children.length > 0 || b._slots !== null) {
+		if (b.cleanups !== null || b.children !== null || b._slots !== null) {
 			unmountBlock(b, false);
 		} else {
 			// Pure-host de-opt item (deoptItemBody with no component descendants):
@@ -21611,7 +21700,7 @@ function coalesceHydratedRanges(
 		if (
 			registered !== null &&
 			registered.length === 1 &&
-			scope.children.length === 0 &&
+			scope.children === null &&
 			registered[0].__kind === 'childSlot' &&
 			(registered[0] as ChildSlot).compactable &&
 			mayBorrowCandidate(registered[0])
@@ -21702,7 +21791,8 @@ function coalesceHydratedRanges(
 
 	function visitScopeContents(scope: Scope): void {
 		const children = scope.children;
-		for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
+		if (children !== null)
+			for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
 		const registered = scope._slots;
 		if (registered === null) return;
 		for (let i = 0; i < registered.length; i++) visitSlot(registered[i]);

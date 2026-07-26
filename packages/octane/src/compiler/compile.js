@@ -16057,9 +16057,11 @@ function propertyIsEnumerableCall(objNode, name) {
 	);
 }
 
-// `__s.cleanups.push(<fn>)`.
+// `(__s.cleanups ??= []).push(<fn>)` — the scope's cleanup array is lazily allocated (most
+// scopes never register one), so the registration site owns creating it.
 function cleanupsPush(fnNode) {
-	return b.stmt(b.call(b.member(b.member(b.id('__s'), 'cleanups'), 'push'), fnNode));
+	const lazyArray = b.assignment('??=', b.member(b.id('__s'), 'cleanups'), b.array([]));
+	return b.stmt(b.call(b.member(lazyArray, 'push'), fnNode));
 }
 
 // Mount for a DEFERRED property-write binding: store the element ref + seed the

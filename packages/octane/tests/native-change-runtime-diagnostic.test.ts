@@ -115,6 +115,23 @@ describe('native text change development diagnostic', () => {
 		}
 	});
 
+	it('skips a mirror input that is aria-hidden from its first render', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const checkableCalls = () =>
+			error.mock.calls.filter((call) => String(call[0]).includes('`checked` prop'));
+		// Mounting straight into the mirror shape is what a form-interop bubble input actually
+		// does. The sibling case above reaches this state via an update, which the diagnostic
+		// does not re-evaluate, so only this one exercises the aria-hidden skip on its own.
+		const result = mount(SpreadText, {
+			hostProps: { type: 'checkbox', checked: true, 'aria-hidden': true },
+		});
+		try {
+			expect(checkableCalls()).toHaveLength(0);
+		} finally {
+			result.unmount();
+		}
+	});
+
 	it('classifies the live input type and skips read-only, disabled, and non-text hosts', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const result = mount(SpreadText, {
