@@ -240,6 +240,59 @@ test('sorts, filters, selects, and recovers the accessible campaign report', asy
 	await expect(page.getByText('12 of 12 campaigns · 1 selected')).toBeVisible();
 });
 
+test('selects cell ranges by click, shift-click, drag, and keyboard', async ({ page }) => {
+	await openDashboard(page);
+	const report = page.getByRole('table', { name: 'Deterministic campaign performance report' });
+	const selected = report.locator('.cell-selected');
+	const cell = (row: number, column: number) =>
+		report.getByRole('row').nth(row).getByRole('cell').nth(column);
+
+	await expect(selected).toHaveCount(0);
+
+	// A plain click anchors a single-cell selection.
+	await cell(1, 1).click();
+	await expect(selected).toHaveCount(1);
+	await expect(cell(1, 1)).toHaveClass(/cell-selected/);
+	await expect(cell(1, 1)).toHaveClass(/cell-focused/);
+
+	// Shift-click extends the anchor into a rectangle: 2 columns x 3 rows.
+	await cell(3, 2).click({ modifiers: ['Shift'] });
+	await expect(selected).toHaveCount(6);
+	// Only the boundary of the rectangle is outlined, so the first row carries a
+	// top edge while an interior row does not.
+	await expect(cell(1, 1)).toHaveClass(/cell-edge-top/);
+	await expect(cell(2, 1)).not.toHaveClass(/cell-edge-top/);
+
+	// Escape clears through the hotkey-driven imperative API.
+	await page.keyboard.press('Escape');
+	await expect(selected).toHaveCount(0);
+
+	// Drag: mousedown starts the range, mouseenter on each cell extends it.
+	// Octane dispatches the real native mouseenter rather than synthesizing it
+	// from over/out, which is what the extend handler listens for.
+	const start = await cell(1, 1).boundingBox();
+	const end = await cell(2, 2).boundingBox();
+	if (!start || !end) throw new Error('campaign cells are not laid out');
+	await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 8 });
+	await page.mouse.up();
+	await expect(selected).toHaveCount(4);
+
+	// Arrow keys move the focused cell; Shift+Arrow extends the range.
+	await page.keyboard.press('ArrowDown');
+	await expect(selected).toHaveCount(1);
+	await page.keyboard.press('Shift+ArrowRight');
+	await expect(selected).toHaveCount(2);
+
+	// Mod+A covers every data cell: 12 rows x 6 columns.
+	await page.keyboard.press('ControlOrMeta+a');
+	await expect(selected).toHaveCount(72);
+
+	await page.keyboard.press('Escape');
+	await expect(selected).toHaveCount(0);
+});
+
 test('windows measured operational logs and jumps to a deterministic off-screen incident', async ({
 	page,
 }) => {
