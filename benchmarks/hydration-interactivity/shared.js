@@ -3,6 +3,11 @@ export const PRE_HYDRATION_TEXT = 'typed before hydration';
 export const POST_HYDRATION_TEXT = ' and still responsive';
 export const CARD_COUNT = 180;
 
+export function readHydrationDraft() {
+	if (typeof document === 'undefined') return INITIAL_VALUE;
+	return document.querySelector('#hydration-input')?.value ?? INITIAL_VALUE;
+}
+
 export const CARDS = Array.from({ length: CARD_COUNT }, (_, index) => ({
 	id: index + 1,
 	title: `Server-rendered article ${index + 1}`,

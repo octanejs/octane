@@ -1,14 +1,10 @@
-import { lazy, Suspense, useState, type FormEvent } from 'react';
+import { Suspense, useState, type FormEvent } from 'react';
 import { CARDS, INITIAL_VALUE } from '../../../../hydration-interactivity/shared.js';
 
 type HydrationBenchmarkProps = {
 	controlled?: boolean;
 	deferred?: boolean;
 };
-
-const ReplayEditor = lazy(() =>
-	import('./hydration-client.js').then((client) => ({ default: client.ReplayEditor })),
-);
 
 export function Editor({ controlled = false }: HydrationBenchmarkProps) {
 	const [draft, setDraft] = useState(INITIAL_VALUE);
@@ -60,11 +56,7 @@ export function App({ controlled = false, deferred = false }: HydrationBenchmark
 			<h1>Hydration interactivity benchmark</h1>
 			{deferred ? (
 				<Suspense fallback={null}>
-					{typeof window === 'undefined' ? (
-						<Editor controlled={controlled} />
-					) : (
-						<ReplayEditor controlled={controlled} />
-					)}
+					<Editor controlled={controlled} />
 				</Suspense>
 			) : (
 				<Editor controlled={controlled} />

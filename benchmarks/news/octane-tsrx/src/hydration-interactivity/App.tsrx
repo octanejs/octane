@@ -1,6 +1,10 @@
 import { Hydrate, useState } from 'octane';
 import { interaction } from 'octane/hydration';
-import { CARDS, INITIAL_VALUE } from '../../../../hydration-interactivity/shared.js';
+import {
+	CARDS,
+	INITIAL_VALUE,
+	readHydrationDraft,
+} from '../../../../hydration-interactivity/shared.js';
 
 type HydrationBenchmarkProps = {
 	controlled?: boolean;
@@ -8,7 +12,7 @@ type HydrationBenchmarkProps = {
 };
 
 function Editor(props: HydrationBenchmarkProps) @{
-	const [draft, setDraft] = useState(INITIAL_VALUE);
+	const [draft, setDraft] = useState(readHydrationDraft());
 	const [clicks, setClicks] = useState(0);
 	const [focuses, setFocuses] = useState(0);
 	const [submitted, setSubmitted] = useState(INITIAL_VALUE);

@@ -1,8 +1,12 @@
 <script>
-	import { CARDS, INITIAL_VALUE } from '../../../../hydration-interactivity/shared.js';
+	import {
+		CARDS,
+		INITIAL_VALUE,
+		readHydrationDraft,
+	} from '../../../../hydration-interactivity/shared.js';
 
 	let { controlled = false } = $props();
-	let draft = $state(INITIAL_VALUE);
+	let draft = $state(readHydrationDraft());
 	let clicks = $state(0);
 	let focuses = $state(0);
 	let submitted = $state(INITIAL_VALUE);

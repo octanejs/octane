@@ -1,5 +1,9 @@
-import { createSignal } from 'solid-js';
-import { CARDS, INITIAL_VALUE } from '../../../../hydration-interactivity/shared.js';
+import { createEffect, createSignal } from 'solid-js';
+import {
+	CARDS,
+	INITIAL_VALUE,
+	readHydrationDraft,
+} from '../../../../hydration-interactivity/shared.js';
 
 type HydrationBenchmarkProps = {
 	controlled?: boolean;
@@ -7,10 +11,14 @@ type HydrationBenchmarkProps = {
 };
 
 export function App(props: HydrationBenchmarkProps) @{
+	const hydrationDraft = readHydrationDraft();
 	const [draft, setDraft] = createSignal(INITIAL_VALUE);
 	const [clicks, setClicks] = createSignal(0);
 	const [focuses, setFocuses] = createSignal(0);
 	const [submitted, setSubmitted] = createSignal(INITIAL_VALUE);
+	createEffect(() => hydrationDraft, (value) => {
+		if (value !== INITIAL_VALUE) setDraft(value);
+	}, { ssrSource: 'client' });
 	const onInput = (event: Event) => setDraft((event.currentTarget as HTMLInputElement).value);
 	const onSend = () => {
 		const input = document.querySelector<HTMLInputElement>('#hydration-input');

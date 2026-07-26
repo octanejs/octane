@@ -1,16 +1,25 @@
 <script setup vapor lang="ts">
-import { shallowRef } from 'vue';
-import { CARDS, INITIAL_VALUE } from '../../../../hydration-interactivity/shared.js';
+import { onMounted, shallowRef } from 'vue';
+import {
+	CARDS,
+	INITIAL_VALUE,
+	readHydrationDraft,
+} from '../../../../hydration-interactivity/shared.js';
 
 const props = defineProps<{
 	controlled?: boolean;
 	deferred?: boolean;
 }>();
 
+const hydrationDraft = readHydrationDraft();
 const draft = shallowRef(INITIAL_VALUE);
 const clicks = shallowRef(0);
 const focuses = shallowRef(0);
 const submitted = shallowRef(INITIAL_VALUE);
+
+onMounted(() => {
+	if (hydrationDraft !== INITIAL_VALUE) draft.value = hydrationDraft;
+});
 
 function onInput(event: Event) {
 	draft.value = (event.currentTarget as HTMLInputElement).value;

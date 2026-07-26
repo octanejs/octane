@@ -1,8 +1,12 @@
 import { useState } from 'preact/hooks';
-import { CARDS, INITIAL_VALUE } from '../../../../hydration-interactivity/shared.js';
+import {
+	CARDS,
+	INITIAL_VALUE,
+	readHydrationDraft,
+} from '../../../../hydration-interactivity/shared.js';
 
 export function App({ controlled = false }) {
-	const [draft, setDraft] = useState(INITIAL_VALUE);
+	const [draft, setDraft] = useState(readHydrationDraft);
 	const [clicks, setClicks] = useState(0);
 	const [focuses, setFocuses] = useState(0);
 	const [submitted, setSubmitted] = useState(INITIAL_VALUE);
