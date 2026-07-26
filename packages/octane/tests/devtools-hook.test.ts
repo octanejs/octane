@@ -22,7 +22,9 @@ function scope(partial: Partial<DevtoolsScopeLike>): DevtoolsScopeLike {
 		body: undefined,
 		hooks: null,
 		effectSlots: null,
-		children: [],
+		// The runtime allocates `children` lazily, so a scope with no child scopes has null
+		// here — not an empty array. The fake mirrors that so the walk is exercised as shipped.
+		children: null,
 		$$ctxValues: null,
 		...partial,
 	} as DevtoolsScopeLike;
