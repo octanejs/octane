@@ -1,6 +1,6 @@
 /**
- * @octanejs/tanstack-table core conformance — useReactTable's state wiring
- * through octane's render path, against the REAL @tanstack/table-core.
+ * @octanejs/tanstack-table core conformance — `useTable`'s state wiring through
+ * octane's render path, against the REAL @tanstack/table-core.
  * Ports the behaviors of upstream react-table's tests/core/core.test.tsx
  * (markup render, stable api, rowModel) and adds the state-wiring matrix the
  * upstream suite doesn't cover.
@@ -12,6 +12,7 @@ import {
 	SwapApp,
 	SortingTable,
 	ControlledSortingTable,
+	SelectorTable,
 	renders,
 	captured,
 	defaultData,
@@ -29,10 +30,11 @@ beforeEach(() => {
 	renders.basic = 0;
 	renders.sorting = 0;
 	renders.controlled = 0;
+	renders.selected = 0;
 	captured.table = undefined;
 	captured.tables.length = 0;
 	captured.sortingStates.length = 0;
-	captured.stateChanges.length = 0;
+	captured.selectedStates.length = 0;
 });
 
 describe('core (ports of upstream core.test.tsx)', () => {
@@ -53,17 +55,24 @@ describe('core (ports of upstream core.test.tsx)', () => {
 		r.unmount();
 	});
 
-	it('has a stable table instance across re-renders', async () => {
-		// Per react-table tests/core/core.test.tsx "has a stable api".
+	it('keeps one underlying table instance across re-renders', async () => {
+		// Per react-table tests/core/core.test.tsx "has a stable api", adapted to
+		// v9: `useTable` returns a FRESH wrapper object each render (it re-binds
+		// `state` and `options` to the values read during that render), so the
+		// stable thing is the underlying instance — its store and its state atoms,
+		// which is what actually must survive for state to persist.
 		const r = mount(SwapApp, {});
 		await flush();
 		expect(captured.tables.length).toBeGreaterThan(0);
-		const first = captured.tables[0];
+		const first = captured.tables[0] as any;
 
 		r.click('#bump'); // unrelated parent state
 		await flush();
 		expect(captured.tables.length).toBeGreaterThan(1);
-		for (const t of captured.tables) expect(t).toBe(first);
+		for (const t of captured.tables as Array<any>) {
+			expect(t.store).toBe(first.store);
+			expect(t.baseAtoms).toBe(first.baseAtoms);
+		}
 		r.unmount();
 	});
 
@@ -146,28 +155,18 @@ describe('state wiring', () => {
 		r.unmount();
 	});
 
-	it('calls a user onStateChange AND still applies internal state', async () => {
-		const r = mount(SortingTable, {});
+	it('exposes only the selected projection on table.state', async () => {
+		// v9's `useTable` takes a selector as its 2nd argument; `table.state` is
+		// that projection, not the full TableState. Re-renders are driven by the
+		// selected value (shallow-compared), so sorting must move it.
+		const r = mount(SelectorTable, {});
 		await flush();
-		expect(captured.stateChanges.length).toBe(0);
+		expect(r.find('#sel-state').textContent).toBe('n=0');
+		expect(Object.keys(captured.selectedStates[0] as object)).toEqual(['sortCount']);
 
-		r.click('#s-th-firstName');
+		r.click('#sel-sort');
 		await flush();
-		// The wrapped handler applied internal state first (DOM reordered), then
-		// called the user handler with the updater (a function, per table-core).
-		expect(captured.stateChanges).toEqual(['function']);
-		expect(firstNames(r)).toEqual(['derek', 'joe', 'tanner']);
-		r.unmount();
-	});
-
-	it('queued functional updaters both apply within one event (Updater<T> contract)', async () => {
-		const r = mount(SortingTable, {});
-		await flush();
-
-		r.click('#double-toggle'); // toggleSorting() twice: none → asc → desc
-		await flush();
-		expect((captured.table as any).getColumn('age').getIsSorted()).toBe('desc');
-		expect(r.find('#s-th-age').textContent).toBe('Age D');
+		expect(r.find('#sel-state').textContent).toBe('n=1');
 		r.unmount();
 	});
 

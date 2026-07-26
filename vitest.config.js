@@ -1886,10 +1886,11 @@ export default defineConfig({
 							find: /^@octanejs\/shadcn$/,
 							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
 						},
-						// @octanejs/radix deliberately NOT aliased to the workspace source:
-						// the package pins the published radix release (maintainer policy from
-						// the cmdk review), so tests exercise the pinned registry copy that
-						// consumers actually install.
+						// @octanejs/radix deliberately carries no alias: it resolves through
+						// node_modules like any other dependency. That used to mean the pinned
+						// published release (maintainer policy from the cmdk review); since the
+						// package moved to `workspace:*` it means packages/radix, so these
+						// tests now cover the sibling source this repo actually ships.
 					],
 				},
 			},
