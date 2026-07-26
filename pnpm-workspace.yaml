@@ -163,8 +163,8 @@ catalogs:
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.1
-    '@ripple-ts/adapter': ^0.3.111
-    '@ripple-ts/vite-plugin': ^0.3.111
+    '@ripple-ts/adapter': ^0.3.112
+    '@ripple-ts/vite-plugin': ^0.3.112
     '@solidjs/web': '2.0.0-beta.15'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
@@ -189,14 +189,14 @@ catalogs:
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.10
     '@vitest/coverage-v8': 4.1.10
-    '@tsrx/core': ^0.1.49
-    '@tsrx/prettier-plugin': ^0.3.111
-    '@tsrx/typescript-plugin': ^0.3.111
-    '@tsrx/ripple': ^0.1.50
-    '@tsrx/react': ^0.2.49
-    '@tsrx/solid': ^0.1.49
-    '@tsrx/vite-plugin-react': ^0.0.81
-    '@tsrx/vite-plugin-solid': ^0.0.79
+    '@tsrx/core': ^0.1.50
+    '@tsrx/prettier-plugin': ^0.3.112
+    '@tsrx/typescript-plugin': ^0.3.112
+    '@tsrx/ripple': ^0.1.51
+    '@tsrx/react': ^0.2.50
+    '@tsrx/solid': ^0.1.50
+    '@tsrx/vite-plugin-react': ^0.0.82
+    '@tsrx/vite-plugin-solid': ^0.0.80
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -323,7 +323,7 @@ catalogs:
     '@react-types/shared': ^3.36.0
     react-dom: ^19.2.7
     react-i18next: 17.0.9
-    ripple: ^0.3.110
+    ripple: ^0.3.112
     rxjs: ^7.8.2
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.15'
@@ -357,18 +357,18 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - '@ripple-ts/adapter@0.3.111'
-  - '@ripple-ts/vite-plugin@0.3.111'
+  - '@ripple-ts/adapter@0.3.112'
+  - '@ripple-ts/vite-plugin@0.3.112'
   - '@tanstack/ai-client@0.21.0'
   - '@tanstack/ai-react@0.17.0'
   - '@tanstack/ai@0.41.0'
-  - '@tsrx/core@0.1.49'
-  - '@tsrx/prettier-plugin@0.3.111'
-  - '@tsrx/react@0.2.49'
-  - '@tsrx/ripple@0.1.50'
-  - '@tsrx/solid@0.1.49'
-  - '@tsrx/typescript-plugin@0.3.111'
-  - '@tsrx/vite-plugin-react@0.0.81'
-  - '@tsrx/vite-plugin-solid@0.0.79'
-  - 'ripple@0.3.111'
+  - '@tsrx/core@0.1.50'
+  - '@tsrx/prettier-plugin@0.3.112'
+  - '@tsrx/react@0.2.50'
+  - '@tsrx/ripple@0.1.51'
+  - '@tsrx/solid@0.1.50'
+  - '@tsrx/typescript-plugin@0.3.112'
+  - '@tsrx/vite-plugin-react@0.0.82'
+  - '@tsrx/vite-plugin-solid@0.0.80'
+  - 'ripple@0.3.112'
   - '@lynx-js/types@4.1.0'

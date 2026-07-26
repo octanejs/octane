@@ -402,7 +402,18 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					// applies it in a DEFERRED measure phase, and a rect read in the
 					// same tick belongs to the PRE-scroll layout, which puts the
 					// pointer on whatever line has since moved into that spot.
-					(found.node.parentElement as HTMLElement)?.scrollIntoView({ block: 'center' });
+					//
+					// `behavior: 'instant'` is load-bearing: the site sets
+					// `scroll-behavior: smooth` on <html> for readers who accept
+					// motion (headless Chromium is one), scrollIntoView scrolls EVERY
+					// ancestor scroller it touches, and an animating one is still
+					// moving frames later — so the rect would be measured mid-flight.
+					// It has to be `instant`, not `auto`: `auto` means "use the
+					// computed scroll-behavior", which is the smooth one.
+					(found.node.parentElement as HTMLElement)?.scrollIntoView({
+						block: 'center',
+						behavior: 'instant',
+					});
 					await new Promise((resolve) =>
 						requestAnimationFrame(() => requestAnimationFrame(resolve)),
 					);
@@ -443,38 +454,46 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 				)
 				.catch(() => {});
 			await page.waitForTimeout(50);
-			return page.evaluate((previous) => {
-				const marks = (index: number) =>
-					Array.from(
-						document
-							.querySelectorAll('.pg-editor .cm-content')
-							[index]?.querySelectorAll('.cm-mapped') ?? [],
-					).map((mark) => mark.textContent);
-				const scroller = document
-					.querySelectorAll('.pg-editor .cm-content')[1]
-					?.closest('.cm-scroller');
-				// Did the pane land on a DECLARATION of a mapped name rather than
-				// on a reference to it? `null` when no mark is a declaration, so
-				// the caller can skip the check.
-				const content = document.querySelectorAll('.pg-editor .cm-content')[1];
-				const box = scroller?.getBoundingClientRect();
-				let declarationVisible: boolean | null = null;
-				for (const mark of content?.querySelectorAll('.cm-mapped') ?? []) {
-					const before = mark.previousSibling?.textContent ?? '';
-					if (!/\b(?:function|const|let|var|class)\s+$/.test(before)) continue;
-					declarationVisible ??= false;
-					const rect = mark.getBoundingClientRect();
-					if (box && rect.top >= box.top && rect.bottom <= box.bottom) {
-						declarationVisible = true;
+			return page.evaluate(
+				({ previous, x, y }) => {
+					const marks = (index: number) =>
+						Array.from(
+							document
+								.querySelectorAll('.pg-editor .cm-content')
+								[index]?.querySelectorAll('.cm-mapped') ?? [],
+						).map((mark) => mark.textContent);
+					const scroller = document
+						.querySelectorAll('.pg-editor .cm-content')[1]
+						?.closest('.cm-scroller');
+					// Did the pane land on a DECLARATION of a mapped name rather than
+					// on a reference to it? `null` when no mark is a declaration, so
+					// the caller can skip the check.
+					const content = document.querySelectorAll('.pg-editor .cm-content')[1];
+					const box = scroller?.getBoundingClientRect();
+					let declarationVisible: boolean | null = null;
+					for (const mark of content?.querySelectorAll('.cm-mapped') ?? []) {
+						const before = mark.previousSibling?.textContent ?? '';
+						if (!/\b(?:function|const|let|var|class)\s+$/.test(before)) continue;
+						declarationVisible ??= false;
+						const rect = mark.getBoundingClientRect();
+						if (box && rect.top >= box.top && rect.bottom <= box.bottom) {
+							declarationVisible = true;
+						}
 					}
-				}
-				return {
-					source: marks(0),
-					output: marks(1),
-					declarationVisible,
-					scrolled: (scroller?.scrollTop ?? 0) !== previous,
-				};
-			}, before);
+					// What the pointer actually landed on. A probe that marks nothing
+					// is either a real mapping gap or a pointer that missed, and the
+					// two are indistinguishable without this.
+					const target = document.elementFromPoint(x, y);
+					return {
+						source: marks(0),
+						output: marks(1),
+						declarationVisible,
+						scrolled: (scroller?.scrollTop ?? 0) !== previous,
+						landedOn: target === null ? null : (target.textContent ?? '').slice(0, 24),
+					};
+				},
+				{ previous: before, x: point.x, y: point.y },
+			);
 		};
 
 		for (const target of ['client', 'server']) {
@@ -496,7 +515,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 				expect(hovered, `${keyword} not found in the source pane`).not.toBeNull();
 				expect(
 					hovered!.source,
-					`hovering ${keyword} in ${target} marked nothing in the SOURCE pane`,
+					`hovering ${keyword} in ${target} marked nothing in the SOURCE pane; the pointer landed on ${JSON.stringify(hovered!.landedOn)}`,
 				).toContain(keyword);
 				expect(hovered!.scrolled, `hovering ${keyword} scrolled the output pane`).toBe(false);
 			}
