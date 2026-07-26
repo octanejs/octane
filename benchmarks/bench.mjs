@@ -236,6 +236,21 @@ const SUITES = [
 		})),
 	},
 	{
+		// Real pre-hydration typing against a withheld production client chunk,
+		// measured with Chromium CDP CPU throttling. The six target apps reuse
+		// news's existing SSR toolchains, including Solid 2 and Vue Vapor; Octane's
+		// real early-capture bootstrap additionally proves exactly-once replay.
+		name: 'hydration-interactivity',
+		cwd: 'hydration-interactivity',
+		servers: [],
+		iter: { normal: 5, quick: 2 },
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
+			label: target,
+			script: 'run.mjs',
+			args: (n) => [target, String(n)],
+		})),
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
@@ -678,6 +693,28 @@ function runHarness(suite, run, outPath) {
 	return { code: res.status ?? 1, json };
 }
 
+function printHydrationInteractivityUx(result) {
+	if (result.suite !== 'hydration-interactivity') return;
+
+	const measured = result.targets.filter((target) => target.meta?.userExperience?.samples > 0);
+	if (measured.length === 0) return;
+
+	console.error('\n  Pre-hydration search-and-Send UX correctness');
+	console.error('  framework       outcome  Send replay   query saved   delivered');
+	for (const target of measured) {
+		const ux = target.meta.userExperience;
+		const fraction = (count) => `${count}/${ux.samples}`;
+		console.error(
+			`  ${target.name.padEnd(15)} ${ux.status.toUpperCase().padEnd(8)} ${fraction(
+				ux.replayedSendClicks,
+			).padEnd(13)} ${fraction(ux.preservedSearches).padEnd(13)} ${fraction(ux.exactDeliveries)}`,
+		);
+		if (ux.issues.length > 0) {
+			console.error(`    UX failure: ${ux.issues.join('; ')}`);
+		}
+	}
+}
+
 // ── run one suite end-to-end ─────────────────────────────────────────────────
 
 async function runSuite(suite) {
@@ -728,6 +765,7 @@ async function runSuite(suite) {
 		if (merged.targets.length === 0) {
 			throw new Error('no targets produced numbers (harness wrote no parseable BENCH_JSON)');
 		}
+		printHydrationInteractivityUx(merged);
 		if (merged.failed) console.error(`  ! harness reported gate failure(s): ${merged.failed}`);
 		return merged;
 	} finally {

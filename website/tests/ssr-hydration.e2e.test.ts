@@ -449,25 +449,31 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					document.querySelectorAll('.pg-editor .cm-content')[1]?.closest('.cm-scroller')
 						?.scrollTop ?? 0,
 			);
-			if (action === 'click') await page.mouse.click(point.x, point.y);
-			else await page.mouse.move(point.x, point.y);
-			// Wait for THIS keyword's own mark rather than a fixed delay — a
-			// loaded machine can still be mid-render, and a stale mark from the
-			// previous probe would satisfy a mere "any mark" check. Falls through
-			// when the position is genuinely unmapped, which is a real answer.
-			await page
-				.waitForFunction(
-					(text) =>
-						Array.from(
-							document
-								.querySelectorAll('.pg-editor .cm-content')[0]
-								?.querySelectorAll('.cm-mapped') ?? [],
-						).some((mark) => mark.textContent === text),
-					keyword,
-					{ timeout: 2_000 },
-				)
-				.catch(() => {});
-			await page.waitForTimeout(50);
+			// A production output swap can finish rendering before CodeMirror's
+			// hover listener is ready. Retry the genuine pointer movement until
+			// THIS keyword is highlighted; never replay a click or accept a stale
+			// decoration from an earlier probe.
+			for (let attempt = 0; attempt < (action === 'hover' ? 3 : 1); attempt++) {
+				if (action === 'click') await page.mouse.click(point.x, point.y);
+				else await page.mouse.move(point.x, point.y);
+
+				const highlighted = await page
+					.waitForFunction(
+						(text) =>
+							Array.from(
+								document
+									.querySelectorAll('.pg-editor .cm-content')[0]
+									?.querySelectorAll('.cm-mapped') ?? [],
+							).some((mark) => mark.textContent === text),
+						keyword,
+						{ timeout: 2_000 },
+					)
+					.then(
+						() => true,
+						() => false,
+					);
+				if (highlighted) break;
+			}
 			return page.evaluate(
 				({ previous, x, y }) => {
 					const marks = (index: number) =>
