@@ -3591,7 +3591,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 					d.key ?? undefined,
 					true,
 					undefined,
-					activeHydration() !== null && KEYED_ELEMENT_DESCRIPTORS.has(d),
+					activeHydration() !== null && elementKeyWasProvided(d),
 				),
 			);
 		} else {
@@ -3605,7 +3605,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 				d.key ?? undefined,
 				true,
 				undefined,
-				activeHydration() !== null && KEYED_ELEMENT_DESCRIPTORS.has(d),
+				activeHydration() !== null && elementKeyWasProvided(d),
 			);
 		}
 	} else {
@@ -8683,6 +8683,10 @@ export function setHTML(el: Element, value: any): void {
 }
 
 const DANGER_HTML_ACTIVE = '__oct_dangerHTML';
+// Latched the first time any host actually takes ownership of its children via
+// dangerouslySetInnerHTML. Every childSlot call has to ask whether raw HTML owns
+// its parent; an app that never uses the feature skips the DOM read entirely.
+let DANGER_HTML_EVER_ACTIVE = false;
 const DANGER_HTML_STATIC_CHILD = '__oct_dangerChild';
 const DANGER_HTML_SPREAD_CHILD = '__oct_dangerSpreadChild';
 const DANGER_HTML_RESOLVED_VALUE = '__oct_dangerResolved';
@@ -8721,6 +8725,7 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 		throw dangerHtmlChildrenError();
 	}
 	(el as any)[DANGER_HTML_ACTIVE] = true;
+	DANGER_HTML_EVER_ACTIVE = true;
 	setHTML(el, value.__html);
 }
 
@@ -8802,6 +8807,7 @@ export function markDangerouslySetInnerHTMLChildren(el: Element): void {
  * child reconciliation in that case so it cannot erase the raw HTML.
  */
 function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean {
+	if (!DANGER_HTML_EVER_ACTIVE) return false;
 	if (parent.nodeType !== 1 || (parent as any)[DANGER_HTML_ACTIVE] !== true) return false;
 	if (value !== null && value !== undefined) throw dangerHtmlChildrenError();
 	return true;
@@ -12882,7 +12888,14 @@ const ELEMENT_TAG = Symbol.for('octane.element');
 // of band. This lets hydration keep an explicit `key={undefined}` as an
 // independent reconciliation boundary without adding an observable descriptor
 // field or penalizing unkeyed descriptors with extra object shape.
+//
+// A non-null `key` already proves presence, so only the AMBIGUOUS nullish-key
+// case is recorded here — every `key={id}` element in a list would otherwise pay
+// a WeakSet insert per render. Read presence through `elementKeyWasProvided`.
 const KEYED_ELEMENT_DESCRIPTORS = new WeakSet<object>();
+function elementKeyWasProvided(descriptor: ElementDescriptor): boolean {
+	return descriptor.key !== null || KEYED_ELEMENT_DESCRIPTORS.has(descriptor);
+}
 // Children.map/toArray synthesize stable traversal keys. Keep the original
 // missing-key validation state out of band so rebasing an unkeyed element from
 // a dynamic collection does not accidentally silence the renderer warning.
@@ -12918,10 +12931,15 @@ export type OctaneNode = unknown;
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
-	const own = Object.getOwnPropertyDescriptor(config, 'key');
 	// React's development-only props.key warning getter is not a real key. This
 	// matters when an element's props object is fed back into createElement.
-	if (own?.get != null && (own.get as any).isReactWarning) return false;
+	// Gated exactly like React's hasValidKey: the reflective probe allocates a
+	// descriptor object on every call, and only a React DEV build can install
+	// such a getter — so production reaches the key with one property read.
+	if (process.env.NODE_ENV !== 'production' && hasOwnProp.call(config, 'key')) {
+		const own = Object.getOwnPropertyDescriptor(config, 'key');
+		if (own?.get != null && (own.get as any).isReactWarning) return false;
+	}
 	return config.key !== undefined;
 }
 
@@ -12986,8 +13004,6 @@ export function createElement<P>(
 	// createElement is callable userland API, so it must snapshot config even on
 	// the common two-argument path. Mutating the caller's object after creation
 	// must not retroactively mutate the element.
-	const keyWasProvided =
-		src != null && (typeof src === 'object' || typeof src === 'function') && 'key' in src;
 	const p = copyElementConfig(src);
 	if (hasPositional) p.children = kids;
 	applyElementDefaultProps(type, p);
@@ -13000,7 +13016,16 @@ export function createElement<P>(
 		ref: p.ref !== undefined ? p.ref : null,
 		children: kids ?? null,
 	};
-	if (keyWasProvided) KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	// Only a NULLISH `key` leaves presence ambiguous (`key` is non-null exactly when
+	// `hasKey`), so the prototype-chain probe stays off the keyed-list hot path.
+	if (
+		key === null &&
+		src != null &&
+		(typeof src === 'object' || typeof src === 'function') &&
+		'key' in src
+	) {
+		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	}
 	return finalizeElementDescriptor(descriptor);
 }
 function isElementDescriptor(v: any): v is ElementDescriptor {
@@ -13074,9 +13099,11 @@ export function cloneElement<P>(
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
 	};
+	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
-		KEYED_ELEMENT_DESCRIPTORS.has(element) ||
-		(config != null && Object.prototype.hasOwnProperty.call(config, 'key'))
+		key === null &&
+		(elementKeyWasProvided(element) ||
+			(config != null && Object.prototype.hasOwnProperty.call(config, 'key')))
 	) {
 		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
 	}
@@ -13098,7 +13125,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 		ref: element.ref,
 		children: element.children,
 	};
-	KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
 	return finalizeElementDescriptor(descriptor);
 }
@@ -14635,26 +14662,27 @@ function prepareDeoptList(
 	forceSingle: boolean = false,
 	includeKeyedSingle: boolean = true,
 ): PreparedDeoptList | null {
-	const items: any[] = [];
-	const keys: any[] = [];
+	// childSlot calls this for EVERY renderable hole on every render, and the
+	// non-list answer (a lone component descriptor, text, null) is the common one
+	// — build the two output arrays only once a list regime is established.
 	if (isFragmentDescriptor(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
 		flattenReactChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
 		return { items, keys };
 	}
 	if (Array.isArray(value)) {
+		const items: any[] = [];
+		const keys: any[] = [];
 		flattenReactChildContainer(items, keys, value, deoptWrapperKind(value), []);
 		return { items, keys };
 	}
 	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		items.push(value);
-		keys.push(scopedDeoptKey([], value, 0, value.key));
-		return { items, keys };
+		return { items: [value], keys: [scopedDeoptKey([], value, 0, value.key)] };
 	}
 	if (forceSingle) {
-		items.push(value);
-		keys.push(scopedDeoptKey([], value, 0, deoptKeyPositional(value, 0)));
-		return { items, keys };
+		return { items: [value], keys: [scopedDeoptKey([], value, 0, deoptKeyPositional(value, 0))] };
 	}
 	return null;
 }
@@ -15489,11 +15517,17 @@ export function childSlot(
 	// in another one-item list.
 	includeKeyedSingle: boolean = true,
 ): void {
+	// Reading the host's tag costs two DOM accessors and this runs for every
+	// renderable hole on every render, so lead with the cheap facts. A de-opt list
+	// ITEM (`includeKeyedSingle === false`, passed only by deoptItemBody) shares
+	// the domParent its list's own childSlot already validated against a non-null
+	// list value, so re-reading the tag once per item proves nothing new.
 	if (
+		value != null &&
+		includeKeyedSingle &&
 		domParent.nodeType === 1 &&
 		VOID_ELEMENTS.has((domParent as Element).localName) &&
-		!isPortalTarget(parentScope.block, domParent) &&
-		value != null
+		!isPortalTarget(parentScope.block, domParent)
 	) {
 		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}

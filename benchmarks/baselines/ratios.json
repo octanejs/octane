@@ -81,6 +81,30 @@
   },
   {
     "suite": "memo-wall",
+    "op": "parent_rerender_equal_B",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1,
+    "note": "Wall B is the value-position control: 1000 fresh createElement descriptors absorbed by the childSlot memo bail. Paired run measured 0.81x on 2026-07-26 (it was 1.22x before per-descriptor allocation was cut); 1.0 keeps noise headroom while a return to the old descriptor cost breaches it."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "one_change_B",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.95,
+    "note": "One changed row amid wall B's 999 successful value-comparing bails. Paired run measured 0.73x on 2026-07-26 (1.08x before); 0.95 bounds a regression back toward per-descriptor reflective work."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "ctx_through_wall_B",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.6,
+    "note": "Provider bump above wall B: rebuild 1000 descriptors, bail all 1000, refresh only the 1000 leaves. Paired runs measured 0.44-0.48x on 2026-07-26 (0.56x before); 0.6 stays above run-to-run spread while still breaching if the per-descriptor cost returns."
+  },
+  {
+    "suite": "memo-wall",
     "op": "mount",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
