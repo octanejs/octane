@@ -1714,7 +1714,12 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		// must not emit the literal string "true").
 		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
-		out += styleName(k) + ':' + cssStyleValue(k, val) + ';';
+		const serialized = cssStyleValue(k, val);
+		// An empty result would serialize as `color:;`, which the client never
+		// produces: setProperty with an empty value removes the declaration. Emitting
+		// it would make the server markup unhydratable.
+		if (serialized === '') continue;
+		out += styleName(k) + ':' + serialized + ';';
 	}
 	return out;
 }
