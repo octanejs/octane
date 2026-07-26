@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "tabs",
+  "type": "registry:ui",
+  "title": "Tabs",
+  "files": [
+    {
+      "path": "ui/tabs.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/tabs.tsrx",
+      "content": "// Tabs — maintainer-supplied default-Tailwind flavor, class strings verbatim.\n// Octane adaptations: \"use client\" dropped, radix-ui → @octanejs/radix, cva →\n// class-variance-authority (unchanged).\nimport { cva, type VariantProps } from 'class-variance-authority';\nimport { Tabs as TabsPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function Tabs({ className, orientation = 'horizontal', ...props }: Props & {\n\torientation?: 'horizontal' | 'vertical';\n}) @{\n\t<TabsPrimitive.Root\n\t\tdata-slot=\"tabs\"\n\t\tdata-orientation={orientation}\n\t\torientation={orientation}\n\t\tclassName={cn('group/tabs flex gap-2 data-horizontal:flex-col', className)}\n\t\t{...props}\n\t/>\n}\n\nexport const tabsListVariants = cva(\n\t'group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-horizontal/tabs:h-8 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'bg-muted',\n\t\t\t\tline: 'gap-1 bg-transparent',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t},\n\t},\n);\n\nexport function TabsList({ className, variant = 'default', ...props }: Props & VariantProps<\n\ttypeof tabsListVariants\n>) @{\n\t<TabsPrimitive.List\n\t\tdata-slot=\"tabs-list\"\n\t\tdata-variant={variant}\n\t\tclassName={cn(tabsListVariants({ variant }), className)}\n\t\t{...props}\n\t/>\n}\n\nexport function TabsTrigger({ className, ...props }: Props) @{\n\t<TabsPrimitive.Trigger\n\t\tdata-slot=\"tabs-trigger\"\n\t\tclassName={cn(\n\t\t\t'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\\'size-\\'])]:size-4',\n\t\t\t'group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent',\n\t\t\t'data-active:bg-background data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground',\n\t\t\t'after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function TabsContent({ className, ...props }: Props) @{\n\t<TabsPrimitive.Content\n\t\tdata-slot=\"tabs-content\"\n\t\tclassName={cn('flex-1 text-sm outline-none', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12",
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

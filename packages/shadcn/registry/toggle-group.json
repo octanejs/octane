@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "toggle-group",
+  "type": "registry:ui",
+  "title": "Toggle Group",
+  "files": [
+    {
+      "path": "ui/toggle-group.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/toggle-group.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/toggle-group.tsx (the `\"use client\"` directive\n// is dropped — octane has no RSC axis). React.createContext/useContext map onto\n// octane's createContext/useContext.\n//\n// ToggleGroup is composed with createElement: the consumer's children must sit\n// INSIDE the context Provider, and opaque compiled .tsrx children can only flow\n// through the props.children channel (see breadcrumb.tsrx's comment).\nimport { createContext, createElement, useContext, type OctaneNode } from 'octane';\nimport { type VariantProps } from 'class-variance-authority';\nimport { ToggleGroup as ToggleGroupPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\nimport { toggleVariants } from '@/components/ui/toggle';\n\nconst ToggleGroupContext = createContext<\n\tVariantProps<typeof toggleVariants> & {\n\t\tspacing?: number;\n\t\torientation?: 'horizontal' | 'vertical';\n\t}\n>({\n\tsize: 'default',\n\tvariant: 'default',\n\tspacing: 2,\n\torientation: 'horizontal',\n});\n\nexport interface ToggleGroupProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvariant?: VariantProps<typeof toggleVariants>['variant'];\n\tsize?: VariantProps<typeof toggleVariants>['size'];\n\tspacing?: number;\n\torientation?: 'horizontal' | 'vertical';\n\tchildren?: OctaneNode;\n}\n\nexport function ToggleGroup({\n\tclassName,\n\tvariant,\n\tsize,\n\tspacing = 2,\n\torientation = 'horizontal',\n\tchildren,\n\t...props\n}: ToggleGroupProps) {\n\treturn createElement(\n\t\tToggleGroupPrimitive.Root,\n\t\t{\n\t\t\t'data-slot': 'toggle-group',\n\t\t\t'data-variant': variant,\n\t\t\t'data-size': size,\n\t\t\t'data-spacing': spacing,\n\t\t\t'data-orientation': orientation,\n\t\t\t// Forwarded to the primitive: it drives RovingFocusGroup's arrow-key\n\t\t\t// axis (a vertical group must ignore left/right and use up/down).\n\t\t\torientation,\n\t\t\tstyle: { '--gap': spacing },\n\t\t\tclassName: cn(\n\t\t\t\t'group/toggle-group flex w-fit items-center gap-[--spacing(var(--gap))] rounded-md data-[spacing=default]:data-[variant=outline]:shadow-xs',\n\t\t\t\tclassName,\n\t\t\t),\n\t\t\t...props,\n\t\t},\n\t\tcreateElement(\n\t\t\tToggleGroupContext.Provider,\n\t\t\t{ value: { variant, size, spacing, orientation } },\n\t\t\tchildren,\n\t\t),\n\t);\n}\n\nexport interface ToggleGroupItemProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvariant?: VariantProps<typeof toggleVariants>['variant'];\n\tsize?: VariantProps<typeof toggleVariants>['size'];\n}\n\nexport function ToggleGroupItem({\n\tclassName,\n\tvariant = 'default',\n\tsize = 'default',\n\t...props\n}: ToggleGroupItemProps) @{\n\tconst context = useContext(ToggleGroupContext);\n\t<ToggleGroupPrimitive.Item\n\t\tdata-slot=\"toggle-group-item\"\n\t\tdata-variant={context.variant || variant}\n\t\tdata-size={context.size || size}\n\t\tdata-spacing={context.spacing}\n\t\tclassName={cn(\n\t\t\t'min-w-0 flex-1 shrink-0 rounded-none shadow-none first:rounded-l-md last:rounded-r-md focus:z-10 focus-visible:z-10 data-[spacing=0]:data-[variant=outline]:border-l-0 data-[spacing=0]:data-[variant=outline]:first:border-l',\n\t\t\ttoggleVariants({\n\t\t\t\tvariant: context.variant || variant,\n\t\t\t\tsize: context.size || size,\n\t\t\t}),\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12",
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "@octane/toggle",
+    "@octane/utils"
+  ]
+}

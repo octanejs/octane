@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "collapsible",
+  "type": "registry:ui",
+  "title": "Collapsible",
+  "files": [
+    {
+      "path": "ui/collapsible.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/collapsible.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/collapsible.tsx (the `\"use client\"`\n// directive is dropped — octane has no RSC axis). Upstream references the\n// `CollapsiblePrimitive.CollapsibleTrigger` / `CollapsibleContent` aliases;\n// the @octanejs/radix binding exports the same components as `Trigger` /\n// `Content`.\nimport { Collapsible as CollapsiblePrimitive } from '@octanejs/radix';\n\ntype Props = Record<string, unknown>;\n\nexport function Collapsible(props: Props) @{\n\t<CollapsiblePrimitive.Root data-slot=\"collapsible\" {...props} />\n}\n\nexport function CollapsibleTrigger(props: Props) @{\n\t<CollapsiblePrimitive.Trigger data-slot=\"collapsible-trigger\" {...props} />\n}\n\nexport function CollapsibleContent(props: Props) @{\n\t<CollapsiblePrimitive.Content data-slot=\"collapsible-content\" {...props} />\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ]
+}

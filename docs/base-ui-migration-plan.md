@@ -444,19 +444,169 @@ work around it in the binding.**
 > octane's native shape — a *better* fit than Radix's children-position `asChild`.**
 > No octane bugs surfaced yet.
 
-## Phased plan (full surface, ~35 components)
+## Parity audit (2026-07-26, vs `@base-ui/react@1.6.0`)
+
+Measured by diffing the pinned `.base-ui/packages/react/src` tree against
+`packages/base-ui/src`. Upstream `1.6.0` is still the published `latest`, so the
+pin is current. Baseline at audit time: **60 base-ui tests green**, `22 of 43`
+published subpaths implemented, `19,614` ported source lines against `73,766`
+upstream source lines (tests excluded).
+
+### A. Missing components (21 of 43 subpaths)
+
+| Component | Upstream loc | Blocking infrastructure |
+| --- | ---: | --- |
+| `combobox` | 6,469 | list navigation, grid navigation, `filter`, `itemEquality`, `resolveValueLabel` |
+| `drawer` | 4,722 | `useSwipeDismiss`, `getElementAtPoint`, `scrollable`, viewport |
+| `menu` | 4,303 | list navigation, typeahead, `useMixedToggleClickHandler`, `getPseudoElementBounds`, viewport |
+| `select` | 4,220 | list navigation, typeahead, `scrollEdges`, `styles`, `usePopupAutoResize` |
+| `navigation-menu` | 3,106 | hover layer, `getCssDimensions`, `setSharedFixedSize`, `isOutsideMenuEvent` |
+| `toast` | 3,004 | `useSwipeDismiss`, `FloatingPortalLite`, `focusVisible` |
+| `scroll-area` | 1,745 | `scrollEdges`, `getOffset`, `styles`, `CSPContext` |
+| `tooltip` | 1,625 | hover layer, `FloatingDelayGroup`, `FloatingPortalLite`, viewport |
+| `tabs` | 1,537 | `getCssDimensions`, `CSPContext` (composite already ported) |
+| `otp-field` | 1,436 | `utils/otp` (field/composite already ported) |
+| `preview-card` | 1,363 | hover layer, `FloatingPortalLite`, viewport |
+| `collapsible` | 1,149 | `collapsibleOpenStateMapping` |
+| `accordion` | 961 | Collapsible |
+| `autocomplete` | 820 | Combobox (thin layer over it) |
+| `toolbar` | 638 | none — composite + `useButton` already ported |
+| `context-menu` | 433 | Menu, `useClientPoint` |
+| `menubar` | 217 | Menu |
+| `unstable-use-media-query` | 90 | none |
+| `button` | 82 | none — `useButton` + `useRenderElement` already ported |
+| `direction-provider` | 72 | none — `DirectionContext` already ported |
+| `csp-provider` | 47 | `CSPContext` |
+
+### B. Missing parts inside shipped components
+
+- `Dialog.Viewport` and `Popover.Viewport` — both need `utils/usePopupViewport`
+  (376) + `utils/popups/inlineRect` (293). The same pair also gates the Viewport
+  part on Tooltip / PreviewCard / Menu / NavigationMenu / Drawer.
+- `NumberField.ScrubArea` and `NumberField.ScrubAreaCursor`.
+
+### C. Live stubs — shipped components with silently inert features
+
+- `utils/floating/useHoverReferenceInteraction` + `useHoverFloatingInteraction`
+  return `{}`, so **`openOnHover` on Popover is a no-op**. Un-stubbing needs the
+  whole hover layer (below).
+- `utils/usePressAndHold` fires once, so **NumberField Increment/Decrement
+  hold-to-repeat is inert**. Single clicks work.
+
+These are the only places where the port accepts a prop and does nothing; both
+are documented in-file, but neither is covered by a failing-pin test.
+
+### D. Missing shared infrastructure
+
+`floating-ui-react` (3,704 loc, gates every remaining overlay):
+`useListNavigation` (931), `useHover` (468), `safePolygon` (452),
+`FloatingDelayGroup` (287), `useClientPoint` (261), `useTypeahead` (254),
+`useFocus` (251), `useHoverInteractionSharedState` (132), `useHoverShared` (73),
+`gridNavigation` (51). `middleware/arrow` (124) is currently satisfied by
+`@octanejs/floating-ui`'s ref-aware `arrow` and needs no port.
+
+`utils` (2,454 loc): `useSwipeDismiss` (1,209), `usePopupViewport` (376),
+`popups/inlineRect` (293), `usePopupAutoResize` (239), `scrollable` (73),
+`useMixedToggleClickHandler` (62), `getPseudoElementBounds` (50),
+`FloatingPortalLite` (44), `collapsibleOpenStateMapping` (36), `scrollEdges`
+(34), `getCssDimensions` (25), `styles` (13), `getElementAtPoint` (4).
+
+`internals` (~690 loc): `resolveValueLabel` (152), `composite/root/gridNavigation`
+(128), `RequestQueue` (127), `filter` (83), `itemEquality` (61), `reason-parts`
+(43), `TimeoutManager` (30), `CSPContext` (24).
+
+**Out of scope:** `internals/temporal`, `internals/temporal-adapter-date-fns`,
+`internals/temporal-adapter-luxon` (~1,290 loc) are unreachable from any exported
+component in `1.6.0` — groundwork for unreleased date components. Port them only
+when an exported component consumes them.
+
+### E. Cross-cutting debt
+
+- **octane `Provider` children shape-flip** (memory `octane-provider-children-shape-flip`):
+  every overlay Root currently pays a stable-descriptor wrapper workaround. Fix in
+  octane core before Menu/Select/Combobox multiply it.
+- **Differential rig blind spots**: the rig compares final HTML only, so focus
+  order, effect timing and hover/delay behavior need dedicated behavior tests.
+  Every phase below must budget for them.
+- **SSR/hydration**: only closed overlays and static components are covered.
+  Open-overlay SSR is untested.
+
+## Remaining plan to full parity
+
+Ordered so that each phase unblocks the next, with the cheap export-surface wins
+pulled forward. Every phase exits on: differential parity for the new components,
+dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
+`pnpm format:check`, full `pnpm test`, a changeset, and a `status.json` update.
+
+- **Phase 3a — Zero-dependency backlog** (~300 loc): `Button`,
+  `DirectionProvider`, `CspProvider` (+ `CSPContext`), `unstable-use-media-query`.
+  All four sit on infrastructure that already exists; closes 4 of the 21 missing
+  subpaths for roughly a day of work. *Exit:* 4 new differential fixtures.
+- **Phase 3b — Hover + focus interaction layer** (~2,400 loc): `safePolygon`,
+  `useHover`, `useHoverShared`, `useHoverInteractionSharedState`, the real
+  `useHoverReferenceInteraction` / `useHoverFloatingInteraction`, `useFocus`,
+  `FloatingDelayGroup`. Deletes stub C1. *Exit:* Popover `openOnHover` behavior
+  tests (open delay, close delay, safe-polygon traversal), no differential
+  regression on the existing Popover fixtures.
+- **Phase 3c — Popup viewport** (~700 loc): `usePopupViewport` +
+  `popups/inlineRect` + `FloatingPortalLite`, then `Dialog.Viewport` and
+  `Popover.Viewport`. Closes gap B1 and unblocks every later Viewport part.
+- **Phase 3d — Tooltip + PreviewCard** (~3,000 loc): both are thin over 3b + 3c.
+  *Exit:* differential on the open popup, behavior tests for hover open/close and
+  delay grouping.
+- **Phase 3e — List navigation + typeahead** (~1,400 loc): `useListNavigation`,
+  `gridNavigation` (both copies), `useTypeahead`, `RequestQueue`,
+  `TimeoutManager`, `useMixedToggleClickHandler`, `getPseudoElementBounds`.
+- **Phase 3f — Menu family** (~5,000 loc): `Menu` (incl. `SubmenuRoot`,
+  `CheckboxItem`, `RadioGroup`/`RadioItem`, `Viewport`), then `Menubar`, then
+  `ContextMenu` (+ `useClientPoint`). *Exit:* differential on an open menu,
+  behavior tests for roving focus, typeahead, submenu open/close, checkbox/radio
+  item semantics.
+- **Phase 3g — Toast** (~4,200 loc): `useSwipeDismiss` + `focusVisible` + the 11
+  Toast parts. `useSwipeDismiss` is shared with Drawer, so it lands here.
+  *Exit:* differential on a rendered toast, behavior tests for timeout dismiss,
+  swipe dismiss, and the viewport focus model.
+- **Phase 4 — Disclosure, navigation, composite** (~6,000 loc), independent of
+  the floating store and parallelisable with Phase 3: `Collapsible`
+  (+ `collapsibleOpenStateMapping`) → `Accordion`; `Toolbar`; `Tabs`
+  (+ `getCssDimensions`); `ScrollArea` (+ `scrollEdges`, `getOffset`, `styles`).
+  *Exit:* rig-green plus roving-focus/keyboard behavior tests.
+- **Phase 5 — Selection giants** (~13,000 loc): `Select` (+ `itemEquality`,
+  `resolveValueLabel`, `usePopupAutoResize`), then `Combobox` (+ `filter`,
+  `handleInputPress`, `useInitialLiveRegionTextMutation`,
+  `ComboboxInternalDismissButton`), then `Autocomplete` as a thin layer, then
+  `OtpField` (+ `utils/otp`). *Exit:* differential on open lists, behavior tests
+  for keyboard selection, typeahead, filtering, and Field integration.
+- **Phase 6 — Drawer + residual** (~5,300 loc): `NavigationMenu`
+  (+ `setSharedFixedSize`, `isOutsideMenuEvent`), `Drawer` (+ `getElementAtPoint`,
+  `scrollable`, reusing 3g's `useSwipeDismiss`), and `NumberField.ScrubArea` /
+  `ScrubAreaCursor` with the real `usePressAndHold` (deletes stub C2).
+- **Phase 7 — Close-out**: barrel export of the full surface, open-overlay SSR +
+  hydration coverage, README + divergence notes, `docs/bindings-status.md`
+  refresh, and a re-run of this audit to confirm 43/43 subpaths.
+
+### Sequencing notes
+
+- Phase 3a and Phase 4 have no dependency on Phase 3b–3g and can run in parallel
+  with them.
+- Fix the octane `Provider` children shape-flip before Phase 3f — Menu, Select and
+  Combobox each add several Roots that would otherwise inherit the workaround.
+- `useSwipeDismiss` (1,209 loc) is the single largest shared util and serves only
+  Toast and Drawer; keeping it in Phase 3g means Phase 6's Drawer is mostly
+  component code.
+
+### Historical phase plan (superseded)
 
 - **Phase 0 — Foundation** (DONE): scaffolding + `.base-ui` + engine + differential harness.
   *Exit:* `useRender` + a trivial component byte-equal in the rig (element+function render,
   className string+fn, `data-*` state). ✅
-- **Phase 1 — Simple state / proof**: Separator ✅, Toggle, ToggleGroup, Avatar, Progress,
+- **Phase 1 — Simple state / proof** (DONE): Separator, Toggle, ToggleGroup, Avatar, Progress,
   Meter, Fieldset. *Exit:* rig-green; state exposure + render engine proven.
-- **Phase 2 — Field/Form + form controls (densest)**: Field, Form, Checkbox, CheckboxGroup,
+- **Phase 2 — Field/Form + form controls (densest)** (DONE): Field, Form, Checkbox, CheckboxGroup,
   Switch, Radio, RadioGroup, NumberField, Input, Slider. Validation system + octane
   uncontrolled-input adaptations. *Exit:* native-behavior parity; divergences documented.
-- **Phase 3 — Overlays (on `@octanejs/floating-ui`)**: Popover, Dialog, AlertDialog, Tooltip,
-  PreviewCard, Menu, Menubar, ContextMenu, Toast. *Exit:* open/close/positioning parity +
-  dedicated focus/dismiss tests.
+- **Phase 3 — Overlays (on `@octanejs/floating-ui`)** (PARTIAL — Dialog, AlertDialog, Popover
+  done): Popover, Dialog, AlertDialog, Tooltip, PreviewCard, Menu, Menubar, ContextMenu, Toast.
 - **Phase 4 — Navigation + composite + Select**: Tabs, Accordion, Collapsible, Toolbar,
   NavigationMenu, ScrollArea, Select. *Exit:* rig + roving-focus/keyboard tests.
 - **Phase 5 — Long tail + polish**: Autocomplete, Combobox; SSR/hydration; README +

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "radio-group",
+  "type": "registry:ui",
+  "title": "Radio Group",
+  "files": [
+    {
+      "path": "ui/radio-group.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/radio-group.tsrx",
+      "content": "// Default-Tailwind radio-group flavor (package canonical) — utilities-inlined\n// upstream styling. Octane adaptations: \"use client\" dropped, lucide-react →\n// @octanejs/lucide, radix-ui → @octanejs/radix; pure template JSX.\nimport { RadioGroup as RadioGroupPrimitive } from '@octanejs/radix';\nimport { CircleIcon } from '@octanejs/lucide';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function RadioGroup({ className, ...props }: Props) @{\n\t<RadioGroupPrimitive.Root\n\t\tdata-slot=\"radio-group\"\n\t\tclassName={cn('grid gap-3', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function RadioGroupItem({ className, ...props }: Props) @{\n\t<RadioGroupPrimitive.Item\n\t\tdata-slot=\"radio-group-item\"\n\t\tclassName={cn(\n\t\t\t'aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:ring-destructive/40',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t<RadioGroupPrimitive.Indicator\n\t\t\tdata-slot=\"radio-group-indicator\"\n\t\t\tclassName=\"relative flex items-center justify-center\"\n\t\t>\n\t\t\t<CircleIcon\n\t\t\t\tclassName=\"absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 fill-primary\"\n\t\t\t/>\n\t\t</RadioGroupPrimitive.Indicator>\n\t</RadioGroupPrimitive.Item>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.8",
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

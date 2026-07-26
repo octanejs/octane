@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "breadcrumb",
+  "type": "registry:ui",
+  "title": "Breadcrumb",
+  "files": [
+    {
+      "path": "ui/breadcrumb.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/breadcrumb.tsrx",
+      "content": "// Default-Tailwind breadcrumb flavor (package canonical) — user-supplied\n// styling, class strings verbatim. Octane adaptations: lucide-react →\n// @octanejs/lucide, radix-ui Slot → @octanejs/radix (@if asChild);\n// BreadcrumbSeparator's `children ?? icon` fallback composes with\n// createElement (opaque children beside a descriptor default).\nimport { Slot } from '@octanejs/radix';\nimport { ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';\nimport { createElement, type OctaneNode } from 'octane';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function Breadcrumb({ className, ...props }: Props) @{\n\t<nav aria-label=\"breadcrumb\" data-slot=\"breadcrumb\" className={cn(className)} {...props} />\n}\n\nexport function BreadcrumbList({ className, ...props }: Props) @{\n\t<ol\n\t\tdata-slot=\"breadcrumb-list\"\n\t\tclassName={cn(\n\t\t\t'flex flex-wrap items-center gap-1.5 text-sm wrap-break-word text-muted-foreground',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function BreadcrumbItem({ className, ...props }: Props) @{\n\t<li\n\t\tdata-slot=\"breadcrumb-item\"\n\t\tclassName={cn('inline-flex items-center gap-1', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function BreadcrumbLink({ asChild, className, ...props }: Props & { asChild?: boolean }) @{\n\t@if (asChild) {\n\t\t<Slot\n\t\t\tdata-slot=\"breadcrumb-link\"\n\t\t\tclassName={cn('transition-colors hover:text-foreground', className)}\n\t\t\t{...props}\n\t\t/>\n\t} @else {\n\t\t<a\n\t\t\tdata-slot=\"breadcrumb-link\"\n\t\t\tclassName={cn('transition-colors hover:text-foreground', className)}\n\t\t\t{...props}\n\t\t/>\n\t}\n}\n\nexport function BreadcrumbPage({ className, ...props }: Props) @{\n\t<span\n\t\tdata-slot=\"breadcrumb-page\"\n\t\trole=\"link\"\n\t\taria-disabled=\"true\"\n\t\taria-current=\"page\"\n\t\tclassName={cn('font-normal text-foreground', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function BreadcrumbSeparator(props: Props & { children?: OctaneNode }) @{\n\tconst { className, children: _children, ...rest } = props;\n\n\t<li\n\t\tdata-slot=\"breadcrumb-separator\"\n\t\trole=\"presentation\"\n\t\taria-hidden=\"true\"\n\t\tclassName={cn('[&>svg]:size-3.5', className)}\n\t\t{...rest}\n\t>\n\t\t{props.children ?? <ChevronRightIcon className=\"cn-rtl-flip\" />}\n\t</li>\n}\n\nexport function BreadcrumbEllipsis({ className, ...props }: Props) @{\n\t<span\n\t\tdata-slot=\"breadcrumb-ellipsis\"\n\t\trole=\"presentation\"\n\t\taria-hidden=\"true\"\n\t\tclassName={cn('flex size-5 items-center justify-center [&>svg]:size-4', className)}\n\t\t{...props}\n\t>\n\t\t<MoreHorizontalIcon />\n\t\t<span className=\"sr-only\">More</span>\n\t</span>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.8",
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

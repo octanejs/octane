@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hover-card",
+  "type": "registry:ui",
+  "title": "Hover Card",
+  "files": [
+    {
+      "path": "ui/hover-card.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/hover-card.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/hover-card.tsx (the `\"use client\"` directive\n// is dropped — octane has no RSC axis).\n//\n// HoverCardContent renders Portal > Content: the Portal's child must be a real\n// element DESCRIPTOR (radix portals cannot enumerate opaque compiled .tsrx\n// children), so the pair is composed with createElement; the consumer's\n// children flow into the Content primitive through the ordinary props.children\n// channel.\nimport { createElement } from 'octane';\nimport { HoverCard as HoverCardPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport function HoverCard(props: Record<string, unknown>) @{\n\t<HoverCardPrimitive.Root data-slot=\"hover-card\" {...props} />\n}\n\nexport function HoverCardTrigger(props: Record<string, unknown>) @{\n\t<HoverCardPrimitive.Trigger data-slot=\"hover-card-trigger\" {...props} />\n}\n\nexport interface HoverCardContentProps extends Record<string, unknown> {\n\tclassName?: string;\n\talign?: 'start' | 'center' | 'end';\n\tsideOffset?: number;\n}\n\nexport function HoverCardContent({\n\tclassName,\n\talign = 'center',\n\tsideOffset = 4,\n\t...props\n}: HoverCardContentProps) {\n\treturn createElement(HoverCardPrimitive.Portal, {\n\t\t'data-slot': 'hover-card-portal',\n\t\tchildren: createElement(HoverCardPrimitive.Content, {\n\t\t\t'data-slot': 'hover-card-content',\n\t\t\talign,\n\t\t\tsideOffset,\n\t\t\tclassName: cn(\n\t\t\t\t'z-50 w-64 origin-(--radix-hover-card-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',\n\t\t\t\tclassName,\n\t\t\t),\n\t\t\t...props,\n\t\t}),\n\t});\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

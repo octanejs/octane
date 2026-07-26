@@ -1864,6 +1864,58 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'shadcn',
+					include: [
+						'packages/shadcn/tests/**/*.test.ts',
+						'packages/shadcn/tests/**/*.test.tsx',
+						'!packages/shadcn/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// Differential precompile for shadcn fixtures: rewrites
+					// `@octanejs/shadcn` → the vendored pinned upstream React sources
+					// (shadcn has no npm runtime package to rewrite to).
+					globalSetup: ['packages/shadcn/tests/differential/_setup.ts'],
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/shadcn$/,
+							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
+						},
+						// @octanejs/radix deliberately NOT aliased to the workspace source:
+						// the package pins the published radix release (maintainer policy from
+						// the cmdk review), so tests exercise the pinned registry copy that
+						// consumers actually install.
+					],
+				},
+			},
+			{
+				test: {
+					name: 'shadcn-ssr',
+					include: ['packages/shadcn/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/shadcn$/,
+							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'aria',
 					include: [
 						'packages/aria/tests/**/*.test.ts',

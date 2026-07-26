@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "toggle",
+  "type": "registry:ui",
+  "title": "Toggle",
+  "files": [
+    {
+      "path": "ui/toggle.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/toggle.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/toggle.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis).\nimport { cva, type VariantProps } from 'class-variance-authority';\nimport { Toggle as TogglePrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport const toggleVariants = cva(\n\t'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\\'size-\\'])]:size-4',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'bg-transparent',\n\t\t\t\toutline: 'border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground',\n\t\t\t},\n\t\t\tsize: {\n\t\t\t\tdefault: 'h-9 min-w-9 px-2',\n\t\t\t\tsm: 'h-8 min-w-8 px-1.5',\n\t\t\t\tlg: 'h-10 min-w-10 px-2.5',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t\tsize: 'default',\n\t\t},\n\t},\n);\n\nexport interface ToggleProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvariant?: VariantProps<typeof toggleVariants>['variant'];\n\tsize?: VariantProps<typeof toggleVariants>['size'];\n}\n\nexport function Toggle({\n\tclassName,\n\tvariant = 'default',\n\tsize = 'default',\n\t...props\n}: ToggleProps) @{\n\t<TogglePrimitive.Root\n\t\tdata-slot=\"toggle\"\n\t\tclassName={cn(toggleVariants({ variant, size, className }))}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12",
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}
