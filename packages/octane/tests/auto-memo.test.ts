@@ -236,6 +236,46 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	it('re-enters a cached region when an imported component it renders is not memo-stable', () => {
+		// The imported component's own memo contract is unknown at compile time, so
+		// the cached region must consult it on entry rather than trust its snapshot.
+		const code = compile(
+			`import { Icon } from './icon';
+			 function Child(props) @{ <span>{props.v}<Icon /></span> }
+			 export function App(props) @{ <Child v={props.v} /> }`,
+			'auto-memo-witness.tsrx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		expect(code).toContain('__memoCommitted');
+		expect(code).toMatch(/Icon\.__memo !== true \|\| Icon\.__compare !== undefined/);
+	});
+
+	it('rejects a callback that reads a ref through a binding pattern', () => {
+		// A callback handed to a child can be invoked during that child's render,
+		// so a ref read hidden in the callback's own pattern still counts.
+		for (const child of [
+			`function Child(props) @{ <b onClick={({ current }) => current}>{props.v}</b> }`,
+			`function Child(props) @{ <b onClick={(e) => { const { current } = e; return current; }}>{props.v}</b> }`,
+			`function Child(props) @{ <b onClick={([{ current }]) => current}>{props.v}</b> }`,
+		]) {
+			const code = compile(
+				`${child}\nexport function App(props) @{ <Child v={props.v} /> }`,
+				'auto-memo-callback-ref.tsrx',
+				{ hmr: false, autoMemo: true },
+			).code;
+			expectNoCompilerRegion(code);
+		}
+		// A callback with no ref read stays eligible, so the rejection is specific.
+		expectCompilerRegion(
+			compile(
+				`function Child(props) @{ <b onClick={(e) => e}>{props.v}</b> }
+				 export function App(props) @{ <Child v={props.v} /> }`,
+				'auto-memo-callback-plain.tsrx',
+				{ hmr: false, autoMemo: true },
+			).code,
+		);
+	});
+
 	it('falls back for impure calls, refs, and direct Suspense boundaries', () => {
 		const cases = [
 			`function Child(props) @{ <div>{props.read()}</div> }`,

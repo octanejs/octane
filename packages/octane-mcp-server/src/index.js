@@ -50,6 +50,7 @@ export const BENCHMARK_SUITES = [
 	'recursive-context',
 	'signal-favoring',
 	'news',
+	'hydration-interactivity',
 	'effectful-list',
 	'memo-wall',
 	'portal-swarm',

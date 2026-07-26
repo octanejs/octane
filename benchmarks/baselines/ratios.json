@@ -1,5 +1,21 @@
 [
   {
+    "suite": "hydration-interactivity",
+    "op": "uncontrolled_6x_hydration",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Same-run production Chromium hydration under real 6x CPU throttling: Octane measured about 0.4x React while preserving pre-hydration input. The 1.5x ceiling leaves browser and machine-noise headroom."
+  },
+  {
+    "suite": "hydration-interactivity",
+    "op": "controlled_6x_hydration",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Same-run production Chromium controlled-input hydration under real 6x CPU throttling: Octane measured about 0.4x React and must preserve the complete pre-hydration draft, focus, and caret."
+  },
+  {
     "suite": "js-framework",
     "op": "run",
     "target": "octane-tsrx",
