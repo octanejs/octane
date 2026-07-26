@@ -1419,10 +1419,27 @@ export function ssrForBlock(content: string, hasItems: boolean): string {
 // replace them with U+FFFD (which would conflate distinct JavaScript strings).
 // Encode each code unit at a fixed width instead: this is total for every JS
 // string and injective over its exact UTF-16 representation.
-function encodeAsyncIdentityString(value: string): string {
+//
+// `toString(16).padStart(4, '0')` allocates two throwaway strings per CODE UNIT,
+// which dominated identity-scoped descriptor rendering. Identity keys are
+// overwhelmingly ASCII (site keys, prop names, route segments), so those units
+// come from a prebuilt table and only the rare non-ASCII unit pays the slow
+// path. The emitted bytes are unchanged.
+const ASCII_ASYNC_IDENTITY_UNITS: string[] = [];
+for (let code = 0; code < 128; code++) {
+	ASCII_ASYNC_IDENTITY_UNITS.push(code.toString(16).padStart(4, '0'));
+}
+/**
+ * @internal Exported for direct testing: a conflating or wrong-width encoding is
+ * invisible through `prerender`, because occurrence tracking assigns list items
+ * distinct scopes independently of the key bytes. Not re-exported from
+ * `octane/server`.
+ */
+export function encodeAsyncIdentityString(value: string): string {
 	let encoded = '';
 	for (let i = 0; i < value.length; i++) {
-		encoded += value.charCodeAt(i).toString(16).padStart(4, '0');
+		const code = value.charCodeAt(i);
+		encoded += code < 128 ? ASCII_ASYNC_IDENTITY_UNITS[code] : code.toString(16).padStart(4, '0');
 	}
 	return encoded;
 }
