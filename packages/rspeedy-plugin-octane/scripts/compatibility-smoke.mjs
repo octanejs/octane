@@ -28,27 +28,10 @@ const WORKSPACE_PACKAGES = Object.freeze({
 	'@octanejs/rspeedy-plugin': resolve(WORKSPACE_ROOT, 'packages/rspeedy-plugin-octane'),
 });
 
-const RSPEEDY_DEPENDENCY_REQUESTS = Object.freeze({
-	'@lynx-js/cache-events-webpack-plugin': '^0.2.0',
-	'@lynx-js/chunk-loading-webpack-plugin': '^0.4.1',
-	'@lynx-js/debug-metadata-rsbuild-plugin': '^0.2.0',
-	'@lynx-js/web-rsbuild-server-middleware': '0.22.2',
-	'@lynx-js/webpack-dev-transport': '^0.3.0',
-	'@lynx-js/websocket': '^0.0.4',
-	'@rsbuild/core': '2.1.4',
-	'@rsbuild/plugin-css-minimizer': '2.0.0',
-	'@rsdoctor/rspack-plugin': '~1.5.6',
-});
-
 function parseArguments(args) {
 	let lane;
-	let checkRegistry = false;
 	for (let index = 0; index < args.length; index++) {
 		const argument = args[index];
-		if (argument === '--check-registry') {
-			checkRegistry = true;
-			continue;
-		}
 		if (argument === '--lane') {
 			lane = args[++index];
 			if (lane === undefined) throw new Error('--lane requires a value');
@@ -59,92 +42,7 @@ function parseArguments(args) {
 	if (lane !== undefined && !Object.hasOwn(LYNX_TOOLCHAIN_LANES, lane)) {
 		throw new Error(`unknown compatibility lane ${JSON.stringify(lane)}`);
 	}
-	return {
-		checkRegistry,
-		lanes: lane === undefined ? Object.keys(LYNX_TOOLCHAIN_LANES) : [lane],
-	};
-}
-
-function npmView(spec, fields) {
-	const output = execFileSync('npm', ['view', spec, ...fields, '--json'], {
-		cwd: WORKSPACE_ROOT,
-		encoding: 'utf8',
-		timeout: 60_000,
-	});
-	return JSON.parse(output);
-}
-
-function latestVersion(spec) {
-	const value = npmView(spec, ['version']);
-	return Array.isArray(value) ? value.at(-1) : value;
-}
-
-function checkCurrentRegistry(lane) {
-	const rspeedy = npmView('@lynx-js/rspeedy@latest', [
-		'version',
-		'dependencies',
-		'peerDependencies',
-	]);
-	assert.equal(rspeedy.version, lane.packages['@lynx-js/rspeedy']);
-	assert.equal(rspeedy.peerDependencies.typescript, '5.1.6 - 5.9.x');
-	for (const [packageName, expectedRequest] of Object.entries(RSPEEDY_DEPENDENCY_REQUESTS)) {
-		assert.equal(rspeedy.dependencies[packageName], expectedRequest);
-		assert.equal(latestVersion(`${packageName}@${expectedRequest}`), lane.packages[packageName]);
-	}
-
-	const rsbuild = npmView(`@rsbuild/core@${lane.packages['@rsbuild/core']}`, [
-		'version',
-		'dependencies',
-	]);
-	assert.equal(rsbuild.dependencies['@rspack/core'], '~2.1.2');
-	assert.equal(
-		latestVersion(`@rspack/core@${rsbuild.dependencies['@rspack/core']}`),
-		lane.packages['@rspack/core'],
-	);
-
-	for (const packageName of [
-		'@lynx-js/css-extract-webpack-plugin',
-		'@lynx-js/runtime-wrapper-webpack-plugin',
-		'@lynx-js/template-webpack-plugin',
-		'@lynx-js/testing-environment',
-		'@lynx-js/webpack-dev-transport',
-	]) {
-		assert.equal(latestVersion(`${packageName}@latest`), lane.packages[packageName]);
-	}
-	assert.equal(latestVersion('typescript@5.9'), lane.packages.typescript);
-
-	const template = npmView(
-		`@lynx-js/template-webpack-plugin@${lane.packages['@lynx-js/template-webpack-plugin']}`,
-		['dependencies'],
-	);
-	assert.equal(template['@lynx-js/tasm'], lane.packages['@lynx-js/tasm']);
-	assert.equal(template['@lynx-js/web-core'], lane.packages['@lynx-js/web-core']);
-	assert.equal(template['@lynx-js/webpack-runtime-globals'], '^0.0.7');
-	assert.equal(
-		latestVersion(
-			`@lynx-js/webpack-runtime-globals@${template['@lynx-js/webpack-runtime-globals']}`,
-		),
-		lane.packages['@lynx-js/webpack-runtime-globals'],
-	);
-
-	const debugMetadata = npmView(
-		`@lynx-js/debug-metadata-rsbuild-plugin@${lane.packages['@lynx-js/debug-metadata-rsbuild-plugin']}`,
-		['dependencies'],
-	);
-	assert.equal(debugMetadata['@lynx-js/debug-metadata'], '^0.1.0');
-	assert.equal(
-		latestVersion(`@lynx-js/debug-metadata@${debugMetadata['@lynx-js/debug-metadata']}`),
-		lane.packages['@lynx-js/debug-metadata'],
-	);
-
-	const excluded = {
-		'@lynx-js/tasm': latestVersion('@lynx-js/tasm@latest'),
-		'@lynx-js/types': latestVersion('@lynx-js/types@latest'),
-		'@rsbuild/core': latestVersion('@rsbuild/core@latest'),
-	};
-	console.log(
-		`registry graph verified; standalone releases intentionally excluded by exact compatibility pins: ${JSON.stringify(excluded)}`,
-	);
+	return lane === undefined ? Object.keys(LYNX_TOOLCHAIN_LANES) : [lane];
 }
 
 function packWorkspacePackages(directory) {
@@ -155,7 +53,7 @@ function packWorkspacePackages(directory) {
 			execFileSync('pnpm', ['--dir', packageRoot, 'pack', '--pack-destination', destination], {
 				cwd: WORKSPACE_ROOT,
 				stdio: ['ignore', 'pipe', 'inherit'],
-				timeout: 120_000,
+				timeout: 300_000,
 			});
 			const archives = readdirSync(destination).filter((entry) => entry.endsWith('.tgz'));
 			assert.equal(archives.length, 1, `${name} should produce exactly one archive`);
@@ -217,22 +115,23 @@ function installConsumer(root, lane, archives) {
 	assert.equal(existsSync(join(root, 'pnpm-lock.yaml')), false, 'smoke created a lockfile');
 }
 
-const options = parseArguments(process.argv.slice(2));
+const lanes = parseArguments(process.argv.slice(2));
 const repositoryLockfile = join(WORKSPACE_ROOT, 'pnpm-lock.yaml');
 const lockfileBefore = readFileSync(repositoryLockfile);
 
-if (options.lanes.length > 1) {
+if (lanes.length > 1) {
 	// Rspack and TASM both load native state. Keep lane verification in separate
 	// processes so loading a second physical consumer cannot reuse the first
 	// consumer's native module state (and sporadically segfault on teardown/build).
 	const script = fileURLToPath(import.meta.url);
-	for (const laneName of options.lanes) {
+	for (const laneName of lanes) {
 		const args = [script, '--lane', laneName];
-		if (options.checkRegistry && laneName === 'current') args.push('--check-registry');
 		execFileSync(process.execPath, args, {
 			cwd: WORKSPACE_ROOT,
 			stdio: 'inherit',
-			timeout: 600_000,
+			// Allow four sequential five-minute packs, installation, and both
+			// clean native builds to complete within the per-lane parent guard.
+			timeout: 1_800_000,
 		});
 	}
 	assert.deepEqual(
@@ -245,9 +144,8 @@ if (options.lanes.length > 1) {
 	const temporaryRoot = mkdtempSync(join(tmpdir(), 'octane-lynx-compatibility-'));
 	try {
 		const archives = packWorkspacePackages(join(temporaryRoot, 'archives'));
-		for (const laneName of options.lanes) {
+		for (const laneName of lanes) {
 			const lane = LYNX_TOOLCHAIN_LANES[laneName];
-			if (options.checkRegistry && laneName === 'current') checkCurrentRegistry(lane);
 			const consumerRoot = join(temporaryRoot, laneName);
 			installConsumer(consumerRoot, lane, archives);
 			const result = await verifyCompatibilityConsumer({

@@ -1,3 +1,4 @@
+import './styles/globals.css';
 import { createRoot } from 'octane';
 import { App } from './App.tsrx';
 

@@ -1,8 +1,16 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 import { octane } from 'octane/compiler/vite';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [octane()],
+	plugins: [octane(), tailwindcss()],
+
+	resolve: {
+		// The shadcn CLI installs registry components importing via the `@/`
+		// alias (components.json `aliases`); mirror it for Vite.
+		alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+	},
 
 	server: {
 		port: 5173,
@@ -20,6 +28,9 @@ export default defineConfig({
 		// `octane` is workspace:* and points `main` at raw TS sources, and also
 		// provides the compiler at `octane/compiler`. Pre-bundling would snapshot
 		// stale output and require `vite --force` on every workspace edit.
-		exclude: ['octane'],
+		// The registry-installed shadcn components build on the raw-source
+		// `@octanejs/radix`/`@octanejs/lucide` bindings — keep those on the
+		// octane plugin path rather than esbuild pre-bundling.
+		exclude: ['octane', '@octanejs/radix', '@octanejs/lucide'],
 	},
 });
