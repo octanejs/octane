@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, useLayoutEffect, useState } from 'octane';
+import { createContext, createElement, use, useContext, useLayoutEffect, useState } from 'octane';
 
 const Ctx = createContext('none');
 
@@ -103,6 +103,24 @@ export function IfBranchSwapCleanupThrows() @{
 			}
 		} @catch (err) {
 			<span class="caught">{(err.message ?? String(err)) as string}</span>
+		}
+	</div>
+}
+
+// A ref-carrying compiled children body inside a Provider, under a Suspense boundary. The compiled
+// body stamps a ref manifest on the Provider's scope; after a flip to the descriptor dialect the
+// suspense-hide walk reads that manifest against whatever now sits in the scope's first slot.
+export function ProviderRefFlipUnderSuspense(props) @{
+	const [wrapped, setWrapped, getWrapped] = useState(false);
+	<div>
+		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
+		@try {
+			const value = use(props.promise);
+			<DialectRoot wrapped={wrapped} value="ctx">
+				<span class="reffed" ref={props.cbRef}>{value as string}</span>
+			</DialectRoot>
+		} @pending {
+			<span class="pending-arm" />
 		}
 	</div>
 }

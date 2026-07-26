@@ -6,6 +6,7 @@ import {
 	ProviderChildrenDialectFlipWithSiblings,
 	ProviderDialectFlipCleanupThrows,
 	IfBranchSwapCleanupThrows,
+	ProviderRefFlipUnderSuspense,
 } from './_fixtures/provider-children-dialect.tsrx';
 
 // A Provider accepts its children in either dialect: the compiled children-block function a
@@ -94,6 +95,31 @@ describe('context Provider — children dialect changes', () => {
 			expect(error.mock.calls.filter((c) => String(c[0]).includes('cleanup-boom'))).toHaveLength(0);
 		} finally {
 			error.mockRestore();
+			m.unmount();
+		}
+	});
+
+	it('keeps a ref inside the children attached across the flip and detached on hide', () => {
+		const calls: string[] = [];
+		const cbRef = (el: Element | null) => calls.push(el === null ? 'detach' : 'attach');
+		const fulfilled = Object.assign(Promise.resolve('a'), { status: 'fulfilled', value: 'a' });
+		const m = mount(ProviderRefFlipUnderSuspense as any, { promise: fulfilled, cbRef });
+		try {
+			expect(calls).toEqual(['attach']);
+
+			// The flip remounts the children, so the ref detaches from the old element and
+			// attaches to the new one — no dangling attach, no missed detach.
+			m.click('.toggle');
+			expect(calls).toEqual(['attach', 'detach', 'attach']);
+
+			// Hiding the boundary detaches it once. The scope was rebuilt by the flip, so this
+			// exercises the hide walk against the post-flip scope rather than the original.
+			m.update(ProviderRefFlipUnderSuspense as any, {
+				promise: Object.assign(new Promise(() => {}), { status: 'pending' }),
+				cbRef,
+			});
+			expect(calls).toEqual(['attach', 'detach', 'attach', 'detach']);
+		} finally {
 			m.unmount();
 		}
 	});

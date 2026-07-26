@@ -5124,6 +5124,11 @@ function resetScopeChildren(scope: Scope): void {
 		scope.effectSlots = null;
 		scope.hooks = null;
 		scope.slots = [];
+		// The compiled ref manifest describes the OUTGOING body's binding bag. A compiled body
+		// re-stamps its own on mount, but the descriptor dialect never does — it would leave the
+		// old manifest pointed at a `childSlot` record, which `detachSubtreeRefs` would then read
+		// as a bag.
+		scope.refFields = null;
 	} finally {
 		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
 	}
