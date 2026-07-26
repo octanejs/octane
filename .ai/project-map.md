@@ -52,6 +52,7 @@ Run targeted package tests by project/file, e.g.:
 
 ## Core invariants
 
+- Fix framework defects in Octane itself. When an application, binding, integration, benchmark, or test exposes an Octane runtime, compiler, scheduler, SSR, hydration, app-core, or build-tool problem, add a regression at the owning package and repair the underlying implementation. Do not hide the defect behind application-specific workarounds, weakened tests, generated output, or test-only behavior; retain the real integration scenario as additional end-to-end evidence.
 - Octane is React-shaped, not React-cloned. Check documented intentional divergences before changing behavior.
 - Hooks use compiler-injected call-site slots; conditional and early-return hooks are valid. Slot-keyed hooks in plain JS loops are a compile error — use the keyed `@for` directive or a child component (`use()`/`useContext` are exempt).
 - Events are native delegated DOM events, not React synthetic events. There is no synthetic `onChange` normalization: `onInput` is the per-edit handler; native `change` fires on commit/blur. `OCTANE_NATIVE_TEXT_ONCHANGE` reports likely React-style text-host wiring at compile time (or at development runtime for ambiguous final props). Keep genuine text commit behavior with `suppressNativeChangeWarning`; do not rewrite component callbacks, selects, or checkbox/radio handlers.

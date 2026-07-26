@@ -101,12 +101,13 @@ export function setExternal(v) {
 	EXTERNAL = v;
 }
 
-// A render-time CALL in the body defeats the survivor short-circuit entirely:
-// `item.read()` reads mutable state through a STABLE item ref (the TanStack
-// Table header pattern — `header.column.getIsSorted()` flips while the header
-// object stays memoized), so the body must re-run on every parent render,
+// A render-time call through a MEMBER callee defeats the survivor short-circuit
+// entirely: `item.read()` reads mutable state through a STABLE item ref (the
+// TanStack Table header pattern — `header.column.getIsSorted()` flips while the
+// header object stays memoized), so the body must re-run on every parent render,
 // React-parity. Contrast DepPureList below: a bare module-var READ stays
-// eligible (documented at-your-own-risk), a call does not.
+// eligible (documented at-your-own-risk), and so does a call through a plain
+// identifier callee (PlainCalleeList) — the receiver is what carries the hazard.
 const callItems = [
 	{ id: 1, read: () => 'r1:' + EXTERNAL },
 	{ id: 2, read: () => 'r2:' + EXTERNAL },
@@ -134,6 +135,36 @@ export function DepPureList() @{
 		<ul>
 			@for (const item of items; key item.id) {
 				<li class="dp-row" data-m={marker}>{'row' + item.id + ':' + EXTERNAL}</li>
+			}
+		</ul>
+	</div>
+}
+
+// A call through a PLAIN IDENTIFIER callee is an ordinary value projection —
+// the shape of every `{formatPrice(cents)}` / `{t('key')}` in real code. It does
+// NOT defeat memoization (contrast CallBodyList's member callee), so the region
+// tracks its real dependencies: a changed item value must still reach the DOM.
+function fmtRow(item: { id: number; value: number }) {
+	return 'p' + item.id + ':' + item.value;
+}
+
+export function PlainCalleeList() @{
+	const [items, setItems] = useState([
+		{ id: 1, value: 0 },
+		{ id: 2, value: 0 },
+	]);
+	const [, setN] = useState(0);
+	<div>
+		<button id="pc-rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
+		<button
+			id="pc-bump"
+			onClick={() => setItems(
+				(prev) => prev.map((it) => (it.id === 1 ? { ...it, value: it.value + 1 } : it)),
+			)}
+		>{'bump'}</button>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li class="pc-row">{fmtRow(item)}</li>
 			}
 		</ul>
 	</div>

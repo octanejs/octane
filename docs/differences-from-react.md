@@ -46,6 +46,47 @@ render. Opaque callback creation such as `useEffect(makeEffect())` requires an
 explicit array or `null`, because evaluating it again to construct a dependency
 would change program behavior.
 
+## Automatic memoization and calls in templates
+
+Production builds memoize component regions automatically, on the same
+pure-render, immutable-snapshot contract React Compiler assumes. Rendering a
+value through a function call keeps the surrounding region memoizable when the
+callee is a **module-scope immutable identity**:
+
+- an imported binding — `{formatPrice(cents)}`, `{t('total')}`,
+  `{segText(seg, done)}`;
+- a same-module `function` declaration that is never reassigned, and whose own
+  body is itself a value projection.
+
+Anything else keeps the region unmemoized, and the region simply re-runs — the
+same result React gives an unmemoized component:
+
+- **A method on your data.** `{header.getIsSorted()}` can return a new answer
+  while `header` stays the same object, so neither the value nor any dependency
+  witnesses the change. Library bindings that expose table/grid/store instances
+  with live accessor methods keep working unchanged, and so does a module helper
+  that merely wraps one (`function sortIcon(h) { return h.getIsSorted(); }` is
+  the same hazard one call frame away, and is rejected for the same reason).
+- **A component-local callee.** `const read = (h) => h.getIsSorted()` is an
+  identifier, but nothing pins it to an immutable module identity, so it cannot
+  stand in for a projection even when something hands it a stable reference.
+- **Hooks.** `use()` is a suspension point, and `use*` calls own hook cells,
+  context subscriptions, and effect lifecycles, so a region containing one is
+  always re-entered.
+- **`new Foo()` and tagged templates.** Construction is not a value projection.
+
+Arguments carry the same contract as the call itself: `{format(row.get())}` is
+rejected even though `format` qualifies.
+
+If you want a method-backed value memoized, read it into a local first
+(`const sorted = header.getIsSorted();`) and let the surrounding state own it —
+the same advice React Compiler gives. Conversely, a region *is* allowed to
+memoize past a mutable module-level variable, whether read directly or returned
+by an imported helper; module state that must drive rendering belongs in state
+or context. Octane cannot read across a module boundary, so an imported helper
+is taken at its word — that is the one place this analysis trusts rather than
+proves, and it matches React Compiler's own assumption.
+
 ## `useState` / `useReducer` current-state getters
 
 Both state hooks have an Octane-only third tuple member: a stable zero-argument

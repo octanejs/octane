@@ -1,6 +1,16 @@
 import { defineConfig, RenderRoute, OCTANE_NONCE_STATE_KEY } from '@octanejs/vite-plugin';
 
 export default defineConfig({
+	server: {
+		rpc: {
+			allowedOrigins: [
+				'http://127.0.0.1',
+				...(process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN === undefined
+					? []
+					: [process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN]),
+			],
+		},
+	},
 	compiler: {
 		renderers: {
 			registry: {
@@ -25,6 +35,9 @@ export default defineConfig({
 	},
 	middlewares: [
 		async (context, next) => {
+			if (context.request.headers.get('x-fixture-rpc-authorization') === 'deny') {
+				return new Response('Unauthorized', { status: 401 });
+			}
 			context.state.set(OCTANE_NONCE_STATE_KEY, 'fixture-nonce');
 			const response = await next();
 			const headers = new Headers(response.headers);

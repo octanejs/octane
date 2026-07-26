@@ -18,19 +18,24 @@ upstream peer, while the `/react` adapter is maintained against Octane.
 - Runtime exports, client lifecycles, lazy-query render guards, and the primary
   query/mutation/reactive-variable paths are covered by binding tests.
 
-## Next milestone: buffered SSR and hydration
+## Buffered SSR and hydration
 
 Apollo's classic `useQuery` does not suspend. Its React SSR integration therefore
 wraps the hook, holds observable subscriptions across renderer passes, waits for
-non-loading results, and renders again. The Octane port should retain that
-algorithm while returning Octane's `{ html, css }` result:
+non-loading results, and renders again. The Octane `/react/ssr` entry retains
+the pinned Apollo 4.2.6 algorithm while preserving Octane's `{ html, css }`
+renderer result:
 
-1. Add an Octane-native `prerenderStatic` on `/react/ssr`.
-2. Preserve `ssr: false`, `no-cache`, error, and maximum-rerender behavior.
-3. Extract a per-request client's cache after rendering.
-4. Restore the cache before `hydrateRoot`, including Vite `preHydrate` examples.
-5. Test request isolation, nested waterfalls, scoped CSS, cache restoration, and
-   duplicate-fetch prevention.
+1. `prerenderStatic` is published on `/react/ssr` with public TypeScript types.
+2. `ssr: false`, `no-cache`, and the maximum renderer-pass limit match upstream.
+3. Each render owns its observables and subscriptions; callers extract the
+   associated per-request client's cache after rendering.
+4. Restore that cache before `hydrateRoot` to prevent duplicate client requests.
+5. Dedicated Node-mode and hydration tests cover request isolation, nested
+   waterfalls, scoped CSS, host adoption, and restored-cache interactivity.
+
+Vite `preHydrate` examples and broader GraphQL error-path conformance remain
+follow-up work.
 
 Automatic cache patches for streaming boundaries remain a later milestone; a
 single pre-stream cache snapshot cannot include writes made by boundaries that

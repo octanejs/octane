@@ -24,7 +24,7 @@ jobs:
       # Any missing or unexpected data falls back to the full test matrix.
       - name: Identify a generated Changesets release merge
         id: classify
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             core.setOutput("is_release", "false");
@@ -210,13 +210,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: "pnpm"
@@ -264,17 +264,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # The production-error catalog is append-only. Its check compares the
           # current tree with the PR base or previous main commit.
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -364,19 +364,19 @@ jobs:
       - name: Build octane package and verify dist
         run: pnpm build
 
-  typecheck_run:
-    name: typecheck packages, website, and examples
+  typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -390,7 +390,7 @@ jobs:
       - name: Validate example catalog and orchestration
         run: pnpm examples:static:check
 
-  examples:
+  example_shard:
     name: example apps (${{ matrix.shard }})
     runs-on: ubuntu-latest
 
@@ -404,13 +404,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -424,22 +424,20 @@ jobs:
       - name: Run example browser journeys
         run: pnpm examples:e2e -- --shard=${{ matrix.shard }}
 
-  # Keep the existing protected `typecheck` context stable while the actual
-  # typecheck and browser-heavy example gate run in parallel. `always()` turns
-  # either failed dependency into a failed required check instead of a skip.
-  typecheck:
-    needs: [typecheck_run, examples]
+  # Keep browser journeys behind their own stable aggregate check so the
+  # protected `typecheck` context can finish as soon as typechecking does.
+  # `always()` makes a failed shard produce a failed example check, not a skip.
+  examples:
+    name: examples
+    needs: example_shard
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify typecheck and example apps passed
+      - name: Verify all example shards passed
         env:
-          TYPECHECK_RESULT: ${{ needs.typecheck_run.result }}
-          EXAMPLES_RESULT: ${{ needs.examples.result }}
-        run: |
-          test "$TYPECHECK_RESULT" = success
-          test "$EXAMPLES_RESULT" = success
+          EXAMPLE_SHARD_RESULT: ${{ needs.example_shard.result }}
+        run: test "$EXAMPLE_SHARD_RESULT" = success
 
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
@@ -460,13 +458,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -516,13 +514,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
@@ -550,13 +548,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"

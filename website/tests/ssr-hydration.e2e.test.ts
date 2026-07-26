@@ -1377,18 +1377,17 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		try {
 			await page.setViewportSize({ width: 390, height: 667 });
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			await page
-				.locator('.pg-panel[aria-label="Source editor"] .cm-content')
-				.click({ position: { x: 150, y: 70 } });
+			const source = page.locator('.pg-panel[aria-label="Source editor"] .cm-content');
+			// Mobile reflow can move fixed coordinates onto whitespace. Select
+			// the visible useState call so Inspect always has a real AST range.
+			await source.getByText('useState', { exact: true }).nth(1).click();
 			await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
 			// Inspect opens the compiled CODE view, same as desktop; the AST is
 			// one switch away, and switching reveals what the editor selected.
 			await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
 			// Browsers may deliver the source editor's mouseleave after its mobile
 			// panel is hidden. It must not clear the AST node we just revealed.
-			await page
-				.locator('.pg-panel[aria-label="Source editor"] .cm-content')
-				.dispatchEvent('mouseleave');
+			await source.dispatchEvent('mouseleave');
 
 			const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
 			await leaf.waitFor({ timeout: 10_000 });
