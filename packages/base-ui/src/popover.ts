@@ -1,16 +1,16 @@
 // Ported from .base-ui/packages/react/src/popover/ (v1.6.0): store (PopoverStore/PopoverHandle),
-// root (context/PopoverRoot/PopoverInteractions), trigger. The CLOSED-state path (Root + Trigger),
-// reusing the Store + floating stack from Dialog. octane adaptations: forwardRef → ref-as-prop;
-// native events; every Store hook-method + hook threads an explicit slot; `React.createContext` →
-// octane `createContext`; `ReactDOM.flushSync` → octane `flushSync`.
+// root (context/PopoverRoot/PopoverInteractions), trigger, and the anchored open path
+// (Portal/Positioner/Popup/Arrow/Backdrop/Title/Description/Close), reusing the Store + floating
+// stack from Dialog. octane adaptations: forwardRef → ref-as-prop; native events; every Store
+// hook-method + hook threads an explicit slot; `React.createContext` → octane `createContext`;
+// `ReactDOM.flushSync` → octane `flushSync`.
 //
-// STUBBED/DEFERRED (behind off-by-default features): `useHoverReferenceInteraction` (openOnHover);
-// the Positioner + Popup + Arrow + Backdrop + Title/Description/Close parts (the open path) land next
-// with `useAnchorPositioning`. Interactions are only mounted when `open || mounted`, and — as with
-// Dialog — a stable no-DOM descriptor wraps the children (octane Provider children shape-flip bug).
+// `openOnHover` is fully wired: the trigger side runs `useHoverReferenceInteraction` (+ safePolygon)
+// and the popup side runs `useHoverFloatingInteraction`.
 import {
 	createContext,
 	createElement,
+	Fragment,
 	useContext,
 	useMemo,
 	useRef,
@@ -415,11 +415,7 @@ function PopoverInteractions(props: any): any {
 		subSlot(slot, 'pip'),
 	);
 
-	return props.children ?? null;
-}
-
-function PopoverChildren(props: any): any {
-	return props.children ?? null;
+	return null;
 }
 
 // --- Root --------------------------------------------------------------------
@@ -519,11 +515,22 @@ function PopoverRootComponent<Payload>(props: any): any {
 	const resolvedChildren =
 		typeof children === 'function' && !isChildrenBlock(children) ? children({ payload }) : children;
 
-	// Stable descriptor shape (see the Dialog note / octane Provider children shape-flip bug).
-	const content = createElement(shouldRenderInteractions ? PopoverInteractions : PopoverChildren, {
-		store,
-		modal,
-		children: resolvedChildren,
+	// Base UI renders `PopoverInteractions` as a headless SIBLING of the children, so toggling it
+	// never disturbs them. Rendering it as a wrapper instead (an earlier workaround for the octane
+	// Provider children shape-flip bug) swapped the wrapper's component type on every open, which
+	// tore down and rebuilt the whole subtree — including the trigger, whose element listeners and
+	// store registration then pointed at a detached node.
+	//
+	// The Provider still needs a stable children shape, so the sibling pair lives inside one
+	// fragment: the Provider always sees a single descriptor, while the interactions element comes
+	// and goes as a keyed sibling and the children keep their identity.
+	const content = createElement(Fragment, {
+		children: [
+			shouldRenderInteractions
+				? createElement(PopoverInteractions, { key: 'interactions', store, modal })
+				: null,
+			createElement(Fragment, { key: 'children', children: resolvedChildren }),
+		],
 	});
 
 	return createElement(PopoverRootContext.Provider, {
@@ -680,18 +687,33 @@ function PopoverTrigger(componentProps: any): any {
 		subSlot(slot, 're'),
 	);
 
+	// The trigger's children shape flips between a lone element (closed) and
+	// [guard, element, guard] (open, non-modal). Base UI keeps the trigger's identity across that
+	// flip by wrapping it in a fragment keyed on the trigger id in BOTH branches — without the key
+	// the button is torn down and rebuilt on every open, which detaches the element listeners
+	// (hover open/close) and makes the positioner see a spurious trigger change.
+	const keyedElement = createElement(Fragment, { key: thisTriggerId, children: element });
+
 	if (isMountedByThisTrigger && !focusManagerModal) {
+		// Base UI renders these as static JSX fragment children; octane reconciles a returned array
+		// as a list, so the guards carry stable keys too — otherwise the unkeyed siblings shift the
+		// keyed trigger and it is rebuilt anyway.
 		return [
-			createElement(FocusGuard, { ref: preFocusGuardRef, onFocus: handlePreFocusGuardFocus }),
-			element,
 			createElement(FocusGuard, {
+				key: `${thisTriggerId}-pre-guard`,
+				ref: preFocusGuardRef,
+				onFocus: handlePreFocusGuardFocus,
+			}),
+			keyedElement,
+			createElement(FocusGuard, {
+				key: `${thisTriggerId}-post-guard`,
 				ref: store.context.triggerFocusTargetRef,
 				onFocus: handleFocusTargetFocus,
 			}),
 		];
 	}
 
-	return element;
+	return keyedElement;
 }
 
 // --- Portal ------------------------------------------------------------------

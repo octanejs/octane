@@ -44,9 +44,7 @@ function DirectionProbe() @{
 function MediaProbe(props) @{
 	<span className="mq">{(useMediaQuery('(min-width: 600px)', {
 		defaultMatches: props.defaultMatches,
-	})
-		? 'true'
-		: 'false') as string}</span>
+	}) ? 'true' : 'false') as string}</span>
 }
 
 // Default (horizontal) — proves the intrinsic-tag render + state→data-* + role/aria.
@@ -687,4 +685,46 @@ export function MediaQueryProbe() @{
 // `defaultMatches` is only the pre-subscription value; the live snapshot still wins.
 export function MediaQueryDefaultMatches() @{
 	<MediaProbe defaultMatches={true} />
+}
+
+// Popover (open-on-hover) — `openOnHover` with no rest delay, for the hover behavior tests.
+// Hover open/close is timing- and pointer-driven, so it is not differential-testable.
+export function PopoverHover() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pop-host" />
+		<Popover.Root>
+			<Popover.Trigger className="pop-trigger" openOnHover delay={0} closeDelay={0}>
+				Open
+			</Popover.Trigger>
+			<Popover.Portal container={hostRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Close className="pop-close">Close</Popover.Close>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}
+
+// Popover (open-on-hover with a close delay) — leaving the trigger must not close it until the
+// delay elapses.
+export function PopoverHoverCloseDelay() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pop-host" />
+		<Popover.Root>
+			<Popover.Trigger className="pop-trigger" openOnHover delay={0} closeDelay={200}>
+				Open
+			</Popover.Trigger>
+			<Popover.Portal container={hostRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Close className="pop-close">Close</Popover.Close>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
 }

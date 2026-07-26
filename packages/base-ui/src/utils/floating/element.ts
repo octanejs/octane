@@ -1,10 +1,44 @@
 // Ported from .base-ui/packages/react/src/floating-ui-react/utils/element.ts (v1.6.0) — the subset
 // used so far. `getTarget` is reused from the composite list utils.
-import { isHTMLElement } from '../dom';
+import { isElement, isHTMLElement } from '../dom';
+import type { PopupTriggerMap } from '../popups/popupTriggerMap';
 import { TYPEABLE_SELECTOR, FOCUSABLE_ATTRIBUTE } from './constants';
 
+import { contains } from '../contains';
+
 export { getTarget } from '../composite/list-utils';
-export { contains } from '../contains';
+export { contains };
+
+// Whether the target sits on (or inside) one of this popup's triggers, and that trigger is not
+// marked disabled. Hover uses it to keep a popup open while the cursor crosses between triggers.
+export function isTargetInsideEnabledTrigger(
+	target: EventTarget | null,
+	triggerElements: PopupTriggerMap,
+): boolean {
+	if (!isElement(target)) {
+		return false;
+	}
+	const targetElement = target as Element;
+	if (triggerElements.hasElement(targetElement)) {
+		return !targetElement.hasAttribute('data-trigger-disabled');
+	}
+	for (const [, trigger] of triggerElements.entries()) {
+		if (contains(trigger, targetElement)) {
+			return !trigger.hasAttribute('data-trigger-disabled');
+		}
+	}
+	return false;
+}
+
+// Whether the element (or an ancestor) is something the user can interact with directly — used to
+// decide whether a pointerdown inside a popup counts as a click-like open.
+export function isInteractiveElement(element: Element | null): boolean {
+	return (
+		element?.closest(
+			`button,a[href],[role="button"],select,[tabindex]:not([tabindex="-1"]),${TYPEABLE_SELECTOR}`,
+		) != null
+	);
+}
 
 // Ported from .base-ui/…/internals/shadowDom.ts — the deepest active element across shadow roots.
 export function activeElement(doc: Document): Element | null {
