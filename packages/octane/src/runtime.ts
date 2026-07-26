@@ -201,7 +201,12 @@ export interface Scope {
 	 * `undefined` when null, identical to a Map.get miss.
 	 */
 	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[];
+	/**
+	 * Teardown callbacks (ref detaches, listener removal, slot cleanup). Lazily allocated by
+	 * `pushCleanup` — most scopes never register one, so the array is only paid for on demand,
+	 * matching `hooks` / `effectSlots` / `_slots`.
+	 */
+	cleanups: Cleanup[] | null;
 	/**
 	 * This scope's effect slots in hook DECLARATION order (first-enqueue order —
 	 * the order the hooks ran in the scope's first render). unmountScope walks it
@@ -218,8 +223,10 @@ export interface Scope {
 	 * (NOT a Map): iteration is a plain indexed for-loop, and lookups are linear
 	 * scans — faster than `Map.get` for the typical N ≤ 8 case (most components
 	 * have a handful of static sub-component calls at most).
+	 *
+	 * Lazily allocated when the first child scope registers: a leaf component has none.
 	 */
-	children: ChildScope[];
+	children: ChildScope[] | null;
 	mounted: boolean;
 	/**
 	 * Slot objects owned by this scope (ifBlockSlot, forBlockSlot, etc.).
@@ -3147,9 +3154,9 @@ class BlockImpl {
 	inactive: boolean;
 	// Hooks + cleanups (per-block state).
 	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[];
+	cleanups: Cleanup[] | null;
 	effectSlots: EffectSlot[] | null;
-	children: ChildScope[];
+	children: ChildScope[] | null;
 	_slots: any[] | null;
 	refFields: string[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
@@ -3237,9 +3244,9 @@ class BlockImpl {
 		this.currentRenderDeferred = false;
 		this.inactive = false;
 		this.hooks = null;
-		this.cleanups = [];
+		this.cleanups = null;
 		this.effectSlots = null;
-		this.children = [];
+		this.children = null;
 		this._slots = null;
 		this.refFields = null;
 		this.$$ctxValues = null;
@@ -3284,9 +3291,9 @@ class ScopeImpl {
 	block: Block;
 	parent: Scope | null;
 	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[];
+	cleanups: Cleanup[] | null;
 	effectSlots: EffectSlot[] | null;
-	children: ChildScope[];
+	children: ChildScope[] | null;
 	_slots: any[] | null;
 	refFields: string[] | null;
 	$$ctxValues: Map<Context<any>, any> | null;
@@ -3301,9 +3308,9 @@ class ScopeImpl {
 		this.block = block;
 		this.parent = parent;
 		this.hooks = null;
-		this.cleanups = [];
+		this.cleanups = null;
 		this.effectSlots = null;
-		this.children = [];
+		this.children = null;
 		this._slots = null;
 		this.refFields = null;
 		this.slots = [];
@@ -3794,7 +3801,7 @@ export function componentSlotLite<P>(
 		}
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
-		parentScope.children.push({ key: slotKey, scope });
+		(parentScope.children ??= []).push({ key: slotKey, scope });
 	} else {
 		// Re-render: the parent's host/anchor are stable across renders so no
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
@@ -4003,20 +4010,22 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // so its recursive cleanup must not manufacture a matching detach.
 function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
 	const c = scope.cleanups;
-	for (let i = c.length - 1; i >= 0; i--) {
-		try {
-			runEffectLifecycleCallback(c[i]);
-		} catch (err) {
-			// Route to the boundary enclosing the DELETION (collected + dispatched
-			// after the walk — see reportTeardownError); React parity: an error in a
-			// deletion-phase cleanup reaches the nearest still-mounted boundary
-			// instead of being swallowed (ReactErrorBoundaries:1927).
-			reportTeardownError(err);
+	if (c !== null)
+		for (let i = c.length - 1; i >= 0; i--) {
+			try {
+				runEffectLifecycleCallback(c[i]);
+			} catch (err) {
+				// Route to the boundary enclosing the DELETION (collected + dispatched
+				// after the walk — see reportTeardownError); React parity: an error in a
+				// deletion-phase cleanup reaches the nearest still-mounted boundary
+				// instead of being swallowed (ReactErrorBoundaries:1927).
+				reportTeardownError(err);
+			}
 		}
-	}
 	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
+	if (children !== null)
+		for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
 	// Walk slot-stashed child Blocks (ifBlock / forBlock / componentSlot / portal).
 	const slots = scope._slots;
 	if (slots !== null) {
@@ -4883,7 +4892,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
 		const cell = s;
-		scope.cleanups.push(() => {
+		(scope.cleanups ??= []).push(() => {
 			cell.active = false;
 		});
 	} else {
@@ -5095,14 +5104,14 @@ function resetScopeChildren(scope: Scope): void {
 	const start = block.startMarker;
 	removeRange(start !== null ? start.nextSibling : block.parentNode.firstChild, block.endMarker);
 
-	// Truncate the eagerly-allocated arrays in place rather than replacing them: same empty
-	// result, no garbage, and the Scope keeps the backing store it already sized.
-	scope.children.length = 0;
-	scope.cleanups.length = 0;
-	scope.slots.length = 0;
+	// Drop the collections rather than emptying them: the lazily-allocated ones go back to null,
+	// and `slots` gets a fresh array (compiled bodies index it directly, so it stays non-null).
+	scope.children = null;
+	scope.cleanups = null;
 	scope._slots = null;
 	scope.effectSlots = null;
 	scope.hooks = null;
+	scope.slots = [];
 }
 
 // ---------------------------------------------------------------------------
@@ -6442,7 +6451,7 @@ export function bindRendererRegionOwner(props: unknown): void {
 	RENDERER_REGION_DOM_OWNERS.set(root, bridge);
 	root.$$ctxCache?.clear();
 	if (previous === undefined) {
-		root.cleanups.push(() => {
+		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
 			if (current === undefined) return;
 			current.release();
@@ -9424,7 +9433,7 @@ export function mountFragmentRef(
 	// `ref`) so a ref the compiler re-points via the update path is honored, and
 	// so the detach cleanup always releases whatever ref is current on unmount.
 	queueRefAttach(scope, () => attachRef(fi._currentRef, fi));
-	scope.cleanups.push(() => {
+	(scope.cleanups ??= []).push(() => {
 		// Detach at commit, not inline (queueRefDetach) — unmount cleanups run
 		// mid-render, and a state-setter ref firing null synchronously can render
 		// before a replacement's attach. The instance is destroyed now; the queued
@@ -10565,7 +10574,7 @@ export function headBlock(
 		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
-		scope.cleanups.push(() => {
+		(scope.cleanups ??= []).push(() => {
 			state!.el.remove();
 			scope.slots[slot] = undefined;
 		});
@@ -14506,9 +14515,9 @@ export function hostComponent(
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
 		const childScope = new ScopeImpl(scope, block);
 		state.childScope = childScope;
-		scope.children.push({ key: slot, scope: childScope });
+		(scope.children ??= []).push({ key: slot, scope: childScope });
 		block.parentNode.insertBefore(el, anchor ?? block.endMarker);
-		scope.cleanups.push(() => queueRefDetach(state!.ref, state!.el));
+		(scope.cleanups ??= []).push(() => queueRefDetach(state!.ref, state!.el));
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
@@ -18517,7 +18526,7 @@ export function useTransition(
 			}
 		};
 		TRANSITION_LISTENERS.add(listener);
-		scope.cleanups.push(() => TRANSITION_LISTENERS.delete(listener));
+		(scope.cleanups ??= []).push(() => TRANSITION_LISTENERS.delete(listener));
 	}
 	return [s.isPending, s.start];
 }
@@ -18687,7 +18696,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 		s = { form: null, listener: null };
 		const slotRef = s;
 		ensureHooks(scope).set(slot, slotRef);
-		scope.cleanups.push(() => {
+		(scope.cleanups ??= []).push(() => {
 			if (slotRef.form && slotRef.listener)
 				FORM_STATUS_LISTENERS.get(slotRef.form)?.delete(slotRef.listener);
 		});
@@ -18809,7 +18818,7 @@ export function useOptimistic<S, V = S>(
 			if (TRANSITION_PENDING_COUNT === 0 && slotRef.armed) clear();
 		};
 		TRANSITION_LISTENERS.add(listener);
-		scope.cleanups.push(() => TRANSITION_LISTENERS.delete(listener));
+		(scope.cleanups ??= []).push(() => TRANSITION_LISTENERS.delete(listener));
 	}
 	s.updateFn = updateFn;
 	let optimistic = passthrough;
@@ -19896,7 +19905,7 @@ function forEachSubtreeChild(
 	includeHiddenTry: boolean = true,
 ): void {
 	const children = scope.children;
-	for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
+	if (children !== null) for (let i = 0, n = children.length; i < n; i++) visit(children[i].scope);
 	const slots = scope._slots;
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
@@ -21136,7 +21145,7 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	// head/tail only AFTER this returns, so the chain still covers exactly the
 	// old items here.
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		if (b.cleanups.length > 0 || b.children.length > 0 || b._slots !== null) {
+		if (b.cleanups !== null || b.children !== null || b._slots !== null) {
 			unmountBlock(b, false);
 		} else {
 			// Pure-host de-opt item (deoptItemBody with no component descendants):
@@ -21658,7 +21667,7 @@ function coalesceHydratedRanges(
 		if (
 			registered !== null &&
 			registered.length === 1 &&
-			scope.children.length === 0 &&
+			scope.children === null &&
 			registered[0].__kind === 'childSlot' &&
 			(registered[0] as ChildSlot).compactable &&
 			mayBorrowCandidate(registered[0])
@@ -21749,7 +21758,8 @@ function coalesceHydratedRanges(
 
 	function visitScopeContents(scope: Scope): void {
 		const children = scope.children;
-		for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
+		if (children !== null)
+			for (let i = 0; i < children.length; i++) visitNestedScope(children[i].scope);
 		const registered = scope._slots;
 		if (registered === null) return;
 		for (let i = 0; i < registered.length; i++) visitSlot(registered[i]);
