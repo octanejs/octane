@@ -245,10 +245,11 @@ jobs:
 
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
-  # lets an authenticated release skip satisfy the contexts publishing expects.
+  # folds the dedicated website browser suite into the same merge and publishing
+  # gates. An authenticated release skip must satisfy both prerequisites.
   test:
     name: test (${{ matrix.required-context }})
-    needs: [release_merge, test_shard]
+    needs: [release_merge, test_shard, website_e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
@@ -258,15 +259,18 @@ jobs:
         required-context: [22, 24]
 
     steps:
-      - name: Verify all test shards passed
+      - name: Verify all test suites passed
         env:
           IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_merge.outputs.is_release }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
+          WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
         run: |
           if [ "$IS_CHANGESET_RELEASE_MERGE" = true ]; then
             test "$SHARD_RESULT" = skipped
+            test "$WEBSITE_E2E_RESULT" = skipped
           else
             test "$SHARD_RESULT" = success
+            test "$WEBSITE_E2E_RESULT" = success
           fi
 
   website_e2e:
