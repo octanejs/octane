@@ -6,6 +6,11 @@ pnpm-workspace.yaml
 .changeset/
 
 # Build outputs
+packages/shadcn/registry/
+# Vendored pinned upstream shadcn sources (byte-exact provenance; do not reformat)
+packages/shadcn/tests/differential/upstream/
+# Vendored pinned upstream shadcn style sheet (byte-exact below its header)
+playground/octane/src/styles/style-nova.css
 **/dist/
 **/build/
 **/.netlify/

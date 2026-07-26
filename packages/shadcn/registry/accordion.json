@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "accordion",
+  "type": "registry:ui",
+  "title": "Accordion",
+  "files": [
+    {
+      "path": "ui/accordion.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/accordion.tsrx",
+      "content": "// App-owned accordion (the shadcn registry-mode ownership model): a custom\n// utilities-inlined flavor. Octane adaptations from the shared React source:\n// \"use client\" dropped, lucide-react → @octanejs/lucide, radix-ui →\n// @octanejs/radix. Children forwarding uses the compiler's `{props.children}`\n// lowering (the syntactic form is load-bearing — a destructured `children`\n// local is not recognized as a forwardable hole), so the markup reads exactly\n// like the React source.\nimport { Accordion as AccordionPrimitive } from '@octanejs/radix';\nimport { ChevronDownIcon, ChevronUpIcon } from '@octanejs/lucide';\nimport type { OctaneNode } from 'octane';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;\n\nexport function Accordion({ className, ...props }: Props) @{\n\t<AccordionPrimitive.Root\n\t\tdata-slot=\"accordion\"\n\t\tclassName={cn('flex w-full flex-col', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function AccordionItem({ className, ...props }: Props) @{\n\t<AccordionPrimitive.Item\n\t\tdata-slot=\"accordion-item\"\n\t\tclassName={cn('not-last:border-b', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function AccordionTrigger(props: Props) @{\n\tconst { className, children: _children, ...rest } = props;\n\n\t<AccordionPrimitive.Header className=\"flex\">\n\t\t<AccordionPrimitive.Trigger\n\t\t\tdata-slot=\"accordion-trigger\"\n\t\t\tclassName={cn(\n\t\t\t\t'group/accordion-trigger relative flex flex-1 items-start justify-between rounded-lg border border-transparent py-2.5 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:after:border-ring disabled:pointer-events-none disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground',\n\t\t\t\tclassName,\n\t\t\t)}\n\t\t\t{...rest}\n\t\t>\n\t\t\t{props.children}\n\t\t\t<ChevronDownIcon\n\t\t\t\tdata-slot=\"accordion-trigger-icon\"\n\t\t\t\tclassName=\"pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden\"\n\t\t\t/>\n\t\t\t<ChevronUpIcon\n\t\t\t\tdata-slot=\"accordion-trigger-icon\"\n\t\t\t\tclassName=\"pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline\"\n\t\t\t/>\n\t\t</AccordionPrimitive.Trigger>\n\t</AccordionPrimitive.Header>\n}\n\nexport function AccordionContent(props: Props) @{\n\tconst { className, children: _children, ...rest } = props;\n\n\t<AccordionPrimitive.Content\n\t\tdata-slot=\"accordion-content\"\n\t\tclassName=\"overflow-hidden text-sm data-open:animate-accordion-down data-closed:animate-accordion-up\"\n\t\t{...rest}\n\t>\n\t\t<div\n\t\t\tclassName={cn(\n\t\t\t\t'h-(--radix-accordion-content-height) pt-0 pb-2.5 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4',\n\t\t\t\tclassName,\n\t\t\t)}\n\t\t>{props.children}</div>\n\t</AccordionPrimitive.Content>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.8",
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "scroll-area",
+  "type": "registry:ui",
+  "title": "Scroll Area",
+  "files": [
+    {
+      "path": "ui/scroll-area.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/scroll-area.tsrx",
+      "content": "// ScrollArea — maintainer-supplied default-Tailwind flavor, class strings\n// verbatim. Octane adaptations: \"use client\" dropped, radix-ui →\n// @octanejs/radix; ScrollArea interleaves consumer children with sibling\n// descriptors (ScrollBar, Corner), so it uses the {props.children} lowering.\nimport type { OctaneNode } from 'octane';\nimport { ScrollArea as ScrollAreaPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;\n\nexport function ScrollArea(props: Props) @{\n\tconst { className, children: _children, ...rest } = props;\n\n\t<ScrollAreaPrimitive.Root data-slot=\"scroll-area\" className={cn('relative', className)} {...rest}>\n\t\t<ScrollAreaPrimitive.Viewport\n\t\t\tdata-slot=\"scroll-area-viewport\"\n\t\t\tclassName=\"size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1\"\n\t\t>{props.children}</ScrollAreaPrimitive.Viewport>\n\t\t<ScrollBar />\n\t\t<ScrollAreaPrimitive.Corner />\n\t</ScrollAreaPrimitive.Root>\n}\n\nexport function ScrollBar({ className, orientation = 'vertical', ...props }: Props & {\n\torientation?: 'vertical' | 'horizontal';\n}) @{\n\t<ScrollAreaPrimitive.ScrollAreaScrollbar\n\t\tdata-slot=\"scroll-area-scrollbar\"\n\t\tdata-orientation={orientation}\n\t\torientation={orientation}\n\t\tclassName={cn(\n\t\t\t'flex touch-none p-px transition-colors select-none data-horizontal:h-2.5 data-horizontal:flex-col data-horizontal:border-t data-horizontal:border-t-transparent data-vertical:h-full data-vertical:w-2.5 data-vertical:border-l data-vertical:border-l-transparent',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t<ScrollAreaPrimitive.ScrollAreaThumb\n\t\t\tdata-slot=\"scroll-area-thumb\"\n\t\t\tclassName=\"relative flex-1 rounded-full bg-border\"\n\t\t/>\n\t</ScrollAreaPrimitive.ScrollAreaScrollbar>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

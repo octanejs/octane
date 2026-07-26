@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "native-select",
+  "type": "registry:ui",
+  "title": "Native Select",
+  "files": [
+    {
+      "path": "ui/native-select.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/native-select.tsrx",
+      "content": "// NativeSelect — maintainer-supplied default-Tailwind flavor, class strings\n// verbatim. Octane adaptations: lucide-react → @octanejs/lucide.\n//\n// The consumer className lands on the WRAPPER div (upstream behavior); the\n// <select> and the chevron keep their fixed classes.\nimport { ChevronDownIcon } from '@octanejs/lucide';\n\nimport { cn } from '@/lib/utils';\n\nexport interface NativeSelectProps extends Record<string, unknown> {\n\tclassName?: string;\n\tsize?: 'sm' | 'default';\n}\n\nexport function NativeSelect({ className, size = 'default', ...props }: NativeSelectProps) @{\n\t<div\n\t\tclassName={cn('group/native-select relative w-fit has-[select:disabled]:opacity-50', className)}\n\t\tdata-slot=\"native-select-wrapper\"\n\t\tdata-size={size}\n\t>\n\t\t<select\n\t\t\tdata-slot=\"native-select\"\n\t\t\tdata-size={size}\n\t\t\tclassName=\"h-8 w-full min-w-0 appearance-none rounded-lg border border-input bg-transparent py-1 pr-8 pl-2.5 text-sm transition-colors outline-none select-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-[size=sm]:py-0.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40\"\n\t\t\t{...props}\n\t\t/>\n\t\t<ChevronDownIcon\n\t\t\tclassName=\"pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground select-none\"\n\t\t\taria-hidden=\"true\"\n\t\t\tdata-slot=\"native-select-icon\"\n\t\t/>\n\t</div>\n}\n\nexport function NativeSelectOption({ className, ...props }: { className?: string } & Record<\n\tstring,\n\tunknown\n>) @{\n\t<option\n\t\tdata-slot=\"native-select-option\"\n\t\tclassName={cn('bg-[Canvas] text-[CanvasText]', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function NativeSelectOptGroup({ className, ...props }: { className?: string } & Record<\n\tstring,\n\tunknown\n>) @{\n\t<optgroup\n\t\tdata-slot=\"native-select-optgroup\"\n\t\tclassName={cn('bg-[Canvas] text-[CanvasText]', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.8"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

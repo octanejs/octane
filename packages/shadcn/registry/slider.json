@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "slider",
+  "type": "registry:ui",
+  "title": "Slider",
+  "files": [
+    {
+      "path": "ui/slider.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/slider.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/slider.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis).\n//\n// The Track/Range/Thumb tree is composed with createElement: upstream renders\n// one Thumb per entry of `_values` via an array map, and mapped/prop-position\n// descriptors are the octane channel for computed children (see\n// breadcrumb.tsrx's comment on opaque compiled children).\nimport { createElement, useMemo } from 'octane';\nimport { Slider as SliderPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport interface SliderProps extends Record<string, unknown> {\n\tclassName?: string;\n\tdefaultValue?: number[];\n\tvalue?: number[];\n\tmin?: number;\n\tmax?: number;\n}\n\nexport function Slider({\n\tclassName,\n\tdefaultValue,\n\tvalue,\n\tmin = 0,\n\tmax = 100,\n\t...props\n}: SliderProps) {\n\tconst _values = useMemo(\n\t\t() => Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max],\n\t\t[value, defaultValue, min, max],\n\t);\n\n\treturn createElement(\n\t\tSliderPrimitive.Root,\n\t\t{\n\t\t\t'data-slot': 'slider',\n\t\t\tdefaultValue,\n\t\t\tvalue,\n\t\t\tmin,\n\t\t\tmax,\n\t\t\tclassName: cn(\n\t\t\t\t'relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',\n\t\t\t\tclassName,\n\t\t\t),\n\t\t\t...props,\n\t\t},\n\t\tcreateElement(\n\t\t\tSliderPrimitive.Track,\n\t\t\t{\n\t\t\t\t'data-slot': 'slider-track',\n\t\t\t\tclassName: 'relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5',\n\t\t\t},\n\t\t\tcreateElement(SliderPrimitive.Range, {\n\t\t\t\t'data-slot': 'slider-range',\n\t\t\t\tclassName: 'absolute bg-primary data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',\n\t\t\t}),\n\t\t),\n\t\t...Array.from(\n\t\t\t{ length: _values.length },\n\t\t\t(_, index) => createElement(SliderPrimitive.Thumb, {\n\t\t\t\t'data-slot': 'slider-thumb',\n\t\t\t\tkey: index,\n\t\t\t\tclassName: 'block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50',\n\t\t\t}),\n\t\t),\n\t);\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

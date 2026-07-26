@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "utils",
+  "type": "registry:lib",
+  "title": "Utils",
+  "description": "The cn() class utility (clsx + tailwind-merge).",
+  "dependencies": [
+    "clsx",
+    "tailwind-merge"
+  ],
+  "files": [
+    {
+      "path": "lib/utils.ts",
+      "type": "registry:lib",
+      "target": "lib/utils.ts",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/lib/utils.ts — unchanged (framework-free).\nimport { clsx, type ClassValue } from 'clsx';\nimport { twMerge } from 'tailwind-merge';\n\nexport function cn(...inputs: ClassValue[]) {\n\treturn twMerge(clsx(inputs));\n}\n"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "types",
+  "type": "registry:lib",
+  "title": "Types",
+  "description": "Host-element prop bases shared by the components.",
+  "files": [
+    {
+      "path": "lib/types.ts",
+      "type": "registry:lib",
+      "target": "lib/types.ts",
+      "content": "// Host-element prop bases for the ported components. Octane exposes the same\n// per-tag prop tables React does (`JSX.IntrinsicElements`), so a component that\n// spreads onto a `<button>` types its rest props as that tag's real props —\n// misspellings and wrong-typed handlers are caught at the call site.\nimport type { JSX } from 'octane/jsx-runtime';\n\nexport type HostProps<T extends keyof JSX.IntrinsicElements> = JSX.IntrinsicElements[T];\n\n/** Props for a component whose host is a `<div>` (the common wrapper shape). */\nexport type DivProps = HostProps<'div'>;\n"
+    }
+  ]
+}

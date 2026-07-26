@@ -12374,6 +12374,12 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 		el.hasAttribute('disabled')
 	)
 		return null;
+	// An aria-hidden control is a form-interop MIRROR (AT-hidden and, by the
+	// pattern's contract, focus-excluded — e.g. the hidden "bubble inputs"
+	// radix-style libraries render behind a custom control): users cannot reach
+	// it, so handler-less controlled props are the intended wiring, not the
+	// authoring mistake this diagnostic exists to catch.
+	if (el.getAttribute('aria-hidden') === 'true') return null;
 
 	const hasInput =
 		isUsableEventSlot(host.$$input as EventSlot) ||

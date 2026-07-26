@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**48 publishable package(s), including 39 framework binding(s).**
+**49 publishable package(s), including 40 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -38,6 +38,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/remix-router` | [`packages/remix-router`](../packages/remix-router) | framework binding | `0.1.12` | 2 |
 | `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.11` | 3 |
 | `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.11` | 2 |
+| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.1` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.11` | 2 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.8` | 1 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.15` | 2 |

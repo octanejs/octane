@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "progress",
+  "type": "registry:ui",
+  "title": "Progress",
+  "files": [
+    {
+      "path": "ui/progress.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/progress.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/progress.tsx (the `\"use client\"` directive\n// is dropped — octane has no RSC axis). As upstream, `value` drives only the\n// indicator transform — it is destructured off and NOT forwarded to the radix\n// Root, whose role/aria-valuemax/data-state contract comes from its defaults.\nimport { Progress as ProgressPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport interface ProgressProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvalue?: number | null;\n}\n\nexport function Progress({ className, value, ...props }: ProgressProps) @{\n\t<ProgressPrimitive.Root\n\t\tdata-slot=\"progress\"\n\t\tclassName={cn('relative h-2 w-full overflow-hidden rounded-full bg-primary/20', className)}\n\t\t{...props}\n\t>\n\t\t<ProgressPrimitive.Indicator\n\t\t\tdata-slot=\"progress-indicator\"\n\t\t\tclassName=\"h-full w-full flex-1 bg-primary transition-all\"\n\t\t\tstyle={{ transform: `translateX(-${100 - (value || 0)}%)` }}\n\t\t/>\n\t</ProgressPrimitive.Root>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

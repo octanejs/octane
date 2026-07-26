@@ -93,6 +93,28 @@ describe('native text change development diagnostic', () => {
 		}
 	});
 
+	it('warns on a handler-less controlled checkable but skips aria-hidden mirror inputs', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const checkableCalls = () =>
+			error.mock.calls.filter((call) => String(call[0]).includes('`checked` prop'));
+		// A user-reachable controlled checkable with no usable handler is broken…
+		const result = mount(SpreadText, { hostProps: { type: 'checkbox', checked: true } });
+		try {
+			expect(checkableCalls()).toHaveLength(PROD_COMPILE ? 0 : 1);
+
+			error.mockClear();
+			// …but the same wiring on an aria-hidden control is the hidden
+			// form-interop MIRROR pattern (a bubble input behind a custom control):
+			// users cannot reach it, so no warning.
+			result.update(SpreadText, {
+				hostProps: { type: 'checkbox', checked: true, 'aria-hidden': true, tabIndex: -1 },
+			});
+			expect(checkableCalls()).toHaveLength(0);
+		} finally {
+			result.unmount();
+		}
+	});
+
 	it('classifies the live input type and skips read-only, disabled, and non-text hosts', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const result = mount(SpreadText, {

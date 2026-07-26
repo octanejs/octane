@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "kbd",
+  "type": "registry:ui",
+  "title": "Kbd",
+  "files": [
+    {
+      "path": "ui/kbd.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/kbd.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/kbd.tsx. Note: upstream renders KbdGroup as\n// a <kbd> host too — preserved as-is.\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport interface KbdProps extends HostProps<'kbd'> {}\n\nexport function Kbd({ className, ...props }: KbdProps) @{\n\t<kbd\n\t\tdata-slot=\"kbd\"\n\t\tclassName={cn(\n\t\t\t'pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function KbdGroup({ className, ...props }: KbdProps) @{\n\t<kbd\n\t\tdata-slot=\"kbd-group\"\n\t\tclassName={cn('inline-flex items-center gap-1', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

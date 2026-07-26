@@ -15,9 +15,19 @@
     "debug-tsx": "pnpm run debug-volar"
   },
   "dependencies": {
-    "octane": "workspace:*"
+    "@octanejs/lucide": "0.1.8",
+    "@octanejs/radix": "0.1.12",
+    "@octanejs/sonner": "0.1.8",
+    "class-variance-authority": "catalog:default",
+    "clsx": "catalog:default",
+    "octane": "workspace:*",
+    "tailwind-merge": "catalog:default"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "catalog:default",
+    "shadcn": "catalog:default",
+    "tailwindcss": "catalog:default",
+    "tw-animate-css": "catalog:default",
     "typescript": "catalog:default",
     "vite": "catalog:default"
   }

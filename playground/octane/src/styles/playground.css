@@ -1,0 +1,143 @@
+/* Playground chrome, expressed entirely in shadcn theme tokens (defined by
+ * styles/shadcn-theme.css and flipped by the `dark` class on <body>) — no
+ * hard-coded palette. Radii derive from the shared --radius scale. */
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+body {
+	font:
+		14px/1.5 -apple-system,
+		BlinkMacSystemFont,
+		'Segoe UI',
+		system-ui,
+		sans-serif;
+	color: var(--foreground);
+	background: var(--background);
+	min-height: 100vh;
+}
+body {
+	color-scheme: light;
+}
+body.dark {
+	color-scheme: dark;
+}
+header.demo-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 20px 24px 12px;
+	border-bottom: 1px solid var(--border);
+}
+header.demo-header h1 {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 600;
+}
+header.demo-header p {
+	margin: 4px 0 0;
+	color: var(--muted-foreground);
+	font-size: 13px;
+}
+nav.demo-nav {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+	padding: 12px 24px;
+	border-bottom: 1px solid var(--border);
+	background: var(--card);
+}
+nav.demo-nav button {
+	padding: 6px 12px;
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--foreground);
+	cursor: pointer;
+	font: inherit;
+	border-radius: calc(var(--radius) * 0.6);
+}
+nav.demo-nav button.active {
+	background: var(--primary);
+	color: var(--primary-foreground);
+	border-color: var(--primary);
+}
+main.demo-stage {
+	padding: 24px;
+}
+h2.demo-title {
+	margin: 0 0 4px;
+	font-size: 16px;
+	font-weight: 600;
+}
+p.demo-blurb {
+	margin: 0 0 16px;
+	color: var(--muted-foreground);
+	font-size: 13px;
+}
+.panel {
+	padding: 16px;
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.8);
+	background: var(--card);
+}
+.row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.row > * {
+	font: inherit;
+}
+button.btn {
+	padding: 6px 12px;
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--foreground);
+	cursor: pointer;
+	border-radius: calc(var(--radius) * 0.6);
+}
+button.btn:hover {
+	border-color: var(--primary);
+}
+input.txt {
+	padding: 6px 10px;
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--foreground);
+	border-radius: calc(var(--radius) * 0.6);
+}
+ul.list {
+	list-style: none;
+	padding: 0;
+	margin: 12px 0;
+}
+ul.list li {
+	padding: 6px 10px;
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.6);
+	margin-bottom: 4px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+code.kbd {
+	font-family: ui-monospace, Menlo, monospace;
+	background: var(--muted);
+	padding: 2px 6px;
+	border-radius: calc(var(--radius) * 0.5);
+	font-size: 12px;
+	color: var(--primary);
+}
+pre.boom {
+	background: color-mix(in oklch, var(--destructive), var(--background) 90%);
+	color: var(--destructive);
+	padding: 12px;
+	border-radius: calc(var(--radius) * 0.6);
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 12px;
+}

@@ -1,0 +1,63 @@
+{
+  "name": "@octanejs/shadcn",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "shadcn/ui for the octane renderer \u2014 the Radix-base shadcn component distribution ported onto octane: cva-variant components preserving the upstream data-slot/class contract, built on @octanejs/radix, published as importable source with a shadcn-CLI-compatible registry planned.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/shadcn"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./src/styles/theme.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/styles/theme.css"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "registry:build": "node scripts/build-registry.mjs",
+    "registry:check": "node scripts/build-registry.mjs --check",
+    "typecheck": "node scripts/typecheck.mjs"
+  },
+  "dependencies": {
+    "@octanejs/lucide": "0.1.8",
+    "@octanejs/radix": "0.1.12",
+    "@octanejs/sonner": "0.1.8",
+    "class-variance-authority": "catalog:default",
+    "clsx": "catalog:default",
+    "tailwind-merge": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "lucide-react": "catalog:default",
+    "octane": "workspace:*",
+    "radix-ui": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

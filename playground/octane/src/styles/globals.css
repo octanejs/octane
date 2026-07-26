@@ -1,0 +1,27 @@
+/* Tailwind v4 entry for the playground's shadcn registry-mode demo.
+ * Layer order mirrors upstream's app css: Tailwind core → animation utilities
+ * → shadcn base (custom variants/keyframes the style sheets rely on) → the
+ * theme tokens installed by `shadcn add @octane/theme` → the vendored pinned
+ * style sheet (visual layer, scoped under .style-nova). */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '../../styles/shadcn-theme.css';
+@import './theme-mapping.css';
+@import './style-nova.css';
+@import './playground.css';
+
+/* Tailwind v4 doesn't scan .tsrx by default — include the app sources. */
+@source '../**/*.tsrx';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Upstream's Tailwind v4 base layer (pinned apps/v4/app/globals.css): v4's
+ * default border color is currentColor, so bare border utilities need the
+ * token applied globally — without this, borders render foreground-colored
+ * (white in dark mode). */
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "aspect-ratio",
+  "type": "registry:ui",
+  "title": "Aspect Ratio",
+  "files": [
+    {
+      "path": "ui/aspect-ratio.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/aspect-ratio.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/aspect-ratio.tsx (the `\"use client\"`\n// directive is dropped — octane has no RSC axis).\nimport { AspectRatio as AspectRatioPrimitive } from '@octanejs/radix';\n\ntype Props = Record<string, unknown>;\n\nexport function AspectRatio(props: Props) @{\n\t<AspectRatioPrimitive.Root data-slot=\"aspect-ratio\" {...props} />\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ]
+}

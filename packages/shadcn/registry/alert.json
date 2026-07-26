@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "alert",
+  "type": "registry:ui",
+  "title": "Alert",
+  "files": [
+    {
+      "path": "ui/alert.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/alert.tsrx",
+      "content": "// Default-Tailwind alert flavor (package canonical) — user-supplied styling,\n// cva strings verbatim. Pure template JSX (no consumer-children interleave).\nimport { cva, type VariantProps } from 'class-variance-authority';\n\nimport { cn } from '@/lib/utils';\nimport type { DivProps } from '@/lib/types';\n\nexport const alertVariants = cva(\n\t'group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*=\\'size-\\'])]:size-4',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'bg-card text-card-foreground',\n\t\t\t\tdestructive: 'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t},\n\t},\n);\n\nexport interface AlertProps extends DivProps {\n\tvariant?: VariantProps<typeof alertVariants>['variant'];\n}\n\nexport function Alert({ className, variant, ...props }: AlertProps) @{\n\t<div\n\t\tdata-slot=\"alert\"\n\t\trole=\"alert\"\n\t\tclassName={cn(alertVariants({ variant }), className)}\n\t\t{...props}\n\t/>\n}\n\nexport function AlertTitle({ className, ...props }: { className?: string } & Record<\n\tstring,\n\tunknown\n>) @{\n\t<div\n\t\tdata-slot=\"alert-title\"\n\t\tclassName={cn(\n\t\t\t'font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function AlertDescription({ className, ...props }: { className?: string } & Record<\n\tstring,\n\tunknown\n>) @{\n\t<div\n\t\tdata-slot=\"alert-description\"\n\t\tclassName={cn(\n\t\t\t'text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function AlertAction({ className, ...props }: { className?: string } & Record<\n\tstring,\n\tunknown\n>) @{\n\t<div data-slot=\"alert-action\" className={cn('absolute top-2 right-2', className)} {...props} />\n}\n"
+    }
+  ],
+  "dependencies": [
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}
