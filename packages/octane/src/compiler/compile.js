@@ -2937,15 +2937,18 @@ function containsRenderCall(stmts, memoCtx = null) {
 }
 
 // A hook call is identified by naming convention — the same signal React and
-// React Compiler key on. Prefixed forms (`unstable_useRouterState`) count: a
-// binding that mirrors React Router's `unstable_` naming is still a hook, and
-// wrapping one in a cache would freeze its subscription rather than merely
-// stale a value.
-const HOOK_NAME_CONVENTION_RE = /(?:^|_)use(?:$|[A-Z])/;
-const HOOK_CALLEE_NAME_RE = /^use[A-Z]/;
+// React Compiler key on — plus React's own `unstable_` staging prefix, which
+// bindings mirror (`unstable_useRouterState` in @octanejs/remix-router). The
+// prefix is enumerated rather than matched as "any `_use`" so an ordinary
+// helper cannot be mistaken for a hook by spelling alone.
+//
+// Getting this wrong in the permissive direction is not a staleness bug: a
+// cache wrapped around a hook call freezes its subscription and its state cell
+// for the life of the component.
+const HOOK_NAME_CONVENTION_RE = /^(?:unstable_)?use(?:$|[A-Z])/;
 
 function isHookCalleeName(name) {
-	return name === 'use' || HOOK_CALLEE_NAME_RE.test(name);
+	return HOOK_NAME_CONVENTION_RE.test(name);
 }
 
 /**

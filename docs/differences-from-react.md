@@ -70,22 +70,68 @@ same result React gives an unmemoized component:
 - **A component-local callee.** `const read = (h) => h.getIsSorted()` is an
   identifier, but nothing pins it to an immutable module identity, so it cannot
   stand in for a projection even when something hands it a stable reference.
-- **Hooks.** `use()` is a suspension point, and `use*` calls own hook cells,
-  context subscriptions, and effect lifecycles, so a region containing one is
-  always re-entered.
+- **Hooks.** `use()` is a suspension point, and `use*` calls (including React's
+  `unstable_use*` staging prefix) own hook cells, context subscriptions, and
+  effect lifecycles, so a region containing one is always re-entered.
 - **`new Foo()` and tagged templates.** Construction is not a value projection.
 
 Arguments carry the same contract as the call itself: `{format(row.get())}` is
 rejected even though `format` qualifies.
 
-If you want a method-backed value memoized, read it into a local first
-(`const sorted = header.getIsSorted();`) and let the surrounding state own it —
-the same advice React Compiler gives. Conversely, a region *is* allowed to
-memoize past a mutable module-level variable, whether read directly or returned
-by an imported helper; module state that must drive rendering belongs in state
-or context. Octane cannot read across a module boundary, so an imported helper
-is taken at its word — that is the one place this analysis trusts rather than
-proves, and it matches React Compiler's own assumption.
+A region *is* allowed to memoize past a mutable module-level variable, whether
+read directly or returned by an imported helper; module state that must drive
+rendering belongs in state or context. Octane cannot read across a module
+boundary, so an imported helper is taken at its word — that is the one place
+this analysis trusts rather than proves, and it matches React Compiler's own
+assumption.
+
+## Derived values are cached at their declaration
+
+A `const` whose initializer performs a call during render is cached on the
+component-local values it reads:
+
+```tsx
+const visible = todos.filter((t) => !t.completed); // cached on [todos]
+```
+
+`visible` keeps the same array identity until `todos` changes. This is what
+makes the region memoization above worth having: a region keys on the identity
+of what it renders, so a derived list rebuilt on every render would defeat its
+cache unconditionally.
+
+**The contract is pure render.** The cached value is reused while its tracked
+inputs are unchanged, so a calculation that reads something no input witnesses —
+a live accessor, a mutable module variable — keeps its old value. Pass such
+state through `useState`/`useReducer`/context and it is witnessed normally.
+
+Never cached:
+
+- **Hook calls.** `const s = useThing()` and `const s = unstable_useThing()`
+  keep their hook cells and subscriptions. Hooks are recognised by naming
+  convention — the same signal React and React Compiler use — so a hook named
+  outside that convention is the one shape this cannot protect.
+- **`let` declarations.** Reassignment would be dropped, so `let` is left alone.
+  It doubles as the escape hatch when you want a value recomputed every render.
+- **Values the render tree never reads.** A calculation used only by an event
+  handler pays nothing.
+
+### Why a hoisted local and an inline expression can differ
+
+`{header.getIsSorted()}` inline in a template is **not** memoized (a method call
+carries the receiver hazard described above), but
+
+```tsx
+const sorted = header.getIsSorted(); // cached on [header]
+```
+
+**is** — so hoisting that expression into a local changes its reactivity.
+
+This asymmetry is deliberate. The inline form is what library bindings put in
+their consumers' templates, where the author may not know a live accessor is
+involved; the `const` form is a value the author chose to name in their own
+component body, which is exactly where React Compiler assumes the pure-render
+contract. Keep such a read inline, or assign it to a `let`, when you want it
+re-evaluated on every render.
 
 ## `useState` / `useReducer` current-state getters
 
