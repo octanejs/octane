@@ -383,23 +383,36 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		// one before using it, and a comment is correctly unmapped.
 		const probeKeyword = async (keyword: string, action: 'hover' | 'click', nth = 0) => {
 			const point = await page.evaluate(
-				({ word, index }) => {
-					const content = document.querySelectorAll('.pg-editor .cm-content')[0];
-					const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-					const hits: { node: Node; at: number }[] = [];
-					while (walker.nextNode()) {
-						const node = walker.currentNode;
-						const at = node.textContent!.indexOf(word);
-						if (at !== -1) hits.push({ node, at });
-					}
-					const hit = hits.at(index);
+				async ({ word, index }) => {
+					const find = () => {
+						const content = document.querySelectorAll('.pg-editor .cm-content')[0];
+						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+						const hits: { node: Node; at: number }[] = [];
+						while (walker.nextNode()) {
+							const node = walker.currentNode;
+							const at = node.textContent!.indexOf(word);
+							if (at !== -1) hits.push({ node, at });
+						}
+						return hits.at(index) ?? null;
+					};
+					const found = find();
+					if (!found) return null;
+					// CodeMirror renders only around its scroll position, so bring the
+					// keyword into view — then let the scroll settle. CodeMirror
+					// applies it in a DEFERRED measure phase, and a rect read in the
+					// same tick belongs to the PRE-scroll layout, which puts the
+					// pointer on whatever line has since moved into that spot.
+					(found.node.parentElement as HTMLElement)?.scrollIntoView({ block: 'center' });
+					await new Promise((resolve) =>
+						requestAnimationFrame(() => requestAnimationFrame(resolve)),
+					);
+					// Re-find after the flush: the re-render replaces the nodes the
+					// first walk held.
+					const hit = find();
 					if (!hit) return null;
 					const range = document.createRange();
 					range.setStart(hit.node, hit.at + 1);
 					range.setEnd(hit.node, hit.at + 2);
-					// CodeMirror renders only around its scroll position; bring the
-					// keyword into view so the measured point is real.
-					(hit.node.parentElement as HTMLElement)?.scrollIntoView({ block: 'center' });
 					const rect = range.getBoundingClientRect();
 					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 				},
@@ -413,7 +426,23 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			);
 			if (action === 'click') await page.mouse.click(point.x, point.y);
 			else await page.mouse.move(point.x, point.y);
-			await page.waitForTimeout(150);
+			// Wait for THIS keyword's own mark rather than a fixed delay — a
+			// loaded machine can still be mid-render, and a stale mark from the
+			// previous probe would satisfy a mere "any mark" check. Falls through
+			// when the position is genuinely unmapped, which is a real answer.
+			await page
+				.waitForFunction(
+					(text) =>
+						Array.from(
+							document
+								.querySelectorAll('.pg-editor .cm-content')[0]
+								?.querySelectorAll('.cm-mapped') ?? [],
+						).some((mark) => mark.textContent === text),
+					keyword,
+					{ timeout: 2_000 },
+				)
+				.catch(() => {});
+			await page.waitForTimeout(50);
 			return page.evaluate((previous) => {
 				const marks = (index: number) =>
 					Array.from(
