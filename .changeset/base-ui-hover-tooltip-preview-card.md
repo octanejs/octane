@@ -15,4 +15,5 @@ Also fixes a `Popover.Root` faithfulness bug: it rendered its interaction
 component as a wrapper around the children rather than as a sibling, so the
 wrapper's type changed on every open and rebuilt the whole subtree — including
 the trigger, whose event listeners and store registration were left pointing at
-a detached element.
+a detached element. `Dialog.Root` used the same wrapper shape and now renders the
+interactions as a sibling too, matching Base UI.

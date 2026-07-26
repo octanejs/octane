@@ -32,13 +32,22 @@ work around it in the binding.**
 >   combiner — no Base UI component uses it, and this binding does not republish that surface.
 > - **Faithfulness bug found and fixed by the hover tests.** `PopoverRoot` rendered
 >   `PopoverInteractions` as a WRAPPER around the children (an earlier workaround for the octane
->   Provider children shape-flip bug), so the wrapper's component type changed on every open and
+>   Provider children dialect-flip bug), so the wrapper's component type changed on every open and
 >   tore down the whole subtree — including the trigger, whose element listeners and store
 >   registration were then pointing at a detached node, which is exactly why hover-close never
->   fired. Base UI renders it as a headless SIBLING; the port now does the same, with the pair
->   inside one fragment so the Provider still sees a single stable descriptor. The trigger also
->   regained upstream's keyed-fragment wrapper, plus keys on the focus guards (octane reconciles a
->   returned array as a list, so unkeyed siblings would shift the keyed trigger anyway).
+>   fired. Base UI renders it as a headless SIBLING, and all four overlay Roots (Dialog, Popover,
+>   Tooltip, PreviewCard) now do the same. The trigger also regained upstream's keyed-fragment
+>   wrapper, plus keys on the focus guards (octane reconciles a returned array as a list, so
+>   unkeyed siblings would shift the keyed trigger anyway).
+> - **The underlying octane bug is fixed separately, so the workaround is gone entirely.** A
+>   Provider's `children` may arrive as a compiled `.tsrx` children-block FUNCTION or as an element
+>   DESCRIPTOR, and both claimed `scope.slots[0]` — a compiled body stores its binding bag there,
+>   the descriptor path stores a `childSlot` record — so alternating between them had the incoming
+>   dialect adopt the outgoing one's record (`TypeError: Cannot read properties of undefined
+>   (reading 'items')`, subtree detached). Fixed in octane by
+>   [#294](https://github.com/octanejs/octane/pull/294). The sibling shape this binding now uses is
+>   dialect-stable (its Provider children are always an array), so these components do not depend on
+>   that fix — it simply means no binding has to keep dodging the bug.
 > - **Phase 3c — popup viewport (~700 lines).** `utils/usePopupViewport` (keeps a DOM clone of the
 >   outgoing content mounted beside the incoming content so a trigger switch can animate),
 >   `utils/usePopupAutoResize` (measure at `max-content` → pin previous size → animate to new),

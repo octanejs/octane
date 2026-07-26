@@ -516,23 +516,16 @@ function PopoverRootComponent<Payload>(props: any): any {
 	const resolvedChildren =
 		typeof children === 'function' && !isChildrenBlock(children) ? children({ payload }) : children;
 
-	// Base UI renders `PopoverInteractions` as a headless SIBLING of the children, so toggling it
-	// never disturbs them. Rendering it as a wrapper instead (an earlier workaround for the octane
-	// Provider children shape-flip bug) swapped the wrapper's component type on every open, which
-	// tore down and rebuilt the whole subtree — including the trigger, whose element listeners and
-	// store registration then pointed at a detached node.
-	//
-	// The Provider still needs a stable children shape, so the sibling pair lives inside one
-	// fragment: the Provider always sees a single descriptor, while the interactions element comes
-	// and goes as a keyed sibling and the children keep their identity.
-	const content = createElement(Fragment, {
-		children: [
-			shouldRenderInteractions
-				? createElement(PopoverInteractions, { key: 'interactions', store, modal })
-				: null,
-			createElement(Fragment, { key: 'children', children: resolvedChildren }),
-		],
-	});
+	// `PopoverInteractions` is a headless SIBLING of the children, exactly as Base UI renders it, so
+	// toggling it never disturbs them. Rendering it as a WRAPPER instead swapped the wrapper's
+	// component type on every open, which tore down and rebuilt the whole subtree — including the
+	// trigger, whose element listeners and store registration then pointed at a detached node.
+	const content = [
+		shouldRenderInteractions
+			? createElement(PopoverInteractions, { key: 'interactions', store, modal })
+			: null,
+		createElement(Fragment, { key: 'children', children: resolvedChildren }),
+	];
 
 	return createElement(PopoverRootContext.Provider, {
 		value: contextValue as PopoverRootContextValue,

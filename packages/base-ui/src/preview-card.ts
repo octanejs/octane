@@ -378,16 +378,13 @@ function PreviewCardRootComponent<Payload>(props: any): any {
 	const resolvedChildren =
 		typeof children === 'function' && !isChildrenBlock(children) ? children({ payload }) : children;
 
-	// Interactions are a headless sibling of the children (as upstream renders them); both live
-	// inside one fragment so the Provider always sees a single stable descriptor.
-	const content = createElement(Fragment, {
-		children: [
-			shouldRenderInteractions
-				? createElement(PreviewCardInteractions, { key: 'interactions', store })
-				: null,
-			createElement(Fragment, { key: 'children', children: resolvedChildren }),
-		],
-	});
+	// `PreviewCardInteractions` is a headless SIBLING of the children, exactly as Base UI renders it.
+	const content = [
+		shouldRenderInteractions
+			? createElement(PreviewCardInteractions, { key: 'interactions', store })
+			: null,
+		createElement(Fragment, { key: 'children', children: resolvedChildren }),
+	];
 
 	return createElement(PreviewCardRootContext.Provider, { value: store, children: content });
 }
