@@ -13,9 +13,10 @@ const __filename = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = resolve(dirname(__filename), '..');
 
 // Bundled skills ship with the npm package and work in ANY project using
-// octane. Repo skills live in the octane monorepo's .ai/skills and are only
-// available when the server runs against a checkout (they cover maintainer
-// workflows: triage, PRs, core changes).
+// octane. Repo skills are read from the RuleSync source, not a generated copy,
+// so this server and every per-agent output (.claude/skills, .github/skills,
+// …) serve the same text. They cover maintainer workflows: triage, PRs, core
+// changes, and are only available when the server runs against a checkout.
 export const BUNDLED_SKILLS = {
 	'bridge-react-package': 'skills/bridge-react-package.md',
 	'build-octane-software': 'skills/build-octane-software.md',
@@ -25,13 +26,14 @@ export const BUNDLED_SKILLS = {
 };
 
 export const REPO_SKILLS = {
-	'bug-hunter': '.ai/skills/bug-hunter.md',
-	'create-a-pr': '.ai/skills/create-a-pr.md',
-	'handle-issue': '.ai/skills/handle-issue.md',
-	'octane-core-extend': '.ai/skills/octane-core-extend.md',
-	'performance-audit': '.ai/skills/performance-audit.md',
-	'react-library-port': '.ai/skills/react-library-port.md',
-	triage: '.ai/skills/triage.md',
+	'authoring-tsrx': '.rulesync/skills/authoring-tsrx/SKILL.md',
+	'bug-hunter': '.rulesync/skills/bug-hunter/SKILL.md',
+	'create-a-pr': '.rulesync/skills/create-a-pr/SKILL.md',
+	'handle-issue': '.rulesync/skills/handle-issue/SKILL.md',
+	'octane-core-extend': '.rulesync/skills/octane-core-extend/SKILL.md',
+	'performance-audit': '.rulesync/skills/performance-audit/SKILL.md',
+	'react-library-port': '.rulesync/skills/react-library-port/SKILL.md',
+	triage: '.rulesync/skills/triage/SKILL.md',
 };
 
 // Suite names from the unified runner manifest (`SUITES` in
@@ -72,10 +74,15 @@ export const BENCHMARK_SUITES = [
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 export function instructionsFor(repoMode) {
+	// This text is injected into every session of every connected agent, whether
+	// or not it touches Octane, so it stays one orienting sentence plus one
+	// pointer. The gates themselves live in octane_engineering_plan, and each
+	// tool's own description says when to call it: that is where a model looks
+	// when it is actually deciding.
 	const common =
-		'Before creating or materially changing Octane software, call octane_engineering_plan and load the build-octane-software skill. Treat its correctness, performance evidence, and adversarial self-review gates as required. Load the task-specific migration, binding, divergence, or SSR skill in addition when relevant. Do not claim a performance improvement without comparable measurements.';
+		"Octane is a compiler-first UI framework with React's programming model, so React habits are the main source of wrong changes here. Before creating or materially changing Octane code, call octane_engineering_plan: it returns the gates that apply and names the skills to load.";
 	return repoMode
-		? `${common} For Octane framework-fundamental work, also load octane-core-extend and performance-audit, establish a relevant baseline before editing, and use octane_validate_plan for the final changed paths.`
+		? `${common} Inside this monorepo checkout it also returns the repository validation commands for the paths you changed.`
 		: common;
 }
 
@@ -109,7 +116,7 @@ export function areaForPath(path) {
 	if (path.startsWith('benchmarks/')) return 'benchmark';
 	if (path.startsWith('website/')) return 'website';
 	if (path.startsWith('.rulesync/')) return 'rulesync-source';
-	if (path.startsWith('.ai/') || path.startsWith('.codex/') || path.startsWith('.claude/')) {
+	if (path.startsWith('.codex/') || path.startsWith('.claude/')) {
 		return 'agent-instructions';
 	}
 	if (path.startsWith('docs/') || path.endsWith('.md')) return 'docs';
@@ -391,7 +398,7 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'Octane skill',
 			description:
-				'Return an Octane agent skill by name. Load build-octane-software before creating or materially changing Octane code; other bundled skills cover React package bridges, component migration, intentional divergences, and SSR setup.' +
+				'Fetch an Octane agent skill by name. Call when starting work the skill covers: build-octane-software for engineering gates, bridge-react-package for porting a React library, migrate-react-component for JSX to .tsrx, react-divergences before assuming React behavior, setup-ssr for server rendering.' +
 				(repoMode ? ' Repo skills cover octane maintainer workflows.' : ''),
 			inputSchema: {
 				name: z.enum(Object.keys(skills)),
@@ -477,12 +484,19 @@ function registerRepoTools(server, repoRoot) {
 		{
 			title: 'Octane project map',
 			description:
-				'Return Octane repository map, source ownership, validation commands, and skill paths.',
+				'Call when you need Octane repo orientation: what the framework is, which source owns which behavior, the intentional divergences from React, the validation commands, and the full package inventory.',
 			inputSchema: {},
 		},
 		async () => {
-			const projectMap = await readFile(resolve(repoRoot, '.ai/project-map.md'), 'utf8');
-			return text(projectMap);
+			// Composed from the two generated sources rather than a hand-written
+			// summary, because both are CI-gated: AGENTS.md against .rulesync/rules,
+			// and packages.md against the workspace manifests. A third restatement
+			// would be the one free to drift.
+			const [rootRule, packages] = await Promise.all([
+				readFile(resolve(repoRoot, 'AGENTS.md'), 'utf8'),
+				readFile(resolve(repoRoot, 'docs/packages.md'), 'utf8'),
+			]);
+			return text(`${rootRule.trimEnd()}\n\n---\n\n${packages.trimStart()}`);
 		},
 	);
 
@@ -490,7 +504,8 @@ function registerRepoTools(server, repoRoot) {
 		'octane_triage_paths',
 		{
 			title: 'Triage Octane paths',
-			description: 'Classify changed paths by Octane repo area.',
+			description:
+				'Call before editing unfamiliar paths in this monorepo to learn which area owns them.',
 			inputSchema: {
 				paths: z.array(z.string()).describe('Repository-relative paths'),
 			},
@@ -505,7 +520,8 @@ function registerRepoTools(server, repoRoot) {
 		'octane_validate_plan',
 		{
 			title: 'Octane validation plan',
-			description: 'Recommend validation commands for changed paths and task kind.',
+			description:
+				'Call when a change is finished to get the validation commands that cover the paths you touched.',
 			inputSchema: {
 				paths: z.array(z.string()).default([]).describe('Repository-relative changed paths'),
 				taskKind: z
@@ -535,7 +551,8 @@ function registerRepoTools(server, repoRoot) {
 		'octane_scaffold_react_port',
 		{
 			title: 'Scaffold React test port',
-			description: 'Run scripts/scaffold-react-port.mjs for a React upstream test file.',
+			description:
+				'Call when porting a React test file into the conformance suite, returns a triage skeleton of in-scope cases and out-of-scope reasons.',
 			inputSchema: {
 				reactTestFile: z
 					.string()

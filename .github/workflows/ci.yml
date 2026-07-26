@@ -338,13 +338,18 @@ jobs:
       # Two-layer sync check for the RuleSync-generated agent files. The root
       # `prepare` script already re-ran `rulesync generate || true` during
       # install, so if the committed files were stale they are now MODIFIED in
-      # the working tree — `git diff` is what actually catches that. The
+      # the working tree, and `git diff` is what actually catches that. The
       # explicit `rules:check` still matters for the case where prepare's
       # rulesync invocation failed silently (it is `|| true` by design).
+      #
+      # The diff is deliberately unfiltered. An enumerated path list silently
+      # stops covering whatever RuleSync starts emitting next, which is exactly
+      # how the skill and instruction outputs escaped it. `prepare` runs nothing
+      # but rulesync, so a dirty tree here is a stale generated file.
       - name: Check AI rule files are in sync
         run: |
           pnpm rules:check
-          git diff --exit-code -- AGENTS.md CLAUDE.md GEMINI.md .github/copilot-instructions.md .cursor/rules/
+          git diff --exit-code
 
       # 0.x alpha: changesets must stay on the patch track. release/publish
       # already enforce this, but checking on PRs surfaces a stray major/minor
@@ -357,6 +362,19 @@ jobs:
       # fail with setup instructions instead of silently turning CI green.
       - name: Disallow skipped and expected-failure tests
         run: pnpm test:markers:check
+
+      # Packages ship their `src/` directly, so an ambient `declare module
+      # '*.tsrx'` in one reaches consumers and turns THEIR .tsrx imports into
+      # `any`. Benchmarks, playground apps, and test directories are unpublished
+      # and stay allowed.
+      - name: Disallow wildcard .tsrx declarations in published sources
+        run: pnpm tsrx-decls:check
+
+      # The root rule and every skill description load on EVERY agent session.
+      # Path-scoped rules under .rulesync carry `globs` and load only when a
+      # matching file is opened, so they are deliberately not budgeted.
+      - name: Check always-loaded agent context is within budget
+        run: pnpm context:budget:check
 
       # docs/parity-gaps.md audits executable expected-failure pins and should
       # remain at zero under the committed-test policy above.

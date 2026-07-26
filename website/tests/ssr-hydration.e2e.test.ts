@@ -278,17 +278,31 @@ async function loadRoute(
 	try {
 		await options.beforeNavigation?.(page, errors);
 		await page.goto(base + path, { waitUntil: 'load' });
-		if (options.waitForNetworkIdle) await page.waitForLoadState('networkidle');
-		await page.waitForFunction(
-			() =>
-				new Promise<boolean>((resolve) =>
-					requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
-				),
-			null,
-			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-		);
-		const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
-		return { page, errors, main };
+		// The dev server can replace the document AFTER `load`: Vite reloads the
+		// page when a request resolves against a stale optimized-dependency hash,
+		// which is its normal recovery, not something the caller asked about. That
+		// destroys the execution context mid-read, so read the replacement instead
+		// of reporting the teardown as a failure.
+		for (let attempt = 0; ; attempt++) {
+			try {
+				if (options.waitForNetworkIdle) await page.waitForLoadState('networkidle');
+				await page.waitForFunction(
+					() =>
+						new Promise<boolean>((resolve) =>
+							requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
+						),
+					null,
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+				);
+				const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
+				return { page, errors, main };
+			} catch (error) {
+				const destroyed =
+					error instanceof Error && error.message.includes('Execution context was destroyed');
+				if (!destroyed || attempt === 2) throw error;
+				await page.waitForLoadState('load');
+			}
+		}
 	} catch (error) {
 		await page.close().catch(() => {});
 		throw error;
@@ -1235,6 +1249,10 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
+	it('playground highlights every control-flow keyword in the compiled code', async () => {
+		await assertControlFlowKeywordMapping(`http://localhost:${DEV_PORT}`);
+	}, 45_000);
+
 	// Editing a route and the router invalidates both the client and SSR module
 	// graphs. A full reload on that hot server must still hydrate through one
 	// current router graph. Keep this last: Vite's cache-busting timestamps stay
@@ -1281,9 +1299,6 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		} finally {
 			restore();
 		}
-	}, 45_000);
-	it('playground highlights every control-flow keyword in the compiled code', async () => {
-		await assertControlFlowKeywordMapping(`http://localhost:${DEV_PORT}`);
 	}, 45_000);
 });
 
