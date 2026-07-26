@@ -150,6 +150,14 @@ jobs:
         id: npm_release
         run: pnpm release:preflight
 
+      # changesets/action creates a version PR instead of running its publish
+      # command whenever any pending changeset document exists. release.yml
+      # already owns version PRs, so hide those documents in this ephemeral
+      # checkout and force this action to perform only npm reconciliation.
+      - name: Isolate pending changesets from npm reconciliation
+        if: steps.npm_release.outputs.needs_publish == 'true'
+        run: pnpm release:prepare-publish
+
       - name: Publish to npm
         id: changesets
         if: steps.npm_release.outputs.needs_publish == 'true'

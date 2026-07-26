@@ -48,6 +48,7 @@
     "changeset:publish": "pnpm changeset:check && changeset publish",
     "release:preflight": "node scripts/npm-release-preflight.mjs",
     "release:preflight:test": "node --test scripts/npm-release-preflight.test.mjs",
+    "release:prepare-publish": "node scripts/prepare-changesets-publish.mjs",
     "prepare": "rulesync generate || true",
     "rules:generate": "rulesync generate",
     "rules:check": "rulesync generate --check",

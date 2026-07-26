@@ -8,6 +8,9 @@ only when at least one version is missing.
 This is deliberately a reconciliation loop rather than a one-shot tied to the
 Version Packages commit. If that commit's CI fails, a later fix on `main` can
 publish the stranded versions after it passes the same required checks.
+Pending changeset documents are isolated only inside the ephemeral publish
+checkout so they cannot switch the publishing action back into version-PR mode;
+the Release PR workflow remains their sole owner.
 
 ## New package bootstrap
 

@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	compareSemver,
 	inspectNpmReleaseState,
 	releaseStateErrors,
 } from './npm-release-preflight.mjs';
+import { isolatePendingChangesets } from './prepare-changesets-publish.mjs';
 
 function registryFixture(packages) {
 	return async (url) => {
@@ -111,5 +115,39 @@ describe('compareSemver', () => {
 		assert.equal(compareSemver('0.1.16', '0.1.16'), 0);
 		assert.equal(compareSemver('0.1.16-beta.2', '0.1.16-beta.11'), -1);
 		assert.equal(compareSemver('0.1.16', '0.1.16-beta.11'), 1);
+	});
+});
+
+describe('npm publish preparation', () => {
+	test('keeps pending release plans from switching the recovery action into version mode', async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), 'octane-publish-'));
+		const directory = path.join(root, '.changeset');
+		await mkdir(directory);
+		await Promise.all([
+			writeFile(path.join(directory, 'config.json'), '{}'),
+			writeFile(path.join(directory, 'README.md'), 'Changesets documentation'),
+			writeFile(path.join(directory, 'pending-release.md'), 'pending release'),
+			writeFile(path.join(directory, 'empty-release.md'), 'empty release'),
+		]);
+
+		try {
+			assert.deepEqual(await isolatePendingChangesets(directory), [
+				'empty-release.md',
+				'pending-release.md',
+			]);
+			assert.deepEqual((await readdir(directory)).sort(), [
+				'.empty-release.md.publish-pending',
+				'.pending-release.md.publish-pending',
+				'README.md',
+				'config.json',
+			]);
+			assert.equal(
+				await readFile(path.join(directory, '.pending-release.md.publish-pending'), 'utf8'),
+				'pending release',
+			);
+			assert.deepEqual(await isolatePendingChangesets(directory), []);
+		} finally {
+			await rm(root, { force: true, recursive: true });
+		}
 	});
 });
