@@ -129,7 +129,9 @@ if (lanes.length > 1) {
 		execFileSync(process.execPath, args, {
 			cwd: WORKSPACE_ROOT,
 			stdio: 'inherit',
-			timeout: 600_000,
+			// Allow four sequential five-minute packs, installation, and both
+			// clean native builds to complete within the per-lane parent guard.
+			timeout: 1_800_000,
 		});
 	}
 	assert.deepEqual(
