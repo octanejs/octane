@@ -1,8 +1,9 @@
 ---
 name: create-a-pr
 description: >-
-  Open a pull request for octane work. Use when a change is finished and needs a
-  branch, changeset, validation evidence, and a PR body.
+  Open a pull request for octane work. Load before creating the branch, commit,
+  changeset, or PR, including when opening a PR is the tail step of a task that
+  was about something else.
 ---
 # Skill: Create an Octane PR
 
@@ -15,7 +16,7 @@ Use this when asked to prepare a branch and pull request for an Octane change.
    git status --short --branch
    git diff --stat
    ```
-2. Read `AGENTS.md` and `AGENTS.md`.
+2. Read `AGENTS.md` and `docs/packages.md`.
 3. Confirm no unrelated local changes are included.
 
 ## Branch and implementation hygiene
