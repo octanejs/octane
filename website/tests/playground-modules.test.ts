@@ -4,7 +4,11 @@
 // code the sandbox receives must only ever reference sibling tokens, bare
 // import-map specifiers, or https://esm.sh/ URLs.
 import { describe, it, expect } from 'vitest';
-import { buildModuleGraph, isReactHostFile } from '../src/lib/playground-modules.ts';
+import {
+	buildModuleGraph,
+	isReactHostFile,
+	peekCompiledFile,
+} from '../src/lib/playground-modules.ts';
 import { moduleToken } from '../src/lib/playground-sandbox.ts';
 
 const APP = 'App.tsrx';
@@ -196,5 +200,41 @@ describe('diagnostics', () => {
 			code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
 			filename: 'Field.tsrx',
 		});
+	});
+});
+
+describe('compiled-output pane reuse', () => {
+	// The pane cannot recompile a `.react.tsx` file itself — the octane compiler
+	// does not own that pipeline. It reads back the graph's own memoized result,
+	// which also keeps the pane from compiling every file a second time.
+	const HOST = 'Host.react.tsx';
+	const hostSource = 'export default function Host() {\n\treturn <div>host</div>;\n}\n';
+
+	it('has nothing to hand back before the graph has compiled a file', () => {
+		expect(peekCompiledFile({ name: 'Never.tsrx', source: 'export const a = 1;' })).toBeNull();
+	});
+
+	it('hands back the Sucrase output for a React-host file', async () => {
+		const graph = await buildModuleGraph([{ name: HOST, source: hostSource }], HOST);
+		expect(graph.ok).toBe(true);
+		const compiled = peekCompiledFile({ name: HOST, source: hostSource });
+		expect(compiled?.ok).toBe(true);
+		if (!compiled?.ok) return;
+		// Sucrase's automatic react-jsx transform, NOT an octane template emit.
+		expect(compiled.code).toContain('react/jsx-runtime');
+		expect(compiled.code).not.toContain("from 'octane'");
+	});
+
+	it('misses once the source moves on, so a stale pane is impossible', async () => {
+		await buildModuleGraph([{ name: HOST, source: hostSource }], HOST);
+		expect(peekCompiledFile({ name: HOST, source: hostSource + '\n' })).toBeNull();
+	});
+
+	it('reports a React-host compile failure instead of throwing', async () => {
+		const broken = 'export default function Host() { return <div>; }';
+		const graph = await buildModuleGraph([{ name: HOST, source: broken }], HOST);
+		expect(graph.ok).toBe(false);
+		const compiled = peekCompiledFile({ name: HOST, source: broken });
+		expect(compiled?.ok).toBe(false);
 	});
 });

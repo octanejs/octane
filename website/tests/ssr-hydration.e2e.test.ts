@@ -354,6 +354,343 @@ async function waitForLocatorText(
 	throw new Error(`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`);
 }
 
+// The end-to-end contract behind the compiler's exact-origin channel, run
+// against BOTH servers: the dev pipeline and the production build compile the
+// playground through different toolchains, and this has to hold on each.
+// Hovering a directive or clause keyword marks it in the SOURCE pane; clicking
+// additionally takes the compiled pane to the code it lowered to, favouring the
+// arm's implementation over the identifier that references it.
+async function assertControlFlowKeywordMapping(baseUrl: string) {
+	// The end-to-end contract behind the compiler's exact-origin channel:
+	// hovering a directive or clause keyword in the source lights up the code
+	// it lowered to. Asserted in the real browser because the mapping is only
+	// half of it — the hover listener, the decoration dispatch and the
+	// CodeMirror mark all have to hold up too.
+	const { page, errors } = await loadRoute(baseUrl, '/playground');
+	try {
+		await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+		await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+		const outputSelector = page.locator('[aria-label="Compiler output"]');
+
+		// Hover a keyword in the SOURCE pane and read back what lit up in the
+		// output pane. Offsets are found in the live document text, so this
+		// tracks the example rather than hard-coded positions.
+		// Put the pointer on a keyword in the SOURCE pane and report what the
+		// output pane shows. `click` additionally asks to be taken there, which
+		// is the only interaction allowed to move the output pane's scroll.
+		// `nth` picks among repeats, negative counting from the end. An example
+		// that introduces its own directives in a prose comment mentions each
+		// one before using it, and a comment is correctly unmapped.
+		const probeKeyword = async (keyword: string, action: 'hover' | 'click', nth = 0) => {
+			const point = await page.evaluate(
+				async ({ word, index }) => {
+					const find = () => {
+						const content = document.querySelectorAll('.pg-editor .cm-content')[0];
+						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+						const hits: { node: Node; at: number }[] = [];
+						while (walker.nextNode()) {
+							const node = walker.currentNode;
+							const at = node.textContent!.indexOf(word);
+							if (at !== -1) hits.push({ node, at });
+						}
+						return hits.at(index) ?? null;
+					};
+					const found = find();
+					if (!found) return null;
+					// CodeMirror renders only around its scroll position, so bring the
+					// keyword into view — then let the scroll settle. CodeMirror
+					// applies it in a DEFERRED measure phase, and a rect read in the
+					// same tick belongs to the PRE-scroll layout, which puts the
+					// pointer on whatever line has since moved into that spot.
+					(found.node.parentElement as HTMLElement)?.scrollIntoView({ block: 'center' });
+					await new Promise((resolve) =>
+						requestAnimationFrame(() => requestAnimationFrame(resolve)),
+					);
+					// Re-find after the flush: the re-render replaces the nodes the
+					// first walk held.
+					const hit = find();
+					if (!hit) return null;
+					const range = document.createRange();
+					range.setStart(hit.node, hit.at + 1);
+					range.setEnd(hit.node, hit.at + 2);
+					const rect = range.getBoundingClientRect();
+					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+				},
+				{ word: keyword, index: nth },
+			);
+			if (!point) return null;
+			const before = await page.evaluate(
+				() =>
+					document.querySelectorAll('.pg-editor .cm-content')[1]?.closest('.cm-scroller')
+						?.scrollTop ?? 0,
+			);
+			if (action === 'click') await page.mouse.click(point.x, point.y);
+			else await page.mouse.move(point.x, point.y);
+			// Wait for THIS keyword's own mark rather than a fixed delay — a
+			// loaded machine can still be mid-render, and a stale mark from the
+			// previous probe would satisfy a mere "any mark" check. Falls through
+			// when the position is genuinely unmapped, which is a real answer.
+			await page
+				.waitForFunction(
+					(text) =>
+						Array.from(
+							document
+								.querySelectorAll('.pg-editor .cm-content')[0]
+								?.querySelectorAll('.cm-mapped') ?? [],
+						).some((mark) => mark.textContent === text),
+					keyword,
+					{ timeout: 2_000 },
+				)
+				.catch(() => {});
+			await page.waitForTimeout(50);
+			return page.evaluate((previous) => {
+				const marks = (index: number) =>
+					Array.from(
+						document
+							.querySelectorAll('.pg-editor .cm-content')
+							[index]?.querySelectorAll('.cm-mapped') ?? [],
+					).map((mark) => mark.textContent);
+				const scroller = document
+					.querySelectorAll('.pg-editor .cm-content')[1]
+					?.closest('.cm-scroller');
+				// Did the pane land on a DECLARATION of a mapped name rather than
+				// on a reference to it? `null` when no mark is a declaration, so
+				// the caller can skip the check.
+				const content = document.querySelectorAll('.pg-editor .cm-content')[1];
+				const box = scroller?.getBoundingClientRect();
+				let declarationVisible: boolean | null = null;
+				for (const mark of content?.querySelectorAll('.cm-mapped') ?? []) {
+					const before = mark.previousSibling?.textContent ?? '';
+					if (!/\b(?:function|const|let|var|class)\s+$/.test(before)) continue;
+					declarationVisible ??= false;
+					const rect = mark.getBoundingClientRect();
+					if (box && rect.top >= box.top && rect.bottom <= box.bottom) {
+						declarationVisible = true;
+					}
+				}
+				return {
+					source: marks(0),
+					output: marks(1),
+					declarationVisible,
+					scrolled: (scroller?.scrollTop ?? 0) !== previous,
+				};
+			}, before);
+		};
+
+		for (const target of ['client', 'server']) {
+			await outputSelector.selectOption(target);
+			await page.waitForFunction(
+				(mode) =>
+					(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+						mode === 'server' ? "from 'octane/server'" : "from 'octane'",
+					),
+				target,
+				{ timeout: 15_000 },
+			);
+			// HOVER first: the source keyword itself must light up in the left
+			// pane. This is the feedback that tells you the position is mapped
+			// at all, and it must not depend on where the right pane happens to
+			// be scrolled.
+			for (const keyword of ['@if', '@for', '@empty']) {
+				const hovered = await probeKeyword(keyword, 'hover');
+				expect(hovered, `${keyword} not found in the source pane`).not.toBeNull();
+				expect(
+					hovered!.source,
+					`hovering ${keyword} in ${target} marked nothing in the SOURCE pane`,
+				).toContain(keyword);
+				expect(hovered!.scrolled, `hovering ${keyword} scrolled the output pane`).toBe(false);
+			}
+			// A `<style>` block is erased from the markup: its CSS is scoped and
+			// hoisted into a module-level injectStyle call. Hovering a rule
+			// inside the block has to reach it — the whole block pairs with the
+			// whole stylesheet, so a position in either one resolves.
+			const styled = await probeKeyword('justify-items', 'hover');
+			expect(styled, `no CSS rule found in the source pane`).not.toBeNull();
+			const inside = (marks: (string | null)[]) =>
+				marks.some((text) => text?.includes('justify-items'));
+			expect(inside(styled!.source), `hovering a rule in ${target} marked no source`).toBe(true);
+			expect(inside(styled!.output), `a rule in ${target} reached no injected CSS`).toBe(true);
+
+			// The Counter example carries @if, @for and @empty. A directive lowers
+			// to helpers far from the hovered line, so clicking is what brings
+			// them into view — and is therefore what can be observed here.
+			for (const keyword of ['@if', '@for', '@empty']) {
+				const result = await probeKeyword(keyword, 'click');
+				expect(result, `${keyword} not found in the source pane`).not.toBeNull();
+				expect(
+					result!.output.length,
+					`${keyword} in ${target}: source ${JSON.stringify(result!.source)}, output ${JSON.stringify(result!.output)}`,
+				).toBeGreaterThan(0);
+				expect(result!.source).toContain(keyword);
+				// Clicking navigates to the arm's IMPLEMENTATION when it has one.
+				if (result!.declarationVisible !== null) {
+					expect(
+						result!.declarationVisible,
+						`${keyword} in ${target} did not land on a declaration`,
+					).toBe(true);
+				}
+			}
+		}
+
+		// The TYPES output is a third artifact — the type-only print's map rather
+		// than the runtime emit's. A directive is lowered away there too, and the
+		// transform's `inspect` flag anchors `@for` on the helper it became.
+		await outputSelector.selectOption('types');
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+					'@jsxImportSource',
+				),
+			null,
+			{ timeout: 15_000 },
+		);
+		for (const keyword of ['@if', '@for', '@empty']) {
+			const typesClick = await probeKeyword(keyword, 'click');
+			expect(typesClick, `${keyword} not found in the source pane`).not.toBeNull();
+			expect(
+				typesClick!.output.length,
+				`${keyword} in types: source ${JSON.stringify(typesClick!.source)}, output ${JSON.stringify(typesClick!.output)}`,
+			).toBeGreaterThan(0);
+			const typesHover = await probeKeyword(keyword, 'hover');
+			expect(
+				typesHover!.source,
+				`hovering ${keyword} in types marked nothing in the SOURCE pane`,
+			).toContain(keyword);
+			expect(typesHover!.scrolled, `hovering ${keyword} scrolled the types pane`).toBe(false);
+		}
+		await outputSelector.selectOption('client');
+
+		// @switch / @case / @default live in a different example.
+		await page.selectOption('.pg-select', 'inputs');
+		await page.waitForFunction(
+			() => (document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('@switch'),
+			null,
+			{ timeout: 15_000 },
+		);
+		await outputSelector.selectOption('client');
+		// CodeMirror renders only the lines around its scroll position, and the
+		// clicks above left the output pane deep in the document. Rewind it, then
+		// wait on the import header at the top of the emit.
+		await page.evaluate(() => {
+			const scroller = document
+				.querySelectorAll('.pg-editor .cm-content')[1]
+				?.closest('.cm-scroller');
+			if (scroller) scroller.scrollTop = 0;
+		});
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+					"from 'octane'",
+				),
+			null,
+			{ timeout: 15_000 },
+		);
+		// The same keywords in the TYPES output. `@switch`/`@case`/`@default`
+		// survive the type-only transform as JavaScript, so the inspection entry
+		// claims their exact keyword spans there too.
+		await outputSelector.selectOption('types');
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+					'@jsxImportSource',
+				),
+			null,
+			{ timeout: 15_000 },
+		);
+		for (const keyword of ['@case', '@default']) {
+			const inTypes = await probeKeyword(keyword, 'click');
+			expect(inTypes, `${keyword} not found in the source pane`).not.toBeNull();
+			expect(
+				inTypes!.output.length,
+				`${keyword} in types: source ${JSON.stringify(inTypes!.source)}, output ${JSON.stringify(inTypes!.output)}`,
+			).toBeGreaterThan(0);
+			const hoveredInTypes = await probeKeyword(keyword, 'hover');
+			expect(
+				hoveredInTypes!.source,
+				`hovering ${keyword} in types marked nothing in the SOURCE pane`,
+			).toContain(keyword);
+		}
+		await outputSelector.selectOption('client');
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+					"from 'octane'",
+				),
+			null,
+			{ timeout: 15_000 },
+		);
+
+		for (const keyword of ['@case', '@default']) {
+			const result = await probeKeyword(keyword, 'click');
+			expect(result, `${keyword} not found in the source pane`).not.toBeNull();
+			expect(
+				result!.output.length,
+				`${keyword}: source ${JSON.stringify(result!.source)}, output ${JSON.stringify(result!.output)}`,
+			).toBeGreaterThan(0);
+		}
+
+		// Hover marks the source side without moving the output pane — the
+		// pointer must never steal the scroll position out from under you.
+		// `@switch` is skipped: this example mentions it in a prose comment
+		// first, and a comment is correctly unmapped.
+		for (const keyword of ['@case', '@default']) {
+			const hovered = await probeKeyword(keyword, 'hover');
+			expect(hovered, `${keyword} not found`).not.toBeNull();
+			expect(hovered!.scrolled, `hovering ${keyword} scrolled the output pane`).toBe(false);
+			expect(hovered!.source, `hovering ${keyword} marked nothing in the source`).toContain(
+				keyword,
+			);
+			// Diagnostic: whether the mapped output is VISIBLE without scrolling.
+			console.log(
+				`hover ${keyword}: source=${JSON.stringify(hovered!.source)} visibleOutput=${JSON.stringify(hovered!.output)}`,
+			);
+		}
+
+		// `@try` and its clauses lower to boundary ELEMENTS in the type-only
+		// output: `@try` names the boundary it became, and each clause names the
+		// `fallback` prop it fills. They live in the Suspense example, whose
+		// opening comment names all three before the block uses them — so probe
+		// the LAST occurrence of each, which is the directive.
+		await page.selectOption('.pg-select', 'suspense');
+		await page.waitForFunction(
+			() => (document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('@pending'),
+			null,
+			{ timeout: 15_000 },
+		);
+		await outputSelector.selectOption('types');
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+					'@jsxImportSource',
+				),
+			null,
+			{ timeout: 15_000 },
+		);
+		for (const [keyword, expected] of [
+			['@try', 'Suspense'],
+			['@pending', 'fallback'],
+			['@catch', 'fallback'],
+		]) {
+			const clicked = await probeKeyword(keyword, 'click', -1);
+			expect(clicked, `${keyword} not found in the source pane`).not.toBeNull();
+			expect(
+				clicked!.output,
+				`${keyword} in types: source ${JSON.stringify(clicked!.source)}`,
+			).toContain(expected);
+			const hovered = await probeKeyword(keyword, 'hover', -1);
+			expect(
+				hovered!.source,
+				`hovering ${keyword} in types marked nothing in the SOURCE pane`,
+			).toContain(keyword);
+			expect(hovered!.scrolled, `hovering ${keyword} scrolled the types pane`).toBe(false);
+		}
+
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+}
+
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	let server: ChildProcess;
 	let DEV_PORT: number;
@@ -926,6 +1263,9 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			restore();
 		}
 	}, 45_000);
+	it('playground highlights every control-flow keyword in the compiled code', async () => {
+		await assertControlFlowKeywordMapping(`http://localhost:${DEV_PORT}`);
+	}, 45_000);
 });
 
 describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
@@ -1071,6 +1411,9 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// the visible useState call so Inspect always has a real AST range.
 			await source.getByText('useState', { exact: true }).nth(1).click();
 			await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
+			// Inspect opens the compiled CODE view, same as desktop; the AST is
+			// one switch away, and switching reveals what the editor selected.
+			await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
 			// Browsers may deliver the source editor's mouseleave after its mobile
 			// panel is hidden. It must not clear the AST node we just revealed.
 			await source.dispatchEvent('mouseleave');
@@ -1164,6 +1507,16 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				).not.toBeNull();
 				return point!;
 			};
+			// CodeMirror renders only the lines around its scroll position, so a
+			// token scrolled far out of view is not in the DOM to be found at all.
+			// Rewind the pane before hunting for one.
+			const rewindPane = (paneIndex: number) =>
+				page.evaluate((index) => {
+					const scroller = document
+						.querySelectorAll('.pg-editor .cm-content')
+						[index as number]?.closest('.cm-scroller');
+					if (scroller) scroller.scrollTop = 0;
+				}, paneIndex);
 			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
 				const point = await tokenPoint(paneIndex, token, occurrence);
 				await page.mouse.click(point.x, point.y);
@@ -1172,6 +1525,20 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				const point = await tokenPoint(paneIndex, token, occurrence);
 				await page.mouse.move(point.x, point.y);
 			};
+			// One authored range can emit several times (a mount and an update
+			// binding, an open and a close tag), so assert that the token IS
+			// highlighted rather than that it is the first highlight.
+			const mappedAnywhere = (paneIndex: number, token: string) =>
+				page.waitForFunction(
+					([index, text]) =>
+						Array.from(
+							document
+								.querySelectorAll('.pg-editor .cm-content')
+								[index as number]?.querySelectorAll('.cm-mapped') ?? [],
+						).some((mark) => mark.textContent === text),
+					[paneIndex, token] as const,
+					{ timeout: 10_000 },
+				);
 			const mappedIn = (paneIndex: number, token: string) =>
 				page.waitForFunction(
 					([index, text]) =>
@@ -1194,10 +1561,21 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				'Types',
 			]);
 			expect(await outputFormat.locator('button.active', { hasText: 'Code' }).count()).toBe(1);
+			// Client and Server code map through the compiler's inspection
+			// segments, the same as Types does through the Volar token map. WHICH
+			// nodes resolve is pinned per node, against the same Counter example,
+			// in playground-mapping.test.ts; what this proves is that the wiring
+			// reaches the runtime targets at all.
+			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+			await mappedAnywhere(1, 'useState');
+			await mappedAnywhere(0, 'useState');
 			await outputSelector.selectOption('server');
 			await outputIncludes("from 'octane/server'");
+			await clickToken(0, 'useState', 2);
+			await mappedAnywhere(1, 'useState');
 			await outputSelector.selectOption('types');
 			await outputIncludes('@jsxImportSource octane');
+			await rewindPane(1);
 			// Clicking a source token reveals the mapped token in Types code…
 			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
 			await mappedIn(1, 'useState');
@@ -1298,6 +1676,42 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		} finally {
 			await page.close();
 		}
+	}, 45_000);
+
+	it('playground keeps both panel heads the same height in every mode', async () => {
+		// The compiled pane's head carries a select and a segmented control; the
+		// source pane's carries text. Letting the taller one size the row makes
+		// the layout jump on every Preview↔Compiled switch, so both reserve that
+		// height from the start.
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			const heights = () =>
+				page.evaluate(() =>
+					Array.from(document.querySelectorAll('.pg-panel-head')).map((head) =>
+						Math.round(head.getBoundingClientRect().height),
+					),
+				);
+			const inPreview = await heights();
+			expect(inPreview.length).toBe(2);
+			expect(inPreview[0], `preview heads differ: ${JSON.stringify(inPreview)}`).toBe(inPreview[1]);
+
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await page.locator('[aria-label="Compiler output"]').waitFor();
+			const inCompiled = await heights();
+			expect(inCompiled[0], `compiled heads differ: ${JSON.stringify(inCompiled)}`).toBe(
+				inCompiled[1],
+			);
+			// And switching modes must not resize the row at all.
+			expect(inCompiled).toEqual(inPreview);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 45_000);
+
+	it('playground highlights every control-flow keyword in the compiled code', async () => {
+		await assertControlFlowKeywordMapping(`http://localhost:${PREVIEW_PORT}`);
 	}, 45_000);
 
 	it('playground refreshes the active AST when another workspace file fails', async () => {

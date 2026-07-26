@@ -4,8 +4,10 @@
 // it as code or an AST (Parsed is AST-only). The Types code is the virtual TSX
 // the IDE language service sees via `octane/compiler/volar`. Hovering or
 // selecting source reveals the corresponding AST node where the compiler has
-// a mapping; hovering a tree node highlights its source origin. Types uses
-// the Volar token mappings bidirectionally (see playground-mapping.ts). The
+// a mapping; hovering a tree node highlights its source origin. In code form
+// every target maps BOTH ways — Types through the Volar token mappings,
+// Client/Server through the compiler's inspection segments and template
+// origins (see playground-mapping.ts). The
 // whole pipeline runs in the browser: `octane/compiler` (and sucrase for
 // React-host `.react.tsx` files) compiles the virtual files on a debounce, the
 // module graph executes inside a SANDBOXED IFRAME with an opaque origin (see
@@ -47,6 +49,9 @@ import { useTitle } from '../../hooks/use-title.ts';
 const { EXAMPLES, CUSTOM_EXAMPLE_ID, DEFAULT_EXAMPLE_ID } = pgExamples;
 
 const HASH_DEBOUNCE_MS = 400;
+// A generated name immediately preceded by one of these is its declaration
+// rather than a reference to it — the preferred target when navigating.
+const DECLARATION_BEFORE = /\b(?:function|const|let|var|class)\s+$/;
 const COMPILE_DEBOUNCE_MS = 250;
 
 const AST_TARGET_META: Record<PlaygroundOutputTarget, { label: string; notice: string }> = {
@@ -169,13 +174,14 @@ export function Playground() @{
 		paneRef.current = 'result';
 		setPane('result');
 	};
-	const openMobileAst = () => {
+	// Mobile's third pane is the compiled view. It opens on CODE, the same
+	// default the desktop switch has — the AST is a mode you choose, not what
+	// "Inspect" means.
+	const openMobileCompiled = () => {
 		setView('compiled');
-		setCompiledMode('ast');
 		paneRef.current = 'result';
 		setPane('result');
 		resultModeRef.current.view = 'compiled';
-		resultModeRef.current.compiledMode = 'ast';
 		controllerRef.current.syncOutput?.();
 	};
 	// Reveal only after the mobile result panel has committed as visible;
@@ -357,46 +363,65 @@ export function Playground() @{
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
 			};
 
-			// Type output and both of its ASTs come from one Volar pass. Runtime
-			// code and AST inspection stay separately lazy so Preview pays for
-			// neither server compilation nor the compiler's opt-in inspection.
-			type TypesEntry = {
+			// One compile per (file, target) feeds BOTH the Code and the AST form,
+			// plus the position mapping between the two editors:
+			//   types           one Volar pass → typed TSX, token mappings, and the
+			//                   authored + generated Programs
+			//   client/server   one INSPECT compile → the emitted module, the final
+			//                   Program with its template IR, and the position
+			//                   artifacts (see playground-mapping.ts)
+			// Flipping Code↔AST, or hovering for a mapping, never recompiles. The
+			// preview's module graph compiles WITHOUT inspection, so a session that
+			// never opens this pane pays nothing for any of it.
+			type BaseEntry = {
 				source: string;
 				code: string;
-				volarMappings: any;
+				/** Lazily built on first lookup; `undefined` = not built yet. */
 				mapping: any;
-				asts: [unknown, unknown] | null;
 				error: string | null;
 			};
+			type TypesEntry =
+				BaseEntry & {
+					kind: 'types';
+					segments: any;
+					asts: [unknown, unknown] | null;
+				};
+			type RuntimeEntry =
+				BaseEntry & {
+					kind: 'runtime';
+					ast: unknown;
+					segments: any;
+					templates: any;
+					aliases: any;
+				};
+			type ReactEntry = BaseEntry & { kind: 'react' };
+			type CodeEntry = TypesEntry | RuntimeEntry | ReactEntry;
 			type AstEntry = {
 				source: string;
 				ast: unknown;
 				label: string;
 				notice: string;
 			};
-			type RuntimeCodeEntry = { source: string; code: string; error: string | null };
 			const typesCache = new Map<string, TypesEntry>();
 			// Track the last graph-level error so pane-only updates (target, mode)
 			// don't wipe it when per-file inspection succeeds.
 			let lastGraphError = '';
-			const runtimeCodeCache = new Map<string, RuntimeCodeEntry>();
-			const runtimeAstCache = new Map<
-				string,
-				{ source: string; ast: unknown; error: string | null }
-			>();
+			const runtimeCache = new Map<string, RuntimeEntry>();
+			const reactCache = new Map<string, ReactEntry>();
 			const runtimeKey = (name: string, target: PlaygroundRuntimeTarget) => target + ':' + name;
 
-			const typesEntry = (name: string) => {
+			const typesEntry = (name: string): TypesEntry => {
 				const source = fileSource(name);
 				const cached = typesCache.get(name);
 				if (cached && cached.source === source) return cached;
 				let entry: TypesEntry;
 				if (pgModules.isReactHostFile(name)) {
 					entry = {
+						kind: 'types',
 						source,
 						// React-host source already is the typed TSX document.
 						code: source,
-						volarMappings: null,
+						segments: null,
 						mapping: pgMapping.identityMapping(source.length),
 						asts: null,
 						error: null,
@@ -405,17 +430,19 @@ export function Playground() @{
 					const result = pg.compileTypes(source, name);
 					entry = result.ok
 						? {
+								kind: 'types',
 								source,
 								code: result.code,
-								volarMappings: result.mappings,
+								segments: result.segments,
 								mapping: undefined,
 								asts: [result.sourceAst, result.generatedAst],
 								error: null,
 							}
 						: {
+								kind: 'types',
 								source,
 								code: '// Types generation failed:\n// ' + result.error,
-								volarMappings: null,
+								segments: null,
 								mapping: null,
 								asts: null,
 								error: result.error,
@@ -424,25 +451,93 @@ export function Playground() @{
 				typesCache.set(name, entry);
 				return entry;
 			};
-			const runtimeCodeEntry = (
-				name: string,
-				target: PlaygroundRuntimeTarget,
-			): RuntimeCodeEntry => {
+			const runtimeEntry = (name: string, target: PlaygroundRuntimeTarget): RuntimeEntry => {
 				const source = fileSource(name);
 				const key = runtimeKey(name, target);
-				const cached = runtimeCodeCache.get(key);
+				const cached = runtimeCache.get(key);
 				if (cached && cached.source === source) return cached;
-				const result = pg.compilePlayground(source, name, target);
-				const entry =
+				const result = pg.compileRuntime(source, name, target);
+				const entry: RuntimeEntry =
 					result.ok
-						? { source, code: result.code, error: null }
+						? {
+								kind: 'runtime',
+								source,
+								code: result.code,
+								ast: result.ast,
+								segments: result.segments,
+								templates: result.templates,
+								aliases: result.aliases,
+								mapping: undefined,
+								error: null,
+							}
 						: {
+								kind: 'runtime',
 								source,
 								code: `// ${OUTPUT_TARGET_LABEL[target]} generation failed:\n// ${result.error}`,
+								ast: null,
+								segments: null,
+								templates: null,
+								aliases: null,
+								mapping: null,
 								error: result.error,
 							};
-				runtimeCodeCache.set(key, entry);
+				runtimeCache.set(key, entry);
 				return entry;
+			};
+			// `.react.tsx` is Sucrase's pipeline, not the octane compiler's — the
+			// module graph already compiled it, so the pane reuses that result
+			// rather than handing React source to a compiler that would reject it.
+			const REACT_HOST_NO_SERVER =
+				'// React-host files render through the React DOM host.\n' +
+				'// The playground has no Octane server output for them.';
+			const reactEntry = (name: string, target: PlaygroundRuntimeTarget): ReactEntry => {
+				const source = fileSource(name);
+				if (target === 'server') {
+					return {
+						kind: 'react',
+						source,
+						code: REACT_HOST_NO_SERVER,
+						mapping: null,
+						error: null,
+					};
+				}
+				const key = runtimeKey(name, target);
+				const cached = reactCache.get(key);
+				if (cached && cached.source === source) return cached;
+				const compiled = pgModules.peekCompiledFile({ name, source });
+				// A miss means this source has not reached the module graph yet; the
+				// debounced compile that follows re-runs showOutput. Never cached, so
+				// the placeholder cannot outlive the compile that replaces it.
+				if (!compiled) {
+					return {
+						kind: 'react',
+						source,
+						code: '// Compiled output appears after the next compile.',
+						mapping: null,
+						error: null,
+					};
+				}
+				const entry: ReactEntry =
+					compiled.ok
+						? { kind: 'react', source, code: compiled.code, mapping: null, error: null }
+						: {
+								kind: 'react',
+								source,
+								code: `// ${OUTPUT_TARGET_LABEL[target]} generation failed:\n// ${compiled.error}`,
+								mapping: null,
+								error: compiled.error,
+							};
+				reactCache.set(key, entry);
+				return entry;
+			};
+			const codeEntry = (name: string, target: PlaygroundOutputTarget): CodeEntry => {
+				if (target === 'types') return typesEntry(name);
+				// "Parsed" is an AST-only artifact; its code form is the client emit.
+				const runtimeTarget: PlaygroundRuntimeTarget =
+					target === 'source' ? 'client' : target;
+				return pgModules.isReactHostFile(name)
+					? reactEntry(name, runtimeTarget)
+					: runtimeEntry(name, runtimeTarget);
 			};
 			type AstEntryResult = { entry: AstEntry | null; error: string | null };
 			const astEntry = (name: string): AstEntryResult => {
@@ -467,18 +562,10 @@ export function Playground() @{
 						error: null,
 					};
 				}
-				const key = runtimeKey(name, target);
-				let cached = runtimeAstCache.get(key);
-				if (!cached || cached.source !== source) {
-					const result = pg.compileRuntimeAst(source, name, target);
-					cached = result.ok
-						? { source, ast: result.ast, error: null }
-						: { source, ast: null, error: result.error };
-					runtimeAstCache.set(key, cached);
-				}
-				return cached.error
-					? { entry: null, error: `AST generation failed: ${cached.error}` }
-					: { entry: { source, ast: cached.ast, ...meta }, error: null };
+				const runtime = runtimeEntry(name, target);
+				return runtime.error
+					? { entry: null, error: `AST generation failed: ${runtime.error}` }
+					: { entry: { source, ast: runtime.ast, ...meta }, error: null };
 			};
 
 			// The exact string the output editor currently displays. The output
@@ -487,6 +574,10 @@ export function Playground() @{
 			// reference compare instead of an O(doc) toString per call.
 			const OUTPUT_PLACEHOLDER = '// Compiled output appears here.';
 			let lastShownOutput = OUTPUT_PLACEHOLDER;
+			// The entry that produced `lastShownOutput` — the mapping owner for
+			// whatever the output editor currently displays, so per-cursor lookups
+			// never re-derive which pipeline/target the pane is on.
+			let lastShownCode: CodeEntry | null = null;
 			let lastShownAst: AstEntry | null = null;
 			const showOutput = (): string | null => {
 				// The compiled pane is not visible: skip entirely — no types
@@ -515,11 +606,7 @@ export function Playground() @{
 					setError(error || lastGraphError);
 					return error;
 				}
-				const target = resultModeRef.current.outputTarget;
-				const output =
-					target === 'types'
-						? typesEntry(currentFile)
-						: runtimeCodeEntry(currentFile, target === 'source' ? 'client' : target);
+				const output = codeEntry(currentFile, resultModeRef.current.outputTarget);
 				const code = output.code;
 				// AST and code highlights describe different artifacts. Clear the
 				// pair even when the cached Types document needs no replacement.
@@ -527,6 +614,7 @@ export function Playground() @{
 				astPreview.clear();
 				// Preserve a graph-level error when switching output artifacts.
 				setError(output.error || lastGraphError);
+				lastShownCode = output;
 				if (typeof code !== 'string' || code === lastShownOutput) return output.error;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
@@ -565,6 +653,22 @@ export function Playground() @{
 					targetView.dispatch({ effects: setMapped.of(Decoration.none) });
 				}
 			};
+			// Does the view already show exactly `ranges` (sorted, as the mapping
+			// and AST paths produce them)?
+			const sameMarks = (targetView: any, ranges: { from: number; to: number }[]) => {
+				const current = targetView.state.field(mappedField, false);
+				if (!current || current.size !== ranges.length) return false;
+				let index = 0;
+				let same = true;
+				current.between(0, targetView.state.doc.length, (from: number, to: number) => {
+					const range = ranges[index++];
+					if (!range || range.from !== from || range.to !== to) {
+						same = false;
+						return false;
+					}
+				});
+				return same && index === ranges.length;
+			};
 
 			// Per-cursor lookups only consult the visible cached artifact. Immutable
 			// AST nodes and template origins both retain authored source offsets.
@@ -574,19 +678,44 @@ export function Playground() @{
 				) return null;
 				return lastShownAst?.source === fileSource(currentFile) ? lastShownAst : null;
 			};
+			// Built once per (entry, artifact) and cached on the entry itself, so a
+			// mousemove stream costs one property read.
+			const buildMapping = (entry: CodeEntry) => {
+				if (entry.kind === 'runtime') {
+					return pgMapping.mappingFromInspection(
+						entry.source,
+						entry.code,
+						entry.segments,
+						entry.templates,
+						entry.aliases,
+					);
+				}
+				// Types uses the SAME artifact as the runtime targets now — the
+				// type-only print's map, widened with authored ends. The verbatim
+				// pass still applies: the printer emits one segment per TOKEN, and
+				// this print copies whole JSX text runs through untokenized.
+				if (entry.kind !== 'types' || !entry.asts) return null;
+				return pgMapping.mappingFromInspection(
+					entry.source,
+					entry.code,
+					entry.segments,
+					null,
+					null,
+					{
+						ranges: pgAst.collectAuthoredRanges(entry.asts[1]),
+						reprint: true,
+					},
+				);
+			};
 			const activeMapping = () => {
 				if (
-					resultModeRef.current.view !== 'compiled' ||
-						resultModeRef.current.compiledMode !== 'code' ||
-						resultModeRef.current.outputTarget !== 'types'
+					resultModeRef.current.view !== 'compiled' || resultModeRef.current.compiledMode !== 'code'
 				) return null;
-				const entry = typesCache.get(currentFile);
+				const entry = lastShownCode;
 				if (
 					!entry || entry.source !== fileSource(currentFile) || entry.code !== lastShownOutput
 				) return null;
-				if (entry.mapping === undefined) {
-					entry.mapping = pgMapping.mappingFromVolar(entry.volarMappings);
-				}
+				if (entry.mapping === undefined) entry.mapping = buildMapping(entry);
 				return entry.mapping;
 			};
 
@@ -607,6 +736,11 @@ export function Playground() @{
 					clearMappedIn(targetView);
 					return;
 				}
+				// A pointer stream re-resolves the SAME ranges for most of its
+				// samples. The field is the single source of truth (it self-clears
+				// on any doc change), so comparing against it is always safe and
+				// costs one pass over the handful of ranges shown.
+				if (!scroll && sameMarks(targetView, clamped)) return;
 				const effects = [
 					setMapped.of(
 						Decoration.set(
@@ -616,7 +750,20 @@ export function Playground() @{
 						),
 					),
 				];
-				if (scroll) effects.push(EditorView.scrollIntoView(clamped[0].from, { y: 'center' }));
+				// Jump to the DEFINITION when one of the mapped ranges is a declared
+				// name: a directive arm maps both to `function __case$0(…)` and to
+				// where that name is handed to the runtime, and the implementation is
+				// what you want to read. Every range still gets a mark either way.
+				if (scroll) {
+					const declared =
+						clamped.find(
+							(range: { from: number; to: number }) => DECLARATION_BEFORE.test(
+								targetView.state.doc.sliceString(Math.max(0, range.from - 12), range.from),
+							),
+						) ??
+							clamped[0];
+					effects.push(EditorView.scrollIntoView(declared.from, { y: 'center' }));
+				}
 				targetView.dispatch({ effects });
 			};
 
@@ -635,6 +782,10 @@ export function Playground() @{
 				pair: { source: { from: number; to: number }[]; output: { from: number; to: number }[] },
 				scrollSide: 'source' | 'output' | null,
 			) => {
+				// Only a deliberate move — a click or a cursor placement — takes the
+				// other pane somewhere. Hover marks in place and never steals scroll,
+				// so a mapped range far from the hovered line is marked but stays
+				// where it is until you click.
 				revealRanges(sourceView, pair.source, scrollSide === 'source');
 				revealRanges(outputView, pair.output, scrollSide === 'output');
 			};
@@ -926,8 +1077,9 @@ export function Playground() @{
 				currentFile = workspace().entry;
 				editorStates.clear();
 				typesCache.clear();
-				runtimeCodeCache.clear();
-				runtimeAstCache.clear();
+				runtimeCache.clear();
+				reactCache.clear();
+				lastShownCode = null;
 				sourceView.setState(makeEditorState(currentFile, fileSource(currentFile)));
 				clearMappedIn(outputView);
 				// Picking an example is the visitor's own action — never gated.
@@ -1230,8 +1382,8 @@ export function Playground() @{
 			<button
 				type="button"
 				class={['pg-seg-btn', pane === 'result' && view === 'compiled' && 'active']}
-				title="Inspect the AST at the current cursor"
-				onClick={openMobileAst}
+				title="Show the compiled output for the current file"
+				onClick={openMobileCompiled}
 			>
 				Inspect
 			</button>
@@ -1422,6 +1574,10 @@ export function Playground() @{
 				align-items: center;
 				justify-content: space-between;
 				gap: 1rem;
+				/* Both heads reserve the height the COMPILED head needs — its output
+				   select and Code/AST switch are taller than the source head's line
+				   of text — so switching Preview↔Compiled never resizes the row. */
+				min-height: 2.7rem;
 				padding: 0.45rem 0.9rem;
 				border-bottom: 1px solid var(--border);
 				background: var(--surface-subtle);

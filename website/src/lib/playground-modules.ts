@@ -93,6 +93,19 @@ async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 	return result;
 }
 
+/**
+ * The memoized compile for one file, if the graph already produced it for this
+ * exact source. The compiled-output pane uses it to show `.react.tsx` files —
+ * the octane compiler cannot compile them at all (they are Sucrase's), and
+ * recompiling them a second time just for the pane would duplicate the work
+ * `buildModuleGraph` has already done. Never compiles; a miss means the next
+ * graph build fills it.
+ */
+export function peekCompiledFile(file: PlaygroundFile): CachedCompile | null {
+	const cached = compileCache.get(file.name);
+	return cached && cached.source === file.source ? cached.result : null;
+}
+
 /** Resolve `./Name[.ext]` against the file set, with extension inference. */
 function resolveSibling(specifier: string, names: Set<string>): string | null {
 	const base = specifier.slice(2);

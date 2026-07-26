@@ -14,14 +14,14 @@
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile, type CompileDiagnostic } from 'octane/compiler';
-import { compileToVolarMappings } from 'octane/compiler/volar';
+import { compileTypesInspection } from 'octane/compiler/volar';
 import {
 	sandboxSrcdoc,
 	RUNTIME_MANIFEST_PATH,
 	PROTOCOL_KEY,
 	type RuntimeManifest,
 } from './playground-sandbox.ts';
-import type { VolarTokenMapping } from './playground-mapping.ts';
+import type { InspectAlias, InspectSegment, InspectTemplate } from './playground-mapping.ts';
 
 export type { CompileDiagnostic };
 
@@ -62,28 +62,59 @@ export interface TypesSuccess {
 	ok: true;
 	/** The typed virtual TSX the language service analyses. */
 	code: string;
-	/** Per-token source↔generated offset mappings (see playground-mapping.ts). */
-	mappings: VolarTokenMapping[];
+	/** Position artifacts for the code pane (see playground-mapping.ts). */
+	segments: InspectSegment[];
 	/** Authored parser tree and the exact Program printed as typed virtual TSX. */
 	sourceAst: unknown;
 	generatedAst: unknown;
 }
 
-/** Inspect a final runtime AST lazily; normal preview compiles pay no inspection cost. */
-export function compileRuntimeAst(
+export interface RuntimeSuccess {
+	ok: true;
+	/** The emitted module — byte-identical to a non-inspect compile. */
+	code: string;
+	warnings: CompileDiagnostic[];
+	/** The final Program plus hoisted template IR, for the AST pane. */
+	ast: unknown;
+	/** Position artifacts for the code pane (see playground-mapping.ts). */
+	segments: InspectSegment[];
+	templates: InspectTemplate[];
+	aliases: InspectAlias[];
+}
+
+/**
+ * Compile one file for the COMPILED PANE with inspection enabled: one compile
+ * yields the emitted code, the final Program, and the position artifacts, so
+ * flipping between Code and AST (or hovering for a mapping) never recompiles.
+ * The preview's module graph keeps using `compilePlayground`, so a run that
+ * never opens the pane still pays no inspection cost. Never throws.
+ */
+export function compileRuntime(
 	source: string,
 	filename: string,
 	mode: PlaygroundRuntimeTarget,
-): { ok: true; ast: unknown } | CompileFailure {
+): RuntimeSuccess | CompileFailure {
 	try {
 		const result = compile(source, filename, { mode, inspect: true });
 		if (!result.inspect) throw new Error('Compiler inspection result is unavailable.');
+		const { ast, templates, segments, aliases } = result.inspect;
 		return {
 			ok: true,
+			code: result.code,
+			warnings: result.diagnostics,
 			ast: {
-				program: result.inspect.ast,
-				templates: result.inspect.templates.map(({ name, ast }) => ({ name, ast })),
+				program: ast,
+				// Only hoisted CLIENT templates carry IR. The server's entries are
+				// static runs — position data for the code pane, with no tree to
+				// show — so they are left out of the AST view rather than filling
+				// it with `{ name: null, ast: null }` rows.
+				templates: templates
+					.filter((template) => template.ast != null)
+					.map(({ name, ast: tree }) => ({ name, ast: tree })),
 			},
+			segments: segments as InspectSegment[],
+			aliases: (aliases ?? []) as InspectAlias[],
+			templates: templates.map(({ html, raw, origins }) => ({ html, raw, origins })),
 		};
 	} catch (error) {
 		return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -91,18 +122,24 @@ export function compileRuntimeAst(
 }
 
 /**
- * Generate the TYPES view of a playground file: the same typed virtual TSX
- * the IDE language service sees (`octane/compiler/volar`), not the runtime
- * emit. Loose parsing keeps partially-broken sources producing partial
- * output. Never throws.
+ * Generate the TYPES view of a playground file: the same typed virtual TSX the
+ * IDE language service sees, not the runtime emit.
+ *
+ * Uses the NAVIGATION entry, not `compileToVolarMappings`. The editor's
+ * mappings carry Volar capability data and are shaped for its position
+ * queries; this pane wants exact authored ranges — including the END a Volar
+ * mapping cannot express — and must not be able to perturb the editor to get
+ * them. Same parse, same transform, same output bytes; only the position
+ * artifact differs, so it is the same `segments` shape the runtime targets use.
+ * Never throws.
  */
 export function compileTypes(source: string, filename: string): TypesSuccess | CompileFailure {
 	try {
-		const out = compileToVolarMappings(source, filename, { loose: true });
+		const out = compileTypesInspection(source, filename);
 		return {
 			ok: true,
 			code: out.code,
-			mappings: out.mappings as VolarTokenMapping[],
+			segments: out.segments as InspectSegment[],
 			sourceAst: out.sourceAst,
 			generatedAst: out.generatedAst,
 		};
