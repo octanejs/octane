@@ -927,3 +927,28 @@ export function PreviewCardInteractive() @{
 		</PreviewCard.Root>
 	</div>
 }
+
+// Two tooltips with NO Tooltip.Provider around them. Base UI's delay-group context has a
+// module-level default whose refs every unscoped tooltip shares, so they still coordinate.
+export function TooltipsWithoutProvider() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="tip-host" />
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-a" delay={0} closeDelay={0}>A</Tooltip.Trigger>
+			<Tooltip.Portal container={hostRef}>
+				<Tooltip.Positioner>
+					<Tooltip.Popup className="pop-a">A content</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-b" delay={0} closeDelay={0}>B</Tooltip.Trigger>
+			<Tooltip.Portal container={hostRef}>
+				<Tooltip.Positioner>
+					<Tooltip.Popup className="pop-b">B content</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
