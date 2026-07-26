@@ -10,7 +10,7 @@ actually delivered exactly once.
 | target | production renderer |
 | --- | --- |
 | `octane-tsrx` | Octane SSR, compiler-owned hydration, and the public lightweight early-capture bootstrap |
-| `react` | React 19 `react-dom/server`, `react-dom/client`, and real Suspense-boundary event replay |
+| `react` | React 19 `react-dom/server`, `react-dom/client`, and real selective hydration |
 | `preact` | native Preact, `preact-render-to-string`, and `preact/compat` flushing |
 | `solid` | Solid 2.0 beta, `@solidjs/web`, and the real Solid hydration script |
 | `svelte` | Svelte 5 server rendering, runes, and strict public hydration |
@@ -20,6 +20,9 @@ All six apps render the same 180 server-rendered articles and the same editor,
 button, visible component-state outputs, and native `input` handler. The
 benchmark reuses each target's established production `benchmarks/news`
 toolchain without modifying the existing news workload or adding dependencies.
+Each editor initializes its client-side draft from the existing server-rendered
+input, so a controlled hydration comparison does not penalize frameworks for
+discarding state that the fixture itself could preserve.
 
 ## Operations
 
@@ -36,19 +39,16 @@ uses a sleep as a hydration gate.
 - `controlled_6x_*`: repeat under the same 6× slowdown with each framework's
   controlled input path; report whether pre-hydration text, focus, and caret
   survive adoption and verify that the next genuine edit updates visible
-  component state. Octane must preserve all three; reference-framework behavior
-  is measured and reported rather than replaced with a compatibility shim.
+  component state. Every target must preserve all three using the same
+  DOM-derived initial draft; no target receives an event-replay shim.
 - `interaction_6x_*`: click the server-rendered button while the production
   hydration chunk is blocked. Octane's public `interaction()` boundary and
-  `initializeHydrationEventCapture()` must replay the click exactly once after
-  hydration. Solid 2.0's real server hydration script must also replay the click
-  exactly once. React installs its actual `hydrateRoot` listeners before the
-  click, leaves a server-rendered Suspense boundary dehydrated until the blocked
-  component chunk arrives, and must replay the native focus event from that
-  exact same user interaction. React 19 cannot replay the blocked discrete click
-  after its lazy component has resolved, so focus and click replay are reported
-  separately rather than incorrectly crediting React with pre-root capture or
-  deferred click replay. The remaining frameworks use their real pre-root
+  Solid 2.0's server hydration script can capture and replay that click after
+  hydration. React installs its real `hydrateRoot` listeners and allows its
+  available Suspense editor to hydrate on interaction, handling the click
+  before the separately withheld completion chunk arrives. The benchmark
+  records which behavior actually occurs instead of hard-coding expected
+  framework capabilities. The remaining frameworks use their real pre-root
   behavior without a synthetic early-capture shim. Every target must process
   the next real post-hydration click exactly once.
 - `search_send_6x_*`: type a real search query into the controlled, still
@@ -56,13 +56,17 @@ uses a sleep as a hydration gate.
   released, and report whether hydration preserves the query, replays the
   discrete click, and submits the exact original query exactly once. Missing
   replay, overwritten query text, and an incorrect submitted value are recorded
-  explicitly as user-experience correctness failures; Octane fails the suite
-  if it loses the query or Send intent.
+  explicitly as user-experience correctness failures. React's interaction-led
+  hydration is credited as a delivered click, not mislabeled as deferred replay.
+  All six targets must preserve the query; Octane additionally fails the suite
+  if it loses the Send intent.
 
 The unified runner prints a six-framework UX correctness table after the
 timings. Each framework receives an explicit `PASS` or `FAIL`, together with
-the measured fractions of replayed Send clicks, preserved search queries, and
-exactly-once deliveries. A replayed focus does not turn a dropped Send into a
+the measured fractions of handled Send clicks, preserved search queries, and
+exactly-once deliveries. The individual target results additionally distinguish
+clicks replayed after hydration from clicks handled by an already installed
+selective-hydration root. A replayed focus does not turn a dropped Send into a
 success, and a replayed Send does not pass if it submits an overwritten query.
 The machine-readable `meta.userExperience` result additionally records the
 counts of dropped clicks, lost searches, incorrect submissions, focus-only
@@ -84,18 +88,16 @@ A timing is accepted only if the harness proves all of the following:
 - Chromium generated one native input event for every typed character;
 - the original server-rendered input, article, and interaction button were
   adopted rather than rebuilt;
-- whether each framework preserved the typed draft, focus, and caret; loss of
-  any of the three fails Octane and is reported honestly for reference targets;
+- every framework preserved the typed draft, focus, and caret;
 - the first post-hydration edit preserved the original draft and updated the
   visible application state;
 - the page contains exactly 180 correctly adopted article cards;
 - hydration completes exactly once without browser or hydration errors;
 - typing a search and clicking Send before hydration either delivers the exact
   original query once or appears explicitly as a replay correctness issue;
-- Octane and Solid 2.0 replay the deferred pre-root click exactly once, React
-  replays the associated focus event exactly once through its genuine
-  dehydrated boundary, and remaining targets are not credited with unsupported
-  replay behavior; and
+- pre-root replay, interaction-led selective hydration, dropped clicks, and
+  focus replay are reported from actual observed events rather than
+  framework-name assumptions; and
 - every target handles the next actual click exactly once.
 
 A failed gate writes a `failed` result and exits nonzero, matching the unified
