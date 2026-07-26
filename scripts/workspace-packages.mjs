@@ -82,6 +82,7 @@ export function getBindingPackages() {
 export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 	const errors = [];
 	const names = new Set();
+	const workspaceNames = new Set(packages.map((pkg) => pkg.name).filter(Boolean));
 	const rootManifest = readJson(path.join(REPO_ROOT, 'package.json'));
 	if (rootManifest.engines?.node !== '>=22') {
 		errors.push('root package.json must declare engines.node ">=22"');
@@ -153,6 +154,20 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 			}
 			if (pkg.manifest.devDependencies?.['@octanejs/app-core'] !== 'workspace:*') {
 				errors.push(`${label} must keep the workspace app core as a dev dependency`);
+			}
+		}
+
+		// Every sibling edge resolves through the workspace. A published range
+		// instead installs the sibling from npm, so the package builds against a
+		// stale copy of source that lives in this checkout, and `changeset version`
+		// rewrites the range on release, desyncing pnpm-lock.yaml and failing the
+		// release job's frozen install.
+		for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
+			for (const [dependency, range] of Object.entries(pkg.manifest[section] ?? {})) {
+				if (!workspaceNames.has(dependency) || range === 'workspace:*') continue;
+				errors.push(
+					`${label} ${section}.${dependency} must be "workspace:*" (received ${JSON.stringify(range)})`,
+				);
 			}
 		}
 	}
