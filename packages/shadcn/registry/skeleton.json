@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "skeleton",
+  "type": "registry:ui",
+  "title": "Skeleton",
+  "files": [
+    {
+      "path": "ui/skeleton.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/skeleton.tsrx",
+      "content": "// Default-Tailwind flavor (package canonical) — utilities-inlined upstream styling.\n// apps/v4/registry/bases/radix/ui/skeleton.tsx.\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport interface SkeletonProps extends HostProps<'div'> {}\n\nexport function Skeleton({ className, ...props }: SkeletonProps) @{\n\t<div\n\t\tdata-slot=\"skeleton\"\n\t\tclassName={cn('animate-pulse rounded-md bg-accent', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

@@ -1,17 +1,31 @@
 import {
+	aggregationFns,
+	columnFacetingFeature,
+	columnFilteringFeature,
+	columnGroupingFeature,
+	columnVisibilityFeature,
+	createExpandedRowModel,
+	createFacetedRowModel,
+	createFacetedUniqueValues,
+	createFilteredRowModel,
+	createGroupedRowModel,
+	createPaginatedRowModel,
+	filterFns,
 	flexRender,
-	getCoreRowModel,
-	getExpandedRowModel,
-	getFacetedRowModel,
-	getFacetedUniqueValues,
-	getFilteredRowModel,
-	getGroupedRowModel,
-	getPaginationRowModel,
-	useReactTable,
+	globalFilteringFeature,
+	rowAggregationFeature,
+	rowExpandingFeature,
+	rowPaginationFeature,
+	rowSelectionFeature,
+	tableFeatures,
+	useTable,
 } from '@octanejs/tanstack-table';
 
 // Feature-smoke fixtures — each table-core feature wired through the octane
 // render path. Data is module-level and deterministic.
+//
+// v9 opts into features explicitly per table (they are tree-shakeable), so each
+// fixture below declares only the features it exercises.
 
 export const captured: { table?: any } = {};
 
@@ -30,21 +44,28 @@ const nameCols = [
 ];
 
 // ── Column + global filtering (+ faceting, which needs the filtered model). ──
+const filterFeatures = tableFeatures({
+	columnFilteringFeature,
+	globalFilteringFeature,
+	columnFacetingFeature,
+	filteredRowModel: createFilteredRowModel(),
+	facetedRowModel: createFacetedRowModel(),
+	facetedUniqueValues: createFacetedUniqueValues(),
+	filterFns,
+});
+
 export function FilterTable(props: { global?: boolean }) @{
-	const table = useReactTable({
+	const table = useTable({
+		features: filterFeatures,
 		data: people,
 		columns: nameCols,
-		getCoreRowModel: getCoreRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
-		getFacetedRowModel: getFacetedRowModel(),
-		getFacetedUniqueValues: getFacetedUniqueValues(),
 	});
 	captured.table = table;
 	<div>
 		@if (props.global) {
 			<input
 				id="gflt"
-				value={table.getState().globalFilter as string ?? ''}
+				value={table.state.globalFilter as string ?? ''}
 				onInput={(e) => table.setGlobalFilter((e.target as HTMLInputElement).value)}
 			/>
 		} @else {
@@ -73,18 +94,22 @@ const manyRows = Array.from(
 	}),
 );
 
+const paginationFeatures = tableFeatures({
+	rowPaginationFeature,
+	paginatedRowModel: createPaginatedRowModel(),
+});
+
 export function PaginationTable() @{
-	const table = useReactTable({
+	const table = useTable({
+		features: paginationFeatures,
 		data: manyRows,
 		columns: [
 			{ accessorKey: 'firstName', header: 'First' },
 		],
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
 	});
 	captured.table = table;
 	<div>
-		<span id="pi">{table.getState().pagination.pageIndex + '/' + table.getPageCount()}</span>
+		<span id="pi">{table.state.pagination.pageIndex + '/' + table.getPageCount()}</span>
 		<button id="prev" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
 			prev
 		</button>
@@ -101,12 +126,14 @@ export function PaginationTable() @{
 }
 
 // ── Row selection: per-row checkbox + header select-all, optional predicate. ──
+const selectionFeatures = tableFeatures({ rowSelectionFeature });
+
 export function SelectionTable(props: { predicated?: boolean }) @{
-	const table = useReactTable({
+	const table = useTable({
+		features: selectionFeatures,
 		data: people,
 		columns: nameCols,
 		enableRowSelection: props.predicated ? (row: any) => row.original.age > 40 : true,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	captured.table = table;
 	<div>
@@ -147,11 +174,13 @@ const groupedCols = [
 	{ accessorKey: 'age', header: 'Age' },
 ];
 
+const visibilityFeatures = tableFeatures({ columnVisibilityFeature });
+
 export function VisibilityTable() @{
-	const table = useReactTable({
+	const table = useTable({
+		features: visibilityFeatures,
 		data: people,
 		columns: groupedCols,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	captured.table = table;
 	<div>
@@ -197,15 +226,19 @@ const tree = [
 	{ name: 'root-b' },
 ];
 
+const expandFeatures = tableFeatures({
+	rowExpandingFeature,
+	expandedRowModel: createExpandedRowModel(),
+});
+
 export function ExpandTable() @{
-	const table = useReactTable({
+	const table = useTable({
+		features: expandFeatures,
 		data: tree,
 		columns: [
 			{ accessorKey: 'name', header: 'Name' },
 		],
 		getSubRows: (row: any) => row.subRows,
-		getCoreRowModel: getCoreRowModel(),
-		getExpandedRowModel: getExpandedRowModel(),
 	});
 	captured.table = table;
 	<ul>
@@ -223,8 +256,20 @@ export function ExpandTable() @{
 }
 
 // ── Grouping + aggregation: grouped by status, age SUM in the aggregated row. ──
+// v9 splits v8's single grouping concern: `columnGroupingFeature` groups rows and
+// `rowAggregationFeature` aggregates their values, so both are opted into here.
+const groupFeatures = tableFeatures({
+	columnGroupingFeature,
+	rowAggregationFeature,
+	rowExpandingFeature,
+	groupedRowModel: createGroupedRowModel(),
+	expandedRowModel: createExpandedRowModel(),
+	aggregationFns,
+});
+
 export function GroupTable() @{
-	const table = useReactTable({
+	const table = useTable({
+		features: groupFeatures,
 		data: people,
 		columns: [
 			{ accessorKey: 'status', header: 'Status' },
@@ -236,15 +281,12 @@ export function GroupTable() @{
 			},
 		],
 		initialState: { grouping: ['status'], expanded: true },
-		getCoreRowModel: getCoreRowModel(),
-		getGroupedRowModel: getGroupedRowModel(),
-		getExpandedRowModel: getExpandedRowModel(),
 	});
 	captured.table = table;
 	<ul>
 		@for (const row of table.getRowModel().rows; key row.id) {
 			<li class="g-row" data-grouped={row.getIsGrouped() ? '1' : '0'}>
-				@for (const cell of row.getVisibleCells(); key cell.id) {
+				@for (const cell of row.getAllCells(); key cell.id) {
 					<span class="g-cell">
 						{cell.getIsAggregated()
 							? flexRender(

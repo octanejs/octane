@@ -16,10 +16,13 @@ describe('export surface', () => {
 	});
 
 	it('re-exports the same @tanstack/table-core module instance', async () => {
+		// Identity, not just presence: the differential oracle compares octane and
+		// React tables that must share one core (same sort/filter fn registries).
 		const core = await import('@tanstack/table-core');
 		expect(binding.createColumnHelper).toBe(core.createColumnHelper);
-		expect(binding.createTable).toBe(core.createTable);
-		expect(binding.getCoreRowModel).toBe(core.getCoreRowModel);
-		expect(binding.getSortedRowModel).toBe(core.getSortedRowModel);
+		expect(binding.constructTable).toBe(core.constructTable);
+		expect(binding.tableFeatures).toBe(core.tableFeatures);
+		expect(binding.createSortedRowModel).toBe(core.createSortedRowModel);
+		expect(binding.sortFns).toBe(core.sortFns);
 	});
 });

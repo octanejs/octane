@@ -14,7 +14,8 @@ export interface DevtoolsScopeLike {
 	body?: unknown; // Block.body (the component function); used by the name resolver
 	hooks: Map<symbol | number, any> | null;
 	effectSlots: any[] | null;
-	children: Array<{ key: symbol | string | number; scope: DevtoolsScopeLike }>;
+	// Lazily allocated by the runtime — null on a scope that never registered a child.
+	children: Array<{ key: symbol | string | number; scope: DevtoolsScopeLike }> | null;
 	$$ctxValues?: Map<any, any> | null;
 }
 
@@ -145,7 +146,7 @@ function buildNode(
 		id,
 		name: nameOf(scope, key),
 		kind: scope.kind ?? 'component',
-		children: scope.children.map((c) => buildNode(c.scope, c.key)),
+		children: scope.children === null ? [] : scope.children.map((c) => buildNode(c.scope, c.key)),
 	};
 }
 

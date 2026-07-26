@@ -1,5 +1,7 @@
 import { useState } from 'octane';
-import { flexRender, getCoreRowModel, useReactTable } from '@octanejs/tanstack-table';
+import { flexRender, tableFeatures, useTable } from '@octanejs/tanstack-table';
+
+const features = tableFeatures({});
 
 // Self-contained differential fixture: the SAME source runs on octane (via
 // @octanejs/tanstack-table) AND on React (the setup rewrites the import to
@@ -33,10 +35,10 @@ const columns = [
 
 export function BasicTable() @{
 	const [alt, setAlt] = useState(false);
-	const table = useReactTable({
+	const table = useTable({
+		features,
 		data: alt ? dataB : dataA,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	<div>
 		<button id="swap-data" onClick={() => setAlt(!alt)}>swap</button>
@@ -57,7 +59,7 @@ export function BasicTable() @{
 			<tbody>
 				@for (const row of table.getRowModel().rows; key row.id) {
 					<tr>
-						@for (const cell of row.getVisibleCells(); key cell.id) {
+						@for (const cell of row.getAllCells(); key cell.id) {
 							<td>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
 						}
 					</tr>
