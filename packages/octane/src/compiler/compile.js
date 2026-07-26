@@ -19984,8 +19984,12 @@ function mapAst(node, mutate) {
 	let out = null;
 	for (const k in node) {
 		if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
-		const mapped = mapAst(node[k], mutate);
-		if (mapped !== node[k]) {
+		// Only object-valued properties can be rewritten, and 61% of this walk's
+		// recursion was `type`, `name`, `raw` and friends returning themselves.
+		const child = node[k];
+		if (child === null || typeof child !== 'object') continue;
+		const mapped = mapAst(child, mutate);
+		if (mapped !== child) {
 			if (out === null) out = { ...node };
 			out[k] = mapped;
 		}
