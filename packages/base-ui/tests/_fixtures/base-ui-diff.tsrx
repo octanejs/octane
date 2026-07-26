@@ -20,6 +20,8 @@ import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Tooltip } from '@octanejs/base-ui/tooltip';
+import { PreviewCard } from '@octanejs/base-ui/preview-card';
 import { Button } from '@octanejs/base-ui/button';
 import { CSPProvider } from '@octanejs/base-ui/csp-provider';
 import { DirectionProvider, useDirection } from '@octanejs/base-ui/direction-provider';
@@ -780,5 +782,148 @@ export function PopoverViewportOpen() @{
 				</Popover.Positioner>
 			</Popover.Portal>
 		</Popover.Root>
+	</div>
+}
+
+// Tooltip (CLOSED) — Root + Trigger only. The popup subtree is unmounted while closed, so this is
+// just the trigger button carrying the tooltip-trigger identifier attribute.
+export function TooltipClosed() @{
+	<Tooltip.Root>
+		<Tooltip.Trigger className="tip-trigger">Hover me</Tooltip.Trigger>
+	</Tooltip.Root>
+}
+
+// Tooltip (OPEN, controlled) — Portal/Positioner/Popup/Arrow. `open` is controlled and there is no
+// trigger, so the anchored positioner has a stable (absent) anchor and the markup is comparable.
+export function TooltipOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Tooltip.Root open>
+			<Tooltip.Portal container={containerRef}>
+				<Tooltip.Positioner className="tip-positioner">
+					<Tooltip.Popup className="tip-popup">
+						<Tooltip.Arrow className="tip-arrow" />
+						Tooltip content
+					</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// Tooltip with a Viewport — the content-transition container inside the popup.
+export function TooltipViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Tooltip.Root open>
+			<Tooltip.Portal container={containerRef}>
+				<Tooltip.Positioner className="tip-positioner">
+					<Tooltip.Popup className="tip-popup">
+						<Tooltip.Viewport className="tip-viewport">Tooltip content</Tooltip.Viewport>
+					</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// A disabled trigger drops the tooltip-trigger identifier and gains data-trigger-disabled.
+export function TooltipDisabledTrigger() @{
+	<Tooltip.Root>
+		<Tooltip.Trigger className="tip-trigger" disabled>Hover me</Tooltip.Trigger>
+	</Tooltip.Root>
+}
+
+// Tooltip.Provider — shares one delay across a group; it renders no DOM of its own.
+export function TooltipProviderGroup() @{
+	<Tooltip.Provider delay={100} closeDelay={50}>
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-trigger">One</Tooltip.Trigger>
+		</Tooltip.Root>
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-trigger-2">Two</Tooltip.Trigger>
+		</Tooltip.Root>
+	</Tooltip.Provider>
+}
+
+// Tooltip (interactive) — a real trigger with no open delay, for the hover behavior test.
+export function TooltipInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="tip-host" />
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-trigger" delay={0} closeDelay={0}>
+				Hover me
+			</Tooltip.Trigger>
+			<Tooltip.Portal container={hostRef}>
+				<Tooltip.Positioner className="tip-positioner">
+					<Tooltip.Popup className="tip-popup">Tooltip content</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// PreviewCard (CLOSED) — Root + Trigger only. The trigger is an <a>, and the popup subtree is
+// unmounted while closed.
+export function PreviewCardClosed() @{
+	<PreviewCard.Root>
+		<PreviewCard.Trigger className="pc-trigger" href="/profile">Base UI</PreviewCard.Trigger>
+	</PreviewCard.Root>
+}
+
+// PreviewCard (OPEN, controlled) — Portal/Positioner/Popup/Arrow plus the backdrop.
+export function PreviewCardOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<PreviewCard.Root open>
+			<PreviewCard.Portal container={containerRef}>
+				<PreviewCard.Backdrop className="pc-backdrop" />
+				<PreviewCard.Positioner className="pc-positioner">
+					<PreviewCard.Popup className="pc-popup">
+						<PreviewCard.Arrow className="pc-arrow" />
+						Preview content
+					</PreviewCard.Popup>
+				</PreviewCard.Positioner>
+			</PreviewCard.Portal>
+		</PreviewCard.Root>
+	</div>
+}
+
+// PreviewCard with a Viewport — the content-transition container inside the popup.
+export function PreviewCardViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<PreviewCard.Root open>
+			<PreviewCard.Portal container={containerRef}>
+				<PreviewCard.Positioner className="pc-positioner">
+					<PreviewCard.Popup className="pc-popup">
+						<PreviewCard.Viewport className="pc-viewport">Preview content</PreviewCard.Viewport>
+					</PreviewCard.Popup>
+				</PreviewCard.Positioner>
+			</PreviewCard.Portal>
+		</PreviewCard.Root>
+	</div>
+}
+
+// PreviewCard (interactive) — a real trigger with no open/close delay, for the hover behavior test.
+export function PreviewCardInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pc-host" />
+		<PreviewCard.Root>
+			<PreviewCard.Trigger className="pc-trigger" href="/profile" delay={0} closeDelay={0}>
+				Base UI
+			</PreviewCard.Trigger>
+			<PreviewCard.Portal container={hostRef}>
+				<PreviewCard.Positioner className="pc-positioner">
+					<PreviewCard.Popup className="pc-popup">Preview content</PreviewCard.Popup>
+				</PreviewCard.Positioner>
+			</PreviewCard.Portal>
+		</PreviewCard.Root>
 	</div>
 }

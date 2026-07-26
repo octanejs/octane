@@ -478,4 +478,50 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+	it('Tooltip: closed (trigger only, popup subtree unmounted)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip: open (portal + anchored positioner + popup + arrow)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip.Viewport: open (current-content container inside the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip: disabled trigger (data-trigger-disabled, no trigger identifier)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipDisabledTrigger', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip.Provider: shares a delay group without rendering DOM', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipProviderGroup', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+	it('PreviewCard: closed (link trigger only, popup subtree unmounted)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PreviewCardClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('PreviewCard: open (portal + backdrop + anchored positioner + popup + arrow)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PreviewCardOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('PreviewCard.Viewport: open (current-content container inside the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PreviewCardViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });

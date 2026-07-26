@@ -23,6 +23,8 @@ export { Progress } from './progress';
 export { Radio } from './radio';
 export { RadioGroup } from './radio-group';
 export { Popover } from './popover';
+export { PreviewCard } from './preview-card';
+export { Tooltip } from './tooltip';
 export { Slider } from './slider';
 export { Switch } from './switch';
 export { Toggle } from './toggle';
