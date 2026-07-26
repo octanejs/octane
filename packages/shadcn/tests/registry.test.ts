@@ -86,17 +86,25 @@ describe('@octanejs/shadcn — registry emit', () => {
 	});
 
 	it('pins cross-binding npm dependencies to exact versions', () => {
-		for (const [itemName, dependencyName] of [
-			['button', '@octanejs/radix'],
-			['spinner', '@octanejs/lucide'],
-			['sonner', '@octanejs/sonner'],
-		] as const) {
-			const item = JSON.parse(readFileSync(join(REGISTRY, `${itemName}.json`), 'utf8'));
-			const siblingName = dependencyName.slice('@octanejs/'.length);
-			const sibling = JSON.parse(
-				readFileSync(join(PKG_ROOT, '..', siblingName, 'package.json'), 'utf8'),
-			);
-			expect(item.dependencies).toContain(`${dependencyName}@${sibling.version}`);
+		// Siblings are declared `workspace:*`, a protocol the shadcn CLI cannot
+		// install, so the emit must carry the sibling's concrete version. Read that
+		// version rather than hard-coding it: a literal here goes stale on every
+		// sibling release, which is the drift the emit exists to avoid.
+		const versionOf = (name: string) =>
+			JSON.parse(readFileSync(join(PKG_ROOT, '..', name, 'package.json'), 'utf8')).version;
+
+		const button = JSON.parse(readFileSync(join(REGISTRY, 'button.json'), 'utf8'));
+		expect(button.dependencies).toContain(`@octanejs/radix@${versionOf('radix')}`);
+		const spinner = JSON.parse(readFileSync(join(REGISTRY, 'spinner.json'), 'utf8'));
+		expect(spinner.dependencies).toContain(`@octanejs/lucide@${versionOf('lucide')}`);
+	});
+
+	it('never emits an uninstallable local protocol', () => {
+		for (const file of readdirSync(REGISTRY).filter((name) => name.endsWith('.json'))) {
+			const item = JSON.parse(readFileSync(join(REGISTRY, file), 'utf8'));
+			for (const dependency of item.dependencies ?? []) {
+				expect(dependency, `${file} emits ${dependency}`).not.toMatch(/@(?:workspace|catalog):/);
+			}
 		}
 	});
 });
