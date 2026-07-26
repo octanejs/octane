@@ -14,7 +14,7 @@ work around it in the binding.**
 > server and client external-store snapshots and threads manual hook slots into
 > both slider call sites. A dedicated Node-mode project verifies the hydration
 > snapshot, accessible separators, hidden edge-aligned slider parts, and closed
-> dialog rendering without a DOM. Client hydration adopts real upstream Base UI
+> dialog rendering without a DOM. Client hydration adopts real Octane Base UI
 > separator markup, transitions to the client snapshot, and remains interactive.
 > Open-overlay and remaining component hydration are still follow-up work.
 

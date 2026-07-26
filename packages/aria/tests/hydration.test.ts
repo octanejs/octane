@@ -1,36 +1,9 @@
-import { createElement as createReactElement, useState as useReactState } from 'react';
-import { renderToString as renderReactToString } from 'react-dom/server';
-import {
-	I18nProvider as ReactI18nProvider,
-	SSRProvider as ReactSSRProvider,
-	useId as useReactAriaId,
-	useIsSSR as useReactIsSSR,
-	useLocale as useReactLocale,
-} from 'react-aria';
 import { flushSync, hydrateRoot } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../octane/tests/_helpers';
+import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';
 import { AriaServerFixture } from './ssr/_fixtures/server.tsx';
-
-function ReactAriaServerContents() {
-	const labelId = useReactAriaId('aria-hydration-label');
-	const { locale, direction } = useReactLocale();
-	const isSSR = useReactIsSSR();
-	const [clicks] = useReactState(0);
-
-	return createReactElement(
-		'main',
-		{ id: 'aria-server', 'data-locale': locale, 'data-direction': direction },
-		createReactElement('label', { id: labelId, htmlFor: 'aria-hydration-input' }, 'Email'),
-		createReactElement('input', {
-			id: 'aria-hydration-input',
-			'aria-labelledby': labelId,
-		}),
-		createReactElement('output', { id: 'aria-render-phase' }, isSSR ? 'server' : 'client'),
-		createReactElement('button', { id: 'aria-hydration-button' }, 'Clicks: ' + clicks),
-	);
-}
 
 async function settle(): Promise<void> {
 	for (let index = 0; index < 3; index += 1) {
@@ -41,16 +14,15 @@ async function settle(): Promise<void> {
 }
 
 describe('@octanejs/aria hydration', () => {
-	it('adopts labelled server nodes, preserves locale, and switches to the client snapshot', async () => {
-		const container = document.createElement('div');
-		container.innerHTML = renderReactToString(
-			createReactElement(ReactSSRProvider, {
-				children: createReactElement(ReactI18nProvider, {
-					locale: 'ar-AE',
-					children: createReactElement(ReactAriaServerContents),
-				}),
-			}),
+	it('adopts labelled Octane server nodes, preserves locale, and switches snapshots', async () => {
+		const serverResult = await renderHydrationFixture(
+			'aria',
+			'packages/aria/tests/ssr/_fixtures/server.tsx',
+			'AriaServerFixture',
+			{ locale: 'ar-AE' },
 		);
+		const container = document.createElement('div');
+		container.innerHTML = serverResult.html;
 		document.body.appendChild(container);
 		const serverMain = container.querySelector('#aria-server');
 		const serverLabel = container.querySelector('#aria-hydration-label');
