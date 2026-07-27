@@ -27,3 +27,9 @@ Module-scope `let` and `var` remain tracked, since any later statement may
 rebind them. A member read through a module-scope `const` (`CONFIG.mode`) is
 now omitted, matching the answer a namespace import already gave: a module-level
 object mutated in place is not witnessed by a dependency array either way.
+
+A regex literal is not treated as an invariant initializer. ESTree spells
+`/foo/g` as a `Literal`, but it allocates a fresh RegExp on every evaluation and
+carries mutable `lastIndex` state, so a local `const pattern = /foo/g` stays
+reactive. The predicate is now shared with the one `compile.js` already used for
+the same question.

@@ -698,12 +698,29 @@ function discoverCustomDependencyHooks(analysis) {
 	return configs;
 }
 
-// Is this initializer the same value on every evaluation of its declaration?
-// Deliberately narrow: a literal has no identity to change. An object or array
-// literal is excluded — it allocates a fresh identity each time.
-function isInvariantLiteral(node) {
-	if (node?.type === 'Literal') return true;
-	return node?.type === 'TemplateLiteral' && (node.expressions?.length ?? 0) === 0;
+/**
+ * Is this expression the same value on every evaluation? Only a PRIMITIVE
+ * literal qualifies: it has no identity to change.
+ *
+ * A regex literal is excluded even though ESTree calls it a `Literal` —
+ * `/foo/g` allocates a fresh RegExp on every evaluation, and carries mutable
+ * `lastIndex` state besides. The object/function check is the same guard one
+ * step more general, for any parser that materializes a literal value.
+ */
+export function isInvariantLiteral(node) {
+	if (!node || node.type !== 'Literal' || node.regex != null) return false;
+	return (
+		node.value === null || (typeof node.value !== 'object' && typeof node.value !== 'function')
+	);
+}
+
+// The same question for a hook initializer, which additionally accepts a
+// template literal with no substitutions — that is a plain string constant.
+// Kept separate so the shared predicate above stays byte-identical to what
+// compile.js's other call sites have always meant by it.
+function isInvariantInitializer(node) {
+	if (node?.type === 'TemplateLiteral') return (node.expressions?.length ?? 0) === 0;
+	return isInvariantLiteral(node);
 }
 
 function markDependencyInvariantBindings(analysis) {
@@ -735,7 +752,7 @@ function markDependencyInvariantBindings(analysis) {
 				if (!dependencyInvariant && init?.type === 'Identifier') {
 					dependencyInvariant = resolveBinding(scope, init.name)?.dependencyInvariant === true;
 				}
-				if (!dependencyInvariant) dependencyInvariant = isInvariantLiteral(init);
+				if (!dependencyInvariant) dependencyInvariant = isInvariantInitializer(init);
 				if (dependencyInvariant && bindings[0] && !bindings[0].binding.dependencyInvariant) {
 					bindings[0].binding.dependencyInvariant = true;
 					changed = true;

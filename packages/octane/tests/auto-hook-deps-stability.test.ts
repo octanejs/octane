@@ -23,11 +23,17 @@ import { slotHooks } from '../src/compiler/slot-hooks.js';
 //
 // The final describe block holds the boundary: `let`, shadowing, and derived
 // values stay reactive, because for those the premise does not hold.
-const c = (source: string): string =>
-	compile(source, 'auto-deps-stability.tsrx', { inlineHookMemo: false }).code;
+const c = (source: string, options?: { mode?: 'client' | 'server'; filename?: string }): string =>
+	compile(source, options?.filename ?? 'auto-deps-stability.tsrx', {
+		inlineHookMemo: false,
+		...options,
+	}).code;
 
+// The inferred array, read back from the emitted hook call. The trailing slot
+// argument is a numeric index in `.tsrx` output and a Symbol alias in `.tsx`
+// output; both forms anchor the match without being asserted themselves.
 const depsOf = (code: string): string[] =>
-	[...code.matchAll(/\[([^[\]]*)\],\s*\d+\s*\)/g)].map((match) =>
+	[...code.matchAll(/\[([^[\]]*)\],\s*(?:\d+|_h\$\d+)\s*\)/g)].map((match) =>
 		match[1].replace(/\s+/g, ' ').trim(),
 	);
 
@@ -131,6 +137,41 @@ describe('dependency stability — module-scope immutable identities', () => {
 		expect(depsOf(code)).toEqual(['props.log']);
 	});
 
+	it('holds the same contract in a server compile', () => {
+		const code = c(
+			`
+      import { useEffect, useMemo } from 'octane';
+      const SCALE = 2;
+      function fmt(n) { return String(n); }
+      export function App(props) @{
+        const label = useMemo(() => fmt(props.value * SCALE));
+        useEffect(() => { props.log(label); });
+        <div>{label as string}</div>
+      }
+    `,
+			{ mode: 'server' },
+		);
+
+		expect(depsOf(code)).toEqual(['props.value', 'props.log, label']);
+	});
+
+	it('holds the same contract for a .tsx source', () => {
+		const code = c(
+			`
+      import { useEffect } from 'octane';
+      const SCALE = 2;
+      function fmt(n) { return String(n); }
+      export function App(props) {
+        useEffect(() => { props.log(fmt(props.value * SCALE)); });
+        return <div />;
+      }
+    `,
+			{ filename: 'auto-deps-stability.tsx' },
+		);
+
+		expect(depsOf(code)).toEqual(['props.log, props.value']);
+	});
+
 	it('holds the same contract in the plain-TS surgical pass', () => {
 		const source = `
 import { useEffect } from 'octane';
@@ -161,6 +202,62 @@ describe('dependency stability — component-local invariants', () => {
 
 		// `limit` is 10 on every render by construction, so nothing can witness it.
 		expect(depsOf(code)).toEqual(['props.log']);
+	});
+
+	it('keeps a component-local const bound to a regex literal', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export function App(props) @{
+        const pattern = /foo/g;
+        useEffect(() => { props.log(pattern); });
+        <div />
+      }
+    `);
+
+		// ESTree spells a regex as a `Literal`, but `/foo/g` allocates a fresh
+		// RegExp on every render and carries mutable `lastIndex` state, so it is
+		// reactive exactly like an object literal would be.
+		expect(depsOf(code)).toEqual(['props.log, pattern']);
+	});
+
+	it('keeps a component-local const bound to an object or array literal', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export function App(props) @{
+        const options = { deep: true };
+        const items = [1, 2];
+        useEffect(() => { props.log(options, items); });
+        <div />
+      }
+    `);
+
+		expect(depsOf(code)).toEqual(['props.log, options, items']);
+	});
+
+	it('omits a component-local const bound to a substitution-free template', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export function App(props) @{
+        const label = \`total\`;
+        useEffect(() => { props.log(label); });
+        <div />
+      }
+    `);
+
+		expect(depsOf(code)).toEqual(['props.log']);
+	});
+
+	it('keeps a component-local const bound to an interpolated template', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export function App(props) @{
+        const label = \`total: \${props.total}\`;
+        useEffect(() => { props.log(label); });
+        <div />
+      }
+    `);
+
+		expect(depsOf(code)).toEqual(['props.log, label']);
 	});
 
 	it('omits a component-local const aliasing an import', () => {
