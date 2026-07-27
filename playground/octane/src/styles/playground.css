@@ -28,7 +28,7 @@ body.dark {
 }
 header.demo-header {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
 	padding: 20px 24px 12px;
@@ -44,31 +44,66 @@ header.demo-header p {
 	color: var(--muted-foreground);
 	font-size: 13px;
 }
-nav.demo-nav {
+/* The sidebar, its rail, the mobile sheet and the menu buttons are all styled
+ * by the vendored shadcn component — only the bits it does not own live here. */
+.demo-nav-title {
+	font-size: 13px;
+	font-weight: 500;
+}
+.demo-nav-empty {
+	margin: 0;
+	padding: 8px;
+	font-size: 13px;
+	color: var(--muted-foreground);
+}
+
+.demo-header-titles {
+	flex: 1;
+	min-width: 0;
+}
+
+section.demo-stage {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.demo-stage-bar {
 	display: flex;
 	gap: 4px;
-	flex-wrap: wrap;
 	padding: 12px 24px;
 	border-bottom: 1px solid var(--border);
-	background: var(--card);
 }
-nav.demo-nav button {
-	padding: 6px 12px;
-	border: 1px solid var(--border);
+.demo-tab {
+	padding: 4px 12px;
+	border: 1px solid transparent;
+	border-radius: calc(var(--radius) * 0.5);
+	background: transparent;
+	color: var(--muted-foreground);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+.demo-tab:hover {
+	color: var(--foreground);
+}
+.demo-tab.is-active {
+	border-color: var(--border);
 	background: var(--background);
 	color: var(--foreground);
-	cursor: pointer;
-	font: inherit;
-	border-radius: calc(var(--radius) * 0.6);
 }
-nav.demo-nav button.active {
-	background: var(--primary);
-	color: var(--primary-foreground);
-	border-color: var(--primary);
-}
-main.demo-stage {
+.demo-stage-body {
 	padding: 24px;
 }
+.demo-source {
+	margin: 0;
+	padding: 24px;
+	overflow-x: auto;
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 12px;
+	line-height: 1.6;
+	tab-size: 2;
+}
+
 h2.demo-title {
 	margin: 0 0 4px;
 	font-size: 16px;
