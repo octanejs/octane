@@ -233,13 +233,16 @@ export const CLIENTS = [
 			scope === 'project'
 				? path.join(paths.projectRoot, '.mcp.json')
 				: path.join(paths.home, '.claude.json'),
+		// The name goes before `-e`: Claude declares `--env <env...>` as variadic,
+		// so an `-e` ahead of the positional swallows the server name and the CLI
+		// rejects it as a malformed environment variable.
 		cliArgs: (name, entry, scope) => [
 			'mcp',
 			'add',
 			'--scope',
 			scope,
-			...Object.entries(entry.env ?? {}).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
 			name,
+			...Object.entries(entry.env ?? {}).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
 			'--',
 			entry.command,
 			...entry.args,

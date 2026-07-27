@@ -50,9 +50,35 @@ describe('octane mcp add', () => {
 		expect(result.exitCode).toBe(0);
 		expect(exec.calls).toHaveLength(1);
 		expect(exec.calls[0].file).toBe('claude');
-		expect(exec.calls[0].args.join(' ')).toContain('mcp add --scope user');
-		expect(exec.calls[0].args.slice(-4)).toEqual(['--', 'npx', '-y', '@octanejs/mcp-server']);
+		// Asserted as exact argv, not by fragments: `claude` declares
+		// `--env <env...>` as variadic, so an `-e` placed before the positional
+		// swallows the server name and the CLI rejects it. Only pinning the whole
+		// array catches a reordering.
+		expect(exec.calls[0].args).toEqual([
+			'mcp',
+			'add',
+			'--scope',
+			'user',
+			'octane',
+			'--',
+			'npx',
+			'-y',
+			'@octanejs/mcp-server',
+		]);
 		expect(result.json().outcomes[0].method).toBe('cli');
+	});
+
+	it('passes the environment after the server name', async () => {
+		const checkout = fixture({
+			'packages/octane/package.json': { name: 'octane', version: '0.1.17' },
+		});
+		const exec = fakeExec(['claude']);
+
+		await runCli(['mcp', 'add', 'claude', '--cwd', checkout.root, '--json'], { exec });
+
+		const args = exec.calls[0].args;
+		expect(args.indexOf('octane')).toBeLessThan(args.indexOf('-e'));
+		expect(args[args.indexOf('-e') + 1]).toBe(`OCTANE_REPO_ROOT=${checkout.root}`);
 	});
 
 	it('falls back to merging the config file when no CLI is available', async () => {
