@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from './args.js';
+import { renderBanner } from './banner.js';
 import { resolveCommand } from './command.js';
 import { createContext } from './context.js';
 import { CliError, EXIT, usageError } from './errors.js';
@@ -84,6 +85,9 @@ async function dispatch(argv, options) {
 			);
 			return EXIT.OK;
 		}
+		// Root invocation only: the wordmark heads `octane` and `octane --help`,
+		// not every subcommand's help.
+		if (path.length === 0) renderBanner(ctx);
 		if (!module && argv.length === 0 && ctx.ui.canPrompt) return runMenu(ctx, options);
 		ctx.ui.log(renderHelp({ path, module, entries: COMMANDS, colors: ctx.ui.colors }));
 		return EXIT.OK;

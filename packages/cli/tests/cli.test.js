@@ -23,6 +23,23 @@ describe('the CLI kernel', () => {
 		expect(result.exitCode).toBe(0);
 	});
 
+	it('shows the mark on the root, but never on a subcommand or under --json', async () => {
+		// The one way decoration can actually break something is by preceding a
+		// JSON document, so that case is pinned rather than eyeballed.
+		const mark = '&&&';
+		for (const argv of [['--help'], []]) {
+			const { stdout } = await runCli(argv);
+			expect(stdout, String(argv)).toContain(mark);
+			expect(stdout, String(argv)).toContain('OCTANE CLI');
+		}
+
+		expect((await runCli(['doctor', '--help'])).stdout).not.toContain(mark);
+		const json = await runCli(['--json']);
+		expect(json.stdout).not.toContain(mark);
+		expect(json.stdout).not.toContain('OCTANE CLI');
+		expect(() => JSON.parse(json.stdout)).not.toThrow();
+	});
+
 	it('exposes the command list to agents under --json', async () => {
 		const result = await runCli(['--json']);
 		expect(result.json().commands.map((/** @type {any} */ c) => c.name)).toEqual(
