@@ -467,6 +467,13 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 				return;
 			case 'ObjectPattern':
 				for (const prop of pattern.properties || []) {
+					// A computed key is a READ of the surrounding scope, not a binding
+					// (`const { [key]: picked } = source`). It must be walked so the
+					// identifier gets a `nodeScopes` entry: `collectDependencies`
+					// resolves every capture through that map, and an unmapped node
+					// resolves to no binding, which it cannot distinguish from a
+					// genuine global — so the capture would be dropped silently.
+					if (prop.computed) walk(prop.key, scope);
 					walkPatternDefaults(prop.type === 'RestElement' ? prop.argument : prop.value, scope);
 				}
 				return;
