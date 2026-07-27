@@ -2182,17 +2182,26 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 // misses unconditionally. The region cache is only as good as the stability of
 // what it keys on.
 //
-// This is the calculation half of the same pure-render, immutable-snapshot
-// contract autoMemo's regions assume, and it is deliberately NOT gated on the
-// callee-shape rule that governs regions: a calculation is a value the author
-// hoisted into a local, and React Compiler memoizes those unconditionally.
-// docs/differences-from-react.md documents the resulting staleness contract.
+// A calculation is admitted on exactly the callee rule that governs regions
+// (plainCalleeIsMemoizable): the receiver of a member call can return a new
+// answer while its own identity holds, and that hazard does not become safe
+// because the author named the result. `virtualizer.getVirtualItems()` in
+// examples/pulseboard is the same shape as `header.column.getIsSorted()` — its
+// window moves with scroll while the virtualizer instance stays put — so
+// caching it froze a virtualized list mid-scroll. One rule, both paths.
+//
+// The cost of that is real and accepted: `const visible = todos.filter(...)`
+// stays uncached, because `todos.filter` is a member call and this analysis
+// cannot yet prove the receiver is an immutable snapshot rather than a live
+// object. Recovering it needs receiver provenance (does the root trace to a
+// state binding?), which is a separate change with its own evidence.
 //
 // Scope: single-declarator `const` with an Identifier id whose init reaches a
 // render-time call (isPropCreationExpr — no JSX, no hook-shaped calls), whose
-// value the render tree actually reads (memoizing a value nothing renders only
-// adds cells), and whose dependencies are all component locals. Bodies that
-// already went through Pass A′ arrive with hook-shaped inits and are skipped.
+// every call is an admitted projection, whose value the render tree actually
+// reads (memoizing a value nothing renders only adds cells), and whose
+// dependencies are all component locals. Bodies that already went through Pass
+// A′ arrive with hook-shaped inits and are skipped.
 function rewriteAutoCalculation(stmt, componentLocals, renderReadNames, ctx) {
 	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
 	if (stmt.declarations?.length !== 1) return stmt;
@@ -2203,6 +2212,9 @@ function rewriteAutoCalculation(stmt, componentLocals, renderReadNames, ctx) {
 	// An arrow/function init is auto-callback's job, not ours.
 	if (FN_TYPES.has(init?.type)) return stmt;
 	if (!isPropCreationExpr(init, ctx)) return stmt;
+	// Every call reached during render must be a proven value projection — the
+	// same admission the region cache uses. A member call fails closed.
+	if (containsRenderCall([init], ctx)) return stmt;
 	const deps = [];
 	const seen = new Set();
 	for (const name of collectFreeIdentifiers(init, [])) {
@@ -10742,7 +10754,7 @@ function collectUseArgumentRoots(
 	startInRenderTree = false,
 	seedRenderReads = false,
 ) {
-	walk(root, EMPTY_BOUND_SET, startInRenderTree);
+	walk(root, EMPTY_BOUND_SET, startInRenderTree, false);
 
 	// `bound` carries every name introduced by a scope the candidate collector
 	// cannot reach: nested-function params + internal declarations, loop
@@ -10754,10 +10766,10 @@ function collectUseArgumentRoots(
 	// into memoization (which would wrongly stop it recreating per render).
 	// Over-binding is the safe direction: a dropped seed just leaves that
 	// chain unmemoized — today's behavior.
-	function walk(n, bound, inRenderTree) {
+	function walk(n, bound, inRenderTree, deferred) {
 		if (n == null || typeof n !== 'object') return;
 		if (Array.isArray(n)) {
-			for (const child of n) walk(child, bound, inRenderTree);
+			for (const child of n) walk(child, bound, inRenderTree, deferred);
 			return;
 		}
 		if (
@@ -10774,7 +10786,10 @@ function collectUseArgumentRoots(
 			const inner = new Set(bound);
 			for (const param of n.params || []) collectPatternNames(param, inner);
 			collectScopeDeclaredNames(n.body, inner);
-			walk(n.body, inner, inRenderTree);
+			// A function VALUE runs at invoke time, not while the template renders,
+			// so names it reads are not render reads. use()-argument seeding still
+			// descends (a use() inside a render prop is a real suspension point).
+			walk(n.body, inner, inRenderTree, true);
 			return;
 		}
 		if (LOOP_TYPES.has(n.type)) {
@@ -10783,7 +10798,7 @@ function collectUseArgumentRoots(
 			for (const key in n) {
 				if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane'))
 					continue;
-				walk(n[key], inner, inRenderTree);
+				walk(n[key], inner, inRenderTree, deferred);
 			}
 			return;
 		}
@@ -10791,7 +10806,7 @@ function collectUseArgumentRoots(
 			const inner = new Set(bound);
 			if (n.param) collectPatternNames(n.param, inner);
 			collectScopeDeclaredNames(n.body, inner);
-			walk(n.body, inner, inRenderTree);
+			walk(n.body, inner, inRenderTree, deferred);
 			return;
 		}
 		if (n.type === 'JSXForExpression') {
@@ -10805,19 +10820,32 @@ function collectUseArgumentRoots(
 				collectPatternNames(n.left, inner);
 			}
 			if (n.index) collectPatternNames(n.index, inner);
-			walk(n.right, bound, true);
-			walk(n.key, inner, true);
-			walk(n.body, inner, true);
-			walk(n.empty, bound, true);
+			walk(n.right, bound, true, deferred);
+			walk(n.key, inner, true, deferred);
+			walk(n.body, inner, true, deferred);
+			walk(n.empty, bound, true, deferred);
 			return;
 		}
-		if (seedRenderReads && inRenderTree && n.type === 'Identifier' && !bound.has(n.name)) {
+		if (
+			seedRenderReads &&
+			inRenderTree &&
+			!deferred &&
+			n.type === 'Identifier' &&
+			!bound.has(n.name)
+		) {
 			into.add(n.name);
+		}
+		if ((n.type === 'MemberExpression' || n.type === 'OptionalMemberExpression') && !n.computed) {
+			// `row.length` reads `row`, not a binding called `length`. Skipping the
+			// property also cannot hide a use() call: a non-computed property is an
+			// Identifier by construction.
+			walk(n.object, bound, inRenderTree, deferred);
+			return;
 		}
 		if (inRenderTree && n.type === 'BlockStatement') {
 			const inner = new Set(bound);
 			collectScopeDeclaredNames(n, inner);
-			for (const child of n.body || []) walk(child, inner, true);
+			for (const child of n.body || []) walk(child, inner, true, deferred);
 			return;
 		}
 		// JSX reached at a setup VALUE position (`const el = <div>{use(x)}</div>`)
@@ -10828,7 +10856,7 @@ function collectUseArgumentRoots(
 				(n.type.startsWith('JSX') || n.type === 'Element' || n.type === 'Tsrx'));
 		for (const key in n) {
 			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
-			walk(n[key], bound, nextInRenderTree);
+			walk(n[key], bound, nextInRenderTree, deferred);
 		}
 	}
 }

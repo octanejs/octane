@@ -88,23 +88,33 @@ assumption.
 ## Derived values are cached at their declaration
 
 A `const` whose initializer performs a call during render is cached on the
-component-local values it reads:
+component locals it reads — provided every one of those calls is a value
+projection by the rule above:
 
 ```tsx
-const visible = todos.filter((t) => !t.completed); // cached on [todos]
+const labels = formatRows(rows); // formatRows is imported → cached on [rows]
 ```
 
-`visible` keeps the same array identity until `todos` changes. This is what
-makes the region memoization above worth having: a region keys on the identity
-of what it renders, so a derived list rebuilt on every render would defeat its
-cache unconditionally.
+`labels` keeps the same array identity until `rows` changes. This is what makes
+the region memoization above worth having: a region keys on the identity of what
+it renders, so a derived value rebuilt on every render defeats its cache
+unconditionally.
 
-**The contract is pure render.** The cached value is reused while its tracked
-inputs are unchanged, so a calculation that reads something no input witnesses —
-a live accessor, a mutable module variable — keeps its old value. Pass such
-state through `useState`/`useReducer`/context and it is witnessed normally.
+The callee rule is the same one regions use, and for the same reason. A member
+call is not cached even when its result is named:
 
-Never cached:
+```tsx
+const items = virtualizer.getVirtualItems(); // NOT cached
+const visible = todos.filter((t) => !t.completed); // NOT cached
+```
+
+The first is the receiver hazard exactly: the window moves with scroll while the
+virtualizer instance stays put, so a cache keyed on it would freeze a
+virtualized list mid-scroll. The second is a genuine miss — `todos` really is an
+immutable snapshot — but this analysis cannot yet tell the two apart, so it fails
+closed on both. Wrap it in `useMemo` yourself when the identity matters.
+
+Also never cached:
 
 - **Hook calls.** `const s = useThing()` and `const s = unstable_useThing()`
   keep their hook cells and subscriptions. Hooks are recognised by naming
@@ -115,23 +125,10 @@ Never cached:
 - **Values the render tree never reads.** A calculation used only by an event
   handler pays nothing.
 
-### Why a hoisted local and an inline expression can differ
-
-`{header.getIsSorted()}` inline in a template is **not** memoized (a method call
-carries the receiver hazard described above), but
-
-```tsx
-const sorted = header.getIsSorted(); // cached on [header]
-```
-
-**is** — so hoisting that expression into a local changes its reactivity.
-
-This asymmetry is deliberate. The inline form is what library bindings put in
-their consumers' templates, where the author may not know a live accessor is
-involved; the `const` form is a value the author chose to name in their own
-component body, which is exactly where React Compiler assumes the pure-render
-contract. Keep such a read inline, or assign it to a `let`, when you want it
-re-evaluated on every render.
+Within those bounds the contract is pure render: the cached value is reused while
+its tracked inputs are unchanged, so a projection that reads state no input
+witnesses keeps its old value. Pass such state through
+`useState`/`useReducer`/context and it is witnessed normally.
 
 ## `useState` / `useReducer` current-state getters
 

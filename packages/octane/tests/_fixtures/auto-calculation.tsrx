@@ -26,15 +26,15 @@ export function resetIdentities() {
 
 export function DerivedIdentity() @{
 	const [items, setItems] = useState([
-		{ id: 1, on: false },
+		{ id: 1, n: 1 },
 	]);
 	const [tick, setTick] = useState(0);
-	const visible = items.filter((it) => !it.on);
+	const visible = projectRows(items);
 	<div>
 		<button id="di-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
 		<button
 			id="di-add"
-			onClick={() => setItems([...items, { id: items.length + 1, on: false }])}
+			onClick={() => setItems([...items, { id: items.length + 1, n: items.length + 1 }])}
 		>{'add'}</button>
 		<span id="di-identity">{identityOf(visible)}</span>
 		<span id="di-count">{'' + visible.length}</span>
@@ -127,5 +127,34 @@ export function HandlerOnlyCalculation() @{
 			onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
 		>{'bump'}</button>
 		<span id="ho-seen">{seen}</span>
+	</div>
+}
+
+// --- a member call on a live receiver is never cached -----------------------
+//
+// The receiver hazard: a stable object whose method returns a different answer
+// each time it is asked. `virtualizer.getVirtualItems()` in examples/pulseboard
+// is this shape — the window moves with scroll while the virtualizer instance
+// stays put — and caching it froze a virtualized list mid-scroll.
+function createSource() {
+	let n = 0;
+	return {
+		read() {
+			n += 1;
+			return 'n' + n;
+		},
+	};
+}
+
+export function LiveReceiverCalculation() @{
+	// Held in state so its identity is stable across renders — exactly the
+	// condition that makes a cache keyed on it freeze.
+	const [source] = useState(createSource);
+	const [tick, setTick] = useState(0);
+	const reading = source.read();
+	<div>
+		<button id="lr-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<span id="lr-reading">{reading}</span>
+		<span id="lr-tickval">{'' + tick}</span>
 	</div>
 }

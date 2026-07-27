@@ -6,6 +6,7 @@ import {
 	HookCallDeclarations,
 	ReassignedLocal,
 	HandlerOnlyCalculation,
+	LiveReceiverCalculation,
 	resetIdentities,
 } from './_fixtures/auto-calculation.tsrx';
 
@@ -136,6 +137,26 @@ describe('auto-calculation — shapes that must keep recomputing', () => {
 		r.click('#ho-bump');
 		r.click('#ho-read');
 		expect(r.find('#ho-seen').textContent).toBe('r1:1|r2:2');
+		r.unmount();
+	});
+});
+
+describe('auto-calculation — a member call on a live receiver is never cached', () => {
+	it('re-reads a stable receiver whose method answer changes', () => {
+		// A cache keyed on the receiver's identity would freeze this reading, which
+		// is how caching `virtualizer.getVirtualItems()` froze a virtualized list
+		// mid-scroll. The receiver carries the hazard, so the author naming the
+		// result does not make it safe.
+		const r = mount(LiveReceiverCalculation);
+		const first = r.find('#lr-reading').textContent;
+
+		r.click('#lr-tick');
+		expect(r.find('#lr-tickval').textContent).toBe('1');
+		expect(r.find('#lr-reading').textContent).not.toBe(first);
+
+		const second = r.find('#lr-reading').textContent;
+		r.click('#lr-tick');
+		expect(r.find('#lr-reading').textContent).not.toBe(second);
 		r.unmount();
 	});
 });
