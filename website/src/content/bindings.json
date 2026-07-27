@@ -4,6 +4,7 @@
     "description": "Small stores, atoms, Redux, RTK Query, and TanStack Store.",
     "packages": [
       "@octanejs/zustand",
+      "@octanejs/valtio",
       "@octanejs/jotai",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",

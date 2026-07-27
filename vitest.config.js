@@ -437,6 +437,39 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'valtio',
+					include: ['packages/valtio/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/valtio$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/react\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/react/utils.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/react.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/vanilla\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/vanilla/utils.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/vanilla$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/vanilla.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'dexie',
 					include: ['packages/dexie/tests/**/*.test.ts'],
 					exclude: [

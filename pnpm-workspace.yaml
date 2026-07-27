@@ -269,6 +269,7 @@ catalogs:
     prettier: ^3.9.6
     preact: ^10.29.7
     preact-render-to-string: ^6.7.0
+    proxy-compare: ^3.0.1
     prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
     '@internationalized/date': ^3.12.2
@@ -352,6 +353,7 @@ catalogs:
     three: 0.172.0
     type-fest: ^5.8.0
     typescript: ^5.9.3
+    valtio: ^2.3.2
     vite: ^8.1.5
     vite-plugin-solid: '3.0.0-next.5'
     # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with

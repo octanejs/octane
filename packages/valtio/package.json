@@ -1,0 +1,57 @@
+{
+  "name": "@octanejs/valtio",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Valtio bindings for the Octane renderer, built on valtio/vanilla with an Octane-native useSnapshot hook.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/valtio"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.ts",
+    "./react/utils": "./src/react/utils.ts",
+    "./vanilla": "./src/vanilla.ts",
+    "./vanilla/utils": "./src/vanilla/utils.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project valtio"
+  },
+  "dependencies": {
+    "proxy-compare": "catalog:default",
+    "valtio": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

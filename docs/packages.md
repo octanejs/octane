@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**52 publishable package(s), including 42 framework binding(s).**
+**53 publishable package(s), including 43 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -60,6 +60,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.14` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.10` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.11` | 2 |
+| `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.0` | 5 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.11` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.17` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.16` | 5 |
