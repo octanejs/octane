@@ -2,3 +2,9 @@
 export * from './store';
 export * from './popupStoreUtils';
 export * from './popupTriggerMap';
+export {
+	createInlineMiddleware,
+	getInlineRectTriggerProps,
+	updateInlineRectCoords,
+	type InlineRectCoords,
+} from './inlineRect';

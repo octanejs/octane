@@ -22,6 +22,7 @@ export const REASONS = {
 	scrub: 'scrub',
 	trackPress: 'track-press',
 	drag: 'drag',
+	disabled: 'disabled',
 	triggerHover: 'trigger-hover',
 	triggerFocus: 'trigger-focus',
 	outsidePress: 'outside-press',

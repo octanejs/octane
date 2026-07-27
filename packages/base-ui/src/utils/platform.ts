@@ -28,6 +28,13 @@ function isAndroid(): boolean {
 	return /Android/.test(ua());
 }
 
+function isMac(): boolean {
+	if (typeof navigator === 'undefined') {
+		return false;
+	}
+	return /^Mac/.test(navigator.platform ?? '') && !isIOS();
+}
+
 function isJsdom(): boolean {
 	return /jsdom/i.test(ua());
 }
@@ -39,6 +46,9 @@ export const platform = {
 		},
 		get android() {
 			return isAndroid();
+		},
+		get mac() {
+			return isMac();
 		},
 	},
 	engine: {

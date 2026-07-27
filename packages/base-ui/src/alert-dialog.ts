@@ -40,8 +40,10 @@ export const AlertDialog = {
 	Portal: Dialog.Portal,
 	Backdrop: Dialog.Backdrop,
 	Popup: Dialog.Popup,
+	Viewport: Dialog.Viewport,
 	Title: Dialog.Title,
 	Description: Dialog.Description,
 	Close: Dialog.Close,
 	createHandle: createAlertDialogHandle,
+	Handle: AlertDialogHandle,
 };

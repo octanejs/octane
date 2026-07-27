@@ -396,4 +396,137 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		await d.step('mount', () => {});
 		d.unmount();
 	});
+	it('Button: native button (type=button from useButton)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonBasic', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: disabled (native disabled attribute)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: focusableWhenDisabled (aria-disabled + stays a tab stop)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonFocusableWhenDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: nativeButton={false} render target (role + tabindex on the span)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonNonNative', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Button: disabled non-native render target (aria-disabled, no attribute)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ButtonNonNativeDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('DirectionProvider: useDirection defaults to ltr with no provider', async () => {
+		const d = await mountDifferential(FIXTURE, 'DirectionDefault', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('DirectionProvider: provides the configured direction to descendants', async () => {
+		const d = await mountDifferential(FIXTURE, 'DirectionRtl', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('DirectionProvider: the nearest provider wins when nested', async () => {
+		const d = await mountDifferential(FIXTURE, 'DirectionNested', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('CSPProvider: renders no DOM of its own and passes children through', async () => {
+		const d = await mountDifferential(FIXTURE, 'CspTransparent', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('useMediaQuery: reports the live matchMedia snapshot', async () => {
+		const d = await mountDifferential(FIXTURE, 'MediaQueryProbe', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('useMediaQuery: the live snapshot overrides defaultMatches', async () => {
+		const d = await mountDifferential(FIXTURE, 'MediaQueryDefaultMatches', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+	it('Dialog.Viewport: open (role=presentation container wrapping the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'DialogViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Dialog.Viewport: closed (unmounted with the rest of the portal subtree)', async () => {
+		const d = await mountDifferential(FIXTURE, 'DialogViewportClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Popover.Viewport: open (current-content container inside the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PopoverViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+	it('Tooltip: closed (trigger only, popup subtree unmounted)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip: open (portal + anchored positioner + popup + arrow)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip.Viewport: open (current-content container inside the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip: disabled trigger (data-trigger-disabled, no trigger identifier)', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipDisabledTrigger', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Tooltip.Provider: shares a delay group without rendering DOM', async () => {
+		const d = await mountDifferential(FIXTURE, 'TooltipProviderGroup', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+	it('PreviewCard: closed (link trigger only, popup subtree unmounted)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PreviewCardClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('PreviewCard: open (portal + backdrop + anchored positioner + popup + arrow)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PreviewCardOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('PreviewCard.Viewport: open (current-content container inside the popup)', async () => {
+		const d = await mountDifferential(FIXTURE, 'PreviewCardViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+	it("AlertDialog.Viewport: open (Dialog's viewport reached through the AlertDialog namespace)", async () => {
+		const d = await mountDifferential(FIXTURE, 'AlertDialogViewportOpen', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
 });
