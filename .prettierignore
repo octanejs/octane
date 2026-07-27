@@ -13,6 +13,9 @@ packages/shadcn/tests/differential/upstream/
 playground/octane/src/styles/style-nova.css
 **/dist/
 **/build/
+# Cargo build artifacts and Tauri's generated ACL schemas
+**/src-tauri/target/
+**/src-tauri/gen/
 **/.netlify/
 **/.nitro/
 **/.output/

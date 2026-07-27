@@ -1,0 +1,163 @@
+import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+	BareGreetingApp,
+	CommandState,
+	DynamicCommandApp,
+	GreetingApp,
+} from '../_fixtures/commands.tsrx';
+import { flush, mount } from '../_helpers';
+
+type Call = { cmd: string; args: any };
+
+function recordIPC(handler: (cmd: string, args: any) => unknown): Call[] {
+	const calls: Call[] = [];
+	mockIPC((cmd, args) => {
+		calls.push({ cmd, args });
+		return handler(cmd, args);
+	});
+	return calls;
+}
+
+const greetCalls = (calls: Call[]) => calls.filter((call) => call.cmd === 'greet');
+
+afterEach(async () => {
+	// Settle any command still in flight so it cannot resolve against the next
+	// test's mock bridge.
+	await flush();
+	clearMocks();
+	delete (window as any).__TAURI_INTERNALS__;
+});
+
+describe('useInvoke', () => {
+	it('suspends until the command resolves, then renders the payload', async () => {
+		recordIPC((_cmd, args) => `hello ${args.name}`);
+		const result = mount(GreetingApp, { name: 'ada' });
+
+		expect(result.find('#fallback').textContent).toBe('loading');
+		await flush();
+		expect(result.find('#greeting').textContent).toBe('hello ada');
+		result.unmount();
+	});
+
+	it('invokes once across the suspend and replay of one episode', async () => {
+		const calls = recordIPC(() => 'hello');
+		const result = mount(GreetingApp, { name: 'ada' });
+		await flush();
+
+		expect(greetCalls(calls)).toHaveLength(1);
+		result.unmount();
+	});
+
+	it('does not re-invoke when a re-render rebuilds an equal args literal', async () => {
+		const calls = recordIPC((_cmd, args) => `hello ${args.name}`);
+		const result = mount(GreetingApp, { name: 'ada' });
+		await flush();
+
+		result.update(GreetingApp, { name: 'ada' });
+		await flush();
+		expect(greetCalls(calls)).toHaveLength(1);
+		expect(result.find('#greeting').textContent).toBe('hello ada');
+		result.unmount();
+	});
+
+	it('runs a command called with neither args nor options', async () => {
+		const calls = recordIPC((cmd) => `ran ${cmd}`);
+		const result = mount(BareGreetingApp);
+		await flush();
+
+		expect(result.find('#greeting').textContent).toBe('ran greet');
+		// @tauri-apps/api defaults an omitted payload to an empty record.
+		expect(greetCalls(calls)[0].args).toEqual({});
+		result.unmount();
+	});
+
+	it('refetches on a changed command name even under explicit deps', async () => {
+		recordIPC((cmd) => `ran ${cmd}`);
+		const result = mount(DynamicCommandApp, { cmd: 'first', version: 1 });
+		await flush();
+		expect(result.find('#dynamic').textContent).toBe('ran first');
+
+		// Explicit deps extend the command name rather than replacing it, so a
+		// caller cannot accidentally pin the result of a command it stopped calling.
+		result.update(DynamicCommandApp, { cmd: 'second', version: 1 });
+		await flush();
+		expect(result.find('#dynamic').textContent).toBe('ran second');
+		result.unmount();
+	});
+
+	it('re-invokes when an argument value changes', async () => {
+		const calls = recordIPC((_cmd, args) => `hello ${args.name}`);
+		const result = mount(GreetingApp, { name: 'ada' });
+		await flush();
+
+		result.update(GreetingApp, { name: 'grace' });
+		await flush();
+		expect(greetCalls(calls)).toHaveLength(2);
+		expect(result.find('#greeting').textContent).toBe('hello grace');
+		result.unmount();
+	});
+
+	it('routes a rejected command to the error boundary', async () => {
+		recordIPC(() => Promise.reject(new Error('command failed')));
+		const result = mount(GreetingApp, { name: 'ada' });
+		await flush();
+
+		expect(result.find('#caught').textContent).toBe('Error');
+		result.unmount();
+	});
+
+	it('reports a missing Tauri host instead of hanging the boundary', async () => {
+		const result = mount(GreetingApp, { name: 'ada' });
+		await flush();
+
+		expect(result.find('#caught').textContent).toBe('TauriUnavailableError');
+		result.unmount();
+	});
+});
+
+describe('useInvokeState', () => {
+	it('starts pending and settles into the payload', async () => {
+		recordIPC((_cmd, args) => `hello ${args.name}`);
+		const result = mount(CommandState, { name: 'ada' });
+
+		expect(result.find('#status').textContent).toBe('pending');
+		await flush();
+		expect(result.find('#status').textContent).toBe('success');
+		expect(result.find('#data').textContent).toBe('hello ada');
+		result.unmount();
+	});
+
+	it('re-runs the command on refetch', async () => {
+		let greeting = 'first';
+		const calls = recordIPC(() => greeting);
+		const result = mount(CommandState, { name: 'ada' });
+		await flush();
+
+		greeting = 'second';
+		result.click('#refetch');
+		await flush();
+		expect(greetCalls(calls)).toHaveLength(2);
+		expect(result.find('#data').textContent).toBe('second');
+		result.unmount();
+	});
+
+	it('exposes a rejection without throwing', async () => {
+		recordIPC(() => Promise.reject(new TypeError('nope')));
+		const result = mount(CommandState, { name: 'ada' });
+		await flush();
+
+		expect(result.find('#status').textContent).toBe('error');
+		expect(result.find('#error').textContent).toBe('TypeError');
+		result.unmount();
+	});
+
+	it('reports a missing Tauri host as an error state', async () => {
+		const result = mount(CommandState, { name: 'ada' });
+		await flush();
+
+		expect(result.find('#status').textContent).toBe('error');
+		expect(result.find('#error').textContent).toBe('TauriUnavailableError');
+		result.unmount();
+	});
+});
