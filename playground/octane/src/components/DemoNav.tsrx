@@ -46,7 +46,7 @@ export function DemoNav(props: DemoNavProps) @{
 	const [query, setQuery] = useState('');
 	const groups = visibleGroups(query);
 
-	<Sidebar collapsible="">
+	<Sidebar collapsible="offcanvas">
 		<SidebarHeader>
 			<SidebarInput
 				type="search"

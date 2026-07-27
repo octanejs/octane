@@ -18,6 +18,34 @@ import {
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog.tsrx';
 import { AspectRatio } from '@/components/ui/aspect-ratio.tsrx';
+import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuTrigger,
+} from '@/components/ui/context-menu.tsrx';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card.tsrx';
+import {
+	Menubar,
+	MenubarContent,
+	MenubarItem,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarTrigger,
+} from '@/components/ui/menubar.tsrx';
+import {
+	NavigationMenu,
+	NavigationMenuContent,
+	NavigationMenuItem,
+	NavigationMenuLink,
+	NavigationMenuList,
+	NavigationMenuTrigger,
+} from '@/components/ui/navigation-menu.tsrx';
 import { Avatar, AvatarFallback, AvatarGroup, AvatarGroupCount } from '@/components/ui/avatar.tsrx';
 import { Badge } from '@/components/ui/badge.tsrx';
 import {
@@ -544,6 +572,108 @@ export function ShadcnDemo() @{
 						</AccordionItem>
 					</Accordion>
 				</CardContent>
+			</Card>
+			<Card>
+				<CardHeader>
+					<CardTitle>{'Context menu'}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<ContextMenu>
+						<ContextMenuTrigger
+							className="flex h-24 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground"
+						>{'Right-click here'}</ContextMenuTrigger>
+						<ContextMenuContent>
+							<ContextMenuLabel>{'Actions'}</ContextMenuLabel>
+							<ContextMenuItem onSelect={() => setLastAction('context: back')}>
+								{'Back'}
+								<ContextMenuShortcut>{'⌘['}</ContextMenuShortcut>
+							</ContextMenuItem>
+							<ContextMenuItem
+								onSelect={() => setLastAction('context: forward')}
+							>{'Forward'}</ContextMenuItem>
+							<ContextMenuSeparator />
+							<ContextMenuCheckboxItem
+								checked={statusBar}
+								onCheckedChange={(next: boolean) => setStatusBar(next)}
+							>{'Show status bar'}</ContextMenuCheckboxItem>
+						</ContextMenuContent>
+					</ContextMenu>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{'Hover card'}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<HoverCard>
+						<HoverCardTrigger
+							className="text-sm underline underline-offset-4"
+						>{'@octanejs'}</HoverCardTrigger>
+						<HoverCardContent>
+							<p className="text-sm">{'Hover cards open on intent, not on click.'}</p>
+						</HoverCardContent>
+					</HoverCard>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{'Menubar'}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<Menubar>
+						<MenubarMenu>
+							<MenubarTrigger>{'File'}</MenubarTrigger>
+							<MenubarContent>
+								<MenubarItem onSelect={() => setLastAction('menubar: new tab')}>
+									{'New tab'}
+									<MenubarShortcut>{'⌘T'}</MenubarShortcut>
+								</MenubarItem>
+								<MenubarSeparator />
+								<MenubarItem
+									onSelect={() => setLastAction('menubar: print')}
+								>{'Print'}</MenubarItem>
+							</MenubarContent>
+						</MenubarMenu>
+						<MenubarMenu>
+							<MenubarTrigger>{'Edit'}</MenubarTrigger>
+							<MenubarContent>
+								<MenubarItem onSelect={() => setLastAction('menubar: undo')}>{'Undo'}</MenubarItem>
+							</MenubarContent>
+						</MenubarMenu>
+					</Menubar>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{'Navigation menu'}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<NavigationMenu>
+						<NavigationMenuList>
+							<NavigationMenuItem>
+								<NavigationMenuTrigger>{'Docs'}</NavigationMenuTrigger>
+								<NavigationMenuContent>
+									<div className="grid w-56 gap-1 p-2">
+										<NavigationMenuLink href="#/counter">{'Counter demo'}</NavigationMenuLink>
+										<NavigationMenuLink href="#/suspense">{'Suspense demo'}</NavigationMenuLink>
+									</div>
+								</NavigationMenuContent>
+							</NavigationMenuItem>
+						</NavigationMenuList>
+					</NavigationMenu>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{'Sidebar'}</CardTitle>
+				</CardHeader>
+				<CardContent
+					className="text-sm text-muted-foreground"
+				>{'This playground’s own navigation IS the sidebar component — rail, mobile sheet, Cmd/Ctrl+B and the collapse cookie. A second SidebarProvider nested here would fight it for the same keyboard shortcut, so it is demonstrated by the shell instead of by a card.'}</CardContent>
 			</Card>
 		</div>
 
