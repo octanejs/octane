@@ -20,6 +20,7 @@ import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Menu } from '@octanejs/base-ui/menu';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
 import { PreviewCard } from '@octanejs/base-ui/preview-card';
 import { Button } from '@octanejs/base-ui/button';
@@ -970,5 +971,129 @@ export function AlertDialogViewportOpen() @{
 				</AlertDialog.Viewport>
 			</AlertDialog.Portal>
 		</AlertDialog.Root>
+	</div>
+}
+
+// Menu (CLOSED) — Root (wraps a FloatingTree) + Trigger only. Proves the Menu store, the parent
+// resolution, and the closed-trigger path (useClick/useFocus/hover, the list-navigation + typeahead
+// reference props Menu.Root merges into `inactiveTriggerProps`, and the trigger focus guards)
+// render byte-identically to real Base UI while closed.
+export function MenuClosed() @{
+	<Menu.Root>
+		<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+	</Menu.Root>
+}
+
+// Menu (OPEN) — the full anchored-dropdown path portaled into an in-fixture host div (so the rig's
+// `container.innerHTML` sees it). jsdom has zero-size rects, so `useAnchorPositioning` computes
+// deterministic default styles in BOTH octane and React — proving the Positioner (useFloating +
+// @floating-ui/dom middleware, with Menu's DROPDOWN_COLLISION_AVOIDANCE), the modal InternalBackdrop
+// and the Popup (role="menu", `data-rootownerid`, FloatingFocusManager) render byte-for-byte
+// identically to real Base UI, including the @floating-ui positioner styles.
+//
+// Controlled-open WITHOUT a trigger keeps the anchor stable: with a trigger, its
+// `element` ↔ `[guard, element, guard]` shape-flip on open remounts the button, which the
+// positioner observes as a transient "trigger change" (sets `data-instant`) — a mount-timing
+// artifact the rig can't see. The trigger's open/dismiss flow is covered by the behavior test on
+// `MenuInteractive` instead.
+export function MenuOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, non-modal) — `modal={false}` drops the InternalBackdrop and the scroll lock, so the
+// positioner/popup pair must still match Base UI exactly on the non-modal path.
+export function MenuOpenNonModal() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, explicit side/align) — the positioner's placement props flow through to the
+// @floating-ui computation and the `data-side`/`data-align` state attributes.
+export function MenuOpenPlacement() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner" side="right" align="start" sideOffset={8}>
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, disabled root) — `disabled` gates useDismiss/useListNavigation/useTypeahead off; the
+// rendered popup must still match.
+export function MenuOpenDisabled() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false} disabled>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (interactive) — a real trigger → open → dismiss flow, for behavior tests (focus management,
+// keyboard open/close and the store's roving-focus plumbing aren't visible in innerHTML, so they
+// can't be differential-tested).
+export function MenuInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Root modal={false}>
+			<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (DETACHED trigger via a handle) — the trigger sits OUTSIDE `Menu.Root` and is associated
+// with it only through the shared `Menu.Handle`. This is the path where `MenuStore.setOpen` must
+// reach `Menu.Root`'s `setOpen`: the store routes it through the floating root context's event bus
+// rather than applying it directly, precisely so a holder of the store alone (a detached trigger,
+// or `handle.open()`/`handle.close()`) drives the one Root that owns the open-change sequence.
+export function MenuWithHandle({ handle }: { handle: any }) @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Trigger handle={handle} id="detached-menu-trigger" className="menu-trigger">
+			Open menu
+		</Menu.Trigger>
+		<Menu.Root handle={handle} modal={false}>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
 	</div>
 }

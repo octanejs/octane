@@ -10,6 +10,46 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3f STAGE 1 — Menu open/close + roving-focus path (2026-07-27). Green: 108 base-ui tests
+> (81 differential + 27 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage
+> moves 28/43 → **29/43**.
+>
+> `packages/base-ui/src/menu.ts` (~1,750 loc) ports `store/MenuStore` + `store/MenuHandle`,
+> `root/MenuRoot` + `MenuRootContext`, `trigger/`, `portal/`, `positioner/` and `popup/`, plus
+> `utils/findRootOwnerId` and the `MenuOpenEventDetails` type. This is the first CONSUMER of the
+> Phase 3e list-navigation infrastructure, which merged (#308) deliberately untested because a
+> differential test needs a rendered component: `MenuRoot` wires `useListNavigation` +
+> `useTypeahead` to the popup store, and `Menu.Positioner` wraps the popup in the `CompositeList`
+> that feeds their element/label refs. **3e needed no repairs** — it works as ported.
+>
+> Supporting additions: `useOpenInteractionType` (the stateful `openMethod` + trigger-props pair;
+> only `useOpenMethodTriggerProps` had been ported, because Popover keeps `openMethod` in its
+> store), `DROPDOWN_COLLISION_AVOIDANCE` / `TYPEAHEAD_RESET_MS` / `PATIENT_CLICK_THRESHOLD` in
+> `utils/constants` (Popover's local copy of the last one now imports it), and the `cancel-open` /
+> `sibling-open` reasons.
+>
+> `MenubarContext` and `ContextMenuRootContext` land as CONTEXT-ONLY modules ahead of their
+> components (stage 4). `Menu`'s `parent` union branches on them in ~a dozen places; having the
+> contexts now let every branch be transcribed verbatim instead of stubbed and re-threaded later.
+> Nothing provides them yet, so those branches are inert.
+>
+> Rig limitation found and documented: a `Menu.Popup` takes focus on open, and the differential rig
+> mounts both runtimes into ONE jsdom document. Whichever popup is focused last makes the other
+> runtime's portal see an outward `focusout`, and `FloatingPortal`'s non-modal tab management
+> answers with `disableFocusInside(portalNode)` — stamping `tabindex="-1" data-tabindex="0"` on
+> that portal's focus guards. Both runtimes run identical code; the asymmetry is one
+> `document.activeElement` for two apps. `parity.test.ts` normalises the guards' tabindex away for
+> the open-menu fixtures and byte-compares everything else. (Popover sidesteps the same issue by
+> running a modal focus manager, which turns portal tab management off.)
+>
+> Not in this stage: `Menu.Item` and the rest of the item family, submenus, `Menubar`,
+> `ContextMenu`, `Menu.Viewport`/`Arrow`/`Backdrop`/`Separator`, and `menu/utils/itemMapping`
+> (which depends on `MenuCheckboxItemDataAttributes` and lands with `CheckboxItem` in stage 2).
+> Item-level roving focus and typeahead matching are therefore untested until stage 2 — stage 1's
+> behavior tests cover the layer below: arrow-key open from the trigger, Escape dismiss, click
+> toggle, the ARIA contract, `aria-orientation` reaching the popup from `useListNavigation`, and
+> focus entering the popup and returning to the trigger.
+
 > **Phases 3a–3d COMPLETE (2026-07-26). Green: 89 base-ui tests (76 differential + 13 behavior),
 > full monorepo suite green, typecheck + format clean.** Subpath coverage moved from 22/43 to
 > **28/43**.
@@ -617,12 +657,23 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
   `useClientPoint` and `popups/inlineRect` they depend on. ✅
 - **Phase 3e — List navigation + typeahead** (~1,400 loc): `useListNavigation`,
   `gridNavigation` (both copies), `useTypeahead`, `RequestQueue`,
-  `TimeoutManager`, `useMixedToggleClickHandler`, `getPseudoElementBounds`.
-- **Phase 3f — Menu family** (~5,000 loc): `Menu` (incl. `SubmenuRoot`,
-  `CheckboxItem`, `RadioGroup`/`RadioItem`, `Viewport`), then `Menubar`, then
-  `ContextMenu` (+ `useClientPoint`). *Exit:* differential on an open menu,
-  behavior tests for roving focus, typeahead, submenu open/close, checkbox/radio
-  item semantics.
+  `TimeoutManager`, `useMixedToggleClickHandler`, `getPseudoElementBounds`. ✅
+- **Phase 3f — Menu family** (~5,000 loc), in four stages:
+  - *Stage 1* (DONE, ~1,750 loc): `MenuStore`/`MenuHandle`, `findRootOwnerId`,
+    `Root`, `Trigger`, `Portal`, `Positioner`, `Popup` — the open/close +
+    roving-focus path, and the first point a differential test can render an
+    OPEN menu. Exercises Phase 3e's `useListNavigation`/`useTypeahead`. ✅
+  - *Stage 2* (~1,400 loc): `Item`, `CheckboxItem`(+`Indicator`),
+    `RadioGroup`/`RadioItem`(+`Indicator`), `Group`/`GroupLabel`, `LinkItem`,
+    `Separator`, `Arrow`, `Backdrop`, `Viewport`, and
+    `menu/utils/stateAttributesMapping`. *Exit:* differential on a populated
+    open menu, behavior tests for roving focus, typeahead, and checkbox/radio
+    item semantics.
+  - *Stage 3* (~340 loc): `SubmenuRoot` + `SubmenuTrigger`. *Exit:* behavior
+    tests for submenu open/close and the parent/sibling close relay.
+  - *Stage 4* (~650 loc): `Menubar` and `ContextMenu` (+ `useClientPoint`),
+    which fill in the already-transcribed `menubar` / `context-menu` parent
+    branches and provide the two context-only modules stage 1 landed.
 - **Phase 3g — Toast** (~4,200 loc): `useSwipeDismiss` + `focusVisible` + the 11
   Toast parts. `useSwipeDismiss` is shared with Drawer, so it lands here.
   *Exit:* differential on a rendered toast, behavior tests for timeout dismiss,

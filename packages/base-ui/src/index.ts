@@ -17,6 +17,7 @@ export { Field } from './field';
 export { Fieldset } from './fieldset';
 export { Form } from './form';
 export { Input } from './input';
+export { Menu } from './menu';
 export { Meter } from './meter';
 export { NumberField } from './number-field';
 export { Progress } from './progress';

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Menu } from '@octanejs/base-ui/menu';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
 import { PreviewCard } from '@octanejs/base-ui/preview-card';
 
@@ -91,6 +92,12 @@ const EXPECTED: Record<string, [Record<string, unknown>, string[]]> = {
 			'Handle',
 		],
 	],
+	// Menu lands in stages (Phase 3f). This list is the STAGE 1 surface — the open/close +
+	// roving-focus path. `Item`, `CheckboxItem`, `RadioGroup`/`RadioItem`, `Group`/`GroupLabel`,
+	// `LinkItem`, `Separator`, `Arrow`, `Backdrop`, `Viewport`, `SubmenuRoot`/`SubmenuTrigger` get
+	// appended here as their stages land; the list must reach upstream's full `index.parts.ts` by
+	// the end of Phase 3f.
+	Menu: [Menu, ['Root', 'Trigger', 'Portal', 'Positioner', 'Popup', 'createHandle', 'Handle']],
 };
 
 describe('@octanejs/base-ui — component namespaces expose every upstream part', () => {
