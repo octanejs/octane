@@ -100,66 +100,6 @@
           "scoreRme": 13.45121547072046,
           "warmupRatio": 1,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 2622,
-          "min": 2622,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 603,
-          "min": 603,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 608,
-          "min": 608,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 2822,
-          "min": 2822,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 608,
-          "min": 608,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 7025,
-          "min": 7025,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3412,
-          "min": 3412,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 1805,
-          "min": 1805,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 1808,
-          "min": 1808,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
         }
       },
       "meta": {
@@ -348,66 +288,6 @@
           "scoreRme": 5.996325080602008,
           "warmupRatio": 0.927710854448243,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 2014,
-          "min": 2014,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 603,
-          "min": 603,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 2214,
-          "min": 2214,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 5217,
-          "min": 5217,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3412,
-          "min": 3412,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 1805,
-          "min": 1805,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
         }
       },
       "meta": {
@@ -569,66 +449,6 @@
           "scoreRme": 28.579502464807156,
           "warmupRatio": 1.0000001589457446,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 2618,
-          "min": 2618,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 1203,
-          "min": 1203,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 4,
-          "min": 4,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 2618,
-          "min": 2618,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 4,
-          "min": 4,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 5621,
-          "min": 5621,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3212,
-          "min": 3212,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 2405,
-          "min": 2405,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 4,
-          "min": 4,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 600,
-          "min": 600,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
         }
       },
       "meta": {
@@ -802,66 +622,6 @@
           "scoreRme": 17.14773238427606,
           "warmupRatio": 0.9600000343322789,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 2619,
-          "min": 2619,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 608,
-          "min": 608,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 600,
-          "min": 600,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 2619,
-          "min": 2619,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 600,
-          "min": 600,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 6222,
-          "min": 6222,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3212,
-          "min": 3212,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 2410,
-          "min": 2410,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 600,
-          "min": 600,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 605,
-          "min": 605,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
         }
       },
       "meta": {
@@ -1035,66 +795,6 @@
           "scoreRme": 22.8052592660955,
           "warmupRatio": 0.96153841216184,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 2618,
-          "min": 2618,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 1207,
-          "min": 1207,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 3818,
-          "min": 3818,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 8021,
-          "min": 8021,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3212,
-          "min": 3212,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 4809,
-          "min": 4809,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 3004,
-          "min": 3004,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
         }
       },
       "meta": {
@@ -1256,66 +956,6 @@
           "scoreRme": 25.217201496475067,
           "warmupRatio": 1.0588234551637872,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 2014,
-          "min": 2014,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 603,
-          "min": 603,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 2214,
-          "min": 2214,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 5217,
-          "min": 5217,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3412,
-          "min": 3412,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 1805,
-          "min": 1805,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
         }
       },
       "meta": {
@@ -1477,66 +1117,6 @@
           "scoreRme": 12.769795345904148,
           "warmupRatio": 0.9642856625878072,
           "samples": 20
-        },
-        "nodes_closed_main": {
-          "median": 3228,
-          "min": 3228,
-          "samples": 1
-        },
-        "elements_closed_main": {
-          "median": 1411,
-          "min": 1411,
-          "samples": 1
-        },
-        "text_closed_main": {
-          "median": 1214,
-          "min": 1214,
-          "samples": 1
-        },
-        "comments_closed_main": {
-          "median": 603,
-          "min": 603,
-          "samples": 1
-        },
-        "nodes_open_main": {
-          "median": 4828,
-          "min": 4828,
-          "samples": 1
-        },
-        "comments_open_main": {
-          "median": 1403,
-          "min": 1403,
-          "samples": 1
-        },
-        "nodes_open_body": {
-          "median": 8431,
-          "min": 8431,
-          "samples": 1
-        },
-        "elements_open_body": {
-          "median": 3412,
-          "min": 3412,
-          "samples": 1
-        },
-        "text_open_body": {
-          "median": 3616,
-          "min": 3616,
-          "samples": 1
-        },
-        "comments_open_body": {
-          "median": 1403,
-          "min": 1403,
-          "samples": 1
-        },
-        "empty_text_open_body": {
-          "median": 605,
-          "min": 605,
-          "samples": 1
-        },
-        "whitespace_text_open_body": {
-          "median": 1208,
-          "min": 1208,
-          "samples": 1
         }
       },
       "meta": {

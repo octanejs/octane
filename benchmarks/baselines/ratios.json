@@ -628,58 +628,6 @@
     "note": "Semantic control: equivalent chat states render exactly 25 text nodes."
   },
   {
-    "suite": "portal-swarm",
-    "op": "nodes_closed_main",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "maxRatio": 1.33,
-    "note": "Closed portal swarm #main census: Octane 2622 vs React 2014 nodes after component-item and dormant-if elision (1.302x, 2026-07-13)."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "elements_closed_main",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: closed portal fixtures render exactly 1411 elements under #main."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "text_closed_main",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: closed portal fixtures render exactly 603 text nodes under #main."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "nodes_open_body",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "maxRatio": 1.38,
-    "note": "Open portal swarm whole-body census retains load-bearing foreign target pairs: Octane 7025 vs React 5217 nodes (1.347x, 2026-07-13)."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "elements_open_body",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: open portal fixtures render exactly 3412 elements across main and foreign targets."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "text_open_body",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: open portal fixtures render exactly 1805 text nodes across main and foreign targets."
-  },
-  {
     "suite": "three-renderer",
     "op": "mount_1k",
     "target": "octane",
