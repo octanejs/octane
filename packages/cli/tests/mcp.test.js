@@ -214,6 +214,40 @@ describe('octane mcp status', () => {
 });
 
 describe('octane mcp remove', () => {
+	it('writes nothing under --dry-run', async () => {
+		const { root } = fixture();
+		const home = fixture({
+			'.cursor/mcp.json': { mcpServers: { octane: { command: 'npx' } } },
+		}).root;
+		const before = readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8');
+
+		const result = await runCli(['mcp', 'remove', 'cursor', '--cwd', root, '--dry-run', '--json'], {
+			env: { HOME: home },
+			exec: fakeExec([]),
+		});
+
+		expect(result.json().dryRun).toBe(true);
+		expect(readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).toBe(before);
+	});
+
+	it('forwards the scope to the client CLI', async () => {
+		// `claude mcp remove` without --scope clears whichever scope the entry
+		// happens to be in, which need not be the one we just reported on.
+		const { root, write } = fixture();
+		write('.mcp.json', { mcpServers: { octane: { command: 'npx' } } });
+		const exec = fakeExec(['claude']);
+
+		await runCli(
+			['mcp', 'remove', 'claude', '--scope', 'project', '--cwd', root, '--yes', '--json'],
+			{
+				exec,
+			},
+		);
+
+		expect(exec.calls).toHaveLength(1);
+		expect(exec.calls[0].args).toEqual(['mcp', 'remove', '--scope', 'project', 'octane']);
+	});
+
 	it('removes the entry and leaves the rest of the file alone', async () => {
 		const { root } = fixture();
 		const home = fixture({

@@ -41,6 +41,20 @@ export default defineCommand({
 			return { json: { ok: true, removed: [] } };
 		}
 
+		if (ctx.dryRun) {
+			for (const state of configured) {
+				const args = state.cliAvailable ? state.client.cliRemoveArgs(SERVER_NAME, scope) : null;
+				ctx.ui.note(`${state.client.label} (${scope})`, [
+					args
+						? `would run: ${state.client.cli} ${args.join(' ')}`
+						: `would rewrite: ${state.configPath}`,
+				]);
+			}
+			return {
+				json: { ok: true, dryRun: true, removed: configured.map((state) => state.client.id) },
+			};
+		}
+
 		const confirmed = await ctx.ui.confirm({
 			message: `Remove "${SERVER_NAME}" from ${configured.map((s) => s.client.label).join(', ')}?`,
 			flag: '--yes',
@@ -53,7 +67,8 @@ export default defineCommand({
 
 		for (const state of configured) {
 			const { client } = state;
-			const args = client.cli && state.cliAvailable ? client.cliRemoveArgs(SERVER_NAME) : null;
+			const args =
+				client.cli && state.cliAvailable ? client.cliRemoveArgs(SERVER_NAME, scope) : null;
 
 			if (client.cli && args) {
 				const result = await ctx.exec.run(client.cli, args, { cwd: ctx.cwd });

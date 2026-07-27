@@ -21,7 +21,7 @@ import { parseJsonc } from '../../kernel/jsonc.js';
  * @property {Scope[]} scopes
  * @property {(scope: Scope, paths: Paths) => string} configPath
  * @property {(name: string, entry: import('./server.js').ServerEntry, scope: Scope) => string[] | null} cliArgs
- * @property {(name: string) => string[] | null} cliRemoveArgs
+ * @property {(name: string, scope: Scope) => string[] | null} cliRemoveArgs
  * @property {(text: string, name: string) => unknown | null} readServer current entry, or null
  * @property {(text: string, name: string, entry: import('./server.js').ServerEntry) => string} write
  * @property {(text: string, name: string) => string} remove
@@ -242,7 +242,10 @@ export const CLIENTS = [
 			entry.command,
 			...entry.args,
 		],
-		cliRemoveArgs: (name) => ['mcp', 'remove', name],
+		// Scope is forwarded: `claude mcp remove` without it removes from
+		// whichever scope the entry happens to exist in, which need not be the
+		// one `mcp remove --scope` just reported.
+		cliRemoveArgs: (name, scope) => ['mcp', 'remove', '--scope', scope, name],
 	}),
 	codex,
 	jsonClient({
