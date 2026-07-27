@@ -1,5 +1,36 @@
 # @octanejs/base-ui
 
+## 0.1.15
+
+### Patch Changes
+
+- 1f0e347: Extend the Base UI port with the hover/focus interaction layer, the popup
+  viewport, and six new components.
+
+  - New components: `Button`, `DirectionProvider`, `CSPProvider`, `useMediaQuery`,
+    `Tooltip` and `PreviewCard`.
+  - New parts on existing components: `Dialog.Viewport` and `Popover.Viewport`.
+  - `openOnHover` on `Popover` now works. It previously accepted the prop and did
+    nothing, because the hover interaction was stubbed.
+
+  Also fixes a `Popover.Root` faithfulness bug: it rendered its interaction
+  component as a wrapper around the children rather than as a sibling, so the
+  wrapper's type changed on every open and rebuilt the whole subtree — including
+  the trigger, whose event listeners and store registration were left pointing at
+  a detached element. `Dialog.Root` used the same wrapper shape and now renders the
+  interactions as a sibling too, matching Base UI.
+
+- Updated dependencies [bd31a2d]
+- Updated dependencies [9e0ef45]
+- Updated dependencies [dea219b]
+- Updated dependencies [2374980]
+- Updated dependencies [2374980]
+- Updated dependencies [ac687f8]
+- Updated dependencies [7997d39]
+- Updated dependencies [eb69cb6]
+  - octane@0.1.17
+  - @octanejs/floating-ui@0.1.16
+
 ## 0.1.14
 
 ### Patch Changes

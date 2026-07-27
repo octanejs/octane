@@ -63,8 +63,8 @@
       "type": "registry:ui",
       "title": "Accordion",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -82,7 +82,7 @@
       "type": "registry:ui",
       "title": "Alert Dialog",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -120,7 +120,7 @@
       "type": "registry:ui",
       "title": "Aspect Ratio",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "files": [
         {
@@ -135,7 +135,7 @@
       "type": "registry:ui",
       "title": "Avatar",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -153,7 +153,7 @@
       "type": "registry:ui",
       "title": "Badge",
       "dependencies": [
-        "@octanejs/radix@0.1.15",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -173,8 +173,8 @@
       "type": "registry:ui",
       "title": "Breadcrumb",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -192,7 +192,7 @@
       "type": "registry:ui",
       "title": "Button",
       "dependencies": [
-        "@octanejs/radix@0.1.15",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -228,8 +228,8 @@
       "type": "registry:ui",
       "title": "Checkbox",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -247,7 +247,7 @@
       "type": "registry:ui",
       "title": "Collapsible",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "files": [
         {
@@ -262,8 +262,8 @@
       "type": "registry:ui",
       "title": "Context Menu",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -281,8 +281,8 @@
       "type": "registry:ui",
       "title": "Dialog",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -301,8 +301,8 @@
       "type": "registry:ui",
       "title": "Dropdown Menu",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -358,7 +358,7 @@
       "type": "registry:ui",
       "title": "Hover Card",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -392,7 +392,7 @@
       "type": "registry:ui",
       "title": "Item",
       "dependencies": [
-        "@octanejs/radix@0.1.15",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -428,7 +428,7 @@
       "type": "registry:ui",
       "title": "Label",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -446,8 +446,8 @@
       "type": "registry:ui",
       "title": "Menubar",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -465,7 +465,7 @@
       "type": "registry:ui",
       "title": "Native Select",
       "dependencies": [
-        "@octanejs/lucide@0.1.11"
+        "@octanejs/lucide@0.1.12"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -483,8 +483,8 @@
       "type": "registry:ui",
       "title": "Navigation Menu",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15",
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -503,7 +503,7 @@
       "type": "registry:ui",
       "title": "Pagination",
       "dependencies": [
-        "@octanejs/lucide@0.1.11"
+        "@octanejs/lucide@0.1.12"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -522,7 +522,7 @@
       "type": "registry:ui",
       "title": "Popover",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -540,7 +540,7 @@
       "type": "registry:ui",
       "title": "Progress",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -558,8 +558,8 @@
       "type": "registry:ui",
       "title": "Radio Group",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -577,7 +577,7 @@
       "type": "registry:ui",
       "title": "Scroll Area",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -595,8 +595,8 @@
       "type": "registry:ui",
       "title": "Select",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -614,7 +614,7 @@
       "type": "registry:ui",
       "title": "Separator",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -632,8 +632,8 @@
       "type": "registry:ui",
       "title": "Sheet",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -652,8 +652,8 @@
       "type": "registry:ui",
       "title": "Sidebar",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/radix@0.1.15",
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -695,7 +695,7 @@
       "type": "registry:ui",
       "title": "Slider",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -713,8 +713,8 @@
       "type": "registry:ui",
       "title": "Sonner",
       "dependencies": [
-        "@octanejs/lucide@0.1.11",
-        "@octanejs/sonner@0.1.11"
+        "@octanejs/lucide@0.1.12",
+        "@octanejs/sonner@0.1.12"
       ],
       "files": [
         {
@@ -729,7 +729,7 @@
       "type": "registry:ui",
       "title": "Spinner",
       "dependencies": [
-        "@octanejs/lucide@0.1.11"
+        "@octanejs/lucide@0.1.12"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -747,7 +747,7 @@
       "type": "registry:ui",
       "title": "Switch",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -780,7 +780,7 @@
       "type": "registry:ui",
       "title": "Tabs",
       "dependencies": [
-        "@octanejs/radix@0.1.15",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -815,7 +815,7 @@
       "type": "registry:ui",
       "title": "Toggle Group",
       "dependencies": [
-        "@octanejs/radix@0.1.15",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -835,7 +835,7 @@
       "type": "registry:ui",
       "title": "Toggle",
       "dependencies": [
-        "@octanejs/radix@0.1.15",
+        "@octanejs/radix@0.1.16",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -854,7 +854,7 @@
       "type": "registry:ui",
       "title": "Tooltip",
       "dependencies": [
-        "@octanejs/radix@0.1.15"
+        "@octanejs/radix@0.1.16"
       ],
       "registryDependencies": [
         "@octane/utils"
