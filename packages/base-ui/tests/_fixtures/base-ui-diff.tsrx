@@ -20,6 +20,12 @@ import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Tooltip } from '@octanejs/base-ui/tooltip';
+import { PreviewCard } from '@octanejs/base-ui/preview-card';
+import { Button } from '@octanejs/base-ui/button';
+import { CSPProvider } from '@octanejs/base-ui/csp-provider';
+import { DirectionProvider, useDirection } from '@octanejs/base-ui/direction-provider';
+import { useMediaQuery } from '@octanejs/base-ui/unstable-use-media-query';
 
 // Self-contained differential fixtures: the SAME source runs on octane (via
 // @octanejs/base-ui/<sub>) AND on React (the setup rewrites imports to the real
@@ -29,6 +35,19 @@ const hrFn = (props) => <hr {...props} />;
 const boldFn = (props) => <b {...props} />;
 const orientClass = (state) => 'sep-' + state.orientation;
 const legendSection = (props) => <section {...props} />;
+const buttonSpanFn = (props) => <span {...props} />;
+
+// Phase-3a probes: these hooks return values with no DOM of their own, so each probe
+// renders the value as text and the rig compares it byte-for-byte.
+function DirectionProbe() @{
+	<span className="dir">{useDirection() as string}</span>
+}
+
+function MediaProbe(props) @{
+	<span className="mq">{(useMediaQuery('(min-width: 600px)', {
+		defaultMatches: props.defaultMatches,
+	}) ? 'true' : 'false') as string}</span>
+}
 
 // Default (horizontal) — proves the intrinsic-tag render + state→data-* + role/aria.
 export function SeparatorDefault() @{
@@ -602,4 +621,354 @@ export function FormBasic() @{
 			<Field.Control className="f-ctrl" name="email" />
 		</Field.Root>
 	</Form>
+}
+
+// ── Phase 3a ────────────────────────────────────────────────────────────────
+
+// Button — a native <button> with type="button" from useButton.
+export function ButtonBasic() @{
+	<Button className="btn">Click me</Button>
+}
+
+// Disabled button — the native `disabled` attribute, no aria-disabled.
+export function ButtonDisabled() @{
+	<Button className="btn" disabled>Click me</Button>
+}
+
+// focusableWhenDisabled — the native attribute is dropped in favour of
+// aria-disabled + a real tab stop, so the button stays reachable.
+export function ButtonFocusableWhenDisabled() @{
+	<Button className="btn" disabled focusableWhenDisabled>Click me</Button>
+}
+
+// Non-native render target — `nativeButton={false}` adds role/tabindex to the <span>.
+export function ButtonNonNative() @{
+	<Button className="btn" nativeButton={false} render={buttonSpanFn}>Click me</Button>
+}
+
+// A disabled non-native button reports aria-disabled instead of the attribute.
+export function ButtonNonNativeDisabled() @{
+	<Button className="btn" nativeButton={false} disabled render={buttonSpanFn}>Click me</Button>
+}
+
+// useDirection defaults to 'ltr' with no provider above it.
+export function DirectionDefault() @{
+	<DirectionProbe />
+}
+
+// DirectionProvider feeds the configured direction to descendants.
+export function DirectionRtl() @{
+	<DirectionProvider direction="rtl">
+		<DirectionProbe />
+	</DirectionProvider>
+}
+
+// Nested providers — the nearest one wins.
+export function DirectionNested() @{
+	<DirectionProvider direction="rtl">
+		<DirectionProvider direction="ltr">
+			<DirectionProbe />
+		</DirectionProvider>
+	</DirectionProvider>
+}
+
+// CSPProvider renders no DOM of its own and passes children straight through.
+export function CspTransparent() @{
+	<CSPProvider nonce="test-nonce">
+		<span className="csp-child">child</span>
+	</CSPProvider>
+}
+
+// useMediaQuery — jsdom's matchMedia never matches, so both renderers report false.
+export function MediaQueryProbe() @{
+	<MediaProbe />
+}
+
+// `defaultMatches` is only the pre-subscription value; the live snapshot still wins.
+export function MediaQueryDefaultMatches() @{
+	<MediaProbe defaultMatches={true} />
+}
+
+// Popover (open-on-hover) — `openOnHover` with no rest delay, for the hover behavior tests.
+// Hover open/close is timing- and pointer-driven, so it is not differential-testable.
+export function PopoverHover() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pop-host" />
+		<Popover.Root>
+			<Popover.Trigger className="pop-trigger" openOnHover delay={0} closeDelay={0}>
+				Open
+			</Popover.Trigger>
+			<Popover.Portal container={hostRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Close className="pop-close">Close</Popover.Close>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}
+
+// Popover (open-on-hover with a close delay) — leaving the trigger must not close it until the
+// delay elapses.
+export function PopoverHoverCloseDelay() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pop-host" />
+		<Popover.Root>
+			<Popover.Trigger className="pop-trigger" openOnHover delay={0} closeDelay={200}>
+				Open
+			</Popover.Trigger>
+			<Popover.Portal container={hostRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Close className="pop-close">Close</Popover.Close>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}
+
+// Dialog.Viewport — the scrollable positioning container between the portal and the popup.
+// It carries role="presentation", `hidden` while unmounted, and the nested/open state attributes.
+export function DialogViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Dialog.Root defaultOpen>
+			<Dialog.Portal container={containerRef}>
+				<Dialog.Backdrop className="dlg-backdrop" />
+				<Dialog.Viewport className="dlg-viewport">
+					<Dialog.Popup className="dlg-popup">
+						<Dialog.Title className="dlg-title">Title</Dialog.Title>
+						<Dialog.Close className="dlg-close">Close</Dialog.Close>
+					</Dialog.Popup>
+				</Dialog.Viewport>
+			</Dialog.Portal>
+		</Dialog.Root>
+	</div>
+}
+
+// A closed Dialog.Viewport stays mounted only when the portal keeps it mounted; by default the
+// whole subtree unmounts, so this renders just the trigger.
+export function DialogViewportClosed() @{
+	<Dialog.Root>
+		<Dialog.Trigger className="dlg-trigger">Open</Dialog.Trigger>
+		<Dialog.Portal>
+			<Dialog.Viewport className="dlg-viewport">
+				<Dialog.Popup className="dlg-popup">Body</Dialog.Popup>
+			</Dialog.Viewport>
+		</Dialog.Portal>
+	</Dialog.Root>
+}
+
+// Popover.Viewport — the content-transition container inside the popup. With a single trigger it
+// never transitions, so it renders the current-content container around the children.
+export function PopoverViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Popover.Root open modal>
+			<Popover.Portal container={containerRef}>
+				<Popover.Positioner className="pop-positioner">
+					<Popover.Popup className="pop-popup">
+						<Popover.Viewport className="pop-viewport">
+							<Popover.Title className="pop-title">Title</Popover.Title>
+							<Popover.Close className="pop-close">Close</Popover.Close>
+						</Popover.Viewport>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	</div>
+}
+
+// Tooltip (CLOSED) — Root + Trigger only. The popup subtree is unmounted while closed, so this is
+// just the trigger button carrying the tooltip-trigger identifier attribute.
+export function TooltipClosed() @{
+	<Tooltip.Root>
+		<Tooltip.Trigger className="tip-trigger">Hover me</Tooltip.Trigger>
+	</Tooltip.Root>
+}
+
+// Tooltip (OPEN, controlled) — Portal/Positioner/Popup/Arrow. `open` is controlled and there is no
+// trigger, so the anchored positioner has a stable (absent) anchor and the markup is comparable.
+export function TooltipOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Tooltip.Root open>
+			<Tooltip.Portal container={containerRef}>
+				<Tooltip.Positioner className="tip-positioner">
+					<Tooltip.Popup className="tip-popup">
+						<Tooltip.Arrow className="tip-arrow" />
+						Tooltip content
+					</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// Tooltip with a Viewport — the content-transition container inside the popup.
+export function TooltipViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Tooltip.Root open>
+			<Tooltip.Portal container={containerRef}>
+				<Tooltip.Positioner className="tip-positioner">
+					<Tooltip.Popup className="tip-popup">
+						<Tooltip.Viewport className="tip-viewport">Tooltip content</Tooltip.Viewport>
+					</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// A disabled trigger drops the tooltip-trigger identifier and gains data-trigger-disabled.
+export function TooltipDisabledTrigger() @{
+	<Tooltip.Root>
+		<Tooltip.Trigger className="tip-trigger" disabled>Hover me</Tooltip.Trigger>
+	</Tooltip.Root>
+}
+
+// Tooltip.Provider — shares one delay across a group; it renders no DOM of its own.
+export function TooltipProviderGroup() @{
+	<Tooltip.Provider delay={100} closeDelay={50}>
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-trigger">One</Tooltip.Trigger>
+		</Tooltip.Root>
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-trigger-2">Two</Tooltip.Trigger>
+		</Tooltip.Root>
+	</Tooltip.Provider>
+}
+
+// Tooltip (interactive) — a real trigger with no open delay, for the hover behavior test.
+export function TooltipInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="tip-host" />
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-trigger" delay={0} closeDelay={0}>
+				Hover me
+			</Tooltip.Trigger>
+			<Tooltip.Portal container={hostRef}>
+				<Tooltip.Positioner className="tip-positioner">
+					<Tooltip.Popup className="tip-popup">Tooltip content</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// PreviewCard (CLOSED) — Root + Trigger only. The trigger is an <a>, and the popup subtree is
+// unmounted while closed.
+export function PreviewCardClosed() @{
+	<PreviewCard.Root>
+		<PreviewCard.Trigger className="pc-trigger" href="/profile">Base UI</PreviewCard.Trigger>
+	</PreviewCard.Root>
+}
+
+// PreviewCard (OPEN, controlled) — Portal/Positioner/Popup/Arrow plus the backdrop.
+export function PreviewCardOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<PreviewCard.Root open>
+			<PreviewCard.Portal container={containerRef}>
+				<PreviewCard.Backdrop className="pc-backdrop" />
+				<PreviewCard.Positioner className="pc-positioner">
+					<PreviewCard.Popup className="pc-popup">
+						<PreviewCard.Arrow className="pc-arrow" />
+						Preview content
+					</PreviewCard.Popup>
+				</PreviewCard.Positioner>
+			</PreviewCard.Portal>
+		</PreviewCard.Root>
+	</div>
+}
+
+// PreviewCard with a Viewport — the content-transition container inside the popup.
+export function PreviewCardViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<PreviewCard.Root open>
+			<PreviewCard.Portal container={containerRef}>
+				<PreviewCard.Positioner className="pc-positioner">
+					<PreviewCard.Popup className="pc-popup">
+						<PreviewCard.Viewport className="pc-viewport">Preview content</PreviewCard.Viewport>
+					</PreviewCard.Popup>
+				</PreviewCard.Positioner>
+			</PreviewCard.Portal>
+		</PreviewCard.Root>
+	</div>
+}
+
+// PreviewCard (interactive) — a real trigger with no open/close delay, for the hover behavior test.
+export function PreviewCardInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="pc-host" />
+		<PreviewCard.Root>
+			<PreviewCard.Trigger className="pc-trigger" href="/profile" delay={0} closeDelay={0}>
+				Base UI
+			</PreviewCard.Trigger>
+			<PreviewCard.Portal container={hostRef}>
+				<PreviewCard.Positioner className="pc-positioner">
+					<PreviewCard.Popup className="pc-popup">Preview content</PreviewCard.Popup>
+				</PreviewCard.Positioner>
+			</PreviewCard.Portal>
+		</PreviewCard.Root>
+	</div>
+}
+
+// Two tooltips with NO Tooltip.Provider around them. Base UI's delay-group context has a
+// module-level default whose refs every unscoped tooltip shares, so they still coordinate.
+export function TooltipsWithoutProvider() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="tip-host" />
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-a" delay={0} closeDelay={0}>A</Tooltip.Trigger>
+			<Tooltip.Portal container={hostRef}>
+				<Tooltip.Positioner>
+					<Tooltip.Popup className="pop-a">A content</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+		<Tooltip.Root>
+			<Tooltip.Trigger className="tip-b" delay={0} closeDelay={0}>B</Tooltip.Trigger>
+			<Tooltip.Portal container={hostRef}>
+				<Tooltip.Positioner>
+					<Tooltip.Popup className="pop-b">B content</Tooltip.Popup>
+				</Tooltip.Positioner>
+			</Tooltip.Portal>
+		</Tooltip.Root>
+	</div>
+}
+
+// AlertDialog re-uses Dialog's Viewport, so it must be reachable through the AlertDialog
+// namespace too — Base UI lists it in AlertDialog's anatomy.
+export function AlertDialogViewportOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<AlertDialog.Root defaultOpen>
+			<AlertDialog.Portal container={containerRef}>
+				<AlertDialog.Backdrop className="ad-backdrop" />
+				<AlertDialog.Viewport className="ad-viewport">
+					<AlertDialog.Popup className="ad-popup">
+						<AlertDialog.Title className="ad-title">Confirm</AlertDialog.Title>
+						<AlertDialog.Close className="ad-close">OK</AlertDialog.Close>
+					</AlertDialog.Popup>
+				</AlertDialog.Viewport>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
+	</div>
 }

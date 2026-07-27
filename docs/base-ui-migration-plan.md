@@ -10,6 +10,62 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phases 3a–3d COMPLETE (2026-07-26). Green: 89 base-ui tests (76 differential + 13 behavior),
+> full monorepo suite green, typecheck + format clean.** Subpath coverage moved from 22/43 to
+> **28/43**.
+>
+> - **Phase 3a — zero-dependency backlog.** `Button` (`useButton` + `useRenderElement`, including
+>   `focusableWhenDisabled` and `nativeButton={false}`), `DirectionProvider` (over the existing
+>   internal `DirectionContext`; octane stores the `TextDirection` string directly rather than
+>   Base UI's `{ direction }` wrapper, so no `useMemo` is needed), `CSPProvider` + the new
+>   `utils/CSPContext`, and `unstable-use-media-query` on octane's native `useSyncExternalStore`
+>   instead of the `use-sync-external-store` shim. 11 differential fixtures.
+> - **Phase 3b — hover + focus interaction layer (~2,400 lines).** Replaced BOTH `openOnHover`
+>   stubs with the real system: `utils/floating/useHoverShared` (delay resolution + open-event
+>   classification), `useHoverInteractionSharedState` (the per-popup mutable record: pointer type,
+>   timers, and the pointer-events mutation that keeps the cursor's path to the popup clickable),
+>   `safePolygon` (verbatim geometry), `useHoverReferenceInteraction` (trigger side),
+>   `useHoverFloatingInteraction` (popup side), `useFocus` (open-while-focused + blocked-focus
+>   bookkeeping), and `FloatingDelayGroup`/`useDelayGroup` (shared-delay tooltip groups). Added
+>   `platform.os.mac` and the `isInteractiveElement` / `isTargetInsideEnabledTrigger` element
+>   helpers. **Deliberate omission:** upstream's standalone `floating-ui-react` `useHover`
+>   combiner — no Base UI component uses it, and this binding does not republish that surface.
+> - **Faithfulness bug found and fixed by the hover tests.** `PopoverRoot` rendered
+>   `PopoverInteractions` as a WRAPPER around the children (an earlier workaround for the octane
+>   Provider children dialect-flip bug), so the wrapper's component type changed on every open and
+>   tore down the whole subtree — including the trigger, whose element listeners and store
+>   registration were then pointing at a detached node, which is exactly why hover-close never
+>   fired. Base UI renders it as a headless SIBLING, and all four overlay Roots (Dialog, Popover,
+>   Tooltip, PreviewCard) now do the same. The trigger also regained upstream's keyed-fragment
+>   wrapper, plus keys on the focus guards (octane reconciles a returned array as a list, so
+>   unkeyed siblings would shift the keyed trigger anyway).
+> - **The underlying octane bug is fixed separately, so the workaround is gone entirely.** A
+>   Provider's `children` may arrive as a compiled `.tsrx` children-block FUNCTION or as an element
+>   DESCRIPTOR, and both claimed `scope.slots[0]` — a compiled body stores its binding bag there,
+>   the descriptor path stores a `childSlot` record — so alternating between them had the incoming
+>   dialect adopt the outgoing one's record (`TypeError: Cannot read properties of undefined
+>   (reading 'items')`, subtree detached). Fixed in octane by
+>   [#294](https://github.com/octanejs/octane/pull/294). The sibling shape this binding now uses is
+>   dialect-stable (its Provider children are always an array), so these components do not depend on
+>   that fix — it simply means no binding has to keep dodging the bug.
+> - **Phase 3c — popup viewport (~700 lines).** `utils/usePopupViewport` (keeps a DOM clone of the
+>   outgoing content mounted beside the incoming content so a trigger switch can animate),
+>   `utils/usePopupAutoResize` (measure at `max-content` → pin previous size → animate to new),
+>   `utils/getCssDimensions`, `utils/usePreviousValue`, `utils/FloatingPortalLite`. Then the two
+>   missing parts on shipped components: **`Dialog.Viewport`** and **`Popover.Viewport`**. Parity
+>   note: upstream's bare `data-current` JSX attribute serializes as `data-current="true"`, so the
+>   port passes `true` rather than `''`.
+> - **Phase 3d — Tooltip + PreviewCard (~3,000 lines).** `src/tooltip.ts` (Provider/Root/Trigger/
+>   Portal/Positioner/Popup/Arrow/Viewport + store + handle), including the trigger's
+>   nested-trigger hover arbitration and `trackCursorAxis` via the newly ported
+>   `utils/floating/useClientPoint`. `src/preview-card.ts` (Root/Trigger/Portal/Positioner/Popup/
+>   Backdrop/Arrow/Viewport + store + handle), whose distinctive piece is the inline-rect anchoring
+>   that pins the card to the hovered line of a wrapping `<a>` (`utils/popups/inlineRect`).
+> - **Rig note:** hover open/close, focus open and delay grouping are timing- and pointer-driven,
+>   so none of them appear in a single innerHTML snapshot. They are covered by dedicated behavior
+>   tests (`popover-hover.test.ts`, `tooltip.test.ts`, `preview-card.test.ts`) alongside the
+>   differential fixtures for structure.
+
 > **SSR foundation (2026-07-25).** `useIsHydrating` now uses Octane's actual
 > server and client external-store snapshots and threads manual hook slots into
 > both slider call sites. A dedicated Node-mode project verifies the hydration
@@ -452,6 +508,12 @@ pin is current. Baseline at audit time: **60 base-ui tests green**, `22 of 43`
 published subpaths implemented, `19,614` ported source lines against `73,766`
 upstream source lines (tests excluded).
 
+> **Superseded in part by Phases 3a–3d** (see the progress log above): the
+> subpath count is now `28 of 43`, gaps B1 (`Dialog.Viewport`/`Popover.Viewport`)
+> and C1 (`openOnHover`) are closed, and `tooltip`, `preview-card`, `button`,
+> `direction-provider`, `csp-provider` and `unstable-use-media-query` have landed.
+> The rest of the inventory below still stands.
+
 ### A. Missing components (21 of 43 subpaths)
 
 | Component | Upstream loc | Blocking infrastructure |
@@ -538,22 +600,21 @@ pulled forward. Every phase exits on: differential parity for the new components
 dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
 `pnpm format:check`, full `pnpm test`, a changeset, and a `status.json` update.
 
-- **Phase 3a — Zero-dependency backlog** (~300 loc): `Button`,
-  `DirectionProvider`, `CspProvider` (+ `CSPContext`), `unstable-use-media-query`.
-  All four sit on infrastructure that already exists; closes 4 of the 21 missing
-  subpaths for roughly a day of work. *Exit:* 4 new differential fixtures.
-- **Phase 3b — Hover + focus interaction layer** (~2,400 loc): `safePolygon`,
-  `useHover`, `useHoverShared`, `useHoverInteractionSharedState`, the real
+- **Phase 3a — Zero-dependency backlog** (DONE): `Button`, `DirectionProvider`,
+  `CSPProvider` (+ `CSPContext`), `unstable-use-media-query`. ✅
+- **Phase 3b — Hover + focus interaction layer** (DONE, ~2,400 loc):
+  `safePolygon`, `useHoverShared`, `useHoverInteractionSharedState`, the real
   `useHoverReferenceInteraction` / `useHoverFloatingInteraction`, `useFocus`,
-  `FloatingDelayGroup`. Deletes stub C1. *Exit:* Popover `openOnHover` behavior
-  tests (open delay, close delay, safe-polygon traversal), no differential
-  regression on the existing Popover fixtures.
-- **Phase 3c — Popup viewport** (~700 loc): `usePopupViewport` +
-  `popups/inlineRect` + `FloatingPortalLite`, then `Dialog.Viewport` and
-  `Popover.Viewport`. Closes gap B1 and unblocks every later Viewport part.
-- **Phase 3d — Tooltip + PreviewCard** (~3,000 loc): both are thin over 3b + 3c.
-  *Exit:* differential on the open popup, behavior tests for hover open/close and
-  delay grouping.
+  `FloatingDelayGroup`. Stub C1 deleted. Upstream's standalone `useHover`
+  combiner was deliberately skipped — no component uses it, and this binding does
+  not republish the vendored `floating-ui-react` surface. ✅
+- **Phase 3c — Popup viewport** (DONE, ~700 loc): `usePopupViewport` +
+  `usePopupAutoResize` + `FloatingPortalLite` + `getCssDimensions` +
+  `usePreviousValue`, then `Dialog.Viewport` and `Popover.Viewport`. Gap B1
+  closed. (`popups/inlineRect` moved to 3d: it serves PreviewCard, not the
+  viewport.) ✅
+- **Phase 3d — Tooltip + PreviewCard** (DONE, ~3,000 loc), plus the
+  `useClientPoint` and `popups/inlineRect` they depend on. ✅
 - **Phase 3e — List navigation + typeahead** (~1,400 loc): `useListNavigation`,
   `gridNavigation` (both copies), `useTypeahead`, `RequestQueue`,
   `TimeoutManager`, `useMixedToggleClickHandler`, `getPseudoElementBounds`.

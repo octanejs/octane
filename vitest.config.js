@@ -651,6 +651,56 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'seo',
+					include: ['packages/seo/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/seo/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/seo$/,
+							replacement: resolve(import.meta.dirname, 'packages/seo/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// SSR half: the whole graph compiles in SERVER mode and bare `octane`
+				// imports resolve to `octane/server`, so the package's plain-.ts hooks
+				// run against the server runtime the compiled components use.
+				test: {
+					name: 'seo-ssr',
+					include: ['packages/seo/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/static$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/static/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/seo$/,
+							replacement: resolve(import.meta.dirname, 'packages/seo/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-store',
 					include: [
 						'packages/tanstack-store/tests/conformance/**/*.test.ts',
@@ -2088,6 +2138,51 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/sonner$/,
 							replacement: resolve(import.meta.dirname, 'packages/sonner/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'cmdk',
+					include: ['packages/cmdk/tests/**/*.test.ts', '!packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					// Fails any test that logs a console.error (octane reports effect
+					// exceptions there without failing the run).
+					setupFiles: ['packages/cmdk/tests/_setup.ts'],
+					// Differential precompile for cmdk fixtures: rewrites
+					// `@octanejs/cmdk` → the real published `cmdk@1.1.1`.
+					globalSetup: ['packages/cmdk/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'cmdk-ssr',
+					include: ['packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					setupFiles: ['packages/cmdk/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
 						},
 					],
 				},

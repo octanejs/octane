@@ -18,6 +18,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarRail,
+	useSidebar,
 } from '@/components/ui/sidebar.tsrx';
 
 interface DemoNavProps {
@@ -45,6 +46,15 @@ function visibleGroups(query: string): DemoGroup[] {
 export function DemoNav(props: DemoNavProps) @{
 	const [query, setQuery] = useState('');
 	const groups = visibleGroups(query);
+	// Below the breakpoint the sidebar is a Sheet laid OVER the stage, so a
+	// selection that only changes the route leaves the sheet covering the demo it
+	// just selected.
+	const { isMobile, setOpenMobile } = useSidebar();
+
+	function select(id: string) {
+		props.onSelect(id);
+		if (isMobile) setOpenMobile(false);
+	}
 
 	<Sidebar collapsible="offcanvas">
 		<SidebarHeader>
@@ -66,7 +76,7 @@ export function DemoNav(props: DemoNavProps) @{
 								<SidebarMenuItem>
 									<SidebarMenuButton
 										isActive={demo.id === props.activeId}
-										onClick={() => props.onSelect(demo.id)}
+										onClick={() => select(demo.id)}
 									>
 										<span class="demo-nav-title">{demo.title as string}</span>
 										<span class="demo-nav-summary">{demo.summary as string}</span>

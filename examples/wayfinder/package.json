@@ -14,6 +14,7 @@
     "e2e": "pnpm test:e2e"
   },
   "dependencies": {
+    "@octanejs/seo": "workspace:*",
     "@octanejs/vite-plugin": "workspace:*",
     "octane": "workspace:*"
   },

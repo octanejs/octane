@@ -48,6 +48,35 @@ function StoreSubscriber(props: IndexedProps) @{
 	<output data-subscriber-index={String(props.index)}>{String(value) as string}</output>
 }
 
+function AsyncStatus() @{
+	const resource = getRuntimeStress().async;
+	const snapshot = useSyncExternalStore(
+		resource.subscribe,
+		resource.getSnapshot,
+		resource.getSnapshot,
+	);
+	<section aria-label="Async recovery">
+		<button
+			id="async-resolve"
+			type="button"
+			onClick={() => resource.run('resolve')}
+		>{'Resolve request'}</button>
+		<button
+			id="async-reject"
+			type="button"
+			onClick={() => resource.run('reject')}
+		>{'Reject request'}</button>
+		<button
+			id="async-slow"
+			type="button"
+			onClick={() => resource.run('slow', 'stale')}
+		>{'Start slow request'}</button>
+		<output id="async-status">{snapshot.status as string}</output>
+		<output id="async-value">{snapshot.value as string}</output>
+		<output id="async-error">{snapshot.error as string}</output>
+	</section>
+}
+
 export function App() @{
 	const [lifecycleVisible, setLifecycleVisible] = useState(false);
 	const [lifecycleTick, setLifecycleTick] = useState(0);
@@ -181,5 +210,6 @@ export function App() @{
 				</div>
 			}
 		</section>
+		<AsyncStatus />
 	</main>
 }

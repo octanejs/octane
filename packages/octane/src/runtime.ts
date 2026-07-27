@@ -1839,8 +1839,17 @@ function scheduleRender(block: Block): void {
 	// transition priority (and useDeferredValue in the replay doesn't defer) —
 	// per ReactDeferredValue-test.js:232.
 	const renderPhaseSelf = CURRENT_BLOCK === block;
+	// A deletion is discovered while reconciling the deleting parent's output, so
+	// CURRENT_BLOCK still names that parent while the removed subtree's destroys and
+	// cleanups run (the same reason Effect Events are permitted from them). Those
+	// are mutation-phase callbacks — React runs them in commitDeletionEffects — so
+	// an update they schedule for a surviving component is legal, not a render-phase
+	// cross-component update.
 	const renderPhaseOther =
-		CURRENT_BLOCK !== null && !renderPhaseSelf && TRANSITION_LISTENER_PUBLISH_DEPTH === 0;
+		CURRENT_BLOCK !== null &&
+		!renderPhaseSelf &&
+		TRANSITION_LISTENER_PUBLISH_DEPTH === 0 &&
+		EFFECT_EVENT_LIFECYCLE_DEPTH === 0;
 	if (renderPhaseOther) {
 		block.crossRenderUpdate = true;
 		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
@@ -14645,6 +14654,29 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 // property (not a WeakMap) keeps the per-child lookup in reconcileDeoptChildren cheap;
 // `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
 const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
+
+// Whether any of `el`'s current children were created by the de-opt reconciler. Every node it
+// builds carries a `$$deoptKey` stamp (or a descriptor), so ownership is derivable and needs no
+// per-element bookkeeping — which keeps it off the reconcile hot path and off the DOM node's shape.
+// React only manages children it created, so an element holding nothing but foreign DOM (a
+// `replaceChildren` into an element we rendered empty, a third-party widget) must be left alone.
+// Portal ranges already get that treatment via `$$portalEnd`; this covers the imperative case.
+function hasDeoptOwnedChild(el: Element): boolean {
+	let n: Node | null = getFirstChild(el);
+	while (n !== null) {
+		// Skip foreign `<!--portal-->…<!--/portal-->` ranges exactly as the removal walk does.
+		// Their contents are stamped, but they belong to the portal, so counting them would make
+		// an element that merely hosts a portal look owned and expose its other children.
+		const rangeEnd = (n as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			n = nodeAfterPortalRange(n, rangeEnd);
+			continue;
+		}
+		if ((n as any).$$deoptKey !== undefined || getDeoptDesc(n) !== undefined) return true;
+		n = getNextSibling(n);
+	}
+	return false;
+}
 interface DeoptStamped {
 	[DEOPT_DESC]?: ElementDescriptor;
 }
@@ -14935,12 +14967,24 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		}
 		return;
 	}
-	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
-	// ranges: a portal rendered elsewhere may target this element, and its nodes are
-	// not ours to reuse, remove, or reorder (React parity — portal content coexists
-	// with the container's rendered children). Range starts carry $$portalEnd.
+	// Nothing to render, and we have never put children here: every node present came from
+	// somewhere else, so leave it alone rather than reconciling against an empty list and
+	// sweeping it away. (Going from rendered children to none still clears — the flag is set.)
+	// Hydration is excluded: the children present are the server's, which this reconcile is
+	// adopting, so a client descriptor that renders none must still clear them.
+	if (next.length === 0 && activeHydration() === null && !hasDeoptOwnedChild(el)) {
+		return;
+	}
+	// Collect only children this reconciler owns. Portal ranges and unstamped
+	// imperatively streamed nodes may coexist with our children; neither belongs
+	// to the descriptor and neither may be removed or positionally adopted.
+	// Hydration is the sole exception: its unstamped server nodes are ours to
+	// adopt. Check hydration lazily so already-stamped updates pay no extra cost.
 	const owned: Node[] = [];
 	let hasForeign = false;
+	let hydrationOwnsUnstamped: boolean | undefined;
+	let byKey: Map<any, Node> | null = null;
+	const unstamped: Node[] = [];
 	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
@@ -14949,26 +14993,29 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			scan = nodeAfterPortalRange(scan, rangeEnd);
 			continue;
 		}
+		const stampedKey = (scan as any).$$deoptKey;
+		const descriptor = stampedKey === undefined ? getDeoptDesc(scan) : undefined;
+		if (
+			stampedKey === undefined &&
+			descriptor === undefined &&
+			!(hydrationOwnsUnstamped ??= activeHydration() !== null)
+		) {
+			hasForeign = true;
+			scan = getNextSibling(scan);
+			continue;
+		}
 		owned.push(scan);
-		scan = getNextSibling(scan);
-	}
-	// Partition current children by their stamped SLOT KEY (position-scoped —
-	// see flattenDeoptChildrenKeyed; explicit keys ride the same scheme). Nodes
-	// without a stamp (server-adopted on the first post-hydration reconcile)
-	// fall back to document-order reuse, and get stamped below for next time.
-	let byKey: Map<any, Node> | null = null;
-	const unstamped: Node[] = [];
-	for (let i = 0; i < owned.length; i++) {
-		const n = owned[i];
-		const k = (n as any).$$deoptKey ?? getDeoptDesc(n)?.key;
-		if (k != null) {
+		const key = stampedKey ?? descriptor?.key;
+		if (key != null) {
 			if (byKey === null) byKey = new Map();
-			if (!byKey.has(k)) {
-				byKey.set(k, n);
+			if (!byKey.has(key)) {
+				byKey.set(key, scan);
+				scan = getNextSibling(scan);
 				continue;
 			}
 		}
-		unstamped.push(n);
+		unstamped.push(scan);
+		scan = getNextSibling(scan);
 	}
 	let up = 0;
 	const result: Node[] = [];
@@ -15001,7 +15048,9 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// like a React portal whose container children reorder around it).
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
-		const at = hasForeign ? liveOwnedChildAt(el, i) : (existing[i] ?? null);
+		const at = hasForeign
+			? liveOwnedChildAt(el, i, hydrationOwnsUnstamped === true)
+			: (existing[i] ?? null);
 		if (at !== want) el.insertBefore(want, at);
 	}
 }
@@ -15019,13 +15068,21 @@ function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 // The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
 // `<!--portal-->…<!--/portal-->` ranges (see reconcileDeoptChildren). Live walk —
 // called per reorder step, only when a foreign range exists.
-function liveOwnedChildAt(el: Element, index: number): Node | null {
+function liveOwnedChildAt(el: Element, index: number, adoptHydrationChildren = false): Node | null {
 	let i = 0;
 	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
 			scan = nodeAfterPortalRange(scan, rangeEnd);
+			continue;
+		}
+		if (
+			!adoptHydrationChildren &&
+			(scan as any).$$deoptKey === undefined &&
+			getDeoptDesc(scan) === undefined
+		) {
+			scan = getNextSibling(scan);
 			continue;
 		}
 		if (i === index) return scan;

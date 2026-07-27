@@ -159,11 +159,14 @@ optionally writes the generated Vitest skeleton to an output file.
 
 Runs benchmark suites through the unified runner (`node benchmarks/bench.mjs`):
 one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
-`weather-app-lighthouse`, `chat-stream`, `dbmon`, `news`, `react-hosted-islands`,
-`ssr-throughput`, `streaming-ssr`,
-`codegen-size`, `bundle-size`, `three-renderer`, `three-bundle-size`, …) or every
-suite with `all`; `quick` selects the reduced-iteration smoke pass. The suite
-list mirrors the runner manifest and `node benchmarks/bench.mjs --list`.
+`hydration-interactivity`, `hydration-stress`, `lifecycle-memory`,
+`controlled-form`, `external-store-fanout`, `external-store-integrations`,
+`scheduler-responsiveness`, `suspense-recovery`, `event-delegation`,
+`application-composition`, `scaling-curves`, `streaming-ssr`,
+`streaming-backpressure`, `compiler-throughput`, `codegen-size`,
+`bundle-size`, `three-renderer`, `three-bundle-size`, …) or every suite with
+`all`; `quick` selects the reduced-iteration smoke pass. The suite list mirrors
+the runner manifest and `node benchmarks/bench.mjs --list`.
 
 ### `octane_issue_context`
 

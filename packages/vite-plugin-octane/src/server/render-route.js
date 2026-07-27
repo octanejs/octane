@@ -37,8 +37,9 @@ import {
  *
  *   - Scoped CSS rides the STREAM (the shell emits its deduped
  *     `<style data-octane>` tags ahead of the body markup, per-wave styles ride
- *     their segment chunk), so nothing is spliced into `<!--ssr-head-->`
- *     anymore — only the hydration data script goes there. `hydrateRoot()`
+ *     their segment chunk), so styles are not spliced into `<!--ssr-head-->`.
+ *     That marker receives the hydration data script and the shell's hoisted
+ *     `<title>`/`<meta>`/`<link>` (see `headChannel` below). `hydrateRoot()`
  *     skips the shell's leading style tags when adopting.
  *   - A render error BEFORE the shell completes still produces the dev 500
  *     page (`renderToReadableStream` rejects on shell errors). An error AFTER
@@ -148,17 +149,27 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// Apply Vite's HTML transforms (HMR client, module resolution, etc.).
 		template = await vite.transformIndexHtml(context.url.pathname, template);
 
-		// Validate the raw SSR template and inject the request-nonced hydrate entry
-		// before consuming the one required head marker with request data.
-		let html = injectHydrationEntry(template, '/@id/virtual:octane-hydrate', nonce);
-		html = html.replace('<!--ssr-head-->', headContent);
+		// Validate the raw SSR template and inject the request-nonced hydrate entry.
+		// The one required head marker is consumed AFTER the render, once the
+		// hoisted metadata is in hand, validation still happens up front here.
+		const html = injectHydrationEntry(template, '/@id/virtual:octane-hydrate', nonce);
 
 		// Start the render. This await resolves at SHELL-ready (so a synchronous
 		// render error still falls into the catch below and produces the dev 500
 		// page); segments keep flushing through the returned stream afterwards.
+		//
+		// `headChannel: 'separate'` matches production (see production.js): the
+		// route renders into the template's `#root`, not a document, so hoisted
+		// `<title>`/`<meta>`/`<link>` must be spliced at `<!--ssr-head-->` rather
+		// than folded into a body that has no `</head>`.
+		let hoistedHead = '';
 		/** @type {ReadableStream<Uint8Array>} */
 		const renderStream = await renderToReadableStream(RootComponent, undefined, {
 			nonce: nonce ?? undefined,
+			headChannel: 'separate',
+			onHeadReady(/** @type {string} */ head) {
+				hoistedHead = head;
+			},
 			signal: context.request.signal,
 			onError(/** @type {unknown} */ error) {
 				if (error instanceof Error) vite.ssrFixStacktrace(error);
@@ -169,7 +180,11 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
-		const [prefix, suffix] = splitSsrTemplate(html);
+		// Function replacement, so `$&`/`` $` ``/`$'`/`$1` inside the route data or
+		// author-controlled metadata cannot expand against the match.
+		const [prefix, suffix] = splitSsrTemplate(
+			html.replace('<!--ssr-head-->', () => headContent + hoistedHead),
+		);
 
 		// Template prefix → render stream (shell, then out-of-order segments) →
 		// template suffix. The hydration <script> is in the SUFFIX, so by the time

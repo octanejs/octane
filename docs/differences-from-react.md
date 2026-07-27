@@ -381,7 +381,12 @@ than `onUncaughtError`.
 ## SSR and streaming
 
 `renderToString`/`renderToStaticMarkup`/`prerender` return `{ html, css }` —
-the `css` field carries octane's scoped styles (React has no equivalent).
+the `css` field carries octane's scoped styles (React has no equivalent). Hoisted
+document metadata folds into `html` as React does; the opt-in
+`headChannel: 'separate'` option (with `RenderResult.head` and
+`StreamOptions.onHeadReady`) is an octane extension for hosts that render into a
+`<head>`-bearing template instead of rendering the document, where React's fold
+has no `</head>` to target.
 `renderToPipeableStream`/`renderToReadableStream` stream out-of-order Suspense
 like Fizz, with these scope differences: per-round re-passes (the prerender
 cost model) instead of per-boundary incremental renders; no selective

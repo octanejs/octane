@@ -12,6 +12,13 @@ import { makeCards, type Scenario } from './data';
 // onChunk in real time.
 export const streaming = true;
 
+export function createBenchmarkStream(
+	scenario: Scenario,
+	options: Parameters<typeof renderToPipeableStream>[2] = {},
+) {
+	return renderToPipeableStream(App, { cards: makeCards(scenario) }, options);
+}
+
 export function renderStream(scenario: Scenario, onChunk: (chunk: string) => void): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const { pipe } = renderToPipeableStream(

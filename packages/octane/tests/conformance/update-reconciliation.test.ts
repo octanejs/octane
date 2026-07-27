@@ -525,6 +525,33 @@ describe('ReactUpdates update reconciliation', () => {
 		removeRoot(root, container);
 	});
 
+	// A deletion's layout destroy is commit-phase work (React's
+	// commitDeletionEffects), even though Octane discovers the deletion while the
+	// deleting parent's body is still on the render stack. An update it schedules
+	// for a surviving component is legal and must not be reported as a render-phase
+	// cross-component update.
+	it("does not warn when a deleted subtree's cleanup updates a surviving component", async () => {
+		const container = ownedContainer();
+		const root = createRoot(container);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			await act(() => root.render(Fixture.DeletionCleanupRegistry));
+			expect(container.querySelector('#deletion-registry-count')!.textContent).toBe('1');
+
+			await act(() => Fixture.setDeletionRegistrySwitch(false));
+			expect(container.querySelector('#deletion-registry-member')).toBeNull();
+			expect(container.querySelector('#deletion-registry-count')!.textContent).toBe('0');
+			expect(
+				error.mock.calls.filter((call) =>
+					String(call[0]).includes('while rendering a different component'),
+				),
+			).toEqual([]);
+		} finally {
+			error.mockRestore();
+			removeRoot(root, container);
+		}
+	});
+
 	// Per ReactUpdates-test.js:1912. An external root unmount is a fresh update
 	// boundary: its cleanup may advance a different root after that root completed
 	// an exactly-at-the-limit chain without inheriting the old budget.

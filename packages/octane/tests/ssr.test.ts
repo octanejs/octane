@@ -317,3 +317,60 @@ describe('SSR — plain-.ts root returning a createElement descriptor', () => {
 		expect(empty).not.toContain('[object Object]');
 	});
 });
+
+// `headChannel: 'separate'` exists for hosts that render into a `<head>`-bearing
+// template they own instead of rendering the document. Folding has no `</head>`
+// to target in a body-only render, so it prepends the metadata into the body -
+// where a `<title>` loses to the template's and a canonical or description is
+// ignored. Separate mode withholds it so the host can place it itself.
+describe('SSR, hoisted head channel', () => {
+	const HEAD_PAGE = `
+		export function Page(props: { slug: string }) @{
+			<>
+				<title>{'Post: ' + props.slug}</title>
+				<meta name="description" content="per-route description" />
+				<main>body text</main>
+			</>
+		}
+	`;
+	const headPage = evalServer(HEAD_PAGE, 'head-channel.tsrx');
+
+	it('folds metadata into html and omits the head field by default', async () => {
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup]) {
+			const result = render(headPage.Page, { slug: 'a' });
+			expect(result.head).toBeUndefined();
+			expect(result.html).toContain('<title>Post: a</title>');
+			expect(result.html).toContain('name="description"');
+			// Prepended, since a body-only render has no `</head>`.
+			expect(result.html.indexOf('<title')).toBeLessThan(result.html.indexOf('<main'));
+		}
+	});
+
+	it('withholds metadata from html and hands it over on the head field', async () => {
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup]) {
+			const { html, head } = render(headPage.Page, { slug: 'a' }, { headChannel: 'separate' });
+			expect(html).not.toContain('<title');
+			expect(html).not.toContain('name="description"');
+			expect(html).toContain('<main>body text</main>');
+			expect(head).toContain('<title>Post: a</title>');
+			expect(head).toContain('name="description"');
+		}
+	});
+
+	it('keeps the channel choice out of the rendered body bytes', async () => {
+		// The metadata moves; nothing else may. This is what lets a host adopt
+		// separate mode without re-baselining its hydratable output.
+		const folded = RT.renderToString(headPage.Page, { slug: 'a' });
+		const separated = RT.renderToString(headPage.Page, { slug: 'a' }, { headChannel: 'separate' });
+		expect(separated.head! + separated.html).toBe(folded.html);
+	});
+
+	it('reports an empty head when a render hoists nothing', async () => {
+		const Root = () => RT.createElement('main', null, 'x');
+		const { html, head } = RT.renderToString(Root as any, undefined, {
+			headChannel: 'separate',
+		});
+		expect(head).toBe('');
+		expect(html).toContain('<main>x</main>');
+	});
+});

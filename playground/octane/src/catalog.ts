@@ -4,6 +4,7 @@
 // pane all read from this list, so none of them need to know about individual
 // demos. Sources are imported with Vite's `?raw` so the Source tab shows the
 // exact file on disk rather than a copy that can rot.
+import { CommandMenu } from './demos/CommandMenu.tsrx';
 import { Conditional } from './demos/Conditional.tsrx';
 import { Counter } from './demos/Counter.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
@@ -12,6 +13,7 @@ import { KeyedList } from './demos/KeyedList.tsrx';
 import { ShadcnDemo } from './demos/Shadcn.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
 
+import commandMenuSource from './demos/CommandMenu.tsrx?raw';
 import conditionalSource from './demos/Conditional.tsrx?raw';
 import counterSource from './demos/Counter.tsrx?raw';
 import dynamicSource from './demos/Dynamic.tsrx?raw';
@@ -89,6 +91,13 @@ export const GROUPS: readonly DemoGroup[] = [
 		id: 'components',
 		label: 'Components',
 		demos: [
+			{
+				id: 'cmdk',
+				title: 'Command menu',
+				summary: 'cmdk — filtering, groups, keyboard nav',
+				Component: CommandMenu,
+				source: commandMenuSource,
+			},
 			{
 				id: 'shadcn',
 				title: 'shadcn/ui',
