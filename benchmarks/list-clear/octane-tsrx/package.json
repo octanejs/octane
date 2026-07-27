@@ -1,0 +1,19 @@
+{
+  "name": "octane-tsrx-list-clear-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "list-clear bench fixture: one keyed list owning its parent and one sharing it with interleaved siblings; exposes window.__mount/__fill*/__op* for the Playwright harness.",
+  "scripts": {
+    "dev": "vite --host --port 5298 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5298 --strictPort"
+  },
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default",
+    "terser": "catalog:default"
+  }
+}

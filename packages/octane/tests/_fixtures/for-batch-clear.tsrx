@@ -82,6 +82,27 @@ function PortalRow({ item, target }: { item: Item; target: Element }) @{
 	</li>
 }
 
+/**
+ * A keyed list SHARING its parent with interleaved JSX on both sides, so a
+ * bulk clear may only take the span between the list's markers. `size` drives
+ * the list across the point where the clear strategy changes.
+ */
+export function SharedParentRows({ size }: { size: number }) @{
+	const initial: Item[] = [];
+	for (let i = 1; i <= size; i++) initial.push({ id: i, label: 'row-' + i });
+	const [items, setItems] = useState(initial);
+	<div>
+		<button id="clear" onClick={() => setItems([])}>clear</button>
+		<ul>
+			<li id="before">before</li>
+			@for (const item of items; key item.id) {
+				<li class="row">{item.label}</li>
+			}
+			<li id="after">after</li>
+		</ul>
+	</div>
+}
+
 /** Portal-carrying rows: item content in a FOREIGN target must self-detach. */
 export function PortalRows({ target }: { target: Element }) @{
 	const [items, setItems] = useState(items3);
