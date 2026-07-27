@@ -1839,8 +1839,17 @@ function scheduleRender(block: Block): void {
 	// transition priority (and useDeferredValue in the replay doesn't defer) —
 	// per ReactDeferredValue-test.js:232.
 	const renderPhaseSelf = CURRENT_BLOCK === block;
+	// A deletion is discovered while reconciling the deleting parent's output, so
+	// CURRENT_BLOCK still names that parent while the removed subtree's destroys and
+	// cleanups run (the same reason Effect Events are permitted from them). Those
+	// are mutation-phase callbacks — React runs them in commitDeletionEffects — so
+	// an update they schedule for a surviving component is legal, not a render-phase
+	// cross-component update.
 	const renderPhaseOther =
-		CURRENT_BLOCK !== null && !renderPhaseSelf && TRANSITION_LISTENER_PUBLISH_DEPTH === 0;
+		CURRENT_BLOCK !== null &&
+		!renderPhaseSelf &&
+		TRANSITION_LISTENER_PUBLISH_DEPTH === 0 &&
+		EFFECT_EVENT_LIFECYCLE_DEPTH === 0;
 	if (renderPhaseOther) {
 		block.crossRenderUpdate = true;
 		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
