@@ -364,13 +364,10 @@ const DOM_OPS = [
 	['elements_mounted', 'mounted', 'elements'],
 	['text_mounted', 'mounted', 'text'],
 	['comments_mounted', 'mounted', 'comments'],
-	['empty_text_mounted', 'mounted', 'emptyText'],
 	['nodes_partial_unmounted', 'partialUnmounted', 'total'],
 	['elements_partial_unmounted', 'partialUnmounted', 'elements'],
 	['text_partial_unmounted', 'partialUnmounted', 'text'],
 	['comments_partial_unmounted', 'partialUnmounted', 'comments'],
-	['empty_text_partial_unmounted', 'partialUnmounted', 'emptyText'],
-	['whitespace_text_partial_unmounted', 'partialUnmounted', 'whitespaceText'],
 ];
 
 const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
