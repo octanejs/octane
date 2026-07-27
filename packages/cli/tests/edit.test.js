@@ -23,6 +23,52 @@ describe('setCompilerOption', () => {
 		});
 	});
 
+	it('treats comments as prose, not syntax', () => {
+		// A `}` or a quoted key inside a JSONC comment previously closed the wrong
+		// object, so the edit landed past it and duplicated `compilerOptions`
+		// while leaving the real one untouched.
+		const source =
+			'{\n\t// "jsxImportSource": "react" was wrong here }\n' +
+			'\t"compilerOptions": {\n\t\t"strict": true\n\t}\n}';
+
+		const edited = setCompilerOption(source, 'jsxImportSource', 'octane');
+		const parsed = parseJsonc(edited.text);
+
+		expect(edited.text).toContain('// "jsxImportSource": "react" was wrong here }');
+		expect(Object.keys(parsed)).toEqual(['compilerOptions']);
+		expect(parsed.compilerOptions).toEqual({ jsxImportSource: 'octane', strict: true });
+	});
+
+	it('sees past a block comment and a comment before the root brace', () => {
+		const block = setCompilerOption(
+			'{\n\t/* legacy: { "jsxImportSource": "react" } */\n\t"compilerOptions": { "strict": true }\n}',
+			'jsxImportSource',
+			'octane',
+		);
+		expect(parseJsonc(block.text).compilerOptions).toEqual({
+			jsxImportSource: 'octane',
+			strict: true,
+		});
+
+		const leading = setCompilerOption(
+			'// tsconfig for the app {\n{\n\t"compilerOptions": { "strict": true }\n}',
+			'jsxImportSource',
+			'octane',
+		);
+		expect(parseJsonc(leading.text).compilerOptions.jsxImportSource).toBe('octane');
+	});
+
+	it('does not swallow a comment trailing the value it replaces', () => {
+		const edited = setCompilerOption(
+			'{\n\t"compilerOptions": {\n\t\t"jsxImportSource": "react" // legacy\n\t}\n}',
+			'jsxImportSource',
+			'octane',
+		);
+
+		expect(edited.text).toContain('"octane" // legacy');
+		expect(parseJsonc(edited.text).compilerOptions.jsxImportSource).toBe('octane');
+	});
+
 	it('replaces an existing value in place', () => {
 		const source = '{\n\t"compilerOptions": {\n\t\t"jsxImportSource": "react"\n\t}\n}';
 		const edited = setCompilerOption(source, 'jsxImportSource', 'octane');

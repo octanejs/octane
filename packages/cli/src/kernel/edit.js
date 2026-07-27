@@ -8,7 +8,57 @@
  */
 
 /**
- * Match the object that starts at `open`, skipping over string literals.
+ * Advance past a string literal or a comment beginning at `i`.
+ *
+ * Every scanner below routes through this. `tsconfig.json` is JSONC, so a `}`
+ * or a quoted key inside a comment is ordinary prose: treating it as syntax
+ * closes the wrong object and lets an edit land in the comment, or duplicate a
+ * key that was already there.
+ *
+ * @param {string} text
+ * @param {number} i
+ * @returns {{ end: number, kind: 'string' | 'comment' } | null}
+ */
+function skipTrivia(text, i) {
+	if (text[i] === '/' && text[i + 1] === '/') {
+		let j = i + 2;
+		while (j < text.length && text[j] !== '\n') j++;
+		return { end: j, kind: 'comment' };
+	}
+	if (text[i] === '/' && text[i + 1] === '*') {
+		let j = i + 2;
+		while (j < text.length && !(text[j] === '*' && text[j + 1] === '/')) j++;
+		return { end: Math.min(j + 2, text.length), kind: 'comment' };
+	}
+	if (text[i] === '"') {
+		let j = i + 1;
+		while (j < text.length && text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
+		return { end: j + 1, kind: 'string' };
+	}
+	return null;
+}
+
+/**
+ * Index of the document's opening brace, skipping any leading comment.
+ *
+ * @param {string} text
+ * @returns {number}
+ */
+function findRootBrace(text) {
+	for (let i = 0; i < text.length;) {
+		const trivia = skipTrivia(text, i);
+		if (trivia) {
+			i = trivia.end;
+			continue;
+		}
+		if (text[i] === '{') return i;
+		i++;
+	}
+	return -1;
+}
+
+/**
+ * Match the object that starts at `open`.
  *
  * @param {string} text
  * @param {number} open index of the `{`
@@ -16,18 +66,19 @@
  */
 function matchBrace(text, open) {
 	let depth = 0;
-	for (let i = open; i < text.length; i++) {
-		const ch = text[i];
-		if (ch === '"') {
-			i++;
-			while (i < text.length && text[i] !== '"') i += text[i] === '\\' ? 2 : 1;
+	for (let i = open; i < text.length;) {
+		const trivia = skipTrivia(text, i);
+		if (trivia) {
+			i = trivia.end;
 			continue;
 		}
+		const ch = text[i];
 		if (ch === '{' || ch === '[') depth++;
 		else if (ch === '}' || ch === ']') {
 			depth--;
 			if (depth === 0) return i;
 		}
+		i++;
 	}
 	return -1;
 }
@@ -45,29 +96,30 @@ function findProperty(text, open, close, key) {
 	const needle = `"${key}"`;
 	let depth = 0;
 
-	for (let i = open + 1; i < close; i++) {
-		const ch = text[i];
-		if (ch === '"') {
-			const start = i;
-			i++;
-			while (i < close && text[i] !== '"') i += text[i] === '\\' ? 2 : 1;
-			if (depth === 0 && text.slice(start, i + 1) === needle) {
-				let cursor = i + 1;
+	for (let i = open + 1; i < close;) {
+		const trivia = skipTrivia(text, i);
+		if (trivia) {
+			if (trivia.kind === 'string' && depth === 0 && text.slice(i, trivia.end) === needle) {
+				let cursor = trivia.end;
 				while (cursor < close && /\s/.test(text[cursor])) cursor++;
-				if (text[cursor] !== ':') continue;
-				cursor++;
-				while (cursor < close && /\s/.test(text[cursor])) cursor++;
-				const valueStart = cursor;
-				const valueEnd =
-					text[cursor] === '{' || text[cursor] === '['
-						? matchBrace(text, cursor) + 1
-						: scanScalar(text, cursor, close);
-				return { start, valueStart, valueEnd };
+				if (text[cursor] === ':') {
+					cursor++;
+					while (cursor < close && /\s/.test(text[cursor])) cursor++;
+					const valueStart = cursor;
+					const valueEnd =
+						text[cursor] === '{' || text[cursor] === '['
+							? matchBrace(text, cursor) + 1
+							: scanScalar(text, cursor, close);
+					return { start: i, valueStart, valueEnd };
+				}
 			}
+			i = trivia.end;
 			continue;
 		}
+		const ch = text[i];
 		if (ch === '{' || ch === '[') depth++;
 		else if (ch === '}' || ch === ']') depth--;
+		i++;
 	}
 	return null;
 }
@@ -79,13 +131,15 @@ function findProperty(text, open, close, key) {
  * @returns {number}
  */
 function scanScalar(text, from, limit) {
-	if (text[from] === '"') {
-		let i = from + 1;
-		while (i < limit && text[i] !== '"') i += text[i] === '\\' ? 2 : 1;
-		return i + 1;
-	}
+	const trivia = skipTrivia(text, from);
+	if (trivia?.kind === 'string') return trivia.end;
+
 	let i = from;
-	while (i < limit && !/[,}\]\n]/.test(text[i])) i++;
+	// Stop before a trailing comment as well as the structural characters: the
+	// value ends where the comment begins, and the comment is not ours to move.
+	while (i < limit && !/[,}\]\n]/.test(text[i]) && !(text[i] === '/' && /[/*]/.test(text[i + 1]))) {
+		i++;
+	}
 	return i;
 }
 
@@ -114,7 +168,7 @@ function detectIndent(text, open) {
  */
 export function setCompilerOption(text, key, value) {
 	const serialized = JSON.stringify(value);
-	const rootOpen = text.indexOf('{');
+	const rootOpen = findRootBrace(text);
 	if (rootOpen === -1) return null;
 	const rootClose = matchBrace(text, rootOpen);
 	if (rootClose === -1) return null;
