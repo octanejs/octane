@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
-import { MenuInteractive } from './_fixtures/base-ui-diff.tsrx';
+import { Menu } from '@octanejs/base-ui/menu';
+import { MenuInteractive, MenuWithHandle } from './_fixtures/base-ui-diff.tsrx';
 
 // Behavior tests for Menu's open/close + focus flow. The differential rig proves the OPEN menu's
 // DOM matches real Base UI byte-for-byte; what it cannot see is focus movement, keyboard-driven
@@ -145,5 +146,63 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 		expect(document.activeElement).toBe(m.find('.menu-trigger'));
 
 		m.unmount();
+	});
+
+	// `MenuStore.setOpen` does NOT apply the open change itself — it emits `setOpen` on the floating
+	// root context's event bus, and `Menu.Root` is the sole listener. That indirection is what lets a
+	// holder of the store ALONE drive the Root: a `Menu.Trigger` rendered outside `Menu.Root`, or
+	// `handle.open()` / `handle.close()` called from anywhere.
+	//
+	// It also means the store's `floatingRootContext` must be the SAME object `Menu.Root` built with
+	// `useSyncedFloatingRootContext` — Menu (unlike Dialog/Popover, which construct one in the store
+	// constructor via `usePopupStore`) installs it from Root through `usePopupInteractionProps`'s
+	// synced state, exactly as upstream `MenuRoot.tsx` does. If it were left as the empty placeholder
+	// from `createInitialPopupStoreState`, every assertion below would fail: the emit would reach a
+	// bus with no listener and nothing would open.
+	describe('detached triggers and the imperative handle', () => {
+		it('opens and closes through the handle, and through a trigger rendered outside Menu.Root', async () => {
+			const handle = Menu.createHandle();
+			const m = mount(MenuWithHandle, { handle });
+			await settle();
+
+			expect(handle.isOpen).toBe(false);
+			expect(m.container.querySelector('[role="menu"]')).toBe(null);
+
+			// The trigger is a sibling of `Menu.Root`, associated only by the shared handle.
+			m.click('.menu-trigger');
+			await settle();
+			expect(handle.isOpen).toBe(true);
+			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
+
+			handle.close();
+			await settle();
+			expect(handle.isOpen).toBe(false);
+			expect(m.container.querySelector('[role="menu"]')).toBe(null);
+
+			// ...and imperatively, naming the registered trigger id.
+			handle.open('detached-menu-trigger');
+			await settle();
+			expect(handle.isOpen).toBe(true);
+			const popup = m.find('.menu-popup');
+			// The popup labels itself with the trigger that opened it, so the handle really did
+			// associate the two rather than just flipping a boolean.
+			expect(popup.getAttribute('aria-labelledby')).toBe('detached-menu-trigger');
+
+			handle.close();
+			await settle();
+			expect(m.container.querySelector('[role="menu"]')).toBe(null);
+
+			m.unmount();
+		});
+
+		it('throws when the handle names a trigger that is not registered', async () => {
+			const handle = Menu.createHandle();
+			const m = mount(MenuWithHandle, { handle });
+			await settle();
+
+			expect(() => handle.open('no-such-trigger')).toThrow(/No trigger found with id/);
+
+			m.unmount();
+		});
 	});
 });

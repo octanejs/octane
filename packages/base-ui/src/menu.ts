@@ -1050,6 +1050,20 @@ function MenuRoot<Payload>(props: any): any {
 
 	const itemProps = listNavigation.item ?? EMPTY_OBJECT;
 
+	// `floatingRootContext` is INSTALLED ON THE STORE here (`usePopupInteractionProps` syncs its
+	// whole state part), and this is the only place it happens. Menu deliberately differs from
+	// Dialog/Popover/Tooltip, which build one in the store constructor and hand it to
+	// `usePopupStore`: a Menu's store may be an EXTERNAL `MenuHandle` store shared with triggers
+	// rendered outside this Root, so the context has to be created by the Root that owns `setOpen`
+	// and published from there. Until this effect runs, `store.state.floatingRootContext` is the
+	// inert placeholder from `createInitialPopupStoreState` — the same one-render window upstream
+	// `MenuRoot.tsx` has, since it installs the context the identical way.
+	//
+	// Every store reader depends on this: `MenuTrigger`'s useClick/useFocus/hover, `MenuPositioner`'s
+	// anchoring, `MenuPopup`'s focus manager, and `MenuStore.setOpen` — which emits on this
+	// context's event bus so a detached trigger or `MenuHandle` reaches this Root's `setOpen`.
+	// Pinned by the detached-trigger/handle tests in `tests/menu.test.ts`: dropping this one field
+	// fails six of them.
 	usePopupInteractionProps(
 		store as any,
 		{

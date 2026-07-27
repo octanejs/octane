@@ -1075,3 +1075,25 @@ export function MenuInteractive() @{
 		</Menu.Root>
 	</div>
 }
+
+// Menu (DETACHED trigger via a handle) — the trigger sits OUTSIDE `Menu.Root` and is associated
+// with it only through the shared `Menu.Handle`. This is the path where `MenuStore.setOpen` must
+// reach `Menu.Root`'s `setOpen`: the store routes it through the floating root context's event bus
+// rather than applying it directly, precisely so a holder of the store alone (a detached trigger,
+// or `handle.open()`/`handle.close()`) drives the one Root that owns the open-change sequence.
+export function MenuWithHandle({ handle }: { handle: any }) @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Trigger handle={handle} id="detached-menu-trigger" className="menu-trigger">
+			Open menu
+		</Menu.Trigger>
+		<Menu.Root handle={handle} modal={false}>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
