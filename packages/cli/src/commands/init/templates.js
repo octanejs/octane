@@ -109,8 +109,16 @@ export const tsconfig = {
 	include: ['src/**/*', 'vite.config.ts'],
 };
 
+/**
+ * Scripts that are correct whatever the bundler is. `tsrx-tsc` is the only
+ * typechecker that reads `.tsrx`, regardless of how the project builds.
+ */
 export const SCRIPTS = {
+	typecheck: 'tsrx-tsc --noEmit -p tsconfig.json',
+};
+
+/** Added only when init is the one creating the Vite config. */
+export const VITE_SCRIPTS = {
 	dev: 'vite',
 	build: 'vite build',
-	typecheck: 'tsrx-tsc --noEmit -p tsconfig.json',
 };

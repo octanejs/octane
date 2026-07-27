@@ -146,6 +146,25 @@ describe('octane init', () => {
 		}
 	});
 
+	it('scaffolds only what is correct for a non-Vite bundler', async () => {
+		// @octanejs/rspack-plugin exports no defineConfig/RenderRoute, so an
+		// octane.config.ts written for it cannot resolve; `vite`/`vite build`
+		// scripts would also be wrong with no vite installed.
+		const { root } = fixture({ 'rspack.config.ts': 'export default {};\n' });
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(existsSync(path.join(root, 'octane.config.ts'))).toBe(false);
+		const scripts = JSON.parse(read(root, 'package.json')).scripts;
+		expect(scripts.typecheck).toContain('tsrx-tsc');
+		expect(scripts.dev).toBeUndefined();
+		expect(scripts.build).toBeUndefined();
+		expect(result.json().manual.join(' ')).toContain('build-tools');
+	});
+
 	it('is idempotent', async () => {
 		const { root } = fixture();
 		const argv = ['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'];

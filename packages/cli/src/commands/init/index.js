@@ -7,6 +7,7 @@ import { installPackages } from '../../kernel/install.js';
 import {
 	MODES,
 	SCRIPTS,
+	VITE_SCRIPTS,
 	appComponent,
 	integrationFor,
 	octaneConfig,
@@ -112,7 +113,21 @@ function plan(project, mode, integration) {
 		);
 	}
 
-	if (mode === 'fullstack') {
+	// init only knows how to scaffold Vite. On another bundler it still does the
+	// parts that are correct everywhere (tsconfig, the right plugin, the right
+	// dependency) and states the rest, rather than writing an octane.config.ts
+	// whose import does not resolve or `vite` scripts with no vite installed.
+	// @octanejs/rspack-plugin in particular exports no defineConfig/RenderRoute:
+	// it is the low-level integration where the app owns its own shell.
+	const scaffoldsVite = project.bundler === null || project.bundler === 'vite';
+
+	if (mode === 'fullstack' && !scaffoldsVite) {
+		manual.push(
+			`Add an octane.config.ts for ${project.bundler}: see https://octanejs.dev/docs/build-tools`,
+		);
+	}
+
+	if (mode === 'fullstack' && scaffoldsVite) {
 		if (!project.octaneConfigPath) {
 			changes.push({
 				file: 'octane.config.ts',
@@ -130,7 +145,8 @@ function plan(project, mode, integration) {
 	}
 
 	const scripts = project.manifest.scripts ?? {};
-	const missing = Object.entries(SCRIPTS).filter(([name]) => !scripts[name]);
+	const applicable = scaffoldsVite ? { ...VITE_SCRIPTS, ...SCRIPTS } : SCRIPTS;
+	const missing = Object.entries(applicable).filter(([name]) => !scripts[name]);
 	if (missing.length > 0) {
 		changes.push({
 			file: 'package.json',
