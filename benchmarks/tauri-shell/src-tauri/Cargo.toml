@@ -1,0 +1,22 @@
+[package]
+name = "tauri-shell-bench"
+version = "0.0.0"
+description = "Tauri host for the octane vs react desktop-shell benchmark"
+edition = "2021"
+rust-version = "1.77.2"
+publish = false
+
+[lib]
+name = "tauri_shell_bench_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = true

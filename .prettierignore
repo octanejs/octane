@@ -12,7 +12,11 @@ packages/shadcn/tests/differential/upstream/
 # Vendored pinned upstream shadcn style sheet (byte-exact below its header)
 playground/octane/src/styles/style-nova.css
 **/dist/
+**/dist-active/
 **/build/
+# Cargo build artifacts and Tauri's generated ACL schemas
+**/src-tauri/target/
+**/src-tauri/gen/
 **/.netlify/
 **/.nitro/
 **/.output/

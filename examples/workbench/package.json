@@ -1,0 +1,28 @@
+{
+  "name": "workbench-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A Tauri v2 desktop task runner built with Octane, exercising the @octanejs/tauri command and event hooks.",
+  "scripts": {
+    "dev": "vite --host --port 5231 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host --port 5231 --strictPort",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@octanejs/tauri": "workspace:*",
+    "@tauri-apps/api": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@tauri-apps/cli": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

@@ -490,6 +490,44 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tauri',
+					include: ['packages/tauri/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tauri$/,
+							replacement: resolve(import.meta.dirname, 'packages/tauri/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tauri-ssr',
+					include: ['packages/tauri/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tauri$/,
+							replacement: resolve(import.meta.dirname, 'packages/tauri/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',

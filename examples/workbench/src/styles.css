@@ -1,0 +1,215 @@
+:root {
+	color-scheme: light dark;
+	--surface: #f6f7f5;
+	--panel: #ffffff;
+	--ink: #16201c;
+	--muted: #5c6b65;
+	--accent: #1f6f5c;
+	--line: #d9e0dc;
+	--danger: #a03027;
+	font-family:
+		ui-sans-serif,
+		system-ui,
+		-apple-system,
+		'Segoe UI',
+		sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--surface: #101512;
+		--panel: #182019;
+		--ink: #e7efe9;
+		--muted: #9dada5;
+		--accent: #6fd1ac;
+		--line: #26312b;
+		--danger: #ff9b8f;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--surface);
+	color: var(--ink);
+}
+
+.workbench {
+	max-width: 60rem;
+	margin: 0 auto;
+	padding: 1.5rem 1.25rem 3rem;
+}
+
+.masthead {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	border-bottom: 1px solid var(--line);
+	padding-bottom: 0.75rem;
+}
+
+.masthead h1 {
+	font-size: 1.35rem;
+	margin: 0;
+	letter-spacing: -0.01em;
+}
+
+.mode {
+	margin: 0;
+	font-size: 0.78rem;
+	color: var(--muted);
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	padding: 0.2rem 0.6rem;
+}
+
+.panes {
+	display: grid;
+	grid-template-columns: minmax(14rem, 20rem) 1fr;
+	gap: 1.25rem;
+	margin-top: 1.25rem;
+	align-items: start;
+}
+
+@media (max-width: 46rem) {
+	.panes {
+		grid-template-columns: 1fr;
+	}
+}
+
+.pane {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 0.6rem;
+	padding: 1rem;
+}
+
+.pane h2 {
+	margin: 0 0 0.75rem;
+	font-size: 0.78rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+}
+
+.task-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 0.4rem;
+}
+
+.task-list button {
+	width: 100%;
+	display: grid;
+	gap: 0.15rem;
+	text-align: left;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 0.45rem;
+	padding: 0.55rem 0.6rem;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+}
+
+.task-list button:hover {
+	border-color: var(--line);
+}
+
+.task-list button[aria-pressed='true'] {
+	border-color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.task-name {
+	font-weight: 600;
+}
+
+.task-summary {
+	font-size: 0.82rem;
+	color: var(--muted);
+}
+
+.status {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+.error {
+	display: grid;
+	gap: 0.6rem;
+	justify-items: start;
+	color: var(--danger);
+	font-size: 0.9rem;
+}
+
+.error p {
+	margin: 0;
+}
+
+.facts {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.35rem 1rem;
+	margin: 0 0 1.1rem;
+	font-size: 0.9rem;
+}
+
+.facts dt {
+	color: var(--muted);
+}
+
+.facts dd {
+	margin: 0;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.run-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-bottom: 0.6rem;
+}
+
+button {
+	font: inherit;
+}
+
+.run-controls button,
+.error button {
+	background: var(--accent);
+	color: var(--panel);
+	border: 1px solid transparent;
+	border-radius: 0.4rem;
+	padding: 0.4rem 0.8rem;
+	cursor: pointer;
+}
+
+.run-controls button[aria-pressed='false'] {
+	background: transparent;
+	color: inherit;
+	border-color: var(--line);
+}
+
+.run-status {
+	margin: 0 0 0.5rem;
+	font-size: 0.82rem;
+	color: var(--muted);
+}
+
+.log {
+	margin: 0;
+	padding-left: 1.4rem;
+	display: grid;
+	gap: 0.2rem;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.84rem;
+	min-height: 1.4rem;
+}

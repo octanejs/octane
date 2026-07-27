@@ -29,6 +29,7 @@ the delivery waves and the distinct regression responsibility of each app.
 | [Streambox](streambox) | A video platform using native media events, a persistent player node, and TanStack Virtual comments | Strict TypeScript support code, production TSRX build, local seekable media, and playback, identity, virtualization, navigation, and recovery Playwright journeys |
 | [Threadline](threadline) | A social timeline using Zustand, optimistic mutations, keyed prepends, and live composer state | Strict TypeScript support code, production TSRX build, and navigation, identity, rapid-interleaving, and rollback Playwright journeys |
 | [Wayfinder](wayfinder) | A streaming travel planner using parallel `use()`, out-of-order Suspense reveals, request aborts, and CSP-safe hydration | Strict TypeScript support code, production client/server builds, and SSR adoption, streaming, abort, CSP, and recovery Playwright journeys |
+| [Workbench](workbench) | A Tauri v2 desktop task runner using suspending IPC commands, command state with refetch, and a detachable event subscription | Strict TypeScript support code, production TSRX build, a Rust backend beside a mock IPC bridge, and streaming, isolation, and recovery Playwright journeys |
 
 ## Repository commands
 

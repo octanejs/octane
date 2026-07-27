@@ -1,0 +1,10 @@
+{
+  "name": "@benchmarks/tauri-shell",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Octane vs React inside a real Tauri window: cold start, IPC-streamed log tail, and keyed churn on WKWebView.",
+  "scripts": {
+    "bench": "node run.mjs"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@benchmarks/tauri-shell-harness",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Workload parameters, deterministic row data, and IPC plumbing shared byte-for-byte by every Tauri shell benchmark target.",
+  "main": "./harness.js",
+  "exports": {
+    ".": "./harness.js"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "catalog:default"
+  }
+}

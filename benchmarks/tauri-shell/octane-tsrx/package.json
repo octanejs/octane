@@ -1,0 +1,19 @@
+{
+  "name": "octane-tsrx-tauri-shell",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Octane column of the Tauri desktop-shell benchmark - cold start, IPC-streamed log tail, and synchronous keyed churn inside the real webview.",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@benchmarks/tauri-shell-harness": "workspace:*",
+    "@tauri-apps/api": "catalog:default",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "terser": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
