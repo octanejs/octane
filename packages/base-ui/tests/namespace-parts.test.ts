@@ -92,12 +92,33 @@ const EXPECTED: Record<string, [Record<string, unknown>, string[]]> = {
 			'Handle',
 		],
 	],
-	// Menu lands in stages (Phase 3f). This list is the STAGE 1 surface — the open/close +
-	// roving-focus path. `Item`, `CheckboxItem`, `RadioGroup`/`RadioItem`, `Group`/`GroupLabel`,
-	// `LinkItem`, `Separator`, `Arrow`, `Backdrop`, `Viewport`, `SubmenuRoot`/`SubmenuTrigger` get
-	// appended here as their stages land; the list must reach upstream's full `index.parts.ts` by
-	// the end of Phase 3f.
-	Menu: [Menu, ['Root', 'Trigger', 'Portal', 'Positioner', 'Popup', 'createHandle', 'Handle']],
+	// Menu lands in stages (Phase 3f). This is the STAGE 1 + 2 surface: everything in upstream's
+	// `menu/index.parts.ts` except `SubmenuRoot`/`SubmenuTrigger`, which land in stage 3.
+	Menu: [
+		Menu,
+		[
+			'Root',
+			'Trigger',
+			'Portal',
+			'Positioner',
+			'Popup',
+			'Arrow',
+			'Backdrop',
+			'Viewport',
+			'Item',
+			'LinkItem',
+			'CheckboxItem',
+			'CheckboxItemIndicator',
+			'RadioGroup',
+			'RadioItem',
+			'RadioItemIndicator',
+			'Group',
+			'GroupLabel',
+			'Separator',
+			'createHandle',
+			'Handle',
+		],
+	],
 };
 
 describe('@octanejs/base-ui — component namespaces expose every upstream part', () => {

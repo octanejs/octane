@@ -23,22 +23,34 @@ const CACHE = resolve(__dirname, '.react-cache');
  * manager's own inside guards.
  *
  * Both runtimes run that identical code; the asymmetry is one document for two apps, not a port
- * divergence (probed: the side holding focus keeps `tabindex="0"`, the side that lost it gets
- * `-1`, and which side that is flips with whatever the previous test left focused). So the guards'
- * tabindex is normalised away and EVERYTHING else — positioner styles, backdrop, roles, ids,
- * aria/data attributes, portal structure — is still byte-compared.
+ * divergence (probed: the side holding focus keeps its original `tabindex`, the side that lost it
+ * gets `-1`, and which side that is flips with whatever the previous test left focused).
+ *
+ * Rather than delete the attributes, this UNDOES the disable — `disableFocusInside` stashes the
+ * previous value in `data-tabindex`, so restoring it is exactly what `enableFocusInside` does when
+ * focus comes back. Both sides therefore normalise to their pre-disable DOM and the `tabindex`
+ * values are still compared, which matters once menu ITEMS are in the popup: their tabindex is
+ * roving state (`open && highlighted ? 0 : -1`), not a constant, so blanket-stripping it would hide
+ * a real roving-focus divergence. Everything else is byte-compared untouched.
  */
-function stripFocusGuardTabIndex(html: string): string {
-	return html.replace(/(<span [^>]*data-base-ui-focus-guard=""[^>]*>)/g, (guard) =>
-		guard.replace(/ data-tabindex="[^"]*"/, '').replace(/ tabindex="[^"]*"/, ''),
-	);
+function undoFocusInsideDisable(html: string): string {
+	return html.replace(/<[a-z]+ [^>]*data-tabindex="[^"]*"[^>]*>/g, (tag) => {
+		const stashed = / data-tabindex="([^"]*)"/.exec(tag)?.[1] ?? '';
+		const withoutStash = tag.replace(/ data-tabindex="[^"]*"/, '');
+		return stashed === ''
+			? withoutStash.replace(/ tabindex="[^"]*"/, '')
+			: withoutStash.replace(/ tabindex="[^"]*"/, ` tabindex="${stashed}"`);
+	});
 }
 
-/** `d.step` for open menus: same compare, minus the shared-focus guard artifact above. */
-async function stepIgnoringGuardTabIndex(d: any, name: string): Promise<void> {
+/**
+ * `d.step` for open menus: same byte-compare, after undoing the shared-document focus artifact
+ * above on both sides.
+ */
+async function stepUndoingFocusDisable(d: any, name: string): Promise<void> {
 	await d.observe(name, () => {});
-	const octane = stripFocusGuardTabIndex(normaliseHtml(d.octane.container.innerHTML));
-	const react = stripFocusGuardTabIndex(normaliseHtml(d.react.container.innerHTML));
+	const octane = undoFocusInsideDisable(normaliseHtml(d.octane.container.innerHTML));
+	const react = undoFocusInsideDisable(normaliseHtml(d.react.container.innerHTML));
 	expect(octane).toBe(react);
 }
 
@@ -568,25 +580,55 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 
 	it('Menu: open modal dropdown (Portal/backdrop/Positioner/Popup) renders byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpen', undefined, CACHE);
-		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		await stepUndoingFocusDisable(d, 'mount (open)');
 		d.unmount();
 	});
 
 	it('Menu: open non-modal dropdown (no internal backdrop) renders byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenNonModal', undefined, CACHE);
-		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		await stepUndoingFocusDisable(d, 'mount (open)');
 		d.unmount();
 	});
 
 	it('Menu: open with explicit side/align/sideOffset renders byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenPlacement', undefined, CACHE);
-		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		await stepUndoingFocusDisable(d, 'mount (open)');
 		d.unmount();
 	});
 
 	it('Menu: open with a disabled root renders byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenDisabled', undefined, CACHE);
-		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with items, a disabled item, Separator and Group/GroupLabel', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenWithItems', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with checkbox items (checked/unchecked + transition-mounted indicator)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenCheckboxItems', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a radio group (group label wiring + selected indicator)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenRadioGroup', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with LinkItem, Arrow and Backdrop', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenLinkArrowBackdrop', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a Viewport wrapping the items', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenViewport', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
 		d.unmount();
 	});
 });

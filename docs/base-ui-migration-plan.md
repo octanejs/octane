@@ -10,6 +10,43 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3f STAGE 2 — the Menu item family (2026-07-27). Green: 121 base-ui tests (86 differential
+> + 35 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage unchanged at
+> **29/43** (Menu was already counted); the `menu` subpath goes from 5 parts to 18 of upstream's 20.
+>
+> Adds ~1,700 loc to `packages/base-ui/src/menu.ts`: `utils/stateAttributesMapping` (`itemMapping`,
+> deferred from stage 1 because it needs the checkbox data-attributes), `item/`
+> (`useMenuItemCommonProps` + `useMenuItem` + `MenuItem`), `link-item/`, `checkbox-item/` +
+> `checkbox-item-indicator/`, `radio-group/` + `radio-item/` + `radio-item-indicator/`, `group/` +
+> `group-label/`, `arrow/`, `backdrop/` and `viewport/`. `Menu.Separator` re-exports the shared
+> `Separator` exactly as upstream's `index.parts.ts` does.
+>
+> **This is where Phase 3e is finally exercised end-to-end.** Items register with the positioner's
+> `CompositeList`, so `useListNavigation` can rove `data-highlighted` and the roving `tabindex`
+> between them and `useTypeahead` can match their collected labels. Behavior tests pin arrow-key
+> roving, Home/End, single-character typeahead, buffer ACCUMULATION (typing `b` then `a` searches
+> `"ba"` and stays on Banana, where a non-accumulating implementation would jump to Apple), and the
+> `TYPEAHEAD_RESET_MS` reset. **3e still needed no repairs.**
+>
+> The differential helper from stage 1 got stronger rather than staying a strip: it now UNDOES
+> `disableFocusInside` by restoring each element's stashed `data-tabindex`, which is exactly what
+> `enableFocusInside` does when focus returns. That keeps `tabindex` VALUES in the byte-compare —
+> which matters now that items are present, since their tabindex is roving state
+> (`open && highlighted ? 0 : -1`) rather than a constant, and blanket-stripping it would have
+> hidden a real roving-focus divergence.
+>
+> Two upstream behaviors worth recording, both confirmed by probe rather than assumption: opening a
+> menu highlights the first item immediately (there is no "nothing highlighted" state after open),
+> and typeahead buffers across keystrokes within `TYPEAHEAD_RESET_MS` rather than matching each key
+> independently.
+>
+> `React.memo` on `MenuRadioGroup` is dropped (octane memoizes renders itself; the wrapper carries
+> no behavioral contract), as are `useControlled`'s `name`/`state` labels, which exist only for
+> React dev warnings.
+>
+> Not in this stage: `SubmenuRoot`/`SubmenuTrigger` (stage 3), `Menubar` and `ContextMenu`
+> (stage 4).
+
 > **Phase 3f STAGE 1 — Menu open/close + roving-focus path (2026-07-27). Green: 108 base-ui tests
 > (81 differential + 27 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage
 > moves 28/43 → **29/43**.
@@ -663,12 +700,12 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
     `Root`, `Trigger`, `Portal`, `Positioner`, `Popup` — the open/close +
     roving-focus path, and the first point a differential test can render an
     OPEN menu. Exercises Phase 3e's `useListNavigation`/`useTypeahead`. ✅
-  - *Stage 2* (~1,400 loc): `Item`, `CheckboxItem`(+`Indicator`),
+  - *Stage 2* (DONE, ~1,700 loc): `Item`, `CheckboxItem`(+`Indicator`),
     `RadioGroup`/`RadioItem`(+`Indicator`), `Group`/`GroupLabel`, `LinkItem`,
     `Separator`, `Arrow`, `Backdrop`, `Viewport`, and
-    `menu/utils/stateAttributesMapping`. *Exit:* differential on a populated
-    open menu, behavior tests for roving focus, typeahead, and checkbox/radio
-    item semantics.
+    `menu/utils/stateAttributesMapping`. Differential on populated open menus;
+    behavior tests for roving focus, typeahead (including buffer accumulation
+    and reset), and checkbox/radio item semantics. ✅
   - *Stage 3* (~340 loc): `SubmenuRoot` + `SubmenuTrigger`. *Exit:* behavior
     tests for submenu open/close and the parent/sibling close relay.
   - *Stage 4* (~650 loc): `Menubar` and `ContextMenu` (+ `useClientPoint`),
