@@ -71,7 +71,7 @@ function createStore(stats) {
 			});
 		},
 		async invalidate() {
-			await backend?.invalidate?.();
+			return backend?.invalidate?.();
 		},
 		get size() {
 			return listeners.size;
@@ -119,6 +119,15 @@ async function createStoreBackend(name) {
 		const { QueryClient } = await import('../../packages/tanstack-query/src/benchmark-core.ts');
 		const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
 		const queryKey = ['runtime-stress', 'subscribers'];
+		let refetches = 0;
+		client.setQueryDefaults(queryKey, {
+			queryFn: async () => {
+				const values = client.getQueryData(queryKey);
+				if (!values) throw new Error('The benchmark query lost its cached subscriber state');
+				refetches++;
+				return values.with(17, values[17] + 1);
+			},
+		});
 		client.setQueryData(queryKey, initial());
 		return {
 			name,
@@ -136,7 +145,10 @@ async function createStoreBackend(name) {
 					Array.from({ length: STORE_SUBSCRIBER_COUNT }, () => value),
 				);
 			},
-			invalidate: () => client.invalidateQueries({ queryKey, exact: true }),
+			async invalidate() {
+				await client.invalidateQueries({ queryKey, exact: true, refetchType: 'all' });
+				return { refetches, value: client.getQueryData(queryKey)?.[17] };
+			},
 		};
 	}
 	throw new Error(`Unknown external-store integration: ${name}`);

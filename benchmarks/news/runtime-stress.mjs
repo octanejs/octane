@@ -550,13 +550,56 @@ async function runStoreIntegrationSample() {
 					),
 				STORE_SUBSCRIBER_COUNT,
 			);
+			const rapidAt = await page.evaluate(() => performance.now());
+			let invalidation;
 			if (name === 'tanstack-query') {
-				await page.evaluate(() => window.__runtimeStress.store.invalidate());
+				const attempt = await page.evaluate(async () => {
+					const { stats, store } = window.__runtimeStress;
+					const before = {
+						backendNotifications: stats.store.backendNotifications,
+						startedAt: performance.now(),
+						value: store.get(17),
+					};
+					const result = await store.invalidate();
+					return {
+						before,
+						refetches: result?.refetches ?? 0,
+						refetchedValue: result?.value,
+					};
+				});
 				await page.waitForFunction(
-					() => document.querySelector('[data-subscriber-index="17"]')?.textContent === '10',
+					(count) =>
+						document.querySelectorAll('[data-subscriber-index]').length === count &&
+						Array.from(document.querySelectorAll('[data-subscriber-index]')).every(
+							(node, index) => node.textContent === (index === 17 ? '11' : '7'),
+						),
+					STORE_SUBSCRIBER_COUNT,
 				);
+				invalidation = await page.evaluate((result) => {
+					const { stats, store } = window.__runtimeStress;
+					return {
+						...result,
+						backendNotifications: stats.store.backendNotifications,
+						completedAt: performance.now(),
+						renderedValue: document.querySelector('[data-subscriber-index="17"]')?.textContent,
+						value: store.get(17),
+					};
+				}, attempt);
+				ensure(
+					invalidation.before.value === 10,
+					'query invalidation did not start from rapid data',
+				);
+				ensure(invalidation.refetches === 1, 'query invalidation did not refetch exactly once');
+				ensure(invalidation.refetchedValue === 11, 'query refetch did not update the cached value');
+				ensure(invalidation.value === 11, 'query refetch did not update the store snapshot');
+				ensure(invalidation.renderedValue === '11', 'query refetch did not update the visible UI');
+				ensure(
+					invalidation.backendNotifications > invalidation.before.backendNotifications,
+					'query invalidation did not notify store subscribers',
+				);
+				ops.tanstack_query_invalidation = invalidation.completedAt - invalidation.before.startedAt;
 			}
-			const updatedAt = await page.evaluate(() => performance.now());
+			const unmountStarted = await page.evaluate(() => performance.now());
 			await page.locator('#store-toggle').click();
 			await page.waitForFunction(
 				() =>
@@ -580,9 +623,9 @@ async function runStoreIntegrationSample() {
 			ops[`${name.replace('-', '_')}_mount`] = readyAt - mountedAt;
 			ops[`${name.replace('-', '_')}_narrow`] = narrowAt - readyAt;
 			ops[`${name.replace('-', '_')}_broad`] = broadAt - narrowAt;
-			ops[`${name.replace('-', '_')}_rapid`] = updatedAt - broadAt;
-			ops[`${name.replace('-', '_')}_unmount`] = state.completedAt - updatedAt;
-			integrations.push(state);
+			ops[`${name.replace('-', '_')}_rapid`] = rapidAt - broadAt;
+			ops[`${name.replace('-', '_')}_unmount`] = state.completedAt - unmountStarted;
+			integrations.push({ ...state, ...(invalidation ? { invalidation } : {}) });
 		}
 		ensure(sample.failures.length === 0, sample.failures.join('; '));
 		return { ops, meta: { integrations, subscriberCount: STORE_SUBSCRIBER_COUNT } };
