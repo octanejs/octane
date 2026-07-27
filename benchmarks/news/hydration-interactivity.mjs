@@ -22,6 +22,7 @@ const positional = args.filter((value) => !value.startsWith('--'));
 const target = TARGETS.includes(positional[0]) ? positional.shift() : 'octane-tsrx';
 const iterations = Number.parseInt(positional[0] ?? '5', 10);
 const warmup = 1;
+const extendedStress = process.env.OCTANE_HYDRATION_STRESS === '1';
 
 if (!Number.isSafeInteger(iterations) || iterations < 1) {
 	throw new Error('Hydration interactivity iterations must be a positive integer');
@@ -385,7 +386,7 @@ async function runReplaySample() {
 	}
 }
 
-async function runSearchAndSendSample() {
+async function runSearchAndSendSample({ keyboard = false } = {}) {
 	const sample = await openSample({ cpuRate: 6, controlled: true, interaction: true });
 	try {
 		const input = sample.page.locator('#hydration-input');
@@ -408,7 +409,12 @@ async function runSearchAndSendSample() {
 		ensure(typed.firstNativeInputAt > 0, 'search typing did not produce native input events');
 
 		const clickedAt = await sample.page.evaluate(() => performance.now());
-		await button.click();
+		if (keyboard) {
+			await button.focus();
+			await sample.page.keyboard.press('Enter');
+		} else {
+			await button.click();
+		}
 		const before = await sample.page.evaluate(() => ({
 			clicks: Number(document.querySelector('#hydration-clicks')?.textContent),
 			focuses: Number(document.querySelector('#hydration-focuses')?.textContent),
@@ -503,6 +509,7 @@ const replayCounts = [];
 const focusReplayCounts = [];
 const replayResults = [];
 const searchSendResults = [];
+const keyboardSendResults = [];
 const inputPreservation = {
 	uncontrolled_1x: [],
 	uncontrolled_6x: [],
@@ -518,6 +525,7 @@ try {
 		const controlled = await runTypingSample({ cpuRate: 6, controlled: true });
 		const replay = await runReplaySample();
 		const searchAndSend = await runSearchAndSendSample();
+		const keyboardSend = extendedStress ? await runSearchAndSendSample({ keyboard: true }) : null;
 
 		if (index >= warmup) {
 			addSamples(rawOperations, 'uncontrolled_1x', plain);
@@ -532,6 +540,10 @@ try {
 			focusReplayCounts.push(replay.replayedFocusEvents);
 			replayResults.push(replay);
 			searchSendResults.push(searchAndSend.delivery);
+			if (keyboardSend) {
+				addSamples(rawOperations, 'keyboard_send_6x', keyboardSend);
+				keyboardSendResults.push(keyboardSend.delivery);
+			}
 		}
 	}
 } catch (error) {
@@ -574,8 +586,27 @@ const userExperience = {
 	issues: [...new Set(searchSendResults.flatMap((sample) => sample.issues))],
 };
 
+const keyboardExperience = {
+	status:
+		keyboardSendResults.length === 0
+			? 'not-run'
+			: keyboardSendResults.every((sample) => sample.deliveredExactlyOnce)
+				? 'pass'
+				: 'fail',
+	samples: keyboardSendResults.length,
+	deliveredSendClicks: keyboardSendResults.filter((sample) => sample.clickDelivered).length,
+	replayedSendClicks: keyboardSendResults.filter((sample) => sample.clickReplayed).length,
+	handledBeforeHydrationChunk: keyboardSendResults.filter(
+		(sample) => sample.handledBeforeHydrationChunk,
+	).length,
+	droppedSendClicks: keyboardSendResults.filter((sample) => !sample.clickDelivered).length,
+	preservedSearches: keyboardSendResults.filter((sample) => sample.searchPreserved).length,
+	exactDeliveries: keyboardSendResults.filter((sample) => sample.deliveredExactlyOnce).length,
+	issues: [...new Set(keyboardSendResults.flatMap((sample) => sample.issues))],
+};
+
 const payload = {
-	suite: 'hydration-interactivity',
+	suite: extendedStress ? 'hydration-stress' : 'hydration-interactivity',
 	iterations,
 	targets: [
 		{
@@ -592,6 +623,8 @@ const payload = {
 				replayedFocusEvents: focusReplayCounts,
 				interactionResults: replayResults,
 				searchSendResults,
+				keyboardSendResults,
+				keyboardExperience,
 				userExperience,
 				hydrationEventReplay: replayResults.some(
 					(sample) =>
@@ -614,7 +647,9 @@ if (process.env.BENCH_JSON) {
 	fs.writeFileSync(process.env.BENCH_JSON, `${JSON.stringify(payload, null, '\t')}\n`);
 }
 
-console.log(`\nHydration interactivity — ${target} (production, real Chromium typing)`);
+console.log(
+	`\n${extendedStress ? 'Hydration stress' : 'Hydration interactivity'} — ${target} (production, real Chromium typing)`,
+);
 console.log(`Server-rendered articles: ${CARD_COUNT}; CPU throttling: 1× and 6×`);
 console.log(
 	`Hydration event replay: ${payload.targets[0].meta.hydrationEventReplay ? 'observed' : 'not observed'}`,
@@ -660,6 +695,21 @@ if (userExperience.samples > 0) {
 	}
 	if (userExperience.issues.length > 0) {
 		console.log(`  UX correctness issues: ${userExperience.issues.join('; ')}`);
+	}
+}
+if (keyboardExperience.samples > 0) {
+	console.log(`Pre-hydration keyboard-and-send UX: ${keyboardExperience.status.toUpperCase()}`);
+	console.log(
+		`  Enter activations delivered: ${keyboardExperience.deliveredSendClicks}/${keyboardExperience.samples}`,
+	);
+	console.log(
+		`  Enter activations dropped: ${keyboardExperience.droppedSendClicks}/${keyboardExperience.samples}`,
+	);
+	console.log(
+		`  Exact keyboard deliveries: ${keyboardExperience.exactDeliveries}/${keyboardExperience.samples}`,
+	);
+	if (keyboardExperience.issues.length > 0) {
+		console.log(`  Keyboard UX correctness issues: ${keyboardExperience.issues.join('; ')}`);
 	}
 }
 console.log('\nOperation                                  score     median        p95');

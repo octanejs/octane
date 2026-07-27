@@ -11,6 +11,13 @@ import { makeCards, type Scenario } from './data';
 // part of the public contract; piping in onAllReady would buffer everything).
 export const streaming = true;
 
+export function createBenchmarkStream(
+	scenario: Scenario,
+	options: Parameters<typeof renderToPipeableStream>[1] = {},
+) {
+	return renderToPipeableStream(createElement(App, { cards: makeCards(scenario) }), options);
+}
+
 export function renderStream(scenario: Scenario, onChunk: (chunk: string) => void): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const destination = new Writable({

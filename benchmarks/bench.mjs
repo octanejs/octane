@@ -250,7 +250,28 @@ const SUITES = [
 			args: (n) => [target, String(n)],
 		})),
 	},
-	...['lifecycle-memory', 'controlled-form', 'external-store-fanout'].map((name) => ({
+	{
+		name: 'hydration-stress',
+		cwd: 'hydration-stress',
+		servers: [],
+		iter: { normal: 5, quick: 2 },
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
+			label: target,
+			script: 'run.mjs',
+			args: (n) => [target, String(n)],
+		})),
+	},
+	...[
+		'lifecycle-memory',
+		'controlled-form',
+		'external-store-fanout',
+		'external-store-integrations',
+		'scheduler-responsiveness',
+		'suspense-recovery',
+		'event-delegation',
+		'application-composition',
+		'scaling-curves',
+	].map((name) => ({
 		name,
 		cwd: name,
 		servers: [],
@@ -352,6 +373,13 @@ const SUITES = [
 		cwd: 'ssr-http',
 		servers: [],
 		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'streaming-backpressure',
+		cwd: 'streaming-backpressure',
+		servers: [],
+		iter: { normal: 5, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
@@ -498,6 +526,13 @@ const SUITES = [
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		name: 'compiler-throughput',
+		cwd: 'compiler-throughput',
+		servers: [],
+		iter: { normal: 5, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
 		// Shipped-bytes comparison (Node-only): production `vite build` of each
@@ -705,7 +740,7 @@ function runHarness(suite, run, outPath) {
 }
 
 function printHydrationInteractivityUx(result) {
-	if (result.suite !== 'hydration-interactivity') return;
+	if (result.suite !== 'hydration-interactivity' && result.suite !== 'hydration-stress') return;
 
 	const measured = result.targets.filter((target) => target.meta?.userExperience?.samples > 0);
 	if (measured.length === 0) return;
@@ -714,6 +749,23 @@ function printHydrationInteractivityUx(result) {
 	console.error('  framework       outcome  Send handled  query saved   delivered');
 	for (const target of measured) {
 		const ux = target.meta.userExperience;
+		const fraction = (count) => `${count}/${ux.samples}`;
+		console.error(
+			`  ${target.name.padEnd(15)} ${ux.status.toUpperCase().padEnd(8)} ${fraction(
+				ux.deliveredSendClicks,
+			).padEnd(13)} ${fraction(ux.preservedSearches).padEnd(13)} ${fraction(ux.exactDeliveries)}`,
+		);
+		if (ux.issues.length > 0) {
+			console.error(`    UX failure: ${ux.issues.join('; ')}`);
+		}
+	}
+
+	const keyboard = result.targets.filter((target) => target.meta?.keyboardExperience?.samples > 0);
+	if (keyboard.length === 0) return;
+	console.error('\n  Pre-hydration keyboard-and-Send UX correctness');
+	console.error('  framework       outcome  Enter handled query saved   delivered');
+	for (const target of keyboard) {
+		const ux = target.meta.keyboardExperience;
 		const fraction = (count) => `${count}/${ux.samples}`;
 		console.error(
 			`  ${target.name.padEnd(15)} ${ux.status.toUpperCase().padEnd(8)} ${fraction(

@@ -19,6 +19,10 @@
 	let audience = $state('personal');
 	let conditional = $state(false);
 	const store = getRuntimeStress().store;
+	const asyncResource = getRuntimeStress().async;
+	let asyncSnapshot = $state(asyncResource.getSnapshot());
+
+	$effect(() => asyncResource.subscribe(() => (asyncSnapshot = asyncResource.getSnapshot())));
 
 	function reset() {
 		resetVersion++;
@@ -134,5 +138,20 @@
 				{/each}
 			</div>
 		{/if}
+	</section>
+
+	<section aria-label="Async recovery">
+		<button id="async-resolve" type="button" onclick={() => asyncResource.run('resolve')}>
+			Resolve request
+		</button>
+		<button id="async-reject" type="button" onclick={() => asyncResource.run('reject')}>
+			Reject request
+		</button>
+		<button id="async-slow" type="button" onclick={() => asyncResource.run('slow', 'stale')}>
+			Start slow request
+		</button>
+		<output id="async-status">{asyncSnapshot.status}</output>
+		<output id="async-value">{asyncSnapshot.value}</output>
+		<output id="async-error">{asyncSnapshot.error}</output>
 	</section>
 </main>

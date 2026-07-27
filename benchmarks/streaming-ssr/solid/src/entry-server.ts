@@ -10,6 +10,12 @@ import { makeCards, type Scenario } from './data';
 // split), not solid-js/web.
 export const streaming = true;
 
+export function createBenchmarkStream(scenario: Scenario) {
+	return renderToStream(() => App({ cards: makeCards(scenario) }), {
+		onError: () => {},
+	});
+}
+
 export function renderStream(scenario: Scenario, onChunk: (chunk: string) => void): Promise<void> {
 	return new Promise((resolve, reject) => {
 		try {

@@ -1,5 +1,5 @@
 <script setup vapor lang="ts">
-import { shallowRef } from 'vue';
+import { onMounted, onUnmounted, shallowRef } from 'vue';
 import {
 	FORM_FIELDS,
 	LIFECYCLE_ROWS,
@@ -20,6 +20,17 @@ const delivery = shallowRef('standard');
 const audience = shallowRef('personal');
 const conditional = shallowRef(false);
 const store = getRuntimeStress().store;
+const asyncResource = getRuntimeStress().async;
+const asyncSnapshot = shallowRef(asyncResource.getSnapshot());
+let unsubscribeAsync: (() => void) | undefined;
+
+onMounted(() => {
+	unsubscribeAsync = asyncResource.subscribe(() => {
+		asyncSnapshot.value = asyncResource.getSnapshot();
+	});
+});
+
+onUnmounted(() => unsubscribeAsync?.());
 
 function reset() {
 	resetVersion.value++;
@@ -124,6 +135,21 @@ function writeRapid() {
 			<div v-if="storeVisible" id="store-subscribers">
 				<StoreSubscriber v-for="index of STORE_SUBSCRIBERS" :key="index" :index="index" />
 			</div>
+		</section>
+
+		<section aria-label="Async recovery">
+			<button id="async-resolve" type="button" @click="asyncResource.run('resolve')">
+				Resolve request
+			</button>
+			<button id="async-reject" type="button" @click="asyncResource.run('reject')">
+				Reject request
+			</button>
+			<button id="async-slow" type="button" @click="asyncResource.run('slow', 'stale')">
+				Start slow request
+			</button>
+			<output id="async-status">{{ asyncSnapshot.status }}</output>
+			<output id="async-value">{{ asyncSnapshot.value }}</output>
+			<output id="async-error">{{ asyncSnapshot.error }}</output>
 		</section>
 	</main>
 </template>
