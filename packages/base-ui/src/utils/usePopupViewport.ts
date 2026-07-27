@@ -104,7 +104,7 @@ function usePopupContentKey(
 	payload: unknown,
 	slot: symbol | undefined,
 ): string {
-	const [contentKey, setContentKey, getContentKey] = useState(0, subSlot(slot, 'ck'));
+	const [contentKey, setContentKey] = useState(0, subSlot(slot, 'ck'));
 	const previousActiveTriggerIdRef = useRef(activeTriggerId, subSlot(slot, 'prevId'));
 	const previousPayloadRef = useRef(payload, subSlot(slot, 'prevPayload'));
 	const pendingPayloadUpdateRef = useRef(false, subSlot(slot, 'pending'));
@@ -119,11 +119,11 @@ function usePopupContentKey(
 
 			if (triggerIdChanged) {
 				// Remount immediately on trigger change; remember if the payload hasn't caught up yet.
-				setContentKey(getContentKey() + 1);
+				setContentKey((k) => k + 1);
 				pendingPayloadUpdateRef.current = !payloadChanged;
 			} else if (pendingPayloadUpdateRef.current && payloadChanged) {
 				// The payload arrived a render later, so remount once more to avoid reusing old nodes.
-				setContentKey(getContentKey() + 1);
+				setContentKey((k) => k + 1);
 				pendingPayloadUpdateRef.current = false;
 			}
 
