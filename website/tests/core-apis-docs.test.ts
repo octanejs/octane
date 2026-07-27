@@ -133,8 +133,9 @@ describe('Core APIs documentation', () => {
 		);
 		expect(active).toBeTruthy();
 		expect(active?.getAttribute('aria-current')).toBe('page');
+		// Pagination follows the docsMeta order; CLI closes out "Start here".
 		expect(container.querySelector('.pagination-link.previous')?.getAttribute('href')).toBe(
-			'/docs/build-tools',
+			'/docs/cli',
 		);
 		expect(container.querySelector('.pagination-link.next')?.getAttribute('href')).toBe(
 			'/docs/tsrx-vs-tsx',

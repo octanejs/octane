@@ -1,0 +1,213 @@
+---
+title: CLI
+---
+
+import { PackageInstall } from '../../components/PackageInstall.tsrx';
+
+<div className="doc-hero">
+	<h1>CLI</h1>
+	<p className="doc-lede">
+		{
+			'The octane command line: wire Octane into a project, diagnose the configuration mistakes that fail quietly, install bindings, decode runtime errors, and give your coding agent the Octane tools.'
+		}
+	</p>
+</div>
+
+<h2 id="install">Install</h2>
+
+<PackageInstall dev="@octanejs/cli" />
+
+Or run it without installing anything:
+
+```bash
+pnpm dlx @octanejs/cli doctor
+```
+
+Every command takes the same global options: `--json`, `--cwd <dir>`, `--yes`,
+`--dry-run`, `--no-color`, `--verbose`, and `--help`.
+
+<h2 id="doctor">octane doctor</h2>
+
+Octane compiles ahead of time, so a misconfiguration usually degrades instead of
+erroring. `doctor` runs 20 checks over exactly the cases where that happens:
+
+```bash
+octane doctor
+
+dependencies
+  ✖ Single Octane runtime          2 copies of octane are installed
+      Hooks and context are keyed per runtime instance, so a second copy breaks
+      them without raising an error. Deduplicate before debugging anything else.
+  ✔ Vite peer range                vite 8.1.5 satisfies ^8.0.16
+
+typescript
+  ✖ JSX import source              jsxImportSource is not set
+  ⚠ Typecheck script               typecheck runs plain tsc
+  ✖ No wildcard .tsrx declaration  declare module '*.tsrx' found in 1 file(s)
+
+3 failing · 1 warning · 11 passing
+`octane doctor --fix` can repair 2 findings.
+```
+
+What it looks for, in the order it reports:
+
+- **environment** — Node 22 or newer, and a package manager it can read.
+- **dependencies** — that `octane` resolves, that there is only **one** copy of
+  it, that your Vite satisfies Octane's peer range, that every installed
+  `@octanejs/*` binding agrees with your runtime version, and that
+  `@tsrx/typescript-plugin` is present once you have `.tsrx` files.
+- **bundler** — that exactly one Octane plugin is registered, distinguishing the
+  client-only `octane/compiler/vite` from the full `@octanejs/vite-plugin`, and
+  reporting both being wired at once.
+- **typescript** — `jsxImportSource: "octane"`, the TSRX language-service
+  plugin, a sane `moduleResolution`, a typecheck script that runs `tsrx-tsc`
+  rather than plain `tsc`, and no wildcard `.tsrx` module declaration.
+- **config** — that `octane.config.ts` loads, that every route entry resolves to
+  a real file with no duplicate paths, and that a configured deployment adapter
+  is installed.
+- **source** — the JSX pragma on `.tsx` files that import Octane, `forwardRef`
+  imported from `octane` (it does not exist), and `ReactNode` where `OctaneNode`
+  belongs.
+
+<aside className="doc-callout important">
+	<p className="doc-callout-title">Two copies of the runtime</p>
+	<p>
+		{
+			'This is the check worth running first. Hook state and context are keyed per runtime instance, so a duplicated octane in the dependency tree breaks them silently rather than throwing. Every other symptom you are chasing may be downstream of it.'
+		}
+	</p>
+</aside>
+
+<h3 id="fixing">Fixing what it finds</h3>
+
+```bash
+octane doctor --fix
+```
+
+`--fix` only touches findings whose repair is unambiguous: setting
+`jsxImportSource`, registering the TSRX plugin, and rewriting a `tsc` typecheck
+script to `tsrx-tsc`. It edits files as text splices, so the comments and
+formatting in your `tsconfig.json` survive. Everything else prints the exact
+change to make rather than guessing at it.
+
+Add `--dry-run` to see what it would do, `--yes` to skip the confirmation, and
+`--only <id>` or `--category <name>` to narrow the run:
+
+```bash
+octane doctor --category typescript
+octane doctor --only deps.octane-duplicates --only ts.jsx-import-source
+```
+
+<h2 id="analyze">octane analyze</h2>
+
+Where `doctor` checks how the project is wired, `analyze` checks the code. It
+compiles every `.tsrx` through the project's own `octane` and reports what the
+compiler found, so the output is exactly what a build would warn about, and new
+compiler diagnostics appear here without a CLI change.
+
+```bash
+octane analyze
+
+src/Form.tsrx
+  ⚠ 12:43  `onChange` on <input type="text"> is a native commit event in Octane …
+      OCTANE_NATIVE_TEXT_ONCHANGE
+      suggestion: use `onInput` at 12:43
+```
+
+`--code <CODE>` narrows to one diagnostic, `--strict` fails the run on warnings
+as well as errors, and a file that will not parse is reported as an error
+without stopping the rest of the run.
+
+<h2 id="init">octane init</h2>
+
+Adds Octane to a project you already have: the bundler plugin, the TypeScript
+settings `.tsrx` needs, the scripts, and the dependencies.
+
+```bash
+octane init --mode spa        # client-only app
+octane init --mode fullstack  # routing, SSR, and a production build
+```
+
+`spa` wires `octane/compiler/vite`. `fullstack` wires `@octanejs/vite-plugin`
+and scaffolds an `octane.config.ts` with one route, plus the entry component it
+points at.
+
+It never overwrites a script you already defined, and it will not rewrite an
+existing bundler config: an arbitrary `vite.config.ts` cannot be edited
+reliably, so `init` prints the exact import and plugin line to add instead. Run
+it on a clean tree, or pass `--force`, so `git diff` stays a usable review of
+what it wrote.
+
+<h2 id="bindings">Bindings and errors</h2>
+
+`octane add` takes either a binding name or the React package it ports, installs
+it through your package manager, and prints the surface that binding supports
+plus its known divergences from upstream:
+
+```bash
+octane add react-hook-form
+
+@octanejs/hook-form  (ports react-hook-form)
+  Complete port of react-hook-form 7.81.0 …
+
+  Differs from upstream:
+    - register() returns onInput (octane's native per-keystroke event)
+      instead of React's synthetic onChange …
+```
+
+When nothing ports the package, it says so rather than installing something
+adjacent. `octane bindings [query]` browses the whole catalog, and
+`--divergences` includes each entry's caveats.
+
+`octane explain` decodes a runtime error. It takes a bare code, a docs URL, or
+the entire minified message a production build prints — arguments included, so
+you get the full development text back:
+
+```bash
+octane explain 'Minified Octane error #3; visit https://octanejs.dev/errors/3?args[]=%7Bfoo%3A%201%7D'
+```
+
+<h2 id="mcp">octane mcp</h2>
+
+Registers the Octane MCP server with your coding agent, so it can reach the
+Octane skills, the bindings catalog, and the React-to-Octane bridging tools.
+
+```bash
+octane mcp add            # pick from the agents it finds
+octane mcp add claude --scope project
+octane mcp status
+octane mcp remove cursor
+```
+
+Claude Code, Codex, Cursor, and VS Code are supported. Where the client ships
+its own CLI, that CLI does the writing, because it owns its config schema;
+otherwise the config file is read, merged, backed up, and rewritten, treating a
+missing or unparseable file as empty rather than failing on it. `--scope user`
+is the default; `--scope project` writes into the project so the whole team
+picks it up. Run inside an Octane checkout, it also sets `OCTANE_REPO_ROOT`.
+
+<h2 id="agents-and-ci">Agents and CI</h2>
+
+Every command is fully drivable by flags and emits a single JSON document under
+`--json`, so a script, a CI job, and an agent all use the same path a human
+does:
+
+```bash
+octane doctor --json
+```
+
+Prompts only ever fill in **missing** input, and only in a real terminal. In a
+pipe or under `CI`, a missing answer is a usage error naming the flag that would
+have supplied it, never a hang.
+
+Exit codes are fixed:
+
+| Code | Meaning                                  |
+| ---- | ---------------------------------------- |
+| `0`  | Success                                  |
+| `1`  | The command ran and failed               |
+| `2`  | Usage error: unknown flag, missing input |
+| `3`  | `doctor` found error-severity problems   |
+
+`octane info` prints the environment and project details worth pasting into a
+bug report.
