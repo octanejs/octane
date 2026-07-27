@@ -33,7 +33,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
+import { censusDomNodes } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -376,7 +376,6 @@ async function runTarget(t, { verify = true } = {}) {
 			unmount,
 		};
 		if (dom !== null) {
-			for (const [op, field] of DOM_OPS) results[op] = deterministicCount(dom[field]);
 			results.__dom = dom;
 		}
 		return {
@@ -397,13 +396,6 @@ const OPS = [
 	'bump_sweep_batched',
 	'bump_sweep_reverse',
 	'unmount',
-];
-
-const DOM_OPS = [
-	['nodes_mounted', 'total'],
-	['elements_mounted', 'elements'],
-	['text_mounted', 'text'],
-	['comments_mounted', 'comments'],
 ];
 
 const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
@@ -489,11 +481,6 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			const r = all[c][op];
 			row.push(`${fmt(r.median)} (min ${fmt(r.min)}, sd ${fmt(r.stddev)})`.padEnd(W));
 		}
-		console.log(row.join('| '));
-	}
-	for (const [op] of DOM_OPS) {
-		const row = [op.padEnd(14)];
-		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -583,12 +570,7 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 				...TARGETS.map((t) => ({
 					name: t.name,
 					ops: all[t.name]
-						? {
-								...Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])])),
-								...Object.fromEntries(
-									DOM_OPS.map(([op]) => [op, deterministicStatForJson(all[t.name][op])]),
-								),
-							}
+						? Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])]))
 						: {},
 					meta: {
 						gates: failedTargets.has(t.name) ? 'fail' : 'pass',

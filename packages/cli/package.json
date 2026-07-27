@@ -1,0 +1,50 @@
+{
+  "name": "@octanejs/cli",
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "The Octane command line: diagnose, configure, and extend an Octane project.",
+  "license": "MIT",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "octane",
+    "cli",
+    "doctor",
+    "tsrx"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "octane": "src/bin/octane.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "cd ../.. && vitest run --project cli"
+  },
+  "dependencies": {
+    "@clack/prompts": "catalog:default",
+    "picocolors": "catalog:default"
+  },
+  "devDependencies": {
+    "vitest": "catalog:default"
+  }
+}
