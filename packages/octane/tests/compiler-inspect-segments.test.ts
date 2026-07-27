@@ -383,6 +383,109 @@ describe.each([
 	});
 });
 
+// An attribute that never bakes into HTML survives only as a runtime call, and
+// every token of that call except the ones NAMING it maps to the value
+// expression. `<form action={fn}>` becomes `setFormAction(el, 'action', …)` /
+// `ssrAttr("action", …)`; `<input defaultValue={v}/>` becomes
+// `setDefaultValueUncontrolled(el, v)` — with no name token at all — /
+// `ssrInputAttrs([[false, "defaultValue", …]])`. Without a claim on the authored
+// name those attributes are unreachable from the output in the forward
+// direction, because the helper is a different word and the literal carries
+// quotes, so neither reproduces the authored text a consumer accepts on its own.
+describe.each([
+	['client', {}],
+	['client dev', { dev: true }],
+	['client prod', { hmr: false as const }],
+	['server', { mode: 'server' as const }],
+	['server dev', { mode: 'server' as const, dev: true }],
+])('attribute names claim the call they lower to — %s', (_label, options) => {
+	const SOURCE = `export default function App(props: {
+	save: (data: FormData) => void;
+	name: string;
+	busy: boolean;
+	tone: string;
+}) @{
+	<form action={props.save}>
+		<input defaultValue={props.name} disabled={props.busy} />
+		<button class={props.tone} aria-label={props.tone}>Go</button>
+	</form>
+}
+`;
+
+	interface Segment {
+		genLine: number;
+		genCol: number;
+		genEndCol: number | null;
+		srcStart: number;
+		srcEnd: number | null;
+		exact?: boolean;
+	}
+
+	const result = compile(SOURCE, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
+		typeof compile
+	> & { inspect: { segments: Segment[] } };
+
+	const lineStarts = [0];
+	for (let i = 0; i < result.code.length; i++) {
+		if (result.code.charCodeAt(i) === 10) lineStarts.push(i + 1);
+	}
+	const text = (segment: Segment) => {
+		const from = lineStarts[segment.genLine] + segment.genCol;
+		const to =
+			segment.genEndCol === null
+				? (lineStarts[segment.genLine + 1] ?? result.code.length + 1) - 1
+				: lineStarts[segment.genLine] + segment.genEndCol;
+		return result.code.slice(from, to).trim();
+	};
+
+	/** The generated tokens claimed by the authored NAME of `attr={…}`. */
+	const claimedBy = (name: string) => {
+		const at = SOURCE.indexOf(`${name}={`);
+		expect(at, `${name} missing from the fixture`).toBeGreaterThanOrEqual(0);
+		return result.inspect.segments
+			.filter(
+				(segment) =>
+					segment.exact === true && segment.srcStart === at && segment.srcEnd === at + name.length,
+			)
+			.map(text);
+	};
+
+	it('emits the same module with and without inspection', () => {
+		expect(compile(SOURCE, 'App.tsrx', options).code).toBe(result.code);
+	});
+
+	it.each(['action', 'defaultValue', 'disabled', 'class', 'aria-label'])(
+		'claims a token of the call %s lowered to',
+		(name) => {
+			const tokens = claimedBy(name);
+			expect(tokens.length, `nothing claims ${name}`).toBeGreaterThan(0);
+			for (const token of tokens) {
+				// Either the helper the attribute routes to, or the name literal that
+				// call passes — never the value expression, and never the whole
+				// attribute.
+				const isHelper = /^_\$[A-Za-z][A-Za-z0-9]*$/.test(token);
+				const isNameLiteral = token === `'${name}'` || token === `"${name}"`;
+				expect(
+					isHelper || isNameLiteral,
+					`${name} claims ${JSON.stringify(token)}, which names neither its helper nor itself`,
+				).toBe(true);
+			}
+		},
+	);
+
+	it('claims only attribute names, never the value or the whole attribute', () => {
+		const authored = new Set(
+			result.inspect.segments
+				.filter((segment) => segment.exact === true && segment.srcEnd !== null)
+				.map((segment) => SOURCE.slice(segment.srcStart, segment.srcEnd!)),
+		);
+		expect(authored.size).toBeGreaterThan(0);
+		for (const claim of authored) {
+			expect(['action', 'defaultValue', 'disabled', 'class', 'aria-label']).toContain(claim);
+		}
+	});
+});
+
 // A `<style>` block's parsed stylesheet hangs off its element with CSS node
 // offsets in the STYLESHEET's coordinate system, not the file's. The
 // smallest-node index that resolves a segment's authored end must not contain
