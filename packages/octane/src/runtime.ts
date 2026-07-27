@@ -14646,12 +14646,18 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 // `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
 const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
 
-// Set on an element once the de-opt reconciler has actually committed children into it. React only
-// manages children it created, so DOM inserted by other means — a `replaceChildren` into an element
-// we rendered empty, a third-party widget — must survive our updates. Without this we reconcile the
-// element's existing DOM against an empty child list and remove all of it. Portal ranges already
-// get this treatment via `$$portalEnd`; this covers the imperative case.
-const DEOPT_OWNS_CHILDREN: unique symbol = Symbol('octane.deoptOwnsChildren');
+// Whether any of `el`'s current children were created by the de-opt reconciler. Every node it
+// builds carries a `$$deoptKey` stamp (or a descriptor), so ownership is derivable and needs no
+// per-element bookkeeping — which keeps it off the reconcile hot path and off the DOM node's shape.
+// React only manages children it created, so an element holding nothing but foreign DOM (a
+// `replaceChildren` into an element we rendered empty, a third-party widget) must be left alone.
+// Portal ranges already get that treatment via `$$portalEnd`; this covers the imperative case.
+function hasDeoptOwnedChild(el: Element): boolean {
+	for (let n: Node | null = getFirstChild(el); n !== null; n = getNextSibling(n)) {
+		if ((n as any).$$deoptKey !== undefined || getDeoptDesc(n) !== undefined) return true;
+	}
+	return false;
+}
 interface DeoptStamped {
 	[DEOPT_DESC]?: ElementDescriptor;
 }
@@ -14933,16 +14939,13 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (existing.length === 0) {
-		let committed = false;
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				el.appendChild(node);
-				committed = true;
 			}
 		}
-		if (committed) (el as any)[DEOPT_OWNS_CHILDREN] = true;
 		return;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
@@ -14950,11 +14953,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// sweeping it away. (Going from rendered children to none still clears — the flag is set.)
 	// Hydration is excluded: the children present are the server's, which this reconcile is
 	// adopting, so a client descriptor that renders none must still clear them.
-	if (
-		next.length === 0 &&
-		(el as any)[DEOPT_OWNS_CHILDREN] !== true &&
-		activeHydration() === null
-	) {
+	if (next.length === 0 && activeHydration() === null && !hasDeoptOwnedChild(el)) {
 		return;
 	}
 	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
@@ -15009,10 +15008,6 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			result.push(node);
 		}
 	}
-	// Reflects what we own RIGHT NOW, not what we ever owned: after clearing our children the
-	// element is unowned again, so DOM inserted afterwards is foreign and must survive.
-	const owns = result.length > 0;
-	if ((el as any)[DEOPT_OWNS_CHILDREN] !== owns) (el as any)[DEOPT_OWNS_CHILDREN] = owns;
 	// Remove OWNED children not reused (foreign portal ranges stay untouched).
 	const keep = result.length > 0 ? new Set<Node>(result) : null;
 	for (let i = owned.length - 1; i >= 0; i--) {
