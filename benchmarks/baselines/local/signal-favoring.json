@@ -100,26 +100,6 @@
           "scoreRme": 64.49999289907585,
           "warmupRatio": 1.0909092288372064,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 319,
-          "min": 319,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 110,
-          "min": 110,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 109,
-          "min": 109,
-          "samples": 1
         }
       },
       "meta": {
@@ -245,26 +225,6 @@
           "scoreRme": 92.64014159963192,
           "warmupRatio": 1.7777774834338842,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 418,
-          "min": 418,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 110,
-          "min": 110,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 208,
-          "min": 208,
-          "samples": 1
         }
       },
       "meta": {
@@ -390,26 +350,6 @@
           "scoreRme": 92.8953591546553,
           "warmupRatio": 1,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 240,
-          "min": 240,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 120,
-          "min": 120,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 20,
-          "min": 20,
-          "samples": 1
         }
       },
       "meta": {
@@ -535,26 +475,6 @@
           "scoreRme": 37.215462824695024,
           "warmupRatio": 0.9999998410542301,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 220,
-          "min": 220,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 120,
-          "min": 120,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -676,26 +596,6 @@
           "scoreRme": 63.20728371233327,
           "warmupRatio": 1,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 300,
-          "min": 300,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 101,
-          "min": 101,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 99,
-          "min": 99,
-          "samples": 1
         }
       },
       "meta": {
@@ -821,26 +721,6 @@
           "scoreRme": 62.02568441551916,
           "warmupRatio": 1.1111109933735537,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 200,
-          "min": 200,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -962,26 +842,6 @@
           "scoreRme": 45.24499092620531,
           "warmupRatio": 1.1818180635940572,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 220,
-          "min": 220,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 120,
-          "min": 120,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -1103,26 +963,6 @@
           "scoreRme": 62.02569452702499,
           "warmupRatio": 1,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 300,
-          "min": 300,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 100,
-          "min": 100,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 101,
-          "min": 101,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 99,
-          "min": 99,
-          "samples": 1
         }
       },
       "meta": {

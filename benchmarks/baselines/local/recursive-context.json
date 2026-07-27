@@ -76,46 +76,6 @@
           "scoreRme": 8.148707247264847,
           "warmupRatio": 0.9999999372582719,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 3081,
-          "min": 3081,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 1024,
-          "min": 1024,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 10,
-          "min": 10,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 2984,
-          "min": 2984,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 992,
-          "min": 992,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 8,
-          "min": 8,
-          "samples": 1
         }
       },
       "meta": {
@@ -246,46 +206,6 @@
           "scoreRme": 3.1538514275478464,
           "warmupRatio": 1.0960452284090423,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 11263,
-          "min": 11263,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 1024,
-          "min": 1024,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 8192,
-          "min": 8192,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 10920,
-          "min": 10920,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 992,
-          "min": 992,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 7944,
-          "min": 7944,
-          "samples": 1
         }
       },
       "meta": {
@@ -417,46 +337,6 @@
           "scoreRme": 12.889939690288482,
           "warmupRatio": 1.0434781684767303,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 5117,
-          "min": 5117,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 1024,
-          "min": 1024,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 2046,
-          "min": 2046,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 4961,
-          "min": 4961,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 993,
-          "min": 993,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
         }
       },
       "meta": {
@@ -582,46 +462,6 @@
           "scoreRme": 7.5209287041668365,
           "warmupRatio": 0.9473684320599524,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 3071,
-          "min": 3071,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 1024,
-          "min": 1024,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 2976,
-          "min": 2976,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 992,
-          "min": 992,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -738,46 +578,6 @@
           "scoreRme": 11.909666834030933,
           "warmupRatio": 1.03846140443928,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 3072,
-          "min": 3072,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 1025,
-          "min": 1025,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 2977,
-          "min": 2977,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 993,
-          "min": 993,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -894,46 +694,6 @@
           "scoreRme": 12.769799151571029,
           "warmupRatio": 1.089285715806241,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 7165,
-          "min": 7165,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 5118,
-          "min": 5118,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 6946,
-          "min": 6946,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 4962,
-          "min": 4962,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -1050,46 +810,6 @@
           "scoreRme": 8.184240940067275,
           "warmupRatio": 0.9259259619012971,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 3071,
-          "min": 3071,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 1024,
-          "min": 1024,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 2976,
-          "min": 2976,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 992,
-          "min": 992,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
         }
       },
       "meta": {
@@ -1206,46 +926,6 @@
           "scoreRme": 6.757143777735279,
           "warmupRatio": 1.0571429768387233,
           "samples": 20
-        },
-        "nodes_mounted": {
-          "median": 12283,
-          "min": 12283,
-          "samples": 1
-        },
-        "elements_mounted": {
-          "median": 2047,
-          "min": 2047,
-          "samples": 1
-        },
-        "text_mounted": {
-          "median": 5119,
-          "min": 5119,
-          "samples": 1
-        },
-        "comments_mounted": {
-          "median": 5117,
-          "min": 5117,
-          "samples": 1
-        },
-        "nodes_partial_unmounted": {
-          "median": 11911,
-          "min": 11911,
-          "samples": 1
-        },
-        "elements_partial_unmounted": {
-          "median": 1984,
-          "min": 1984,
-          "samples": 1
-        },
-        "text_partial_unmounted": {
-          "median": 4964,
-          "min": 4964,
-          "samples": 1
-        },
-        "comments_partial_unmounted": {
-          "median": 4963,
-          "min": 4963,
-          "samples": 1
         }
       },
       "meta": {
