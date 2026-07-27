@@ -5,6 +5,8 @@ import {
 	CommandState,
 	DynamicCommandApp,
 	GreetingApp,
+	HeaderedCommandState,
+	HeaderedGreetingApp,
 } from '../_fixtures/commands.tsrx';
 import { flush, mount } from '../_helpers';
 
@@ -20,6 +22,22 @@ function recordIPC(handler: (cmd: string, args: any) => unknown): Call[] {
 }
 
 const greetCalls = (calls: Call[]) => calls.filter((call) => call.cmd === 'greet');
+
+/**
+ * `mockIPC` drops `invoke`'s third argument, so headers are invisible through
+ * it. Standing in as the bridge itself is what `invoke` actually calls, so this
+ * observes exactly what would reach the host.
+ */
+function recordBridge(handler: (cmd: string, args: any) => unknown): HeadersInit[] {
+	const headers: HeadersInit[] = [];
+	(window as any).__TAURI_INTERNALS__ = {
+		invoke: async (cmd: string, args: any, options?: { headers?: HeadersInit }) => {
+			headers.push(options?.headers ?? {});
+			return handler(cmd, args);
+		},
+	};
+	return headers;
+}
 
 afterEach(async () => {
 	// Settle any command still in flight so it cannot resolve against the next
@@ -192,6 +210,47 @@ describe('useInvokeState', () => {
 
 		expect(result.find('#status').textContent).toBe('error');
 		expect(result.find('#error').textContent).toBe('TauriUnavailableError');
+		result.unmount();
+	});
+});
+
+describe('headers', () => {
+	it('refetches the suspending read when a header value rotates', async () => {
+		const seen = recordBridge(() => 'ok');
+		const result = mount(HeaderedGreetingApp, { token: 'first' });
+		await flush();
+		expect(seen).toEqual([{ Authorization: 'first' }]);
+
+		// Headers reach the host on every request, so a rotated token has to issue
+		// a new command rather than replay the memoized promise.
+		result.update(HeaderedGreetingApp, { token: 'second' });
+		await flush();
+		expect(seen).toEqual([{ Authorization: 'first' }, { Authorization: 'second' }]);
+		result.unmount();
+	});
+
+	it('does not refetch when a re-render rebuilds an equal headers literal', async () => {
+		const seen = recordBridge(() => 'ok');
+		const result = mount(HeaderedGreetingApp, { token: 'first' });
+		await flush();
+
+		// The key is by value, matching the argument record, so the inline literal
+		// every render allocates does not count as a change.
+		result.update(HeaderedGreetingApp, { token: 'first' });
+		await flush();
+		expect(seen).toHaveLength(1);
+		result.unmount();
+	});
+
+	it('re-runs the non-suspending read when a header value rotates', async () => {
+		const seen = recordBridge(() => 'ok');
+		const result = mount(HeaderedCommandState, { token: 'first' });
+		await flush();
+		expect(result.find('#status').textContent).toBe('success');
+
+		result.update(HeaderedCommandState, { token: 'second' });
+		await flush();
+		expect(seen).toEqual([{ Authorization: 'first' }, { Authorization: 'second' }]);
 		result.unmount();
 	});
 });

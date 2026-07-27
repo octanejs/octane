@@ -29,7 +29,9 @@ the subtree down, which also lets a changed `event` or `enabled` retry it.
 never re-runs it. Its default refetch key compares a record argument by *value*,
 which keeps the ubiquitous `invoke('cmd', { id })` object literal from
 refetching on every render; array and binary payloads stay identity-compared
-because hashing them per render is unbounded work.
+because hashing them per render is unbounded work. `options.headers` is keyed
+the same way, so a rotated `Authorization` value refetches rather than serving
+what the previous token fetched.
 
 Everything is guarded on `window.__TAURI_INTERNALS__`, so a browser tab or an
 SSR pass never faults on a missing bridge: server rendering performs no IPC,

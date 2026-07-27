@@ -75,3 +75,20 @@ export function argsKey(args: InvokeArgs | undefined): unknown {
 	if (args === undefined) return undefined;
 	return isPlainRecord(args) ? stableStringify(args) : args;
 }
+
+/**
+ * Refetch key for `InvokeOptions.headers`. Headers reach the host on every
+ * request, so a rotated `Authorization` value has to refetch exactly like a
+ * changed argument would. Compared by value for the same reason `argsKey`
+ * compares a record by value: the inline `{ Authorization: token }` literal is
+ * the common case, and identity would refetch on every render.
+ */
+export function headersKey(headers: HeadersInit | undefined): unknown {
+	if (headers === undefined) return undefined;
+	// Header iteration is spec-ordered (lowercased, sorted), so it is canonical
+	// already; the other two forms go through the same key sort as arguments.
+	if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+		return stableStringify([...headers]);
+	}
+	return stableStringify(headers);
+}

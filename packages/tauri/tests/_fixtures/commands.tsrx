@@ -41,6 +41,31 @@ export function DynamicCommandApp(props: { cmd: string; version: number }) @{
 	}
 }
 
+function HeaderedGreeting(props: { token: string }) @{
+	const greeting = useInvoke<string>('greet', undefined, {
+		headers: { Authorization: props.token },
+	});
+	<span id="greeting">{greeting as string}</span>
+}
+
+export function HeaderedGreetingApp(props: { token: string }) @{
+	@try {
+		<HeaderedGreeting token={props.token} />
+	} @pending {
+		<span id="fallback">loading</span>
+	}
+}
+
+export function HeaderedCommandState(props: { token: string }) @{
+	const result = useInvokeState<string>('greet', undefined, {
+		headers: { Authorization: props.token },
+	});
+	<div>
+		<span id="status">{result.status as string}</span>
+		<span id="data">{(result.data ?? '') as string}</span>
+	</div>
+}
+
 export function CommandState(props: { name: string }) @{
 	const result = useInvokeState<string>('greet', { name: props.name });
 	<div>

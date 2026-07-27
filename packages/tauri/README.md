@@ -34,9 +34,12 @@ every render. That serialization costs one pass over the record per render,
 which is nothing for the small argument objects commands take; array and binary
 payloads are compared by identity instead.
 
-`options.deps` replaces the argument half of that key, not the command name:
-`cmd` is always part of it, so a changed command can never keep serving the
-previous one's result.
+`options.headers` is keyed the same way, so rotating an `Authorization` value
+issues a new command instead of serving the one the previous token fetched.
+
+`options.deps` replaces the argument half of that key, not the command name or
+the headers: both are always part of it, so a changed command or credential can
+never keep serving the previous one's result.
 
 Writing `use(invoke('cmd', args))` directly in a `.tsrx` file also works and
 gets the compiler's parallel-`use()` treatment. Reach for `useInvoke` when you

@@ -1,12 +1,20 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { InvokeArgs } from '@tauri-apps/api/core';
 import { use, useMemo } from 'octane';
-import { TauriUnavailableError, argsKey, hasTauriHost, splitSlot, subSlot } from './internal';
+import {
+	TauriUnavailableError,
+	argsKey,
+	hasTauriHost,
+	headersKey,
+	splitSlot,
+	subSlot,
+} from './internal';
 
 export interface UseInvokeOptions {
 	/**
-	 * Extra refetch key, appended to the command name rather than replacing it,
-	 * so a changed `cmd` always refetches. Defaults to the argument values.
+	 * Extra refetch key, appended to the command name and headers rather than
+	 * replacing them, so a changed `cmd` or `headers` always refetches. Defaults
+	 * to the argument values.
 	 */
 	deps?: readonly unknown[];
 	/** Request headers, forwarded to `invoke`'s `InvokeOptions`. */
@@ -25,7 +33,7 @@ export function useInvoke<T>(cmd: string, ...rest: [InvokeArgs?, UseInvokeOption
 	const invokeArgs = args[0] as InvokeArgs | undefined;
 	const options = args[1] as UseInvokeOptions | undefined;
 	const headers = options?.headers;
-	const deps = [cmd, ...(options?.deps ?? [argsKey(invokeArgs)])];
+	const deps = [cmd, headersKey(headers), ...(options?.deps ?? [argsKey(invokeArgs)])];
 
 	const request = useMemo(
 		() => {

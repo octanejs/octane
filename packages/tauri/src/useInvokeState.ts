@@ -1,7 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { InvokeArgs } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'octane';
-import { TauriUnavailableError, argsKey, hasTauriHost, splitSlot, subSlot } from './internal';
+import {
+	TauriUnavailableError,
+	argsKey,
+	hasTauriHost,
+	headersKey,
+	splitSlot,
+	subSlot,
+} from './internal';
 import type { UseInvokeOptions } from './useInvoke';
 
 export interface InvokeState<T> {
@@ -46,7 +53,7 @@ export function useInvokeState<T>(
 	const invokeArgs = args[0] as InvokeArgs | undefined;
 	const options = args[1] as UseInvokeOptions | undefined;
 	const headers = options?.headers;
-	const deps = [cmd, ...(options?.deps ?? [argsKey(invokeArgs)])];
+	const deps = [cmd, headersKey(headers), ...(options?.deps ?? [argsKey(invokeArgs)])];
 
 	const [snapshot, setSnapshot] = useState<Snapshot<T> | null>(
 		null,
