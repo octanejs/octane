@@ -6,6 +6,8 @@ import { Menu } from '@octanejs/base-ui/menu';
 import {
 	MenuInteractive,
 	MenuItemsInteractive,
+	MenuOpenWithSubmenuOpen,
+	MenuSubmenuInteractive,
 	MenuWithHandle,
 } from './_fixtures/base-ui-diff.tsrx';
 
@@ -368,6 +370,100 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 			expect(after[1].hasAttribute('data-checked')).toBe(true);
 			expect(after[0].hasAttribute('data-unchecked')).toBe(true);
 			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
+
+			m.unmount();
+		});
+	});
+
+	// Phase 3f STAGE 3. A `SubmenuTrigger` is simultaneously an ITEM of the parent menu and the
+	// TRIGGER of its own, and opening a submenu is what finally runs the sibling-close, parent-close
+	// and item-hover relays `Menu.Positioner` has carried inertly since stage 1.
+	describe('submenus', () => {
+		it('opens a submenu from its trigger and closes it with Escape, leaving the parent open', async () => {
+			const m = mount(MenuSubmenuInteractive);
+			await settle();
+
+			m.click('.menu-trigger');
+			await settle();
+			expect(m.container.querySelector('.menu-popup')).not.toBe(null);
+			expect(m.container.querySelector('.submenu-popup')).toBe(null);
+
+			// `openOnHover={false}` on this fixture's trigger, so a press opens it.
+			m.click('.menu-subtrigger');
+			await settle();
+			expect(m.container.querySelector('.submenu-popup')).not.toBe(null);
+
+			// Escape from INSIDE the tree closes only the CHILD: `closeParentOnEsc` defaults to
+			// false, which is what the `bubbles: { escapeKey: ... }` option on the submenu's
+			// useDismiss controls. (Dispatching on `document` instead would close both, since that
+			// target is outside BOTH floating elements and each dismisses independently — the
+			// single-level tests above can use `document` precisely because there is only one menu.)
+			key(m.find('.submenu-popup'), 'Escape');
+			await settle();
+			expect(m.container.querySelector('.submenu-popup')).toBe(null);
+			expect(m.container.querySelector('.menu-popup')).not.toBe(null);
+
+			m.unmount();
+		});
+
+		it('marks the trigger expanded and wires it to the submenu popup', async () => {
+			const m = mount(MenuSubmenuInteractive);
+			await settle();
+			m.click('.menu-trigger');
+			await settle();
+
+			const closed = m.find('.menu-subtrigger');
+			expect(closed.getAttribute('role')).toBe('menuitem');
+			expect(closed.getAttribute('aria-haspopup')).toBe('menu');
+			expect(closed.getAttribute('aria-expanded')).toBe('false');
+
+			m.click('.menu-subtrigger');
+			await settle();
+
+			const open = m.find('.menu-subtrigger');
+			expect(open.getAttribute('aria-expanded')).toBe('true');
+			expect(open.hasAttribute('data-popup-open')).toBe(true);
+			// The trigger owns its own id (it is also a parent item), and the submenu popup labels
+			// itself with it — this is what the `delete rootTriggerProps.id` line protects.
+			expect(open.getAttribute('aria-controls')).toBe(m.find('.submenu-popup').id);
+			expect(m.find('.submenu-popup').getAttribute('aria-labelledby')).toBe(open.id);
+
+			m.unmount();
+		});
+
+		it('highlights the submenu trigger while its submenu is open', async () => {
+			// The differential rig cannot see this: the trigger is the only tabbable child of the
+			// parent popup while open, so the parent's focus manager focuses it and its `onFocus`
+			// sets the PARENT store's `activeIndex`. With both runtimes sharing one
+			// `document.activeElement`, only one can win. Mounted alone, octane matches React.
+			const m = mount(MenuOpenWithSubmenuOpen);
+			await settle();
+
+			const sub = m.find('.menu-subtrigger');
+			expect(sub.hasAttribute('data-highlighted')).toBe(true);
+			expect(sub.getAttribute('tabindex')).toBe('0');
+			expect(document.activeElement).toBe(sub);
+			// Exactly one item is highlighted across the whole parent menu.
+			expect(m.findAll('[data-highlighted]').length).toBe(1);
+
+			m.unmount();
+		});
+
+		it('nests the submenu: inline-end placement, data-nested, and a shared root owner id', async () => {
+			const m = mount(MenuOpenWithSubmenuOpen);
+			await settle();
+
+			const submenuPopup = m.find('.submenu-popup');
+			// `parent.type === 'menu'` flips the positioner defaults and marks the popup nested.
+			expect(submenuPopup.getAttribute('data-side')).toBe('inline-end');
+			expect(submenuPopup.getAttribute('data-align')).toBe('start');
+			expect(submenuPopup.hasAttribute('data-nested')).toBe(true);
+			expect(m.find('.menu-popup').hasAttribute('data-nested')).toBe(false);
+			// `rootId` propagates from the parent store, so `findRootOwnerId` treats both popups as
+			// belonging to the same menu tree.
+			expect(submenuPopup.getAttribute('data-rootownerid')).toBe(
+				m.find('.menu-popup').getAttribute('data-rootownerid'),
+			);
 
 			m.unmount();
 		});

@@ -10,6 +10,39 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3f STAGE 3 — submenus (2026-07-27). Green: 129 base-ui tests (88 differential + 41
+> behavior/namespace), typecheck + `format:check` clean.** `Menu` now covers **all 20 upstream
+> parts**; the `menu` subpath is complete.
+>
+> Adds `MenuSubmenuRoot` (provides `MenuSubmenuRootContext`, which is what makes the nested
+> `MenuRoot` resolve `parent` to `{ type: 'menu' }`, then renders a plain `MenuRoot`) and
+> `MenuSubmenuTrigger`. The trigger is the first user of the `submenu-trigger` arm of `useMenuItem`'s
+> `itemMetadata`, and opening a submenu activates the sibling-close / parent-close / item-hover
+> relays `MenuPositioner` has carried inertly since stage 1. It holds TWO stores at once: it is an
+> item of the parent menu (parent `CompositeList`, `itemProps`, `isActive`) and the trigger of its
+> own.
+>
+> **A second rig limitation, and why it was NOT normalised away.** With a submenu open, its trigger
+> is the only tabbable child of the parent popup (`tabIndex: open || highlighted ? 0 : -1`), so the
+> parent focus manager focuses it and the trigger's `onFocus` sets the PARENT store's `activeIndex`
+> → `data-highlighted`. Both runtimes share one `document.activeElement`, so only one can win — and
+> unlike the focus-guard `tabindex`, this is derived STORE state, which no DOM-level normaliser can
+> reconstruct. Confirmed it is the rig and not the port by mounting octane ALONE: the trigger is
+> highlighted and is `document.activeElement`, exactly matching React. Normalising `data-highlighted`
+> away would blind the roving-focus comparison stage 2 deliberately preserved, so instead the
+> open-submenu case byte-compares the SUBMENU'S OWN PORTAL SUBTREE (`stepComparingSubtree`), where
+> the whole stage-3 payload lives — nested `inline-end`/`start` placement, `data-nested`, the popup's
+> aria wiring back to the trigger, the nested items — and the trigger's highlighted state is asserted
+> octane-only.
+>
+> Escape semantics were probed rather than assumed: dispatched from INSIDE the tree it closes only
+> the child (`closeParentOnEsc` defaults to false); dispatched on `document` it closes both, because
+> that target is outside both floating elements and each menu dismisses independently. The
+> single-level tests can use `document` precisely because there is only one menu.
+>
+> Not ported here: `Menubar` and `ContextMenu` (stage 4), which fill in the `menubar` /
+> `context-menu` parent branches transcribed in stage 1.
+
 > **Phase 3f STAGE 2 — the Menu item family (2026-07-27). Green: 121 base-ui tests (86 differential
 > + 35 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage unchanged at
 > **29/43** (Menu was already counted); the `menu` subpath goes from 5 parts to 18 of upstream's 20.
@@ -716,8 +749,10 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
     `menu/utils/stateAttributesMapping`. Differential on populated open menus;
     behavior tests for roving focus, typeahead (including buffer accumulation
     and reset), and checkbox/radio item semantics. ✅
-  - *Stage 3* (~340 loc): `SubmenuRoot` + `SubmenuTrigger`. *Exit:* behavior
-    tests for submenu open/close and the parent/sibling close relay.
+  - *Stage 3* (DONE, ~340 loc): `SubmenuRoot` + `SubmenuTrigger`. Differential
+    on a closed submenu and on the open submenu's own portal subtree; behavior
+    tests for submenu open/close, the child-only Escape, the trigger's dual
+    item+trigger role, and nested placement. ✅
   - *Stage 4* (~650 loc): `Menubar` and `ContextMenu` (+ `useClientPoint`),
     which fill in the already-transcribed `menubar` / `context-menu` parent
     branches and provide the two context-only modules stage 1 landed.
