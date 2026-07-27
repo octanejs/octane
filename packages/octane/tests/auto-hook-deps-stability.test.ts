@@ -2,27 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
 
-// Known GAPS in compiler-inferred hook dependencies, written as executable
-// assertions of the intended behaviour.
+// Which captures a compiler-inferred dependency array may omit, and which it
+// must keep.
 //
-// Every `it.fails` below states what the compiler SHOULD emit and currently
-// does not. They stay green while the gap is open and flip red the moment it
-// closes — at which point drop the `.fails` rather than deleting the case.
-// The plain `it` blocks are the guards those fixes must not break.
+// The governing rule is that a dependency array tracks values whose identity
+// can change BETWEEN RENDERS. A binding evaluated once for the program's
+// lifetime cannot, so it is not a dependency — the same conclusion React's
+// exhaustive-deps rule reaches for any outer-scope value, and the one two
+// neighbouring parts of this compiler already reached:
 //
-// The contract being asserted is the same one two neighbouring passes already
-// hold, and which `hook-deps.js` alone does not:
+//   - an IMPORTED binding is omitted from an inferred array;
+//   - autoMemo's `plainCalleeIsMemoizable` treats a same-module `function`
+//     declaration that is never reassigned as a "module-scope immutable
+//     identity", explicitly indistinguishable from an import.
 //
-//   - an IMPORTED binding is already omitted from an inferred array, because a
-//     module binding's identity is fixed for the program lifetime;
-//   - autoMemo's `plainCalleeIsMemoizable` already treats a same-module
-//     `function` declaration that is never reassigned as a "module-scope
-//     immutable identity", indistinguishable from an import.
+// A same-module `const`/`function`/`class` is that same identity. Treating it
+// as reactive put a dead comparison slot in every array that touched one, and
+// made `import { fmt } from './fmt'` disagree with the byte-identical helper
+// declared locally.
 //
-// A same-module `const`/`function`/`class` is that same identity, so making it
-// a reactive dependency is a dead comparison slot in every emitted array and a
-// behavioural difference between `import { fmt } from './fmt'` and the byte
-// identical helper declared locally.
+// The final describe block holds the boundary: `let`, shadowing, and derived
+// values stay reactive, because for those the premise does not hold.
 const c = (source: string): string =>
 	compile(source, 'auto-deps-stability.tsrx', { inlineHookMemo: false }).code;
 
@@ -32,7 +32,7 @@ const depsOf = (code: string): string[] =>
 	);
 
 describe('dependency stability — module-scope immutable identities', () => {
-	it.fails('omits a module-scope const binding', () => {
+	it('omits a module-scope const binding', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       const SCALE = 2;
@@ -42,11 +42,10 @@ describe('dependency stability — module-scope immutable identities', () => {
       }
     `);
 
-		// Emits [props.log, props.value, SCALE].
 		expect(depsOf(code)).toEqual(['props.log, props.value']);
 	});
 
-	it.fails('omits a module-scope function declaration', () => {
+	it('omits a module-scope function declaration', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       function fmt(n) { return String(n); }
@@ -56,12 +55,12 @@ describe('dependency stability — module-scope immutable identities', () => {
       }
     `);
 
-		// Emits [props.log, fmt, props.value]. An `import { fmt } from './fmt'`
-		// with the identical call site already emits [props.log, props.value].
+		// `import { fmt } from './fmt'` with the identical call site must produce
+		// the identical array: where the helper is declared cannot change it.
 		expect(depsOf(code)).toEqual(['props.log, props.value']);
 	});
 
-	it.fails('omits a module-scope const arrow function', () => {
+	it('omits a module-scope const arrow function', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       const fmt = (n) => String(n);
@@ -74,7 +73,7 @@ describe('dependency stability — module-scope immutable identities', () => {
 		expect(depsOf(code)).toEqual(['props.log, props.value']);
 	});
 
-	it.fails('omits a module-scope class binding', () => {
+	it('omits a module-scope class binding', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       class Thing {}
@@ -87,7 +86,7 @@ describe('dependency stability — module-scope immutable identities', () => {
 		expect(depsOf(code)).toEqual(['props.log']);
 	});
 
-	it.fails('omits a member read of a module-scope const object', () => {
+	it('omits a member read of a module-scope const object', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       const CONFIG = { mode: 'fast' };
@@ -97,12 +96,13 @@ describe('dependency stability — module-scope immutable identities', () => {
       }
     `);
 
-		// Emits [props.log, CONFIG.mode]. `import * as CONFIG` + `CONFIG.mode` is
-		// already omitted, so the two spellings disagree on the same read.
+		// The receiver is what a dependency would witness, and it is fixed. This
+		// matches the answer `import * as CONFIG` + `CONFIG.mode` already gives:
+		// a module-level object mutated in place is unwitnessed either way.
 		expect(depsOf(code)).toEqual(['props.log']);
 	});
 
-	it.fails('omits a module-scope component referenced as a JSX tag', () => {
+	it('omits a module-scope component referenced as a JSX tag', () => {
 		const code = c(`
       import { useMemo } from 'octane';
       function Row(props) @{ <li>{props.text as string}</li> }
@@ -112,11 +112,11 @@ describe('dependency stability — module-scope immutable identities', () => {
       }
     `);
 
-		// Emits [props.items, Row].
+		// A component referenced as a tag is an ordinary capture of its binding.
 		expect(depsOf(code)).toEqual(['props.items']);
 	});
 
-	it.fails('omits a module-scope const declared after the component', () => {
+	it('omits a module-scope const declared after the component', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       export function App(props) @{
@@ -131,7 +131,7 @@ describe('dependency stability — module-scope immutable identities', () => {
 		expect(depsOf(code)).toEqual(['props.log']);
 	});
 
-	it.fails('holds the same contract in the plain-TS surgical pass', () => {
+	it('holds the same contract in the plain-TS surgical pass', () => {
 		const source = `
 import { useEffect } from 'octane';
 import { imported } from './config';
@@ -143,14 +143,13 @@ export function useThing(value: number) {
 `;
 		const code = slotHooks(source, 'use-thing.ts')!.code;
 
-		// Emits [helper, value, SCALE]. Both entry points share hook-deps.js, so
-		// the gap and its fix are one and the same.
+		// The `.tsrx` compiler and this pass must agree on the same source.
 		expect(code).toMatch(/useEffect\([^;]*?, \[value\], _h\$\d+\)/);
 	});
 });
 
 describe('dependency stability — component-local invariants', () => {
-	it.fails('omits a component-local const bound to a literal', () => {
+	it('omits a component-local const bound to a literal', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       export function App(props) @{
@@ -160,11 +159,11 @@ describe('dependency stability — component-local invariants', () => {
       }
     `);
 
-		// Emits [props.log, limit]. `limit` is 10 on every render by construction.
+		// `limit` is 10 on every render by construction, so nothing can witness it.
 		expect(depsOf(code)).toEqual(['props.log']);
 	});
 
-	it.fails('omits a component-local const aliasing an import', () => {
+	it('omits a component-local const aliasing an import', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       import { fmt } from './fmt';
@@ -175,27 +174,20 @@ describe('dependency stability — component-local invariants', () => {
       }
     `);
 
-		// Emits [props.log, f, props.value]. markDependencyInvariantBindings
-		// propagates `const a = b` through an already-invariant `b`, but an
-		// IMPORTED binding is never marked invariant — it is only filtered at the
-		// use site — so the alias does not inherit it.
+		// Naming an invariant value does not make it reactive, so an alias must
+		// reach the same answer as the binding it aliases.
 		expect(depsOf(code)).toEqual(['props.log, props.value']);
 	});
 });
 
 describe('dependency inference — computed destructuring keys', () => {
-	// These were missed dependencies, not dead slots: the effect kept a stale
-	// `key` and never re-ran when it changed.
+	// A computed key is a READ of the surrounding scope, so it is a capture like
+	// any other — the object-literal case below is the same read in a position
+	// that was never in doubt. Dropping it is a missed dependency: the effect
+	// keeps a stale `key` and never re-runs when it changes.
 	//
-	// `buildScopes`'s `walkPatternDefaults` did not visit a computed ObjectPattern
-	// key, so those Identifier nodes got no `nodeScopes` entry.
-	// `collectDependencies`'s `walkPatternExpression` DOES visit them
-	// (`if (prop.computed) walk(prop.key)`) — the intent was never in doubt — but
-	// `addIdentifier` resolves through `nodeScopes`, and an unmapped node is
-	// indistinguishable from a genuine global, so the capture was skipped.
-	//
-	// Every binding position that admits a pattern routes through
-	// `walkPatternDefaults`, so each of these shapes is a separate entry into it.
+	// Patterns appear in several binding positions, and each reaches the walk
+	// differently, so every position gets a case.
 
 	it('tracks a computed key in a declaration inside the callback', () => {
 		const code = c(`
@@ -332,6 +324,79 @@ describe('dependency stability — guards the fixes must not break', () => {
     `);
 
 		expect(depsOf(code)).toEqual(['props.log, hits']);
+	});
+
+	it('keeps a module-scope function that some statement reassigns', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      function fmt(n) { return String(n); }
+      export function install(next) { fmt = next; }
+      export function App(props) @{
+        useEffect(() => { props.log(fmt(props.value)); });
+        <div />
+      }
+    `);
+
+		// A function binding is writable, unlike a const. Reassigned anywhere in
+		// the module — including from inside another function — it is reactive.
+		expect(depsOf(code)).toEqual(['props.log, fmt, props.value']);
+	});
+
+	it('keeps a module-scope class that some statement reassigns', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      class Thing {}
+      export function swap(next) { Thing = next; }
+      export function App(props) @{
+        useEffect(() => { props.log(new Thing()); });
+        <div />
+      }
+    `);
+
+		expect(depsOf(code)).toEqual(['props.log, Thing']);
+	});
+
+	it('keeps a module-scope var, which is neither const nor block scoped', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      var moduleVar = 0;
+      export function App(props) @{
+        useEffect(() => { props.log(moduleVar); });
+        <div />
+      }
+    `);
+
+		expect(depsOf(code)).toEqual(['props.log, moduleVar']);
+	});
+
+	it('omits an exported module-scope const and function alike', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export const SCALE = 2;
+      export function fmt(n) { return String(n); }
+      export function App(props) @{
+        useEffect(() => { props.log(fmt(props.value * SCALE)); });
+        <div />
+      }
+    `);
+
+		// Exporting a binding does not let anything rebind it from outside.
+		expect(depsOf(code)).toEqual(['props.log, props.value']);
+	});
+
+	it('omits a name bound by a module-scope const destructuring pattern', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      const { mode, sizes: [first] } = { mode: 'fast', sizes: [1] };
+      export function App(props) @{
+        useEffect(() => { props.log(mode, first); });
+        <div />
+      }
+    `);
+
+		// The pattern runs once at module evaluation, so every name it binds is
+		// as fixed as a plain `const`.
+		expect(depsOf(code)).toEqual(['props.log']);
 	});
 
 	it('keeps a component-local const that shadows a module-scope const', () => {
