@@ -786,6 +786,9 @@ overrides:
 
 packageExtensionsChecksum: sha256-kfm1FmKj+dGJ1mbVor30ucTdX3Yg+IVGhIkuq6dFEI0=
 
+patchedDependencies:
+  '@changesets/cli@2.31.1': b2e3a2f8bfccf1ba042c15980245f5bc2ef7d4898e838d4cf5cab75b7b920b90
+
 importers:
 
   .:
@@ -798,7 +801,7 @@ importers:
         version: 0.7.0
       '@changesets/cli':
         specifier: catalog:default
-        version: 2.31.1(@types/node@24.13.3)
+        version: 2.31.1(patch_hash=b2e3a2f8bfccf1ba042c15980245f5bc2ef7d4898e838d4cf5cab75b7b920b90)(@types/node@24.13.3)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.3.112(prettier@3.9.6)
@@ -16577,7 +16580,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@changesets/cli@2.31.1(@types/node@24.13.3)':
+  '@changesets/cli@2.31.1(patch_hash=b2e3a2f8bfccf1ba042c15980245f5bc2ef7d4898e838d4cf5cab75b7b920b90)(@types/node@24.13.3)':
     dependencies:
       '@changesets/apply-release-plan': 7.1.1
       '@changesets/assemble-release-plan': 6.0.10
