@@ -492,7 +492,10 @@ export interface MenuRootContextValue<Payload = unknown> {
 	parent: MenuParent;
 }
 
-const MenuRootContext = createContext<MenuRootContextValue | undefined>(undefined);
+// Exported so `ContextMenu.Root` can render `<MenuRootContext.Provider value={undefined}>` around
+// its `Menu.Root`, exactly as upstream does — that is what stops a ContextMenu from being mistaken
+// for a nested menu (see the `contextMenuContext && !parentMenuRootContext` guard in `MenuRoot`).
+export const MenuRootContext = createContext<MenuRootContextValue | undefined>(undefined);
 
 export function useMenuRootContext(optional?: false): MenuRootContextValue;
 export function useMenuRootContext(optional: true): MenuRootContextValue | undefined;

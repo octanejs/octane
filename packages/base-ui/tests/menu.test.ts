@@ -30,6 +30,23 @@ async function settle(): Promise<void> {
 	}
 }
 
+/**
+ * Settle until `predicate` holds, or give up after `timeoutMs`.
+ *
+ * Focus assertions need this rather than a fixed number of `settle()` ticks: the focus manager
+ * hands off through `enqueueFocus` (an animation frame), so on a loaded machine the focus can land
+ * a few frames later than a four-iteration settle. That made the focus assertions here pass in a
+ * `--project base-ui` run and fail inside a full `pnpm test`. Waiting for the condition keeps the
+ * assertion exactly as strong while removing the timing dependence — the `expect` after the wait
+ * still fails loudly if focus never arrives.
+ */
+async function settleUntil(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (!predicate() && Date.now() < deadline) {
+		await settle();
+	}
+}
+
 function key(target: Element, k: string): void {
 	flushSync(() => {
 		target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
@@ -144,12 +161,14 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 		const popup = m.find('.menu-popup');
 		// `Menu.Popup` runs the focus manager with `initialFocus` on for a non-submenu; with no
 		// items yet the popup itself takes focus (it carries `tabindex="-1"`).
+		await settleUntil(() => popup.contains(document.activeElement));
 		expect(popup.contains(document.activeElement)).toBe(true);
 
 		key(document, 'Escape');
 		await settle();
 
 		// `returnFocus` is on for a top-level dropdown, so focus lands back on the trigger.
+		await settleUntil(() => document.activeElement === m.find('.menu-trigger'));
 		expect(document.activeElement).toBe(m.find('.menu-trigger'));
 
 		m.unmount();
@@ -440,6 +459,7 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 			await settle();
 
 			const sub = m.find('.menu-subtrigger');
+			await settleUntil(() => sub.hasAttribute('data-highlighted'));
 			expect(sub.hasAttribute('data-highlighted')).toBe(true);
 			expect(sub.getAttribute('tabindex')).toBe('0');
 			expect(document.activeElement).toBe(sub);

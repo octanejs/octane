@@ -21,6 +21,8 @@ import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
 import { Menu } from '@octanejs/base-ui/menu';
+import { Menubar } from '@octanejs/base-ui/menubar';
+import { ContextMenu } from '@octanejs/base-ui/context-menu';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
 import { PreviewCard } from '@octanejs/base-ui/preview-card';
 import { Button } from '@octanejs/base-ui/button';
@@ -1347,5 +1349,134 @@ export function MenuSubmenuInteractive() @{
 				</Menu.Positioner>
 			</Menu.Portal>
 		</Menu.Root>
+	</div>
+}
+
+// Menubar (CLOSED) — a CompositeRoot of Menu.Triggers sharing one FloatingTree. The `menubar` arm
+// of Menu's parent union, transcribed in stage 1 and inert until now, makes each trigger render as
+// a CompositeItem with `role="menuitem"` instead of a standalone button.
+export function MenubarClosed() @{
+	<Menubar className="menubar">
+		<Menu.Root>
+			<Menu.Trigger className="menubar-trigger">File</Menu.Trigger>
+		</Menu.Root>
+		<Menu.Root>
+			<Menu.Trigger className="menubar-trigger">Edit</Menu.Trigger>
+		</Menu.Root>
+	</Menubar>
+}
+
+// Menubar (vertical, non-modal, disabled) — the state attributes and the orientation that flows
+// into both the composite roving focus and the menus' positioner defaults.
+export function MenubarVerticalDisabled() @{
+	<Menubar className="menubar" orientation="vertical" modal={false} disabled>
+		<Menu.Root>
+			<Menu.Trigger className="menubar-trigger">File</Menu.Trigger>
+		</Menu.Root>
+	</Menubar>
+}
+
+// Menubar with one menu OPEN — proves the menubar parent branch end to end: the open menu's
+// positioner takes its side from the bar's orientation, the backdrop cutout is the BAR (not the
+// trigger) so the whole menubar stays clickable, and the trigger keeps `role="menuitem"`.
+export function MenubarOpenMenu() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menubar className="menubar">
+			<Menu.Root open>
+				<Menu.Trigger className="menubar-trigger">File</Menu.Trigger>
+				<Menu.Portal container={containerRef}>
+					<Menu.Positioner className="menu-positioner">
+						<Menu.Popup className="menu-popup">
+							<Menu.Item className="menu-item">New</Menu.Item>
+							<Menu.Item className="menu-item">Open</Menu.Item>
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+			<Menu.Root>
+				<Menu.Trigger className="menubar-trigger">Edit</Menu.Trigger>
+			</Menu.Root>
+		</Menubar>
+	</div>
+}
+
+// ContextMenu (CLOSED) — Root + Trigger only. The trigger is a plain region that listens for
+// contextmenu/long-press; nothing is portaled until it opens.
+export function ContextMenuClosed() @{
+	<ContextMenu.Root>
+		<ContextMenu.Trigger className="ctx-trigger">Right click me</ContextMenu.Trigger>
+	</ContextMenu.Root>
+}
+
+// ContextMenu (OPEN) — the `context-menu` arm of Menu's parent union: a MODAL focus manager, fixed
+// positioning, `start` alignment with the cursor-anchored offsets, and Menu's parts reached through
+// the ContextMenu namespace.
+export function ContextMenuOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<ContextMenu.Root open>
+			<ContextMenu.Trigger className="ctx-trigger">Right click me</ContextMenu.Trigger>
+			<ContextMenu.Portal container={containerRef}>
+				<ContextMenu.Positioner className="ctx-positioner">
+					<ContextMenu.Popup className="ctx-popup">
+						<ContextMenu.Item className="ctx-item">Cut</ContextMenu.Item>
+						<ContextMenu.Separator className="ctx-sep" />
+						<ContextMenu.Item className="ctx-item">Copy</ContextMenu.Item>
+					</ContextMenu.Popup>
+				</ContextMenu.Positioner>
+			</ContextMenu.Portal>
+		</ContextMenu.Root>
+	</div>
+}
+
+// ContextMenu (interactive) — for behavior tests: a real `contextmenu` event opens it at the cursor.
+export function ContextMenuInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="ctx-host" />
+		<ContextMenu.Root>
+			<ContextMenu.Trigger className="ctx-trigger">Right click me</ContextMenu.Trigger>
+			<ContextMenu.Portal container={hostRef}>
+				<ContextMenu.Positioner className="ctx-positioner">
+					<ContextMenu.Popup className="ctx-popup">
+						<ContextMenu.Item className="ctx-item">Cut</ContextMenu.Item>
+					</ContextMenu.Popup>
+				</ContextMenu.Positioner>
+			</ContextMenu.Portal>
+		</ContextMenu.Root>
+	</div>
+}
+
+// Menubar (interactive) — for behavior tests: pressing a trigger opens its menu, and the sibling
+// trigger opens on hover once one menu is open.
+export function MenubarInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menubar className="menubar">
+			<Menu.Root>
+				<Menu.Trigger className="menubar-file">File</Menu.Trigger>
+				<Menu.Portal container={hostRef}>
+					<Menu.Positioner className="menu-positioner">
+						<Menu.Popup className="file-popup">
+							<Menu.Item className="menu-item">New</Menu.Item>
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+			<Menu.Root>
+				<Menu.Trigger className="menubar-edit">Edit</Menu.Trigger>
+				<Menu.Portal container={hostRef}>
+					<Menu.Positioner className="menu-positioner">
+						<Menu.Popup className="edit-popup">
+							<Menu.Item className="menu-item">Undo</Menu.Item>
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+		</Menubar>
 	</div>
 }

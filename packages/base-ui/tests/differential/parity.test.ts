@@ -701,6 +701,36 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('Menubar: closed (composite root of menuitem triggers)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Menubar: vertical, non-modal, disabled (state attributes + orientation)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarVerticalDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Menubar: with one menu open (bar-cutout backdrop, orientation-driven side)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarOpenMenu', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('ContextMenu: closed Root+Trigger', async () => {
+		const d = await mountDifferential(FIXTURE, 'ContextMenuClosed', undefined, CACHE);
+		await d.step('mount (closed)', () => {});
+		d.unmount();
+	});
+
+	it('ContextMenu: open (modal focus manager, fixed positioning, Menu parts via the namespace)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ContextMenuOpen', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
 	it('Menu: OPEN submenu subtree (nested placement, data-nested, aria wiring, nested items)', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenWithSubmenuOpen', undefined, CACHE);
 		await stepComparingSubtree(d, 'mount (both open)', '.submenu-positioner');
