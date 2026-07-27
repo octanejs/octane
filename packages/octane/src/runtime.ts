@@ -14645,6 +14645,13 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 // property (not a WeakMap) keeps the per-child lookup in reconcileDeoptChildren cheap;
 // `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
 const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
+
+// Set on an element once the de-opt reconciler has actually committed children into it. React only
+// manages children it created, so DOM inserted by other means — a `replaceChildren` into an element
+// we rendered empty, a third-party widget — must survive our updates. Without this we reconcile the
+// element's existing DOM against an empty child list and remove all of it. Portal ranges already
+// get this treatment via `$$portalEnd`; this covers the imperative case.
+const DEOPT_OWNS_CHILDREN: unique symbol = Symbol('octane.deoptOwnsChildren');
 interface DeoptStamped {
 	[DEOPT_DESC]?: ElementDescriptor;
 }
@@ -14931,8 +14938,15 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				el.appendChild(node);
+				(el as any)[DEOPT_OWNS_CHILDREN] = true;
 			}
 		}
+		return;
+	}
+	// Nothing to render, and we have never put children here: every node present came from
+	// somewhere else, so leave it alone rather than reconciling against an empty list and
+	// sweeping it away. (Going from rendered children to none still clears — the flag is set.)
+	if (next.length === 0 && (el as any)[DEOPT_OWNS_CHILDREN] !== true) {
 		return;
 	}
 	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
@@ -14987,6 +15001,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			result.push(node);
 		}
 	}
+	if (result.length > 0) (el as any)[DEOPT_OWNS_CHILDREN] = true;
 	// Remove OWNED children not reused (foreign portal ranges stay untouched).
 	const keep = result.length > 0 ? new Set<Node>(result) : null;
 	for (let i = owned.length - 1; i >= 0; i--) {
