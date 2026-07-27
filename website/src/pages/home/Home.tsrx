@@ -5,6 +5,7 @@ import { Hero } from './sections/Hero.tsrx';
 import { Features } from './sections/Features.tsrx';
 import { Proven } from './sections/Proven.tsrx';
 import { Why } from './sections/Why.tsrx';
+import { Cli } from './sections/Cli.tsrx';
 import { ReactCompat } from './sections/ReactCompat.tsrx';
 import { Spin } from './sections/Spin.tsrx';
 import { Explorer } from './sections/Explorer.tsrx';
@@ -15,6 +16,7 @@ export function Home() @{
 		<Features />
 		<Proven />
 		<Why />
+		<Cli />
 		<ReactCompat />
 		<Spin />
 		<Explorer />

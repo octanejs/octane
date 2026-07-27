@@ -53,6 +53,35 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'cli',
+		title: 'CLI',
+		description:
+			'Diagnose a project with octane doctor, wire Octane in, install bindings, and decode runtime errors.',
+		group: 'Start here',
+		searchTerms: [
+			'octane doctor',
+			'octane init',
+			'octane add',
+			'octane explain',
+			'octane mcp',
+			'@octanejs/cli',
+			'duplicate runtime',
+			'jsxImportSource',
+			'tsrx-tsc',
+			'exit code',
+		],
+		sections: [
+			{ id: 'install', title: 'Install' },
+			{ id: 'doctor', title: 'octane doctor' },
+			{ id: 'fixing', title: 'Fixing what it finds', level: 3 },
+			{ id: 'analyze', title: 'octane analyze' },
+			{ id: 'init', title: 'octane init' },
+			{ id: 'bindings', title: 'Bindings and errors' },
+			{ id: 'mcp', title: 'octane mcp' },
+			{ id: 'agents-and-ci', title: 'Agents and CI' },
+		],
+	},
+	{
 		slug: 'core-apis',
 		title: 'Core APIs',
 		description:

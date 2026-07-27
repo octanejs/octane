@@ -17,6 +17,11 @@ const SPECIAL_ROLES = new Map([
 	// binding, so it stays outside the binding status/catalog contract.
 	['@octanejs/tanstack-start', 'metaframework'],
 	['@octanejs/mcp-server', 'agent tooling'],
+	// The CLI inspects and configures other people's projects, including ones
+	// that have no Octane installed yet, which is exactly what `octane init`
+	// exists to fix. Coupling it to the runtime singleton would make it
+	// uninstallable in the case it is meant to solve.
+	['@octanejs/cli', 'developer tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
 	// Original Octane API rather than a port of an upstream library, so it has no
 	// binding status.json / parity contract to satisfy.

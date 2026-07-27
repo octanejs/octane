@@ -175,8 +175,8 @@ describe('website routes', () => {
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// compat, spin, explorer. (Each section carries a compiler-added scoped class
-		// after its semantic one.)
+		// cli, compat, spin, explorer. (Each section carries a compiler-added scoped
+		// class after its semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
 		);
@@ -185,6 +185,7 @@ describe('website routes', () => {
 			'features',
 			'proven',
 			'why',
+			'cli',
 			'compat',
 			'spin',
 			'explorer',

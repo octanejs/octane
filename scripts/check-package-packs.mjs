@@ -120,7 +120,7 @@ function targetExists(target, files) {
 	return [...files].some((file) => pattern.test(file));
 }
 
-function validatePackedPackage(pkg, manifest, files) {
+function validatePackedPackage(pkg, manifest, files, executableFiles) {
 	const errors = [];
 	if (manifest.name !== pkg.name || manifest.version !== pkg.version) {
 		errors.push(
@@ -190,6 +190,20 @@ function validatePackedPackage(pkg, manifest, files) {
 		}
 		if (!targetExists(target.value, files)) {
 			errors.push(`${target.label} points to missing ${JSON.stringify(target.value)}`);
+		}
+	}
+
+	// A bin without the executable bit installs as a symlink the shell refuses to
+	// run ("permission denied"). npm repairs this for some install paths and not
+	// others, so the mode has to be correct in the tarball itself.
+	const binTargets = [];
+	if (manifest.bin != null) collectStrings(manifest.bin, 'bin', binTargets);
+	for (const target of binTargets) {
+		const normalized = target.value.replace(/^\.\//, '');
+		if (files.has(normalized) && !executableFiles.has(normalized)) {
+			errors.push(
+				`${target.label} ${JSON.stringify(target.value)} is not executable in the tarball`,
+			);
 		}
 	}
 
@@ -1042,8 +1056,18 @@ try {
 					.filter(Boolean)
 					.map((file) => file.replace(/^package\//, '').replace(/\/$/, '')),
 			);
+			// `tar -tvzf` prints the stored mode per entry; owner-execute is what
+			// decides whether an installed bin is runnable.
+			const executableFiles = new Set(
+				tarOutput(['-tvzf', archive])
+					.split('\n')
+					.filter((line) => /^[-l]..x/.test(line))
+					.map((line) => line.slice(line.indexOf('package/')))
+					.filter(Boolean)
+					.map((file) => file.replace(/^package\//, '').replace(/\/$/, '')),
+			);
 			rawTsrxFiles += [...files].filter((file) => file.endsWith('.tsrx')).length;
-			const errors = validatePackedPackage(pkg, manifest, files);
+			const errors = validatePackedPackage(pkg, manifest, files, executableFiles);
 			if (errors.length) failures.push(`${pkg.name}:\n    - ${errors.join('\n    - ')}`);
 			else console.log(`packed ${pkg.name} (${files.size} files)`);
 		} catch (error) {

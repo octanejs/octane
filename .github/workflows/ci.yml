@@ -490,6 +490,13 @@ jobs:
       - name: Check binding parity-gap index is current
         run: pnpm binding-parity:gaps:check
 
+      # @octanejs/cli ships a snapshot of the binding and error-code catalogs
+      # because it runs against user projects, not this checkout. Regenerating
+      # has to happen in the same change that edits a status.json or adds an
+      # error code, or `octane bindings`/`octane explain` go stale on npm.
+      - name: Check CLI data snapshot is current
+        run: pnpm cli:data:check
+
       # docs/bindings-status.md is generated from the per-package status.json
       # blocks in the @octanejs/* binding packages. Changing a binding's scope
       # means updating its status.json and regenerating in the same change.

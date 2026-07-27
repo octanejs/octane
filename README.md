@@ -145,6 +145,12 @@ Octane's published packages require Node.js 22 or newer.
 pnpm add octane @octanejs/vite-plugin
 ```
 
+Or let the CLI wire it up, including the TypeScript settings `.tsrx` needs:
+
+```bash
+pnpm dlx @octanejs/cli init
+```
+
 For any Vite app, add Octane's Vite integration:
 
 ```ts
@@ -591,7 +597,7 @@ Octane itself. Good places to start:
 ## Packages
 
 This is a pnpm monorepo containing the core runtime+compiler, the metaframework
-plugin (and its Vercel and Cloudflare adapters), an MCP server, private evaluation tooling, and
+plugin (and its Vercel and Cloudflare adapters), the CLI, an MCP server, private evaluation tooling, and
 the framework bindings. The current workspace package inventory and counts are
 generated from the workspace manifests in
 [`docs/packages.md`](./docs/packages.md):
@@ -618,6 +624,11 @@ generated from the workspace manifests in
   file-route generation, server-function compilation, streaming SSR, hydration,
   and Vite development and production integration, using
   [`@octanejs/tanstack-router`](./packages/tanstack-router) as its router binding.
+- [`@octanejs/cli`](./packages/cli) is the `octane` command line: `init` wires
+  Octane into an existing project, `doctor` finds and repairs the
+  misconfigurations that break Octane quietly, `add` installs a binding and
+  reports its divergences, `explain` decodes a runtime error code, and `mcp add`
+  registers the MCP server with Claude Code, Codex, Cursor, or VS Code.
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
   compile tooling to AI agents over MCP.
 - [`@octanejs/evals`](./packages/octane-evals) is the private workspace package
