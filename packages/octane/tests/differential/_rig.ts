@@ -106,7 +106,7 @@ function hashString(s: string): string {
  *     compile-emission divergence, NOT a renderer-behaviour divergence, so
  *     we collapse to put both runtimes on equal footing.
  */
-function normaliseHtml(html: string): string {
+export function normaliseHtml(html: string): string {
 	return canonicaliseGeneratedIds(
 		sortAttributes(
 			collapseInterTagWhitespace(stripComments(html))

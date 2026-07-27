@@ -28,9 +28,11 @@ export default defineConfig({
 		// `octane` is workspace:* and points `main` at raw TS sources, and also
 		// provides the compiler at `octane/compiler`. Pre-bundling would snapshot
 		// stale output and require `vite --force` on every workspace edit.
-		// The registry-installed shadcn components build on the raw-source
-		// `@octanejs/radix`/`@octanejs/lucide` bindings — keep those on the
-		// octane plugin path rather than esbuild pre-bundling.
-		exclude: ['octane', '@octanejs/radix', '@octanejs/lucide'],
+		//
+		// The bindings are the same shape: they ship `.tsrx`/`.ts` sources that the
+		// octane plugin has to compile, so they must not be pre-bundled either. That
+		// covers both the cmdk demo and the registry-installed shadcn components,
+		// which build on the raw-source radix and lucide bindings.
+		exclude: ['octane', '@octanejs/cmdk', '@octanejs/radix', '@octanejs/lucide'],
 	},
 });

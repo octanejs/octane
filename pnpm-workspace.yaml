@@ -281,6 +281,7 @@ catalogs:
     class-variance-authority: 0.7.1
     classnames: ^2.5.1
     clsx: ^2.1.1
+    cmdk: 1.1.1
     tailwind-merge: 3.6.0
     d3-array: 3.2.1
     d3-chord: ^1.0.6
