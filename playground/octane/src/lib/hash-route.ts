@@ -18,8 +18,13 @@ function readRoute(): string {
  *
  * Routes are a bare demo id rather than `group/id` so that regrouping the
  * catalog never breaks a shared link.
+ *
+ * `replace` swaps the current history entry instead of adding one. Correcting a
+ * route the app cannot resolve must not leave a step in the history: pushing
+ * one means Back returns to the bad hash, the correction fires again, and the
+ * user can never leave the page.
  */
-export function useHashRoute(): [string, (route: string) => void] {
+export function useHashRoute(): [string, (route: string, options?: { replace?: boolean }) => void] {
 	const [route, setRoute] = useState(readRoute);
 
 	useEffect(() => {
@@ -28,12 +33,19 @@ export function useHashRoute(): [string, (route: string) => void] {
 		return () => window.removeEventListener('hashchange', sync);
 	}, []);
 
-	// Writing the hash fires `hashchange`, which updates the state above — the
-	// setter deliberately does not touch state itself, so the URL cannot drift
-	// out of step with what is rendered.
 	return [
 		route,
-		(next: string) => {
+		(next: string, options?: { replace?: boolean }) => {
+			if (options?.replace) {
+				// replaceState does NOT emit `hashchange`, so the state has to be set
+				// here — otherwise the caller's "is this route resolvable" test never
+				// clears and it rewrites the URL on every render.
+				window.history.replaceState(null, '', `#/${next}`);
+				setRoute(next);
+				return;
+			}
+			// A real navigation writes the URL and lets the listener above update the
+			// state, so the URL stays the single source of truth.
 			window.location.hash = `#/${next}`;
 		},
 	];

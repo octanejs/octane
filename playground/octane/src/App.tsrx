@@ -15,7 +15,7 @@ export function App() @{
 	// A stale or mistyped link renders the fallback demo; rewrite the URL to
 	// match so what is shared next points at what is actually on screen.
 	useEffect(() => {
-		if (route !== demo.id) navigate(demo.id);
+		if (route !== demo.id) navigate(demo.id, { replace: true });
 	}, [route, demo.id]);
 
 	<SidebarProvider>
