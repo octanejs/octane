@@ -269,6 +269,20 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			expect(prodHtml).not.toContain(`<link rel="modulepreload" href="/${deferredJavaScript}">`);
 			expect(prodHtml).not.toContain(`src="/${prefetchedJavaScript}"`);
 			expect(prodHtml).not.toContain(`<link rel="modulepreload" href="/${prefetchedJavaScript}">`);
+
+			// Hoisted metadata belongs in the template's <head>, not in #root. The
+			// handler renders the route into `<div id="root">`, so core's default
+			// fold would prepend it into the body, where the title loses to the
+			// template's and the description is ignored. Asserted on BOTH responses
+			// because the splice lives in two files (dev render-route, prod handler).
+			for (const html of [prodHtml, devHtml]) {
+				const slug = url === '/' ? 'home' : 'hello';
+				const headRegion = html.slice(0, html.indexOf('</head>'));
+				expect(headRegion).toContain(`<title>Fixture page ${slug}</title>`);
+				expect(headRegion).toContain('content="fixture page description"');
+				expect(bodyRegionOf(html)).not.toContain('<title>');
+				expect(bodyRegionOf(html)).not.toContain('fixture page description');
+			}
 		}
 	});
 

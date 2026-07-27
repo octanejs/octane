@@ -33,7 +33,9 @@ benchmarks/baselines/ratios.suggested.json
 
 # Pinned mui/base-ui checkout — the porting source-of-truth for @octanejs/base-ui
 # (see docs/base-ui-migration-plan.md; clone is re-created on demand, never committed).
-.base-ui/
+# No trailing slash: a worktree may link the checkout in rather than clone it, and a
+# `.base-ui/` rule matches only a real directory — a symlink would slip into a commit.
+.base-ui
 
 # Pinned adobe/react-spectrum checkout — the porting source-of-truth for @octanejs/aria
 # (see docs/aria-migration-plan.md; clone is re-created on demand, never committed).

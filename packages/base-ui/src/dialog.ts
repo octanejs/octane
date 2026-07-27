@@ -9,6 +9,7 @@
 import {
 	createContext,
 	createElement,
+	Fragment,
 	useContext,
 	useMemo,
 	useRef,
@@ -33,7 +34,11 @@ import { useDismiss } from './utils/floating/useDismiss';
 import { useScrollLock } from './utils/useScrollLock';
 import { useOpenChangeComplete } from './utils/useOpenChangeComplete';
 import { useOpenMethodTriggerProps } from './utils/useOpenInteractionType';
-import { triggerOpenStateMapping, popupStateMapping } from './utils/popupStateMapping';
+import {
+	triggerOpenStateMapping,
+	popupStateMapping,
+	CommonPopupDataAttributes,
+} from './utils/popupStateMapping';
 import { transitionStatusMapping } from './utils/useTransitionStatus';
 import type { StateAttributesMapping } from './utils/getStateAttributesProps';
 import { EMPTY_OBJECT } from './utils/empty';
@@ -404,14 +409,7 @@ function DialogInteractions(props: any): any {
 		subSlot(slot, 'pip'),
 	);
 
-	// Renders the Dialog's children (see the note at the `content` call site). No DOM of its own.
-	return props.children ?? null;
-}
-
-// Passthrough used when the interactions aren't mounted, to keep the Provider's children a stable
-// element-descriptor shape (see the note at the `content` call site).
-function DialogChildren(props: any): any {
-	return props.children ?? null;
+	return null;
 }
 
 export function useRenderDialogRoot<Payload>(
@@ -482,19 +480,19 @@ export function useRenderDialogRoot<Payload>(
 	const resolvedChildren =
 		typeof children === 'function' && !isChildrenBlock(children) ? children({ payload }) : children;
 
-	// The Provider's `children` must stay a STABLE shape (always an element descriptor) across
-	// renders: octane's `childrenAsBody` runs a render-FUNCTION child directly in the Provider scope
-	// (owning `scope.slots`) but routes a DESCRIPTOR child through `childSlot(scope, 0)` — alternating
-	// the two across renders (a raw children-block when closed vs a component when open) collides those
-	// slot namespaces and crashes octane's reconciler (see octane bug note). So a no-DOM component
-	// wraps the children in BOTH states: `DialogInteractions` (runs the open-state hooks) when
-	// open/mounted, else `DialogChildren` (a passthrough). Both just render `props.children`.
-	const content = createElement(shouldRenderInteractions ? DialogInteractions : DialogChildren, {
-		store,
-		parentContext: parentDialogRootContext?.store.context,
-		isDrawer,
-		children: resolvedChildren,
-	});
+	// `DialogInteractions` is a headless SIBLING of the children, exactly as Base UI renders it, so
+	// toggling it never disturbs them.
+	const content = [
+		shouldRenderInteractions
+			? createElement(DialogInteractions, {
+					key: 'interactions',
+					store,
+					parentContext: parentDialogRootContext?.store.context,
+					isDrawer,
+				})
+			: null,
+		createElement(Fragment, { key: 'children', children: resolvedChildren }),
+	];
 
 	return createElement(IsDrawerContext.Provider, {
 		value: false,
@@ -844,6 +842,73 @@ function DialogClose(componentProps: any): any {
 	);
 }
 
+// --- Viewport ----------------------------------------------------------------
+
+export const DialogViewportDataAttributes = {
+	open: CommonPopupDataAttributes.open,
+	closed: CommonPopupDataAttributes.closed,
+	startingStyle: CommonPopupDataAttributes.startingStyle,
+	endingStyle: CommonPopupDataAttributes.endingStyle,
+	nested: 'data-nested',
+	nestedDialogOpen: 'data-nested-dialog-open',
+} as const;
+
+const viewportStateAttributesMapping: StateAttributesMapping<any> = {
+	...(popupStateMapping as StateAttributesMapping<any>),
+	...(transitionStatusMapping as StateAttributesMapping<any>),
+	nested(value: boolean) {
+		return value ? { [DialogViewportDataAttributes.nested]: '' } : null;
+	},
+	nestedDialogOpen(value: boolean) {
+		return value ? { [DialogViewportDataAttributes.nestedDialogOpen]: '' } : null;
+	},
+};
+
+// A positioning container for the dialog popup that can be made scrollable.
+function DialogViewport(componentProps: any): any {
+	const slot = S('DialogViewport');
+	const { render, className, style, children, ref, ...elementProps } = componentProps;
+
+	const keepMounted = useDialogPortalContext();
+	const { store } = useDialogRootContext() as DialogRootContextValue;
+
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const nested = store.useState('nested', subSlot(slot, 'nested'));
+	const transitionStatus = store.useState('transitionStatus', subSlot(slot, 'ts'));
+	const nestedOpenDialogCount = store.useState('nestedOpenDialogCount', subSlot(slot, 'nodc'));
+	const mounted = store.useState('mounted', subSlot(slot, 'mounted'));
+
+	const setViewportElement = store.useStateSetter('viewportElement', subSlot(slot, 'sve'));
+
+	const state = {
+		open,
+		nested,
+		transitionStatus,
+		nestedDialogOpen: nestedOpenDialogCount > 0,
+	};
+
+	return useRenderElement(
+		'div',
+		{ render, className, style },
+		{
+			enabled: keepMounted || mounted,
+			state,
+			ref: [ref, setViewportElement],
+			stateAttributesMapping: viewportStateAttributesMapping,
+			props: [
+				{
+					role: 'presentation',
+					hidden: !mounted,
+					style: { pointerEvents: !open ? 'none' : undefined },
+					children,
+				},
+				elementProps,
+			],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
 // --- Namespace ---------------------------------------------------------------
 
 export const Dialog = {
@@ -852,8 +917,10 @@ export const Dialog = {
 	Portal: DialogPortal,
 	Backdrop: DialogBackdrop,
 	Popup: DialogPopup,
+	Viewport: DialogViewport,
 	Title: DialogTitle,
 	Description: DialogDescription,
 	Close: DialogClose,
 	createHandle: createDialogHandle,
+	Handle: DialogHandle,
 };

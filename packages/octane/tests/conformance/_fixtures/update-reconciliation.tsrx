@@ -27,6 +27,7 @@ let _setFunctionSwitchMode: any = null;
 let _bumpFunctionSwitch: any = null;
 let _setFunctionSwitchContext: any = null;
 let _bumpExternalUnmountTarget: any = null;
+let _setDeletionRegistrySwitch: any = null;
 
 export function setFirst(value: any) {
 	_setFirst(value);
@@ -54,6 +55,9 @@ export function setDeleteChild(value: any) {
 }
 export function setDeleteStoreParent(value: boolean) {
 	_setDeleteStoreParent!(value);
+}
+export function setDeletionRegistrySwitch(value: boolean) {
+	_setDeletionRegistrySwitch(value);
 }
 export function setMemoChild(value: any) {
 	_setMemoChild(value);
@@ -447,6 +451,38 @@ export function NestedEffectUpdates(props) @{
 		if (step < props.limit) setStep((value: number) => value + 1);
 	}, null);
 	<span id="nested-effect-step">{step as number}</span>
+}
+
+// A registry owner whose members register/unregister from a layout effect, with a
+// plain-return switcher in between: flipping the switch DELETES the mounted member
+// while the switcher's own body is still on the render stack, so the member's layout
+// destroy is discovered mid-render even though it is commit-phase work.
+function DeletionRegistryMember(props) @{
+	useLayoutEffect(() => {
+		props.register();
+		return () => props.unregister();
+	}, []);
+	<span id="deletion-registry-member">{'member'}</span>
+}
+
+function DeletionRegistrySwitcher(props) {
+	return props.showMember
+		? <DeletionRegistryMember register={props.register} unregister={props.unregister} />
+		: null;
+}
+
+export function DeletionCleanupRegistry() @{
+	const [showMember, setShowMember] = useState(true);
+	const [registered, setRegistered] = useState(0);
+	_setDeletionRegistrySwitch = setShowMember;
+	<div>
+		<DeletionRegistrySwitcher
+			showMember={showMember}
+			register={() => setRegistered((count: number) => count + 1)}
+			unregister={() => setRegistered((count: number) => count - 1)}
+		/>
+		<span id="deletion-registry-count">{registered as number}</span>
+	</div>
 }
 
 export function ExternalUnmountCleanupSource(props) @{

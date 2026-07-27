@@ -1,5 +1,6 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'octane';
 import type { OctaneNode } from 'octane';
+import { Head, Meta, Seo, Title } from '@octanejs/seo';
 import type { RenderRouteProps } from '@octanejs/vite-plugin';
 import {
 	DESTINATIONS,
@@ -16,6 +17,9 @@ import './styles.css';
 
 const SAVED_STORAGE_KEY = 'wayfinder:saved:v1';
 const NOTES_STORAGE_KEY = 'wayfinder:notes:v1';
+
+// Absolute-ises canonical and og:image, which scrapers do not resolve for you.
+const SITE_ORIGIN = 'https://wayfinder.example';
 
 type Navigate = (href: string) => void;
 
@@ -261,6 +265,13 @@ function DiscoverPage(props: DiscoverPageProps) @{
 	useEffect(() => () => activeSearch.current?.abort(), []);
 
 	<main id="main-content" class="discover-page">
+		<Head>
+			<Seo
+				title="Go somewhere, slowly"
+				description="Thoughtful city breaks planned around the shape of your day."
+				canonical="/"
+			/>
+		</Head>
 		<section class="hero">
 			<div class="hero-copy">
 				<p class="eyebrow eyebrow-accent">Small journeys, properly considered</p>
@@ -554,6 +565,13 @@ function TripPage(props: TripPageProps) @{
 
 	@if (destination === undefined || planningRun === null) {
 		<main id="main-content" class="not-found-page">
+			<Head>
+				<Seo
+					title="Route not found"
+					description="That city is not part of the current Wayfinder edition."
+					robots={{ index: false, follow: true }}
+				/>
+			</Head>
 			<p class="eyebrow eyebrow-accent">Route not found</p>
 			<h1>This path has slipped beyond the map.</h1>
 			<p>Choose a city from the current Wayfinder edition and begin again.</p>
@@ -563,6 +581,31 @@ function TripPage(props: TripPageProps) @{
 		</main>
 	} @else {
 		<main id="main-content" class="trip-page" data-trip-id={destination.id}>
+			<Head>
+				<Seo
+					title={destination.city + ', ' + destination.country}
+					description={destination.tagline}
+					canonical={'/trips/' + destination.id}
+					openGraph={{
+						type: 'article',
+						images: [
+							{
+								url: '/og/' + destination.id + '.png',
+								alt: destination.city + ' city edition',
+								width: 1200,
+								height: 630,
+							},
+						],
+					}}
+					jsonLd={{
+						'@context': 'https://schema.org',
+						'@type': 'TouristDestination',
+						name: destination.city,
+						description: destination.intro,
+						addressCountry: destination.country,
+					}}
+				/>
+			</Head>
 			<section class={['trip-hero', `trip-${destination.accent}`]}>
 				<div class="trip-hero-copy">
 					<AppLink href="/" class="back-link" navigate={props.navigate}>
@@ -689,6 +732,12 @@ function SavedPage(props: SavedPageProps) @{
 		(destination) => props.saved.includes(destination.id),
 	);
 	<main id="main-content" class="saved-page">
+		<Head>
+			<Title text="Saved journeys" />
+			<Meta name="description" content="A small shelf of routes stored only in this browser." />
+			{/* A private list is not worth indexing, but its links are worth following. */}
+			<Meta name="robots" content="noindex, follow" />
+		</Head>
 		<div class="saved-heading">
 			<p class="eyebrow eyebrow-accent">Kept for later</p>
 			<h1>Your saved journeys.</h1>
@@ -771,38 +820,58 @@ export function App(props: RenderRouteProps) @{
 		return () => window.removeEventListener('popstate', onPopState);
 	}, []);
 
-	<div
-		class="app"
-		data-hydrated={hydrated ? 'true' : 'false'}
-		data-app-ready={storageReady ? 'true' : 'false'}
-	>
-		<a class="skip-link" href="#main-content">Skip to main content</a>
-		<Header navigate={navigate} savedCount={saved.length} />
-		@if (route.name === 'discover') {
-			<DiscoverPage navigate={navigate} scenario={route.scenario} />
-		} @else if (route.name === 'trip') {
-			<TripPage
-				tripId={route.tripId}
-				month={route.month}
-				scenario={route.scenario}
-				navigate={navigate}
-				saved={saved.includes(route.tripId)}
-				toggleSaved={toggleSaved}
-				initialNote=""
-				storageReady={storageReady}
-				requestState={props.state}
+	// One <Head> wraps the app, so every <Head> block a page renders merges into
+	// it rather than emitting a second set of tags. The blocks below are siblings
+	// of these defaults, not nested inside them, and still win: precedence is
+	// registration order, not position.
+	<Head>
+		<div
+			class="app"
+			data-hydrated={hydrated ? 'true' : 'false'}
+			data-app-ready={storageReady ? 'true' : 'false'}
+		>
+			<Seo
+				site={SITE_ORIGIN}
+				titleTemplate="%s · Wayfinder"
+				openGraph={{ type: 'website', siteName: 'Wayfinder', locale: 'en_GB' }}
+				twitter={{ card: 'summary_large_image' }}
+				robots={{ index: true, follow: true, maxImagePreview: 'large' }}
 			/>
-		} @else if (route.name === 'saved') {
-			<SavedPage saved={saved} storageReady={storageReady} navigate={navigate} />
-		} @else {
-			<main id="main-content" class="not-found-page">
-				<p class="eyebrow eyebrow-accent">404 · beyond this edition</p>
-				<h1>We have not walked that road yet.</h1>
-				<AppLink href="/" class="button button-dark" navigate={navigate}>
-					Return to Wayfinder
-				</AppLink>
-			</main>
-		}
-		<Footer navigate={navigate} />
-	</div>
+			<a class="skip-link" href="#main-content">Skip to main content</a>
+			<Header navigate={navigate} savedCount={saved.length} />
+			@if (route.name === 'discover') {
+				<DiscoverPage navigate={navigate} scenario={route.scenario} />
+			} @else if (route.name === 'trip') {
+				<TripPage
+					tripId={route.tripId}
+					month={route.month}
+					scenario={route.scenario}
+					navigate={navigate}
+					saved={saved.includes(route.tripId)}
+					toggleSaved={toggleSaved}
+					initialNote=""
+					storageReady={storageReady}
+					requestState={props.state}
+				/>
+			} @else if (route.name === 'saved') {
+				<SavedPage saved={saved} storageReady={storageReady} navigate={navigate} />
+			} @else {
+				<main id="main-content" class="not-found-page">
+					<Head>
+						<Seo
+							title="Page not found"
+							description="That route is not part of this edition of Wayfinder."
+							robots={{ index: false, follow: true }}
+						/>
+					</Head>
+					<p class="eyebrow eyebrow-accent">404 · beyond this edition</p>
+					<h1>We have not walked that road yet.</h1>
+					<AppLink href="/" class="button button-dark" navigate={navigate}>
+						Return to Wayfinder
+					</AppLink>
+				</main>
+			}
+			<Footer navigate={navigate} />
+		</div>
+	</Head>
 }
