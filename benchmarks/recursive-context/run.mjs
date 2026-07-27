@@ -365,7 +365,6 @@ const DOM_OPS = [
 	['text_mounted', 'mounted', 'text'],
 	['comments_mounted', 'mounted', 'comments'],
 	['empty_text_mounted', 'mounted', 'emptyText'],
-	['whitespace_text_mounted', 'mounted', 'whitespaceText'],
 	['nodes_partial_unmounted', 'partialUnmounted', 'total'],
 	['elements_partial_unmounted', 'partialUnmounted', 'elements'],
 	['text_partial_unmounted', 'partialUnmounted', 'text'],

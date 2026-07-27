@@ -405,7 +405,6 @@ const DOM_OPS = [
 	['text_mounted', 'text'],
 	['comments_mounted', 'comments'],
 	['empty_text_mounted', 'emptyText'],
-	['whitespace_text_mounted', 'whitespaceText'],
 ];
 
 const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
