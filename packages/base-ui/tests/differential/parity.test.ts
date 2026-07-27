@@ -44,14 +44,18 @@ function undoFocusInsideDisable(html: string): string {
 }
 
 /**
- * `d.step` for open menus: same byte-compare, after undoing the shared-document focus artifact
- * above on both sides.
+ * `d.step` for open menus: drives the step on both runtimes, then byte-compares after undoing the
+ * shared-document focus artifact above on both sides.
  */
-async function stepUndoingFocusDisable(d: any, name: string): Promise<void> {
-	await d.observe(name, () => {});
+async function stepUndoingFocusDisable(
+	d: any,
+	name: string,
+	fn: (i: any, r: any) => void | Promise<void> = () => {},
+): Promise<void> {
+	await d.observe(name, fn);
 	const octane = undoFocusInsideDisable(normaliseHtml(d.octane.container.innerHTML));
 	const react = undoFocusInsideDisable(normaliseHtml(d.react.container.innerHTML));
-	expect(octane).toBe(react);
+	expect(octane, `divergence at step "${name}"`).toBe(react);
 }
 
 describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
@@ -611,6 +615,37 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Menu: open with checkbox items (checked/unchecked + transition-mounted indicator)', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenCheckboxItems', undefined, CACHE);
 		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	// Base UI's MENU indicators gate on `item.checked`, not on the `mounted` flag that
+	// `Checkbox.Indicator`/`Radio.Indicator` use — so unchecking drops the node immediately and the
+	// exit transition never runs. That reads as a bug against the rest of Base UI, and it was raised
+	// as one in review, but it is upstream's own inconsistency (`MenuCheckboxItemIndicator.tsx` L26
+	// does not even destructure `mounted`). Porting the "fix" would diverge from the real
+	// `@base-ui/react`; this step is the proof that both runtimes drop it on the same commit, and
+	// the guard against a future well-meant repair.
+	it('Menu: toggling a checkbox item matches Base UI, including the immediate indicator unmount', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenCheckboxItems', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open, first item checked)');
+		await stepUndoingFocusDisable(d, 'uncheck the first item', async (i, r) => {
+			await i.click('.menu-check');
+			await r.click('.menu-check');
+		});
+		await stepUndoingFocusDisable(d, 're-check the first item', async (i, r) => {
+			await i.click('.menu-check');
+			await r.click('.menu-check');
+		});
+		d.unmount();
+	});
+
+	it('Menu: selecting a different radio item matches Base UI (indicator moves)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenRadioGroup', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open, second item selected)');
+		await stepUndoingFocusDisable(d, 'select the first item', async (i, r) => {
+			await i.click('.menu-radio');
+			await r.click('.menu-radio');
+		});
 		d.unmount();
 	});
 

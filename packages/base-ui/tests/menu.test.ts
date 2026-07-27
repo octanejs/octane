@@ -341,6 +341,15 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 			// `closeOnClick` defaults to false for checkbox items.
 			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
 
+			// Unchecking drops the indicator on the SAME commit — Base UI's menu indicators gate on
+			// `checked` rather than the transition `mounted` flag, so there is no exit transition.
+			// See the UPSTREAM QUIRK note in `src/menu.ts`; the differential toggle step proves the
+			// real `@base-ui/react` does the same.
+			m.click('.menu-check');
+			await settle();
+			expect(m.find('.menu-check').getAttribute('aria-checked')).toBe('false');
+			expect(m.container.querySelector('.menu-check-ind')).toBe(null);
+
 			m.unmount();
 		});
 

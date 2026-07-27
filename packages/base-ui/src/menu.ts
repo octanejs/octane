@@ -2554,6 +2554,14 @@ function MenuCheckboxItemIndicator(componentProps: any): any {
 		transitionStatus,
 	};
 
+	// UPSTREAM QUIRK, transcribed deliberately: this gates on `item.checked`, NOT on the `mounted`
+	// flag `useTransitionStatus` returns — which is what `Checkbox.Indicator` and `Radio.Indicator`
+	// use. So unchecking drops the node on the same commit and the exit transition
+	// (`data-ending-style`) never runs, making the `useOpenChangeComplete` → `setMounted(false)`
+	// pair below effectively dead for the uncheck direction. Base UI 1.6.0's menu indicators do not
+	// even destructure `mounted` (`MenuCheckboxItemIndicator.tsx` L26). Reported as a bug in review;
+	// "fixing" it would diverge from the real `@base-ui/react`, so it stays, pinned by the toggle
+	// steps in `tests/differential/parity.test.ts`.
 	return useRenderElement(
 		'span',
 		componentProps,
@@ -2920,6 +2928,14 @@ function MenuRadioItemIndicator(componentProps: any): any {
 		transitionStatus,
 	};
 
+	// UPSTREAM QUIRK, transcribed deliberately: this gates on `item.checked`, NOT on the `mounted`
+	// flag `useTransitionStatus` returns — which is what `Checkbox.Indicator` and `Radio.Indicator`
+	// use. So unchecking drops the node on the same commit and the exit transition
+	// (`data-ending-style`) never runs, making the `useOpenChangeComplete` → `setMounted(false)`
+	// pair below effectively dead for the uncheck direction. Base UI 1.6.0's menu indicators do not
+	// even destructure `mounted` (`MenuCheckboxItemIndicator.tsx` L26). Reported as a bug in review;
+	// "fixing" it would diverge from the real `@base-ui/react`, so it stays, pinned by the toggle
+	// steps in `tests/differential/parity.test.ts`.
 	return useRenderElement(
 		'span',
 		componentProps,

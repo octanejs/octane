@@ -44,6 +44,16 @@ work around it in the binding.**
 > no behavioral contract), as are `useControlled`'s `name`/`state` labels, which exist only for
 > React dev warnings.
 >
+> **Upstream quirk transcribed, not repaired:** Base UI's MENU indicators gate their render on
+> `item.checked` rather than the `mounted` flag `useTransitionStatus` returns — unlike
+> `Checkbox.Indicator`/`Radio.Indicator`, which use `mounted`. Unchecking therefore drops the node
+> on the same commit and the exit transition never runs, which makes the accompanying
+> `useOpenChangeComplete` → `setMounted(false)` pair dead for that direction.
+> `MenuCheckboxItemIndicator.tsx` L26 does not even destructure `mounted`. This was raised as a bug
+> in review; repairing it would diverge from the real `@base-ui/react`, so it is transcribed as-is,
+> documented at both call sites, and pinned by differential TOGGLE steps that drive check → uncheck
+> → re-check on both runtimes.
+>
 > Not in this stage: `SubmenuRoot`/`SubmenuTrigger` (stage 3), `Menubar` and `ContextMenu`
 > (stage 4).
 
