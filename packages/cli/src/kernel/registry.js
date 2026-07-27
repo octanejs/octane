@@ -20,6 +20,11 @@ export const COMMANDS = [
 		load: () => import('../commands/doctor/index.js'),
 	},
 	{
+		name: 'analyze',
+		summary: 'Compile the project and report the Octane compiler diagnostics.',
+		load: () => import('../commands/analyze.js'),
+	},
+	{
 		name: 'info',
 		summary: 'Print environment and project details for a bug report.',
 		load: () => import('../commands/info.js'),

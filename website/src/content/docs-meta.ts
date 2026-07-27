@@ -74,6 +74,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'install', title: 'Install' },
 			{ id: 'doctor', title: 'octane doctor' },
 			{ id: 'fixing', title: 'Fixing what it finds', level: 3 },
+			{ id: 'analyze', title: 'octane analyze' },
 			{ id: 'init', title: 'octane init' },
 			{ id: 'bindings', title: 'Bindings and errors' },
 			{ id: 'mcp', title: 'octane mcp' },

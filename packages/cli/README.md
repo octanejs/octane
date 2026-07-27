@@ -21,6 +21,7 @@ pnpm dlx @octanejs/cli doctor
 | --- | --- |
 | `octane init` | Wire Octane into the project in this directory: bundler plugin, tsconfig, scripts, dependencies. |
 | `octane doctor` | Check the project for the mistakes that break Octane quietly. `--fix` repairs the mechanical ones. |
+| `octane analyze` | Compile the project and report every Octane compiler diagnostic, with its code and suggested edit. |
 | `octane add <package>` | Install a binding, by its own name or by the React package it ports, and print its divergences. |
 | `octane bindings [query]` | List and search the `@octanejs/*` bindings. |
 | `octane explain <error>` | Decode a runtime error code, including the minified production message. |
@@ -60,6 +61,31 @@ octane doctor --json       # for CI; exits 3 when an error-severity check fails
 `--fix` only touches findings whose repair is unambiguous, and it edits files as
 text splices, so comments and formatting in your `tsconfig.json` survive.
 Anything else is reported with the exact remedy rather than guessed at.
+
+## `octane analyze`
+
+Where `doctor` checks how the project is wired, `analyze` checks the code. It
+compiles every `.tsrx` through the project's own `octane` and reports what the
+compiler found, so the results are exactly what a build would warn about, and
+new compiler diagnostics show up here without a CLI change.
+
+```bash
+octane analyze                              # every .tsrx in the project
+octane analyze src/App.tsrx                 # just these
+octane analyze --code OCTANE_HYDRATE_SPLIT_STYLE
+octane analyze --strict                     # warnings fail the run too
+```
+
+```
+src/Form.tsrx
+  ⚠ 12:43  `onChange` on <input type="text"> is a native commit event in Octane …
+      OCTANE_NATIVE_TEXT_ONCHANGE
+      suggestion: use `onInput` at 12:43
+```
+
+A file that will not parse is reported as an error and does not stop the rest of
+the run. Exit code is `3` when anything error-severity was found, or when
+`--strict` and there were warnings.
 
 ## For agents and CI
 
