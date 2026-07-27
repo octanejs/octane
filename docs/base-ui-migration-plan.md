@@ -10,6 +10,42 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3f COMPLETE — stage 4, Menubar + ContextMenu (2026-07-27). Green: 142 base-ui tests
+> (93 differential + 49 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage
+> **29/43 → 31/43**.
+>
+> `src/menubar.ts` (a `CompositeRoot` of `Menu.Trigger`s over one `FloatingTree`, plus the
+> `MenubarContent` relay that lifts `hasSubmenuOpen` onto the bar) and `src/context-menu.ts`
+> (`ContextMenuRoot` + `ContextMenuTrigger`, with every other part re-exported from `Menu` exactly
+> as upstream's `index.parts.ts` does).
+>
+> **This retires the last of stage 1's inert code.** The `menubar` and `context-menu` arms of
+> `MenuParent` were transcribed verbatim in stage 1 with nothing to provide their contexts; the two
+> context-only modules (`utils/MenubarContext`, `utils/ContextMenuRootContext`) now have owners, and
+> every branch that reads them runs: menubar triggers render as `CompositeItem`s with
+> `role="menuitem"`, the backdrop cutout becomes the BAR rather than the trigger, the positioner
+> takes its side from the bar's orientation, and a context menu gets a modal focus manager, fixed
+> positioning and the item `mouseup` guards that stop the opening right-click from activating an
+> item under the cursor. `MenuRootContext` is now exported so `ContextMenu.Root` can provide
+> `undefined` around its `Menu.Root` — that is what distinguishes "this Menu IS the context menu"
+> from "this Menu is nested inside a ContextMenu.Trigger".
+>
+> Three test expectations were probed rather than assumed, after each failed first:
+> - A context menu's rendered `data-align` is `end`, not the `start` the branch requests — collision
+>   avoidance settles it, and jsdom reports a zero-size viewport. What IS deterministic and asserted:
+>   `position: fixed`, and `--transform-origin` tracking the cursor exactly (y=80 → `1px 74px`,
+>   y=300 → `1px 294px`). `transform` is clamped to the same value for every point, so it proves
+>   nothing here.
+> - Switching menus by pressing a sibling trigger does not hand over — it dismisses the open menu
+>   without opening the sibling. Once a menubar has an open menu the siblings become HOVER-driven
+>   (`openOnHover` follows the bar's `hasSubmenuOpen`), which needs `safePolygon` + rest timers and
+>   real pointer geometry. Left uncovered and documented in the test file, the same limitation as
+>   submenu open-on-hover in stage 3.
+> - What a synthetic press DOES cover: opening from a trigger, the bar's `data-has-submenu-open`
+>   tracking, and the owning trigger toggling its own menu shut.
+>
+> **Phase 3f is now complete**: `Menu` at 20/20 parts, `Menubar`, and `ContextMenu` at 19/19.
+
 > **Phase 3f STAGE 3 — submenus (2026-07-27). Green: 129 base-ui tests (88 differential + 41
 > behavior/namespace), typecheck + `format:check` clean.** `Menu` now covers **all 20 upstream
 > parts**; the `menu` subpath is complete.
@@ -753,9 +789,9 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
     on a closed submenu and on the open submenu's own portal subtree; behavior
     tests for submenu open/close, the child-only Escape, the trigger's dual
     item+trigger role, and nested placement. ✅
-  - *Stage 4* (~650 loc): `Menubar` and `ContextMenu` (+ `useClientPoint`),
-    which fill in the already-transcribed `menubar` / `context-menu` parent
-    branches and provide the two context-only modules stage 1 landed.
+  - *Stage 4* (DONE, ~650 loc): `Menubar` and `ContextMenu`, which fill in the
+    already-transcribed `menubar` / `context-menu` parent branches and provide
+    the two context-only modules stage 1 landed. ✅ **Phase 3f complete.**
 - **Phase 3g — Toast** (~4,200 loc): `useSwipeDismiss` + `focusVisible` + the 11
   Toast parts. `useSwipeDismiss` is shared with Drawer, so it lands here.
   *Exit:* differential on a rendered toast, behavior tests for timeout dismiss,
