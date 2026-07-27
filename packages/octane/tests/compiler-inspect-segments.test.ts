@@ -486,6 +486,145 @@ describe.each([
 	});
 });
 
+// Two lowerings resolve an element's props as a GROUP rather than one call per
+// attribute, and both dropped the authored names on the floor.
+//
+// A host with a spread, a duplicate prop, or a value/defaultValue cascade
+// routes every prop through one commit-phase collector — `setHostPropSources(
+// el, [[false, 'defaultValue', …]])` — whose per-source name literal is the
+// only token naming each attribute. Server-side, `<textarea>`/`<select>`
+// value/defaultValue never serialize as attributes at all: they become the
+// content/projection call `ssrTextareaValue(…)` / `ssrSelectScope(…)`, which
+// takes its sources POSITIONALLY, so the helper is the only token there is.
+// Unclaimed, both leave common controlled-form names unreachable from the
+// output.
+describe.each([
+	['client', {}],
+	['client dev', { dev: true }],
+	['client prod', { hmr: false as const }],
+	['server', { mode: 'server' as const }],
+	['server dev', { mode: 'server' as const, dev: true }],
+])('grouped prop lowerings claim their attribute names — %s', (_label, options) => {
+	const SOURCE = `export default function App(props: {
+	rest: Record<string, unknown>;
+	name: string;
+	bio: string;
+	fallback: string;
+	tone: string;
+}) @{
+	<form>
+		<input {...props.rest} defaultValue={props.name} />
+		<textarea value={props.bio} defaultValue={props.fallback} />
+		<select value={props.tone}><option value="a">A</option></select>
+	</form>
+}
+`;
+
+	interface Segment {
+		genLine: number;
+		genCol: number;
+		genEndCol: number | null;
+		srcStart: number;
+		srcEnd: number | null;
+		exact?: boolean;
+	}
+
+	const result = compile(SOURCE, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
+		typeof compile
+	> & {
+		inspect: {
+			segments: Segment[];
+			aliases: { srcStart: number; srcEnd: number; ofStart: number }[];
+		};
+	};
+
+	const lineStarts = [0];
+	for (let i = 0; i < result.code.length; i++) {
+		if (result.code.charCodeAt(i) === 10) lineStarts.push(i + 1);
+	}
+	const text = (segment: Segment) => {
+		const from = lineStarts[segment.genLine] + segment.genCol;
+		const to =
+			segment.genEndCol === null
+				? (lineStarts[segment.genLine + 1] ?? result.code.length + 1) - 1
+				: lineStarts[segment.genLine] + segment.genEndCol;
+		return result.code.slice(from, to).trim();
+	};
+
+	/** The authored offset of `name` in the writer located by `anchor`. */
+	const nameAt = (anchor: string, name: string) => {
+		const at = SOURCE.indexOf(anchor);
+		expect(at, `${anchor} missing from the fixture`).toBeGreaterThanOrEqual(0);
+		return at + anchor.indexOf(name);
+	};
+
+	/** The generated tokens claimed by that authored name. */
+	const claimedBy = (anchor: string, name: string) => {
+		const at = nameAt(anchor, name);
+		return result.inspect.segments
+			.filter(
+				(segment) =>
+					segment.exact === true && segment.srcStart === at && segment.srcEnd === at + name.length,
+			)
+			.map(text);
+	};
+
+	it('emits the same module with and without inspection', () => {
+		expect(compile(SOURCE, 'App.tsrx', options).code).toBe(result.code);
+	});
+
+	it.each([
+		['a spread-resolved input default', '{...props.rest} defaultValue={', 'defaultValue'],
+		['a cascading textarea value', '<textarea value={', 'value'],
+		['a select value', '<select value={', 'value'],
+	])('claims a token of the call %s lowered to', (_case, anchor, name) => {
+		const tokens = claimedBy(anchor, name);
+		expect(tokens.length, `nothing claims ${name} of \`${anchor}\``).toBeGreaterThan(0);
+		for (const token of tokens) {
+			// Either the helper the group routes through, or the name literal that
+			// call passes for this source — never the value expression.
+			const isHelper = /^_\$[A-Za-z][A-Za-z0-9]*$/.test(token);
+			const isNameLiteral = token === `'${name}'` || token === `"${name}"`;
+			expect(
+				isHelper || isNameLiteral,
+				`${name} claims ${JSON.stringify(token)}, which names neither its helper nor itself`,
+			).toBe(true);
+		}
+	});
+
+	// The second writer of a cascade is reachable too. Client-side it has its own
+	// source row; server-side both writers feed ONE positional call, so the name
+	// resolves through an alias onto the writer that anchors it.
+	it('reaches the second writer of a textarea cascade', () => {
+		const at = nameAt('{props.bio} defaultValue={', 'defaultValue');
+		const direct = claimedBy('{props.bio} defaultValue={', 'defaultValue');
+		const aliased = result.inspect.aliases.filter(
+			(alias) => alias.srcStart === at && alias.srcEnd === at + 'defaultValue'.length,
+		);
+		expect(
+			direct.length + aliased.length,
+			'the textarea `defaultValue` writer names nothing',
+		).toBeGreaterThan(0);
+		for (const alias of aliased) {
+			// An alias lends the target's ranges, so it must point at the sibling
+			// writer's NAME — the only offset that claims the shared call.
+			expect(alias.ofStart).toBe(nameAt('<textarea value={', 'value'));
+		}
+	});
+
+	it('claims only attribute names, never the value or the whole attribute', () => {
+		const authored = new Set(
+			result.inspect.segments
+				.filter((segment) => segment.exact === true && segment.srcEnd !== null)
+				.map((segment) => SOURCE.slice(segment.srcStart, segment.srcEnd!)),
+		);
+		expect(authored.size).toBeGreaterThan(0);
+		for (const claim of authored) {
+			expect(['value', 'defaultValue']).toContain(claim);
+		}
+	});
+});
+
 // A `<style>` block's parsed stylesheet hangs off its element with CSS node
 // offsets in the STYLESHEET's coordinate system, not the file's. The
 // smallest-node index that resolves a segment's authored end must not contain
