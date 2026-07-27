@@ -1,12 +1,12 @@
 {
   "name": "@octanejs/shadcn",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
-  "description": "shadcn/ui for the octane renderer \u2014 the Radix-base shadcn component distribution ported onto octane: cva-variant components preserving the upstream data-slot/class contract, built on @octanejs/radix, published as importable source with a shadcn-CLI-compatible registry planned.",
+  "description": "shadcn/ui for the octane renderer — the Radix-base shadcn component distribution ported onto octane: cva-variant components preserving the upstream data-slot/class contract, built on @octanejs/radix, published as importable source with a shadcn-CLI-compatible registry planned.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

@@ -1,5 +1,19 @@
 # @octanejs/apollo-client
 
+## 0.1.12
+
+### Patch Changes
+
+- Updated dependencies [bd31a2d]
+- Updated dependencies [9e0ef45]
+- Updated dependencies [dea219b]
+- Updated dependencies [2374980]
+- Updated dependencies [2374980]
+- Updated dependencies [ac687f8]
+- Updated dependencies [7997d39]
+- Updated dependencies [eb69cb6]
+  - octane@0.1.17
+
 ## 0.1.11
 
 ### Patch Changes

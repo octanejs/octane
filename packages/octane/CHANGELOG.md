@@ -1,5 +1,153 @@
 # octane
 
+## 0.1.17
+
+### Patch Changes
+
+- bd31a2d: Derived values are now cached at their declaration. A `const` whose initializer
+  performs a call during render — where every such call is a value projection by
+  the rule automatic memoization already uses — is lowered to a compiler-owned
+  memo keyed on the component locals it reads, so its identity is stable until
+  those inputs change.
+
+  This is what makes region memoization worth having. A region keys on the
+  identity of what it renders, so a derived value rebuilt on every render defeats
+  its cache unconditionally: memo-wall's value-position wall rebuilt 1,000
+  descriptors through `buildValueRows(items)` on every parent re-render, and that
+  call alone was 35% of the operation's CPU profile.
+
+  A calculation is admitted on exactly the callee rule that governs regions, so
+  the two agree. A member call is not cached even when its result is named:
+  `virtualizer.getVirtualItems()` moves with scroll while the virtualizer instance
+  stays put, and caching it froze a virtualized list mid-scroll. That also means
+  `const visible = todos.filter(...)` stays uncached — a genuine miss, since
+  `todos` really is an immutable snapshot, but this analysis cannot yet tell an
+  immutable receiver from a live one. Wrap it in `useMemo` yourself when the
+  identity matters; recovering it automatically needs receiver provenance and is
+  left as follow-up.
+
+  Also never cached: hook calls (recognised by naming convention, including
+  React's `unstable_use*` staging prefix — a cache around a hook freezes its state
+  cell and any subscription it owns), `let` declarations, which stay the escape
+  hatch for a value that must recompute every render, and calculations the render
+  tree never reads. Server compiles are untouched, since a server render evaluates
+  each body once.
+
+  Measured on `benchmarks/memo-wall`, paired runs against a baseline recorded
+  before any edit:
+
+  parent_rerender_equal_B 0.226ms → 0.091ms (−60%)
+  one_change_B 0.235ms → 0.156ms (−34%)
+  ctx_through_wall_B 0.569ms → 0.413ms (−27%)
+
+  That is the `createElement`-descriptors-through-a-children-hole shape every
+  `@octanejs/*` binding produces. `todomvc`, `chat-stream` and `js-framework`
+  compile byte-identically with and without this change and are reported as
+  controls only — their run-to-run movement (up to ±100% on sub-millisecond
+  operations) is the noise floor, not a result.
+
+  Compiled output grows 0.07% gzip on the `codegen-size` corpus.
+
+- 9e0ef45: Stop reporting a deleted subtree's cleanup as a render-phase cross-component update.
+
+  Octane discovers a deletion while reconciling the deleting parent's output, so
+  `CURRENT_BLOCK` still names that parent while the removed subtree's destroys and
+  cleanups run. A cleanup that calls `setState` on a surviving component was
+  therefore treated as a render-phase update: it logged `Cannot update a component
+(X) while rendering a different component (Y)` and flagged the target for the
+  render-phase branch of the update-depth error.
+
+  Those callbacks are mutation-phase work (React runs them in
+  `commitDeletionEffects`), and updating another component from them is the normal
+  registry pattern, so they no longer take that branch. `@octanejs/radix`'s Select
+  hit this on every open and close: `SelectItemText`'s layout cleanup calls
+  `onNativeOptionRemove` on the Select provider as the content swaps between its
+  detached fragment and the open popper.
+
+  Genuine render-body updates are unaffected: those run with no cleanup on the
+  stack and still warn and still terminate the loop.
+
+- dea219b: Stop the de-opt reconciler removing DOM it did not create.
+
+  An element rendered with no children still had its existing DOM reconciled
+  against an empty child list, so anything inserted by other means — a
+  `replaceChildren` with a captured snapshot, a third-party widget mounted into a
+  container — was swept away by the next unrelated re-render. React only manages
+  children it created, and portal ranges were already excluded here for that
+  reason; this extends the same treatment to imperative content.
+
+  Children the renderer did commit still clear when they go away, so
+  `{cond && <X/>}` is unaffected.
+
+  Found from `@octanejs/base-ui`, whose popup Viewport fills a snapshot container
+  this way and lost its previous content mid-transition.
+
+- 2374980: Allocate a Scope's `cleanups` and `children` arrays lazily.
+
+  Both were created eagerly for every Scope even though most scopes never register
+  a cleanup or a child scope, while the neighbouring `hooks`, `effectSlots` and
+  `_slots` fields were already lazy. They now follow the same pattern: `null` until
+  something registers, allocated at the registration site.
+
+  On a 500-row × 3-cell tree (2,501 scopes) this removes 4,002 of the 7,503 array
+  allocations those three collections were making — every `cleanups` array and 60%
+  of the `children` arrays. Compiled output grows 17 bytes gzipped across the
+  16-file codegen corpus, from the `??=` at the three cleanup-registration sites.
+
+  `slots` deliberately stays eager: every scope in that same measurement used it,
+  so making it lazy would add a null check to the framework's hottest path and to
+  every emitted `__s.slots[N]` access while saving nothing.
+
+- 2374980: Fix a context Provider corrupting the tree when its children switch dialect.
+
+  A Provider accepts its children either as the compiled children-block function a
+  `.tsrx` parent passes, or as an element descriptor from a `createElement` parent.
+  Both claimed `scope.slots[0]` — a compiled body stores its binding bag there,
+  while the descriptor path stores a `childSlot` record — so a parent that wraps
+  its children conditionally, and therefore alternates between the two shapes
+  across renders, had the incoming dialect read the outgoing one's record as its
+  own. The result was a `TypeError` and a detached subtree.
+
+  The children now remount across such a flip, which is the same contract React
+  gives an element-type change.
+
+- ac687f8: The development controlled-form diagnostic no longer warns on `aria-hidden`
+  inputs. An aria-hidden control is the hidden form-interop "mirror input"
+  pattern (e.g. the bubble inputs radix-style libraries render behind a custom
+  control): it is assistive-technology-hidden and focus-excluded, so handler-less
+  controlled `checked`/`value` props are the intended wiring there, not the
+  authoring mistake the diagnostic exists to catch. Real, user-reachable
+  controls keep the full warning.
+- 7997d39: Speed up the server's async-identity string encoding. Identity scopes encode each
+  UTF-16 code unit at a fixed width so lone surrogates stay injective, but the
+  encoder built every unit with `toString(16).padStart(4, '0')` — two throwaway
+  string allocations per character, which showed up as roughly 15% of render time
+  on descriptor-heavy SSR (the shape `@octanejs/*` bindings produce). Identity keys
+  are overwhelmingly ASCII, so those units now come from a prebuilt table and only
+  the rare non-ASCII unit takes the formatting path.
+
+  The emitted encoding is unchanged: verified byte-identical across all 65536 code
+  units, lone surrogates, and fuzzed inputs.
+
+- eb69cb6: Authored `<title>`/`<meta>`/`<link>` now reach the real `<head>` in file-routed
+  SSR apps. The route renders into the template's `<div id="root">`, not a
+  document, so core's head fold had no `</head>` to target and prepended the
+  metadata inside `#root` instead: the template's `<title>` won by document order,
+  `link rel="canonical"` and `meta name="description"` were ignored where they
+  landed, and hydration could not find the ownership markers in `document.head` so
+  it appended duplicates.
+
+  New opt-in `RenderOptions.headChannel: 'separate'` withholds hoisted metadata
+  from `html`/the streamed shell and hands it over on its own, through
+  `RenderResult.head` for the buffered renderers and the new
+  `StreamOptions.onHeadReady(head)` for the streaming ones (called before the shell
+  is written, so a host can still place it in the template prefix). Both the dev
+  server and the production handler use it and splice at `<!--ssr-head-->`.
+
+  The default stays `'fold'` and is unchanged: same bytes, same result shape, no
+  `head` field. Core does not dedupe metadata, so a `<title>` in `index.html` and
+  one in a component both still ship.
+
 ## 0.1.16
 
 ### Patch Changes
