@@ -79,7 +79,6 @@ export function DemoNav(props: DemoNavProps) @{
 										onClick={() => select(demo.id)}
 									>
 										<span class="demo-nav-title">{demo.title as string}</span>
-										<span class="demo-nav-summary">{demo.summary as string}</span>
 									</SidebarMenuButton>
 								</SidebarMenuItem>
 							}
