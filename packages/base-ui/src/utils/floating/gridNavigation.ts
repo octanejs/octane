@@ -1,0 +1,54 @@
+// Ported from .base-ui/packages/react/src/floating-ui-react/hooks/gridNavigation.ts (v1.6.0). The
+// grid navigator `useListNavigation` injects for its own `grid` option — distinct from
+// `../composite/gridNavigation`, which builds the navigator `useCompositeRoot` takes.
+//
+// octane adaptations: the event is the NATIVE `KeyboardEvent`, and `React.RefObject<T>` is a plain
+// `{ current: T }`. Not a hook, so no slot. Upstream's `utils/composite` module is split in this
+// binding: the list algebra lives in `../composite/list-utils`, the grid algorithm in
+// `../composite/grid-utils`.
+import { getGridNavigatedIndex } from '../composite/grid-utils';
+import { isIndexOutOfListBounds, type DisabledIndices } from '../composite/list-utils';
+
+/**
+ * Positional arguments are deliberate: property names of an options object
+ * don't minify, and the signature is locked to the caller via `typeof` on the
+ * `grid` option of `useListNavigation`.
+ *
+ * The injected grid navigator only ever operates on a uniform 1x1 grid (sizes are
+ * always `1x1` and packing is never dense), so the cell-map machinery that supports
+ * multi-cell items collapses to an identity transform over the item list. Calling
+ * `getGridNavigatedIndex` directly keeps the cell-map helpers
+ * (`createGridCellMap`/`getGridCellIndexOfCorner`/`getGridCellIndices`) out of
+ * grid-combobox bundles.
+ */
+export function gridNavigation(
+	event: KeyboardEvent,
+	prevIndex: number,
+	listRef: { current: Array<HTMLElement | null> },
+	orientation: 'horizontal' | 'vertical' | 'both',
+	loopFocus: boolean,
+	rtl: boolean,
+	disabledIndices: DisabledIndices | undefined,
+	minIndex: number,
+	maxIndex: number,
+	cols = 2,
+): number | undefined {
+	const nextIndex = getGridNavigatedIndex(listRef.current, {
+		event,
+		orientation,
+		loopFocus,
+		rtl,
+		cols,
+		disabledIndices,
+		minIndex,
+		maxIndex,
+		// An out-of-range previous index falls back to the first enabled item.
+		prevIndex: prevIndex > maxIndex ? minIndex : prevIndex,
+		stopEvent: true,
+	});
+
+	// `getGridNavigatedIndex` can return an out-of-bounds sentinel (e.g. `-1` when there is no
+	// previous item to move from); surface that as `undefined` so the caller treats it as
+	// "no navigation" rather than highlighting index `-1`.
+	return isIndexOutOfListBounds(listRef.current, nextIndex) ? undefined : nextIndex;
+}
