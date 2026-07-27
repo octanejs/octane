@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TauriShellBench",
+  "version": "0.0.0",
+  "identifier": "dev.octanejs.tauri-shell-bench",
+  "build": {
+    "frontendDist": "../dist-active"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Tauri shell benchmark",
+        "width": 1000,
+        "height": 700,
+        "focus": true,
+        "resizable": false,
+        "incognito": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.png"]
+  }
+}

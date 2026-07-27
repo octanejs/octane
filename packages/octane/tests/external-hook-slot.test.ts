@@ -671,6 +671,7 @@ describe('manifest-declared manual hook slots', () => {
 			'tanstack-start',
 			'tanstack-store',
 			'tanstack-virtual',
+			'tauri',
 			'testing-library',
 			'three',
 			'tiptap',

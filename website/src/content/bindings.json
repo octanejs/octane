@@ -70,6 +70,11 @@
     "packages": ["@octanejs/three"]
   },
   {
+    "title": "Desktop",
+    "description": "Tauri v2 commands and events for desktop applications.",
+    "packages": ["@octanejs/tauri"]
+  },
+  {
     "title": "Styling, tests, and devtools",
     "description": "Compiled StyleX, runtime styled-components, DOM-first component tests, and the TanStack Devtools panel.",
     "packages": [

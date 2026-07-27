@@ -37,6 +37,8 @@ packages:
   - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
+  - benchmarks/tauri-shell
+  - benchmarks/tauri-shell/*
   - benchmarks/tanstack-start
   - benchmarks/tanstack-start/*
   - benchmarks/tanstack-com
@@ -185,6 +187,8 @@ catalogs:
     '@tanstack/store': ^0.9.3
     '@tanstack/table-core': 8.21.3
     '@tanstack/virtual-core': 3.17.3
+    '@tauri-apps/api': 2.11.1
+    '@tauri-apps/cli': 2.11.4
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.10
