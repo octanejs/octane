@@ -67,6 +67,7 @@ export function CommandRoot(props: CommandProps) @{
 	useLayoutEffect(() => {
 		if (value !== undefined) {
 			state.current.value = value.trim();
+			scheduleSelectedItemIdSync();
 			store.emit();
 		}
 	}, [value]);
@@ -100,10 +101,7 @@ export function CommandRoot(props: CommandProps) @{
 						else document.getElementById(listId)?.focus();
 					}
 
-					schedule(7, () => {
-						state.current.selectedItemId = getSelectedItem()?.id;
-						store.emit();
-					});
+					scheduleSelectedItemIdSync();
 
 					// `_opts` truthy means "do not scroll the selection into view".
 					if (!_opts) schedule(5, scrollSelectedIntoView);
@@ -515,6 +513,18 @@ export function CommandRoot(props: CommandProps) @{
 
 	function getSelectedItem() {
 		return listInnerRef.current?.querySelector(`${ITEM_SELECTOR}[aria-selected="true"]`);
+	}
+
+	function scheduleSelectedItemIdSync() {
+		// Selection state renders before its DOM id can be observed. Defer the
+		// lookup until the selected Item has committed, then publish the id to
+		// Input/List. Controlled prop reconciliation bypasses setState('value')
+		// so it does not call onValueChange, but it still needs this same
+		// accessibility follow-up.
+		schedule(7, () => {
+			state.current.selectedItemId = getSelectedItem()?.id;
+			store.emit();
+		});
 	}
 
 	/** Element children of `container`, in the order they are painted. */

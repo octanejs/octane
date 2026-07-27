@@ -23,3 +23,5 @@ and groups also no longer keep a stale filter score — they register their valu
 through the same hook as items, so they were scored once against the empty
 search and never refreshed, which let them outrank genuine matches.
 
+Controlled selection updates now keep the input and list
+`aria-activedescendant` synchronized with the selected option.

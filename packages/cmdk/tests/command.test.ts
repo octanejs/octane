@@ -630,11 +630,19 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 	it('controlled value drives the selection', async () => {
 		const app = mount(ControlledMenu, { value: 'Banana' });
 		await settle();
-		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Banana');
+		const activeDescendants = () => [
+			app.find('[cmdk-input]').getAttribute('aria-activedescendant'),
+			app.find('[cmdk-list]').getAttribute('aria-activedescendant'),
+		];
+		let selected = app.find('[cmdk-item][aria-selected="true"]');
+		expect(selected.textContent).toBe('Banana');
+		expect(activeDescendants()).toEqual([selected.id, selected.id]);
 
 		app.update(ControlledMenu, { value: 'Cherry' });
 		await settle();
-		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Cherry');
+		selected = app.find('[cmdk-item][aria-selected="true"]');
+		expect(selected.textContent).toBe('Cherry');
+		expect(activeDescendants()).toEqual([selected.id, selected.id]);
 
 		app.unmount();
 	});
