@@ -1,0 +1,134 @@
+import { readFileSync } from 'node:fs';
+import { parseArgs } from './args.js';
+import { resolveCommand } from './command.js';
+import { createContext } from './context.js';
+import { CliError, EXIT, usageError } from './errors.js';
+import { renderHelp } from './help.js';
+import { COMMANDS } from './registry.js';
+
+export const VERSION = JSON.parse(
+	readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+).version;
+
+/**
+ * @typedef {Object} RunOptions
+ * @property {NodeJS.ProcessEnv} [env]
+ * @property {NodeJS.WritableStream} [stdout]
+ * @property {NodeJS.WritableStream} [stderr]
+ * @property {boolean} [tty]
+ * @property {import('./exec.js').Exec} [exec]
+ */
+
+/**
+ * @param {import('./context.js').Ctx} ctx
+ * @param {RunOptions} options the original invocation options, so the chosen
+ *   command runs against the same streams and injected process access
+ * @returns {Promise<number>}
+ */
+async function runMenu(ctx, options) {
+	const name = await ctx.ui.select({
+		message: 'What would you like to do?',
+		flag: '<command>',
+		options: COMMANDS.map((entry) => ({
+			value: entry.name,
+			label: entry.name,
+			hint: entry.summary,
+		})),
+	});
+	return dispatch([name], options);
+}
+
+/**
+ * @param {string[]} argv
+ * @param {RunOptions} options
+ * @returns {Promise<number>}
+ */
+async function dispatch(argv, options) {
+	const stdout = options.stdout ?? process.stdout;
+	const { path, module, argv: rest } = await resolveCommand(COMMANDS, argv);
+
+	if (!module && rest.length > 0 && !rest[0].startsWith('-')) {
+		throw usageError(`Unknown command: ${rest[0]}`, 'Run `octane --help` to list commands.');
+	}
+
+	const parsed = parseArgs(rest, module ?? {});
+	const ctx = createContext({
+		flags: parsed.flags,
+		version: VERSION,
+		env: options.env,
+		stdout,
+		tty: options.tty,
+		exec: options.exec,
+	});
+
+	if (parsed.flags.version && path.length === 0) {
+		if (ctx.json) stdout.write(`${JSON.stringify({ version: VERSION }, null, 2)}\n`);
+		else ctx.ui.log(VERSION);
+		return EXIT.OK;
+	}
+
+	if (!module?.run || parsed.flags.help) {
+		if (ctx.json) {
+			const listed = module?.subcommands ?? COMMANDS;
+			stdout.write(
+				`${JSON.stringify(
+					{
+						command: path.join(' ') || null,
+						commands: listed.map((e) => ({ name: e.name, summary: e.summary })),
+					},
+					null,
+					2,
+				)}\n`,
+			);
+			return EXIT.OK;
+		}
+		if (!module && argv.length === 0 && ctx.ui.canPrompt) return runMenu(ctx, options);
+		ctx.ui.log(renderHelp({ path, module, entries: COMMANDS, colors: ctx.ui.colors }));
+		return EXIT.OK;
+	}
+
+	const result = await module.run(ctx, {
+		flags: parsed.flags,
+		positionals: parsed.positionals,
+		rest: parsed.rest,
+	});
+
+	if (typeof result === 'number') return result;
+	if (result && typeof result === 'object') {
+		if (ctx.json && result.json !== undefined) {
+			stdout.write(`${JSON.stringify(result.json, null, 2)}\n`);
+		}
+		return result.exitCode ?? EXIT.OK;
+	}
+	return EXIT.OK;
+}
+
+/**
+ * Entry point. Never throws: every failure is rendered and turned into an exit
+ * code, in the caller's chosen output format.
+ *
+ * @param {string[]} argv
+ * @param {RunOptions} [options]
+ * @returns {Promise<number>}
+ */
+export async function main(argv, options = {}) {
+	const stderr = options.stderr ?? process.stderr;
+	const json = argv.includes('--json');
+
+	try {
+		return await dispatch(argv, options);
+	} catch (error) {
+		const known = error instanceof CliError;
+		const message = error instanceof Error ? error.message : String(error);
+
+		if (json) {
+			stderr.write(`${JSON.stringify({ ok: false, error: message }, null, 2)}\n`);
+		} else {
+			stderr.write(`\n${message}\n`);
+			if (known && error.hint) stderr.write(`${error.hint}\n`);
+			if (!known && error instanceof Error && error.stack) stderr.write(`\n${error.stack}\n`);
+		}
+
+		return known ? error.exitCode : EXIT.FAILURE;
+	}
+}
