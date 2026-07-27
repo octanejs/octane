@@ -21,22 +21,31 @@ export const VERSION = JSON.parse(
  */
 
 /**
+ * Offer the commands available at `path` and dispatch the chosen one.
+ *
+ * Recursive by construction: choosing a group re-enters `dispatch`, which finds
+ * a module with subcommands and no `run` and calls back here. So `octane` then
+ * `mcp` walks into add/status/remove without the caller knowing how deep the
+ * tree goes.
+ *
  * @param {import('./context.js').Ctx} ctx
  * @param {RunOptions} options the original invocation options, so the chosen
  *   command runs against the same streams and injected process access
+ * @param {string[]} path commands already chosen
+ * @param {import('./command.js').CommandEntry[]} entries what is available here
  * @returns {Promise<number>}
  */
-async function runMenu(ctx, options) {
+async function runMenu(ctx, options, path, entries) {
 	const name = await ctx.ui.select({
-		message: 'What would you like to do?',
+		message: path.length === 0 ? 'What would you like to do?' : `octane ${path.join(' ')}`,
 		flag: '<command>',
-		options: COMMANDS.map((entry) => ({
+		options: entries.map((entry) => ({
 			value: entry.name,
 			label: entry.name,
 			hint: entry.summary,
 		})),
 	});
-	return dispatch([name], options);
+	return dispatch([...path, name], options);
 }
 
 /**
@@ -88,7 +97,14 @@ async function dispatch(argv, options) {
 		// Root invocation only: the wordmark heads `octane` and `octane --help`,
 		// not every subcommand's help.
 		if (path.length === 0) renderBanner(ctx);
-		if (!module && argv.length === 0 && ctx.ui.canPrompt) return runMenu(ctx, options);
+
+		// Nothing runnable was named, so offer what is available here instead of
+		// printing help at someone who has not asked for it. `--help` is an
+		// explicit request for the text, so it still wins.
+		const choices = module?.subcommands ?? (module ? [] : COMMANDS);
+		if (!parsed.flags.help && ctx.ui.canPrompt && choices.length > 0) {
+			return runMenu(ctx, options, path, choices);
+		}
 		ctx.ui.log(renderHelp({ path, module, entries: COMMANDS, colors: ctx.ui.colors }));
 		return EXIT.OK;
 	}

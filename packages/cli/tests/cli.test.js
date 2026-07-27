@@ -47,6 +47,21 @@ describe('the CLI kernel', () => {
 		);
 	});
 
+	it('falls back to help for a command group when it cannot prompt', async () => {
+		// Interactively `octane mcp` opens a submenu; with no TTY it must print
+		// that group's commands rather than hang waiting for a selection.
+		const result = await runCli(['mcp']);
+		expect(result.exitCode).toBe(0);
+		for (const name of ['add', 'status', 'remove']) expect(result.stdout).toContain(name);
+
+		const json = await runCli(['mcp', '--json']);
+		expect(json.json().commands.map((/** @type {any} */ c) => c.name)).toEqual([
+			'add',
+			'status',
+			'remove',
+		]);
+	});
+
 	it('rejects a --cwd that does not exist', async () => {
 		// Otherwise the commands report on a phantom empty project, which reads
 		// as a real result rather than a typo.
