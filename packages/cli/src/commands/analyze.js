@@ -69,23 +69,50 @@ function describeSuggestions(suggestions) {
 }
 
 /**
- * A thrown parse failure carries a Babel-style `loc`, not the structured shape
- * a diagnostic has. Normalise it so the report has one row type.
+ * Position appended by the compiler to a thrown message, e.g. `(App.tsrx:6:18)`.
+ * Semantic errors carry their location this way rather than on `loc`.
+ */
+const TRAILING_LOCATION = /\s*\(([^()\s]+):(\d+):(\d+)\)\s*$/;
+
+/**
+ * Normalise a thrown compile failure into a finding.
+ *
+ * Two shapes reach here. A genuine parse failure carries a Babel-style `loc`.
+ * A semantic failure (a slot-keyed hook in a plain JS loop, say) is thrown with
+ * its position appended to the message instead, so recovering it keeps the
+ * report pointing at the offending line rather than at 1:1.
  *
  * @param {unknown} error
  * @param {string} file
- * @param {string} [code]
+ * @param {string} [code] overrides the derived code, for a read failure
  * @returns {Finding}
  */
-function parseFailure(error, file, code = 'OCTANE_PARSE_ERROR') {
+function thrownFailure(error, file, code) {
+	const message = error instanceof Error ? error.message : String(error);
 	const loc = /** @type {any} */ (error)?.loc;
+	if (loc) {
+		return {
+			file,
+			line: loc.line ?? 1,
+			column: (loc.column ?? 0) + 1,
+			severity: 'error',
+			code: code ?? 'OCTANE_PARSE_ERROR',
+			message,
+			suggestions: [],
+		};
+	}
+
+	const trailing = TRAILING_LOCATION.exec(message);
 	return {
 		file,
-		line: loc?.line ?? 1,
-		column: (loc?.column ?? 0) + 1,
+		line: trailing ? Number(trailing[2]) : 1,
+		column: trailing ? Number(trailing[3]) : 1,
 		severity: 'error',
-		code,
-		message: error instanceof Error ? error.message : String(error),
+		// Not every throw is a parse failure; saying so sends people looking for
+		// a syntax mistake that is not there.
+		code: code ?? 'OCTANE_COMPILE_ERROR',
+		// The position now has its own columns, so drop the duplicate tail.
+		message: trailing ? message.slice(0, trailing.index) : message,
 		suggestions: [],
 	};
 }
@@ -138,7 +165,7 @@ export default defineCommand({
 				source = readFileSync(absolute, 'utf8');
 			} catch (error) {
 				// Unreadable is not unparseable; saying so sends people to the wrong fix.
-				findings.push(parseFailure(error, file, 'OCTANE_READ_ERROR'));
+				findings.push(thrownFailure(error, file, 'OCTANE_READ_ERROR'));
 				continue;
 			}
 
@@ -159,7 +186,7 @@ export default defineCommand({
 			} catch (error) {
 				// A file that will not compile is the most severe thing analyze can
 				// find, and it must not stop the other files being reported.
-				findings.push(parseFailure(error, file));
+				findings.push(thrownFailure(error, file));
 			}
 		}
 		spinner.stop(`Compiled ${targets.length} file(s)`);

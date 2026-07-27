@@ -88,6 +88,31 @@ describe('octane analyze', () => {
 		expect(result.exitCode).toBe(3);
 	});
 
+	it('points a semantic compile error at its real line, not 1:1', async () => {
+		// A slot-keyed hook in a plain JS loop is a compile error, and the compiler
+		// appends the position to the message rather than setting `loc`. Reporting
+		// it as a parse failure at 1:1 sends people hunting for a syntax mistake.
+		const result = await analyze({
+			'src/Loop.tsrx':
+				"import { useState } from 'octane';\n\n" +
+				'export function Loop() @{\n' +
+				'\tconst values: number[] = [];\n' +
+				'\tfor (const item of [1, 2, 3]) {\n' +
+				'\t\tconst [value] = useState(item);\n' +
+				'\t\tvalues.push(value);\n' +
+				'\t}\n\n' +
+				'\t<div>{String(values.length) as string}</div>\n}\n',
+		});
+
+		const [finding] = result.json().findings;
+		expect(finding.code).toBe('OCTANE_COMPILE_ERROR');
+		expect(finding.line).toBe(6);
+		expect(finding.message).toContain('@for');
+		// The position has its own columns now, so the duplicate tail is gone.
+		expect(finding.message).not.toMatch(/\(\S+:\d+:\d+\)\s*$/);
+		expect(result.exitCode).toBe(3);
+	});
+
 	it('separates an unreadable file from an unparseable one', async () => {
 		const { root } = project({});
 		const result = await runCli(
