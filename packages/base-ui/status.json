@@ -1,14 +1,14 @@
 {
   "upstream": { "package": "@base-ui/react", "version": "1.6.0" },
-  "surface": "Alpha, in progress: 28 of 43 upstream subpaths. The foundation, overlay infrastructure, hover/focus interaction layer and popup viewport have landed, along with Dialog, AlertDialog, Popover, Tooltip, PreviewCard, the full form-control set, and the standalone Button/DirectionProvider/CSPProvider/useMediaQuery utilities — ported at full fidelity and differential-verified against the real `@base-ui/react`.",
+  "surface": "Alpha, in progress: 29 of 43 upstream subpaths. The foundation, overlay infrastructure, hover/focus interaction layer, list-navigation/typeahead layer and popup viewport have landed, along with Dialog, AlertDialog, Popover, Tooltip, PreviewCard, the full form-control set, and the standalone Button/DirectionProvider/CSPProvider/useMediaQuery utilities — ported at full fidelity and differential-verified against the real `@base-ui/react`. Menu is PARTIAL: `Root`/`Trigger`/`Portal`/`Positioner`/`Popup` (the open/close + roving-focus path) are in place; items, submenus, `Viewport`/`Arrow`/`Backdrop`/`Separator`, Menubar and ContextMenu are not yet ported.",
   "divergences": [
-    "Handlers receive native DOM events (no synthetic layer): visible text controls use per-edit `input`, while the NumberField form-facing number input intentionally observes native `change` commits.",
+    "Handlers receive native DOM events (no synthetic layer): visible text controls use per-edit `input`, while the NumberField form-facing number input intentionally observes native `change` commits. React's synthetic-only `event.isPropagationStopped()` (used by Menu's popup keyboard relay) becomes a native `event.cancelBubble` read.",
     "`forwardRef` becomes ref-as-prop; `className` composes via octane's `normalizeClass` (the render-prop string merge matches Base UI exactly).",
     "The vendored `floating-ui-react` surface is internal rather than republished, so its standalone `useHover` combiner is not ported — no Base UI component uses it.",
     "Tooltips outside a `Tooltip.Provider` still share the delay-group context's module-level default refs, so opening one closes another. Transcribed from Base UI rather than chosen; pinned by `tests/tooltip-delay-group.test.ts`.",
     "`NumberField.ScrubArea` and hold-to-repeat stepping remain unported; the steppers respond to single presses only."
   ],
   "ssr": "Dedicated Node-mode tests cover server snapshots, accessible separators, edge-aligned slider visibility, and closed dialogs; hydration adopts Vite-compiled Octane server markup, transitions to the client snapshot, and preserves interaction. Open overlays and remaining components are not yet covered.",
-  "verified": "2026-07-26",
+  "verified": "2026-07-27",
   "docs": ["docs/base-ui-migration-plan.md"]
 }

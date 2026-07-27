@@ -5,12 +5,42 @@
  * mounts both, and asserts byte-identical innerHTML after each step. This is the
  * gold-standard proof that the port behaves like Base UI — not just "passes my tests".
  */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import { mountDifferential, normaliseHtml } from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/base-ui-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+/**
+ * The rig mounts BOTH runtimes into one jsdom document, so they share a single
+ * `document.activeElement`. A `Menu.Popup` takes focus on open (unlike Dialog/Popover, whose
+ * differential fixtures either run a MODAL focus manager or never focus), and it does so on both
+ * sides — so whichever popup is focused last makes the OTHER runtime's still-focused portal fire a
+ * `focusout` whose `relatedTarget` sits outside it. `FloatingPortal`'s non-modal tab-management
+ * answers that by running `disableFocusInside(portalNode)`, which stamps
+ * `tabindex="-1" data-tabindex="<prev>"` on every tabbable in that portal — including the focus
+ * manager's own inside guards.
+ *
+ * Both runtimes run that identical code; the asymmetry is one document for two apps, not a port
+ * divergence (probed: the side holding focus keeps `tabindex="0"`, the side that lost it gets
+ * `-1`, and which side that is flips with whatever the previous test left focused). So the guards'
+ * tabindex is normalised away and EVERYTHING else — positioner styles, backdrop, roles, ids,
+ * aria/data attributes, portal structure — is still byte-compared.
+ */
+function stripFocusGuardTabIndex(html: string): string {
+	return html.replace(/(<span [^>]*data-base-ui-focus-guard=""[^>]*>)/g, (guard) =>
+		guard.replace(/ data-tabindex="[^"]*"/, '').replace(/ tabindex="[^"]*"/, ''),
+	);
+}
+
+/** `d.step` for open menus: same compare, minus the shared-focus guard artifact above. */
+async function stepIgnoringGuardTabIndex(d: any, name: string): Promise<void> {
+	await d.observe(name, () => {});
+	const octane = stripFocusGuardTabIndex(normaliseHtml(d.octane.container.innerHTML));
+	const react = stripFocusGuardTabIndex(normaliseHtml(d.react.container.innerHTML));
+	expect(octane).toBe(react);
+}
 
 describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Separator: default (horizontal), byte-identical', async () => {
@@ -527,6 +557,36 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it("AlertDialog.Viewport: open (Dialog's viewport reached through the AlertDialog namespace)", async () => {
 		const d = await mountDifferential(FIXTURE, 'AlertDialogViewportOpen', undefined, CACHE);
 		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Menu: closed Root+Trigger renders the trigger byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuClosed', undefined, CACHE);
+		await d.step('mount (closed)', () => {});
+		d.unmount();
+	});
+
+	it('Menu: open modal dropdown (Portal/backdrop/Positioner/Popup) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpen', undefined, CACHE);
+		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open non-modal dropdown (no internal backdrop) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenNonModal', undefined, CACHE);
+		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with explicit side/align/sideOffset renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenPlacement', undefined, CACHE);
+		await stepIgnoringGuardTabIndex(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a disabled root renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenDisabled', undefined, CACHE);
+		await stepIgnoringGuardTabIndex(d, 'mount (open)');
 		d.unmount();
 	});
 });
