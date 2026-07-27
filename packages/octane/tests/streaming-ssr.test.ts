@@ -8,7 +8,7 @@ import * as ServerRT from 'octane/server';
 import * as HydrationRT from 'octane/hydration';
 import { prerender } from 'octane/static';
 import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
@@ -1271,6 +1271,74 @@ describe('renderToReadableStream', () => {
 		const [id] = protocolIds(text);
 		expect(text).not.toContain('must-not-flush');
 		expect(text).toContain(errorCall(id));
+	});
+});
+
+// A host that streams the render inside a template it owns writes its `<head>`
+// before it reads the first render chunk, so `headChannel: 'separate'` must hand
+// the shell's hoisted metadata over BEFORE the shell is written. Without that
+// ordering the metadata could only ever follow the host's `<head>`.
+describe('streaming, hoisted head channel', () => {
+	const HEAD_SHELL = `
+		export function Page(props: { slug: string }) @{
+			<>
+				<title>{'Post: ' + props.slug}</title>
+				<meta name="description" content="shell description" />
+				<main>shell body</main>
+			</>
+		}
+	`;
+
+	const headServer = loadCompiledFixtureSource<{ Page: (props: { slug: string }) => unknown }>(
+		HEAD_SHELL,
+		{ id: '/packages/octane/tests/_fixtures/stream-head.tsrx', mode: 'server' },
+	);
+
+	it('rides the shell by default', async () => {
+		const stream = await ServerRT.renderToReadableStream(headServer.Page, { slug: 'a' });
+		const text = await new Response(stream).text();
+		expect(text).toContain('<title>Post: a</title>');
+		expect(text).toContain('name="description"');
+	});
+
+	it('hands the shell head over before the shell is written, and withholds it', async () => {
+		const order: string[] = [];
+		let head = '';
+		const stream = await ServerRT.renderToReadableStream(
+			headServer.Page,
+			{ slug: 'a' },
+			{
+				headChannel: 'separate',
+				onHeadReady(value) {
+					order.push('head');
+					head = value;
+				},
+				onShellReady() {
+					order.push('shell');
+				},
+			},
+		);
+		// The handover precedes shell-ready, which is what resolves this promise -
+		// so the metadata is already in hand for a prefix written ahead of the body.
+		expect(order).toEqual(['head', 'shell']);
+		expect(head).toContain('<title>Post: a</title>');
+		expect(head).toContain('name="description"');
+
+		const text = await new Response(stream).text();
+		expect(text).not.toContain('<title');
+		expect(text).not.toContain('name="description"');
+		expect(text).toContain('<main>shell body</main>');
+	});
+
+	it('does not call onHeadReady under the default fold', async () => {
+		const onHeadReady = vi.fn();
+		const stream = await ServerRT.renderToReadableStream(
+			headServer.Page,
+			{ slug: 'a' },
+			{ onHeadReady },
+		);
+		await new Response(stream).text();
+		expect(onHeadReady).not.toHaveBeenCalled();
 	});
 });
 

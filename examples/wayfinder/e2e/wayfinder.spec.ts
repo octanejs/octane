@@ -261,3 +261,39 @@ test('recovers search and forecast failures, clears an empty result, and remains
 		true,
 	);
 });
+
+test('serves per-route metadata in the head and follows client navigation', async ({
+	page,
+	baseURL,
+}) => {
+	if (baseURL === undefined) throw new Error('Wayfinder requires a Playwright baseURL');
+
+	// What a crawler sees, before any JavaScript runs.
+	const html = await (await fetch(new URL('/trips/lisbon?month=oct', baseURL))).text();
+	const head = html.slice(0, html.indexOf('</head>'));
+	expect(head).toContain('<title>Lisbon, Portugal · Wayfinder</title>');
+	expect(head).toContain('content="Tiled hills, late lunches, Atlantic light."');
+	// Absolute, because scrapers do not resolve these relative to the page.
+	expect(head).toContain('href="https://wayfinder.example/trips/lisbon"');
+	expect(head).toContain('content="https://wayfinder.example/og/lisbon.png"');
+	// Exactly one title in the whole document: the page's, not the template's.
+	expect(html.match(/<title/g)).toHaveLength(1);
+
+	const discover = await (await fetch(new URL('/', baseURL))).text();
+	expect(discover).toContain('<title>Go somewhere, slowly · Wayfinder</title>');
+	// A page override beats the app-level index,follow default.
+	const saved = await (await fetch(new URL('/saved', baseURL))).text();
+	expect(saved).toContain('content="noindex, follow"');
+
+	// And the same metadata follows client-side navigation, without piling up.
+	await page.goto('/');
+	await expect(page).toHaveTitle('Go somewhere, slowly · Wayfinder');
+	await page.getByRole('link', { name: 'Lisbon', exact: true }).first().click();
+	await expect(page).toHaveTitle('Lisbon, Portugal · Wayfinder');
+	await expect(page.locator('head title')).toHaveCount(1);
+	await expect(page.locator('head link[rel="canonical"]')).toHaveCount(1);
+
+	await page.goBack();
+	await expect(page).toHaveTitle('Go somewhere, slowly · Wayfinder');
+	await expect(page.locator('head title')).toHaveCount(1);
+});

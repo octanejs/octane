@@ -82,6 +82,29 @@ describe('createHandler', () => {
 		);
 	});
 
+	it('splices the render head channel without expanding $ patterns', async () => {
+		// Everything spliced at <!--ssr-head--> is data: the serialized route URL
+		// and the render's hoisted metadata. A string replacement would let `$&`
+		// and friends in either one expand against the matched marker.
+		const deps = {
+			...baseDeps,
+			renderToReadableStream: async (_c: unknown, _p: unknown, options: any) => {
+				options.onHeadReady('<title>a $& b $` c</title>');
+				return streamOf('<main>page</main>');
+			},
+		};
+		const handler = createHandler(makeManifest() as any, deps as any);
+		const response = await handler(new Request('http://localhost/?q=$&$`'));
+		const html = await response.text();
+
+		expect(html).toContain('<title>a $& b $` c</title>');
+		expect(html).not.toContain('<!--ssr-head-->');
+		// The marker text must not have been re-inserted by an expanded pattern.
+		expect(html.split('ssr-head').length - 1).toBe(0);
+		const head = html.slice(0, html.indexOf('</head>'));
+		expect(head).toContain('<title>a $& b $` c</title>');
+	});
+
 	it('uses the RenderRoute status (catch-all 404) and route params', async () => {
 		const handler = createHandler(makeManifest() as any, baseDeps as any);
 		const response = await handler(new Request('http://localhost/not/a/page'));

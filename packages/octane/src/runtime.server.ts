@@ -4659,7 +4659,12 @@ export function namespaceHeadElement(
  * - `html` — the rendered markup. Hoisted document metadata (`<title>`/`<meta>`/
  *   `<link>`, collected via `ssrHeadEl`) is folded IN: spliced before `</head>`
  *   when the render produced a document, otherwise prepended. (React folds head
- *   resources into the document too, so there is no separate `head` channel.)
+ *   resources into the document too, which is why folding is the default.)
+ * - `head`, the hoisted metadata on its own, present ONLY under
+ *   `headChannel: 'separate'`; `html` then excludes it. For hosts that render
+ *   into a `<head>`-bearing template they own rather than rendering the
+ *   document, where the fold has no `</head>` to target and would otherwise
+ *   prepend metadata into the body. See `RenderOptions.headChannel`.
  * - `css` — the scoped stylesheets of the components that rendered, as
  *   ready-to-place `<style data-octane="hash">…</style>` tags (one per hash,
  *   deduped). Kept as its own field because octane has scoped CSS that React core
@@ -4671,6 +4676,7 @@ export function namespaceHeadElement(
 export interface RenderResult {
 	html: string;
 	css: string;
+	head?: string;
 }
 
 /** Options accepted by the buffered render entry points (React-shaped subset). */
@@ -4696,6 +4702,22 @@ export interface RenderOptions {
 	 * renders only (`prerender`).
 	 */
 	timeoutMs?: number;
+	/**
+	 * Where hoisted `<title>`/`<meta>`/`<link>` go.
+	 *
+	 * `'fold'` (default) keeps React's resource-hoisting shape: the metadata is
+	 * spliced into `html` before `</head>`, or prepended when the render is not a
+	 * document. `'separate'` withholds it from `html`/the streamed shell and hands
+	 * it over on its own, `RenderResult.head` for the buffered renderers,
+	 * `StreamOptions.onHeadReady` for the streaming ones.
+	 *
+	 * A host that renders into a `<head>`-bearing template it owns (rather than
+	 * rendering the document itself) needs `'separate'`: the fold has no
+	 * `</head>` to find in a body-only render, so it would prepend the metadata
+	 * into the body, where a `<title>` loses to the template's and a canonical or
+	 * description is ignored outright.
+	 */
+	headChannel?: 'fold' | 'separate';
 }
 
 // Insert the hoisted head markup into `body`: before `</head>` when the render
@@ -5440,10 +5462,24 @@ async function runBuffered(
 }
 
 /** Turn a completed pass into the `{ html, css }` result (head folded in, seeds appended). */
-function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
+function passToResult(
+	pass: FullPassResult,
+	nonceAttr: string,
+	separateHead: boolean = false,
+): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
+	// Stripping the two channels separately equals stripping the folded string -
+	// no match spans the join, which is what keeps `head + html` byte-identical
+	// to the folded `html`.
+	if (separateHead) {
+		return {
+			html: pass.vtCandidates ? vtSsrStrip(body) : body,
+			css: pass.css,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+		};
+	}
 	const html = spliceHead(body, pass.head);
 	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
 }
@@ -5461,7 +5497,11 @@ export async function prerender(
 ): Promise<RenderResult> {
 	const component = entryComponent as ServerComponent;
 	const nonceAttr = nonceAttrOf(options);
-	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
+	return passToResult(
+		await runBuffered(component, props, options, nonceAttr),
+		nonceAttr,
+		options?.headChannel === 'separate',
+	);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -5625,7 +5665,7 @@ export function renderToString(
 		options?.onError?.(err);
 		throw err;
 	}
-	return passToResult(pass, nonceAttr);
+	return passToResult(pass, nonceAttr, options?.headChannel === 'separate');
 }
 
 /**
@@ -5658,7 +5698,15 @@ export function renderToStaticMarkup(
 		options?.onError?.(err);
 		throw err;
 	}
-	// No seeds (non-hydratable). Head is folded in without adoption markers.
+	// No seeds (non-hydratable). Head is folded in without adoption markers, or
+	// handed over on its own under `headChannel: 'separate'`.
+	if (options?.headChannel === 'separate') {
+		return {
+			html: pass.vtCandidates ? vtSsrStrip(pass.body) : pass.body,
+			css: pass.css,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+		};
+	}
 	const html = spliceHead(pass.body, pass.head);
 	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
 }
@@ -6269,6 +6317,19 @@ export interface StreamOptions extends RenderOptions {
 	onShellReady?: () => void;
 	onShellError?: (err: unknown) => void;
 	onAllReady?: () => void;
+	/**
+	 * Receives the shell's hoisted `<title>`/`<meta>`/`<link>` under
+	 * `headChannel: 'separate'`, called once BEFORE the shell is written and
+	 * therefore before `onShellReady` and before `renderToReadableStream`'s
+	 * promise resolves, so a host still has time to place the metadata in the
+	 * template prefix it writes ahead of the render stream. Never called under
+	 * the default `'fold'`, where the metadata rides the shell.
+	 *
+	 * Only the shell's metadata: head elements hoisted from inside a Suspense
+	 * boundary that streams later are re-created client-side on hydration (see
+	 * docs/ssr.md).
+	 */
+	onHeadReady?: (head: string) => void;
 	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */
 	injection?: StreamInjectionSource;
 }
@@ -6626,6 +6687,17 @@ async function runStream(
 	// the authored <head> instead of preceding `<html>`. The tail carries only
 	// closing tags + block markers, so it needs no vt stripping. Without
 	// injection the shell shape is otherwise unchanged.
+	//
+	// Under `headChannel: 'separate'` the metadata is withheld from every shell
+	// shape above and handed to `onHeadReady` instead, BEFORE the shell is
+	// written, a host composing a template prefix around this stream has not
+	// emitted its `<head>` yet at that point, so it can still place the metadata
+	// there.
+	// The shell is vt-stripped as a whole below, so the withheld head is stripped
+	// here to keep both channels equivalent to the folded shell.
+	const separateHead = options?.headChannel === 'separate';
+	if (separateHead) options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+	const shellHead = separateHead ? '' : pass.head;
 	const documentRoot = isDocumentRoot(pass.body);
 	let shell = documentRoot ? '<!DOCTYPE html>' : '';
 	let heldDocumentTail = '';
@@ -6637,13 +6709,13 @@ async function runStream(
 			const headInsert = documentHeadInsertionPoint(bodyHtml);
 			shell +=
 				headInsert !== -1
-					? bodyHtml.slice(0, headInsert) + leadingStyles + pass.head + bodyHtml.slice(headInsert)
-					: leadingStyles + pass.head + bodyHtml;
+					? bodyHtml.slice(0, headInsert) + leadingStyles + shellHead + bodyHtml.slice(headInsert)
+					: leadingStyles + shellHead + bodyHtml;
 		} else {
-			shell += leadingStyles + pass.head + pass.body;
+			shell += leadingStyles + shellHead + pass.body;
 		}
 	} else {
-		shell += leadingStyles + pass.head + pass.body;
+		shell += leadingStyles + shellHead + pass.body;
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;

@@ -279,39 +279,67 @@ export function createHandler(manifest, deps) {
 		}
 
 		const headContent = [...preloadTags, dataScript].join('\n');
-		const html = applyHydrationNonce(htmlTemplate, nonce).replace('<!--ssr-head-->', headContent);
+		const noncedTemplate = applyHydrationNonce(htmlTemplate, nonce);
 
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
-		const [prefix, suffix] = splitSsrTemplate(html);
+		// `headChannel: 'separate'` below: this handler renders the ROUTE into the
+		// template's `<div id="root">`, not a document, so core's default fold has
+		// no `</head>` to target and would prepend hoisted `<title>`/`<meta>`/
+		// `<link>` into the body, where a title loses to the template's and a
+		// canonical or description is ignored. Splicing at `<!--ssr-head-->`
+		// instead is also what makes hydration's `document.head` adoption find the
+		// ownership markers rather than creating duplicates.
+		//
+		// The replacement is a FUNCTION, not a string: a string replacement makes
+		// `$&`, `` $` ``, `$'` and `$1` in the inserted text expand against the
+		// match, and this text now carries author-controlled metadata as well as
+		// the serialized route data.
+		/** @param {string} hoistedHead */
+		const splitAroundBody = (hoistedHead) =>
+			splitSsrTemplate(noncedTemplate.replace('<!--ssr-head-->', () => headContent + hoistedHead));
 
 		if (manifest.render === 'buffered') {
 			// Await-everything fallback (`prerender` from octane/static): no
 			// streaming, one document. The deduped scoped-style tags lead the body
 			// markup inside #root — the same position they hold in the streamed
 			// shell — so hydrateRoot's leading-style skip applies unchanged.
-			const { html: body, css } = await prerender(RootComponent, undefined, {
+			const {
+				html: body,
+				css,
+				head,
+			} = await prerender(RootComponent, undefined, {
 				nonce: nonce ?? undefined,
+				headChannel: 'separate',
 				signal: context.request.signal,
 				onError(/** @type {unknown} */ error) {
 					console.error('[octane] SSR render error:', error);
 				},
 			});
+			const [prefix, suffix] = splitAroundBody(head ?? '');
 			return new Response(prefix + css + body + suffix, { status, headers });
 		}
 
 		// Streaming (default): shell flushes at first await, suspense segments
 		// stream out-of-order behind it — identical to dev.
+		let hoistedHead = '';
 		/** @type {ReadableStream<Uint8Array>} */
 		const renderStream = await renderToReadableStream(RootComponent, undefined, {
 			nonce: nonce ?? undefined,
+			headChannel: 'separate',
+			// Fires before the shell is written, so the metadata is in hand before
+			// the template prefix (which carries `<head>`) is composed below.
+			onHeadReady(/** @type {string} */ head) {
+				hoistedHead = head;
+			},
 			signal: context.request.signal,
 			onError(/** @type {unknown} */ error) {
 				console.error('[octane] SSR render error:', error);
 			},
 		});
 
+		const [prefix, suffix] = splitAroundBody(hoistedHead);
 		const body = composeHtmlStream(prefix, renderStream, suffix);
 
 		return new Response(body, { status, headers });

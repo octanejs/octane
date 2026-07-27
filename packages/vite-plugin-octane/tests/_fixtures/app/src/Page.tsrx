@@ -51,28 +51,33 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 	if (props.params.slug === 'pending') {
 		use(loadPendingFixture());
 	}
-	<main>
-		<h1>{'Fixture page ' + (props.params.slug ?? 'home')}</h1>
-		<p class="url">{props.url}</p>
-		<p class="count">{'Count: ' + count}</p>
-		<button onClick={() => setCount((current) => current + 1)}>Increment fixture</button>
-		<button onClick={() => setGuardedVisible((visible) => !visible)}>
-			Toggle guarded const
-		</button>
-		<GuardedConst visible={guardedVisible} />
-		<button onClick={() => fixtureRpc('browser')}>Call server</button>
-		<RpcProbe />
-		<Canvas>
-			<Scene />
-		</Canvas>
-		<Hydrate when={interaction({ events: 'click' })}>
-			<DeferredHydrationProof />
-		</Hydrate>
-		<Hydrate when={media('(min-width: 2000px)')} prefetch={load()}>
-			<PrefetchedHydrationProof />
-		</Hydrate>
-		<Hydrate when={media('(min-width: 2100px)')} split={false}>
-			<UnsplitHydrationProof />
-		</Hydrate>
-	</main>
+	<>
+		{/* Metadata must land in the template's head, not fold into #root. */}
+		<title>{'Fixture page ' + (props.params.slug ?? 'home')}</title>
+		<meta name="description" content="fixture page description" />
+		<main>
+			<h1>{'Fixture page ' + (props.params.slug ?? 'home')}</h1>
+			<p class="url">{props.url}</p>
+			<p class="count">{'Count: ' + count}</p>
+			<button onClick={() => setCount((current) => current + 1)}>Increment fixture</button>
+			<button onClick={() => setGuardedVisible((visible) => !visible)}>
+				Toggle guarded const
+			</button>
+			<GuardedConst visible={guardedVisible} />
+			<button onClick={() => fixtureRpc('browser')}>Call server</button>
+			<RpcProbe />
+			<Canvas>
+				<Scene />
+			</Canvas>
+			<Hydrate when={interaction({ events: 'click' })}>
+				<DeferredHydrationProof />
+			</Hydrate>
+			<Hydrate when={media('(min-width: 2000px)')} prefetch={load()}>
+				<PrefetchedHydrationProof />
+			</Hydrate>
+			<Hydrate when={media('(min-width: 2100px)')} split={false}>
+				<UnsplitHydrationProof />
+			</Hydrate>
+		</main>
+	</>
 }

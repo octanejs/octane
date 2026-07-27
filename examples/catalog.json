@@ -1016,7 +1016,7 @@
       "directory": "examples/wayfinder",
       "id": "wayfinder",
       "title": "Wayfinder",
-      "summary": "A streaming travel planner proving Octane parallel use, out-of-order Suspense reveals, abort isolation, strict CSP, and hydration adoption.",
+      "summary": "A streaming travel planner proving Octane parallel use, out-of-order Suspense reveals, abort isolation, strict CSP, hydration adoption, and per-route SEO metadata.",
       "status": "active",
       "host": "octane",
       "renderModes": ["client", "streaming-ssr", "hydration"],
@@ -1028,6 +1028,7 @@
         "hydration",
         "native-events",
         "parallel-use",
+        "seo-metadata",
         "streaming-ssr",
         "suspense",
         "tsrx-control-flow"
@@ -1066,6 +1067,13 @@
           "id": "empty-failure-retry-mobile",
           "title": "Recover search and forecast failures, clear an empty result, and use the planner at mobile width",
           "kind": "resilience",
+          "spec": "e2e/wayfinder.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "per-route-seo-metadata",
+          "title": "Serve per-route title, description, canonical, and Open Graph tags in the head, and follow client navigation",
+          "kind": "ssr-hydration",
           "spec": "e2e/wayfinder.spec.ts",
           "critical": true
         }

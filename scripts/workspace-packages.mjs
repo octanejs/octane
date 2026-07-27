@@ -18,6 +18,9 @@ const SPECIAL_ROLES = new Map([
 	['@octanejs/tanstack-start', 'metaframework'],
 	['@octanejs/mcp-server', 'agent tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
+	// Original Octane API rather than a port of an upstream library, so it has no
+	// binding status.json / parity contract to satisfy.
+	['@octanejs/seo', 'document metadata'],
 ]);
 
 const OCTANE_SINGLETON_CONSUMERS = new Set([

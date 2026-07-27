@@ -76,7 +76,7 @@ const packedExampleCanaries = [
 		dependencyEdges: [['@octanejs/vite-plugin', '@octanejs/app-core']],
 		directory: 'wayfinder',
 		label: 'Wayfinder SSR example',
-		packages: ['octane', '@octanejs/vite-plugin', '@octanejs/app-core'],
+		packages: ['octane', '@octanejs/vite-plugin', '@octanejs/app-core', '@octanejs/seo'],
 	},
 ];
 const inventoryErrors = validateWorkspacePackages(packages);

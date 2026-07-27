@@ -44,8 +44,11 @@ The three buffered renderers return `RenderResult = { html, css }`:
   resolved, an inline `<script type="application/json" data-octane-suspense>`
   seed that hydration consumes. Hoisted `<title>`/`<meta>`/`<link>` (rendered
   anywhere in the tree, each preceded by an adoption marker comment) are folded
-  in — spliced into `<head>` when the render produced a document, else prepended
-  (React-19 resource hoisting; there is no separate `head` channel).
+  in by default — spliced into `<head>` when the render produced a document, else
+  prepended (React-19 resource hoisting). `headChannel: 'separate'` withholds
+  them and returns them as `head` instead.
+- `head` — the hoisted metadata on its own, present **only** under
+  `headChannel: 'separate'` (see `RenderOptions`).
 - `css` — deduped `<style data-octane="hash">` tags collected from scoped
   `<style>` components. Place inside `<head>`. The client skips re-injecting any
   hash already present. (Kept as its own field because Octane has scoped CSS
@@ -98,7 +101,13 @@ use the same keyed hydration ranges as arrays. A thenable that settles while it
 is first subscribed is unwrapped in that render without publishing a fallback.
 
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
-`onShellError(err)`, `onAllReady()`, and `injection`. A recoverable error in
+`onShellError(err)`, `onAllReady()`, `onHeadReady(head)`, and `injection`.
+`onHeadReady` fires only under `headChannel: 'separate'`, once, **before** the
+shell is written and therefore before `onShellReady` and before
+`renderToReadableStream`'s promise resolves, so a host still has time to place
+the metadata in a template prefix it writes ahead of the render stream. It
+carries the shell's metadata only; head elements hoisted inside a boundary that
+streams later are still re-created client-side (see "Not built yet"). A recoverable error in
 Suspense content reaches `onError`, preserves the emitted fallback, and marks
 only that boundary for client rendering. Calling `abort(reason)` reports the
 reason for each abandoned pending task, preserves emitted fallbacks for client
@@ -159,6 +168,17 @@ concurrently rather than awaiting `allReady` before reading. Same
   request dies; pending promises reject with `signal.reason` and streams cancel.
 - `timeoutMs?: number` — per-render override of the suspense settle deadline;
   `0` disables it. Async renders only.
+- `headChannel?: 'fold' | 'separate'` — where hoisted `<title>`/`<meta>`/`<link>`
+  go. `'fold'` (default) keeps React's resource-hoisting shape described above.
+  `'separate'` withholds the metadata from `html`/the streamed shell and hands it
+  over on its own: `RenderResult.head` for the buffered renderers,
+  `StreamOptions.onHeadReady` for the streaming ones. A host that renders into a
+  `<head>`-bearing template it owns, rather than rendering the document itself,
+  needs `'separate'`: a body-only render has no `</head>` for the fold to target,
+  so folding prepends the metadata into the body, where a `<title>` loses to the
+  template's and a canonical or description is ignored. Nothing but the position
+  of the metadata changes: `head + html` under `'separate'` is byte-identical to
+  `html` under `'fold'`.
 
 ### `setSsrSuspenseTimeout(ms)` / `getSsrSuspenseTimeout()`
 
@@ -249,8 +269,16 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
 a route from `octane.config.ts`, loads the page module through Vite's SSR
 pipeline, renders it with `renderToReadableStream()` — the shell flushes as soon
 as it is ready and suspended boundaries stream in behind it — into `index.html`
-around `<!--ssr-body-->` (`<!--ssr-head-->` receives the hydration data script;
-styles ride the stream), and injects the hydration entry. Route components
+around `<!--ssr-body-->` (`<!--ssr-head-->` receives the hydration data script
+and the shell's hoisted `<title>`/`<meta>`/`<link>`; styles ride the stream), and
+injects the hydration entry. The route renders into the template's
+`<div id="root">` rather than as a document, so both dev and production request
+`headChannel: 'separate'` and splice the metadata at `<!--ssr-head-->`: authored
+metadata therefore lands in the real `<head>`, and hydration adopts those
+elements from `document.head` instead of appending duplicates. Core's default
+fold would instead prepend them inside `#root`. Note that core does not dedupe:
+a `<title>` in the template and one in a component both ship, and the template's
+wins by document order, so let the component own it. Route components
 receive `{ params, url }`, and `router.preHydrate` names a client module whose
 default export is awaited before `hydrateRoot` (e.g. an app router committing
 its match tree). `module server` functions are executed through

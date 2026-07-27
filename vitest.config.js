@@ -651,6 +651,56 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'seo',
+					include: ['packages/seo/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/seo/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/seo$/,
+							replacement: resolve(import.meta.dirname, 'packages/seo/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// SSR half: the whole graph compiles in SERVER mode and bare `octane`
+				// imports resolve to `octane/server`, so the package's plain-.ts hooks
+				// run against the server runtime the compiled components use.
+				test: {
+					name: 'seo-ssr',
+					include: ['packages/seo/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/static$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/static/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/seo$/,
+							replacement: resolve(import.meta.dirname, 'packages/seo/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-store',
 					include: [
 						'packages/tanstack-store/tests/conformance/**/*.test.ts',
