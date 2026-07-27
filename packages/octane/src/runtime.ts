@@ -14653,8 +14653,18 @@ const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
 // `replaceChildren` into an element we rendered empty, a third-party widget) must be left alone.
 // Portal ranges already get that treatment via `$$portalEnd`; this covers the imperative case.
 function hasDeoptOwnedChild(el: Element): boolean {
-	for (let n: Node | null = getFirstChild(el); n !== null; n = getNextSibling(n)) {
+	let n: Node | null = getFirstChild(el);
+	while (n !== null) {
+		// Skip foreign `<!--portal-->…<!--/portal-->` ranges exactly as the removal walk does.
+		// Their contents are stamped, but they belong to the portal, so counting them would make
+		// an element that merely hosts a portal look owned and expose its other children.
+		const rangeEnd = (n as any).$$portalEnd as Node | undefined;
+		if (rangeEnd != null) {
+			n = nodeAfterPortalRange(n, rangeEnd);
+			continue;
+		}
 		if ((n as any).$$deoptKey !== undefined || getDeoptDesc(n) !== undefined) return true;
+		n = getNextSibling(n);
 	}
 	return false;
 }

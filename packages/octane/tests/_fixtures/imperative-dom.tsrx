@@ -49,3 +49,21 @@ export function ForeignDomAfterOurChildrenClear() @{
 		<ClearingHost show={step === 0} n={step} />
 	</div>
 }
+
+// A host that renders children, plus a second host rendered empty. Used to check what happens when
+// previously-rendered nodes are moved (not cloned) into the empty one.
+function SourceHost(props) {
+	return createElement('div', { class: 'source' }, createElement('i', { class: 'moved' }));
+}
+function SinkHost(props) {
+	return createElement('div', { class: 'sink', 'data-n': props.n });
+}
+
+export function MovedRenderedNodes() @{
+	const [n, setN] = useState(0);
+	<div>
+		<button class="bump" onClick={() => setN(n + 1)}>bump</button>
+		<SourceHost />
+		<SinkHost n={n} />
+	</div>
+}
