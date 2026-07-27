@@ -33,7 +33,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
+import { censusDomNodes, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -376,7 +376,6 @@ async function runTarget(t, { verify = true } = {}) {
 			unmount,
 		};
 		if (dom !== null) {
-			for (const [op, field] of DOM_OPS) results[op] = deterministicCount(dom[field]);
 			results.__dom = dom;
 		}
 		return {
@@ -397,13 +396,6 @@ const OPS = [
 	'bump_sweep_batched',
 	'bump_sweep_reverse',
 	'unmount',
-];
-
-const DOM_OPS = [
-	['nodes_mounted', 'total'],
-	['elements_mounted', 'elements'],
-	['text_mounted', 'text'],
-	['comments_mounted', 'comments'],
 ];
 
 const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
