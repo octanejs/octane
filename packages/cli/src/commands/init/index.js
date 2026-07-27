@@ -145,6 +145,7 @@ function plan(project, mode) {
 }
 
 export default defineCommand({
+	requiresProject: true,
 	description:
 		'Wire Octane into the project in this directory: the bundler plugin, the TypeScript\n' +
 		'settings .tsrx needs, the scripts, and the dependencies.',

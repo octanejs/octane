@@ -1,6 +1,7 @@
+import { rmSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COMMANDS } from '../src/kernel/registry.js';
-import { runCli } from './helpers/fixture.js';
+import { createFixture, runCli } from './helpers/fixture.js';
 
 describe('the CLI kernel', () => {
 	it('lists every registered command in help', async () => {
@@ -29,20 +30,52 @@ describe('the CLI kernel', () => {
 		);
 	});
 
+	it('rejects a --cwd that does not exist', async () => {
+		// Otherwise the commands report on a phantom empty project, which reads
+		// as a real result rather than a typo.
+		const result = await runCli(['doctor', '--cwd', '/definitely/not/here', '--json']);
+		expect(result.exitCode).toBe(2);
+		expect(JSON.parse(result.stderr).error).toMatch(/--cwd directory does not exist/);
+	});
+
+	it('refuses to run a project-writing command outside a package.json', async () => {
+		const { root } = createFixture({ 'src/App.tsrx': 'export function App() @{ <div /> }\n' });
+		try {
+			for (const argv of [
+				['init', '--mode', 'spa', '--cwd', root, '--yes'],
+				['add', 'zustand', '--cwd', root],
+			]) {
+				const result = await runCli(argv, {
+					exec: { which: () => null, run: async () => ({ code: 0, stdout: '', stderr: '' }) },
+				});
+				expect(result.exitCode, argv[0]).toBe(1);
+				expect(result.stderr, argv[0]).toMatch(/No package\.json found/);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('rejects an unknown command with a usage exit code', async () => {
 		const result = await runCli(['banana']);
 		expect(result.exitCode).toBe(2);
 		expect(result.stderr).toMatch(/Unknown command: banana/);
 	});
 
-	it('reports errors as JSON when --json is set', async () => {
-		const result = await runCli(['banana', '--json']);
-		expect(result.exitCode).toBe(2);
-		expect(JSON.parse(result.stderr)).toMatchObject({ ok: false });
+	it('reports errors as JSON when --json is set, in either spelling', async () => {
+		for (const flag of ['--json', '--json=true']) {
+			const result = await runCli(['banana', flag]);
+			expect(result.exitCode, flag).toBe(2);
+			expect(JSON.parse(result.stderr), flag).toMatchObject({ ok: false });
+		}
 	});
 
-	it('prints the version', async () => {
-		const result = await runCli(['--version']);
-		expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	it('prints the version, and does so on a subcommand too', async () => {
+		// Help lists --version under "Global options" for every command, so it has
+		// to answer there rather than silently running the command instead.
+		const root = await runCli(['--version']);
+		expect(root.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+		expect((await runCli(['doctor', '--version'])).stdout.trim()).toBe(root.stdout.trim());
+		expect((await runCli(['mcp', 'add', '--version'])).stdout.trim()).toBe(root.stdout.trim());
 	});
 });

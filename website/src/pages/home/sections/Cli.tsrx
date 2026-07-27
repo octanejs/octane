@@ -1,6 +1,7 @@
 // The CLI section: what `octane doctor` actually prints, beside the commands
 // that get you there. The transcript is real output from a deliberately broken
 // project, trimmed to the findings that make the point.
+import { Link } from '@octanejs/tanstack-router';
 
 const TRANSCRIPT = [
 	{ id: 'group-deps', kind: 'group', title: 'dependencies', message: '' },
@@ -74,12 +75,9 @@ export function Cli() @{
 			</ul>
 
 			<div class="cli-actions">
-				<a
-					href="https://github.com/octanejs/octane/blob/main/packages/cli/README.md"
-					target="_blank"
-					rel="noreferrer"
-					class="btn-primary"
-				>CLI reference</a>
+				<Link to="/docs/$slug" params={{ slug: 'cli' }} class="btn-primary">
+					CLI reference
+				</Link>
 			</div>
 		</div>
 

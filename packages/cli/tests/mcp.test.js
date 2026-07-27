@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { spliceTomlSection } from '../src/commands/mcp/clients.js';
+import { CLIENTS, spliceTomlSection } from '../src/commands/mcp/clients.js';
 import { createFixture, runCli } from './helpers/fixture.js';
 
 /** @type {{ cleanup: () => void }[]} */
@@ -258,5 +258,42 @@ describe('spliceTomlSection', () => {
 		const removed = spliceTomlSection(added, '[mcp_servers.octane]', null);
 		expect(removed).not.toContain('mcp_servers');
 		expect(removed).toContain('[tui]');
+	});
+
+	it('round-trips: adding then removing restores the file byte-for-byte', () => {
+		// The strongest guarantee available for a file we edit on the user's
+		// behalf: after `mcp add` and `mcp remove`, their config is what it was.
+		const added = spliceTomlSection(CONFIG, '[mcp_servers.octane]', ['command = "npx"']);
+		const replaced = spliceTomlSection(added, '[mcp_servers.octane]', ['command = "new"']);
+
+		expect(spliceTomlSection(replaced, '[mcp_servers.octane]', null)).toBe(CONFIG);
+	});
+
+	it('leaves blank lines inside an unrelated multi-line string alone', () => {
+		// Replacing an existing section must not reformat the rest of the file.
+		// A whitespace pass over the whole document reaches into this string and
+		// silently rewrites user data that has nothing to do with MCP.
+		const withBlock =
+			'[mcp_servers.octane]\ncommand = "old"\n\n' +
+			'[profile]\ninstructions = """\nline one\n\n\n\nline two\n"""\n';
+
+		const next = spliceTomlSection(withBlock, '[mcp_servers.octane]', ['command = "npx"']);
+
+		expect(next).toContain('line one\n\n\n\nline two');
+		expect(next).toContain('command = "npx"');
+		expect(next).not.toContain('command = "old"');
+	});
+
+	it('reads only its own section when a later server carries the key', () => {
+		// An octane entry without `command` (an HTTP server, say) must not report
+		// the next section's command as its own.
+		const config =
+			'[mcp_servers.octane]\nurl = "https://example.test/mcp"\n\n' +
+			'[mcp_servers.other]\ncommand = "other-bin"\n';
+		const codex = CLIENTS.find((entry) => entry.id === 'codex');
+
+		expect(codex?.readServer(config, 'octane')).toEqual({ command: null });
+		expect(codex?.readServer(config, 'other')).toEqual({ command: 'other-bin' });
+		expect(codex?.readServer(config, 'absent')).toBe(null);
 	});
 });

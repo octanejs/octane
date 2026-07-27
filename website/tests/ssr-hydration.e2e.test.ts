@@ -38,6 +38,7 @@ const REACT_CDN_ENTRIES = {
 const ROUTES = [
 	'/',
 	'/docs',
+	'/docs/cli',
 	'/docs/core-apis',
 	'/docs/tsrx-vs-tsx',
 	'/docs/differences-from-react',

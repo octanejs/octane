@@ -117,6 +117,9 @@ export default defineCommand({
 Commands write human output through `ctx.ui` and return their machine payload as
 `json`; the kernel prints whichever the caller asked for. Process access goes
 through `ctx.exec` so commands that shell out stay testable without spawning.
+A command that writes into the project sets `requiresProject: true`, and the
+kernel refuses to run it outside a `package.json` rather than letting it fail
+somewhere inside an `fs` call.
 
 Doctor checks follow the same pattern: add one to
 `src/commands/doctor/checks/<category>.js` with an `id`, a `severity`, a `run`,

@@ -61,7 +61,9 @@ async function dispatch(argv, options) {
 		exec: options.exec,
 	});
 
-	if (parsed.flags.version && path.length === 0) {
+	// `--version` is documented as a global flag, so it answers everywhere rather
+	// than only at the root.
+	if (parsed.flags.version) {
 		if (ctx.json) stdout.write(`${JSON.stringify({ version: VERSION }, null, 2)}\n`);
 		else ctx.ui.log(VERSION);
 		return EXIT.OK;
@@ -85,6 +87,14 @@ async function dispatch(argv, options) {
 		if (!module && argv.length === 0 && ctx.ui.canPrompt) return runMenu(ctx, options);
 		ctx.ui.log(renderHelp({ path, module, entries: COMMANDS, colors: ctx.ui.colors }));
 		return EXIT.OK;
+	}
+
+	// Commands that write into a project need one to exist. Without this they
+	// fail deep inside an fs call with a raw ENOENT stack.
+	if (module.requiresProject && ctx.project().manifestPath === null) {
+		throw new CliError(`No package.json found in ${ctx.cwd} or any parent directory.`, {
+			hint: 'Run this inside a project, or create one first with `npm init -y`.',
+		});
 	}
 
 	const result = await module.run(ctx, {
@@ -113,7 +123,9 @@ async function dispatch(argv, options) {
  */
 export async function main(argv, options = {}) {
 	const stderr = options.stderr ?? process.stderr;
-	const json = argv.includes('--json');
+	// Read from raw argv: a failure can happen before the flags are parsed, and
+	// the parser accepts `--json=true` as well as the bare form.
+	const json = argv.some((token) => token === '--json' || token.startsWith('--json='));
 
 	try {
 		return await dispatch(argv, options);

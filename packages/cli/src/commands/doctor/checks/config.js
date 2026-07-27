@@ -50,17 +50,37 @@ async function resolveConfigLoader(root) {
 }
 
 /**
+ * Loading the config means running esbuild over `octane.config.ts`. All three
+ * config checks need the same result, so it is computed once instead of three
+ * times per `doctor` run.
+ *
+ * Keyed on the project object rather than its path: `ctx.refreshProject()`
+ * hands out a new object after `--fix` writes, so a refreshed project reloads
+ * instead of serving a stale parse, and the entry dies with the project.
+ *
+ * @type {WeakMap<object, Promise<{ config: any } | { error: string }>>}
+ */
+const loaded = new WeakMap();
+
+/**
  * @param {import('../../../kernel/project.js').Project} project
  * @returns {Promise<{ config: any } | { error: string }>}
  */
-async function loadConfig(project) {
-	const load = await resolveConfigLoader(project.root);
-	if (!load) return { error: 'unresolved' };
-	try {
-		return { config: await load(project.root) };
-	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error) };
+function loadConfig(project) {
+	let pending = loaded.get(project);
+	if (!pending) {
+		pending = (async () => {
+			const load = await resolveConfigLoader(project.root);
+			if (!load) return { error: 'unresolved' };
+			try {
+				return { config: await load(project.root) };
+			} catch (error) {
+				return { error: error instanceof Error ? error.message : String(error) };
+			}
+		})();
+		loaded.set(project, pending);
 	}
+	return pending;
 }
 
 /**

@@ -131,15 +131,34 @@ export function spliceTomlSection(text, header, body) {
 		return `${prefix}${header}\n${body.join('\n')}\n`;
 	}
 
-	let end = start + 1;
-	while (end < lines.length && !/^\s*\[/.test(lines[end])) end++;
-
+	const end = sectionEnd(lines, start);
 	const before = lines.slice(0, start);
 	const after = lines.slice(end);
-	const replacement = body ? [header, ...body, ''] : [];
-	if (!body) while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
 
-	return [...before, ...replacement, ...after].join('\n').replace(/\n{3,}/g, '\n\n');
+	// Blank lines are trimmed only at the splice boundary. A global whitespace
+	// pass would also reach inside a multi-line TOML string elsewhere in the
+	// file, which is exactly the unrelated user data this splice exists to
+	// leave alone.
+	while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
+
+	const separator = before.length > 0 ? [''] : [];
+	const replacement = body ? [...separator, header, ...body] : [];
+	const tail = after.length > 0 ? ['', ...after] : [''];
+
+	return [...before, ...replacement, ...tail].join('\n');
+}
+
+/**
+ * Index of the first line after the section starting at `start`.
+ *
+ * @param {string[]} lines
+ * @param {number} start
+ * @returns {number}
+ */
+function sectionEnd(lines, start) {
+	let end = start + 1;
+	while (end < lines.length && !/^\s*\[/.test(lines[end])) end++;
+	return end;
 }
 
 /**
@@ -169,12 +188,13 @@ const codex = {
 	cliRemoveArgs: (name) => ['mcp', 'remove', name],
 
 	readServer(text, name) {
-		const header = `[mcp_servers.${name}]`;
-		const start = text.split('\n').findIndex((line) => line.trim() === header);
+		const lines = text.split('\n');
+		const start = lines.findIndex((line) => line.trim() === `[mcp_servers.${name}]`);
 		if (start === -1) return null;
-		const body = text.split('\n').slice(start + 1);
-		const command = /^\s*command\s*=\s*"([^"]*)"/m.exec(body.join('\n'));
-		return { command: command?.[1] ?? null };
+		// Bounded to this section: an unbounded search would report a later
+		// server's command as if it were ours.
+		const body = lines.slice(start + 1, sectionEnd(lines, start)).join('\n');
+		return { command: /^\s*command\s*=\s*"([^"]*)"/m.exec(body)?.[1] ?? null };
 	},
 
 	write(text, name, entry) {

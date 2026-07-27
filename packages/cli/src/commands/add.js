@@ -31,6 +31,7 @@ function resolve(name) {
 }
 
 export default defineCommand({
+	requiresProject: true,
 	description:
 		'Install an Octane binding, by its own name or by the React package it ports, and\n' +
 		'report the surface it supports and where it deliberately differs from upstream.',

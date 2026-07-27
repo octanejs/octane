@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findNestedProperty, setCompilerOption } from '../src/kernel/edit.js';
+import { parseJsonc } from '../src/kernel/jsonc.js';
 
 describe('setCompilerOption', () => {
 	it('inserts a key while preserving comments and trailing commas', () => {
@@ -14,11 +15,11 @@ describe('setCompilerOption', () => {
 		expect(edited?.changed).toBe(true);
 		expect(edited?.text).toContain('// keep me');
 		expect(edited?.text).toContain('"strict": true,');
-		expect(edited?.text).toContain('"jsxImportSource": "octane"');
-		expect(
-			JSON.parse(edited.text.replace('// keep me', '').replace(/,(\s*})/g, '$1')),
-		).toMatchObject({
+		// The result must still be a readable tsconfig, comments and trailing
+		// comma included, not merely a string containing the right substring.
+		expect(parseJsonc(edited.text)).toEqual({
 			compilerOptions: { jsxImportSource: 'octane', strict: true },
+			include: ['src'],
 		});
 	});
 

@@ -16,6 +16,8 @@
  * @property {Record<string, import('./args.js').FlagSpec>} [flags]
  * @property {import('./args.js').PositionalSpec[]} [positionals]
  * @property {CommandEntry[]} [subcommands]
+ * @property {boolean} [requiresProject] refuse to run outside a package.json,
+ *   for commands that write into one
  * @property {(ctx: import('./context.js').Ctx, input: CommandInput) => Promise<CommandResult>} [run]
  */
 

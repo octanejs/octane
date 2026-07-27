@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createExec } from './exec.js';
+import { usageError } from './errors.js';
 import { detectProject } from './project.js';
 import { createUi, resolveMode } from './ui.js';
 
@@ -38,6 +40,11 @@ export function createContext({
 	exec,
 }) {
 	const cwd = path.resolve(flags.cwd ?? process.cwd());
+	// A typo'd --cwd would otherwise be reported on as if it were an empty
+	// project, which reads as a real (and wrong) result.
+	if (flags.cwd !== undefined && !existsSync(cwd)) {
+		throw usageError(`--cwd directory does not exist: ${cwd}`);
+	}
 	const json = Boolean(flags.json);
 	const ui = createUi({
 		mode: resolveMode({ json, color: flags.color !== false, tty, env }),

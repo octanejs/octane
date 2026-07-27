@@ -174,7 +174,7 @@ export function findCopies(root, name) {
 		}
 	};
 
-	record(path.join(modules, name), name);
+	record(path.join(modules, name), 'the project');
 
 	/** @type {string[]} */
 	const owners = [];
@@ -249,6 +249,8 @@ export function scanSourceFiles(root, { limit = SOURCE_FILE_LIMIT } = {}) {
 /**
  * @typedef {Object} Project
  * @property {string} root
+ * @property {string | null} manifestPath null when no package.json exists
+ *   anywhere up the tree, which is what separates "a project" from "a directory"
  * @property {any} manifest
  * @property {Record<string, string>} declaredDependencies every dependency kind, merged
  * @property {string[]} bindings installed `@octanejs/*` package names
@@ -273,12 +275,13 @@ export function scanSourceFiles(root, { limit = SOURCE_FILE_LIMIT } = {}) {
  */
 export function detectProject(cwd) {
 	const root = findRoot(cwd);
-	const manifest = readJsonc(path.join(root, 'package.json')) ?? {};
+	const manifestPath = path.join(root, 'package.json');
+	const manifest = readJsonc(manifestPath);
 
 	const declaredDependencies = {
-		...(manifest.dependencies ?? {}),
-		...(manifest.devDependencies ?? {}),
-		...(manifest.peerDependencies ?? {}),
+		...(manifest?.dependencies ?? {}),
+		...(manifest?.devDependencies ?? {}),
+		...(manifest?.peerDependencies ?? {}),
 	};
 
 	// Walk up for the lockfile: in a monorepo it lives at the workspace root, not
@@ -298,7 +301,7 @@ export function detectProject(cwd) {
 		dir = parent;
 	}
 
-	if (!packageManager && typeof manifest.packageManager === 'string') {
+	if (!packageManager && typeof manifest?.packageManager === 'string') {
 		packageManager = /** @type {Project['packageManager']} */ (
 			manifest.packageManager.split('@')[0]
 		);
@@ -320,7 +323,8 @@ export function detectProject(cwd) {
 
 	return {
 		root,
-		manifest,
+		manifestPath: manifest === null ? null : manifestPath,
+		manifest: manifest ?? {},
 		declaredDependencies,
 		bindings: Object.keys(declaredDependencies).filter((name) => name.startsWith('@octanejs/')),
 		packageManager,
@@ -351,6 +355,7 @@ export function summarizeProject(project) {
 	return {
 		root: project.root,
 		name: project.manifest.name ?? null,
+		hasManifest: project.manifestPath !== null,
 		packageManager: project.packageManager,
 		lockfile: project.lockfile,
 		bundler: project.bundler,
