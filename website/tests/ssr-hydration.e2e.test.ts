@@ -724,6 +724,70 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			expect(hovered!.scrolled, `hovering ${keyword} scrolled the types pane`).toBe(false);
 		}
 
+		// A STATIC attribute is baked into template markup and the template's
+		// origins carry it. A dynamic one has no markup at all — `<form
+		// action={fn}>` and `<input defaultValue={v}/>` survive only as a runtime
+		// call, whose every token but the ones NAMING it maps to the value
+		// expression. The compiler claims the authored name for those tokens, and
+		// that claim is the whole reason hovering either one lights up.
+		await page.selectOption('.pg-select', 'form-actions');
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('useFormStatus'),
+			null,
+			{ timeout: 15_000 },
+		);
+		// The probes above left the SOURCE pane scrolled deep into another example,
+		// and CodeMirror renders only around its scroll position — rewind so the
+		// whole form is inside the rendered range.
+		await page.evaluate(() => {
+			const scroller = document
+				.querySelectorAll('.pg-editor .cm-content')[0]
+				?.closest('.cm-scroller');
+			if (scroller) scroller.scrollTop = 0;
+		});
+		await page.waitForFunction(
+			() =>
+				(document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('defaultValue'),
+			null,
+			{ timeout: 15_000 },
+		);
+		for (const target of ['client', 'server']) {
+			await outputSelector.selectOption(target);
+			await page.waitForFunction(
+				(mode) =>
+					(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+						mode === 'server' ? "from 'octane/server'" : "from 'octane'",
+					),
+				target,
+				{ timeout: 15_000 },
+			);
+			// The example's opening comment writes `<form action={fn}>` before the
+			// form uses it, so `action` is probed from the END; `defaultValue`
+			// appears once.
+			for (const [attribute, nth] of [
+				['action', -1],
+				['defaultValue', 0],
+			] as const) {
+				const hovered = await probeKeyword(attribute, 'hover', nth);
+				expect(hovered, `${attribute} not found in the source pane`).not.toBeNull();
+				expect(
+					hovered!.source,
+					`hovering ${attribute} in ${target} marked nothing in the SOURCE pane; the pointer landed on ${JSON.stringify(hovered!.landedOn)}`,
+				).toContain(attribute);
+				expect(hovered!.scrolled, `hovering ${attribute} scrolled the output pane`).toBe(false);
+
+				// The call it lowered to sits far from the hovered line, so clicking
+				// is what brings it into view.
+				const clicked = await probeKeyword(attribute, 'click', nth);
+				expect(
+					clicked!.output.length,
+					`${attribute} in ${target}: source ${JSON.stringify(clicked!.source)}, output ${JSON.stringify(clicked!.output)}`,
+				).toBeGreaterThan(0);
+			}
+		}
+		await outputSelector.selectOption('client');
+
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
