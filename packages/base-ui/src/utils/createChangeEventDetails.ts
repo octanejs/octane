@@ -28,6 +28,7 @@ export const REASONS = {
 	outsidePress: 'outside-press',
 	closePress: 'close-press',
 	focusOut: 'focus-out',
+	listNavigation: 'list-navigation',
 	escapeKey: 'escape-key',
 	imperativeAction: 'imperative-action',
 } as const;
