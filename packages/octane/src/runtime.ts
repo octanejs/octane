@@ -21203,10 +21203,35 @@ function reconcileKeyed<T>(
 }
 
 /**
+ * How many items a SHARED-parent clear needs before the scoped Range beats
+ * walking the marker span. Measured in Chromium (Playwright, 101 trials per
+ * point, alternating order, batched above the 100us clock clamp), clearing
+ * 4-node items out of a 3000-node document:
+ *
+ *   items      10     25     50    100-600    1000    2000
+ *   range/walk 2.21x  1.58x  1.34x  ~1.0x     0.88x   0.92x
+ *
+ * The walk wins outright while Range's fixed setup dominates, the two are
+ * within run-to-run noise across the middle band (the ratio flips between
+ * runs there; Range's absolute times are stable, the walk's are not), and
+ * Range pulls reproducibly ahead by ~8-12% once the per-node call overhead
+ * dominates. The boundary sits at the TOP of the noise band rather than the
+ * bottom: nothing measurable is given up in a browser either way, while the
+ * walk is worth far more everywhere else — jsdom's `deleteContents` decides
+ * containment with a boundary-point comparison per candidate node, each of
+ * which can walk the whole document, so the Range path costs
+ * O(items x document) there (266x the walk at 100 items in a 3400-node
+ * document, and it grows with PAGE size, not list size).
+ */
+const RANGE_CLEAR_MIN_ITEMS = 512;
+
+/**
  * Bulk-clear a forBlock's items. When the forBlock owns its parent (markers
  * bracket the entire content), uses `textContent = ''` — the fastest DOM clear
- * on Chromium per Ripple's measured advantage on the `clear` op. Otherwise
- * falls back to a scoped Range deletion.
+ * on Chromium per Ripple's measured advantage on the `clear` op. A shared
+ * parent keeps neighbours intact by clearing only the marker span: a sibling
+ * walk, or a scoped Range once the list is large enough to pay for it
+ * (RANGE_CLEAR_MIN_ITEMS).
  *
  * Every item still gets a disposal pass: items whose scope carries cleanups,
  * child scopes, or slot-stashed Blocks (a cross-module `<Row/>` lives on the
@@ -21223,8 +21248,13 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 		(p as Element).textContent = '';
 		p.appendChild(state.start);
 		p.appendChild(state.end);
+	} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
+		// Shared parent (other JSX interleaved) — detach the marker span directly.
+		// Each removal takes a whole item subtree, so this is one call per ITEM,
+		// not per node.
+		removeRange(state.start.nextSibling, state.end);
 	} else {
-		// Shared parent (other JSX interleaved) — scoped Range delete keeps neighbors intact.
+		// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
 		const range = document.createRange();
 		range.setStartAfter(state.start);
 		range.setEndBefore(state.end);

@@ -1,0 +1,14 @@
+{
+  "name": "@benchmarks/list-clear",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Keyed-list bulk clear across the two parent shapes: a list that owns its parent vs one sharing it with interleaved JSX, at sizes either side of the shared-parent strategy boundary.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:long": "node run.mjs 40"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}

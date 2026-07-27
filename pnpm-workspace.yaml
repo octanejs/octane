@@ -12,6 +12,8 @@ packages:
   - benchmarks/dbmon/*
   - benchmarks/effectful-list
   - benchmarks/effectful-list/*
+  - benchmarks/list-clear
+  - benchmarks/list-clear/*
   - benchmarks/memo-wall
   - benchmarks/memo-wall/*
   - benchmarks/portal-swarm
@@ -390,7 +392,7 @@ minimumReleaseAgeExclude:
   - 'shadcn@4.14.1'
   - 'tailwindcss@4.3.3'
   - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.16
+  - octane@0.1.16 || 0.1.17
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

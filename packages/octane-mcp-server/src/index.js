@@ -62,6 +62,7 @@ export const BENCHMARK_SUITES = [
 	'application-composition',
 	'scaling-curves',
 	'effectful-list',
+	'list-clear',
 	'memo-wall',
 	'portal-swarm',
 	'react-hosted-islands',

@@ -12,6 +12,7 @@ import {
 	ComponentRows,
 	RefRows,
 	PortalRows,
+	SharedParentRows,
 	log,
 	resetLog,
 } from './_fixtures/for-batch-clear.tsrx';
@@ -78,5 +79,25 @@ describe('forBlock — batch-clear disposal', () => {
 		expect(target.querySelectorAll('.tip')).toHaveLength(0);
 		r.unmount();
 		target.remove();
+	});
+});
+
+// A list that OWNS its parent can be cleared by emptying the parent outright;
+// one sharing its parent with other JSX may only take the span between its own
+// markers. Both list sizes are exercised because the shared-parent clear picks
+// its DOM strategy by size — the contract is identical either way: the items
+// go, the neighbours stay, in order.
+describe('forBlock — shared-parent bulk clear', () => {
+	it.each([
+		['a small list', 3],
+		['a large list', 600],
+	])('clears %s without disturbing its interleaved siblings', (_label, size) => {
+		const r = mount(SharedParentRows, { size });
+		expect(r.findAll('li.row')).toHaveLength(size);
+
+		r.click('#clear');
+		expect(r.findAll('li.row')).toHaveLength(0);
+		expect(r.findAll('li').map((li) => li.id)).toEqual(['before', 'after']);
+		r.unmount();
 	});
 });

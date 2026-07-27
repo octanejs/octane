@@ -813,7 +813,7 @@ importers:
         version: 0.3.112(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.112(@tsrx/react@0.2.50(react@19.2.7))(@tsrx/ripple@0.1.51)(@tsrx/solid@0.1.50(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.16(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.112(@tsrx/react@0.2.50(react@19.2.7))(@tsrx/ripple@0.1.51)(@tsrx/solid@0.1.50(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -1550,6 +1550,25 @@ importers:
       '@vitejs/plugin-vue':
         specifier: catalog:default
         version: 6.0.8(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(vue@3.6.0-rc.1(typescript@5.9.3))
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  benchmarks/list-clear:
+    dependencies:
+      playwright:
+        specifier: catalog:default
+        version: 1.61.1
+
+  benchmarks/list-clear/octane-tsrx:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -14059,8 +14078,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.1.16:
-    resolution: {integrity: sha512-zTGFr/oMhkVZuK1tDm40VcJW4xViTQTMYaTA8jg0Qi3Mm3THC4n+HU0nnuaMiZXymckpeufyrHXba22m6tS/Ow==}
+  octane@0.1.17:
+    resolution: {integrity: sha512-SP/DX7WPjAuZHobJiWy7UFp1IllsufOmfwIlfCKKoPV96sKnM9BwUCK8ueguqdOMri5E7giVBjZBWF0g9fmCZw==}
     engines: {node: '>=22'}
     peerDependencies:
       react: ^19.0.0
@@ -21407,7 +21426,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/typescript-plugin@0.3.112(@tsrx/react@0.2.50(react@19.2.7))(@tsrx/ripple@0.1.51)(@tsrx/solid@0.1.50(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.16(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.112(@tsrx/react@0.2.50(react@19.2.7))(@tsrx/ripple@0.1.51)(@tsrx/solid@0.1.50(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -21416,7 +21435,7 @@ snapshots:
       '@tsrx/react': 0.2.50(react@19.2.7)
       '@tsrx/ripple': 0.1.51
       '@tsrx/solid': 0.1.50(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
-      octane: 0.1.16(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.1.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/typescript-plugin@0.3.112(@tsrx/react@0.2.50(react@19.2.7))(@tsrx/ripple@0.1.51)(@tsrx/solid@0.1.50(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
@@ -26220,7 +26239,7 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.1.16(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.1.17(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@tsrx/core': 0.1.50
       '@types/react': 19.2.17

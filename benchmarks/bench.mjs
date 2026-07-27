@@ -299,6 +299,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// The only suite that reaches the shared-parent bulk clear: every other
+		// fixture's `@for` is the sole child of its parent. The two shared sizes
+		// straddle the strategy boundary, so moving it moves one of them.
+		name: 'list-clear',
+		cwd: 'list-clear',
+		servers: [{ filter: 'octane-tsrx-list-clear-bench', port: 5298 }],
+		iter: { normal: 20, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'memo-wall',
 		cwd: 'memo-wall',
 		servers: [
