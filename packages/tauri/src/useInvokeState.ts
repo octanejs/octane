@@ -13,8 +13,19 @@ export interface InvokeState<T> {
 }
 
 type Settled<T> = Pick<InvokeState<T>, 'status' | 'data' | 'error'>;
+/** A settled result stamped with the request key that produced it. */
+type Snapshot<T> = Settled<T> & { key: readonly unknown[] };
 
 const PENDING: Settled<never> = { status: 'pending', data: undefined, error: undefined };
+
+/** Elementwise `Object.is`, matching how the effect below compares the same key. */
+function sameRequest(a: readonly unknown[], b: readonly unknown[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (!Object.is(a[i], b[i])) return false;
+	}
+	return true;
+}
 
 export function useInvokeState<T>(
 	cmd: string,
@@ -37,8 +48,8 @@ export function useInvokeState<T>(
 	const headers = options?.headers;
 	const deps = [cmd, ...(options?.deps ?? [argsKey(invokeArgs)])];
 
-	const [settled, setSettled] = useState<Settled<T>>(
-		PENDING as Settled<T>,
+	const [snapshot, setSnapshot] = useState<Snapshot<T> | null>(
+		null,
 		subSlot(slot, 'invokeState:settled'),
 	);
 	const [attempt, retry] = useReducer(
@@ -46,36 +57,42 @@ export function useInvokeState<T>(
 		0,
 		subSlot(slot, 'invokeState:attempt'),
 	);
+	const request = [...deps, attempt];
+
+	// Deriving the reset rather than deferring it to the effect is what upholds
+	// the no-stale-while-revalidate contract: the very render that first observes
+	// a new command, args, or attempt reports `pending` instead of handing back
+	// the previous request's payload for a frame.
+	const settled: Settled<T> =
+		snapshot !== null && sameRequest(snapshot.key, request) ? snapshot : (PENDING as Settled<T>);
 
 	useEffect(
 		() => {
 			if (!hasTauriHost()) {
-				setSettled({
+				setSnapshot({
 					status: 'error',
 					data: undefined,
 					error: new TauriUnavailableError(`useInvokeState('${cmd}')`),
+					key: request,
 				});
 				return;
 			}
 			let disposed = false;
-			setSettled((previous) =>
-				previous.status === 'pending' ? previous : (PENDING as Settled<T>),
-			);
 			invoke<T>(cmd, invokeArgs, headers === undefined ? undefined : { headers }).then(
 				(data) => {
 					// The cleanup below runs before a deps-change or refetch re-entry, so
 					// an in-flight command can never overwrite the request that replaced it.
-					if (!disposed) setSettled({ status: 'success', data, error: undefined });
+					if (!disposed) setSnapshot({ status: 'success', data, error: undefined, key: request });
 				},
 				(error) => {
-					if (!disposed) setSettled({ status: 'error', data: undefined, error });
+					if (!disposed) setSnapshot({ status: 'error', data: undefined, error, key: request });
 				},
 			);
 			return () => {
 				disposed = true;
 			};
 		},
-		[...deps, attempt],
+		request,
 		subSlot(slot, 'invokeState:effect'),
 	);
 

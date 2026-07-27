@@ -142,6 +142,40 @@ describe('useInvokeState', () => {
 		result.unmount();
 	});
 
+	it('returns to pending and clears data on refetch', async () => {
+		recordIPC(() => 'first');
+		const result = mount(CommandState, { name: 'ada' });
+		await flush();
+		expect(result.find('#data').textContent).toBe('first');
+
+		// The README states refetch returns to pending and clears data. That has
+		// to hold in the commit the click produces, not one effect drain later.
+		result.click('#refetch');
+		expect(result.find('#status').textContent).toBe('pending');
+		expect(result.find('#data').textContent).toBe('');
+		result.unmount();
+	});
+
+	it('never pairs new arguments with the previous command payload', async () => {
+		recordIPC((_cmd, args) => `hello ${args.name}`);
+		const result = mount(CommandState, { name: 'ada' });
+		await flush();
+		expect(result.find('#data').textContent).toBe('hello ada');
+
+		// The README rules out stale-while-revalidate, so the very commit that
+		// first observes the new args has to be pending already. Effects have not
+		// been drained here on purpose: a reset deferred to one would let this
+		// frame paint `ada`'s payload under `grace`.
+		result.update(CommandState, { name: 'grace' });
+		expect(result.find('#status').textContent).toBe('pending');
+		expect(result.find('#data').textContent).toBe('');
+
+		await flush();
+		expect(result.find('#status').textContent).toBe('success');
+		expect(result.find('#data').textContent).toBe('hello grace');
+		result.unmount();
+	});
+
 	it('exposes a rejection without throwing', async () => {
 		recordIPC(() => Promise.reject(new TypeError('nope')));
 		const result = mount(CommandState, { name: 'ada' });
