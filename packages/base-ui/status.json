@@ -1,6 +1,9 @@
 {
-  "upstream": { "package": "@base-ui/react", "version": "1.6.0" },
-  "surface": "Alpha, in progress: 29 of 43 upstream subpaths. The foundation, overlay infrastructure, hover/focus interaction layer, list-navigation/typeahead layer and popup viewport have landed, along with Dialog, AlertDialog, Popover, Tooltip, PreviewCard, the full form-control set, and the standalone Button/DirectionProvider/CSPProvider/useMediaQuery utilities — ported at full fidelity and differential-verified against the real `@base-ui/react`. Menu is PARTIAL: `Root`/`Trigger`/`Portal`/`Positioner`/`Popup` (the open/close + roving-focus path) are in place; items, submenus, `Viewport`/`Arrow`/`Backdrop`/`Separator`, Menubar and ContextMenu are not yet ported.",
+  "upstream": {
+    "package": "@base-ui/react",
+    "version": "1.6.0"
+  },
+  "surface": "Alpha, in progress: 29 of 43 upstream subpaths. The foundation, overlay infrastructure, hover/focus interaction layer, list-navigation/typeahead layer and popup viewport have landed, along with Dialog, AlertDialog, Popover, Tooltip, PreviewCard, the full form-control set, and the standalone Button/DirectionProvider/CSPProvider/useMediaQuery utilities — ported at full fidelity and differential-verified against the real `@base-ui/react`. Menu covers 18 of its 20 parts — Root/Trigger/Portal/Positioner/Popup plus the full item family (Item, LinkItem, CheckboxItem, RadioGroup/RadioItem and their indicators, Group/GroupLabel, Separator), Arrow, Backdrop and Viewport; submenus, Menubar and ContextMenu are not yet ported.",
   "divergences": [
     "Handlers receive native DOM events (no synthetic layer): visible text controls use per-edit `input`, while the NumberField form-facing number input intentionally observes native `change` commits. React's synthetic-only `event.isPropagationStopped()` (used by Menu's popup keyboard relay) becomes a native `event.cancelBubble` read.",
     "`forwardRef` becomes ref-as-prop; `className` composes via octane's `normalizeClass` (the render-prop string merge matches Base UI exactly).",

@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
+import { TYPEAHEAD_RESET_MS } from '@octanejs/base-ui/utils/constants';
 import { Menu } from '@octanejs/base-ui/menu';
-import { MenuInteractive, MenuWithHandle } from './_fixtures/base-ui-diff.tsrx';
+import {
+	MenuInteractive,
+	MenuItemsInteractive,
+	MenuWithHandle,
+} from './_fixtures/base-ui-diff.tsrx';
 
 // Behavior tests for Menu's open/close + focus flow. The differential rig proves the OPEN menu's
 // DOM matches real Base UI byte-for-byte; what it cannot see is focus movement, keyboard-driven
@@ -201,6 +206,168 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 			await settle();
 
 			expect(() => handle.open('no-such-trigger')).toThrow(/No trigger found with id/);
+
+			m.unmount();
+		});
+	});
+
+	// Phase 3f STAGE 2. `Menu.Item` and friends register with the positioner's `CompositeList`, which
+	// is what finally gives Phase 3e's `useListNavigation` and `useTypeahead` something to drive.
+	// None of this is visible in a mount-time innerHTML snapshot, so it lives here rather than in the
+	// differential rig.
+	describe('items: roving focus, typeahead and activation', () => {
+		function highlightedLabel(m: { container: HTMLElement }): string | null {
+			const el = m.container.querySelector('[data-highlighted]');
+			return el ? el.textContent : null;
+		}
+
+		async function openWithItems() {
+			const m = mount(MenuItemsInteractive);
+			await settle();
+			m.click('.menu-trigger');
+			await settle();
+			return m;
+		}
+
+		it('arrow keys rove data-highlighted between items, skipping the roving-focus tabindex', async () => {
+			const m = await openWithItems();
+
+			const popup = m.find('.menu-popup');
+			// `useListNavigation` highlights the first item as the menu opens.
+			expect(highlightedLabel(m)).toBe('Apple');
+
+			key(popup, 'ArrowDown');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Banana');
+
+			key(popup, 'ArrowDown');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Cherry');
+
+			key(popup, 'ArrowUp');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Banana');
+
+			// Exactly one item is highlighted at a time, and it is the one holding the roving
+			// tabindex=0 (`open && highlighted ? 0 : -1` in useMenuItemCommonProps).
+			expect(m.findAll('[data-highlighted]').length).toBe(1);
+			expect(m.find('[data-highlighted]').getAttribute('tabindex')).toBe('0');
+			expect(
+				m.findAll('.menu-item').filter((el) => el.getAttribute('tabindex') === '0').length,
+			).toBe(1);
+
+			m.unmount();
+		});
+
+		it('End/Home jump to the last and first items', async () => {
+			const m = await openWithItems();
+			const popup = m.find('.menu-popup');
+
+			key(popup, 'End');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Fig');
+
+			key(popup, 'Home');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Apple');
+
+			m.unmount();
+		});
+
+		it('typeahead highlights the item whose label matches the typed character', async () => {
+			const m = await openWithItems();
+			const popup = m.find('.menu-popup');
+			expect(highlightedLabel(m)).toBe('Apple');
+
+			// `useTypeahead` matches against the labels `useCompositeListItem` collected from each
+			// item's text content.
+			key(popup, 'c');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Cherry');
+
+			// The buffer ACCUMULATES rather than matching each keystroke independently: 'b' then a
+			// quick 'a' searches for "ba", so it stays on Banana. A non-accumulating implementation
+			// would jump to Apple on the 'a'.
+			await new Promise((res) => setTimeout(res, TYPEAHEAD_RESET_MS + 100));
+			key(popup, 'b');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Banana');
+
+			key(popup, 'a');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Banana');
+
+			// ...and it resets after `TYPEAHEAD_RESET_MS`, so a fresh 'a' starts a new search.
+			await new Promise((res) => setTimeout(res, TYPEAHEAD_RESET_MS + 100));
+			key(popup, 'a');
+			await settle();
+			expect(highlightedLabel(m)).toBe('Apple');
+
+			m.unmount();
+		});
+
+		it('clicking a plain item closes the menu (closeOnClick defaults to true)', async () => {
+			const m = await openWithItems();
+			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
+
+			m.click('.menu-item');
+			await settle();
+
+			expect(m.container.querySelector('[role="menu"]')).toBe(null);
+
+			m.unmount();
+		});
+
+		it('a checkbox item toggles its checked state and keeps the menu open', async () => {
+			const m = await openWithItems();
+
+			const item = m.find('.menu-check');
+			expect(item.getAttribute('role')).toBe('menuitemcheckbox');
+			expect(item.getAttribute('aria-checked')).toBe('false');
+			// `itemMapping` renders the checked state as a present/absent attribute PAIR.
+			expect(item.hasAttribute('data-unchecked')).toBe(true);
+			expect(item.hasAttribute('data-checked')).toBe(false);
+			// The indicator is transition-mounted, so it is absent while unchecked.
+			expect(m.container.querySelector('.menu-check-ind')).toBe(null);
+
+			m.click('.menu-check');
+			await settle();
+
+			const checked = m.find('.menu-check');
+			expect(checked.getAttribute('aria-checked')).toBe('true');
+			expect(checked.hasAttribute('data-checked')).toBe(true);
+			expect(checked.hasAttribute('data-unchecked')).toBe(false);
+			expect(m.container.querySelector('.menu-check-ind')).not.toBe(null);
+			// `closeOnClick` defaults to false for checkbox items.
+			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
+
+			// Unchecking drops the indicator on the SAME commit — Base UI's menu indicators gate on
+			// `checked` rather than the transition `mounted` flag, so there is no exit transition.
+			// See the UPSTREAM QUIRK note in `src/menu.ts`; the differential toggle step proves the
+			// real `@base-ui/react` does the same.
+			m.click('.menu-check');
+			await settle();
+			expect(m.find('.menu-check').getAttribute('aria-checked')).toBe('false');
+			expect(m.container.querySelector('.menu-check-ind')).toBe(null);
+
+			m.unmount();
+		});
+
+		it('a radio item selects within its group and keeps the menu open', async () => {
+			const m = await openWithItems();
+
+			const radios = m.findAll('.menu-radio');
+			expect(radios.map((el) => el.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+			expect(radios[0].getAttribute('role')).toBe('menuitemradio');
+
+			radios[1].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+			await settle();
+
+			const after = m.findAll('.menu-radio');
+			expect(after.map((el) => el.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+			expect(after[1].hasAttribute('data-checked')).toBe(true);
+			expect(after[0].hasAttribute('data-unchecked')).toBe(true);
+			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
 
 			m.unmount();
 		});

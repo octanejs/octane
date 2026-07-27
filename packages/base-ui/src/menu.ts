@@ -1,12 +1,25 @@
-// Ported from .base-ui/packages/react/src/menu/ (v1.6.0) — Phase 3f STAGE 1: the open/close +
-// roving-focus path. `store/MenuStore` + `store/MenuHandle`, `utils/findRootOwnerId` (in
-// `./utils/findRootOwnerId`) + `utils/types`, `root/MenuRoot` + `root/MenuRootContext`, `trigger/`,
-// `portal/`, `positioner/` and `popup/`. Items, submenus, groups, checkbox/radio items, `Viewport`,
-// `Arrow`, `Menubar` and `ContextMenu` land in later stages.
+// Ported from .base-ui/packages/react/src/menu/ (v1.6.0) — Phase 3f STAGES 1 + 2.
 //
-// This is the first consumer of the Phase 3e list-navigation infrastructure: `MenuRoot` is where
-// `useListNavigation` and `useTypeahead` get wired to a real popup store, and `Menu.Positioner`
-// wraps the popup in the `CompositeList` those hooks read their element/label refs from.
+// STAGE 1, the open/close + roving-focus path: `store/MenuStore` + `store/MenuHandle`,
+// `utils/findRootOwnerId` (in `./utils/findRootOwnerId`) + `utils/types`, `root/MenuRoot` +
+// `root/MenuRootContext`, `trigger/`, `portal/`, `positioner/` and `popup/`. It is the first
+// consumer of the Phase 3e list-navigation infrastructure: `MenuRoot` is where `useListNavigation`
+// and `useTypeahead` get wired to a real popup store, and `Menu.Positioner` wraps the popup in the
+// `CompositeList` those hooks read their element/label refs from.
+//
+// STAGE 2, the item family and the remaining popup parts: `utils/stateAttributesMapping`
+// (`itemMapping`), `item/` (`useMenuItemCommonProps` + `useMenuItem` + `MenuItem`), `link-item/`,
+// `checkbox-item/` + `checkbox-item-indicator/`, `radio-group/` + `radio-item/` +
+// `radio-item-indicator/`, `group/` + `group-label/`, `arrow/`, `backdrop/` and `viewport/`. This
+// is where the 3e infrastructure is finally exercised end-to-end: items register themselves with
+// the positioner's `CompositeList`, so `useListNavigation` can rove `data-highlighted` between
+// them and `useTypeahead` can match their labels.
+//
+// `Menu.Separator` re-exports the shared `Separator` exactly as upstream `menu/index.parts.ts`
+// does — it is not a Menu-specific part.
+//
+// Submenus (`submenu-root/`, `submenu-trigger/`) land in stage 3; `Menubar` and `ContextMenu` in
+// stage 4.
 //
 // octane adaptations:
 //   - components are `createElement`, not JSX; `forwardRef` → ref-as-prop; each component takes its
@@ -14,10 +27,13 @@
 //   - native, delegated events — `event.nativeEvent` collapses to `event`, and
 //     `event.isPropagationStopped()` (React-synthetic-only) becomes a `cancelBubble` read;
 //   - `React.createContext`/`useContext` → octane's; `React.useImperativeHandle` → octane's;
-//   - `useIsoLayoutEffect` → octane `useLayoutEffect`;
-//   - `fastComponent`/`fastComponentRef` (React fiber fast paths) are dropped — plain functions;
+//   - `useIsoLayoutEffect` → octane `useLayoutEffect`; `useMergedRefs` → `useComposedRefs`;
+//   - `fastComponent`/`fastComponentRef` (React fiber fast paths) are dropped — plain functions,
+//     as is the `React.memo` wrapper on `MenuRadioGroup` (octane memoizes renders itself and the
+//     wrapper carries no behavioral contract);
 //   - this package carries NO `process.env.NODE_ENV` branches, so upstream's dev-only warning for
-//     `modal` on a nested menu is dropped (same call as the rest of the binding).
+//     `modal` on a nested menu is dropped (same call as the rest of the binding). `useControlled`
+//     likewise takes no `name`/`state` labels here — they exist only for dev warnings.
 //
 // STAGING NOTE: the `menubar` / `context-menu` / `nested-context-menu` arms of `MenuParent` are
 // transcribed verbatim even though no component provides those contexts yet — see
@@ -40,13 +56,20 @@ import {
 } from 'octane';
 
 import { S, subSlot } from './internal';
+import { Separator } from './separator';
 import { useRenderElement } from './utils/useRenderElement';
 import { mergeProps } from './utils/mergeProps';
 import { useButton } from './utils/useButton';
 import { useBaseUiId } from './utils/useBaseUiId';
 import { useStableCallback } from './utils/useStableCallback';
+import { useControlled } from './utils/useControlled';
 import { useRefWithInit } from './utils/useRefWithInit';
 import { useTimeout } from './utils/useTimeout';
+import { useComposedRefs } from './utils/composeRefs';
+import { useTransitionStatus } from './utils/useTransitionStatus';
+import { usePopupViewport } from './utils/usePopupViewport';
+import { useCompositeListItem } from './utils/composite/useCompositeListItem';
+import { platform } from './utils/platform';
 import {
 	createChangeEventDetails,
 	REASONS,
@@ -509,9 +532,13 @@ export interface MenuPositionerContextValue {
 
 const MenuPositionerContext = createContext<MenuPositionerContextValue | undefined>(undefined);
 
-export function useMenuPositionerContext(): MenuPositionerContextValue {
+export function useMenuPositionerContext(optional?: false): MenuPositionerContextValue;
+export function useMenuPositionerContext(optional: true): MenuPositionerContextValue | undefined;
+export function useMenuPositionerContext(
+	optional?: boolean,
+): MenuPositionerContextValue | undefined {
 	const context = useContext(MenuPositionerContext);
-	if (!context) {
+	if (!context && !optional) {
 		throw new Error(
 			'Base UI: MenuPositionerContext is missing. Menu parts must be placed within <Menu.Positioner>.',
 		);
@@ -1996,12 +2023,1117 @@ export interface MenuPopupState {
 	instant: 'dismiss' | 'click' | 'group' | 'trigger-change' | undefined;
 }
 
+// --- Item state attributes ----------------------------------------------------
+
+/**
+ * Ported from `.base-ui/packages/react/src/menu/utils/stateAttributesMapping.ts` (v1.6.0), with the
+ * `MenuCheckboxItemDataAttributes` values it references inlined. Shared by `CheckboxItem`,
+ * `RadioItem` and both indicators: a `checked` state maps to a PRESENT/ABSENT attribute pair rather
+ * than `data-checked="false"`.
+ */
+export const itemMapping: StateAttributesMapping<{ checked: boolean }> = {
+	checked(value: boolean): Record<string, string> {
+		if (value) {
+			return { 'data-checked': '' };
+		}
+		return { 'data-unchecked': '' };
+	},
+	...transitionStatusMapping,
+};
+
+// --- Item internals -----------------------------------------------------------
+
+export const REGULAR_ITEM = {
+	type: 'regular-item' as const,
+};
+
+export type UseMenuItemMetadata =
+	| typeof REGULAR_ITEM
+	| {
+			type: 'submenu-trigger';
+			setActive: () => void;
+	  };
+
+export interface UseMenuItemCommonPropsParameters {
+	closeOnClick: boolean;
+	highlighted: boolean;
+	id: string | undefined;
+	nodeId: string | undefined;
+	store: MenuStore<any>;
+	typingRef?: { current: boolean } | undefined;
+	itemRef: { current: HTMLElement | null };
+	itemMetadata?: UseMenuItemMetadata | undefined;
+}
+
+/**
+ * The props every menu item type shares: id/role/tabIndex plus the keydown, mousemove, click and
+ * mouseup handlers. Ported from `menu/item/useMenuItemCommonProps.ts`.
+ */
+export function useMenuItemCommonProps(
+	params: UseMenuItemCommonPropsParameters,
+	slot: symbol | undefined,
+): HTMLProps {
+	const { closeOnClick, highlighted, id, nodeId, store, typingRef, itemRef, itemMetadata } = params;
+
+	const { events: menuEvents } = store.useState('floatingTreeRoot', subSlot(slot, 'ftr'));
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const contextMenuContext = useContextMenuRootContext(true);
+	const isContextMenu = contextMenuContext !== undefined;
+
+	return useMemo(
+		() => ({
+			id,
+			role: 'menuitem' as const,
+			tabIndex: open && highlighted ? 0 : -1,
+			onKeyDown(event: KeyboardEvent) {
+				if (event.key === ' ' && typingRef?.current) {
+					event.preventDefault();
+				}
+			},
+			onMouseMove(event: MouseEvent) {
+				if (!nodeId) {
+					return;
+				}
+
+				// Inform the floating tree that a menu item within this menu was hovered/moved over
+				// so unrelated descendant submenus can be closed.
+				menuEvents.emit('itemhover', {
+					nodeId,
+					target: event.currentTarget,
+				});
+			},
+			onClick(event: MouseEvent) {
+				if (closeOnClick) {
+					menuEvents.emit('close', { domEvent: event, reason: REASONS.itemPress });
+				}
+			},
+			onMouseUp(event: MouseEvent) {
+				if (contextMenuContext) {
+					const initialCursorPoint = contextMenuContext.initialCursorPointRef.current;
+					contextMenuContext.initialCursorPointRef.current = null;
+					if (
+						isContextMenu &&
+						initialCursorPoint &&
+						Math.abs(event.clientX - initialCursorPoint.x) <= 1 &&
+						Math.abs(event.clientY - initialCursorPoint.y) <= 1
+					) {
+						return;
+					}
+
+					// On non-macOS platforms, this mouseup belongs to the right-click gesture that
+					// opened the context menu, so it must not activate an item.
+					if (isContextMenu && !platform.os.mac && event.button === 2) {
+						return;
+					}
+				}
+
+				if (
+					itemRef.current &&
+					store.context.allowMouseUpTriggerRef.current &&
+					(!isContextMenu || event.button === 2)
+				) {
+					// Fires when the user presses the trigger, moves the cursor, and releases over
+					// the item. Trigger the click and override `closeOnClick` to always close.
+					if (!itemMetadata || itemMetadata.type === 'regular-item') {
+						itemRef.current.click();
+					}
+				}
+			},
+		}),
+		[
+			closeOnClick,
+			highlighted,
+			id,
+			menuEvents,
+			nodeId,
+			open,
+			store,
+			typingRef,
+			itemRef,
+			contextMenuContext,
+			isContextMenu,
+			itemMetadata,
+		],
+		subSlot(slot, 'm'),
+	);
+}
+
+export interface UseMenuItemParameters {
+	closeOnClick: boolean;
+	disabled: boolean;
+	highlighted: boolean;
+	id: string | undefined;
+	nativeButton: boolean;
+	itemMetadata: UseMenuItemMetadata;
+	nodeId: string | undefined;
+	store: MenuStore<any>;
+	typingRef?: { current: boolean } | undefined;
+}
+
+export interface UseMenuItemReturnValue {
+	getItemProps: (externalProps?: HTMLProps) => HTMLProps;
+	itemRef: (node: HTMLElement | null) => void;
+}
+
+/** Ported from `menu/item/useMenuItem.ts`. */
+export function useMenuItem(
+	params: UseMenuItemParameters,
+	slot: symbol | undefined,
+): UseMenuItemReturnValue {
+	const {
+		closeOnClick,
+		disabled: disabledProp = false,
+		highlighted,
+		id,
+		store,
+		typingRef = store.context.typingRef,
+		nativeButton,
+		itemMetadata,
+		nodeId,
+	} = params;
+
+	const rootDisabled = store.useState('disabled', subSlot(slot, 'rd'));
+	const disabled = disabledProp || rootDisabled;
+
+	const itemRef = useRef<HTMLElement | null>(null, subSlot(slot, 'ref'));
+
+	const { getButtonProps, buttonRef } = useButton(
+		{
+			disabled,
+			focusableWhenDisabled: true,
+			native: nativeButton,
+			composite: true,
+		},
+		subSlot(slot, 'btn'),
+	);
+
+	const commonProps = useMenuItemCommonProps(
+		{
+			closeOnClick,
+			highlighted,
+			id,
+			nodeId,
+			store,
+			typingRef,
+			itemRef,
+			itemMetadata,
+		},
+		subSlot(slot, 'common'),
+	);
+
+	const getItemProps = useCallback(
+		(externalProps?: HTMLProps): HTMLProps => {
+			return mergeProps(
+				commonProps,
+				{
+					onMouseEnter() {
+						if (itemMetadata.type !== 'submenu-trigger') {
+							return;
+						}
+
+						itemMetadata.setActive();
+					},
+				},
+				externalProps,
+				getButtonProps,
+			);
+		},
+		[commonProps, getButtonProps, itemMetadata],
+		subSlot(slot, 'gip'),
+	);
+
+	const mergedRef = useComposedRefs(itemRef, buttonRef, subSlot(slot, 'refs'));
+
+	return useMemo(
+		() => ({
+			getItemProps,
+			itemRef: mergedRef,
+		}),
+		[getItemProps, mergedRef],
+		subSlot(slot, 'ret'),
+	);
+}
+
+// --- Item ---------------------------------------------------------------------
+
+function MenuItem(componentProps: any): any {
+	const slot = S('MenuItem');
+	const {
+		render,
+		className,
+		id: idProp,
+		label,
+		nativeButton = false,
+		disabled = false,
+		closeOnClick = true,
+		style,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const listItem = useCompositeListItem({ label }, subSlot(slot, 'li'));
+	const menuPositionerContext = useMenuPositionerContext(true);
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const highlighted = store.useState('isActive', subSlot(slot, 'hl'), listItem.index);
+	const itemProps = store.useState('itemProps', subSlot(slot, 'ip'));
+
+	const { getItemProps, itemRef } = useMenuItem(
+		{
+			closeOnClick,
+			disabled,
+			highlighted,
+			id,
+			store,
+			nativeButton,
+			nodeId: menuPositionerContext?.context.nodeId,
+			itemMetadata: REGULAR_ITEM,
+		},
+		subSlot(slot, 'item'),
+	);
+
+	const state: MenuItemState = {
+		disabled,
+		highlighted,
+	};
+
+	return useRenderElement(
+		'div',
+		componentProps,
+		{
+			state,
+			props: [itemProps, elementProps, getItemProps],
+			ref: [itemRef, forwardedRef, listItem.ref],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuItemState {
+	/** Whether the item should ignore user interaction. */
+	disabled: boolean;
+	/** Whether the item is highlighted. */
+	highlighted: boolean;
+}
+
+// --- LinkItem -----------------------------------------------------------------
+
+function MenuLinkItem(componentProps: any): any {
+	const slot = S('MenuLinkItem');
+	const {
+		render,
+		className,
+		id: idProp,
+		label,
+		closeOnClick = false,
+		style,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const linkRef = useRef<HTMLAnchorElement | null>(null, subSlot(slot, 'link'));
+
+	const listItem = useCompositeListItem({ label }, subSlot(slot, 'li'));
+	const menuPositionerContext = useMenuPositionerContext(true);
+	const nodeId = menuPositionerContext?.context.nodeId;
+
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const highlighted = store.useState('isActive', subSlot(slot, 'hl'), listItem.index);
+	const itemProps = store.useState('itemProps', subSlot(slot, 'ip'));
+	const typingRef = store.context.typingRef;
+
+	const { getButtonProps, buttonRef } = useButton(
+		{ native: false, composite: true },
+		subSlot(slot, 'btn'),
+	);
+
+	const commonProps = useMenuItemCommonProps(
+		{
+			closeOnClick,
+			highlighted,
+			id,
+			nodeId,
+			store,
+			typingRef,
+			itemRef: linkRef,
+		},
+		subSlot(slot, 'common'),
+	);
+
+	function getItemProps(externalProps?: HTMLProps): HTMLProps {
+		return mergeProps(commonProps, externalProps, getButtonProps);
+	}
+
+	const state: MenuLinkItemState = { highlighted };
+
+	return useRenderElement(
+		'a',
+		componentProps,
+		{
+			state,
+			props: [itemProps, elementProps, getItemProps],
+			ref: [linkRef, buttonRef, forwardedRef, listItem.ref],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuLinkItemState {
+	/** Whether the item is highlighted. */
+	highlighted: boolean;
+}
+
+// --- CheckboxItem -------------------------------------------------------------
+
+export interface MenuCheckboxItemContextValue {
+	checked: boolean;
+	highlighted: boolean;
+	disabled: boolean;
+}
+
+const MenuCheckboxItemContext = createContext<MenuCheckboxItemContextValue | undefined>(undefined);
+
+export function useMenuCheckboxItemContext(): MenuCheckboxItemContextValue {
+	const context = useContext(MenuCheckboxItemContext);
+	if (context === undefined) {
+		throw new Error(
+			'Base UI: MenuCheckboxItemContext is missing. MenuCheckboxItem parts must be placed within <Menu.CheckboxItem>.',
+		);
+	}
+	return context;
+}
+
+function MenuCheckboxItem(componentProps: any): any {
+	const slot = S('MenuCheckboxItem');
+	const {
+		render,
+		className,
+		id: idProp,
+		label,
+		nativeButton = false,
+		disabled = false,
+		closeOnClick = false,
+		checked: checkedProp,
+		defaultChecked,
+		onCheckedChange,
+		style,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const listItem = useCompositeListItem({ label }, subSlot(slot, 'li'));
+	const menuPositionerContext = useMenuPositionerContext(true);
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const highlighted = store.useState('isActive', subSlot(slot, 'hl'), listItem.index);
+	const itemProps = store.useState('itemProps', subSlot(slot, 'ip'));
+
+	const [checked, setChecked] = useControlled<boolean>(
+		{
+			controlled: checkedProp,
+			default: defaultChecked ?? false,
+		},
+		subSlot(slot, 'ctrl'),
+	);
+
+	const { getItemProps, itemRef } = useMenuItem(
+		{
+			closeOnClick,
+			disabled,
+			highlighted,
+			id,
+			store,
+			nativeButton,
+			nodeId: menuPositionerContext?.context.nodeId,
+			itemMetadata: REGULAR_ITEM,
+		},
+		subSlot(slot, 'item'),
+	);
+
+	const state: MenuCheckboxItemState = useMemo(
+		() => ({
+			disabled,
+			highlighted,
+			checked,
+		}),
+		[disabled, highlighted, checked],
+		subSlot(slot, 'state'),
+	);
+
+	function handleClick(event: MouseEvent) {
+		// octane dispatches NATIVE events, so upstream's `event.nativeEvent` collapses to `event`.
+		const details = createChangeEventDetails(REASONS.itemPress, event, undefined, {
+			preventUnmountOnClose() {},
+		});
+
+		onCheckedChange?.(!checked, details);
+
+		if (details.isCanceled) {
+			return;
+		}
+
+		setChecked((currentlyChecked: boolean) => !currentlyChecked);
+	}
+
+	const element = useRenderElement(
+		'div',
+		componentProps,
+		{
+			state,
+			stateAttributesMapping: itemMapping,
+			props: [
+				itemProps,
+				{
+					role: 'menuitemcheckbox',
+					'aria-checked': checked,
+					onClick: handleClick,
+				},
+				elementProps,
+				getItemProps,
+			],
+			ref: [itemRef, forwardedRef, listItem.ref],
+		},
+		subSlot(slot, 're'),
+	);
+
+	return createElement(MenuCheckboxItemContext.Provider, { value: state, children: element });
+}
+
+export interface MenuCheckboxItemState {
+	/** Whether the checkbox item should ignore user interaction. */
+	disabled: boolean;
+	/** Whether the checkbox item is currently highlighted. */
+	highlighted: boolean;
+	/** Whether the checkbox item is currently ticked. */
+	checked: boolean;
+}
+
+function MenuCheckboxItemIndicator(componentProps: any): any {
+	const slot = S('MenuCheckboxItemIndicator');
+	const {
+		render,
+		className,
+		style,
+		keepMounted = false,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const item = useMenuCheckboxItemContext();
+
+	const indicatorRef = useRef<HTMLSpanElement | null>(null, subSlot(slot, 'ref'));
+
+	const { transitionStatus, setMounted } = useTransitionStatus(
+		item.checked,
+		undefined,
+		undefined,
+		subSlot(slot, 'ts'),
+	);
+
+	useOpenChangeComplete(
+		{
+			open: item.checked,
+			ref: indicatorRef,
+			onComplete() {
+				if (!item.checked) {
+					setMounted(false);
+				}
+			},
+		},
+		subSlot(slot, 'occ'),
+	);
+
+	const state: MenuCheckboxItemIndicatorState = {
+		checked: item.checked,
+		disabled: item.disabled,
+		highlighted: item.highlighted,
+		transitionStatus,
+	};
+
+	// UPSTREAM QUIRK, transcribed deliberately: this gates on `item.checked`, NOT on the `mounted`
+	// flag `useTransitionStatus` returns — which is what `Checkbox.Indicator` and `Radio.Indicator`
+	// use. So unchecking drops the node on the same commit and the exit transition
+	// (`data-ending-style`) never runs, making the `useOpenChangeComplete` → `setMounted(false)`
+	// pair below effectively dead for the uncheck direction. Base UI 1.6.0's menu indicators do not
+	// even destructure `mounted` (`MenuCheckboxItemIndicator.tsx` L26). Reported as a bug in review;
+	// "fixing" it would diverge from the real `@base-ui/react`, so it stays, pinned by the toggle
+	// steps in `tests/differential/parity.test.ts`.
+	return useRenderElement(
+		'span',
+		componentProps,
+		{
+			state,
+			ref: [forwardedRef, indicatorRef],
+			stateAttributesMapping: itemMapping,
+			props: {
+				'aria-hidden': true,
+				...elementProps,
+			},
+			enabled: keepMounted || item.checked,
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuCheckboxItemIndicatorState {
+	/** Whether the checkbox item is currently ticked. */
+	checked: boolean;
+	/** Whether the component should ignore user interaction. */
+	disabled: boolean;
+	/** Whether the item is highlighted. */
+	highlighted: boolean;
+	/** The transition status of the component. */
+	transitionStatus: TransitionStatus;
+}
+
+// --- Group / GroupLabel -------------------------------------------------------
+
+export type MenuGroupContextValue = (id: string | undefined) => void;
+
+const MenuGroupContext = createContext<MenuGroupContextValue | undefined>(undefined);
+
+export function useMenuGroupRootContext(): MenuGroupContextValue {
+	const context = useContext(MenuGroupContext);
+	if (context === undefined) {
+		throw new Error(
+			'Base UI: MenuGroupContext is missing. Menu group parts must be used within <Menu.Group> or <Menu.RadioGroup>.',
+		);
+	}
+	return context;
+}
+
+function MenuGroup(componentProps: any): any {
+	const slot = S('MenuGroup');
+	const { render, className, style, ref: forwardedRef, ...elementProps } = componentProps;
+
+	const [labelId, setLabelId] = useState<string | undefined>(undefined, subSlot(slot, 'label'));
+
+	const element = useRenderElement(
+		'div',
+		componentProps,
+		{
+			ref: forwardedRef,
+			props: {
+				role: 'group',
+				'aria-labelledby': labelId,
+				...elementProps,
+			},
+		},
+		subSlot(slot, 're'),
+	);
+
+	return createElement(MenuGroupContext.Provider, { value: setLabelId, children: element });
+}
+
+function MenuGroupLabel(componentProps: any): any {
+	const slot = S('MenuGroupLabel');
+	const {
+		render,
+		className,
+		style,
+		id: idProp,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+
+	const setLabelId = useMenuGroupRootContext();
+
+	useLayoutEffect(
+		() => {
+			setLabelId(id);
+			return () => {
+				setLabelId(undefined);
+			};
+		},
+		[setLabelId, id],
+		subSlot(slot, 'e'),
+	);
+
+	return useRenderElement(
+		'div',
+		componentProps,
+		{
+			ref: forwardedRef,
+			props: {
+				id,
+				role: 'presentation',
+				...elementProps,
+			},
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+// --- RadioGroup / RadioItem ---------------------------------------------------
+
+export interface MenuRadioGroupContextValue {
+	value: any;
+	setValue: (newValue: any, eventDetails: any) => void;
+	disabled: boolean;
+}
+
+const MenuRadioGroupContext = createContext<MenuRadioGroupContextValue | undefined>(undefined);
+
+export function useMenuRadioGroupContext(): MenuRadioGroupContextValue {
+	const context = useContext(MenuRadioGroupContext);
+	if (context === undefined) {
+		throw new Error(
+			'Base UI: MenuRadioGroupContext is missing. MenuRadioGroup parts must be placed within <Menu.RadioGroup>.',
+		);
+	}
+	return context;
+}
+
+// Upstream wraps this in `React.memo`; octane memoizes component renders itself (autoMemo), and the
+// wrapper carries no behavioral contract, so it is dropped.
+function MenuRadioGroup(componentProps: any): any {
+	const slot = S('MenuRadioGroup');
+	const {
+		render,
+		className,
+		value: valueProp,
+		defaultValue,
+		onValueChange: onValueChangeProp,
+		disabled = false,
+		style,
+		'aria-labelledby': ariaLabelledByProp,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const [labelId, setLabelId] = useState<string | undefined>(undefined, subSlot(slot, 'label'));
+
+	const [value, setValueUnwrapped] = useControlled<any>(
+		{
+			controlled: valueProp,
+			default: defaultValue,
+		},
+		subSlot(slot, 'ctrl'),
+	);
+
+	const setValue = useStableCallback(
+		(newValue: any, eventDetails: any) => {
+			onValueChangeProp?.(newValue, eventDetails);
+
+			if (eventDetails.isCanceled) {
+				return;
+			}
+
+			setValueUnwrapped(newValue);
+		},
+		subSlot(slot, 'setValue'),
+	);
+
+	const state: MenuRadioGroupState = { disabled };
+
+	const element = useRenderElement(
+		'div',
+		componentProps,
+		{
+			state,
+			ref: forwardedRef,
+			props: {
+				role: 'group',
+				'aria-labelledby': ariaLabelledByProp ?? labelId,
+				'aria-disabled': disabled || undefined,
+				...elementProps,
+			},
+		},
+		subSlot(slot, 're'),
+	);
+
+	const context: MenuRadioGroupContextValue = useMemo(
+		() => ({
+			value,
+			setValue,
+			disabled,
+		}),
+		[value, setValue, disabled],
+		subSlot(slot, 'ctx'),
+	);
+
+	return createElement(MenuGroupContext.Provider, {
+		value: setLabelId,
+		children: createElement(MenuRadioGroupContext.Provider, { value: context, children: element }),
+	});
+}
+
+export interface MenuRadioGroupState {
+	/** Whether the component is disabled. */
+	disabled: boolean;
+}
+
+export interface MenuRadioItemContextValue {
+	checked: boolean;
+	highlighted: boolean;
+	disabled: boolean;
+}
+
+const MenuRadioItemContext = createContext<MenuRadioItemContextValue | undefined>(undefined);
+
+export function useMenuRadioItemContext(): MenuRadioItemContextValue {
+	const context = useContext(MenuRadioItemContext);
+	if (context === undefined) {
+		throw new Error(
+			'Base UI: MenuRadioItemContext is missing. MenuRadioItem parts must be placed within <Menu.RadioItem>.',
+		);
+	}
+	return context;
+}
+
+function MenuRadioItem(componentProps: any): any {
+	const slot = S('MenuRadioItem');
+	const {
+		render,
+		className,
+		id: idProp,
+		label,
+		nativeButton = false,
+		disabled: disabledProp = false,
+		closeOnClick = false,
+		value,
+		style,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const listItem = useCompositeListItem({ label }, subSlot(slot, 'li'));
+	const menuPositionerContext = useMenuPositionerContext(true);
+	const id = useBaseUiId(idProp, subSlot(slot, 'id'));
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const highlighted = store.useState('isActive', subSlot(slot, 'hl'), listItem.index);
+	const itemProps = store.useState('itemProps', subSlot(slot, 'ip'));
+
+	const {
+		value: selectedValue,
+		setValue: setSelectedValue,
+		disabled: groupDisabled,
+	} = useMenuRadioGroupContext();
+
+	const disabled = groupDisabled || disabledProp;
+	const checked = selectedValue === value;
+
+	const { getItemProps, itemRef } = useMenuItem(
+		{
+			closeOnClick,
+			disabled,
+			highlighted,
+			id,
+			store,
+			nativeButton,
+			nodeId: menuPositionerContext?.context.nodeId,
+			itemMetadata: REGULAR_ITEM,
+		},
+		subSlot(slot, 'item'),
+	);
+
+	const state: MenuRadioItemState = useMemo(
+		() => ({
+			disabled,
+			highlighted,
+			checked,
+		}),
+		[disabled, highlighted, checked],
+		subSlot(slot, 'state'),
+	);
+
+	function handleClick(event: MouseEvent) {
+		// octane dispatches NATIVE events, so upstream's `event.nativeEvent` collapses to `event`.
+		const details = createChangeEventDetails(REASONS.itemPress, event, undefined, {
+			preventUnmountOnClose() {},
+		});
+
+		setSelectedValue(value, details);
+	}
+
+	const element = useRenderElement(
+		'div',
+		componentProps,
+		{
+			state,
+			stateAttributesMapping: itemMapping,
+			props: [
+				itemProps,
+				{
+					role: 'menuitemradio',
+					'aria-checked': checked,
+					onClick: handleClick,
+				},
+				elementProps,
+				getItemProps,
+			],
+			ref: [itemRef, forwardedRef, listItem.ref],
+		},
+		subSlot(slot, 're'),
+	);
+
+	return createElement(MenuRadioItemContext.Provider, { value: state, children: element });
+}
+
+export interface MenuRadioItemState {
+	/** Whether the radio item should ignore user interaction. */
+	disabled: boolean;
+	/** Whether the radio item is currently highlighted. */
+	highlighted: boolean;
+	/** Whether the radio item is currently selected. */
+	checked: boolean;
+}
+
+function MenuRadioItemIndicator(componentProps: any): any {
+	const slot = S('MenuRadioItemIndicator');
+	const {
+		render,
+		className,
+		style,
+		keepMounted = false,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const item = useMenuRadioItemContext();
+
+	const indicatorRef = useRef<HTMLSpanElement | null>(null, subSlot(slot, 'ref'));
+
+	const { transitionStatus, setMounted } = useTransitionStatus(
+		item.checked,
+		undefined,
+		undefined,
+		subSlot(slot, 'ts'),
+	);
+
+	useOpenChangeComplete(
+		{
+			open: item.checked,
+			ref: indicatorRef,
+			onComplete() {
+				if (!item.checked) {
+					setMounted(false);
+				}
+			},
+		},
+		subSlot(slot, 'occ'),
+	);
+
+	const state: MenuRadioItemIndicatorState = {
+		checked: item.checked,
+		disabled: item.disabled,
+		highlighted: item.highlighted,
+		transitionStatus,
+	};
+
+	// UPSTREAM QUIRK, transcribed deliberately: this gates on `item.checked`, NOT on the `mounted`
+	// flag `useTransitionStatus` returns — which is what `Checkbox.Indicator` and `Radio.Indicator`
+	// use. So unchecking drops the node on the same commit and the exit transition
+	// (`data-ending-style`) never runs, making the `useOpenChangeComplete` → `setMounted(false)`
+	// pair below effectively dead for the uncheck direction. Base UI 1.6.0's menu indicators do not
+	// even destructure `mounted` (`MenuCheckboxItemIndicator.tsx` L26). Reported as a bug in review;
+	// "fixing" it would diverge from the real `@base-ui/react`, so it stays, pinned by the toggle
+	// steps in `tests/differential/parity.test.ts`.
+	return useRenderElement(
+		'span',
+		componentProps,
+		{
+			state,
+			stateAttributesMapping: itemMapping,
+			ref: [forwardedRef, indicatorRef],
+			props: {
+				'aria-hidden': true,
+				...elementProps,
+			},
+			enabled: keepMounted || item.checked,
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuRadioItemIndicatorState {
+	/** Whether the radio item is currently selected. */
+	checked: boolean;
+	/** Whether the component should ignore user interaction. */
+	disabled: boolean;
+	/** Whether the item is highlighted. */
+	highlighted: boolean;
+	/** The transition status of the component. */
+	transitionStatus: TransitionStatus;
+}
+
+// --- Arrow --------------------------------------------------------------------
+
+function MenuArrow(componentProps: any): any {
+	const slot = S('MenuArrow');
+	const { render, className, style, ref: forwardedRef, ...elementProps } = componentProps;
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const { arrowRef, side, align, arrowUncentered, arrowStyles } = useMenuPositionerContext();
+	const open = store.useState('open', subSlot(slot, 'open'));
+
+	const state: MenuArrowState = {
+		open,
+		side,
+		align,
+		uncentered: arrowUncentered,
+	};
+
+	return useRenderElement(
+		'div',
+		componentProps,
+		{
+			ref: [arrowRef, forwardedRef],
+			stateAttributesMapping: popupStateMapping,
+			state,
+			props: {
+				style: arrowStyles,
+				'aria-hidden': true,
+				...elementProps,
+			},
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuArrowState {
+	/** Whether the menu is currently open. */
+	open: boolean;
+	/** The side of the anchor the component is placed on. */
+	side: Side;
+	/** The alignment of the component relative to the anchor. */
+	align: Align;
+	/** Whether the arrow cannot be centered on the anchor. */
+	uncentered: boolean;
+}
+
+// --- Backdrop -----------------------------------------------------------------
+
+const menuBackdropStateAttributesMapping: StateAttributesMapping<any> = {
+	...popupStateMapping,
+	...transitionStatusMapping,
+};
+
+function MenuBackdrop(componentProps: any): any {
+	const slot = S('MenuBackdrop');
+	const { render, className, style, ref: forwardedRef, ...elementProps } = componentProps;
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const mounted = store.useState('mounted', subSlot(slot, 'mounted'));
+	const transitionStatus = store.useState('transitionStatus', subSlot(slot, 'trans'));
+	const lastOpenChangeReason = store.useState('lastOpenChangeReason', subSlot(slot, 'locr'));
+
+	const contextMenuContext = useContextMenuRootContext();
+
+	const state: MenuBackdropState = {
+		open,
+		transitionStatus,
+	};
+
+	return useRenderElement(
+		'div',
+		componentProps,
+		{
+			ref: contextMenuContext?.backdropRef
+				? [forwardedRef, contextMenuContext.backdropRef]
+				: forwardedRef,
+			state,
+			stateAttributesMapping: menuBackdropStateAttributesMapping,
+			props: [
+				{
+					role: 'presentation',
+					hidden: !mounted,
+					style: {
+						pointerEvents: lastOpenChangeReason === REASONS.triggerHover ? 'none' : undefined,
+						userSelect: 'none',
+						WebkitUserSelect: 'none',
+					},
+				},
+				elementProps,
+			],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuBackdropState {
+	/** Whether the menu is currently open. */
+	open: boolean;
+	/** The transition status of the component. */
+	transitionStatus: TransitionStatus;
+}
+
+// --- Viewport -----------------------------------------------------------------
+
+export const MenuViewportCssVars = {
+	/**
+	 * The width of the parent popup when the previous content was rendered. Placed on the
+	 * 'previous' container so the popup's dimensions can be frozen while content animates.
+	 */
+	popupWidth: '--popup-width',
+	/** The height of the parent popup when the previous content was rendered. */
+	popupHeight: '--popup-height',
+} as const;
+
+const menuViewportStateAttributesMapping: StateAttributesMapping<any> = {
+	activationDirection: (value: string | undefined) =>
+		value ? { 'data-activation-direction': value } : null,
+};
+
+// A viewport for displaying content transitions. Only needed when one popup can be opened by
+// multiple triggers, its content changes per trigger, and switching between them is animated.
+function MenuViewport(componentProps: any): any {
+	const slot = S('MenuViewport');
+	const { render, className, style, children, ref: forwardedRef, ...elementProps } = componentProps;
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+	const { side } = useMenuPositionerContext();
+
+	const instantType = store.useState('instantType', subSlot(slot, 'instant'));
+
+	const { children: childrenToRender, state: viewportState } = usePopupViewport(
+		{ store, side, cssVars: MenuViewportCssVars, children },
+		subSlot(slot, 'vp'),
+	);
+
+	const state: MenuViewportState = {
+		activationDirection: viewportState.activationDirection,
+		transitioning: viewportState.transitioning,
+		instant: instantType,
+	};
+
+	return useRenderElement(
+		'div',
+		componentProps,
+		{
+			state,
+			ref: forwardedRef,
+			props: [elementProps, { children: childrenToRender }],
+			stateAttributesMapping: menuViewportStateAttributesMapping,
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuViewportState {
+	/** The activation direction of the transitioned content. */
+	activationDirection: string | undefined;
+	/** Whether the viewport is currently transitioning between contents. */
+	transitioning: boolean;
+	/** Present if animations should be instant. */
+	instant: 'dismiss' | 'click' | 'group' | 'trigger-change' | undefined;
+}
+
 // --- Namespace ---------------------------------------------------------------
 
 /**
- * Phase 3f STAGE 1 surface. `Item`, `CheckboxItem`, `RadioGroup`/`RadioItem`, `Group`/`GroupLabel`,
- * `LinkItem`, `Separator`, `Arrow`, `Backdrop`, `Viewport`, `SubmenuRoot`/`SubmenuTrigger` land in
- * stages 2–3.
+ * Phase 3f STAGE 1 + 2 surface. `SubmenuRoot`/`SubmenuTrigger` land in stage 3.
+ *
+ * `Separator` is upstream's shared `Separator`, re-exported through the Menu namespace exactly as
+ * `menu/index.parts.ts` does — not a Menu-specific part.
  */
 export const Menu = {
 	Root: MenuRoot,
@@ -2009,6 +3141,19 @@ export const Menu = {
 	Portal: MenuPortal,
 	Positioner: MenuPositioner,
 	Popup: MenuPopup,
+	Arrow: MenuArrow,
+	Backdrop: MenuBackdrop,
+	Viewport: MenuViewport,
+	Item: MenuItem,
+	LinkItem: MenuLinkItem,
+	CheckboxItem: MenuCheckboxItem,
+	CheckboxItemIndicator: MenuCheckboxItemIndicator,
+	RadioGroup: MenuRadioGroup,
+	RadioItem: MenuRadioItem,
+	RadioItemIndicator: MenuRadioItemIndicator,
+	Group: MenuGroup,
+	GroupLabel: MenuGroupLabel,
+	Separator,
 	createHandle: createMenuHandle,
 	Handle: MenuHandle,
 };

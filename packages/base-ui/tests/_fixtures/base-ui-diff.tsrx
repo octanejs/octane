@@ -1097,3 +1097,162 @@ export function MenuWithHandle({ handle }: { handle: any }) @{
 		</Menu.Root>
 	</div>
 }
+
+// Menu (OPEN, with items) — the stage-2 payload. Items register with the positioner's CompositeList,
+// which is what gives `useListNavigation`/`useTypeahead` (Phase 3e) something to navigate. Covers
+// the item roles/tabindex, the disabled item, Group + GroupLabel's `aria-labelledby` wiring, and
+// `Menu.Separator` (the shared Separator reached through the Menu namespace).
+export function MenuOpenWithItems() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.Item className="menu-item">Copy</Menu.Item>
+						<Menu.Item className="menu-item" disabled>Paste</Menu.Item>
+						<Menu.Separator className="menu-sep" />
+						<Menu.Group className="menu-group">
+							<Menu.GroupLabel className="menu-group-label">More</Menu.GroupLabel>
+							<Menu.Item className="menu-item">Duplicate</Menu.Item>
+						</Menu.Group>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, checkbox items) — `role="menuitemcheckbox"`, `aria-checked`, and `itemMapping`'s
+// present/absent `data-checked`/`data-unchecked` pair. The indicator is transition-mounted, so the
+// unchecked item has no indicator element at all while the checked one does.
+export function MenuOpenCheckboxItems() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.CheckboxItem className="menu-check" defaultChecked>
+							<Menu.CheckboxItemIndicator className="menu-check-ind">x</Menu.CheckboxItemIndicator>
+							Bold
+						</Menu.CheckboxItem>
+						<Menu.CheckboxItem className="menu-check">
+							<Menu.CheckboxItemIndicator className="menu-check-ind">x</Menu.CheckboxItemIndicator>
+							Italic
+						</Menu.CheckboxItem>
+						<Menu.CheckboxItem className="menu-check">
+							<Menu.CheckboxItemIndicator className="menu-check-ind" keepMounted>
+								x
+							</Menu.CheckboxItemIndicator>
+							Underline
+						</Menu.CheckboxItem>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, radio group) — `role="group"` + the GroupLabel `aria-labelledby` wiring RadioGroup
+// shares with Group, plus `role="menuitemradio"`/`aria-checked` and the selected item's indicator.
+export function MenuOpenRadioGroup() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.RadioGroup className="menu-radio-group" defaultValue="md">
+							<Menu.GroupLabel className="menu-group-label">Size</Menu.GroupLabel>
+							<Menu.RadioItem className="menu-radio" value="sm">
+								<Menu.RadioItemIndicator className="menu-radio-ind">o</Menu.RadioItemIndicator>
+								Small
+							</Menu.RadioItem>
+							<Menu.RadioItem className="menu-radio" value="md">
+								<Menu.RadioItemIndicator className="menu-radio-ind">o</Menu.RadioItemIndicator>
+								Medium
+							</Menu.RadioItem>
+						</Menu.RadioGroup>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, link item + arrow + backdrop) — the remaining stage-2 parts. LinkItem renders an
+// `<a>` that still carries the menuitem role and the composite tabindex; Arrow picks up the
+// positioner's arrow styles; Backdrop is the user-facing overlay (distinct from the modal
+// InternalBackdrop the positioner renders on its own).
+export function MenuOpenLinkArrowBackdrop() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Backdrop className="menu-backdrop" />
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Arrow className="menu-arrow">^</Menu.Arrow>
+						<Menu.LinkItem className="menu-link" href="https://example.com">Docs</Menu.LinkItem>
+						<Menu.Item className="menu-item">Close</Menu.Item>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, viewport) — the content-transition container between the popup and its children.
+export function MenuOpenViewport() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Viewport className="menu-viewport">
+							<Menu.Item className="menu-item">Cut</Menu.Item>
+							<Menu.Item className="menu-item">Copy</Menu.Item>
+						</Menu.Viewport>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (interactive, with items) — for behavior tests: roving focus, typeahead, item activation,
+// and checkbox/radio toggling, none of which are visible in a mount-time innerHTML snapshot.
+export function MenuItemsInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Root modal={false}>
+			<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Apple</Menu.Item>
+						<Menu.Item className="menu-item">Banana</Menu.Item>
+						<Menu.Item className="menu-item">Cherry</Menu.Item>
+						<Menu.CheckboxItem className="menu-check">
+							<Menu.CheckboxItemIndicator className="menu-check-ind">x</Menu.CheckboxItemIndicator>
+							Damson
+						</Menu.CheckboxItem>
+						<Menu.RadioGroup className="menu-radio-group" defaultValue="e1">
+							<Menu.RadioItem className="menu-radio" value="e1">Elderberry</Menu.RadioItem>
+							<Menu.RadioItem className="menu-radio" value="e2">Fig</Menu.RadioItem>
+						</Menu.RadioGroup>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
