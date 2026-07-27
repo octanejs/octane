@@ -33,6 +33,19 @@ refs, and state getters. It also omits `useEffectEvent` results because Effect
 Events are non-reactive captures, despite their intentionally fresh wrapper
 identity.
 
+A dependency array tracks what can change *between renders*, so a binding that
+is evaluated once for the program's lifetime is not a dependency. Alongside
+imports, the compiler omits module-scope `const` declarations and module-scope
+`function` and `class` declarations that nothing reassigns — the same values
+React's `exhaustive-deps` rule never asks you to list, because they are outside
+the component. This applies to a member read through one of them
+(`CONFIG.mode`), exactly as it already did for a namespace import, so a
+module-level object mutated in place is not witnessed by a dependency array;
+hold such state in a store or in state, not a module singleton. Module-scope
+`let` and `var` stay tracked: any later statement may rebind them. A local
+`const` that only names one of these values, or that binds a literal, is
+likewise omitted — naming a fixed value does not make it reactive.
+
 The full `.tsrx`/`.tsx` compiler also recognizes locally declared custom hooks
 that transparently forward a callback parameter and their final dependency
 parameter to one of those hooks. Nested transparent wrappers are followed

@@ -41,7 +41,7 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
-import { applyHookDependencies } from './hook-deps.js';
+import { applyHookDependencies, isInvariantLiteral } from './hook-deps.js';
 import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
 import {
 	expandDomRendererRegionsAst,
@@ -10267,13 +10267,6 @@ function unwrapTsExpr(n) {
 // ESTree represents RegExp syntax as a Literal too, but evaluating `/x/`
 // creates a new object every render. Only primitive literal values are safe to
 // use in a component-lifetime identity proof.
-function isInvariantLiteral(node) {
-	if (!node || node.type !== 'Literal' || node.regex != null) return false;
-	return (
-		node.value === null || (typeof node.value !== 'object' && typeof node.value !== 'function')
-	);
-}
-
 // A value that can safely be installed once at mount: only identifiers proven
 // to have component-lifetime identity. Literals are normally baked into the
 // template before this point, but accepting them makes event-bundle argument

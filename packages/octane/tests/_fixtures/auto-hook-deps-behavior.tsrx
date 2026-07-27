@@ -82,6 +82,20 @@ export function EffectFromDestructuring(props) @{
 	<span>{props.noise as string}</span>
 }
 
+const MODULE_SCALE = 10;
+const MODULE_CONFIG = { prefix: 'cfg' };
+
+function moduleFormat(value) {
+	return `fmt:${value}`;
+}
+
+export function EffectFromModuleScopeHelpers(props) @{
+	useEffect(() => {
+		props.log(`${MODULE_CONFIG.prefix}:${moduleFormat(props.value * MODULE_SCALE)}`);
+	});
+	<span>{props.noise as string}</span>
+}
+
 export function EffectWithConvergingUpdate(props) @{
 	const [value, setValue] = useState(0);
 	useEffect(() => {

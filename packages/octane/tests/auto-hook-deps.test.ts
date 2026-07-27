@@ -137,7 +137,7 @@ describe('automatic hook dependencies — full compiler', () => {
 		expect(code).not.toMatch(/\[\s*ref\.current/);
 	});
 
-	it('tracks mutable module bindings while omitting imports', () => {
+	it('tracks mutable module bindings while omitting immutable ones', () => {
 		const code = c(`
       import { useEffect } from 'octane';
       import { importedValue } from './config';
@@ -151,9 +151,11 @@ describe('automatic hook dependencies — full compiler', () => {
       }
     `);
 
-		expect(code).toMatch(
-			/useEffect\([\s\S]*?,\s*\[props\.log, moduleValue, moduleObject\.value\],\s*\d+\s*\)/,
-		);
+		// `let` is the only one of the three a later statement can rebind, so it is
+		// the only one a dependency array can witness. An import and a module-scope
+		// `const` are both fixed for the program's lifetime — see
+		// auto-hook-deps-stability.test.ts for that contract in full.
+		expect(code).toMatch(/useEffect\([\s\S]*?,\s*\[props\.log, moduleValue\],\s*\d+\s*\)/);
 	});
 
 	it('emits valid chain expressions for deep optional reads', () => {

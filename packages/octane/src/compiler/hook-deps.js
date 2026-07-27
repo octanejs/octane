@@ -50,6 +50,7 @@ function declareName(scope, name, details = null) {
 			scope,
 			imported: false,
 			dependencyInvariant: false,
+			moduleImmutable: false,
 			reassigned: false,
 			octaneImport: null,
 			octaneNamespace: false,
@@ -59,6 +60,7 @@ function declareName(scope, name, details = null) {
 		scope.bindings.set(name, binding);
 	}
 	if (details?.imported) binding.imported = true;
+	if (details?.moduleImmutable) binding.moduleImmutable = true;
 	if (details?.octaneImport) binding.octaneImport = details.octaneImport;
 	if (details?.octaneNamespace) binding.octaneNamespace = true;
 	if (details?.hookRuntimeImport) binding.hookRuntimeImport = details.hookRuntimeImport;
@@ -134,14 +136,21 @@ function predeclareDirect(statements, scope, hookRuntimeModules) {
 		}
 		const node = unwrapExport(original);
 		if (!node) continue;
+		// A module-scope `const`/`function`/`class` is evaluated once for the
+		// program's lifetime, so its identity is fixed exactly like an import's.
+		// `var` and `let` are excluded: any later statement may rebind them.
+		// Function and class bindings are writable, so their claim is provisional
+		// here and withdrawn by `reassigned` at marking time.
+		const atModuleScope = scope.kind === 'module';
 		if (node.type === 'VariableDeclaration') {
 			const target = node.kind === 'var' ? nearestFunctionScope(scope) : scope;
-			for (const decl of node.declarations || []) declarePattern(decl.id, target);
+			const details = atModuleScope && node.kind === 'const' ? { moduleImmutable: true } : null;
+			for (const decl of node.declarations || []) declarePattern(decl.id, target, details);
 		} else if (
 			(node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') &&
 			node.id
 		) {
-			declareName(scope, node.id.name);
+			declareName(scope, node.id.name, atModuleScope ? { moduleImmutable: true } : null);
 		}
 	}
 }
@@ -467,6 +476,13 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 				return;
 			case 'ObjectPattern':
 				for (const prop of pattern.properties || []) {
+					// A computed key is a READ of the surrounding scope, not a binding
+					// (`const { [key]: picked } = source`). It must be walked so the
+					// identifier gets a `nodeScopes` entry: `collectDependencies`
+					// resolves every capture through that map, and an unmapped node
+					// resolves to no binding, which it cannot distinguish from a
+					// genuine global — so the capture would be dropped silently.
+					if (prop.computed) walk(prop.key, scope);
 					walkPatternDefaults(prop.type === 'RestElement' ? prop.argument : prop.value, scope);
 				}
 				return;
@@ -487,6 +503,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 		record.stableDefinition = kind === 'const';
 	}
 	const analysis = {
+		moduleScope,
 		nodeScopes,
 		functionScopes,
 		declarators,
@@ -681,7 +698,44 @@ function discoverCustomDependencyHooks(analysis) {
 	return configs;
 }
 
+/**
+ * Is this expression the same value on every evaluation? Only a PRIMITIVE
+ * literal qualifies: it has no identity to change.
+ *
+ * A regex literal is excluded even though ESTree calls it a `Literal` —
+ * `/foo/g` allocates a fresh RegExp on every evaluation, and carries mutable
+ * `lastIndex` state besides. The object/function check is the same guard one
+ * step more general, for any parser that materializes a literal value.
+ */
+export function isInvariantLiteral(node) {
+	if (!node || node.type !== 'Literal' || node.regex != null) return false;
+	return (
+		node.value === null || (typeof node.value !== 'object' && typeof node.value !== 'function')
+	);
+}
+
+// The same question for a hook initializer, which additionally accepts a
+// template literal with no substitutions — that is a plain string constant.
+// Kept separate so the shared predicate above stays byte-identical to what
+// compile.js's other call sites have always meant by it.
+function isInvariantInitializer(node) {
+	if (node?.type === 'TemplateLiteral') return (node.expressions?.length ?? 0) === 0;
+	return isInvariantLiteral(node);
+}
+
 function markDependencyInvariantBindings(analysis) {
+	// Seed the lattice with the bindings whose identity is fixed for the
+	// program's lifetime, so the `const alias = original` propagation below
+	// carries them into component scope for free.
+	//
+	// An imported binding was already filtered at every use site; marking it
+	// here changes nothing about its own treatment and exists so an alias of it
+	// inherits the same answer.
+	for (const binding of analysis.moduleScope.bindings.values()) {
+		if (binding.imported || (binding.moduleImmutable && !binding.reassigned)) {
+			binding.dependencyInvariant = true;
+		}
+	}
 	let changed = true;
 	while (changed) {
 		changed = false;
@@ -698,6 +752,7 @@ function markDependencyInvariantBindings(analysis) {
 				if (!dependencyInvariant && init?.type === 'Identifier') {
 					dependencyInvariant = resolveBinding(scope, init.name)?.dependencyInvariant === true;
 				}
+				if (!dependencyInvariant) dependencyInvariant = isInvariantInitializer(init);
 				if (dependencyInvariant && bindings[0] && !bindings[0].binding.dependencyInvariant) {
 					bindings[0].binding.dependencyInvariant = true;
 					changed = true;
