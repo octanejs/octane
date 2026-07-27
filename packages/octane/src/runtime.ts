@@ -14933,20 +14933,28 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (existing.length === 0) {
+		let committed = false;
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				el.appendChild(node);
-				(el as any)[DEOPT_OWNS_CHILDREN] = true;
+				committed = true;
 			}
 		}
+		if (committed) (el as any)[DEOPT_OWNS_CHILDREN] = true;
 		return;
 	}
 	// Nothing to render, and we have never put children here: every node present came from
 	// somewhere else, so leave it alone rather than reconciling against an empty list and
 	// sweeping it away. (Going from rendered children to none still clears — the flag is set.)
-	if (next.length === 0 && (el as any)[DEOPT_OWNS_CHILDREN] !== true) {
+	// Hydration is excluded: the children present are the server's, which this reconcile is
+	// adopting, so a client descriptor that renders none must still clear them.
+	if (
+		next.length === 0 &&
+		(el as any)[DEOPT_OWNS_CHILDREN] !== true &&
+		activeHydration() === null
+	) {
 		return;
 	}
 	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
@@ -15001,7 +15009,10 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			result.push(node);
 		}
 	}
-	if (result.length > 0) (el as any)[DEOPT_OWNS_CHILDREN] = true;
+	// Reflects what we own RIGHT NOW, not what we ever owned: after clearing our children the
+	// element is unowned again, so DOM inserted afterwards is foreign and must survive.
+	const owns = result.length > 0;
+	if ((el as any)[DEOPT_OWNS_CHILDREN] !== owns) (el as any)[DEOPT_OWNS_CHILDREN] = owns;
 	// Remove OWNED children not reused (foreign portal ranges stay untouched).
 	const keep = result.length > 0 ? new Set<Node>(result) : null;
 	for (let i = owned.length - 1; i >= 0; i--) {

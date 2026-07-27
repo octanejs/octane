@@ -43,4 +43,33 @@ describe('DOM the renderer did not create', () => {
 		});
 		d.unmount();
 	});
+
+	it('survives insertion after the renderer clears its own children', async () => {
+		const d = await mountDifferential(
+			FIXTURE,
+			'ForeignDomAfterOurChildrenClear',
+			undefined,
+			undefined,
+		);
+		await d.step('clear our child', (i, r) => {
+			for (const m of [i, r]) (m.container.querySelector('.next') as HTMLElement).click();
+		});
+		await d.observe('insert into the now-empty host', (i, r) => {
+			for (const m of [i, r]) {
+				m.container
+					.querySelector('.clearing')!
+					.appendChild(
+						Object.assign(document.createElement('b'), { className: 'late', textContent: 'L' }),
+					);
+			}
+		});
+		await d.step('re-render again', (i, r) => {
+			for (const m of [i, r]) (m.container.querySelector('.next') as HTMLElement).click();
+		});
+		await d.observe('assert', (i) => {
+			// Our child went away two renders ago, so the element is no longer ours to clear.
+			expect(i.container.querySelector('.late')?.textContent).toBe('L');
+		});
+		d.unmount();
+	});
 });

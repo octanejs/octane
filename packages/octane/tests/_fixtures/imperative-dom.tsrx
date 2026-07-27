@@ -31,3 +31,21 @@ export function OwnedChildrenStillClear() @{
 		<OwnedHost show={show} />
 	</div>
 }
+
+// Renders children, then stops. Once ours are gone the element is unowned again, so content put
+// there afterwards belongs to whoever put it there.
+function ClearingHost(props) {
+	return createElement(
+		'div',
+		{ class: 'clearing', 'data-n': props.n },
+		props.show ? createElement('i', { class: 'mine' }) : null,
+	);
+}
+
+export function ForeignDomAfterOurChildrenClear() @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button class="next" onClick={() => setStep(step + 1)}>next</button>
+		<ClearingHost show={step === 0} n={step} />
+	</div>
+}
