@@ -71,6 +71,12 @@ function jsBytes(distDir) {
 	return { raw, gzip };
 }
 
+// The terminating newline is what proves the report line is whole. Under /m a
+// bare `$` also matches end-of-string, so a chunk that stops mid-JSON would
+// match as a finished line, JSON.parse would throw on the truncation, and the
+// child would be killed before the rest of the line ever arrived.
+const RESULT_LINE = /^BENCH_RESULT (.*)\r?\n/m;
+
 /**
  * Boot the host once against whatever sits in dist-active and resolve the
  * measurements the page reported. Every repetition is a fresh process, so the
@@ -88,7 +94,7 @@ function launchOnce() {
 
 		child.stdout.on('data', (chunk) => {
 			stdout += chunk;
-			const match = /^BENCH_RESULT (.*)$/m.exec(stdout);
+			const match = RESULT_LINE.exec(stdout);
 			if (match === null) return;
 			clearTimeout(timer);
 			try {
@@ -105,7 +111,7 @@ function launchOnce() {
 		});
 		child.on('exit', (code) => {
 			clearTimeout(timer);
-			if (!/^BENCH_RESULT /m.test(stdout)) {
+			if (!RESULT_LINE.test(stdout)) {
 				reject(new Error(`host exited with ${code} before reporting\n${stderr}`));
 			}
 		});
