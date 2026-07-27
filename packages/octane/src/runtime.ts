@@ -14975,12 +14975,16 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	if (next.length === 0 && activeHydration() === null && !hasDeoptOwnedChild(el)) {
 		return;
 	}
-	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
-	// ranges: a portal rendered elsewhere may target this element, and its nodes are
-	// not ours to reuse, remove, or reorder (React parity — portal content coexists
-	// with the container's rendered children). Range starts carry $$portalEnd.
+	// Collect only children this reconciler owns. Portal ranges and unstamped
+	// imperatively streamed nodes may coexist with our children; neither belongs
+	// to the descriptor and neither may be removed or positionally adopted.
+	// Hydration is the sole exception: its unstamped server nodes are ours to
+	// adopt. Check hydration lazily so already-stamped updates pay no extra cost.
 	const owned: Node[] = [];
 	let hasForeign = false;
+	let hydrationOwnsUnstamped: boolean | undefined;
+	let byKey: Map<any, Node> | null = null;
+	const unstamped: Node[] = [];
 	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
@@ -14989,26 +14993,29 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			scan = nodeAfterPortalRange(scan, rangeEnd);
 			continue;
 		}
+		const stampedKey = (scan as any).$$deoptKey;
+		const descriptor = stampedKey === undefined ? getDeoptDesc(scan) : undefined;
+		if (
+			stampedKey === undefined &&
+			descriptor === undefined &&
+			!(hydrationOwnsUnstamped ??= activeHydration() !== null)
+		) {
+			hasForeign = true;
+			scan = getNextSibling(scan);
+			continue;
+		}
 		owned.push(scan);
-		scan = getNextSibling(scan);
-	}
-	// Partition current children by their stamped SLOT KEY (position-scoped —
-	// see flattenDeoptChildrenKeyed; explicit keys ride the same scheme). Nodes
-	// without a stamp (server-adopted on the first post-hydration reconcile)
-	// fall back to document-order reuse, and get stamped below for next time.
-	let byKey: Map<any, Node> | null = null;
-	const unstamped: Node[] = [];
-	for (let i = 0; i < owned.length; i++) {
-		const n = owned[i];
-		const k = (n as any).$$deoptKey ?? getDeoptDesc(n)?.key;
-		if (k != null) {
+		const key = stampedKey ?? descriptor?.key;
+		if (key != null) {
 			if (byKey === null) byKey = new Map();
-			if (!byKey.has(k)) {
-				byKey.set(k, n);
+			if (!byKey.has(key)) {
+				byKey.set(key, scan);
+				scan = getNextSibling(scan);
 				continue;
 			}
 		}
-		unstamped.push(n);
+		unstamped.push(scan);
+		scan = getNextSibling(scan);
 	}
 	let up = 0;
 	const result: Node[] = [];
@@ -15041,7 +15048,9 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// like a React portal whose container children reorder around it).
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
-		const at = hasForeign ? liveOwnedChildAt(el, i) : (existing[i] ?? null);
+		const at = hasForeign
+			? liveOwnedChildAt(el, i, hydrationOwnsUnstamped === true)
+			: (existing[i] ?? null);
 		if (at !== want) el.insertBefore(want, at);
 	}
 }
@@ -15059,13 +15068,21 @@ function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 // The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
 // `<!--portal-->…<!--/portal-->` ranges (see reconcileDeoptChildren). Live walk —
 // called per reorder step, only when a foreign range exists.
-function liveOwnedChildAt(el: Element, index: number): Node | null {
+function liveOwnedChildAt(el: Element, index: number, adoptHydrationChildren = false): Node | null {
 	let i = 0;
 	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
 			scan = nodeAfterPortalRange(scan, rangeEnd);
+			continue;
+		}
+		if (
+			!adoptHydrationChildren &&
+			(scan as any).$$deoptKey === undefined &&
+			getDeoptDesc(scan) === undefined
+		) {
+			scan = getNextSibling(scan);
 			continue;
 		}
 		if (i === index) return scan;

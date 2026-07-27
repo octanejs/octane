@@ -6,556 +6,2013 @@
       "name": "octane-tsrx",
       "ops": {
         "mount": {
-          "score": 4.237499997019768,
-          "median": 4.299999982118607,
-          "min": 4.0999999940395355,
-          "mean": 4.269999998807907,
-          "p95": 4.699999988079071,
-          "sd": 0.15927467109323498,
-          "rme": 1.7457139104194952,
-          "scoreRme": 1.4681259353997893,
-          "warmupRatio": 1.0235988195481194,
+          "score": 5.262499988079071,
+          "median": 5.299999952316284,
+          "min": 5,
+          "mean": 5.2799999833107,
+          "p95": 5.5,
+          "sd": 0.13992479469887895,
+          "rme": 1.2402664265877985,
+          "scoreRme": 2.0694833748377723,
+          "warmupRatio": 1.0071258896198543,
           "samples": 20
         },
         "update_root": {
-          "score": 0.5375000014901161,
-          "median": 0.5999999940395355,
-          "min": 0.4000000059604645,
-          "mean": 0.5700000032782555,
-          "p95": 0.7000000178813934,
-          "sd": 0.09787209676154886,
-          "rme": 8.03596922455852,
-          "scoreRme": 14.251565892827237,
-          "warmupRatio": 1.2093023333180717,
+          "score": 0.8000000417232513,
+          "median": 0.8000001907348633,
+          "min": 0.7000000476837158,
+          "mean": 0.8350000143051147,
+          "p95": 0.9000000953674316,
+          "sd": 0.06708203520976058,
+          "rme": 3.759879944452529,
+          "scoreRme": 7.900911935700136,
+          "warmupRatio": 1.0624999743886305,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.05000000074505806,
-          "median": 0.09999999403953552,
+          "score": 0.050000011920928955,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.06500000357627869,
-          "p95": 0.20000001788139343,
-          "sd": 0.05871429870817869,
-          "rme": 42.27510821243183,
-          "scoreRme": 126.41457213388672,
-          "warmupRatio": 1.2500000558793536,
+          "mean": 0.06000001430511474,
+          "p95": 0.10000014305114746,
+          "sd": 0.05026248097859919,
+          "rme": 39.20548207287936,
+          "scoreRme": 89.38859786680926,
+          "warmupRatio": 1.2499997019768472,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.03750000149011612,
-          "median": 0.09999999403953552,
+          "score": 0.04999995231628418,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.06000000387430191,
-          "p95": 0.10000002384185791,
-          "sd": 0.050262472240537814,
-          "rme": 39.20548207281077,
-          "scoreRme": 115.40018362616587,
-          "warmupRatio": 1,
+          "mean": 0.06500002145767211,
+          "p95": 0.20000004768371582,
+          "sd": 0.05871431259996665,
+          "rme": 42.275106584899696,
+          "scoreRme": 89.38859786668225,
+          "warmupRatio": 1.2500017881410486,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.0625,
-          "median": 0.09999999403953552,
+          "score": 0.07500004768371582,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.08499999791383743,
-          "p95": 0.19999998807907104,
-          "sd": 0.06708203602806707,
-          "rme": 36.935293208869226,
-          "scoreRme": 99.53892686690783,
-          "warmupRatio": 1,
+          "mean": 0.09500000476837159,
+          "p95": 0.20000004768371582,
+          "sd": 0.0686332708244297,
+          "rme": 33.811567087908514,
+          "scoreRme": 78.83331543308405,
+          "warmupRatio": 1.166665607029211,
           "samples": 20
         },
         "unmount": {
-          "score": 0.5249999985098839,
+          "score": 0.4750000238418579,
           "median": 0.5,
-          "min": 0.4000000059604645,
-          "mean": 0.525,
-          "p95": 0.6000000238418579,
-          "sd": 0.055011959281507705,
-          "rme": 4.904017823752215,
-          "scoreRme": 7.372646873026481,
-          "warmupRatio": 0.9285714326261664,
+          "min": 0.39999985694885254,
+          "mean": 0.47500001192092894,
+          "p95": 0.6000001430511475,
+          "sd": 0.05501197068665915,
+          "rme": 5.420231213951801,
+          "scoreRme": 8.148707247264847,
+          "warmupRatio": 0.9999999372582719,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 3081,
+          "min": 3081,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 10,
+          "min": 10,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 2984,
+          "min": 2984,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 992,
+          "min": 992,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 8,
+          "min": 8,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
-        "gates": "pass"
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 3081,
+            "elements": 2047,
+            "text": 1024,
+            "comments": 10,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "/if": 3,
+              "if": 3,
+              "/comp": 2,
+              "comp": 2
+            },
+            "commentParents": {
+              "div.n": 10
+            }
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 2984,
+            "elements": 1984,
+            "text": 992,
+            "comments": 8,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "/if": 3,
+              "if": 3,
+              "/comp": 1,
+              "comp": 1
+            },
+            "commentParents": {
+              "div.n": 8
+            }
+          }
+        }
       }
     },
     {
       "name": "octane-jsx",
       "ops": {
         "mount": {
-          "score": 6.962500002235174,
-          "median": 6.9000000059604645,
-          "min": 6.699999988079071,
-          "mean": 6.920000003278256,
-          "p95": 7.199999988079071,
-          "sd": 0.13992478819710658,
-          "rme": 0.9463304052446919,
-          "scoreRme": 1.8085426890081417,
-          "warmupRatio": 0.9892280078268475,
+          "score": 9.149999976158142,
+          "median": 9.200000047683716,
+          "min": 8.699999809265137,
+          "mean": 9.250000011920928,
+          "p95": 10.200000047683716,
+          "sd": 0.44307540591110056,
+          "rme": 2.2417652934797814,
+          "scoreRme": 4.582182744053344,
+          "warmupRatio": 1.0286885298762518,
           "samples": 20
         },
         "update_root": {
-          "score": 1.2250000089406967,
-          "median": 1.2999999821186066,
-          "min": 1.0999999940395355,
-          "mean": 1.2850000023841859,
-          "p95": 1.5,
-          "sd": 0.10894228087958448,
-          "rme": 3.9677798330165652,
-          "scoreRme": 7.065317313300821,
-          "warmupRatio": 1.0816326415176345,
+          "score": 2.137500047683716,
+          "median": 2.1000001430511475,
+          "min": 2,
+          "mean": 2.1200000166893007,
+          "p95": 2.6000001430511475,
+          "sd": 0.1361114345519268,
+          "rme": 3.004782058526288,
+          "scoreRme": 7.520925275655451,
+          "warmupRatio": 0.9824561295881633,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.11249999701976776,
-          "median": 0.09999999403953552,
+          "score": 0.125,
+          "median": 0.10000014305114746,
           "min": 0,
-          "mean": 0.11999999582767487,
-          "p95": 0.20000001788139343,
-          "sd": 0.061558698984752275,
-          "rme": 24.008356549554545,
-          "scoreRme": 26.277784739011782,
+          "mean": 0.1350000023841858,
+          "p95": 0.20000004768371582,
+          "sd": 0.05871428481656642,
+          "rme": 20.354677676491182,
+          "scoreRme": 30.96508909396633,
           "warmupRatio": 1,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.037500008940696716,
-          "median": 0.09999999403953552,
+          "score": 0.07499998807907104,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.07000000178813934,
-          "p95": 0.19999998807907104,
-          "sd": 0.057124056947914975,
-          "rme": 38.19224809573084,
-          "scoreRme": 115.40018362616405,
-          "warmupRatio": 1.9999995032947453,
+          "mean": 0.0899999737739563,
+          "p95": 0.20000004768371582,
+          "sd": 0.07181845983534937,
+          "rme": 37.346330391389785,
+          "scoreRme": 78.8333512337066,
+          "warmupRatio": 1.1666661368475177,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.11250000447034836,
-          "median": 0.19999998807907104,
-          "min": 0.09999999403953552,
-          "mean": 0.15000000298023225,
-          "p95": 0.20000001788139343,
-          "sd": 0.051298920661913286,
-          "rme": 16.005571669040993,
-          "scoreRme": 26.277780761165488,
-          "warmupRatio": 1.5555555334797622,
+          "score": 0.1499999761581421,
+          "median": 0.20000004768371582,
+          "min": 0.09999990463256836,
+          "mean": 0.18000000715255737,
+          "p95": 0.3000001907348633,
+          "sd": 0.06958522513146903,
+          "rme": 18.092506811855984,
+          "scoreRme": 29.796175609083342,
+          "warmupRatio": 1.416667130258422,
           "samples": 20
         },
         "unmount": {
-          "score": 2.125,
-          "median": 2.0999999940395355,
-          "min": 1.9000000059604645,
-          "mean": 2.1049999997019766,
-          "p95": 2.399999976158142,
-          "sd": 0.1431782084526828,
-          "rme": 3.183310885222058,
-          "scoreRme": 6.221530207915051,
-          "warmupRatio": 0.9823529404752395,
+          "score": 2.212499976158142,
+          "median": 2.299999952316284,
+          "min": 2.0999999046325684,
+          "mean": 2.325,
+          "p95": 2.8000001907348633,
+          "sd": 0.1860249343722109,
+          "rme": 3.7445741359899274,
+          "scoreRme": 3.1538514275478464,
+          "warmupRatio": 1.0960452284090423,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 11263,
+          "min": 11263,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 8192,
+          "min": 8192,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 10920,
+          "min": 10920,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 992,
+          "min": 992,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 7944,
+          "min": 7944,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
-        "gates": "pass"
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 11263,
+            "elements": 2047,
+            "text": 1024,
+            "comments": 8192,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "": 4100,
+              "/it": 2046,
+              "it": 2046
+            },
+            "commentParents": {
+              "div.n": 8176,
+              "div.mid": 10,
+              "div#main": 6
+            }
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 10920,
+            "elements": 1984,
+            "text": 992,
+            "comments": 7944,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "": 3976,
+              "/it": 1984,
+              "it": 1984
+            },
+            "commentParents": {
+              "div.n": 7938,
+              "div#main": 6
+            }
+          }
+        }
       }
     },
     {
       "name": "solid",
       "ops": {
         "mount": {
-          "score": 4.462500002235174,
-          "median": 4.4000000059604645,
-          "min": 4.299999982118607,
-          "mean": 4.46000000089407,
-          "p95": 4.700000017881393,
-          "sd": 0.11876558365369265,
-          "rme": 1.2462637963619154,
-          "scoreRme": 2.6380037559786835,
-          "warmupRatio": 0.9915966383257516,
+          "score": 5.200000047683716,
+          "median": 5.200000047683716,
+          "min": 4.900000095367432,
+          "mean": 5.175000023841858,
+          "p95": 5.5,
+          "sd": 0.19432744566317744,
+          "rme": 1.7574299223079848,
+          "scoreRme": 3.938749715173339,
+          "warmupRatio": 0.9879807578785533,
           "samples": 20
         },
         "update_root": {
-          "score": 0.5375000052154064,
-          "median": 0.5999999940395355,
-          "min": 0.4000000059604645,
-          "mean": 0.5650000035762787,
-          "p95": 0.7000000178813934,
-          "sd": 0.06708204175677082,
-          "rme": 5.556637334402267,
-          "scoreRme": 14.251566968837329,
-          "warmupRatio": 1.0930232493667231,
+          "score": 0.5374999642372131,
+          "median": 0.5,
+          "min": 0.40000009536743164,
+          "mean": 0.5399999856948853,
+          "p95": 0.6000001430511475,
+          "sd": 0.059824272279147314,
+          "rme": 5.184870415438787,
+          "scoreRme": 8.051168459313866,
+          "warmupRatio": 1.000000055446185,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.03750000149011612,
-          "median": 0.09999999403953552,
+          "score": 0.03749999403953552,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.0550000011920929,
-          "p95": 0.20000001788139343,
-          "sd": 0.06048053437265997,
-          "rme": 51.46442813174386,
-          "scoreRme": 115.40018362616587,
-          "warmupRatio": 1.3333332008785723,
+          "mean": 0.07999995946884156,
+          "p95": 0.19999980926513672,
+          "sd": 0.061558654648832825,
+          "rme": 36.01252588055266,
+          "scoreRme": 115.40018362628066,
+          "warmupRatio": 2.6666653421187942,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.03750000521540642,
-          "median": 0.09999999403953552,
+          "score": 0.08750003576278687,
+          "median": 0.10000014305114746,
           "min": 0,
-          "mean": 0.06000000089406967,
-          "p95": 0.10000002384185791,
-          "sd": 0.05026246974397366,
-          "rme": 39.20548207281052,
-          "scoreRme": 115.40018362616588,
-          "warmupRatio": 0.9999999006589392,
+          "mean": 0.09000002145767212,
+          "p95": 0.20000004768371582,
+          "sd": 0.05525061560651899,
+          "rme": 28.730867471493955,
+          "scoreRme": 61.24180066965225,
+          "warmupRatio": 1,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.14999999850988388,
-          "median": 0.19999998807907104,
-          "min": 0.09999999403953552,
-          "mean": 0.17000000327825546,
-          "p95": 0.30000001192092896,
-          "sd": 0.0571240555749887,
-          "rme": 15.726219524620392,
-          "scoreRme": 29.79619780890183,
-          "warmupRatio": 1.1666666832235126,
+          "score": 0.13749998807907104,
+          "median": 0.19999980926513672,
+          "min": 0.09999990463256836,
+          "mean": 0.16499996185302734,
+          "p95": 0.2999999523162842,
+          "sd": 0.07451598675226678,
+          "rme": 21.135856103049182,
+          "scoreRme": 31.472810096026937,
+          "warmupRatio": 1,
           "samples": 20
         },
         "unmount": {
-          "score": 0.4750000052154064,
-          "median": 0.5,
-          "min": 0.30000001192092896,
-          "mean": 0.49500000178813935,
-          "p95": 0.6000000238418579,
-          "sd": 0.08255779562215973,
-          "rme": 7.805614852088833,
-          "scoreRme": 15.603602042855371,
-          "warmupRatio": 1.0263157797734825,
+          "score": 0.574999988079071,
+          "median": 0.5999999046325684,
+          "min": 0.39999985694885254,
+          "mean": 0.5899999618530274,
+          "p95": 0.7000000476837158,
+          "sd": 0.07181849303273541,
+          "rme": 5.6968991979079355,
+          "scoreRme": 12.889939690288482,
+          "warmupRatio": 1.0434781684767303,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 5117,
+          "min": 5117,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 2046,
+          "min": 2046,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 4961,
+          "min": 4961,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 993,
+          "min": 993,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
-        "gates": "pass"
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 5117,
+            "elements": 2047,
+            "text": 1024,
+            "comments": 2046,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "": 2046
+            },
+            "commentParents": {
+              "div.n": 2044,
+              "div.mid": 2
+            }
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 4961,
+            "elements": 1984,
+            "text": 993,
+            "comments": 1984,
+            "emptyText": 1,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "": 1984
+            },
+            "commentParents": {
+              "div.n": 1984
+            }
+          }
+        }
       }
     },
     {
       "name": "react",
       "ops": {
         "mount": {
-          "score": 5.175000000745058,
-          "median": 5.199999988079071,
-          "min": 5,
-          "mean": 5.21499999910593,
-          "p95": 5.5999999940395355,
-          "sd": 0.13869694281155556,
-          "rme": 1.2447060663478065,
-          "scoreRme": 2.070978982134121,
-          "warmupRatio": 1.0120772946842516,
+          "score": 5.450000047683716,
+          "median": 5.5,
+          "min": 5.200000047683716,
+          "mean": 5.479999995231628,
+          "p95": 5.799999952316284,
+          "sd": 0.16415649903027657,
+          "rme": 1.4019475103489074,
+          "scoreRme": 2.008774067666304,
+          "warmupRatio": 1.0022935648376259,
           "samples": 20
         },
         "update_root": {
-          "score": 0.6500000059604645,
-          "median": 0.699999988079071,
-          "min": 0.5999999940395355,
-          "mean": 0.6699999988079071,
-          "p95": 0.7999999821186066,
-          "sd": 0.07326950062957392,
-          "rme": 5.118028031349569,
-          "scoreRme": 6.876044492237088,
-          "warmupRatio": 1.0576922807996798,
+          "score": 0.6499999463558197,
+          "median": 0.7000000476837158,
+          "min": 0.5999999046325684,
+          "mean": 0.7100000023841858,
+          "p95": 0.8000001907348633,
+          "sd": 0.07181852623014566,
+          "rme": 4.73404486172979,
+          "scoreRme": 6.876044098172754,
+          "warmupRatio": 1.1538462949222479,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.08750000223517418,
-          "median": 0.09999999403953552,
+          "score": 0.0625,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.10499999821186065,
-          "p95": 0.20000001788139343,
-          "sd": 0.07591546268295654,
-          "rme": 33.83725950666467,
-          "scoreRme": 61.241804297200616,
-          "warmupRatio": 1.1428570455434397,
+          "mean": 0.07999998331069946,
+          "p95": 0.20000004768371582,
+          "sd": 0.06155868318695147,
+          "rme": 36.012531843106295,
+          "scoreRme": 99.53894217788142,
+          "warmupRatio": 1.200000286102295,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.08749999478459358,
-          "median": 0.10000002384185791,
+          "score": 0.08750003576278687,
+          "median": 0.10000014305114746,
           "min": 0,
-          "mean": 0.12000000029802323,
-          "p95": 0.20000001788139343,
-          "sd": 0.06958523550037606,
-          "rme": 27.138765272733306,
-          "scoreRme": 61.24180792482268,
-          "warmupRatio": 1.7142857994352119,
+          "mean": 0.10500001907348633,
+          "p95": 0.20000004768371582,
+          "sd": 0.0604805468213861,
+          "rme": 26.957558828888406,
+          "scoreRme": 33.785714285902415,
+          "warmupRatio": 1.14285660763198,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.11250000074505806,
-          "median": 0.09999999403953552,
+          "score": 0.08749997615814209,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.12000000178813934,
-          "p95": 0.20000001788139343,
-          "sd": 0.05231483865675119,
-          "rme": 20.403180340587493,
-          "scoreRme": 26.27778275008876,
-          "warmupRatio": 1.111111103752513,
+          "mean": 0.10999999046325684,
+          "p95": 0.20000004768371582,
+          "sd": 0.04472135057127799,
+          "rme": 19.027270556782668,
+          "scoreRme": 33.78571428587106,
+          "warmupRatio": 1.1428570455434106,
           "samples": 20
         },
         "unmount": {
-          "score": 0.7500000037252903,
-          "median": 0.7999999821186066,
-          "min": 0.699999988079071,
-          "mean": 0.7600000023841857,
-          "p95": 0.9000000059604645,
-          "sd": 0.06805570483006532,
-          "rme": 4.190879492948183,
-          "scoreRme": 5.959239916978776,
-          "warmupRatio": 0.9999999950329463,
+          "score": 0.7125000357627869,
+          "median": 0.7000000476837158,
+          "min": 0.5999999046325684,
+          "mean": 0.7000000238418579,
+          "p95": 0.8000001907348633,
+          "sd": 0.06488860326130734,
+          "rme": 4.338350155169877,
+          "scoreRme": 7.5209287041668365,
+          "warmupRatio": 0.9473684320599524,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 3071,
+          "min": 3071,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 2976,
+          "min": 2976,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 992,
+          "min": 992,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
-        "gates": "pass"
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 3071,
+            "elements": 2047,
+            "text": 1024,
+            "comments": 0,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 2976,
+            "elements": 1984,
+            "text": 992,
+            "comments": 0,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          }
+        }
       }
     },
     {
       "name": "ripple",
       "ops": {
         "mount": {
-          "score": 5.200000002980232,
-          "median": 5.199999988079071,
-          "min": 5.0999999940395355,
-          "mean": 5.190000002086163,
-          "p95": 5.5,
-          "sd": 0.11192102638513335,
-          "rme": 1.0092495320924377,
-          "scoreRme": 1.4887077584249038,
-          "warmupRatio": 0.9903846145304438,
+          "score": 5.424999982118607,
+          "median": 5.400000095367432,
+          "min": 5.200000047683716,
+          "mean": 5.509999966621399,
+          "p95": 5.8999998569488525,
+          "sd": 0.20749125944222843,
+          "rme": 1.762391709149529,
+          "scoreRme": 2.293523932677586,
+          "warmupRatio": 1.0322580613263457,
           "samples": 20
         },
         "update_root": {
-          "score": 0.5500000044703484,
-          "median": 0.5999999940395355,
-          "min": 0.4000000059604645,
-          "mean": 0.5600000008940696,
-          "p95": 0.7000000178813934,
-          "sd": 0.07539370357572464,
-          "rme": 6.300881044311059,
-          "scoreRme": 8.126236830191406,
-          "warmupRatio": 1.0681818067904347,
+          "score": 0.6500000357627869,
+          "median": 0.6000001430511475,
+          "min": 0.5,
+          "mean": 0.6400000214576721,
+          "p95": 0.7000000476837158,
+          "sd": 0.059824305839723355,
+          "rme": 4.37473660462558,
+          "scoreRme": 6.876047250813809,
+          "warmupRatio": 0.9615383627852093,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.02499999850988388,
-          "median": 0,
+          "score": 0.03749999403953552,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.04500000029802322,
-          "p95": 0.10000002384185791,
-          "sd": 0.0510417788914411,
-          "rme": 53.08447367196286,
-          "scoreRme": 154.82559312243657,
-          "warmupRatio": 2.000000149011621,
+          "mean": 0.049999988079071044,
+          "p95": 0.10000014305114746,
+          "sd": 0.05129890537370389,
+          "rme": 48.01671309916589,
+          "scoreRme": 115.40018362628066,
+          "warmupRatio": 1.3333338631524823,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.03749999776482582,
-          "median": 0.09999999403953552,
+          "score": 0.025000035762786865,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.06499999910593032,
-          "p95": 0.10000002384185791,
-          "sd": 0.04893604781984876,
-          "rme": 35.23463457571614,
-          "scoreRme": 115.40018362616405,
-          "warmupRatio": 1.333333432674414,
+          "mean": 0.055000030994415285,
+          "p95": 0.20000004768371582,
+          "sd": 0.060480560307391254,
+          "rme": 51.46442231373547,
+          "scoreRme": 154.82559312243657,
+          "warmupRatio": 3.4999964237264294,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.20000000298023224,
-          "median": 0.19999998807907104,
-          "min": 0.09999999403953552,
-          "mean": 0.19500000029802322,
-          "p95": 0.29999998211860657,
-          "sd": 0.03940344154555929,
-          "rme": 9.457008378061891,
-          "scoreRme": 22.34714447169423,
-          "warmupRatio": 0.9374999674037103,
+          "score": 0.15000003576278687,
+          "median": 0.20000004768371582,
+          "min": 0.09999990463256836,
+          "mean": 0.16999999284744263,
+          "p95": 0.2999999523162842,
+          "sd": 0.057124066283901466,
+          "rme": 15.726223437703126,
+          "scoreRme": 29.79619928893642,
+          "warmupRatio": 1.2499995032947453,
           "samples": 20
         },
         "unmount": {
-          "score": 0.3749999925494194,
-          "median": 0.4000000059604645,
-          "min": 0.29999998211860657,
-          "mean": 0.38499999344348906,
-          "p95": 0.5,
-          "sd": 0.058714298441030745,
-          "rme": 7.137356413737736,
-          "scoreRme": 15.766668725203168,
-          "warmupRatio": 1.0666666540834637,
+          "score": 0.3250000476837158,
+          "median": 0.3000001907348633,
+          "min": 0.2999999523162842,
+          "mean": 0.34500004053115846,
+          "p95": 0.40000009536743164,
+          "sd": 0.05104178027443652,
+          "rme": 6.924061203315788,
+          "scoreRme": 11.909666834030933,
+          "warmupRatio": 1.03846140443928,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 3072,
+          "min": 3072,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 2977,
+          "min": 2977,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 993,
+          "min": 993,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
-        "gates": "pass"
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 3072,
+            "elements": 2047,
+            "text": 1025,
+            "comments": 0,
+            "emptyText": 1,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 2977,
+            "elements": 1984,
+            "text": 993,
+            "comments": 0,
+            "emptyText": 1,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          }
+        }
       }
     },
     {
       "name": "vue-vapor",
       "ops": {
         "mount": {
-          "score": 10.6875,
-          "median": 10.599999994039536,
-          "min": 10.200000017881393,
-          "mean": 10.675,
-          "p95": 12.699999988079071,
-          "sd": 0.5379052924371286,
-          "rme": 2.3582626033085288,
-          "scoreRme": 2.418203865349912,
-          "warmupRatio": 1.0093567249370596,
+          "score": 10.675000011920929,
+          "median": 10.599999904632568,
+          "min": 10.299999952316284,
+          "mean": 10.600000023841858,
+          "p95": 10.900000095367432,
+          "sd": 0.1622214288661028,
+          "rme": 0.716236726636393,
+          "scoreRme": 1.0039642505485316,
+          "warmupRatio": 0.9847775209315459,
           "samples": 20
         },
         "update_root": {
-          "score": 0.3375000059604645,
-          "median": 0.4000000059604645,
-          "min": 0.20000001788139343,
-          "mean": 0.3700000047683716,
-          "p95": 0.4000000059604645,
-          "sd": 0.05712405475123119,
-          "rme": 7.225560264144,
-          "scoreRme": 18.433134279442065,
-          "warmupRatio": 1.1851851708768002,
+          "score": 0.3499999940395355,
+          "median": 0.39999985694885254,
+          "min": 0.2999999523162842,
+          "mean": 0.3699999928474426,
+          "p95": 0.5,
+          "sd": 0.057124061890550054,
+          "rme": 7.225561399987153,
+          "scoreRme": 12.769795345904148,
+          "warmupRatio": 1.1071429270870843,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.03750000149011612,
-          "median": 0.09999999403953552,
+          "score": 0.03749999403953552,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.06999999731779098,
-          "p95": 0.19999998807907104,
-          "sd": 0.05712405447664544,
-          "rme": 38.19224888251671,
-          "scoreRme": 115.40018362616587,
-          "warmupRatio": 1,
+          "mean": 0.05,
+          "p95": 0.10000014305114746,
+          "sd": 0.0512989176043277,
+          "rme": 48.01671309917408,
+          "scoreRme": 115.40018362628066,
+          "warmupRatio": 1.333333068423759,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.01249999925494194,
-          "median": 0,
+          "score": 0.025000005960464478,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.034999999403953555,
-          "p95": 0.10000002384185791,
-          "sd": 0.04893604765958375,
-          "rme": 65.43574992632944,
-          "scoreRme": 236.49999999999997,
-          "warmupRatio": 4.000000298023242,
+          "mean": 0.050000011920928955,
+          "p95": 0.10000014305114746,
+          "sd": 0.05129892983494565,
+          "rme": 48.016713099176805,
+          "scoreRme": 154.82559312258326,
+          "warmupRatio": 2.5000005960463056,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.13749999180436134,
-          "median": 0.19999998807907104,
-          "min": 0,
-          "mean": 0.17000000029802323,
-          "p95": 0.30000001192092896,
-          "sd": 0.0732695141165244,
-          "rme": 20.171055294665063,
-          "scoreRme": 31.4727773525902,
-          "warmupRatio": 1.5454546809196552,
+          "score": 0.18749994039535522,
+          "median": 0.20000004768371582,
+          "min": 0.09999990463256836,
+          "mean": 0.1899999976158142,
+          "p95": 0.2999999523162842,
+          "sd": 0.06407229582465349,
+          "rme": 15.782322761624867,
+          "scoreRme": 28.579527745304716,
+          "warmupRatio": 0.9333338525561817,
           "samples": 20
         },
         "unmount": {
-          "score": 0.6624999977648258,
-          "median": 0.7000000178813934,
+          "score": 0.699999988079071,
+          "median": 0.7000000476837158,
           "min": 0.5,
-          "mean": 0.7150000005960464,
-          "p95": 0.9000000059604645,
-          "sd": 0.09333019765881424,
-          "rme": 6.109003499870008,
-          "scoreRme": 11.562590753910689,
-          "warmupRatio": 1.150943398984907,
+          "mean": 0.7299999952316284,
+          "p95": 0.7999999523162842,
+          "sd": 0.08013145087420363,
+          "rme": 5.1372935145269665,
+          "scoreRme": 12.769799151571029,
+          "warmupRatio": 1.089285715806241,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 7165,
+          "min": 7165,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 5118,
+          "min": 5118,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 4094,
+          "min": 4094,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 6946,
+          "min": 6946,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 4962,
+          "min": 4962,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 3970,
+          "min": 3970,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
-        "gates": "pass"
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 7165,
+            "elements": 2047,
+            "text": 5118,
+            "comments": 0,
+            "emptyText": 4094,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 6946,
+            "elements": 1984,
+            "text": 4962,
+            "comments": 0,
+            "emptyText": 3970,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          }
+        }
       }
     },
     {
       "name": "preact",
       "ops": {
         "mount": {
-          "score": 4.587500002235174,
-          "median": 4.5999999940395355,
+          "score": 4.687499940395355,
+          "median": 4.700000047683716,
           "min": 4.5,
-          "mean": 4.600000001490116,
-          "p95": 4.799999982118607,
-          "sd": 0.08583950789335558,
-          "rme": 0.8733405350783531,
-          "scoreRme": 2.0523207084286565,
-          "warmupRatio": 1.010899182718408,
+          "mean": 4.680000007152557,
+          "p95": 5.199999809265137,
+          "sd": 0.17044831729446874,
+          "rme": 1.7045160497133498,
+          "scoreRme": 4.094131423393663,
+          "warmupRatio": 1.0053333601040313,
           "samples": 20
         },
         "update_root": {
-          "score": 1.199999999254942,
-          "median": 1.2000000178813934,
-          "min": 1,
-          "mean": 1.2100000023841857,
-          "p95": 1.300000011920929,
-          "sd": 0.08522416490488927,
-          "rme": 3.2963370639916376,
-          "scoreRme": 7.449049937848047,
-          "warmupRatio": 1.031250007469983,
+          "score": 1.1875000298023224,
+          "median": 1.2000000476837158,
+          "min": 1.0999999046325684,
+          "mean": 1.2000000119209289,
+          "p95": 1.4000000953674316,
+          "sd": 0.08583952799368177,
+          "rme": 3.3478061362218794,
+          "scoreRme": 5.876119023798763,
+          "warmupRatio": 1.0210526360699343,
           "samples": 20
         },
         "update_partial": {
-          "score": 0.07499999925494194,
-          "median": 0.09999999403953552,
+          "score": 0.09999996423721313,
+          "median": 0.10000014305114746,
           "min": 0,
-          "mean": 0.1250000014901161,
-          "p95": 0.20000001788139343,
-          "sd": 0.07163504333506743,
-          "rme": 26.820677264133806,
-          "scoreRme": 78.8333378084127,
-          "warmupRatio": 1,
+          "mean": 0.11500000953674316,
+          "p95": 0.20000004768371582,
+          "sd": 0.058714313668570564,
+          "rme": 23.89463180242189,
+          "scoreRme": 44.694325573292275,
+          "warmupRatio": 1.3750006705524935,
           "samples": 20
         },
         "partial_unmount": {
-          "score": 0.04999999701976776,
-          "median": 0.09999999403953552,
+          "score": 0.07499998807907104,
+          "median": 0.09999990463256836,
           "min": 0,
-          "mean": 0.06499999910593032,
-          "p95": 0.19999998807907104,
-          "sd": 0.05871429323163512,
-          "rme": 42.27510717669764,
-          "scoreRme": 126.41456742457673,
-          "warmupRatio": 1,
+          "mean": 0.0899999737739563,
+          "p95": 0.20000004768371582,
+          "sd": 0.06407229582465349,
+          "rme": 33.31824623207241,
+          "scoreRme": 78.83329753278801,
+          "warmupRatio": 1.1666665342118794,
           "samples": 20
         },
         "partial_remount": {
-          "score": 0.13749999925494194,
-          "median": 0.19999998807907104,
-          "min": 0.09999999403953552,
-          "mean": 0.15999999791383743,
-          "p95": 0.30000001192092896,
-          "sd": 0.05982430583963965,
-          "rme": 17.49894723333604,
-          "scoreRme": 31.472776897821902,
-          "warmupRatio": 1.0909090859830872,
+          "score": 0.1874999701976776,
+          "median": 0.20000004768371582,
+          "min": 0.09999990463256836,
+          "mean": 0.18499995470046998,
+          "p95": 0.2999999523162842,
+          "sd": 0.058714295502495045,
+          "rme": 14.853420042268631,
+          "scoreRme": 28.579526165262735,
+          "warmupRatio": 1.0666662957932624,
           "samples": 20
         },
         "unmount": {
-          "score": 0.9875000044703484,
+          "score": 1.0124999284744263,
           "median": 1,
-          "min": 0.7999999821186066,
-          "mean": 0.9649999991059304,
-          "p95": 1.100000023841858,
-          "sd": 0.09333020211250574,
-          "rme": 4.526360330084943,
-          "scoreRme": 8.391437646547363,
-          "warmupRatio": 0.9493670767649801,
+          "min": 0.7999999523162842,
+          "mean": 0.9849999427795411,
+          "p95": 1.0999999046325684,
+          "sd": 0.09880867665331965,
+          "rme": 4.694756890790551,
+          "scoreRme": 8.184240940067275,
+          "warmupRatio": 0.9259259619012971,
           "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 3071,
+          "min": 3071,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 2976,
+          "min": 2976,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 992,
+          "min": 992,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 3071,
+            "elements": 2047,
+            "text": 1024,
+            "comments": 0,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 2976,
+            "elements": 1984,
+            "text": 992,
+            "comments": 0,
+            "emptyText": 0,
+            "whitespaceText": 0,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {},
+            "commentParents": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "svelte",
+      "ops": {
+        "mount": {
+          "score": 14.987499982118607,
+          "median": 14.900000095367432,
+          "min": 14.700000047683716,
+          "mean": 14.964999985694885,
+          "p95": 15.299999952316284,
+          "sd": 0.15652472619729602,
+          "rme": 0.4895087536730723,
+          "scoreRme": 1.0085289851732675,
+          "warmupRatio": 0.9941618030850684,
+          "samples": 20
+        },
+        "update_root": {
+          "score": 0.5000000298023224,
+          "median": 0.5999999046325684,
+          "min": 0.40000009536743164,
+          "mean": 0.5600000262260437,
+          "p95": 0.7000000476837158,
+          "sd": 0.07539371148155745,
+          "rme": 6.300881420000964,
+          "scoreRme": 8.938861385065579,
+          "warmupRatio": 1.2249998912215299,
+          "samples": 20
+        },
+        "update_partial": {
+          "score": 0.07499998807907104,
+          "median": 0.09999990463256836,
+          "min": 0,
+          "mean": 0.09499994516372681,
+          "p95": 0.20000004768371582,
+          "sd": 0.03940344532732614,
+          "rme": 19.41176713683732,
+          "scoreRme": 51.60853104094259,
+          "warmupRatio": 1.4999992052712767,
+          "samples": 20
+        },
+        "partial_unmount": {
+          "score": 0.08750003576278687,
+          "median": 0.10000014305114746,
+          "min": 0,
+          "mean": 0.10000002384185791,
+          "p95": 0.20000004768371582,
+          "sd": 0.05619513976303865,
+          "rme": 26.29982645107579,
+          "scoreRme": 33.785714285902415,
+          "warmupRatio": 1.0000003405978308,
+          "samples": 20
+        },
+        "partial_remount": {
+          "score": 0.3749999701976776,
+          "median": 0.39999985694885254,
+          "min": 0.2999999523162842,
+          "mean": 0.37499997615814207,
+          "p95": 0.5,
+          "sd": 0.07163502417587321,
+          "rme": 8.940224038577641,
+          "scoreRme": 15.766660938587188,
+          "warmupRatio": 0.9666666958067175,
+          "samples": 20
+        },
+        "unmount": {
+          "score": 0.8749999403953552,
+          "median": 0.9000000953674316,
+          "min": 0.7999999523162842,
+          "mean": 0.899999988079071,
+          "p95": 1.0999999046325684,
+          "sd": 0.0794719287922458,
+          "rme": 4.132620068378964,
+          "scoreRme": 6.757143777735279,
+          "warmupRatio": 1.0571429768387233,
+          "samples": 20
+        },
+        "nodes_mounted": {
+          "median": 12283,
+          "min": 12283,
+          "samples": 1
+        },
+        "elements_mounted": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "text_mounted": {
+          "median": 5119,
+          "min": 5119,
+          "samples": 1
+        },
+        "comments_mounted": {
+          "median": 5117,
+          "min": 5117,
+          "samples": 1
+        },
+        "empty_text_mounted": {
+          "median": 3072,
+          "min": 3072,
+          "samples": 1
+        },
+        "whitespace_text_mounted": {
+          "median": 1023,
+          "min": 1023,
+          "samples": 1
+        },
+        "nodes_partial_unmounted": {
+          "median": 11911,
+          "min": 11911,
+          "samples": 1
+        },
+        "elements_partial_unmounted": {
+          "median": 1984,
+          "min": 1984,
+          "samples": 1
+        },
+        "text_partial_unmounted": {
+          "median": 4964,
+          "min": 4964,
+          "samples": 1
+        },
+        "comments_partial_unmounted": {
+          "median": 4963,
+          "min": 4963,
+          "samples": 1
+        },
+        "empty_text_partial_unmounted": {
+          "median": 2980,
+          "min": 2980,
+          "samples": 1
+        },
+        "whitespace_text_partial_unmounted": {
+          "median": 992,
+          "min": 992,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "gates": "pass",
+        "dom": {
+          "mounted": {
+            "root": "#main",
+            "total": 12283,
+            "elements": 2047,
+            "text": 5119,
+            "comments": 5117,
+            "emptyText": 3072,
+            "whitespaceText": 1023,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "": 5117
+            },
+            "commentParents": {
+              "div.n": 5109,
+              "div.mid": 6,
+              "div#main": 2
+            }
+          },
+          "partialUnmounted": {
+            "root": "#main",
+            "total": 11911,
+            "elements": 1984,
+            "text": 4964,
+            "comments": 4963,
+            "emptyText": 2980,
+            "whitespaceText": 992,
+            "hydrationMarkersPhysical": 0,
+            "hydrationMarkersLogical": 0,
+            "hydrationMarkersCounted": 0,
+            "hydrationMarkerMaxMultiplicity": 0,
+            "leadingHydrationStartsPhysical": 0,
+            "leadingHydrationStartsLogical": 0,
+            "commentsByData": {
+              "": 4963
+            },
+            "commentParents": {
+              "div.n": 4961,
+              "div#main": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "octane-tsrx-dialect-pair",
+      "ops": {
+        "mount": {
+          "score": 5.407499992847443,
+          "median": 5.3999998569488525,
+          "min": 5,
+          "mean": 5.407499992847443,
+          "p95": 6.1000001430511475,
+          "sd": 0.25357697916435534,
+          "rme": 1.4532467888247396,
+          "scoreRme": 1.4532467888247396,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "update_root": {
+          "score": 0.8899999856948853,
+          "median": 0.8999998569488525,
+          "min": 0.7000000476837158,
+          "mean": 0.8899999856948853,
+          "p95": 1,
+          "sd": 0.10327954619146515,
+          "rme": 3.59625432342258,
+          "scoreRme": 3.59625432342258,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "update_partial": {
+          "score": 0.0625,
+          "median": 0.09999990463256836,
+          "min": 0,
+          "mean": 0.0625,
+          "p95": 0.10000014305114746,
+          "sd": 0.05400617475073186,
+          "rme": 26.778699124300985,
+          "scoreRme": 26.778699124300985,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "partial_unmount": {
+          "score": 0.06250001192092895,
+          "median": 0.09999990463256836,
+          "min": 0,
+          "mean": 0.06250001192092895,
+          "p95": 0.20000004768371582,
+          "sd": 0.058561835571925604,
+          "rme": 29.037595850350634,
+          "scoreRme": 29.037595850350634,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "partial_remount": {
+          "score": 0.0975000023841858,
+          "median": 0.09999990463256836,
+          "min": 0,
+          "mean": 0.0975000023841858,
+          "p95": 0.20000004768371582,
+          "sd": 0.06196566864840528,
+          "rme": 19.695753023090226,
+          "scoreRme": 19.695753023090226,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "unmount": {
+          "score": 0.4875000059604645,
+          "median": 0.5,
+          "min": 0.39999985694885254,
+          "mean": 0.4875000059604645,
+          "p95": 0.6000001430511475,
+          "sd": 0.06864066088042155,
+          "rme": 4.363479165351535,
+          "scoreRme": 4.363479165351535,
+          "warmupRatio": 1,
+          "samples": 40
+        }
+      },
+      "meta": {
+        "gates": "pass",
+        "order": "ABBA"
+      }
+    },
+    {
+      "name": "octane-jsx-dialect-pair",
+      "ops": {
+        "mount": {
+          "score": 8.964999997615815,
+          "median": 8.899999856948853,
+          "min": 8.400000095367432,
+          "mean": 8.964999997615815,
+          "p95": 10.200000047683716,
+          "sd": 0.43709415486827224,
+          "rme": 1.5109523927091486,
+          "scoreRme": 1.5109523927091486,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "update_root": {
+          "score": 2.119999998807907,
+          "median": 2.0999999046325684,
+          "min": 1.7999999523162842,
+          "mean": 2.119999998807907,
+          "p95": 2.4000000953674316,
+          "sd": 0.15557996753370437,
+          "rme": 2.274279787069053,
+          "scoreRme": 2.274279787069053,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "update_partial": {
+          "score": 0.11250001192092896,
+          "median": 0.10000014305114746,
+          "min": 0,
+          "mean": 0.11250001192092896,
+          "p95": 0.20000004768371582,
+          "sd": 0.06479750508266179,
+          "rme": 17.84973577100926,
+          "scoreRme": 17.84973577100926,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "partial_unmount": {
+          "score": 0.09500000476837159,
+          "median": 0.09999990463256836,
+          "min": 0,
+          "mean": 0.09500000476837159,
+          "p95": 0.20000004768371582,
+          "sd": 0.055238400389053456,
+          "rme": 18.01953344744022,
+          "scoreRme": 18.01953344744022,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "partial_remount": {
+          "score": 0.17250003814697265,
+          "median": 0.20000004768371582,
+          "min": 0.09999990463256836,
+          "mean": 0.17250003814697265,
+          "p95": 0.3000001907348633,
+          "sd": 0.06788940187270841,
+          "rme": 12.196602295642233,
+          "scoreRme": 12.196602295642233,
+          "warmupRatio": 1,
+          "samples": 40
+        },
+        "unmount": {
+          "score": 2.347500002384186,
+          "median": 2.3999998569488525,
+          "min": 2.0999999046325684,
+          "mean": 2.347500002384186,
+          "p95": 2.700000047683716,
+          "sd": 0.16792477319904936,
+          "rme": 2.2168445715447698,
+          "scoreRme": 2.2168445715447698,
+          "warmupRatio": 1,
+          "samples": 40
+        }
+      },
+      "meta": {
+        "gates": "pass",
+        "order": "ABBA"
+      }
+    },
+    {
+      "name": "octane-tsrx-work",
+      "ops": {
+        "mount_renderBlock": {
+          "median": 4099,
+          "min": 4099,
+          "samples": 1
+        },
+        "mount_componentSlot": {
+          "median": 2,
+          "min": 2,
+          "samples": 1
+        },
+        "mount_componentSlotVoid": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "mount_componentSlotLite": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "mount_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_renderBlock": {
+          "median": 4099,
+          "min": 4099,
+          "samples": 1
+        },
+        "update_root_componentSlot": {
+          "median": 2,
+          "min": 2,
+          "samples": 1
+        },
+        "update_root_componentSlotVoid": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "update_root_componentSlotLite": {
+          "median": 2047,
+          "min": 2047,
+          "samples": 1
+        },
+        "update_root_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_setText": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "update_root_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_renderBlock": {
+          "median": 127,
+          "min": 127,
+          "samples": 1
+        },
+        "update_partial_componentSlot": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "update_partial_componentSlotVoid": {
+          "median": 32,
+          "min": 32,
+          "samples": 1
+        },
+        "update_partial_componentSlotLite": {
+          "median": 62,
+          "min": 62,
+          "samples": 1
+        },
+        "update_partial_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_setText": {
+          "median": 32,
+          "min": 32,
+          "samples": 1
+        },
+        "update_partial_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_renderBlock": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "partial_unmount_componentSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_unmountBlock": {
+          "median": 126,
+          "min": 126,
+          "samples": 1
+        },
+        "partial_unmount_unmountScope": {
+          "median": 188,
+          "min": 188,
+          "samples": 1
+        },
+        "partial_remount_renderBlock": {
+          "median": 127,
+          "min": 127,
+          "samples": 1
+        },
+        "partial_remount_componentSlot": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "partial_remount_componentSlotVoid": {
+          "median": 32,
+          "min": 32,
+          "samples": 1
+        },
+        "partial_remount_componentSlotLite": {
+          "median": 62,
+          "min": 62,
+          "samples": 1
+        },
+        "partial_remount_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_renderBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_componentSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_unmountBlock": {
+          "median": 4099,
+          "min": 4099,
+          "samples": 1
+        },
+        "unmount_unmountScope": {
+          "median": 6146,
+          "min": 6146,
+          "samples": 1
         }
       },
       "meta": {
@@ -563,79 +2020,397 @@
       }
     },
     {
-      "name": "svelte",
+      "name": "octane-jsx-work",
       "ops": {
-        "mount": {
-          "score": 14.912500008940697,
-          "median": 14.900000005960464,
-          "min": 14.599999994039536,
-          "mean": 14.910000002384185,
-          "p95": 15.100000023841858,
-          "sd": 0.14832397486027027,
-          "rme": 0.4655731673137202,
-          "scoreRme": 1.0136014870211822,
-          "warmupRatio": 1.0025146682509145,
-          "samples": 20
+        "mount_renderBlock": {
+          "median": 7168,
+          "min": 7168,
+          "samples": 1
         },
-        "update_root": {
-          "score": 0.5374999977648258,
-          "median": 0.5999999940395355,
-          "min": 0.5,
-          "mean": 0.5649999991059304,
-          "p95": 0.7999999821186066,
-          "sd": 0.08127276659547258,
-          "rme": 6.73210416500363,
-          "scoreRme": 8.051175155418457,
-          "warmupRatio": 1.1162790771817568,
-          "samples": 20
+        "mount_componentSlot": {
+          "median": 2048,
+          "min": 2048,
+          "samples": 1
         },
-        "update_partial": {
-          "score": 0.08750000223517418,
-          "median": 0.09999999403953552,
+        "mount_componentSlotVoid": {
+          "median": 0,
           "min": 0,
-          "mean": 0.09500000476837159,
-          "p95": 0.20000001788139343,
-          "sd": 0.060480536966128505,
-          "rme": 29.795195662088375,
-          "scoreRme": 61.241810645541186,
-          "warmupRatio": 1.2857143039606052,
-          "samples": 20
+          "samples": 1
         },
-        "partial_unmount": {
-          "score": 0.08750000223517418,
-          "median": 0.09999999403953552,
+        "mount_componentSlotLite": {
+          "median": 0,
           "min": 0,
-          "mean": 0.10000000298023223,
-          "p95": 0.20000001788139343,
-          "sd": 0.06488857183650869,
-          "rme": 30.368436508393025,
-          "scoreRme": 61.241804297200616,
-          "warmupRatio": 0.9999999574252548,
-          "samples": 20
+          "samples": 1
         },
-        "partial_remount": {
-          "score": 0.3500000014901161,
-          "median": 0.3999999761581421,
-          "min": 0.29999998211860657,
-          "mean": 0.35499999970197677,
-          "p95": 0.5,
-          "sd": 0.060480531649519345,
-          "rme": 7.973361925428447,
-          "scoreRme": 12.769800782582564,
-          "warmupRatio": 0.928571422489322,
-          "samples": 20
+        "mount_childSlot": {
+          "median": 4096,
+          "min": 4096,
+          "samples": 1
         },
-        "unmount": {
-          "score": 0.7875000052154064,
-          "median": 0.800000011920929,
-          "min": 0.5999999940395355,
-          "mean": 0.8250000029802322,
-          "p95": 1,
-          "sd": 0.0850696300004237,
-          "rme": 4.825861173173883,
-          "scoreRme": 8.860819101295634,
-          "warmupRatio": 1.1111110990219857,
-          "samples": 20
+        "mount_createElement": {
+          "median": 5121,
+          "min": 5121,
+          "samples": 1
+        },
+        "mount_hostElementBody": {
+          "median": 1023,
+          "min": 1023,
+          "samples": 1
+        },
+        "mount_deoptItemBody": {
+          "median": 2046,
+          "min": 2046,
+          "samples": 1
+        },
+        "mount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "mount_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_renderBlock": {
+          "median": 7168,
+          "min": 7168,
+          "samples": 1
+        },
+        "update_root_componentSlot": {
+          "median": 2048,
+          "min": 2048,
+          "samples": 1
+        },
+        "update_root_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_childSlot": {
+          "median": 4096,
+          "min": 4096,
+          "samples": 1
+        },
+        "update_root_createElement": {
+          "median": 5121,
+          "min": 5121,
+          "samples": 1
+        },
+        "update_root_hostElementBody": {
+          "median": 1023,
+          "min": 1023,
+          "samples": 1
+        },
+        "update_root_deoptItemBody": {
+          "median": 2046,
+          "min": 2046,
+          "samples": 1
+        },
+        "update_root_reconcileKeyed": {
+          "median": 1023,
+          "min": 1023,
+          "samples": 1
+        },
+        "update_root_updateSurvivor": {
+          "median": 2046,
+          "min": 2046,
+          "samples": 1
+        },
+        "update_root_setText": {
+          "median": 1024,
+          "min": 1024,
+          "samples": 1
+        },
+        "update_root_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_root_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_renderBlock": {
+          "median": 221,
+          "min": 221,
+          "samples": 1
+        },
+        "update_partial_componentSlot": {
+          "median": 64,
+          "min": 64,
+          "samples": 1
+        },
+        "update_partial_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_childSlot": {
+          "median": 125,
+          "min": 125,
+          "samples": 1
+        },
+        "update_partial_createElement": {
+          "median": 158,
+          "min": 158,
+          "samples": 1
+        },
+        "update_partial_hostElementBody": {
+          "median": 31,
+          "min": 31,
+          "samples": 1
+        },
+        "update_partial_deoptItemBody": {
+          "median": 62,
+          "min": 62,
+          "samples": 1
+        },
+        "update_partial_reconcileKeyed": {
+          "median": 31,
+          "min": 31,
+          "samples": 1
+        },
+        "update_partial_updateSurvivor": {
+          "median": 62,
+          "min": 62,
+          "samples": 1
+        },
+        "update_partial_setText": {
+          "median": 32,
+          "min": 32,
+          "samples": 1
+        },
+        "update_partial_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "update_partial_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_renderBlock": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "partial_unmount_componentSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_childSlot": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "partial_unmount_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_unmount_unmountBlock": {
+          "median": 220,
+          "min": 220,
+          "samples": 1
+        },
+        "partial_unmount_unmountScope": {
+          "median": 220,
+          "min": 220,
+          "samples": 1
+        },
+        "partial_remount_renderBlock": {
+          "median": 221,
+          "min": 221,
+          "samples": 1
+        },
+        "partial_remount_componentSlot": {
+          "median": 64,
+          "min": 64,
+          "samples": 1
+        },
+        "partial_remount_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_childSlot": {
+          "median": 125,
+          "min": 125,
+          "samples": 1
+        },
+        "partial_remount_createElement": {
+          "median": 158,
+          "min": 158,
+          "samples": 1
+        },
+        "partial_remount_hostElementBody": {
+          "median": 31,
+          "min": 31,
+          "samples": 1
+        },
+        "partial_remount_deoptItemBody": {
+          "median": 62,
+          "min": 62,
+          "samples": 1
+        },
+        "partial_remount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_unmountBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "partial_remount_unmountScope": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_renderBlock": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_componentSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_componentSlotVoid": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_componentSlotLite": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_childSlot": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_createElement": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_hostElementBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_deoptItemBody": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_reconcileKeyed": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_updateSurvivor": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_setText": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "unmount_unmountBlock": {
+          "median": 7168,
+          "min": 7168,
+          "samples": 1
+        },
+        "unmount_unmountScope": {
+          "median": 7168,
+          "min": 7168,
+          "samples": 1
         }
       },
       "meta": {

@@ -141,3 +141,86 @@ pre.boom {
 	font-family: ui-monospace, Menlo, monospace;
 	font-size: 12px;
 }
+
+/* @octanejs/cmdk ships unstyled — it exposes a DOM contract of `cmdk-*`
+ * attributes to style against. Ported here from the playground's old inline
+ * <style> block when that was retired, with the original hard-coded palette
+ * translated to the shared shadcn tokens. */
+.cmdk-shell [cmdk-root] {
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.6);
+	background: var(--card);
+	overflow: hidden;
+}
+[cmdk-input] {
+	width: 100%;
+	padding: 12px 14px;
+	border: 0;
+	border-bottom: 1px solid var(--border);
+	background: transparent;
+	color: var(--foreground);
+	font: inherit;
+	outline: none;
+}
+[cmdk-list] {
+	max-height: 320px;
+	overflow: auto;
+	padding: 6px;
+	/* The port keeps this in sync with the results' height. */
+	transition: height 120ms ease;
+}
+[cmdk-item] {
+	display: flex;
+	align-items: center;
+	padding: 8px 10px;
+	border-radius: calc(var(--radius) * 0.5);
+	cursor: pointer;
+	-webkit-user-select: none;
+	user-select: none;
+	font-size: 13px;
+}
+[cmdk-item][data-selected='true'] {
+	background: var(--primary);
+	color: var(--primary-foreground);
+}
+[cmdk-item][data-disabled='true'] {
+	color: var(--muted-foreground);
+	cursor: not-allowed;
+}
+[cmdk-group-heading] {
+	padding: 10px 10px 4px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--muted-foreground);
+}
+[cmdk-separator] {
+	height: 1px;
+	margin: 6px 4px;
+	background: var(--border);
+}
+[cmdk-empty] {
+	padding: 18px 10px;
+	text-align: center;
+	font-size: 13px;
+	color: var(--muted-foreground);
+}
+.cmdk-dialog-overlay {
+	position: fixed;
+	inset: 0;
+	background: color-mix(in oklch, var(--foreground) 45%, transparent);
+}
+.cmdk-dialog-content {
+	position: fixed;
+	top: 20%;
+	left: 50%;
+	transform: translateX(-50%);
+	width: min(560px, calc(100vw - 32px));
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.8);
+	background: var(--popover);
+	color: var(--popover-foreground);
+	box-shadow: 0 16px 48px color-mix(in oklch, var(--foreground) 35%, transparent);
+	overflow: hidden;
+}

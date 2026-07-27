@@ -7,6 +7,7 @@ import {
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -181,12 +182,12 @@ export function App() @{
 		);
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
 		Reflect.deleteProperty(globalThis, profilerGlobal);
 		Reflect.deleteProperty(globalThis, runGlobal);
 		Reflect.deleteProperty(globalThis, productionErrorGlobal);
 		Reflect.deleteProperty(globalThis, transpileGlobal);
-		rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	function installRealProfileFixture(includeRawBinding: boolean) {
