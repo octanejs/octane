@@ -58,6 +58,34 @@ async function stepUndoingFocusDisable(
 	expect(octane, `divergence at step "${name}"`).toBe(react);
 }
 
+/**
+ * Byte-compare ONE subtree instead of the whole container.
+ *
+ * Needed for an open SUBMENU. The submenu trigger is the only tabbable child of the parent popup
+ * while its submenu is open (`tabIndex: open || highlighted ? 0 : -1`), so the parent focus
+ * manager's initial focus lands on it, and the trigger's `onFocus` sets the PARENT menu's
+ * `activeIndex` — which surfaces as `data-highlighted`. With both runtimes in one document only one
+ * can win that focus, so only one gets the derived state. Unlike the focus-guard `tabindex`, this is
+ * store state, not a DOM attribute the rig can reconstruct.
+ *
+ * Verified it is the rig and not the port: mounted octane ALONE (no React competing for focus) and
+ * the trigger *is* highlighted and *is* `document.activeElement`, matching React exactly. Rather
+ * than normalise `data-highlighted` away — which would blind the roving-focus comparison the stage-2
+ * helper deliberately preserves — this compares the submenu's OWN portal subtree, where the whole
+ * stage-3 payload lives: nested placement, `data-nested`, the popup's aria wiring back to the
+ * trigger, and the nested items. The trigger's own highlighted state is covered by an octane-only
+ * assertion in `tests/menu.test.ts`.
+ */
+async function stepComparingSubtree(d: any, name: string, selector: string): Promise<void> {
+	await d.observe(name, () => {});
+	const pick = (root: HTMLElement) => {
+		const el = root.querySelector(selector);
+		expect(el, `no element matching ${selector}`).not.toBe(null);
+		return undoFocusInsideDisable(normaliseHtml((el as HTMLElement).outerHTML));
+	};
+	expect(pick(d.octane.container), `divergence at step "${name}"`).toBe(pick(d.react.container));
+}
+
 describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Separator: default (horizontal), byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'SeparatorDefault', undefined, CACHE);
@@ -664,6 +692,18 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Menu: open with a Viewport wrapping the items', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenViewport', undefined, CACHE);
 		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a closed submenu (SubmenuTrigger is both a parent item and a trigger)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenWithSubmenu', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open, submenu closed)');
+		d.unmount();
+	});
+
+	it('Menu: OPEN submenu subtree (nested placement, data-nested, aria wiring, nested items)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenWithSubmenuOpen', undefined, CACHE);
+		await stepComparingSubtree(d, 'mount (both open)', '.submenu-positioner');
 		d.unmount();
 	});
 });

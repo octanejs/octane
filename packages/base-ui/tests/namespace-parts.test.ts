@@ -92,8 +92,8 @@ const EXPECTED: Record<string, [Record<string, unknown>, string[]]> = {
 			'Handle',
 		],
 	],
-	// Menu lands in stages (Phase 3f). This is the STAGE 1 + 2 surface: everything in upstream's
-	// `menu/index.parts.ts` except `SubmenuRoot`/`SubmenuTrigger`, which land in stage 3.
+	// The COMPLETE upstream `menu/index.parts.ts` surface (Phase 3f stages 1-3). Menubar and
+	// ContextMenu are separate namespaces and land in stage 4.
 	Menu: [
 		Menu,
 		[
@@ -115,6 +115,8 @@ const EXPECTED: Record<string, [Record<string, unknown>, string[]]> = {
 			'Group',
 			'GroupLabel',
 			'Separator',
+			'SubmenuRoot',
+			'SubmenuTrigger',
 			'createHandle',
 			'Handle',
 		],

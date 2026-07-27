@@ -18,8 +18,14 @@
 // `Menu.Separator` re-exports the shared `Separator` exactly as upstream `menu/index.parts.ts`
 // does — it is not a Menu-specific part.
 //
-// Submenus (`submenu-root/`, `submenu-trigger/`) land in stage 3; `Menubar` and `ContextMenu` in
-// stage 4.
+// STAGE 3, submenus: `submenu-root/` (`MenuSubmenuRoot` + the `MenuSubmenuRootContext` stage 1
+// already declared) and `submenu-trigger/`. `MenuSubmenuTrigger` is the piece that finally uses the
+// `submenu-trigger` arm of `useMenuItem`'s `itemMetadata`, and it activates the sibling-close /
+// parent-close / item-hover relays `MenuPositioner` has carried inertly since stage 1: it is
+// simultaneously an ITEM of the parent menu (parent's `CompositeList`, `itemProps`, `isActive`) and
+// the TRIGGER of its own menu, so it holds both stores at once.
+//
+// `Menubar` and `ContextMenu` land in stage 4.
 //
 // octane adaptations:
 //   - components are `createElement`, not JSX; `forwardRef` → ref-as-prop; each component takes its
@@ -99,7 +105,11 @@ import {
 	PATIENT_CLICK_THRESHOLD,
 	TYPEAHEAD_RESET_MS,
 } from './utils/constants';
-import { popupStateMapping, pressableTriggerOpenStateMapping } from './utils/popupStateMapping';
+import {
+	popupStateMapping,
+	pressableTriggerOpenStateMapping,
+	triggerOpenStateMapping,
+} from './utils/popupStateMapping';
 import { transitionStatusMapping } from './utils/useTransitionStatus';
 import type { TransitionStatus } from './utils/useTransitionStatus';
 import type { StateAttributesMapping } from './utils/getStateAttributesProps';
@@ -149,6 +159,7 @@ import {
 	useOpenStateTransitions,
 	usePopupInteractionProps,
 	useTriggerDataForwarding,
+	useTriggerRegistration,
 	FOCUSABLE_POPUP_PROPS,
 	PopupTriggerMap,
 	type PopupStoreContext,
@@ -3127,10 +3138,222 @@ export interface MenuViewportState {
 	instant: 'dismiss' | 'click' | 'group' | 'trigger-change' | undefined;
 }
 
+// --- SubmenuRoot --------------------------------------------------------------
+
+/**
+ * Groups all parts of a submenu. Renders no HTML element of its own — it provides
+ * `MenuSubmenuRootContext` (which is what makes the nested `MenuRoot` resolve its `parent` to
+ * `{ type: 'menu' }`) and then renders a plain `MenuRoot`.
+ */
+function MenuSubmenuRoot(props: any): any {
+	const slot = S('MenuSubmenuRoot');
+	const parentMenu = (useMenuRootContext() as MenuRootContextValue).store;
+
+	const contextValue = useMemo(() => ({ parentMenu }), [parentMenu], subSlot(slot, 'ctx'));
+
+	return createElement(MenuSubmenuRootContext.Provider, {
+		value: contextValue,
+		children: createElement(MenuRoot, props),
+	});
+}
+
+// --- SubmenuTrigger -----------------------------------------------------------
+
+/**
+ * A menu item that opens a submenu. It is BOTH an item of the parent menu (it registers with the
+ * parent's `CompositeList` and reads the parent's `itemProps`/`isActive`) and the trigger of its own
+ * menu (it registers with this menu's store and drives its open state), which is why it reaches for
+ * two stores at once.
+ */
+function MenuSubmenuTrigger(componentProps: any): any {
+	const slot = S('MenuSubmenuTrigger');
+	const {
+		render,
+		className,
+		style,
+		label,
+		id: idProp,
+		nativeButton = false,
+		openOnHover = true,
+		delay = 100,
+		closeDelay = 0,
+		disabled: disabledProp = false,
+		ref: forwardedRef,
+		...elementProps
+	} = componentProps;
+
+	const listItem = useCompositeListItem({ label }, subSlot(slot, 'li'));
+	const menuPositionerContext = useMenuPositionerContext();
+
+	const { store } = useMenuRootContext() as MenuRootContextValue;
+
+	const thisTriggerId = useBaseUiId(idProp, subSlot(slot, 'id'));
+	const open = store.useState('open', subSlot(slot, 'open'));
+	const floatingRootContext = store.useState('floatingRootContext', subSlot(slot, 'frc'));
+	const floatingTreeRoot = store.useState('floatingTreeRoot', subSlot(slot, 'ftr'));
+	const popupId = store.useState('triggerPopupId', subSlot(slot, 'tpid'), thisTriggerId);
+
+	const baseRegisterTrigger = useTriggerRegistration(
+		thisTriggerId,
+		store as any,
+		subSlot(slot, 'reg'),
+	);
+	const registerTrigger = useCallback(
+		(element: Element | null) => {
+			const cleanup = baseRegisterTrigger(element);
+
+			if (element !== null && store.select('open') && store.select('activeTriggerId') == null) {
+				store.update({
+					activeTriggerId: thisTriggerId,
+					activeTriggerElement: element,
+					closeDelay,
+				});
+			}
+
+			return cleanup;
+		},
+		[baseRegisterTrigger, closeDelay, store, thisTriggerId],
+		subSlot(slot, 'regcb'),
+	);
+
+	const triggerElementRef = useRef<HTMLElement | null>(null, subSlot(slot, 'ter'));
+	const handleTriggerElementRef = useCallback(
+		(el: HTMLElement | null) => {
+			triggerElementRef.current = el;
+			store.set('activeTriggerElement', el);
+		},
+		[store],
+		subSlot(slot, 'tercb'),
+	);
+
+	const submenuRootContext = useMenuSubmenuRootContext();
+	if (!submenuRootContext?.parentMenu) {
+		throw new Error('Base UI: <Menu.SubmenuTrigger> must be placed in <Menu.SubmenuRoot>.');
+	}
+
+	store.useSyncedValue('closeDelay', closeDelay, subSlot(slot, 'cd'));
+
+	const parentMenuStore = submenuRootContext.parentMenu;
+	const rootDisabled = store.useState('disabled', subSlot(slot, 'rd'));
+	const parentDisabled = parentMenuStore.useState('disabled', subSlot(slot, 'pd'));
+	const disabled = disabledProp || rootDisabled || parentDisabled;
+
+	// Upstream's dev-only `isElementDisabled` warning is dropped — this package carries no
+	// `process.env.NODE_ENV` branches.
+
+	const itemProps = parentMenuStore.useState('itemProps', subSlot(slot, 'ip'));
+	const highlighted = parentMenuStore.useState('isActive', subSlot(slot, 'hl'), listItem.index);
+
+	const itemMetadata = useMemo(
+		() => ({
+			type: 'submenu-trigger' as const,
+			setActive() {
+				if (parentMenuStore.select('highlightItemOnHover')) {
+					parentMenuStore.set('activeIndex', listItem.index);
+				}
+			},
+		}),
+		[parentMenuStore, listItem.index],
+		subSlot(slot, 'meta'),
+	);
+
+	const { getItemProps, itemRef } = useMenuItem(
+		{
+			closeOnClick: false,
+			disabled,
+			highlighted,
+			id: thisTriggerId,
+			store,
+			typingRef: parentMenuStore.context.typingRef,
+			nativeButton,
+			itemMetadata,
+			nodeId: menuPositionerContext?.context.nodeId,
+		},
+		subSlot(slot, 'item'),
+	);
+
+	const hoverEnabled = store.useState('hoverEnabled', subSlot(slot, 'he'));
+
+	const hoverProps = useHoverReferenceInteraction(
+		floatingRootContext,
+		{
+			enabled: hoverEnabled && openOnHover && !disabled,
+			handleClose: safePolygon({ blockPointerEvents: true }),
+			mouseOnly: true,
+			move: true,
+			restMs: delay,
+			delay: { open: delay, close: closeDelay },
+			shouldOpen: delay > 0 ? () => parentMenuStore.select('allowMouseEnter') : undefined,
+			triggerElementRef,
+			externalTree: floatingTreeRoot,
+			isClosing: () => store.select('transitionStatus') === 'ending',
+		},
+		subSlot(slot, 'hover'),
+	);
+
+	const click = useClick(
+		floatingRootContext,
+		{
+			enabled: !disabled,
+			event: 'mousedown',
+			toggle: !openOnHover,
+			ignoreMouse: openOnHover,
+			stickIfOpen: false,
+		},
+		subSlot(slot, 'click'),
+	);
+
+	const localInteractionProps = click.reference ?? EMPTY_OBJECT;
+
+	// Transcribed verbatim, mutation included: the submenu trigger owns its OWN `id` (it is also a
+	// parent-menu item), so the root's trigger props must not stamp one over it.
+	const rootTriggerProps = store.useState('triggerProps', subSlot(slot, 'tp'), true);
+	delete rootTriggerProps.id;
+
+	const state: MenuSubmenuTriggerState = { disabled, highlighted, open };
+
+	return useRenderElement(
+		'div',
+		componentProps,
+		{
+			state,
+			stateAttributesMapping: triggerOpenStateMapping,
+			props: [
+				localInteractionProps,
+				hoverProps,
+				rootTriggerProps,
+				itemProps,
+				{
+					'aria-controls': popupId,
+					tabIndex: open || highlighted ? 0 : -1,
+					onBlur() {
+						if (highlighted) {
+							parentMenuStore.set('activeIndex', null);
+						}
+					},
+				},
+				elementProps,
+				getItemProps,
+			],
+			ref: [forwardedRef, listItem.ref, itemRef, registerTrigger, handleTriggerElementRef],
+		},
+		subSlot(slot, 're'),
+	);
+}
+
+export interface MenuSubmenuTriggerState {
+	/** Whether the component should ignore user interaction. */
+	disabled: boolean;
+	/** Whether the item is highlighted. */
+	highlighted: boolean;
+	/** Whether the menu is currently open. */
+	open: boolean;
+}
+
 // --- Namespace ---------------------------------------------------------------
 
 /**
- * Phase 3f STAGE 1 + 2 surface. `SubmenuRoot`/`SubmenuTrigger` land in stage 3.
+ * The full upstream `menu/index.parts.ts` surface (Phase 3f stages 1–3).
  *
  * `Separator` is upstream's shared `Separator`, re-exported through the Menu namespace exactly as
  * `menu/index.parts.ts` does — not a Menu-specific part.
@@ -3154,6 +3377,8 @@ export const Menu = {
 	Group: MenuGroup,
 	GroupLabel: MenuGroupLabel,
 	Separator,
+	SubmenuRoot: MenuSubmenuRoot,
+	SubmenuTrigger: MenuSubmenuTrigger,
 	createHandle: createMenuHandle,
 	Handle: MenuHandle,
 };

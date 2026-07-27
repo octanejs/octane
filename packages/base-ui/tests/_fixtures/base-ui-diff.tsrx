@@ -1256,3 +1256,96 @@ export function MenuItemsInteractive() @{
 		</Menu.Root>
 	</div>
 }
+
+// Menu (OPEN, with a closed submenu) — the stage-3 skeleton. `SubmenuTrigger` is simultaneously an
+// item of the parent menu and the trigger of its own, so it carries the parent's `itemProps` and
+// roving tabindex alongside `aria-haspopup`/`aria-expanded` and the trigger open-state attributes.
+// The submenu itself is closed here, so only the trigger renders.
+export function MenuOpenWithSubmenu() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.SubmenuRoot>
+							<Menu.SubmenuTrigger className="menu-subtrigger">Share</Menu.SubmenuTrigger>
+							<Menu.Portal container={containerRef}>
+								<Menu.Positioner className="submenu-positioner">
+									<Menu.Popup className="submenu-popup">
+										<Menu.Item className="submenu-item">Email</Menu.Item>
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.SubmenuRoot>
+						<Menu.Item className="menu-item">Paste</Menu.Item>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, with an OPEN submenu) — both levels mounted. The nested `Menu.Root` resolves its
+// parent to `{ type: 'menu' }` through `SubmenuRoot`'s context, which flips the submenu positioner
+// to `inline-end`/`start` placement, marks the popup `data-nested`, and suppresses the modal
+// backdrop for the nested level.
+export function MenuOpenWithSubmenuOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.SubmenuRoot open>
+							<Menu.SubmenuTrigger className="menu-subtrigger">Share</Menu.SubmenuTrigger>
+							<Menu.Portal container={containerRef}>
+								<Menu.Positioner className="submenu-positioner">
+									<Menu.Popup className="submenu-popup">
+										<Menu.Item className="submenu-item">Email</Menu.Item>
+										<Menu.Item className="submenu-item">Message</Menu.Item>
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.SubmenuRoot>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (interactive submenu) — for behavior tests: opening a submenu from its trigger, the
+// parent/sibling close relays, and Escape closing only the child.
+export function MenuSubmenuInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Root modal={false}>
+			<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.SubmenuRoot>
+							<Menu.SubmenuTrigger className="menu-subtrigger" openOnHover={false}>
+								Share
+							</Menu.SubmenuTrigger>
+							<Menu.Portal container={hostRef}>
+								<Menu.Positioner className="submenu-positioner">
+									<Menu.Popup className="submenu-popup">
+										<Menu.Item className="submenu-item">Email</Menu.Item>
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.SubmenuRoot>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
