@@ -5,10 +5,10 @@ import { setCompilerOption } from '../../kernel/edit.js';
 import { CliError, EXIT } from '../../kernel/errors.js';
 import { installPackages } from '../../kernel/install.js';
 import {
-	DEV_DEPENDENCIES,
 	MODES,
 	SCRIPTS,
 	appComponent,
+	integrationFor,
 	octaneConfig,
 	tsconfig,
 	viteConfig,
@@ -47,9 +47,10 @@ const writeFile = (file, body) => () => {
 /**
  * @param {import('../../kernel/project.js').Project} project
  * @param {keyof typeof MODES} mode
+ * @param {ReturnType<typeof integrationFor>} integration
  * @returns {{ changes: Change[], manual: string[] }}
  */
-function plan(project, mode) {
+function plan(project, mode, integration) {
 	const { root } = project;
 	/** @type {Change[]} */
 	const changes = [];
@@ -94,18 +95,19 @@ function plan(project, mode) {
 		}
 	}
 
-	const viteConfigPath = project.bundlerConfigPath ?? at('vite.config.ts');
+	const bundlerConfigPath = project.bundlerConfigPath ?? at('vite.config.ts');
 	if (!project.bundlerConfigPath) {
 		changes.push({
 			file: 'vite.config.ts',
-			summary: `create, registering ${MODES[mode].specifier}`,
-			apply: writeFile(viteConfigPath, viteConfig(mode)),
+			summary: `create, registering ${integration.specifier}`,
+			apply: writeFile(bundlerConfigPath, viteConfig(mode)),
 		});
-	} else if (!readFileSync(viteConfigPath, 'utf8').includes(MODES[mode].specifier)) {
+	} else if (!readFileSync(bundlerConfigPath, 'utf8').includes(integration.specifier)) {
 		// Rewriting an arbitrary bundler config is guesswork; state the exact
-		// edit instead of attempting it.
+		// edit instead of attempting it. The specifier is the one for THIS
+		// project's bundler, not the Vite plugin init would otherwise scaffold.
 		manual.push(
-			`In ${path.relative(root, viteConfigPath)}, add: import { octane } from '${MODES[mode].specifier}';`,
+			`In ${path.relative(root, bundlerConfigPath)}, add: import { octane } from '${integration.specifier}';`,
 			'then include octane() in the plugins array.',
 		);
 	}
@@ -187,10 +189,11 @@ export default defineCommand({
 				}))
 		);
 
-		const { changes, manual } = plan(project, mode);
+		const integration = integrationFor(project.bundler, mode);
+		const { changes, manual } = plan(project, mode, integration);
 		const declared = project.declaredDependencies;
-		const dependencies = MODES[mode].dependencies.filter((name) => !declared[name]);
-		const devDependencies = DEV_DEPENDENCIES.filter((name) => !declared[name]);
+		const dependencies = integration.dependencies.filter((name) => !declared[name]);
+		const devDependencies = integration.devDependencies.filter((name) => !declared[name]);
 
 		ctx.ui.intro('octane init');
 

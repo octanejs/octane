@@ -129,6 +129,23 @@ describe('octane init', () => {
 		expect(result.json().manual.join(' ')).toContain('octane/compiler/vite');
 	});
 
+	it("advises the plugin for the project's own bundler, not always Vite", async () => {
+		// Naming the Vite plugin at an Rspack project wires the wrong plugin into
+		// the wrong bundler.
+		for (const [bundler, specifier] of [
+			['rspack', '@octanejs/rspack-plugin'],
+			['rsbuild', '@octanejs/rsbuild-plugin'],
+			['vite', '@octanejs/vite-plugin'],
+		]) {
+			const { root } = fixture({ [`${bundler}.config.ts`]: 'export default { plugins: [] };\n' });
+			const result = await runCli(
+				['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'],
+				{ exec: gitExec() },
+			);
+			expect(result.json().manual.join(' '), bundler).toContain(specifier);
+		}
+	});
+
 	it('is idempotent', async () => {
 		const { root } = fixture();
 		const argv = ['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'];

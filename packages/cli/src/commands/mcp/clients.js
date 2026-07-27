@@ -73,6 +73,7 @@ function parseObject(text) {
  *   cli?: string | null,
  *   scopes?: Scope[],
  *   key?: string,
+ *   entry?: (entry: import('./server.js').ServerEntry) => object,
  *   configPath: (scope: Scope, paths: Paths) => string,
  *   cliArgs?: Client['cliArgs'],
  *   cliRemoveArgs?: Client['cliRemoveArgs'],
@@ -81,6 +82,7 @@ function parseObject(text) {
  */
 function jsonClient(spec) {
 	const key = spec.key ?? 'mcpServers';
+	const shape = spec.entry ?? ((entry) => entry);
 
 	return {
 		id: spec.id,
@@ -97,7 +99,7 @@ function jsonClient(spec) {
 
 		write(text, name, entry) {
 			const config = parseObject(text);
-			config[key] = { ...config[key], [name]: entry };
+			config[key] = { ...config[key], [name]: shape(entry) };
 			return `${JSON.stringify(config, null, 2)}\n`;
 		},
 
@@ -259,8 +261,11 @@ export const CLIENTS = [
 	jsonClient({
 		id: 'vscode',
 		label: 'VS Code',
-		// VS Code names the map `servers`, not `mcpServers`.
+		// VS Code names the map `servers`, not `mcpServers`, and its schema
+		// discriminates transports on `type`; without it the entry is rejected
+		// and the server silently never registers.
 		key: 'servers',
+		entry: (entry) => ({ type: 'stdio', ...entry }),
 		scopes: ['project'],
 		configPath: (scope, paths) => path.join(paths.projectRoot, '.vscode', 'mcp.json'),
 	}),

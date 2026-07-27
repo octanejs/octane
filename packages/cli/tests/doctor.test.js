@@ -126,6 +126,43 @@ describe('octane doctor', () => {
 		expect(result.exitCode).toBe(0);
 	});
 
+	it('does not mistake a *-tsc tool for plain tsc', async () => {
+		// `\btsc\b` also matches the tail of `vue-tsc`, which would fail a healthy
+		// script and, under --fix, rewrite it to `vue-tsrx-tsc`.
+		const { root } = fixture({
+			...HEALTHY,
+			'package.json': {
+				name: 'vue-ish',
+				scripts: { typecheck: 'vue-tsc --noEmit' },
+				dependencies: { octane: '^0.1.17' },
+			},
+		});
+
+		const report = (await runCli(['doctor', '--cwd', root, '--json'])).json();
+		expect(check(report, 'ts.typecheck-script').status).not.toBe('fail');
+
+		await runCli(['doctor', '--cwd', root, '--fix', '--yes', '--category', 'typescript']);
+		expect(
+			JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).scripts.typecheck,
+		).toBe('vue-tsc --noEmit');
+	});
+
+	it('rewrites every bare tsc in a compound script', async () => {
+		const { root } = fixture({
+			...HEALTHY,
+			'package.json': {
+				name: 'compound',
+				scripts: { typecheck: 'tsc -p a && tsc -p b' },
+				dependencies: { octane: '^0.1.17' },
+			},
+		});
+
+		await runCli(['doctor', '--cwd', root, '--fix', '--yes', '--category', 'typescript']);
+		expect(
+			JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).scripts.typecheck,
+		).toBe('tsrx-tsc -p a && tsrx-tsc -p b');
+	});
+
 	it('filters with --only', async () => {
 		const { root } = fixture(HEALTHY);
 		const report = (

@@ -120,6 +120,22 @@ describe('octane mcp add', () => {
 		const written = JSON.parse(readFileSync(path.join(root, '.vscode', 'mcp.json'), 'utf8'));
 		expect(written.servers.octane).toBeTruthy();
 		expect(written.mcpServers).toBeUndefined();
+		// VS Code discriminates transports on `type`; an entry without it is
+		// rejected and the server never registers.
+		expect(written.servers.octane.type).toBe('stdio');
+	});
+
+	it('does not put the VS Code transport tag in other clients', async () => {
+		const { root } = fixture();
+		const home = fixture().root;
+
+		await runCli(['mcp', 'add', 'cursor', '--cwd', root, '--json'], {
+			env: { HOME: home },
+			exec: fakeExec([]),
+		});
+
+		const written = JSON.parse(readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8'));
+		expect(written.mcpServers.octane.type).toBeUndefined();
 	});
 
 	it('is idempotent: a second run leaves the file byte-identical', async () => {

@@ -8,26 +8,65 @@
 export const MODES = {
 	spa: {
 		label: 'Client-only app',
-		hint: "compiles .tsrx, keeps Vite's standard HTML handling",
-		specifier: 'octane/compiler/vite',
-		dependencies: ['octane'],
+		hint: "compiles .tsrx, keeps the bundler's standard HTML handling",
+		dependencies: [],
 	},
 	fullstack: {
 		label: 'Routing and SSR',
 		hint: 'adds octane.config.ts, streaming SSR, hydration, production build',
-		specifier: '@octanejs/vite-plugin',
-		dependencies: ['octane', '@octanejs/vite-plugin'],
+		dependencies: [],
 	},
 };
 
-export const DEV_DEPENDENCIES = ['@tsrx/typescript-plugin', 'vite'];
+/**
+ * Which package supplies the Octane plugin, per bundler and mode.
+ *
+ * `init` only scaffolds a Vite project, but it also advises projects that
+ * already have a bundler config, and naming the Vite plugin at an Rspack
+ * project would wire the wrong plugin into the wrong bundler.
+ */
+const INTEGRATIONS = {
+	vite: {
+		spa: { specifier: 'octane/compiler/vite', packages: [] },
+		fullstack: { specifier: '@octanejs/vite-plugin', packages: ['@octanejs/vite-plugin'] },
+	},
+	rspack: {
+		spa: { specifier: 'octane/compiler/bundler', packages: [] },
+		fullstack: { specifier: '@octanejs/rspack-plugin', packages: ['@octanejs/rspack-plugin'] },
+	},
+	rsbuild: {
+		spa: { specifier: 'octane/compiler/bundler', packages: [] },
+		fullstack: { specifier: '@octanejs/rsbuild-plugin', packages: ['@octanejs/rsbuild-plugin'] },
+	},
+	rspeedy: {
+		spa: { specifier: 'octane/compiler/bundler', packages: [] },
+		fullstack: { specifier: '@octanejs/rspeedy-plugin', packages: ['@octanejs/rspeedy-plugin'] },
+	},
+};
+
+/**
+ * @param {keyof typeof INTEGRATIONS | null} bundler defaults to vite, which is
+ *   what `init` scaffolds when a project has no bundler config yet
+ * @param {keyof typeof MODES} mode
+ * @returns {{ specifier: string, dependencies: string[], devDependencies: string[] }}
+ */
+export function integrationFor(bundler, mode) {
+	const target = INTEGRATIONS[bundler ?? 'vite'] ?? INTEGRATIONS.vite;
+	return {
+		specifier: target[mode].specifier,
+		dependencies: ['octane', ...target[mode].packages],
+		// The bundler itself is only ours to install when we are the ones
+		// creating its config.
+		devDependencies: ['@tsrx/typescript-plugin', ...(bundler === null ? ['vite'] : [])],
+	};
+}
 
 /**
  * @param {keyof typeof MODES} mode
  * @returns {string}
  */
 export const viteConfig = (mode) => `import { defineConfig } from 'vite';
-import { octane } from '${MODES[mode].specifier}';
+import { octane } from '${integrationFor('vite', mode).specifier}';
 
 export default defineConfig({
 \tplugins: [octane()],

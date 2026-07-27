@@ -6,6 +6,12 @@ import { findNestedProperty, setCompilerOption } from '../../../kernel/edit.js';
 const TSRX_PLUGIN = '@tsrx/typescript-plugin';
 const WILDCARD_DECL = /^\s*declare\s+module\s+['"]\*\.tsrx['"]/;
 const LEGACY_RESOLUTION = new Set(['node', 'node10', 'classic']);
+// `tsc` as its own command word. `\btsc\b` also matches the tail of `vue-tsc`
+// and `svelte-tsc`, which would fail a healthy script and, under --fix, rewrite
+// it to `vue-tsrx-tsc`. Quotes count as delimiters because the --fix path
+// splices the raw JSON value, quotes included.
+const BARE_TSC = /(^|[\s;&|("'])tsc(?=[\s;&|)"']|$)/;
+const BARE_TSC_GLOBAL = new RegExp(BARE_TSC.source, 'g');
 
 /**
  * @param {import('../../../kernel/project.js').Project} project
@@ -116,7 +122,7 @@ export const typescriptChecks = [
 			const script = project.manifest.scripts?.typecheck;
 			if (!script) return skip('No typecheck script');
 			if (script.includes('tsrx-tsc')) return pass('typecheck runs tsrx-tsc');
-			if (!/\btsc\b/.test(script)) return skip(`typecheck runs "${script}"`);
+			if (!BARE_TSC.test(script)) return skip(`typecheck runs "${script}"`);
 			return fail('typecheck runs plain tsc', {
 				detail: [
 					'Plain tsc cannot read .tsrx. Any program containing them must use tsrx-tsc.',
@@ -131,7 +137,7 @@ export const typescriptChecks = [
 			if (!range) return { changed: false, message: 'Could not locate the typecheck script.' };
 
 			const current = source.slice(range.valueStart, range.valueEnd);
-			const replaced = current.replace(/\btsc\b/g, 'tsrx-tsc');
+			const replaced = current.replace(BARE_TSC_GLOBAL, (_m, before) => `${before}tsrx-tsc`);
 			if (replaced === current) return { changed: false, message: 'Nothing to replace.' };
 
 			writeFileSync(
