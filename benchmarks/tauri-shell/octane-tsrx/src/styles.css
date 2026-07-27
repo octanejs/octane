@@ -1,0 +1,37 @@
+* {
+	box-sizing: border-box;
+}
+body {
+	margin: 0;
+	font-family: ui-sans-serif, system-ui, sans-serif;
+	background: #101512;
+	color: #e7efe9;
+}
+main {
+	padding: 1rem 1.25rem;
+}
+h1 {
+	font-size: 1rem;
+	margin: 0 0 0.75rem;
+	color: #6fd1ac;
+}
+.log {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 0.78rem;
+}
+.log li {
+	display: flex;
+	gap: 0.75rem;
+	padding: 0.05rem 0;
+}
+.seq {
+	color: #6fd1ac;
+	min-width: 4ch;
+	text-align: right;
+}
+.text {
+	color: #9dada5;
+}

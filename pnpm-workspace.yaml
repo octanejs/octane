@@ -37,6 +37,8 @@ packages:
   - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
+  - benchmarks/tauri-shell
+  - benchmarks/tauri-shell/*
   - benchmarks/tanstack-start
   - benchmarks/tanstack-start/*
   - benchmarks/tanstack-com
