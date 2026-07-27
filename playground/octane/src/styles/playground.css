@@ -45,28 +45,10 @@ header.demo-header p {
 	font-size: 13px;
 }
 /* The sidebar, its rail, the mobile sheet and the menu buttons are all styled
- * by the vendored shadcn component — only the bits it does not own live here.
- * The two spans inside a menu button stack, and both collapse away with the
- * rail so the icon-width sidebar stays clean. */
+ * by the vendored shadcn component — only the bits it does not own live here. */
 .demo-nav-title {
 	font-size: 13px;
 	font-weight: 500;
-}
-.demo-nav-summary {
-	font-size: 11px;
-	color: var(--muted-foreground);
-	line-height: 1.4;
-}
-.demo-sidebar [data-slot='sidebar-menu-button'] {
-	height: auto;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
-	padding-block: 8px;
-}
-.demo-sidebar [data-slot='sidebar-menu-button'][data-active='true'] .demo-nav-summary {
-	color: inherit;
-	opacity: 0.8;
 }
 .demo-nav-empty {
 	margin: 0;

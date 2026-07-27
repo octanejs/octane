@@ -26,11 +26,16 @@ interface DemoNavProps {
 	onSelect: (id: string) => void;
 }
 
-/** Case-insensitive match over the fields a reader actually scans. */
+/**
+ * Case-insensitive match over the title.
+ *
+ * Only what is rendered is searchable: matching hidden text makes entries
+ * appear for a query the user cannot see anywhere on the row.
+ */
 function matches(demo: Demo, query: string): boolean {
 	const needle = query.trim().toLowerCase();
 	if (!needle) return true;
-	return demo.title.toLowerCase().includes(needle) || demo.summary.toLowerCase().includes(needle);
+	return demo.title.toLowerCase().includes(needle);
 }
 
 /** Groups with their non-matching demos removed, and empty groups dropped. */

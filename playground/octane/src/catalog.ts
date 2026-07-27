@@ -26,8 +26,6 @@ export interface Demo {
 	/** Stable id — also the URL route, so renaming one breaks shared links. */
 	readonly id: string;
 	readonly title: string;
-	/** One line on what this demo exercises; shown in the nav. */
-	readonly summary: string;
 	readonly Component: () => unknown;
 	readonly source: string;
 }
@@ -46,42 +44,36 @@ export const GROUPS: readonly DemoGroup[] = [
 			{
 				id: 'counter',
 				title: 'Counter',
-				summary: 'State, effects and the update form',
 				Component: Counter,
 				source: counterSource,
 			},
 			{
 				id: 'keyed-list',
 				title: 'Keyed list',
-				summary: '@for with a key, and LIS reordering',
 				Component: KeyedList,
 				source: keyedListSource,
 			},
 			{
 				id: 'conditional',
 				title: 'Conditional',
-				summary: '@if / @else with branch-local state',
 				Component: Conditional,
 				source: conditionalSource,
 			},
 			{
 				id: 'inputs',
 				title: 'Inputs + @switch',
-				summary: 'Native events and controlled values',
 				Component: Inputs,
 				source: inputsSource,
 			},
 			{
 				id: 'dynamic',
 				title: 'Dynamic tag',
-				summary: '<{expr}> picks the component at runtime',
 				Component: DynamicDemo,
 				source: dynamicSource,
 			},
 			{
 				id: 'suspense',
 				title: 'Suspense',
-				summary: 'use() and per-stratum suspending',
 				Component: SuspenseDemo,
 				source: suspenseSource,
 			},
@@ -94,14 +86,12 @@ export const GROUPS: readonly DemoGroup[] = [
 			{
 				id: 'cmdk',
 				title: 'Command menu',
-				summary: 'cmdk — filtering, groups, keyboard nav',
 				Component: CommandMenu,
 				source: commandMenuSource,
 			},
 			{
 				id: 'shadcn',
 				title: 'shadcn/ui',
-				summary: 'The registry-installed component gallery',
 				Component: ShadcnDemo,
 				source: shadcnSource,
 			},
