@@ -14542,7 +14542,7 @@ export function hostComponent(
 	slot: number,
 	tag: string,
 	props: Record<string, any> | null,
-	childrenBody?: ComponentBody | null,
+	childrenBody?: unknown,
 	anchor?: Node | null,
 ): Element {
 	const block = scope.block;
@@ -14563,17 +14563,21 @@ export function hostComponent(
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
-	if (childrenBody != null) {
+	if (typeof childrenBody === 'function') {
 		// The compiled children render-body is a FRESH closure every parent render, but
 		// it is the SAME positional children slot. childSlot keys block-reuse on body
 		// identity, so handing it the raw closure would re-mount (and DOM-duplicate) the
 		// children — a `@for`/`@if` block especially — on every re-render. Pass a STABLE
 		// delegating body whose target we update each render, so childSlot reconciles.
-		state.latest = childrenBody;
+		state.latest = childrenBody as ComponentBody;
 		if (state.body === undefined) {
 			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
 		}
 		childSlot(state.childScope!, 0, el, state.body, null, false, el);
+	} else if (childrenBody != null) {
+		// createElement/descriptor callers already supply a renderable value. Let
+		// childSlot reconcile it directly instead of assuming every child is callable.
+		childSlot(state.childScope!, 0, el, childrenBody, null, false, el);
 	}
 	return el;
 }
