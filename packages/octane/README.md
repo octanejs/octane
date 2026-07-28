@@ -9,11 +9,13 @@ Octane is a fast, JavaScript UI framework, and the successor to
 already know, a compiler that keeps the runtime small and fast, no rules of
 hooks, and no hand-maintained dependency arrays in the common case. Omit a hook's
 dependency list and the compiler derives it from the closure; explicit arrays
-retain React semantics, while `null` means every render. Locally declared custom
-hooks in full-compiled `.tsrx`/`.tsx` modules also qualify when they transparently
-forward their callback and final dependency parameter to a supported hook. This
-package ships both the runtime and compiler, with the compiler exposed at
-`octane/compiler`.
+retain React semantics, while `null` means every render. Built-in hook calls
+retain this inference inside compiler-processed custom hooks, including those in
+plain `.ts`/`.js` modules. Inferring a dependency argument at a call to a custom
+wrapper is narrower: the wrapper must be locally declared in a fully compiled
+`.tsrx`/`.tsx` module and transparently forward its callback and final dependency
+parameter to a supported hook. This package ships both the runtime and compiler,
+with the compiler exposed at `octane/compiler`.
 
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
