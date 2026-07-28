@@ -281,4 +281,77 @@ describe('directives at value position', () => {
 			}
 		});
 	});
+
+	describe('diagnostic for an unowned directive', () => {
+		// Every value position an unowned directive can occupy has to report the
+		// authored keyword. Reaching the printer instead yields
+		// `Not implemented: JSXIfExpression`, which names an internal node type and
+		// tells the author nothing about their source.
+		const unowned: [string, string][] = [
+			[
+				'bare directive at an attribute value inside a callback',
+				`export function App(props: { rows: any[] }) @{
+	const render = (row: any) => <Cell slot={@if (row.ok) { <a /> } @else { <b /> }} />;
+	<div>{props.rows.map(render)}</div>
+}
+`,
+			],
+			[
+				'bare directive in a container child inside a callback',
+				`export function App(props: { rows: any[] }) @{
+	const render = (row: any) => <div>{@for (const x of row.xs; key x) { <a /> }}</div>;
+	<div>{props.rows.map(render)}</div>
+}
+`,
+			],
+			[
+				'element-wrapped directive inside a callback',
+				`export function App(props: { rows: any[] }) @{
+	const render = (row: any) => <Cell slot={<h1>@switch (row.k) { @case 1: { <a /> } }</h1>} />;
+	<div>{props.rows.map(render)}</div>
+}
+`,
+			],
+			[
+				'module-level initializer with no owning body',
+				`const v = @try { <a /> } @catch (e) { <b /> };
+export function App() @{
+	<div>{v}</div>
+}
+`,
+			],
+		];
+
+		for (const [label, source] of unowned) {
+			for (const mode of ['client', 'server'] as const) {
+				it(`names the authored keyword for a ${label} (${mode})`, () => {
+					let message = '';
+					try {
+						compile(source, 'App.tsrx', { mode });
+					} catch (error) {
+						message = String((error as Error).message);
+					}
+					expect(message).toMatch(/is not supported at this value position/);
+					// The authored spelling, not the parser's node type.
+					expect(message).toMatch(/`@(if|for|switch|try)`/);
+					expect(message).not.toMatch(/Not implemented/);
+				});
+			}
+		}
+
+		it('leaves an `@{ … }` sub-template to its own handling', () => {
+			// `() => @{ … }` is a supported sub-template owned by rewriteTsrxBlocks,
+			// not a set of directive arms, so the unowned-directive advice must not
+			// claim it.
+			const source = `export function App(props: { label: string; target: any }) @{
+	const slot = () => @{
+		<div class="from-tsrx">{props.label}</div>
+	};
+	<div class="host">{createPortal(slot, props.target)}</div>
+}
+`;
+			const { code } = compile(source, 'App.tsrx', { mode: 'client' });
+			expect(code).toContain('from-tsrx');
+		});
+	});
 });

@@ -13258,6 +13258,18 @@ const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
 	'JSXCodeBlock',
 ]);
 
+// The control-flow directives, whose arms are hoisted into an owning body. A
+// `@{ … }` block is also folded as a setup value, but it is a sub-template rather
+// than a set of arms — `rewriteTsrxBlocks` owns its expression-position handling,
+// and the unowned-directive diagnostic's advice does not apply to it — so it is
+// deliberately absent here.
+const VALUE_DIRECTIVE_ARM_TYPES = new Set([
+	'JSXIfExpression',
+	'JSXForExpression',
+	'JSXSwitchExpression',
+	'JSXTryExpression',
+]);
+
 function setupDirectiveFragment(directive) {
 	return inheritOriginLoc(b.jsx_fragment([directive]), directive);
 }
@@ -13430,6 +13442,14 @@ function rewriteJsxValues(node, ctx) {
 			// lowerJsxChild owns the single implementation of fragment lowering.
 			return lowerJsxChild(n, ctx);
 		}
+		// The fold above already replaced every directive this body owns, so one still
+		// standing here has no owner: it is inside a nested function, or the module
+		// has no owning body at all. Report it against the authored keyword instead of
+		// letting the TSRX-only node reach the printer, which only knows how to say
+		// `Not implemented: JSXIfExpression`. lowerJsxChild covers the same case for a
+		// directive that is a child of a value element; this covers the bare ones —
+		// `prop={@if …}`, `{@for …}`, and a module-level initializer.
+		if (VALUE_DIRECTIVE_ARM_TYPES.has(t)) rejectUnownedValueDirective(n);
 		return null;
 	});
 }
@@ -13451,7 +13471,7 @@ function lowerJsxChild(child, ctx) {
 		return rewriteJsxValues(child.expression, ctx);
 	}
 	if (t === 'JSXElement' || t === 'Element') return jsxElementToCreateElement(child, ctx);
-	if (SETUP_VALUE_DIRECTIVE_TYPES.has(t)) rejectUnownedValueDirective(child);
+	if (VALUE_DIRECTIVE_ARM_TYPES.has(t)) rejectUnownedValueDirective(child);
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
 		for (const c of child.children || []) {
