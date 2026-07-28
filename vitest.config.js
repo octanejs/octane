@@ -2524,13 +2524,13 @@ export default defineConfig({
 				test: {
 					name: 'website-unit',
 					include: ['website/tests/**/*.test.ts'],
-					exclude: [
-						'website/tests/core-apis-docs.test.ts',
-						'website/tests/ssr-smoke.test.ts',
-						'website/tests/ssr-hydration.e2e.test.ts',
-					],
+					exclude: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
 					environment: 'jsdom',
 					globals: false,
+					// The Core APIs route test renders the whole documentation graph, so
+					// it runs longer than the five-second default even though it needs
+					// nothing but jsdom.
+					testTimeout: 15_000,
 				},
 				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
 				// routing, and deployment are owned by @octanejs/tanstack-start; the
@@ -2540,11 +2540,10 @@ export default defineConfig({
 			{
 				test: {
 					name: 'website-integration',
-					include: [
-						'website/tests/core-apis-docs.test.ts',
-						'website/tests/ssr-smoke.test.ts',
-						'website/tests/ssr-hydration.e2e.test.ts',
-					],
+					include: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
+					// One production build and one preview server for both specs; see
+					// the file header for why they no longer build for themselves.
+					globalSetup: ['./website/tests/setup/production-server.ts'],
 					environment: 'jsdom',
 					globals: false,
 					// Vitest defaults ordinary tests to five seconds. This project
@@ -2552,9 +2551,16 @@ export default defineConfig({
 					// coverage, so give unannotated integration cases the same
 					// budget as the SSR smoke test.
 					testTimeout: 15_000,
-					// The SSR and browser specs write website/.output, while the
-					// route-level docs test renders the full application. Keep this
-					// integration boundary serial while ordinary tests stay parallel.
+					// Browser cases inside the e2e spec run concurrently (page-per-case
+					// against a shared server). Four keeps the Vite dev server's on-demand
+					// transform queue from becoming the bottleneck and leaves headroom, so
+					// timing-sensitive hover and layout cases are not measured on a
+					// saturated machine.
+					maxConcurrency: 4,
+					// Both specs drive the shared preview server and the e2e spec also
+					// owns a Vite dev server, a browser, and source edits for its HMR
+					// case. Keep the FILE boundary serial even though cases within a file
+					// are concurrent.
 					fileParallelism: false,
 				},
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
