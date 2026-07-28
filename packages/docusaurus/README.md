@@ -1,0 +1,100 @@
+# `@octanejs/docusaurus`
+
+The headless Docusaurus content and MDX bridge for Octane.
+
+Docusaurus has a useful boundary before React: its Node-side config, presets,
+and plugins load content, create data modules, and emit a serializable route
+tree. This package adopts that graph, normalizes it into a renderer-neutral
+manifest, resolves Docusaurus module aliases for Vite, and compiles
+Docusaurus-shaped MDX exports into real Octane components.
+
+It does **not** run React themes or React-authored swizzles unchanged. Octane is
+compiler-first; the renderer and theme layers must be authored for Octane.
+
+## Version contract
+
+The headless loader is intentionally pinned to `@docusaurus/core@3.10.1`.
+Docusaurus does not publish the `server/site` loader as a stable public entry,
+so accepting an untested minor would turn an internal upstream refactor into a
+silent route-data corruption. The loader checks both the package version and
+Docusaurus's Node `>=20.0` runtime requirement before importing that seam. This
+package retains Octane's repository-wide Node `>=22` baseline.
+
+`allowUnsupportedVersion: true` is available only for explicit compatibility
+experiments.
+
+## Inspect the headless site graph
+
+```js
+import {
+	createDocusaurusManifest,
+	loadDocusaurusSite,
+} from '@octanejs/docusaurus';
+
+const loaded = await loadDocusaurusSite({ siteDir: process.cwd() });
+const manifest = await createDocusaurusManifest(loaded);
+```
+
+The manifest contains:
+
+- nested routes with `component`, `modules`, `props`, and plugin context;
+- generated global data and per-document metadata;
+- `@site`, `@generated`, `~docs`, `@theme`, `@theme-original`, and
+  `@theme-init` resolution;
+- the exact Docusaurus version and route-path inventory.
+
+The CLI exposes the same boundary:
+
+```bash
+octane-docusaurus inspect --site-dir . --out .octane-docusaurus/manifest.json
+octane-docusaurus clear --site-dir .
+```
+
+## Vite
+
+```ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+import { docusaurus } from '@octanejs/docusaurus/vite';
+
+export default defineConfig({
+	plugins: [...docusaurus(), octane()],
+});
+```
+
+The bridge publishes `virtual:octane-docusaurus-manifest` and resolves
+Docusaurus aliases. Its MDX plugin chooses Octane client/server compilation per
+Vite environment and injects metadata discovered by the content plugins.
+
+## Docusaurus-aware MDX
+
+```js
+import { compileDocusaurusMdx } from '@octanejs/docusaurus/mdx';
+
+const result = await compileDocusaurusMdx(source, '/docs/intro.mdx', {
+	metadata: docMetadata,
+	resolveMarkdownLink: ({ linkPathname }) =>
+		linkPathname.startsWith('./') ? `/guide/${linkPathname.slice(2)}` : null,
+});
+```
+
+Alongside the default document component, compiled modules export Docusaurus's
+document shape:
+
+- `frontMatter` (plus `@octanejs/mdx`'s existing `frontmatter`);
+- `contentTitle`;
+- `toc`;
+- `metadata`;
+- `assets`.
+
+GitHub-compatible heading IDs (including explicit Docusaurus IDs), duplicate
+slugs, first-title wrapping/removal, TOC bounds, and Markdown link/image
+rewriting happen before Octane compilation. User remark/rehype/recma plugins
+remain composable.
+
+## Current scope
+
+Phases 1–3 are implemented here: headless loading, manifest/Vite integration,
+and MDX compilation. Client routing, static generation, hydration, and an
+Octane classic theme are deliberately left to the renderer/theme phases; the
+CLI therefore does not present `start` or `build` as working commands yet.

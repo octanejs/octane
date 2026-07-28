@@ -38,6 +38,7 @@ const packages = getWorkspacePackages().filter(
 const packageVersions = new Map(packages.map((pkg) => [pkg.name, pkg.version]));
 const octaneSingletonConsumers = new Set([
 	'@octanejs/app-core',
+	'@octanejs/docusaurus',
 	'@octanejs/rspack-plugin',
 	'@octanejs/rspeedy-plugin',
 	'@octanejs/rsbuild-plugin',
