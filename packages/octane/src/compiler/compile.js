@@ -5990,7 +5990,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// `const el = <App/>`) to createElement(...) before printing — esrap
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
-			const lowered = stampAnonymousDefaultFunctionLoc(rewriteJsxValues(hooked, ctx), ctx);
+			const lowered = stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx);
 			// Top-level passthrough (imports, plain consts/functions): already a
 			// rewritten statement node — embedded directly in the module AST.
 			bodyNodes.push(lowered);
@@ -6499,7 +6499,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 			// User imports from 'octane' resolve to the server runtime instead.
 			addUserImportSpecifiers(ctx, node);
 		} else {
-			bodyNodes.push(rewriteJsxValues(node, ctx));
+			bodyNodes.push(rewriteModuleJsxValues(node, ctx));
 		}
 	}
 
@@ -6773,46 +6773,7 @@ function ssrCompileBody(
 	// Fold one directive found at value position into a server sub-render owned by
 	// THIS body. Mirrors the client's lowerBodyValueDirective: the arms compile
 	// against this body's scope and the helper lands in this body's inlinedSubs.
-	const lowerBodyValueDirective = (directive) => {
-		{
-			const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
-			const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
-			const sub = ssrCompileSub(
-				[preparedDirective],
-				ctx,
-				'__sfragment',
-				[],
-				cssHash,
-				'opaque',
-				null,
-				true,
-				true,
-			);
-			inlinedSubs.push(sub.fn);
-			// The fragment body stays local so it can close over setup values, while
-			// this per-site module wrapper gives server replays a stable component
-			// identity. Its descriptor also preserves the component-bearing child
-			// marker shape expected by hostElementBody hydration on the client.
-			ctx.hoistedHelpers.push(
-				inheritOriginLoc(
-					b.function_declaration(
-						b.id(wrapperName),
-						[b.id('props'), b.id('__s')],
-						b.block([
-							b.return(b.call(b.member(b.id('props'), 'body'), b.id('undefined'), b.id('__s'))),
-						]),
-					),
-					directive,
-				),
-			);
-			ctx.runtimeNeeded.add('createElement');
-			return b.call(
-				'_$createElement',
-				b.id(wrapperName),
-				b.object([b.prop('init', b.id('body'), b.id(sub.fnName))]),
-			);
-		}
-	};
+	const lowerBodyValueDirective = serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash);
 	const preparedStatements = workingStatements.map((statement) =>
 		lowerSetupValueDirectives(statement, lowerBodyValueDirective),
 	);
@@ -13369,10 +13330,187 @@ function lowerSetupValueDirectives(node, lowerDirective) {
 function rejectUnownedValueDirective(node) {
 	const keyword = DIRECTIVE_KEYWORDS[node.type] ?? 'directive';
 	throw new Error(
-		`\`${keyword}\` is not supported at this value position — a directive's arms need an owning component to hoist into, ` +
-			`and a callback or module-level value has none. Move the markup into its own component and render that instead ` +
+		`\`${keyword}\` is not supported inside a module-level callback. Its arms are hoisted, so anything they read ` +
+			`from the callback has to be threaded in from the call site, and that channel is built per component — a ` +
+			`module-level callback has no component to build it against. Move the callback inside the component that ` +
+			`uses it, or move the markup into its own component and render that instead ` +
 			`(\`slot={<Row item={item} />}\`, with the \`${keyword}\` inside \`Row\`).`,
 	);
+}
+
+// Lift a directive's control expression — `@if`'s test, `@for`'s iterable,
+// `@switch`'s discriminant — into a name the caller supplies, so the value is read
+// where the directive is WRITTEN rather than each time the compiled body runs.
+// `@try` has no control expression and needs no lift. Returns null when there is
+// nothing to lift; the rewrite is copy-on-write, per the parser-AST rule.
+function liftDirectiveControl(ctx, directive) {
+	const key =
+		directive.type === 'JSXIfExpression'
+			? 'test'
+			: directive.type === 'JSXForExpression'
+				? 'right'
+				: directive.type === 'JSXSwitchExpression'
+					? 'discriminant'
+					: null;
+	if (key === null) return null;
+	const value = directive[key];
+	if (value == null) return null;
+	// A literal is the same value whenever it is read, so inlining it keeps the
+	// output smaller with no change in meaning. An IDENTIFIER is not: a module
+	// `let` can be reassigned between the definition and the first render, and the
+	// client snapshots it into a hole at the definition site regardless. Leaving it
+	// inline here is precisely the divergence this lift exists to prevent.
+	if (value.type === 'Literal') return null;
+	const frozenName = allocCompilerName(ctx, `__c$${ctx.nextFragId++}`);
+	return {
+		directive: { ...directive, [key]: inheritOriginLoc(b.id(frozenName), value) },
+		entry: { name: frozenName, value },
+	};
+}
+
+// Build the SERVER fold for a directive at value position: the directive body
+// compiles to a local `__sfragment` sub-render pushed into `inlinedSubs`, and a
+// per-site module wrapper gives server replays a stable component identity. The
+// wrapper's descriptor also preserves the component-bearing child marker shape
+// hostElementBody hydration expects on the client.
+//
+// `inlinedSubs` is the sink that decides ownership: a component body passes its
+// own list so the sub can close over setup values; module-level statements pass
+// the hoisted-helper list, where a module-level directive's only possible
+// references already live.
+function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, freezeControl = false) {
+	return (rawDirective) => {
+		// A module-level value is computed ONCE, where it is written. The client gets
+		// that for free — its fold lifts the control expression out as a hole
+		// evaluated at the definition site — but the server compiles the directive
+		// into a sub it calls per render, which would re-read the expression every
+		// time. Lift the same expression here so both sides freeze together, matching
+		// a plain `const v = cond ? <A/> : <B/>` and React's module-level elements.
+		const frozen = freezeControl ? liftDirectiveControl(ctx, rawDirective) : null;
+		const directive = frozen === null ? rawDirective : frozen.directive;
+		const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
+		const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
+		// The sub is declared in the OWNING body, so it closes over that body's values
+		// lexically. A name introduced by an enclosing callback is not in scope there
+		// even though it is in scope at the call site, so those names ride an env
+		// array through the wrapper instead. Every other fold sees an empty set here
+		// and keeps its previous output exactly.
+		const callbackScope = ctx._callbackScopeNames;
+		// Each entry is a name the sub binds plus the expression that supplies it at
+		// the call site: a callback capture supplies itself, a lifted control
+		// expression supplies the value it froze.
+		const envEntries =
+			callbackScope == null || callbackScope.size === 0
+				? []
+				: [...collectFreeIdentifiers(b.block([preparedDirective]), new Set())]
+						.filter((identifier) => callbackScope.has(identifier))
+						.sort()
+						.map((identifier) => ({ name: identifier, value: b.id(identifier) }));
+		if (frozen !== null) envEntries.push(frozen.entry);
+		const env = envEntries.map((entry) => entry.name);
+		const subStmts = env.length
+			? [
+					inheritOriginLoc(
+						b.const(b.array_pattern(env.map((identifier) => b.id(identifier))), b.id('__props')),
+						directive,
+					),
+					preparedDirective,
+				]
+			: [preparedDirective];
+		const sub = ssrCompileSub(
+			subStmts,
+			ctx,
+			'__sfragment',
+			[],
+			cssHash,
+			'opaque',
+			null,
+			true,
+			true,
+		);
+		inlinedSubs.push(sub.fn);
+		ctx.hoistedHelpers.push(
+			inheritOriginLoc(
+				b.function_declaration(
+					b.id(wrapperName),
+					[b.id('props'), b.id('__s')],
+					b.block([
+						b.return(
+							b.call(
+								b.member(b.id('props'), 'body'),
+								// The sub reads its env off the first (`__props`) argument, which
+								// is otherwise unused for a fragment body.
+								env.length ? b.member(b.id('props'), 'env') : b.id('undefined'),
+								b.id('__s'),
+							),
+						),
+					]),
+				),
+				directive,
+			),
+		);
+		ctx.runtimeNeeded.add('createElement');
+		// The wrapper call stands where the directive was authored, and every printed
+		// node needs an origin (assertNodeLocs). Inside a component body the enclosing
+		// statement supplied one; a module-level statement does not.
+		const descriptorProps = [b.prop('init', b.id('body'), b.id(sub.fnName))];
+		if (env.length) {
+			// Built HERE, at the call site, where the callback's names are in scope.
+			descriptorProps.push(
+				b.prop('init', b.id('env'), b.array(envEntries.map((entry) => entry.value))),
+			);
+		}
+		return inheritOriginLoc(
+			b.call('_$createElement', b.id(wrapperName), b.object(descriptorProps)),
+			directive,
+		);
+	};
+}
+
+/**
+ * Value-lower a MODULE-level statement.
+ *
+ * A directive at module value position — `const v = @if (…) { … };` — has no
+ * component body to own it, and needs none: it can only close over module
+ * bindings, which every hoisted helper already sees, so its arms need no env
+ * tuple. Publishing a fold whose sink IS module scope lets the top-level path
+ * lower it exactly like a directive inside a body, with the renderer and arms
+ * landing next to each other as hoisted helpers.
+ *
+ * Both emitters route their module-level statements through here so the client
+ * and server agree on what a module-level directive value compiles to.
+ */
+function rewriteModuleJsxValues(node, ctx) {
+	const previous = ctx._valueDirectiveLowering;
+	// Module scope has no component context, and must not borrow the last one
+	// compiled: `helperCaptures` reads this set to decide what an arm captures, so a
+	// stale set would let a directive inside a MODULE-level callback fold as if the
+	// callback's params could be threaded, hoisting an arm that reads them free.
+	// Clearing it keeps the bare module-level case folding (its arms reference only
+	// module bindings, which every hoisted helper already sees) while routing the
+	// module-level callback to the unowned diagnostic.
+	const previousLocals = ctx.currentComponentLocals;
+	ctx.currentComponentLocals = null;
+	// Each emitter folds to its own shape — the client to a compiled-fragment
+	// renderer, the server to an `__sfragment` sub-render. Picking by mode here is
+	// what stops the client's DOM helpers being emitted into a server module.
+	ctx._valueDirectiveLowering =
+		ctx.mode === 'server'
+			? serverValueDirectiveFold(ctx, 'module', ctx.hoistedHelpers, null, true)
+			: (directive) =>
+					lowerHostFragment(
+						setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, 'module')),
+						ctx,
+						ctx.hoistedHelpers,
+						'opaque',
+						null,
+					);
+	try {
+		return rewriteJsxValues(node, ctx);
+	} finally {
+		ctx._valueDirectiveLowering = previous;
+		ctx.currentComponentLocals = previousLocals;
+	}
 }
 
 /**
@@ -13400,15 +13538,44 @@ function rewriteJsxValues(node, ctx) {
 	if (lower != null) node = lowerSetupValueDirectives(node, lower);
 	return mapAst(node, (n) => {
 		const t = n && n.type;
-		// A nested function is a separate lexical owner. `rewriteJsxValues` re-enters
-		// itself for attribute values and container children, so without clearing the
-		// fold here a directive inside a callback would be folded by whichever
-		// re-entry first reached it, with no function node in view — hoisting its arms
-		// to this body's helper list, where the callback's params do not exist.
-		// Ordinary JSX values inside the callback still lower; only the fold is off.
+		// A nested function is a separate LEXICAL owner, but a folded arm never needs
+		// lexical access to it: arms are hoisted to module scope and receive what they
+		// capture through the `__extra` env tuple, and that tuple is built at the
+		// `createElement(_frag$N, { … })` call site — which sits INSIDE this callback,
+		// where its params are in scope. So the fold stays live here; what has to
+		// change is the set of names helperCaptures will thread, which otherwise holds
+		// only the component's own locals and would silently drop `row` from the tuple,
+		// leaving the arm referencing it free.
+		//
+		// The env tuple only exists when there is a component context to compute it
+		// against (`helperCaptures` returns null without one, which pins helpers inline
+		// next to values they cannot reach). With no context, leave the directive for
+		// the unowned diagnostic below rather than folding it into the wrong scope.
 		if (lower != null && isFunctionNode(n)) {
-			const previous = ctx._valueDirectiveLowering;
-			ctx._valueDirectiveLowering = null;
+			const previousLocals = ctx.currentComponentLocals;
+			const previousLower = ctx._valueDirectiveLowering;
+			let previousCallbackScope = ctx._callbackScopeNames;
+			if (previousLocals == null) {
+				// No component context, so `helperCaptures` would return null and pin the
+				// arms beside values they cannot reach. Drop the fold for this subtree so
+				// re-entries below (an attribute value re-enters rewriteJsxValues, with no
+				// function node left in view) cannot pick it back up, and the directive
+				// reaches the unowned diagnostic instead of folding into the wrong scope.
+				ctx._valueDirectiveLowering = null;
+			} else {
+				const introduced = collectComponentLocals(n);
+				const extended = new Set(previousLocals);
+				for (const name of introduced) extended.add(name);
+				ctx.currentComponentLocals = extended;
+				// Names a CALLBACK introduces are visible at the fold's call site but not
+				// where a hoisted helper is declared, so they are exactly the ones that
+				// have to be threaded rather than closed over. Tracking them separately
+				// keeps every other fold's output unchanged.
+				previousCallbackScope = ctx._callbackScopeNames;
+				const callbackScope = new Set(previousCallbackScope || []);
+				for (const name of introduced) callbackScope.add(name);
+				ctx._callbackScopeNames = callbackScope;
+			}
 			try {
 				let out = n;
 				for (const key in n) {
@@ -13423,7 +13590,9 @@ function rewriteJsxValues(node, ctx) {
 				}
 				return out;
 			} finally {
-				ctx._valueDirectiveLowering = previous;
+				ctx.currentComponentLocals = previousLocals;
+				ctx._valueDirectiveLowering = previousLower;
+				ctx._callbackScopeNames = previousCallbackScope;
 			}
 		}
 		// Host OR component JSX at a VALUE position (a `.map(...)` callback, a
