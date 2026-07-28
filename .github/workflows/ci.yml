@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  # Only the newest state of a pull request or main can still ship.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Named once: the sharded suite excludes these specs and website_e2e runs
   # them. Splitting the paths means a stale name could silently stop running
