@@ -1,5 +1,320 @@
 # octane
 
+## 0.1.18
+
+### Patch Changes
+
+- c3ba5e0: `compile({ inspect: true })` now claims an authored attribute NAME for the
+  tokens that name the call the attribute lowered to, so navigation tooling can
+  resolve a dynamic attribute in both directions.
+
+  A static attribute is baked into template markup and the template's origins
+  already carried it. A dynamic one has no markup at all — `<form action={fn}>`
+  survives as `setFormAction(el, 'action', …)` / `ssrAttr("action", …)`, and
+  `<input defaultValue={v}/>` as `setDefaultValueUncontrolled(el, v)`, which has
+  no name token whatsoever — and every other token of those calls maps to the
+  value expression. The authored name was therefore unreachable from the output:
+  the helper is a different word and the name literal carries quotes, so neither
+  reproduces the authored text a consumer accepts on an inferred attribution.
+
+  Covers both emitters and every attribute that routes to a helper rather than to
+  baked HTML: form actions, controlled and uncontrolled form props, `class`,
+  `style`, `autoFocus`, boolean, ARIA, `data-*`, and the generic attribute path.
+
+  Inspection-gated as before — the emitted module is byte-identical with and
+  without `inspect`.
+
+- 430061e: Allow runtime host components to render descriptor children produced by TSX and `createElement` call sites.
+- a21ff46: Tear down an effect when its conditional hook call site is not reached during a successful component render.
+- 1821f63: New compile option `dataCallbackHooks`. A hook can now declare that a callback
+  argument is data it memoizes on, rather than a dependency subject it re-runs.
+  Production compiles then key that callback on the values it actually reads, so
+  its identity moves only when they do.
+
+  ```js
+  compile(source, filename, {
+  	dataCallbackHooks: ['@octanejs/tanstack-store#useSelector'],
+  });
+  ```
+
+  Entries are `module#hookName`, matched against the call site's import — including
+  a namespace import, matched against the namespace's own module — or a bare
+  `hookName` for a hook declared in the module being compiled. A default or
+  namespace import from elsewhere never matches a bare entry.
+
+  This closes the other half of the capture-free callback lift. A callback that
+  captures nothing is lifted to module scope and keeps one identity forever; a
+  callback that reads component state cannot move, but is now wrapped in
+  `useCallback` with an inferred dependency list. On a 512-subscriber fan-out over
+  20 unrelated parent re-renders, selector invocations for a capturing selector
+  drop from 10,240 to zero, and the re-render cost fell from 21.4–23.1ms to
+  7.8–9.9ms.
+
+  The dependency list is left for inference to fill, which is why the transform
+  runs before it. That ordering is load-bearing rather than incidental: coarse
+  identifier dependencies (`[props]`) are worthless here, because the props object
+  is a fresh identity on every parent render, so the memo never hits. Inference
+  produces the member paths actually read (`[props.offset]`).
+
+  Nothing is inferred about which hooks qualify, and the transform is inert until
+  something opts in. The compiler already refuses to attach dependency semantics
+  to custom hooks it cannot statically prove, and a wrong answer here produces a
+  stale closure — silent, and attributed to the application rather than to the
+  compiler — so the fact is declared rather than guessed.
+
+  Declared hooks are still left alone where the hook owns freshness itself: when
+  its own dependency list is inferred, and when the call passes an explicit
+  dependency array or `null` (the author's "re-run every render" escape hatch).
+  Dev, HMR, and profile compiles keep the authored form, matching the neighbouring
+  inline hook-memo tier.
+
+- 3db74e9: A directive at value position now compiles inside a callback and at module scope,
+  so `@if`/`@for`/`@switch`/`@try` no longer depend on sitting directly in a
+  component body.
+
+  **Inside a callback.** A directive's arms are hoisted, so they cannot reach a
+  callback's parameters lexically — but they never needed to. Captured values
+  already travel through the construct's env channel, and that channel is built at
+  the `createElement(_frag$N, …)` call site, which sits inside the callback where
+  its parameters are in scope. What was missing was the capture set: it held only
+  the component's own locals, so a name introduced by an enclosing callback was
+  dropped from the tuple and the arm was emitted reading it free — a module-scope
+  helper closing over a variable that does not exist there, which only fails once
+  the arm renders. The set now grows with each callback the value lowering
+  descends through, and the same names ride an env array on the server, whose subs
+  are declared in the owning body rather than hoisted. Nested callbacks compose:
+  an arm may read from every enclosing scope.
+
+  **At module scope.** `const v = @if (…) { … };` has no component body to own it
+  and needs none — it can only close over module bindings, which every hoisted
+  helper already sees, so its arms hoist beside it. Both emitters fold it to their
+  own shape; previously neither did, and the client's DOM helpers could be emitted
+  into a server module.
+
+  A module-level value is computed once, where it is written, exactly like
+  `const v = cond ? <A/> : <B/>` and like a React element built at module scope.
+  The client already did that — its fold lifts the control expression out as a hole
+  evaluated at the definition site — but the server compiles the directive into a
+  sub it calls per render, so it re-read the expression every time. Given the same
+  module state the two emitters could then disagree, and hydration reported
+  nothing. The server now lifts the same expression (`@if`'s test, `@for`'s
+  iterable, `@switch`'s discriminant) to the definition site, so both freeze
+  together. `@try` has no control expression: it selects an arm from what its body
+  does at render time, which both emitters already did per render.
+
+  What remains unsupported is a directive inside a MODULE-level callback: the env
+  channel is built per component, and there is no component to build it against.
+  That is now the only case the diagnostic covers, and its wording says so rather
+  than claiming directives need an owning component in general.
+
+  Covered by client render, server render, hydration adoption, and type-only
+  output, including a directive whose arm reads the parameter of an enclosing
+  callback and one that reads through two nested callbacks.
+
+- 0d4ed9e: Directives used at a VALUE position now compile on the client and the server.
+  A `@if`/`@for`/`@switch`/`@try` is compiler-owned template syntax, but a value
+  position lowers through the descriptor path rather than the template walk, and
+  that path had no case for it. What happened next depended only on where the
+  directive sat:
+
+  - `const branch = @if (ok) { … } @else { … }` emitted
+    `const branch = {createElement(…)}` — an object literal wrapping a call
+    expression, so the module did not parse. Setup attribute values
+    (`<Child prop={@if …} />`) had the same shape. The lowered descriptor was
+    always wrapped in a `JSXExpressionContainer`, which is right only in JSX child
+    position; anywhere else it prints as a bare `{expr}` block.
+  - `<Child prop={@for …} />` and `<div>{@switch …}</div>` in rendered output
+    reached the printer as raw TSRX nodes and threw
+    `Not implemented: JSXIfExpression`.
+  - `<Child prop={<h1>@if … </h1>} />` and `<div>{<h1>@if … </h1>}</div>` — a host
+    element that is itself a value, holding a directive among its children — were
+    compiled with the directive **silently dropped**. The element lowered to a
+    `createElement` descriptor whose child lowering discarded every node it did not
+    recognise, so the arms vanished with no diagnostic.
+
+  All of these now fold through the same hoisted-renderer path setup directive
+  values already used, so each arm compiles once and the value becomes an ordinary
+  renderable descriptor. Both emitters publish that fold for the body being
+  compiled and restore the previous owner afterwards, so a nested body never folds
+  its arms into its parent's helper list.
+
+  The fold stops at a callback boundary. A directive's arms are hoisted into the
+  body that owns them and read the values that body threads in, so folding one that
+  belongs to a callback would hoist arms referencing the callback's params into a
+  scope where those params do not exist — a module-level helper closing over a free
+  variable, which only fails once the arm renders. A value-position directive with
+  no owning body is now a compile error naming the authored keyword and pointing at
+  the fix (move the markup into its own component), rather than silently dropped
+  markup or a helper that throws at runtime.
+
+  The type-only (`to_ts`) emitter was already correct here; this brings the client
+  and server emitters in line with it. Covers all four directives across the
+  initializer, attribute-value, expression-container and element-holding-a-directive
+  positions, in rendered output and in setup, with client render, SSR and hydration
+  adoption tests.
+
+- 7bdf1fa: Correctly bind loop indexes in explicit TSRX and TSX list keys so indexed rendering and hydration do not throw.
+- e1927d8: Keep enclosing DOM boundaries attached when a ref-owning conditional branch switches to a lazy Suspense component.
+- dac0e66: Fixes two ways a loop head could hide a component reference from free-variable
+  analysis, each of which let the capture-free hook-callback lift move a callback
+  that was not actually capture-free:
+
+  - A `for-in`/`for-of` head with no declaration ASSIGNS an existing binding
+    rather than introducing one. It was being treated as a fresh loop binding, so
+    `for (acc of s.items) { … }` hid the write to the component's `acc` entirely
+    and the callback read as capture-free. Lifted to module scope, that
+    assignment has no binding to land on.
+  - A destructuring default in a loop's declaration —
+    `for (const [x = props.seed] of s.pairs)` — is an expression that runs on
+    every iteration, but only the names the pattern declared were collected, so
+    the read of `props` was invisible.
+
+  Both are corrected in the shared analysis, so every caller of it benefits, and
+  the same treatment is applied to the `@for` template directive's head.
+
+- 54c60fa: `compile({ inspect: true })` now also claims the authored attribute NAME for the
+  two lowerings that resolve an element's props as a GROUP, rather than one call
+  per attribute. Both dropped the name on the way out, leaving common controlled
+  form props unreachable from the output in the forward direction.
+
+  A host with a spread, a duplicate prop, or a `value`/`defaultValue` cascade
+  routes every prop through one commit-phase collector —
+  `setHostPropSources(el, [[false, 'defaultValue', …]])` — where the per-source
+  name literal is the only token that names its attribute. It now carries the
+  authored name instead of the element's location, the same split
+  `ssrAttrs`/`ssrInputAttrs` rows already made on the server.
+
+  Server-side `<textarea>`/`<select>` `value`/`defaultValue` never serialize as
+  attributes at all: they become the content-position `ssrTextareaValue(…)` or
+  option-projection `ssrSelectScope(…)` call, which takes its writers
+  POSITIONALLY, so there is no name literal and the helper alias is the only token
+  there is. It is now anchored on the authored name, and when both writers are
+  present the second aliases onto the first — one call cannot carry two locations.
+
+  The emitted module is byte-identical with and without `inspect`, and unchanged
+  from before this fix.
+
+- 59a95d6: Production compiles lift a capture-free function argument of a hook call to
+  module scope, so the hook sees one identity for the module's lifetime instead of
+  a fresh function every render.
+
+  This matters for hooks that COMPARE the callback. A store selector is the
+  motivating case: `useSelector(store, (s) => s.total)` feeds a memo keyed on the
+  selector's identity, and an inline arrow defeats it on every render — so an
+  unrelated parent re-render re-runs the selection for every subscriber. Measured
+  on 512 subscribers over 20 unrelated re-renders, selector invocations drop from
+  512 per render to zero. Holding the compile mode fixed and varying only selector
+  identity, an expensive selector's re-render cost fell about 25% (62.6–64.1ms →
+  46.5–47.4ms across three runs); with a cheap selector the wall-clock difference
+  stayed inside run-to-run noise, so the durable claim is the eliminated work
+  rather than a fixed speedup.
+
+  The analysis is deliberately conservative and over-approximates the component's
+  bindings, so shadowing can only cost a lift, never produce a wrong one. A
+  callback is left exactly where it was authored when it reads component state,
+  `this`, or `arguments`, renders JSX, or contains a hook call.
+
+  Hooks whose contract is stated in terms of the callback are excluded, because
+  moving it would change observable behavior rather than just an address:
+  `useCallback` returns the argument and owes a fresh identity when deps change;
+  `useMemo` and the effect hooks are defined by how often the callback runs;
+  `useState`/`useReducer` take a once-only lazy initialiser; `useEffectEvent`
+  deliberately hands back an unstable wrapper. Custom `use[A-Z]` hooks and
+  `useSyncExternalStore` — whose `subscribe`/`getSnapshot` are data it reads —
+  take the lift.
+
+  Dev, HMR, and profile compiles keep the authored form, on the same gate as the
+  neighbouring inline hook-memo tier.
+
+  Two free-variable analysis fixes come with it, both affecting capture analysis
+  generally rather than only the lift:
+
+  - A binding pattern's default initialisers and computed keys are expressions
+    evaluated at binding time, and were never walked — only the names a pattern
+    declared were collected. So `(s, scale = props.factor) => …` and
+    `({ [props.field]: picked }) => …` reported no reference to `props` at all,
+    and read as capture-free.
+  - A classic `for (let i = 0; …)` carries its declaration in the loop's `init`
+    rather than its `left`, so `i` was reported free and read as a capture of an
+    enclosing binding the loop actually shadows. This made any callback containing
+    a counting loop look instance-specific.
+
+- 138fbd9: Compiler-inferred hook dependency arrays now resolve two capture-analysis
+  defects.
+
+  A computed key in a binding pattern (`const { [key]: picked } = source`) is a
+  read of the surrounding scope, but the scope walk never visited it, so the
+  identifier resolved to no binding at all — indistinguishable from a global —
+  and was dropped. Any effect keyed on that value kept a stale capture and never
+  re-ran when it changed. The fix covers every position a pattern can appear in:
+  declarations, function parameters, catch clauses, for-of heads, and patterns
+  nested in any of them.
+
+  Module-scope `const` declarations, and module-scope `function` and `class`
+  declarations that nothing reassigns, are no longer emitted as dependencies. A
+  dependency array tracks what can change between renders, and these are
+  evaluated once for the program's lifetime — the conclusion imports already got
+  here, that `exhaustive-deps` reaches for any outer-scope value, and that
+  autoMemo already reached for same-module function declarations. Previously
+  `import { fmt } from './fmt'` and a byte-identical local helper produced
+  different arrays. A local `const` that only names such a value, or that binds a
+  literal, is omitted for the same reason.
+
+  Module-scope `let` and `var` remain tracked, since any later statement may
+  rebind them. A member read through a module-scope `const` (`CONFIG.mode`) is
+  now omitted, matching the answer a namespace import already gave: a module-level
+  object mutated in place is not witnessed by a dependency array either way.
+
+  A regex literal is not treated as an invariant initializer. ESTree spells
+  `/foo/g` as a `Literal`, but it allocates a fresh RegExp on every evaluation and
+  carries mutable `lastIndex` state, so a local `const pattern = /foo/g` stays
+  reactive. The predicate is now shared with the one `compile.js` already used for
+  the same question.
+
+- 50c1ab5: Preserve independently managed streamed DOM when it is interleaved with
+  renderer-owned host children.
+
+  The de-optimized host reconciler now adopts unstamped nodes only during
+  hydration. Normal client updates retain external stream boundaries, list nodes,
+  interactive controls, and their listeners while continuing to update, reorder,
+  and remove children created by Octane itself.
+
+- e0c5490: Clear a shared-parent keyed list by walking its marker span, falling back to
+  the scoped Range only once the list is large enough to pay for it.
+
+  A `@for` block that owns its parent is still cleared with `textContent = ''`.
+  One that shares its parent with other JSX previously always used
+  `Range.deleteContents()`. Measured in Chromium, that is the slower of the two
+  for every list size a page realistically clears — 2.2× at 10 items, 1.3× at
+  100 — and only pulls ahead by ~8-12% past roughly a thousand items, so the
+  strategy is now chosen by item count.
+
+  The gap is far wider off the browser. jsdom decides Range containment with a
+  boundary-point comparison per candidate node, each of which can walk the whole
+  document, making `deleteContents` cost O(items × document): 266× the walk when
+  clearing 100 items from a 3400-node document, growing with PAGE size rather
+  than list size. Any Octane component test that clears such a list paid it —
+  one route in this repo's own suite spent 2.8-7.3s in a single render, against
+  ~150ms for the same component tree mounted directly, and now renders in ~200ms.
+
+  No change for the owns-parent case, which is what the existing `clear`
+  benchmarks exercise — every other suite's `@for` is the sole child of its
+  parent, so the shared-parent path had no coverage at all. The new `list-clear`
+  suite adds it, with both sizes and an owns-parent control, and gates each op on
+  the neighbours surviving the clear (a clear that took the wrong span would
+  otherwise report as a faster one).
+
+- e6a158e: A hook callback written through a type assertion — `((s) => s.total) as Sel` —
+  is now recognised as a callback. It previously matched neither the module-scope
+  lift nor dep-keying, because both tested the argument's node type directly and a
+  `TSAsExpression` is not an arrow, so a typed selector silently kept its
+  per-render identity churn.
+
+  Both passes now peel the assertion, and both move the UNWRAPPED function. The
+  assertion is erased from the emitted module either way, and dropping it means a
+  type alias declared inside the component cannot be dragged out to module scope
+  by the lift.
+
 ## 0.1.17
 
 ### Patch Changes

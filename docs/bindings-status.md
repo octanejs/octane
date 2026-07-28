@@ -64,7 +64,7 @@ supported surface and known test coverage described for that package.
 
 ## @octanejs/apollo-client
 
-[`packages/apollo-client`](../packages/apollo-client) `0.1.12` — ports `@apollo/client@4.2.6`. Status data: [`packages/apollo-client/status.json`](../packages/apollo-client/status.json).
+[`packages/apollo-client`](../packages/apollo-client) `0.1.13` — ports `@apollo/client@4.2.6`. Status data: [`packages/apollo-client/status.json`](../packages/apollo-client/status.json).
 
 Complete published client adapter surface: all 18 @apollo/client/react runtime exports and their Apollo 4.2.6 TypeScript declarations, framework-neutral root/testing exports, an Octane MockedProvider, and the Octane-native /react/ssr prerenderStatic entry.
 
@@ -82,7 +82,7 @@ See also: [`docs/apollo-client-port-plan.md`](apollo-client-port-plan.md)
 
 ## @octanejs/aria
 
-[`packages/aria`](../packages/aria) `0.0.11` — ports `react-aria@3.50.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
+[`packages/aria`](../packages/aria) `0.0.12` — ports `react-aria@3.50.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
 
 Phases 0-5 + the Tree/Table follow-up complete. Phases 0-1: the utils foundation, SSR utilities, the complete interactions area (usePress, useHover, focus/keyboard family, useLongPress, useMove, Pressable/PressResponder), the focus area (FocusScope with containment/restore/focus managers, FocusRing, useFocusRing, useHasTabbableChild), the i18n area (I18nProvider, locale/collator/formatter/filter hooks), form validation (useFormValidation + stately useFormValidationState), and the leaf hooks: useButton/useToggleButton(+Group), useLabel/useField, useCheckbox(+Group/+Item), useRadio/useRadioGroup, useSwitch, useTextField, useSearchField, useProgressBar, useMeter, useSeparator, useLink, useDisclosure, useToolbar, VisuallyHidden. Phase 2 adds the collections + selection tier: the stately collections engine (CollectionBuilder/Item/Section/useCollection) and selection core (Selection/SelectionManager/useMultipleSelectionState), the stately state hooks (useListState/useSingleSelectListState, useTreeState, useMenuTriggerState/useSubmenuTriggerState, useOverlayTriggerState, useSelectState, useComboBoxState, useTabListState, useNumberFieldState, useSliderState), the aria selection area (useSelectableCollection/-Item/-List, useTypeSelect, ListKeyboardDelegate, DOMLayoutDelegate), and the aria hooks useListBox/useOption/useListBoxSection, useMenu/useMenuItem/useMenuSection/useMenuTrigger/useSubmenuTrigger, useTab/useTabList/useTabPanel, useSlider/useSliderThumb, useNumberField, useGridList(+Item/+Section/+SelectionCheckbox), useTag/useTagGroup, useBreadcrumbs/useBreadcrumbItem — plus the matching react-stately state hooks under `@octanejs/aria/stately`. Phase 3 adds the overlays hooks tier: the stately `useTooltipTriggerState` and the whole aria overlays area (usePreventScroll, ariaHideOutside, DismissButton, PortalProvider, useOverlay, useOverlayTrigger, useOverlayPosition + calculatePosition, Overlay/useOverlayFocusContain, useModal/ModalProvider/OverlayProvider/OverlayContainer, useModalOverlay, usePopover), plus the consumers useDialog, useTooltip/useTooltipTrigger, useSelect/useHiddenSelect/HiddenSelect, and useComboBox. Differential-verified byte-identical against the real react-aria (interactions + button/toggle/checkbox/switch/radio/textfield/progress + tabs + listbox + select + combobox fixtures); dialog/tooltip/overlay focus-trap/dismiss/scroll-lock paths are covered by behavioral tests (the differential rig shares one document, so focus/portal/positioning aren't rig-driveable). Autocomplete (useAutocomplete/useSearchAutocomplete) is deferred — useComboBox does not depend on it in 3.50.0. Phase 4 adds the react-aria-components foundation under `@octanejs/aria/components`: the collections engine re-hosted on a detached real-DOM store (BaseCollection/CollectionBuilder/createLeafComponent/createBranchComponent/Hidden/useCachedChildren + Collection/Section), the RAC plumbing (Provider, useContextProps, slotted contexts, useRenderProps/composeRenderProps with data-* state attributes), and the non-collection components: Button, ToggleButton(+Group), Checkbox(+Group/Field/Button), Switch(+Field/Button), RadioGroup(+Radio/Field/Button), TextField, SearchField, NumberField, Form, Label/Input/TextArea/FieldError, Group, Toolbar, Separator, Header, Heading, Link, ProgressBar, Meter, Slider(+Output/Track/Thumb/Fill), Disclosure(+Group/Panel), DialogTrigger/Dialog, Modal/ModalOverlay, Popover, TooltipTrigger/Tooltip, OverlayArrow, Text, Keyboard, SelectionIndicator, SharedElementTransition. Phase-4 differentials drive the REAL components on both sides byte-identical (Button hover+mid-press, ToggleButton, Checkbox, TextField typing, Disclosure expand/collapse). Phase 5 adds the RAC collection components over that engine: Autocomplete (full — aria useAutocomplete + stately useAutocompleteState now ported), ListBox(+Item/Section/LoadMoreItem), Menu(+MenuTrigger/SubmenuTrigger/MenuItem/MenuSection), Select(+SelectValue), ComboBox(+ComboBoxValue), Tabs(+TabList/Tab/TabPanels/TabPanel), TagGroup(+TagList/Tag), GridList(+Item/Section/Header/LoadMoreItem), Breadcrumbs(+Breadcrumb), and the DragAndDrop context layer (DropIndicator/contexts/DragAndDropHooks type; components' dnd branches are inert — the dnd engine and useDragAndDrop() itself arrive in a later phase, the stub throws). Phase-5 differentials drive the REAL react-aria-components byte-identical (ListBox selection + keyed reverse, Tabs switch, TagGroup multi-select, GridList row selection, Breadcrumbs, ComboBox typing); Menu/Select open-state (portal'd) carries behavioral coverage incl. keyboard-driven submenus. The Tree/Table follow-up adds the remaining collection verticals: stately grid (GridCollection/useGridState) + the full stately table area (TableCollection/useTableState/column-resize state/UNSTABLE_useTreeGridState), the aria tree hooks (useTree/useTreeItem) and the full aria table hook area (useTable family, TableKeyboardDelegate, useTableColumnResize, grid hooks it rides on), RAC Tree(+TreeItem/TreeItemContent/TreeSection/TreeHeader/TreeLoadMoreItem) and RAC Table(+TableHeader/TableBody/Column/Row/Cell/ColumnResizer/ResizableTableContainer/TableFooter/TableLoadMoreItem). Tree structure states and the interactive Table (sort cycling, row selection) are differential-verified byte-identical vs the real react-aria-components; chevron-driven Tree interaction carries behavioral coverage (the rig's virtual clicks cannot faithfully reproduce the focus-effect interplay on the React side). TableLayout lands with the Virtualizer; date/color families and the drag-and-drop engine are not started — see the migration plan.
 
@@ -101,7 +101,7 @@ See also: [`docs/aria-migration-plan.md`](aria-migration-plan.md)
 
 ## @octanejs/base-ui
 
-[`packages/base-ui`](../packages/base-ui) `0.1.15` — ports `@base-ui/react@1.6.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
+[`packages/base-ui`](../packages/base-ui) `0.1.16` — ports `@base-ui/react@1.6.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
 
 Alpha, in progress: 31 of 43 upstream subpaths. The foundation, overlay infrastructure, hover/focus interaction layer, list-navigation/typeahead layer and popup viewport have landed, along with Dialog, AlertDialog, Popover, Tooltip, PreviewCard, the full form-control set, and the standalone Button/DirectionProvider/CSPProvider/useMediaQuery utilities — ported at full fidelity and differential-verified against the real `@base-ui/react`. Menu is COMPLETE at all 20 upstream parts — Root/Trigger/Portal/Positioner/Popup, the full item family (Item, LinkItem, CheckboxItem, RadioGroup/RadioItem and their indicators, Group/GroupLabel, Separator), Arrow, Backdrop, Viewport, and SubmenuRoot/SubmenuTrigger. Menubar and ContextMenu have landed too, so the whole menu family is complete.
 
@@ -121,7 +121,7 @@ See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md)
 
 ## @octanejs/cmdk
 
-[`packages/cmdk`](../packages/cmdk) `0.1.0` — ports `cmdk@1.1.1`. Status data: [`packages/cmdk/status.json`](../packages/cmdk/status.json).
+[`packages/cmdk`](../packages/cmdk) `0.1.1` — ports `cmdk@1.1.1`. Status data: [`packages/cmdk/status.json`](../packages/cmdk/status.json).
 
 Complete against the published `cmdk@1.1.1` public surface: `Command` (the root itself) and the `CommandRoot` named export, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading`, the flat `CommandX` aliases, `useCommandState`, and `defaultFilter` — with the DOM-authoritative store and item/group registration, `useValue` text-content inference, `onInput`-driven search, score filtering plus item and group DOM sorting, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, the `--cmdk-list-height` ResizeObserver, and a Radix-backed `Command.Dialog`. `asChild` is the one unsupported prop (see divergences).
 
@@ -159,7 +159,7 @@ See also: [`docs/cmdk-port-plan.md`](cmdk-port-plan.md)
 
 ## @octanejs/devtools
 
-[`packages/devtools`](../packages/devtools) `0.0.5` — ports `octane@workspace`. Status data: [`packages/devtools/status.json`](../packages/devtools/status.json).
+[`packages/devtools`](../packages/devtools) `0.0.6` — ports `octane@workspace`. Status data: [`packages/devtools/status.json`](../packages/devtools/status.json).
 
 Octane-native DevTools plugin (not an upstream port): renders live runtime diagnostics into a TanStack Devtools host via @tanstack/devtools-event-client. P1 ships the Components tree + state inspector.
 
@@ -171,7 +171,7 @@ Scope/evidence last checked: 2026-07-24.
 
 ## @octanejs/dexie
 
-[`packages/dexie`](../packages/dexie) `0.1.10` — ports `dexie-react-hooks@4.4.0`. Status data: [`packages/dexie/status.json`](../packages/dexie/status.json).
+[`packages/dexie`](../packages/dexie) `0.1.11` — ports `dexie-react-hooks@4.4.0`. Status data: [`packages/dexie/status.json`](../packages/dexie/status.json).
 
 Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root.
 
@@ -187,7 +187,7 @@ Scope/evidence last checked: 2026-07-16.
 
 ## @octanejs/dnd-kit
 
-[`packages/dnd-kit`](../packages/dnd-kit) `0.1.12` — ports `@dnd-kit/react@0.5.0`. Status data: [`packages/dnd-kit/status.json`](../packages/dnd-kit/status.json).
+[`packages/dnd-kit`](../packages/dnd-kit) `0.1.13` — ports `@dnd-kit/react@0.5.0`. Status data: [`packages/dnd-kit/status.json`](../packages/dnd-kit/status.json).
 
 Complete modern dnd-kit React-adapter surface: DragDropProvider, DragOverlay, useDraggable/useDroppable, manager/monitor/operation hooks, PointerSensor/KeyboardSensor re-exports, the public signal-hook utilities, useSortable, and all four upstream entry points.
 
@@ -204,7 +204,7 @@ Scope/evidence last checked: 2026-07-15.
 
 ## @octanejs/floating-ui
 
-[`packages/floating-ui`](../packages/floating-ui) `0.1.16` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
+[`packages/floating-ui`](../packages/floating-ui) `0.1.17` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
 
 Positioning (`useFloating`, ref-aware `arrow`, the `@floating-ui/dom` middleware re-exports, the floating tree), the full interaction-hook set (`useInteractions`, `useHover` + `safePolygon`, `useClick`, `useFocus`, `useDismiss`, `useRole`, `useClientPoint`, `useListNavigation`, `useTypeahead`), the component layer (`FloatingPortal`, `FloatingOverlay`, `FloatingFocusManager`, `FloatingArrow`, `FloatingList`, `Composite`), and transitions + `FloatingDelayGroup`.
 
@@ -220,7 +220,7 @@ Scope/evidence last checked: 2026-07-05.
 
 ## @octanejs/hook-form
 
-[`packages/hook-form`](../packages/hook-form) `0.1.14` — ports `react-hook-form@7.81.0`. Status data: [`packages/hook-form/status.json`](../packages/hook-form/status.json).
+[`packages/hook-form`](../packages/hook-form) `0.1.15` — ports `react-hook-form@7.81.0`. Status data: [`packages/hook-form/status.json`](../packages/hook-form/status.json).
 
 Complete port of react-hook-form 7.81.0 (upstream commit b7df98c2) with the upstream test suite ported: `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.
 
@@ -237,7 +237,7 @@ See also: [`docs/octanejs-hook-form-plan.md`](octanejs-hook-form-plan.md)
 
 ## @octanejs/i18next
 
-[`packages/i18next`](../packages/i18next) `0.1.12` — ports `react-i18next@17.0.9`. Status data: [`packages/i18next/status.json`](../packages/i18next/status.json).
+[`packages/i18next`](../packages/i18next) `0.1.13` — ports `react-i18next@17.0.9`. Status data: [`packages/i18next/status.json`](../packages/i18next/status.json).
 
 Complete runtime port of react-i18next 17.0.9: useTranslation, I18nextProvider/context, Trans/TransWithoutContext, IcuTrans/IcuTransWithoutContext, Translation, the withTranslation/withSSR HOCs, useSSR, namespace reporting, initialization/default helpers, and the root ICU helper exports over the unchanged i18next core.
 
@@ -254,7 +254,7 @@ Scope/evidence last checked: 2026-07-13.
 
 ## @octanejs/jotai
 
-[`packages/jotai`](../packages/jotai) `0.1.14` — ports `jotai@2.20.2`. Status data: [`packages/jotai/status.json`](../packages/jotai/status.json).
+[`packages/jotai`](../packages/jotai) `0.1.15` — ports `jotai@2.20.2`. Status data: [`packages/jotai/status.json`](../packages/jotai/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.
 
@@ -268,7 +268,7 @@ Scope/evidence last checked: 2026-07-21.
 
 ## @octanejs/lexical
 
-[`packages/lexical`](../packages/lexical) `0.1.16` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
+[`packages/lexical`](../packages/lexical) `0.1.17` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
 
 35 of 39 `@lexical/react` modules ported: composer + contexts, the editable surface, plain/rich text, and the full plugin/menu set (history, lists + check-list, links, tables, markdown shortcuts, the typeahead/node-menu/context-menu family, draggable-block, character-limit, …) plus the `useLexical*` hooks.
 
@@ -285,7 +285,7 @@ Scope/evidence last checked: 2026-07-09.
 
 ## @octanejs/lucide
 
-[`packages/lucide`](../packages/lucide) `0.1.12` — ports `lucide-react@1.24.0`. Status data: [`packages/lucide/status.json`](../packages/lucide/status.json).
+[`packages/lucide`](../packages/lucide) `0.1.13` — ports `lucide-react@1.24.0`. Status data: [`packages/lucide/status.json`](../packages/lucide/status.json).
 
 Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.
 
@@ -305,7 +305,7 @@ See also: [`docs/lucide-port-plan.md`](lucide-port-plan.md)
 
 ## @octanejs/mdx
 
-[`packages/mdx`](../packages/mdx) `0.1.14` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
+[`packages/mdx`](../packages/mdx) `0.1.15` — ports `@mdx-js/mdx@3.1.1`. Status data: [`packages/mdx/status.json`](../packages/mdx/status.json).
 
 The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context. The octane website runs on it.
 
@@ -321,7 +321,7 @@ See also: [`docs/mdx-migration-plan.md`](mdx-migration-plan.md)
 
 ## @octanejs/motion
 
-[`packages/motion`](../packages/motion) `0.1.16` — ports `motion@12.42.2`. Status data: [`packages/motion/status.json`](../packages/motion/status.json).
+[`packages/motion`](../packages/motion) `0.1.17` — ports `motion@12.42.2`. Status data: [`packages/motion/status.json`](../packages/motion/status.json).
 
 Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, and the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.
 
@@ -338,7 +338,7 @@ Scope/evidence last checked: 2026-07-21.
 
 ## @octanejs/nuqs
 
-[`packages/nuqs`](../packages/nuqs) `0.1.6` — ports `nuqs@2.9.1`. Status data: [`packages/nuqs/status.json`](../packages/nuqs/status.json).
+[`packages/nuqs`](../packages/nuqs) `0.1.7` — ports `nuqs@2.9.1`. Status data: [`packages/nuqs/status.json`](../packages/nuqs/status.json).
 
 Full vendored port: the framework-agnostic core (`parsers`/`parseAs*`/`createParser`, `createSerializer`, `createLoader`, `createStandardSchemaV1`, the throttle/debounce update queues, sync emitter and URL encoding) is vendored verbatim from nuqs 2.9.1; the React layer (`useQueryState`, `useQueryStates`, the `useSyncExternalStores` helper and the adapter context) is ported onto octane's hooks — same `useState`/`useEffect`/`useSyncExternalStore` implementation shape as upstream, so re-render and URL-reconciliation behaviour matches nuqs on React. Adapters ported: `@octanejs/nuqs/adapters/react` (`NuqsAdapter`, `enableHistorySync`), `/adapters/custom` (`unstable_createAdapterProvider`), `/adapters/testing` (`NuqsTestingAdapter`, `withNuqsTestingAdapter`). Server surface (`@octanejs/nuqs/server`) exposes `createLoader`/`createSerializer`/parsers/`createStandardSchemaV1`.
 
@@ -355,7 +355,7 @@ Scope/evidence last checked: 2026-07-20.
 
 ## @octanejs/radix
 
-[`packages/radix`](../packages/radix) `0.1.16` — ports `radix-ui@1.6.4`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
+[`packages/radix`](../packages/radix) `0.1.17` — ports `radix-ui@1.6.4`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
 
 Complete against the unified `radix-ui@1.6.4` component surface — all primitives (incl. Dialog, the Menu/DropdownMenu/ContextMenu family, Popover, Tooltip, Select, NavigationMenu, Toast, Menubar, Slider, the form controls, and OneTimePasswordField/PasswordToggleField) plus the composition/state/overlay foundations — verified by a differential suite (same fixtures through octane and the real radix-ui, byte-identical DOM).
 
@@ -372,7 +372,7 @@ See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/recharts
 
-[`packages/recharts`](../packages/recharts) `0.1.14` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
+[`packages/recharts`](../packages/recharts) `0.1.15` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
 
 Partial (phases 0–1 of 5): the static `BarChart`/`LineChart` pipeline end-to-end (`isAnimationActive={false}`), byte-identical to upstream in the differential rig; the Redux/RTK state layer, `Surface`/`Layer`, and the pure shape set are in place.
 
@@ -390,7 +390,7 @@ See also: [`docs/recharts-port-plan.md`](recharts-port-plan.md)
 
 ## @octanejs/redux
 
-[`packages/redux`](../packages/redux) `0.1.14` — ports `react-redux@9.3.0`. Status data: [`packages/redux/status.json`](../packages/redux/status.json).
+[`packages/redux`](../packages/redux) `0.1.15` — ports `react-redux@9.3.0`. Status data: [`packages/redux/status.json`](../packages/redux/status.json).
 
 The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Export parity is pinned by test.
 
@@ -405,7 +405,7 @@ Scope/evidence last checked: 2026-07-08.
 
 ## @octanejs/redux-toolkit
 
-[`packages/redux-toolkit`](../packages/redux-toolkit) `0.1.12` — ports `@reduxjs/toolkit@2.12.0`. Status data: [`packages/redux-toolkit/status.json`](../packages/redux-toolkit/status.json).
+[`packages/redux-toolkit`](../packages/redux-toolkit) `0.1.13` — ports `@reduxjs/toolkit@2.12.0`. Status data: [`packages/redux-toolkit/status.json`](../packages/redux-toolkit/status.json).
 
 Complete four-entry-point port: the framework-agnostic Toolkit and RTK Query core are re-exported verbatim; `/query/react` provides generated query, lazy-query, mutation, infinite-query, prefetch hooks and `ApiProvider`; `/react` provides the dynamic-middleware dispatch-hook integration.
 
@@ -420,7 +420,7 @@ Scope/evidence last checked: 2026-07-13.
 
 ## @octanejs/remix-router
 
-[`packages/remix-router`](../packages/remix-router) `0.1.13` — ports `react-router@8.2.0`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
+[`packages/remix-router`](../packages/remix-router) `0.1.14` — ports `react-router@8.2.0`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
 
 COMPLETE port (all phases shipped — full export parity, EXPECTED_MISSING is empty): the framework-agnostic router core (lib/router/* + framework-free helpers, ~12k lines) is vendored byte-close and validated by 161 ported upstream router tests plus four focused v8.2 regression pins; the data-mode React layer (createMemoryRouter, RouterProvider incl. the /dom flushSync variant, Outlet, Await, RenderErrorBoundary/errorElement, Link + useLinkClickHandler, and the full read-hook family) and the declarative layer (MemoryRouter, Routes/Route in BOTH children forms — descriptor children walked upstream-style, .tsrx block children via a registration collector — Navigate, createRoutesFromChildren/Elements, the UNSAFE_With*Props wrappers) and the DOM layer (createBrowserRouter/createHashRouter with __staticRouterHydrationData parsing, BrowserRouter/HashRouter/unstable_HistoryRouter, Link + NavLink incl. the isActive/isPending render props, useLinkClickHandler, useSearchParams) and the mutation layer (Form on octane's native delegated submit event, useSubmit incl. JSON encTypes, useFormAction with ?index resolution, useFetcher/useFetchers incl. fetcher.Form/load/submit/reset and shared keys), the guard/scroll layer (useBlocker, unstable_usePrompt, ScrollRestoration/UNSAFE_useScrollRestoration, useBeforeUnload, useViewTransitionState, unstable_useRoute/unstable_useRouterState), static SSR (StaticRouter, StaticRouterProvider, createStaticHandler/createStaticRouter rendering through octane/server — markup byte-identical to react-dom/server after marker stripping, hydration payload identical), and the vendored cookie/session server runtime (createCookie/createSession/createCookieSessionStorage/createMemorySessionStorage) are transcribed onto octane and differential-verified against real react-router. Framework-mode + RSC names (Meta/Links/Scripts, createRequestHandler, UNSAFE_ internals) exist as THROWING STUBS so parity is honest.
 
@@ -442,7 +442,7 @@ See also: [`docs/remix-router-port-plan.md`](remix-router-port-plan.md)
 
 ## @octanejs/shadcn
 
-[`packages/shadcn`](../packages/shadcn) `0.0.2` — ports `shadcn-ui/ui (radix base)@4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
+[`packages/shadcn`](../packages/shadcn) `0.0.3` — ports `shadcn-ui/ui (radix base)@4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
 
 Tiers 1-2 complete plus the first Tier-3 composites — 40 component families (~185 exports). STYLING FLAVOR: the package is mid-migration from the pinned bases/radix semantic-hook (cn-*) system to the default-Tailwind utilities-inlined flavor (user-directed; class strings verbatim from supplied sources or upstream new-york-v4). Migrated: accordion, alert, alert-dialog, avatar, badge, breadcrumb, button, card, checkbox, collapsible, dialog, input, label, progress, radio-group, separator, skeleton, slider, sonner, switch, table, tabs, textarea, toggle, toggle-group. Still cn-*-hooked (style-sheet-dependent): select, scroll-area, sheet, tooltip, popover, hover-card, dropdown-menu, context-menu, menubar, navigation-menu, pagination, sidebar, field, item, empty, native-select, kbd, spinner. Structure/behavior are unchanged by the flavor migration; the shipped registry (packages/shadcn/registry, 47 items) carries the current flavors and the migrated ones install through the upstream shadcn CLI without its cn-* style-transform stripping.
 
@@ -477,7 +477,7 @@ See also: [`docs/shadcn-port-plan.md`](shadcn-port-plan.md)
 
 ## @octanejs/sonner
 
-[`packages/sonner`](../packages/sonner) `0.1.12` — ports `sonner@2.0.7`. Status data: [`packages/sonner/status.json`](../packages/sonner/status.json).
+[`packages/sonner`](../packages/sonner) `0.1.13` — ports `sonner@2.0.7`. Status data: [`packages/sonner/status.json`](../packages/sonner/status.json).
 
 Complete against the published `sonner@2.0.7` public surface: `Toaster`, the callable `toast` API and all methods, `useSonner`, promise lifecycle, multiple toaster targeting, stacked layout, themes, styling, focus management, timers, and swipe dismissal.
 
@@ -495,7 +495,7 @@ See also: [`docs/sonner-port-plan.md`](sonner-port-plan.md)
 
 ## @octanejs/styled-components
 
-[`packages/styled-components`](../packages/styled-components) `0.1.9` — ports `styled-components@6.4.3`. Status data: [`packages/styled-components/status.json`](../packages/styled-components/status.json).
+[`packages/styled-components`](../packages/styled-components) `0.1.10` — ports `styled-components@6.4.3`. Status data: [`packages/styled-components/status.json`](../packages/styled-components/status.json).
 
 Full v6 web API, ported from the upstream 6.4.3 sources: `styled` with every HTML/SVG tag shortcut, `.attrs`/`.withConfig` chaining, `css`, `keyframes`, `createGlobalStyle`, `createTheme`, `ThemeProvider`/`ThemeContext`/`ThemeConsumer`/`useTheme`/`withTheme`, `StyleSheetManager`/`StyleSheetContext`/`StyleSheetConsumer` (targets, namespaces, vendor prefixing, stylis plugins, `shouldForwardProp`), `ServerStyleSheet`, `isStyledComponent`, `version`, and `__PRIVATE__`. Component selectors, folding (`styled(Styled)`), transient `$` props, `as`/`forwardedAs`, and the grouped CSSOM sheet engine (with upstream `data-styled` rehydration) all behave as upstream. The React Native surface and the RSC-only `stylisPluginRSC` are not ported.
 
@@ -516,7 +516,7 @@ Scope/evidence last checked: 2026-07-18.
 
 ## @octanejs/stylex
 
-[`packages/stylex`](../packages/stylex) `0.1.16` — ports `@stylexjs/stylex@0.19.0`. Status data: [`packages/stylex/status.json`](../packages/stylex/status.json).
+[`packages/stylex`](../packages/stylex) `0.1.17` — ports `@stylexjs/stylex@0.19.0`. Status data: [`packages/stylex/status.json`](../packages/stylex/status.json).
 
 Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle.
 
@@ -531,7 +531,7 @@ Scope/evidence last checked: 2026-07-09.
 
 ## @octanejs/tanstack-ai
 
-[`packages/tanstack-ai`](../packages/tanstack-ai) `0.0.11` — ports `@tanstack/ai-react@0.17.0`. Status data: [`packages/tanstack-ai/status.json`](../packages/tanstack-ai/status.json).
+[`packages/tanstack-ai`](../packages/tanstack-ai) `0.0.12` — ports `@tanstack/ai-react@0.17.0`. Status data: [`packages/tanstack-ai/status.json`](../packages/tanstack-ai/status.json).
 
 Ports the @tanstack/ai-react 0.17.0 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while reusing @tanstack/ai 0.41.0 and @tanstack/ai-client 0.21.0 unchanged and mirroring all 30 @tanstack/ai-client convenience re-exports from the upstream index.
 
@@ -556,7 +556,7 @@ Scope/evidence last checked: 2026-07-16.
 
 ## @octanejs/tanstack-devtools
 
-[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.11` — ports `@tanstack/react-devtools@0.10.7`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
+[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.12` — ports `@tanstack/react-devtools@0.10.7`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
 
 Ports the @tanstack/react-devtools 0.10.7 public surface (the `TanStackDevtools` component plus its plugin/init types) onto Octane while reusing the framework-agnostic `@tanstack/devtools` 0.12.5 core (`TanStackDevtoolsCore`) unchanged. Plugin, title, and custom-trigger content authored as Octane elements is portaled into the containers the core creates.
 
@@ -577,7 +577,7 @@ Scope/evidence last checked: 2026-07-17.
 
 ## @octanejs/tanstack-form
 
-[`packages/tanstack-form`](../packages/tanstack-form) `0.0.11` — ports `@tanstack/react-form@1.33.2`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
+[`packages/tanstack-form`](../packages/tanstack-form) `0.0.12` — ports `@tanstack/react-form@1.33.2`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
 
 Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.
 
@@ -597,7 +597,7 @@ Scope/evidence last checked: 2026-07-15.
 
 ## @octanejs/tanstack-hotkeys
 
-[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.6` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
+[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.7` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
 
 Complete: the full upstream hook surface (`useHotkey`, `useHotkeys`, `useHeldKeys`, `useHeldKeyCodes`, `useKeyHold`, `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`, `useHotkeySequenceRecorder`, `useHotkeyRegistrations`) plus `HotkeysProvider`/`useHotkeysContext`/`useDefaultHotkeysOptions`, re-exporting the framework-agnostic `@tanstack/hotkeys@0.8.0` core unchanged; store subscriptions go through `@octanejs/tanstack-store`.
 
@@ -614,7 +614,7 @@ Scope/evidence last checked: 2026-07-20.
 
 ## @octanejs/tanstack-pacer
 
-[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.6` — ports `@tanstack/react-pacer@0.22.1`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
+[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.7` — ports `@tanstack/react-pacer@0.22.1`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
 
 Complete: every upstream hook family — debouncer (`useDebouncer`, `useDebouncedState`, `useDebouncedValue`, `useDebouncedCallback`), throttler, rate-limiter, queuer, batcher, and their async variants (async-debouncer, async-throttler, async-rate-limiter, async-queuer, async-batcher) — plus `PacerProvider`/`usePacerContext`/`useDefaultPacerOptions`, the per-instance `Subscribe` render-prop component, and the upstream subpath exports (`/debouncer`, `/async-retryer`, `/types`, `/utils`, ...), re-exporting the framework-agnostic `@tanstack/pacer@0.21.1` core unchanged.
 
@@ -631,7 +631,7 @@ Scope/evidence last checked: 2026-07-20.
 
 ## @octanejs/tanstack-query
 
-[`packages/tanstack-query`](../packages/tanstack-query) `0.1.16` — ports `@tanstack/react-query@5.101.3`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
+[`packages/tanstack-query`](../packages/tanstack-query) `0.1.17` — ports `@tanstack/react-query@5.101.3`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
 
 Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.
 
@@ -647,7 +647,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.1.16` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.1.17` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.
 
@@ -668,7 +668,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.6` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.7` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Complete: `setupRouterSsrQueryIntegration` (the package's only export) delegating to `@tanstack/router-ssr-query-core@1.169.1`, with the QueryClientProvider Wrap composition on Octane.
 
@@ -680,7 +680,7 @@ Scope/evidence last checked: 2026-07-20.
 
 ## @octanejs/tanstack-store
 
-[`packages/tanstack-store`](../packages/tanstack-store) `0.0.11` — ports `@tanstack/react-store@0.11.0`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
+[`packages/tanstack-store`](../packages/tanstack-store) `0.0.12` — ports `@tanstack/react-store@0.11.0`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
 
 Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.
 
@@ -697,7 +697,7 @@ Scope/evidence last checked: 2026-07-15.
 
 ## @octanejs/tanstack-table
 
-[`packages/tanstack-table`](../packages/tanstack-table) `0.1.14` — ports `@tanstack/react-table@9.0.0-beta.58`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
+[`packages/tanstack-table`](../packages/tanstack-table) `0.1.15` — ports `@tanstack/react-table@9.0.0-beta.58`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
 
 Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.
 
@@ -715,7 +715,7 @@ Scope/evidence last checked: 2026-07-26.
 
 ## @octanejs/tanstack-virtual
 
-[`packages/tanstack-virtual`](../packages/tanstack-virtual) `0.1.14` — ports `@tanstack/react-virtual@3.14.5`. Status data: [`packages/tanstack-virtual/status.json`](../packages/tanstack-virtual/status.json).
+[`packages/tanstack-virtual`](../packages/tanstack-virtual) `0.1.15` — ports `@tanstack/react-virtual@3.14.5`. Status data: [`packages/tanstack-virtual/status.json`](../packages/tanstack-virtual/status.json).
 
 Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle.
 
@@ -731,7 +731,7 @@ Scope/evidence last checked: 2026-07-12.
 
 ## @octanejs/tauri
 
-[`packages/tauri`](../packages/tauri) `0.0.0` — ports `@tauri-apps/api@2.11.1`. Status data: [`packages/tauri/status.json`](../packages/tauri/status.json).
+[`packages/tauri`](../packages/tauri) `0.0.1` — ports `@tauri-apps/api@2.11.1`. Status data: [`packages/tauri/status.json`](../packages/tauri/status.json).
 
 Octane hooks over the framework-neutral Tauri IPC surface: useInvoke (suspending command), useInvokeState (pending/success/error with refetch), and useTauriEvent (event subscription with lifecycle-safe teardown). The rest of @tauri-apps/api — window, webview, menu, tray, path, dpi, image, and the plugin packages — is already framework-neutral and is imported directly rather than re-exported here.
 
@@ -751,7 +751,7 @@ Scope/evidence last checked: 2026-07-27.
 
 ## @octanejs/testing-library
 
-[`packages/testing-library`](../packages/testing-library) `0.1.14` — ports `@testing-library/react` (unpinned). Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
+[`packages/testing-library`](../packages/testing-library) `0.1.15` — ports `@testing-library/react` (unpinned). Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
 
 `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.
 
@@ -771,7 +771,7 @@ See also: [`docs/testing-library-migration-plan.md`](testing-library-migration-p
 
 ## @octanejs/three
 
-[`packages/three`](../packages/three) `0.1.10` — ports `@react-three/fiber@9.6.1 (2a528745)`. Status data: [`packages/three/status.json`](../packages/three/status.json).
+[`packages/three`](../packages/three) `0.1.11` — ports `@react-three/fiber@9.6.1 (2a528745)`. Status data: [`packages/three/status.json`](../packages/three/status.json).
 
 Technical-preview Milestones 0–10 surface: renderer configuration and the DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning HTMLCanvasElement and OffscreenCanvas roots, Octane act/flushSync scheduling, callback-aware unmountComponentAtNode, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, controlled WebXR loop handoff, context-restore invalidation, compatible/reconstructing HMR, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, client-only Canvas shell streaming and production Vite/Rsbuild hydration adoption with the matching raw Rspack graph split, the explicit-target low-level DOMRegion boundary, a deterministic testing harness, an asynchronously acknowledged structured-clone transport proof, a checked public API/subpath matrix, Three r156/current compatibility lanes, a packed external consumer, real WebGL failure/recovery coverage, and semantic-checksummed renderer and shipped-size benchmarks.
 
@@ -803,7 +803,7 @@ See also: [`docs/three-port-plan.md`](three-port-plan.md), [`packages/three/UPST
 
 ## @octanejs/tiptap
 
-[`packages/tiptap`](../packages/tiptap) `0.0.11` — ports `@tiptap/react@3.28.0`. Status data: [`packages/tiptap/status.json`](../packages/tiptap/status.json).
+[`packages/tiptap`](../packages/tiptap) `0.0.12` — ports `@tiptap/react@3.28.0`. Status data: [`packages/tiptap/status.json`](../packages/tiptap/status.json).
 
 Complete @tiptap/react 3.28.0 adapter surface across the root and ./menus entries: @tiptap/core re-exports, editor hooks and contexts, the EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, BubbleMenu, and FloatingMenu.
 
@@ -828,7 +828,7 @@ Scope/evidence last checked: 2026-07-17.
 
 ## @octanejs/valtio
 
-[`packages/valtio`](../packages/valtio) `0.1.0` — ports `valtio@2.3.2`. Status data: [`packages/valtio/status.json`](../packages/valtio/status.json).
+[`packages/valtio`](../packages/valtio) `0.1.1` — ports `valtio@2.3.2`. Status data: [`packages/valtio/status.json`](../packages/valtio/status.json).
 
 The framework-agnostic `valtio/vanilla` core and `valtio/vanilla/utils` are re-exported verbatim; `useSnapshot` and the `useProxy` utility are ported to Octane.
 
@@ -842,7 +842,7 @@ Scope/evidence last checked: 2026-07-27.
 
 ## @octanejs/visx
 
-[`packages/visx`](../packages/visx) `0.1.11` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
+[`packages/visx`](../packages/visx) `0.1.12` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
 
 Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.
 
@@ -865,7 +865,7 @@ Scope/evidence last checked: 2026-07-14.
 
 ## @octanejs/zustand
 
-[`packages/zustand`](../packages/zustand) `0.1.16` — ports `zustand@5.0.14`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
+[`packages/zustand`](../packages/zustand) `0.1.17` — ports `zustand@5.0.14`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).
 
