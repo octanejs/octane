@@ -2588,6 +2588,41 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 	walk(root, new Set(initiallyBound));
 	return free;
 
+	/**
+	 * Walk the EXPRESSION positions inside a binding pattern: default
+	 * initialisers and computed keys. `collectBindings` harvests the names a
+	 * pattern declares, but those two positions are ordinary expressions that
+	 * run at binding time and may reference outer values — so they carry free
+	 * identifiers that the pattern's names alone never reveal.
+	 */
+	function walkPatternExpressions(pattern, scope) {
+		if (!pattern || typeof pattern !== 'object') return;
+		switch (pattern.type) {
+			case 'AssignmentPattern':
+				walkPatternExpressions(pattern.left, scope);
+				walk(pattern.right, scope);
+				return;
+			case 'ObjectPattern':
+				for (const p of pattern.properties || []) {
+					if (p.type === 'RestElement') {
+						walkPatternExpressions(p.argument, scope);
+						continue;
+					}
+					if (p.computed) walk(p.key, scope);
+					walkPatternExpressions(p.value || p.key, scope);
+				}
+				return;
+			case 'ArrayPattern':
+				for (const e of pattern.elements || []) walkPatternExpressions(e, scope);
+				return;
+			case 'RestElement':
+				walkPatternExpressions(pattern.argument, scope);
+				return;
+			default:
+				return;
+		}
+	}
+
 	function walk(n, scope) {
 		if (!n) return;
 		if (Array.isArray(n)) {
@@ -2691,6 +2726,12 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			for (const p of n.params || []) collectBindings(p, newScope);
 			// `function name(){}` introduces its own name into the body scope too.
 			if (n.id) collectBindings(n.id, newScope);
+			// A parameter pattern is not only a set of bindings: default
+			// initialisers and computed destructuring keys are EXPRESSIONS that run
+			// when the function is called, and they can reference anything the
+			// function closes over. Walking only the body would miss
+			// `(s, x = outer) => …` and `({ [outer]: v }) => …` entirely.
+			for (const p of n.params || []) walkPatternExpressions(p, newScope);
 			walk(n.body, newScope);
 			return;
 		}
@@ -2710,8 +2751,10 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			return;
 		}
 
-		// VariableDeclarator's `id` is a binding, only walk the init.
+		// VariableDeclarator's `id` is a binding — but the pattern's defaults and
+		// computed keys are still live expressions (`const { [k]: a, b = c } = o`).
 		if (t === 'VariableDeclarator') {
+			walkPatternExpressions(n.id, scope);
 			walk(n.init, scope);
 			return;
 		}
@@ -2720,6 +2763,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		if (t === 'CatchClause') {
 			const newScope = new Set(scope);
 			if (n.param) collectBindings(n.param, newScope);
+			if (n.param) walkPatternExpressions(n.param, newScope);
 			walk(n.body, newScope);
 			return;
 		}
@@ -2731,6 +2775,13 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 				for (const d of n.left.declarations || []) collectBindings(d.id, newScope);
 			} else if (n.left) {
 				collectBindings(n.left, newScope);
+			}
+			// A CLASSIC for carries its declaration in `init`, not `left`, and that
+			// binding is visible to the test/update/body. Without this, `i` in
+			// `for (let i = 0; i < n; i++)` is reported free, which reads as a
+			// capture of an enclosing `i` that the loop actually shadows.
+			if (n.init && n.init.type === 'VariableDeclaration') {
+				for (const d of n.init.declarations || []) collectBindings(d.id, newScope);
 			}
 			walk(n.init, newScope);
 			walk(n.test, newScope);
@@ -2761,6 +2812,232 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
 			walk(n[key], scope);
 		}
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capture-free hook-callback hoisting (production compiles).
+//
+// A function passed as an argument to a hook call site is reallocated on every
+// render, so any hook that COMPARES that argument sees a fresh identity each
+// time and redoes work whose inputs never moved. A store selector is the
+// motivating case: `useSelector(store, (s) => s.total)` feeds a memo keyed on
+// the selector's identity, so an unrelated parent re-render re-runs the
+// selection for every subscriber.
+//
+// A function that captures NOTHING from the component cannot behave differently
+// between renders or between instances — its behavior is fixed for the module's
+// lifetime. Lifting it to module scope therefore gives it one stable identity
+// and removes the per-render allocation, without changing what it computes.
+//
+// This is deliberately conservative. The analysis over-approximates the
+// component's bindings (every name declared anywhere in the enclosing
+// module-level function counts as local), so shadowing can only ever cause a
+// DECLINE, never an unsafe hoist. A function that reads `this`/`arguments`,
+// renders JSX, or contains a hook call keeps its authored position.
+//
+// Dev/HMR compiles keep the authored form, matching the inline hook-memo tier:
+// identity stability is a production optimization, and an HMR edit should not
+// have to reason about which closures were lifted out of the component.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Over-approximate the names a subtree DECLARES: every function parameter,
+ * variable/function/class declaration, and catch parameter at any depth. Used
+ * as the "component-local" set — a candidate referencing any of these is
+ * declined, so a name declared in a sibling scope costs a hoist but never
+ * produces a wrong one.
+ */
+function collectSubtreeBindings(root, out) {
+	const seen = new WeakSet();
+	walk(root);
+	return out;
+
+	function walk(n) {
+		if (!n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		const t = n.type;
+		if (!t || seen.has(n)) return;
+		seen.add(n);
+		if (
+			t === 'FunctionExpression' ||
+			t === 'FunctionDeclaration' ||
+			t === 'ArrowFunctionExpression'
+		) {
+			if (n.id) collectBindings(n.id, out);
+			for (const p of n.params || []) collectBindings(p, out);
+		} else if (t === 'VariableDeclarator') {
+			collectBindings(n.id, out);
+		} else if (t === 'ClassDeclaration' || t === 'ClassExpression') {
+			if (n.id) collectBindings(n.id, out);
+		} else if (t === 'CatchClause') {
+			if (n.param) collectBindings(n.param, out);
+		} else if (t === 'JSXForExpression') {
+			if (n.index) collectBindings(n.index, out);
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+}
+
+/** Hook-shaped callee name at a call site, or null. Mirrors the slot-injection
+ *  convention: built-in hooks, `use(...)`, and React's `use[A-Z]` custom-hook rule. */
+function hookShapedCalleeName(call) {
+	const callee = call.callee;
+	if (!callee) return null;
+	if (callee.type === 'Identifier') return callee.name;
+	if (
+		callee.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.property?.type === 'Identifier'
+	)
+		return callee.property.name;
+	return null;
+}
+
+function isHookShapedCall(call) {
+	const name = hookShapedCalleeName(call);
+	if (name === null) return false;
+	return HOOK_NAMES.has(name) || name === 'use' || /^use[A-Z]/.test(name);
+}
+
+// Hooks whose CONTRACT is stated in terms of the callback they receive, so
+// moving that callback would change observable behavior rather than just its
+// address:
+//
+//   - `useCallback` RETURNS the argument, and promises a fresh identity when
+//     deps change — a lifted function can never provide one.
+//   - `useMemo`/`useEffect`/`useLayoutEffect`/`useInsertionEffect` are defined
+//     by how often the callback runs, and the inline hook-memo tier already
+//     consumes them with full knowledge of those semantics.
+//   - `useState`/`useReducer` take a lazy initialiser that runs once.
+//   - `useEffectEvent` deliberately hands back an unstable wrapper.
+//
+// Everything else — custom `use[A-Z]` hooks, and `useSyncExternalStore`, whose
+// `subscribe`/`getSnapshot` are data the hook reads rather than identity it
+// publishes — treats a callback argument as a value, which is exactly where a
+// stable identity is worth having.
+const CALLBACK_IDENTITY_OWNING_HOOKS = new Set(
+	[...HOOK_NAMES, 'use'].filter((name) => name !== 'useSyncExternalStore'),
+);
+
+function hookOwnsCallbackIdentity(call) {
+	const name = hookShapedCalleeName(call);
+	return name !== null && CALLBACK_IDENTITY_OWNING_HOOKS.has(name);
+}
+
+/**
+ * Whether `fn` can be lifted to module scope without changing what it computes.
+ * `componentBound` is the over-approximated set of names the enclosing
+ * module-level function declares.
+ */
+function isHoistableHookCallback(fn, componentBound) {
+	if (fn.type !== 'ArrowFunctionExpression' && fn.type !== 'FunctionExpression') return false;
+	// A JSX code-block body is a subtemplate with its own compile pass.
+	if (fn.body?.type === 'JSXCodeBlock') return false;
+
+	let disqualified = false;
+	const seen = new WeakSet();
+	scan(fn);
+	if (disqualified) return false;
+
+	// Any reference to a name the component declares makes the closure
+	// instance-specific, so it must stay where it was authored.
+	const free = collectFreeIdentifiers(fn, new Set());
+	for (const name of free) {
+		if (componentBound.has(name)) return false;
+	}
+	return true;
+
+	function scan(n) {
+		if (disqualified || !n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) scan(x);
+			return;
+		}
+		const t = n.type;
+		if (!t || seen.has(n)) return;
+		seen.add(n);
+		if (
+			// `this`/`arguments`/`super` bind to the enclosing call, not to the
+			// function's text, so the meaning would move with the function.
+			t === 'ThisExpression' ||
+			t === 'Super' ||
+			t === 'MetaProperty' ||
+			// Rendering depends on the component context the compiler is building.
+			t === 'JSXElement' ||
+			t === 'JSXFragment' ||
+			t === 'Element' ||
+			t === 'Fragment' ||
+			t === 'JSXCodeBlock' ||
+			t === 'Tsrx' ||
+			t === 'Tsx'
+		) {
+			disqualified = true;
+			return;
+		}
+		if (t === 'Identifier' && n.name === 'arguments') {
+			disqualified = true;
+			return;
+		}
+		// A hook call must keep its authored call site: its slot is keyed there,
+		// and module scope has no render scope to run in.
+		if (t === 'CallExpression' && isHookShapedCall(n)) {
+			disqualified = true;
+			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			scan(n[key]);
+		}
+	}
+}
+
+/**
+ * Lift capture-free function arguments of hook calls to module scope, so the
+ * hook sees one identity for the module's lifetime. Returns the AST unchanged
+ * when nothing qualifies.
+ */
+function hoistCaptureFreeHookCallbacks(ast, options = {}) {
+	if (options.enabled !== true) return ast;
+	if (!Array.isArray(ast?.body)) return ast;
+
+	const hoisted = [];
+	let nextId = 0;
+	const body = ast.body.map((statement) => processTopLevel(statement));
+	if (hoisted.length === 0) return ast;
+	// Declarations land before the statement that referenced them, preserving
+	// the authored order of everything else.
+	return { ...ast, body: [...hoisted, ...body] };
+
+	function processTopLevel(statement) {
+		// Bindings are collected over the WHOLE top-level statement, not per
+		// function within it: `const A = () => …, B = () => …` declares two
+		// components, and a set built from only one of them would miss the other's
+		// locals and let a capturing callback look free.
+		const componentBound = collectSubtreeBindings(statement, new Set());
+		const visit = (n) => {
+			if (n.type !== 'CallExpression' || !isHookShapedCall(n)) return null;
+			const ownsIdentity = hookOwnsCallbackIdentity(n);
+			// Recurse into the arguments HERE: returning a node from mapAst's
+			// callback stops its own descent, so a hook call nested inside an
+			// argument would otherwise never be visited.
+			const args = n.arguments.map((arg) => {
+				const walked = mapAst(arg, visit);
+				if (ownsIdentity || arg?.type === 'SpreadElement') return walked;
+				if (!isHoistableHookCallback(walked, componentBound)) return walked;
+				const name = `_fn$${nextId++}`;
+				hoisted.push(inheritOriginLoc(b.const(name, walked), arg));
+				return inheritOriginLoc(b.id(name), arg);
+			});
+			return { ...n, arguments: args };
+		};
+		return mapAst(statement, visit);
 	}
 }
 
@@ -5391,6 +5668,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// inline-cache-vs-elsewhere in one line.
 	const inlineHookMemoEnabled =
 		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+	// Same production-only gate as the tiers above, and for the same reason: a
+	// lifted callback has left the component, which dev tooling, HMR boundaries,
+	// and profile attribution all reason about. Runs AFTER dependency inference
+	// so materialised dep arrays are already in place — module scope reads as
+	// non-reactive, so re-ordering the two would change what inference produces.
+	ast = hoistCaptureFreeHookCallbacks(ast, {
+		enabled: !hmrEnabled && !devEnabled && !profileEnabled,
+	});
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	const ctx = {

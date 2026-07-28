@@ -61,6 +61,7 @@ export const BENCHMARK_SUITES = [
 	'event-delegation',
 	'application-composition',
 	'scaling-curves',
+	'store-selector-fanout',
 	'effectful-list',
 	'list-clear',
 	'memo-wall',

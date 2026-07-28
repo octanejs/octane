@@ -180,6 +180,7 @@ internally, get their own baseline and guard namespace.
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, snapshots, notifications, renders, and exact subscription cleanup |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and six-framework cleanup gates |
+| `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
 | `scheduler-responsiveness` | scheduler-responsiveness | none (builds) | real controlled typing during eight 512-subscriber store updates at 6× CPU throttling, with focus, caret, frame, and notification gates |
 | `suspense-recovery` | suspense-recovery | none (builds) | six-framework visible async pending, rejection, retry, cancellation, and stale-response correctness |
 | `event-delegation` | event-delegation | none (builds) | 128 real native input events, 512 event-bearing hosts, capture/bubble accounting, and every controlled output |

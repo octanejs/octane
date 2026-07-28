@@ -283,6 +283,21 @@ const SUITES = [
 		})),
 	})),
 	{
+		// Selector-based fan-out: 512 subscribers read one store through a
+		// selector, then the parent re-renders 20 times with the store untouched.
+		// Reuses the news per-target toolchains with its own page, so the shared
+		// runtime-stress fixture's 512 form fields stay out of the measurement.
+		name: 'store-selector-fanout',
+		cwd: 'store-selector-fanout',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
+			label: target,
+			script: 'run.mjs',
+			args: (n) => [target, String(n)],
+		})),
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
