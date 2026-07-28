@@ -50,11 +50,21 @@ useEffect(() => {
 }); // inferred from syncRoom and room.id
 ```
 
-Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules participate when
-they transparently forward their callback and final dependency parameter to one of
-those hooks. The compiler follows nested transparent wrappers, but it does not guess
-from a `use*` name alone. Plain `.ts`/`.js` modules, imported custom hooks, and wrappers
-that transform or inspect those parameters need an explicit list.
+Direct calls to built-in hooks infer their dependencies in every compiler-processed
+module, including custom hooks written in plain `.ts` or `.js`:
+
+```ts
+export function useLoggedValue(value: string, log: (value: string) => void) {
+	useEffect(() => log(value)); // inferred from log and value
+}
+```
+
+Inferring an omitted list at a call to a custom wrapper is a narrower operation.
+It works when a local wrapper in a fully compiled `.tsrx`/`.tsx` module transparently
+forwards its callback and final dependency parameter to a built-in hook. Nested local
+transparent wrappers also work. Wrapper calls in plain `.ts`/`.js` and imported,
+method-style, or non-transparent wrappers need an explicit list; their internal calls
+to built-in hooks can still infer dependencies.
 
 An explicit array keeps its exact React meaning. Pass `null` when you intentionally
 want the effect or computation to run after every render.
