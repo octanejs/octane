@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core';
-import type { Context } from 'octane';
+import type { Context, OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 
 import type { EditorContentProps } from './EditorContent.tsrx';
 import type { EditorStateSnapshot } from './useEditorState';
@@ -30,7 +31,7 @@ export type TiptapWrapperEditorInstanceProps =
 	  };
 
 export type TiptapWrapperProps = TiptapWrapperEditorInstanceProps & {
-	children: unknown;
+	children: OctaneNode;
 };
 
 export type TiptapContentProps = Omit<EditorContentProps, 'editor' | 'ref'> & {
@@ -38,8 +39,8 @@ export type TiptapContentProps = Omit<EditorContentProps, 'editor' | 'ref'> & {
 	ref?: never;
 };
 
-export declare function TiptapWrapper(props: TiptapWrapperProps): unknown;
-export declare function TiptapContent(props: TiptapContentProps): unknown;
+export declare function TiptapWrapper(props: TiptapWrapperProps): Octane.JSX.Element;
+export declare function TiptapContent(props: TiptapContentProps): Octane.JSX.Element;
 
 export declare const Tiptap: typeof TiptapWrapper & {
 	Content: typeof TiptapContent;

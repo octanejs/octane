@@ -1,5 +1,5 @@
 // Ported from sonner@2.0.7 src/assets.tsx.
-import type { ToastTypes } from './types';
+import type { ToastElement, ToastTypes } from './types';
 
 const SuccessIcon = <svg
 	xmlns="http://www.w3.org/2000/svg"
@@ -72,7 +72,7 @@ export const CloseIcon = <svg
 	<line x1="6" y1="6" x2="18" y2="18" />
 </svg>;
 
-export function getAsset(type: ToastTypes | undefined): any {
+export function getAsset(type: ToastTypes | undefined): ToastElement | null {
 	switch (type) {
 		case 'success':
 			return SuccessIcon;

@@ -36,7 +36,7 @@ export function Group(props: GroupProps) @{
 	const contextValue = useMemo(() => ({ id, forceMount }), [forceMount]);
 
 	<div
-		ref={[ref, props.ref]}
+		ref={[ref, props.ref ?? null]}
 		{...etc}
 		cmdk-group=""
 		role="presentation"

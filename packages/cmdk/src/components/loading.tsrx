@@ -5,7 +5,7 @@ export function Loading(props: LoadingProps) @{
 	const { progress, children, label = 'Loading...', ref: _ref, ...etc } = props;
 
 	<div
-		ref={props.ref}
+		ref={props.ref ?? null}
 		{...etc}
 		cmdk-loading=""
 		role="progressbar"

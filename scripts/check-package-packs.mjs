@@ -20,10 +20,15 @@ import {
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
 import {
+	createPackedTsrxConsumerConfig,
+	createPackedTsrxConsumerManifest,
 	createPackedExampleManifest,
 	isWithinDirectory,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
+	PACKED_TSRX_CONSUMER_PACKAGES,
 	renderPackedExampleWorkspace,
+	renderPackedTsrxConsumerSource,
+	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
 import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
 import {
@@ -48,8 +53,13 @@ const octaneSingletonConsumers = new Set([
 const viteToolRequire = createRequire(
 	path.join(REPO_ROOT, 'packages/vite-plugin-octane/package.json'),
 );
+const repositoryRequire = createRequire(path.join(REPO_ROOT, 'package.json'));
 const viteVersion = viteToolRequire('vite/package.json').version;
 const nodeTypesVersion = viteToolRequire('@types/node/package.json').version;
+const tsrxTypeScriptPluginVersion = repositoryRequire(
+	'@tsrx/typescript-plugin/package.json',
+).version;
+const typescriptVersion = repositoryRequire('typescript/package.json').version;
 const packedExampleCanaries = [
 	{
 		artifacts: ['dist/index.html'],
@@ -637,7 +647,6 @@ process.stdout.write(JSON.stringify(result));`,
 	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
 	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
 	const threeConfigEntry = consumerRequire.resolve('@octanejs/three/config');
-	const repositoryRequire = createRequire(path.join(REPO_ROOT, 'package.json'));
 	const threeConfigBundle = path.join(consumerDirectory, 'three-config.mjs');
 	execFileSync(
 		repositoryRequire.resolve('esbuild/bin/esbuild'),
@@ -731,6 +740,104 @@ process.stdout.write(output, () => process.exit(0));
 
 	console.log(
 		'installed packed octane + Hook Form + Apollo Client + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
+	);
+}
+
+/**
+ * Typecheck source-published bindings from their real installed tarballs. A
+ * workspace project or plain tsc cannot exercise the TSRX implementation files
+ * that become part of a strict external consumer's TypeScript program.
+ */
+function validatePackedTsrxConsumer(tempRoot, archives) {
+	const consumerDirectory = path.join(tempRoot, 'external-tsrx-source-consumer');
+	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
+		throw new Error('packed TSRX source consumer must be created outside the workspace');
+	}
+
+	const sourceDirectory = path.join(consumerDirectory, 'src');
+	mkdirSync(sourceDirectory, { recursive: true });
+	const archiveSpecs = Object.fromEntries(
+		PACKED_TSRX_CONSUMER_PACKAGES.map((packageName) => [
+			packageName,
+			fileArchiveSpec(archives, packageName),
+		]),
+	);
+	const manifest = createPackedTsrxConsumerManifest(archiveSpecs, {
+		nodeTypes: nodeTypesVersion,
+		tsrxTypeScriptPlugin: tsrxTypeScriptPluginVersion,
+		typescript: typescriptVersion,
+	});
+
+	writeFileSync(
+		path.join(consumerDirectory, 'package.json'),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.json'),
+		`${JSON.stringify(createPackedTsrxConsumerConfig(), null, 2)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		renderPackedExampleWorkspace(archiveSpecs),
+	);
+	writeFileSync(
+		path.join(sourceDirectory, 'PublishedSourceConsumer.tsrx'),
+		renderPackedTsrxConsumerSource(),
+	);
+	writeFileSync(
+		path.join(sourceDirectory, 'published-types.ts'),
+		renderPackedTsrxConsumerTypeProbe(),
+	);
+
+	execFileSync(
+		'pnpm',
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=false',
+		],
+		{
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+
+	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
+	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
+	for (const packageName of PACKED_TSRX_CONSUMER_PACKAGES) {
+		const entry = realpathSync(consumerRequire.resolve(packageName));
+		if (isWithinDirectory(REPO_ROOT, entry)) {
+			throw new Error(`${packageName} resolved back into the workspace: ${entry}`);
+		}
+		if (packageName !== 'octane') {
+			const peerRuntime = realpathSync(createRequire(entry).resolve('octane'));
+			if (peerRuntime !== directRuntime) {
+				throw new Error(
+					`${packageName} resolved a second Octane runtime:\n  app: ${directRuntime}\n  package: ${peerRuntime}`,
+				);
+			}
+		}
+	}
+
+	for (const toolingSpecifier of ['@tsrx/typescript-plugin', 'octane/compiler/volar']) {
+		const entry = realpathSync(consumerRequire.resolve(toolingSpecifier));
+		if (isWithinDirectory(REPO_ROOT, entry)) {
+			throw new Error(`${toolingSpecifier} resolved back into the workspace: ${entry}`);
+		}
+	}
+
+	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.json'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 120_000,
+	});
+
+	console.log(
+		'strict tsrx-tsc validated packed Cmdk, Sonner, and Tiptap source with the installed Octane Volar compiler and precise consumer props',
 	);
 }
 
@@ -1078,6 +1185,10 @@ try {
 	}
 	if (!failures.length) {
 		const consumerValidations = [
+			{
+				label: 'external strict packed TSRX source consumer',
+				run: () => validatePackedTsrxConsumer(tempRoot, packedArchives),
+			},
 			{
 				label: 'external packed consumer',
 				run: () => validatePackedConsumer(tempRoot, packedArchives),

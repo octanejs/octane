@@ -20,7 +20,7 @@ export function Input(props: InputProps) @{
 	}, [props.value]);
 
 	<input
-		ref={props.ref}
+		ref={props.ref ?? null}
 		{...etc}
 		cmdk-input=""
 		autoComplete="off"

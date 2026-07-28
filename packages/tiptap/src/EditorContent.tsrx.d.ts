@@ -1,4 +1,6 @@
 import type { Editor } from '@tiptap/core';
+import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 
 import type { ContentComponent } from './Editor';
 
@@ -13,10 +15,10 @@ export interface EditorContentProps {
 	editor: Editor | null;
 	ref?: EditorContentRef<HTMLDivElement>;
 	innerRef?: EditorContentRef<HTMLDivElement>;
-	children?: unknown;
+	children?: OctaneNode;
 	[key: string]: unknown;
 }
 
 export declare function createContentComponent(): ContentComponent;
-export declare function PureEditorContent(props: EditorContentProps): unknown;
-export declare const EditorContent: (props: EditorContentProps) => unknown;
+export declare function PureEditorContent(props: EditorContentProps): Octane.JSX.Element;
+export declare const EditorContent: (props: EditorContentProps) => Octane.JSX.Element;
