@@ -126,8 +126,9 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
+            core.setOutput("synchronized", "false");
             try {
-              await github.rest.pulls.list({
+              const { data: pulls } = await github.rest.pulls.list({
                 owner,
                 repo,
                 state: "open",
@@ -137,6 +138,27 @@ jobs:
               });
               core.setOutput("degraded", "false");
               core.setOutput("status", "200");
+
+              // Once a Version Packages PR has merged, changesets/action can
+              // report "No commits between main and changeset-release/main".
+              // Prove that this is an expected no-op from remote state instead
+              // of inspecting the consumed changeset files.
+              if (pulls.length === 0) {
+                const [{ data: main }, { data: release }] = await Promise.all([
+                  github.rest.repos.getCommit({ owner, repo, ref: "main" }),
+                  github.rest.repos.getCommit({
+                    owner,
+                    repo,
+                    ref: "changeset-release/main",
+                  }),
+                ]);
+                if (main.commit.tree.sha === release.commit.tree.sha) {
+                  core.setOutput("synchronized", "true");
+                  core.notice(
+                    "The release branch already matches main and no release pull request is open.",
+                  );
+                }
+              }
             } catch (error) {
               const status = Number(error.status ?? error.response?.status ?? 0);
               const code = String(error.code ?? error.cause?.code ?? "unknown");
@@ -157,6 +179,19 @@ jobs:
               }
               throw error;
             }
+
+      - name: Accept synchronized release branch
+        if: >-
+          steps.release_pr_first.outcome == 'failure' &&
+          steps.release_pr_retry.outcome == 'failure' &&
+          steps.release_api.outputs.synchronized == 'true'
+        run: |
+          echo "::notice title=Release PR already synchronized::The remote release branch matches main and no generated release pull request is open."
+          {
+            echo "### Release PR already synchronized"
+            echo
+            echo "Both synchronization attempts found no commits to propose. The remote release branch matches main and no generated release pull request is open."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Defer release pull request synchronization
         if: >-
@@ -180,7 +215,8 @@ jobs:
           always() &&
           steps.release_pr_first.outcome == 'failure' &&
           steps.release_pr_retry.outcome == 'failure' &&
-          steps.release_api.outputs.degraded != 'true'
+          steps.release_api.outputs.degraded != 'true' &&
+          steps.release_api.outputs.synchronized != 'true'
         env:
           OCTANE_RELEASE_API_STATUS: ${{ steps.release_api.outputs.status }}
         run: |
