@@ -115,12 +115,12 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'portal-swarm',
 			'octane-tsrx': 1,
-			react: 2.6345384087565744,
-			preact: 2.9212365593032366,
-			solid: 0.4512400392440764,
-			svelte: 2.544428225389751,
-			ripple: 1.5436200245548042,
-			'vue-vapor': 1.271864317288355,
+			react: 7.674610301092914,
+			preact: 9.435843248855534,
+			solid: 1.0544782471163001,
+			svelte: 2.873552787834435,
+			ripple: 3.213255345880366,
+			'vue-vapor': 1.2497161384375328,
 		},
 		{
 			op: 'async-waterfall',
