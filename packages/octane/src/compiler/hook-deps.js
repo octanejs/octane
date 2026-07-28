@@ -20,6 +20,7 @@ const DEPENDENCY_HOOKS = new Map([
 const OMITTED_DEPENDENCY_RESULT_HOOKS = new Set(['useRef', 'useEffectEvent']);
 const STABLE_TUPLE_RESULTS = new Map([
 	['useState', new Set([1, 2])],
+	['useLinkedState', new Set([1, 2])],
 	['useReducer', new Set([1, 2])],
 	['useTransition', new Set([1])],
 	['useActionState', new Set([1])],

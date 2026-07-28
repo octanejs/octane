@@ -1682,6 +1682,7 @@ function moduleImportsViewTransition(astBody) {
 
 export const HOOK_NAMES = new Set([
 	'useState',
+	'useLinkedState',
 	'useReducer',
 	'useEffect',
 	'useLayoutEffect',
@@ -1926,7 +1927,8 @@ function collectComponentLocals(componentNode) {
  * memoising on.
  *
  * Stability sources:
- *   - useState / useReducer setters and state getters (second/third slots)
+ *   - useState / useLinkedState / useReducer setters and state getters
+ *     (second/third slots)
  *   - useRef returns (the ref object itself, not .current)
  *   - useCallback returns
  *   - Arrows previously declared in this body whose free vars are themselves
@@ -1945,10 +1947,10 @@ function computeStableLocals(statements, componentLocals) {
 			if (!init) continue;
 			if (init.type === 'CallExpression') {
 				const callName = stableHookCallName(init);
-				// [_, setX] = useState(...)  — second slot is the stable setter.
-				// Same shape for useReducer's dispatch.
+				// [_, setX] = useState(...) — second slot is the stable setter.
+				// Linked-state setters and reducer dispatchers have the same shape.
 				if (
-					(callName === 'useState' || callName === 'useReducer') &&
+					(callName === 'useState' || callName === 'useLinkedState' || callName === 'useReducer') &&
 					decl.id.type === 'ArrayPattern' &&
 					decl.id.elements &&
 					decl.id.elements.length >= 2 &&
@@ -1960,7 +1962,7 @@ function computeStableLocals(statements, componentLocals) {
 				// [_, _, getX] = useState(...) — the compiler-generated getter
 				// closes over the hook cell and is stable for that cell's lifetime.
 				if (
-					(callName === 'useState' || callName === 'useReducer') &&
+					(callName === 'useState' || callName === 'useLinkedState' || callName === 'useReducer') &&
 					decl.id.type === 'ArrayPattern' &&
 					decl.id.elements &&
 					decl.id.elements.length >= 3 &&
@@ -1969,7 +1971,9 @@ function computeStableLocals(statements, componentLocals) {
 				) {
 					stable.add(decl.id.elements[2].name);
 				}
-				if (callName === 'useState' || callName === 'useReducer') continue;
+				if (callName === 'useState' || callName === 'useLinkedState' || callName === 'useReducer') {
+					continue;
+				}
 				// x = useRef(...) / useCallback(...) — the
 				// return value is stable for the lifetime of the component.
 				if (
@@ -2023,7 +2027,7 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 			if (init.type === 'CallExpression') {
 				const callName = stableHookCallName(init);
 				if (
-					(callName === 'useState' || callName === 'useReducer') &&
+					(callName === 'useState' || callName === 'useLinkedState' || callName === 'useReducer') &&
 					decl.id.type === 'ArrayPattern'
 				) {
 					const setter = decl.id.elements?.[1];
@@ -11602,6 +11606,7 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 
 const STATE_GETTER_HELPERS = {
 	useState: '__useStateWithGetter',
+	useLinkedState: '__useLinkedStateWithGetter',
 	useReducer: '__useReducerWithGetter',
 };
 
@@ -11613,6 +11618,7 @@ const STATE_GETTER_HELPERS = {
 // therefore need no padding.
 const NUMERIC_HOOK_SLOT_POSITION = {
 	useState: 1,
+	useLinkedState: 3,
 	useReducer: 3,
 	useEffect: 2,
 	useLayoutEffect: 2,
@@ -11661,7 +11667,7 @@ function isTransparentStateTupleWrapper(node, child) {
 	return false;
 }
 
-// Source-level useState/useReducer tuples have a third getState member. Mark
+// Source-level state/linked-state/reducer tuples have a third getState member. Mark
 // calls that can observe it so rewriteHookCalls can select the getter-enabled
 // helper; the public base hooks remain the allocation-free two-item path.
 // Escaping or ambiguous tuples conservatively receive the full shape.

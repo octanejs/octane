@@ -31,6 +31,7 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'useImperativeHandle',
 	'useInsertionEffect',
 	'useLayoutEffect',
+	'useLinkedState',
 	'useMemo',
 	'useOptimistic',
 	'useReducer',
@@ -3021,6 +3022,7 @@ function emitComponentAst(shape, state) {
 
 export const UNIVERSAL_COMPILER_RUNTIME_IMPORTS = new Set([
 	...UNIVERSAL_RUNTIME_IMPORTS,
+	'__useLinkedStateWithGetter',
 	'__useReducerWithGetter',
 	'__useStateWithGetter',
 	'hookSlots',
@@ -3386,6 +3388,7 @@ export function lowerUniversalRendererRegionAst(
 		Object.fromEntries(
 			[
 				'__useStateWithGetter',
+				'__useLinkedStateWithGetter',
 				'__useReducerWithGetter',
 				'useMemo',
 				'useBatch',

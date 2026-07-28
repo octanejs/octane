@@ -229,6 +229,7 @@ function collectVoidRootEdits(ast, st, isVoidComponentImport) {
 
 const STATE_GETTER_HELPERS = {
 	useState: '__useStateWithGetter',
+	useLinkedState: '__useLinkedStateWithGetter',
 	useReducer: '__useReducerWithGetter',
 };
 

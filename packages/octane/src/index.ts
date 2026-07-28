@@ -25,6 +25,9 @@ export {
 	// Hooks (octane extension: each accepts a trailing compiler slot — required
 	// when calling from plain .ts, injected by the compiler in .tsrx/.tsx)
 	useState,
+	useLinkedState,
+	type LinkedStatePrevious,
+	type LinkedStateOptions,
 	useReducer,
 	useEffect,
 	useLayoutEffect,
@@ -90,6 +93,7 @@ export {
 	// `@try`/`@catch` as the language tooling's type-only virtual TSX spells it.
 	TsrxErrorBoundary,
 	__useStateWithGetter,
+	__useLinkedStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
 	bindRendererRegionOwner,
