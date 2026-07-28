@@ -200,6 +200,70 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		expect(code).toContain('opts.id');
 	});
 
+	it('treats a loop that assigns an existing binding as a write to it', () => {
+		// `for (acc of …)` with no declaration ASSIGNS the enclosing `acc` rather
+		// than introducing one. Reading it as a fresh loop binding hid the
+		// reference, so a callback that mutates component state looked
+		// capture-free — and at module scope the write has no binding to land on.
+		const written = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        export function App(props) @{
+          let acc;
+          const total = useSelector(props.store, (s) => {
+            let seen = 0;
+            for (acc of s.items) { seen++; }
+            return seen;
+          });
+          <p>{total as string}</p>
+        }
+      `,
+			'loop-assign.tsrx',
+			PROD,
+		).code;
+		expect(hoistCount(written)).toBe(0);
+
+		// Same for `for-in`, and for a destructuring assignment target.
+		const forIn = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        export function App(props) @{
+          let key;
+          const total = useSelector(props.store, (s) => {
+            let seen = 0;
+            for (key in s.map) { seen++; }
+            return seen;
+          });
+          <p>{total as string}</p>
+        }
+      `,
+			'loop-assign-in.tsrx',
+			PROD,
+		).code;
+		expect(hoistCount(forIn)).toBe(0);
+	});
+
+	it('treats a destructuring default in a loop declaration as a capture', () => {
+		// The loop's own `x` is a real binding, but the default initialiser beside
+		// it is an expression that reads the component.
+		const code = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        export function App(props) @{
+          const first = useSelector(props.store, (s) => {
+            for (const [x = props.seed] of s.pairs) return x;
+            return 0;
+          });
+          <p>{first as string}</p>
+        }
+      `,
+			'loop-decl-default.tsrx',
+			PROD,
+		).code;
+		expect(hoistCount(code)).toBe(0);
+		expect(code).toContain('props.seed');
+	});
+
 	it('lifts a callback whose only extra names are its own loop counters', () => {
 		// A classic `for (let i = 0; …)` declares `i` in the loop's `init` rather
 		// than its `left`. Reading that as a free variable made any callback
