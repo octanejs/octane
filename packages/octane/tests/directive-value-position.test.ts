@@ -188,4 +188,56 @@ describe('directives at value position', () => {
 			});
 		}
 	});
+
+	describe('ownership across a callback boundary', () => {
+		// A directive's arms are hoisted into the body that owns them, and the values
+		// they read are threaded in from that body. A callback is a separate lexical
+		// owner, so folding one of its directives into the enclosing component would
+		// hoist arms that read the callback's params into a scope without them —
+		// producing a module-scope helper referencing a free variable.
+		const inCallback = `export function App(props: { rows: { ok: boolean; label: string }[] }) @{
+	const render = (row: { ok: boolean; label: string }) =>
+		<Cell slot={<h1>@if (row.ok) { <b>{row.label}</b> } @else { <i>none</i> }</h1>} />;
+	<div>{props.rows.map(render)}</div>
+}
+`;
+
+		for (const mode of ['client', 'server'] as const) {
+			it(`rejects a value-position directive owned by a callback in ${mode} mode`, () => {
+				expect(() => compile(inCallback, 'App.tsrx', { mode })).toThrow(
+					/owning component to hoist into/,
+				);
+			});
+		}
+
+		it('never emits a hoisted arm that reads a callback param as a free variable', () => {
+			// The failure this guards is silent: the module still parses, and only
+			// blows up as a ReferenceError once the arm renders.
+			for (const mode of ['client', 'server'] as const) {
+				let code: string;
+				try {
+					code = compile(inCallback, 'App.tsrx', { mode }).code;
+				} catch {
+					continue; // Rejected outright, which is the stronger outcome.
+				}
+				const hoisted = code.match(/^function (?:__then|__else|__sif|__scase)[\s\S]*?^}/gm) ?? [];
+				for (const arm of hoisted) expect(arm).not.toMatch(/\brow\./);
+			}
+		});
+
+		it('still lowers ordinary JSX values inside a callback', () => {
+			// The boundary must switch off the directive fold only — a callback that
+			// returns plain JSX still lowers to a descriptor.
+			const source = `export function App(props: { rows: { label: string }[] }) @{
+	const render = (row: { label: string }) => <Cell slot={<h1>{row.label}</h1>} />;
+	<div>{props.rows.map(render)}</div>
+}
+`;
+			for (const mode of ['client', 'server'] as const) {
+				const { code } = compile(source, 'App.tsrx', { mode });
+				expect(code).toContain('createElement');
+				expect(code).toContain('row.label');
+			}
+		});
+	});
 });

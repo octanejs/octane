@@ -29,6 +29,15 @@ renderable descriptor. Both emitters publish that fold for the body being
 compiled and restore the previous owner afterwards, so a nested body never folds
 its arms into its parent's helper list.
 
+The fold stops at a callback boundary. A directive's arms are hoisted into the
+body that owns them and read the values that body threads in, so folding one that
+belongs to a callback would hoist arms referencing the callback's params into a
+scope where those params do not exist — a module-level helper closing over a free
+variable, which only fails once the arm renders. A value-position directive with
+no owning body is now a compile error naming the authored keyword and pointing at
+the fix (move the markup into its own component), rather than silently dropped
+markup or a helper that throws at runtime.
+
 The type-only (`to_ts`) emitter was already correct here; this brings the client
 and server emitters in line with it. Covers all four directives across the
 initializer, attribute-value, expression-container and element-holding-a-directive
