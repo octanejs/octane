@@ -98,11 +98,13 @@ function BrowserHarness() @{
 		content: initialContent,
 		immediatelyRender: true,
 	});
-	const modeEditor = useEditor({
-		extensions: [StarterKit],
-		content: '<p>Switchable editor</p>',
-		immediatelyRender: true,
-	});
+	const modeEditor = new URLSearchParams(window.location.search).has('editor-switch')
+		? useEditor({
+				extensions: [StarterKit],
+				content: '<p>Switchable editor</p>',
+				immediatelyRender: true,
+			})
+		: null;
 
 	<main>
 		@if (editor) {

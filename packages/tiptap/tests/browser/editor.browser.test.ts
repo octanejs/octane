@@ -127,6 +127,8 @@ async function readMenuGeometry(kind: 'bubble' | 'floating') {
 
 describe('@octanejs/tiptap real-browser behavior', () => {
 	it('switches EditorContent and a lazy Suspense source editor without detached anchors', async () => {
+		await page.goto(`${origin}/?editor-switch=1`, { waitUntil: 'networkidle' });
+
 		const modeSwitch = page.locator('[data-editor-switch="true"]');
 		const toggle = modeSwitch.getByRole('button', { name: 'Toggle source editor' });
 		const richEditor = modeSwitch.locator('[data-branch-rich-editor="true"] .ProseMirror');
