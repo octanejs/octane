@@ -19,9 +19,7 @@ import type {
 } from './Editor';
 
 export type EditorContentRef<T> =
-	| { current: T | null }
-	| ((value: T | null) => void | (() => void))
-	| null;
+	{ current: T | null } | ((value: T | null) => void | (() => void)) | null;
 
 export interface EditorContentProps {
 	editor: Editor | null;
