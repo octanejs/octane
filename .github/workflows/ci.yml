@@ -7,9 +7,8 @@ on:
     branches: [main]
 
 concurrency:
-  # A newer revision makes an older run for the same PR obsolete. Main pushes
-  # stay independent because release-merge CI can gate package publishing.
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  # Only the newest state of a pull request or main can still ship.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
