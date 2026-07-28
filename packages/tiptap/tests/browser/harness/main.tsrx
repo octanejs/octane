@@ -9,9 +9,8 @@ import {
 } from '@octanejs/tiptap';
 import { BubbleMenu, FloatingMenu } from '@octanejs/tiptap/menus';
 import { createRoot, delegateEvents, useState } from 'octane';
-import { EditorModeSwitch } from './editor-mode-switch.tsx';
 
-delegateEvents(['click', 'dragstart', 'dragover', 'drop']);
+delegateEvents(['dragstart', 'dragover', 'drop']);
 
 function DraggableCardView(props) @{
 	<NodeViewWrapper as="article" class="draggable-card" data-card-label={props.node.attrs.label}>
@@ -98,13 +97,6 @@ function BrowserHarness() @{
 		content: initialContent,
 		immediatelyRender: true,
 	});
-	const modeEditor = new URLSearchParams(window.location.search).has('editor-switch')
-		? useEditor({
-				extensions: [StarterKit],
-				content: '<p>Switchable editor</p>',
-				immediatelyRender: true,
-			})
-		: null;
 
 	<main>
 		@if (editor) {
@@ -131,9 +123,6 @@ function BrowserHarness() @{
 					</FloatingMenu>
 				</Tiptap>
 			</section>
-		}
-		@if (modeEditor) {
-			<EditorModeSwitch editor={modeEditor} />
 		}
 
 		<section

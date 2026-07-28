@@ -19746,6 +19746,7 @@ function renderBranchSlot(
 		const oldBoundaryShared = sharesBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd);
 		if (state.block) {
 			unmountBlock(state.block);
+			if (parentBlock.disposed) return;
 			state.block = null;
 		}
 		state.branch = next;
