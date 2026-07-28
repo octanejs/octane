@@ -507,7 +507,8 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # The production-error catalog is append-only. Its check compares the
-          # current tree with the PR base or previous main commit.
+          # current tree with the PR base, previous main commit, or origin/main
+          # when a release dispatch falls back to full CI.
           fetch-depth: 0
 
       - name: Install pnpm
@@ -585,7 +586,7 @@ jobs:
       # dispositions/local evidence and keeps the generated report current.
       - name: Check Redact-derived adversarial contract ledger
         env:
-          OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || (github.event_name == 'workflow_dispatch' && 'origin/main') }}
         run: pnpm redact-audit:check
 
       # Production error URLs are a public compatibility surface. Keep the
@@ -593,7 +594,7 @@ jobs:
       # runtime call sites synchronized before a package can be built.
       - name: Check Octane production error catalog
         env:
-          OCTANE_ERROR_CODES_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          OCTANE_ERROR_CODES_BASE: ${{ github.event.pull_request.base.sha || github.event.before || (github.event_name == 'workflow_dispatch' && 'origin/main') }}
         run: pnpm error-codes:check
 
       # Package discovery is shared by every package-wide repository check.
