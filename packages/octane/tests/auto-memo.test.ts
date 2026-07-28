@@ -932,6 +932,74 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it('restores native mapped order when a stable array loses its own map override', () => {
+		const source = `
+			function StableMapReceiverApp(props) {
+				const rows = props.rows;
+				return (
+					<ul id="tsx-stable-map-receiver">
+						{rows.map((item) => <li key={item.id}>{item.label}</li>)}
+					</ul>
+				);
+			}
+			export const App = StableMapReceiverApp;
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'tsx-stable-map-receiver.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const rows = [
+			{ id: 1, label: 'first' },
+			{ id: 2, label: 'second' },
+		];
+		const props = { rows };
+		const events: string[] = [];
+		const root = mount(client.App, props);
+		const originalRows = root.findAll('#tsx-stable-map-receiver li');
+		expect(originalRows.map((row) => row.textContent)).toEqual(['first', 'second']);
+
+		try {
+			Object.defineProperty(rows, 'map', {
+				configurable: true,
+				value<T>(
+					this: typeof rows,
+					callback: (item: (typeof rows)[number], index: number, array: typeof rows) => T,
+					thisArg?: unknown,
+				): T[] {
+					if (this !== rows) throw new Error('stable map lost its receiver');
+					events.push('custom:start');
+					events.push('callback:2:1');
+					const second = callback.call(thisArg, rows[1]!, 1, rows);
+					events.push('callback:1:0');
+					const first = callback.call(thisArg, rows[0]!, 0, rows);
+					events.push('custom:end');
+					return [second, first];
+				},
+			});
+
+			root.update(client.App, props);
+			expect(events).toEqual(['custom:start', 'callback:2:1', 'callback:1:0', 'custom:end']);
+			expect(root.findAll('#tsx-stable-map-receiver li')).toEqual([
+				originalRows[1],
+				originalRows[0],
+			]);
+
+			events.length = 0;
+			delete (rows as { map?: unknown }).map;
+			root.update(client.App, props);
+			expect(events).toEqual([]);
+			expect(root.findAll('#tsx-stable-map-receiver li')).toEqual(originalRows);
+			expect(root.findAll('#tsx-stable-map-receiver li').map((row) => row.textContent)).toEqual([
+				'first',
+				'second',
+			]);
+		} finally {
+			delete (rows as { map?: unknown }).map;
+			root.unmount();
+		}
+	});
+
 	it('honors an Array.prototype.map replacement installed after the component module loads', () => {
 		const events: string[] = [];
 		const rows = [

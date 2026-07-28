@@ -14680,6 +14680,12 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	}
 	const propsNode = inheritOriginLoc(b.object(properties), node);
 	const childrenNeedRenderScope = jsxValueChildrenNeedRenderScope(node);
+	const eagerProviderChildren =
+		eagerRoot &&
+		componentTag &&
+		childrenNeedRenderScope &&
+		(nameNode?.type === 'MemberExpression' || nameNode?.type === 'JSXMemberExpression') &&
+		nameNode.property?.name === 'Provider';
 	const loweredChildren = [];
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
@@ -14697,10 +14703,14 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		}
 	} else {
 		for (const child of node.children || []) {
-			const lowered = lowerJsxChild(
-				componentTag ? rewriteOpaqueTitles(child, ctx, 'opaque') : child,
-				ctx,
-			);
+			const authoredChild = componentTag ? rewriteOpaqueTitles(child, ctx, 'opaque') : child;
+			// The provider still defers its children; once its own readChildren
+			// callback runs, a direct JSX root already owns that provider scope.
+			const lowered =
+				eagerProviderChildren &&
+				(authoredChild?.type === 'Element' || authoredChild?.type === 'JSXElement')
+					? jsxElementToCreateElement(authoredChild, ctx, true)
+					: lowerJsxChild(authoredChild, ctx);
 			if (lowered !== null) loweredChildren.push(lowered);
 		}
 	}
@@ -15827,6 +15837,7 @@ function emitAutoMemoRegion(
 	extraMiss,
 	contextAware,
 	depNode,
+	initValue = null,
 ) {
 	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0));
 	const contextIndex = contextAware ? cell.base + dependencies.length : null;
@@ -15864,7 +15875,8 @@ function emitAutoMemoRegion(
 			b.stmt(b.assignment('=', b.id(cache), b.call(b.member(b.id(cache), 'slice')))),
 			null,
 		);
-	const markInit = () => b.stmt(b.assignment('=', cacheAt(cell.init), b.literal(true)));
+	const markInit = () =>
+		b.stmt(b.assignment('=', cacheAt(cell.init), initValue ?? b.literal(true)));
 	// `statement` is the guarded region's statement NODE; the returned region is
 	// a statement node too — the caller stamps the origin.
 	if (!contextAware) {
@@ -16870,6 +16882,7 @@ function planJsx(
 					forcedMiss,
 					fc.autoMemoContextAware,
 					depNode,
+					b.id(nativeName),
 				);
 				pushAfterStmt(fc.id, org, b.block([...prefix, guarded]));
 			} else {
