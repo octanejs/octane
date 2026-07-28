@@ -27,6 +27,18 @@ describe('Docusaurus Vite bridge', () => {
 		);
 	});
 
+	it('resolves a relative site directory from the Vite root', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({ siteDir: path.basename(fixture.siteDir) });
+
+		await plugin.configResolved({ root: path.dirname(fixture.siteDir), command: 'serve' });
+
+		expect(await plugin.resolveId('@theme/Root')).toBe(
+			path.join(fixture.siteDir, 'src/theme/Root.js'),
+		);
+	});
+
 	it('registers concrete config, plugin, and content watch inputs', async () => {
 		const fixture = createSiteFixture();
 		disposals.push(fixture.dispose);

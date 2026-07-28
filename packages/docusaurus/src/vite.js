@@ -32,7 +32,7 @@ function createSharedState(options) {
 	let manifest;
 	let contentIndex = new Map();
 	let loading;
-	let root = path.resolve(options.siteDir ?? process.cwd());
+	let root = path.resolve(process.cwd(), options.siteDir ?? '.');
 
 	async function refresh() {
 		if (loading) return loading;
@@ -55,7 +55,7 @@ function createSharedState(options) {
 
 	return {
 		setRoot(value) {
-			root = path.resolve(options.siteDir ?? value);
+			root = path.resolve(value, options.siteDir ?? '.');
 		},
 		refresh,
 		async getManifest() {
