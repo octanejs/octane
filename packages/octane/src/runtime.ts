@@ -5230,16 +5230,6 @@ function childrenAsBody(children: unknown): ComponentBody {
 }
 
 /**
- * Compiler-only component for a context-sensitive JSX expression in an element
- * value. The descriptor preserves ordinary element/children inspection while
- * calling the expression only after its actual provider or boundary is active.
- */
-export function renderScopedValue(props: { read: () => unknown }, scope: Scope): void {
-	const block = scope.block;
-	childSlot(scope, 0, block.parentNode, props.read(), block.endMarker);
-}
-
-/**
  * Records which children dialect (1 = compiled body, 2 = descriptor) a scope last rendered, so a
  * flip can be detected. Lives in the hook map, whose Symbol keys are disjoint from the numeric
  * `slots` indices the two dialects contend over.

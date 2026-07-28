@@ -14151,48 +14151,10 @@ function rewriteJsxValues(node, ctx) {
 	});
 }
 
-// A call in a JSX child can read context, throw, or suspend. In a template the
-// expression runs only after the represented component/boundary has entered its
-// scope. A value-position descriptor must preserve that same owner: evaluating
-// the call while constructing createElement's arguments runs it too early.
-// Functions are values, not invocations; leave their bodies untouched so render
-// props and event callbacks retain their ordinary JavaScript contract.
-function jsxChildNeedsRenderScope(expression) {
-	const pending = [expression];
-	const seen = new WeakSet();
-	while (pending.length > 0) {
-		const current = pending.pop();
-		if (current == null || typeof current !== 'object' || seen.has(current)) continue;
-		seen.add(current);
-		if (Array.isArray(current)) {
-			for (const entry of current) pending.push(entry);
-			continue;
-		}
-		if (
-			current.type === 'CallExpression' ||
-			current.type === 'OptionalCallExpression' ||
-			current.type === 'NewExpression' ||
-			current.type === 'TaggedTemplateExpression' ||
-			current.type === 'AwaitExpression'
-		) {
-			return true;
-		}
-		if (isFunctionNode(current)) continue;
-		for (const key in current) {
-			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			const value = current[key];
-			if (value !== null && typeof value === 'object') pending.push(value);
-		}
-	}
-	return false;
-}
-
 // Lower one JSX child node to a `createElement` argument expression (or null to
 // drop it). Text → string literal (whitespace-only-with-newline indentation is
-// dropped, JSX rule); ordinary `{expr}` → its lowered value; scope-sensitive
-// `{expr}` → a descriptor whose stable runtime component evaluates it after
-// entering the represented render scope; nested element → recurse; fragment →
-// an array of children.
+// dropped, JSX rule); `{expr}` → the lowered inner expression; nested element →
+// recurse; fragment → array of children.
 function lowerJsxChild(child, ctx) {
 	const t = child && child.type;
 	if (t === 'JSXText' || t === 'Text') {
@@ -14203,16 +14165,7 @@ function lowerJsxChild(child, ctx) {
 	}
 	if (t === 'JSXExpressionContainer') {
 		if (!child.expression || child.expression.type === 'JSXEmptyExpression') return null;
-		const expression = rewriteJsxValues(child.expression, ctx);
-		if (!jsxChildNeedsRenderScope(child.expression)) return expression;
-		ctx.runtimeNeeded.add('createElement');
-		ctx.runtimeNeeded.add('renderScopedValue');
-		const read = inheritOriginLoc(b.arrow([], expression), child.expression);
-		const props = inheritOriginLoc(
-			b.object([inheritOriginLoc(b.prop('init', b.id('read'), read), child.expression)]),
-			child,
-		);
-		return inheritOriginLoc(b.call('_$createElement', b.id('_$renderScopedValue'), props), child);
+		return rewriteJsxValues(child.expression, ctx);
 	}
 	if (t === 'JSXElement' || t === 'Element') return jsxElementToCreateElement(child, ctx);
 	if (VALUE_DIRECTIVE_ARM_TYPES.has(t)) rejectUnownedValueDirective(child);

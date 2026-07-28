@@ -191,7 +191,6 @@ export {
 	// Compact compiler ABI; keep the descriptive export for older compiled output.
 	markSingleRoot as __s,
 	markChildrenBlock,
-	renderScopedValue,
 	childSlot,
 	positionalChildren,
 	textSlot,
