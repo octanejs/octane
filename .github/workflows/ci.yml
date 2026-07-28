@@ -5,19 +5,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # changesets/action uses GITHUB_TOKEN, which deliberately does not trigger a
-  # pull_request workflow. release.yml dispatches this workflow on the generated
-  # branch so the protected lint/typecheck jobs can report authenticated skips.
-  workflow_dispatch:
-    inputs:
-      release_pr_number:
-        description: Generated Changesets pull request number
-        required: true
-        type: string
-      release_head_sha:
-        description: Generated Changesets pull request head SHA
-        required: true
-        type: string
 
 env:
   # Named once: the sharded suite excludes these specs and website_e2e runs
@@ -41,9 +28,9 @@ jobs:
       is_release_merge: ${{ steps.classify.outputs.is_release_merge }}
 
     steps:
-      # Authenticate both the lightweight release-PR dispatch and the eventual
-      # main merge from PR metadata, commit ancestry, authorship, and changed
-      # files. Any missing or unexpected data falls back to normal CI.
+      # Authenticate both a generated release PR event and the eventual main
+      # merge from PR metadata, commit ancestry, authorship, and changed files.
+      # Any missing or unexpected data falls back to normal CI.
       - name: Identify a generated Changesets release change
         id: classify
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -72,44 +59,6 @@ jobs:
               if (context.eventName === "pull_request") {
                 const candidate = context.payload.pull_request;
                 if (!candidate || !expectedPull(candidate)) {
-                  return;
-                }
-                pull = candidate;
-                generatedSha = candidate.head.sha;
-                expectedParentSha = candidate.base.sha;
-                releaseKind = "pr";
-              } else if (context.eventName === "workflow_dispatch") {
-                const inputNumber = Number(
-                  context.payload.inputs?.release_pr_number,
-                );
-                const inputHeadSha =
-                  context.payload.inputs?.release_head_sha ?? "";
-                if (
-                  context.ref !== "refs/heads/changeset-release/main" ||
-                  !Number.isSafeInteger(inputNumber) ||
-                  inputNumber <= 0 ||
-                  !/^[0-9a-f]{40}$/.test(inputHeadSha) ||
-                  context.sha !== inputHeadSha
-                ) {
-                  core.warning(
-                    "Invalid generated release PR dispatch. Running the full CI suite.",
-                  );
-                  return;
-                }
-
-                const { data: candidate } = await github.rest.pulls.get({
-                  owner,
-                  repo,
-                  pull_number: inputNumber,
-                });
-                if (
-                  candidate.state !== "open" ||
-                  candidate.head.sha !== context.sha ||
-                  !expectedPull(candidate)
-                ) {
-                  core.warning(
-                    `Changesets PR #${inputNumber} does not match dispatch ${context.sha}. Running the full CI suite.`,
-                  );
                   return;
                 }
                 pull = candidate;
@@ -507,8 +456,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # The production-error catalog is append-only. Its check compares the
-          # current tree with the PR base, previous main commit, or origin/main
-          # when a release dispatch falls back to full CI.
+          # current tree with the PR base or previous main commit.
           fetch-depth: 0
 
       - name: Install pnpm
@@ -586,7 +534,7 @@ jobs:
       # dispositions/local evidence and keeps the generated report current.
       - name: Check Redact-derived adversarial contract ledger
         env:
-          OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || (github.event_name == 'workflow_dispatch' && 'origin/main') }}
+          OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm redact-audit:check
 
       # Production error URLs are a public compatibility surface. Keep the
@@ -594,7 +542,7 @@ jobs:
       # runtime call sites synchronized before a package can be built.
       - name: Check Octane production error catalog
         env:
-          OCTANE_ERROR_CODES_BASE: ${{ github.event.pull_request.base.sha || github.event.before || (github.event_name == 'workflow_dispatch' && 'origin/main') }}
+          OCTANE_ERROR_CODES_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm error-codes:check
 
       # Package discovery is shared by every package-wide repository check.
