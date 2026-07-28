@@ -3,7 +3,7 @@ import * as ServerRuntime from 'octane/server';
 import { compile } from 'octane/compiler';
 import { compileToVolarMappings } from 'octane/compiler/volar';
 import { flushSync, hydrateRoot } from '../src/index.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import { mount } from './_helpers.js';
 import {
 	BareDirectiveValue,
@@ -13,6 +13,7 @@ import {
 	DirectiveContainerChild,
 	ModuleDirectiveValue,
 	CallbackDirective,
+	CallbackTryDirective,
 	NestedCallbackDirective,
 } from './_fixtures/directive-value-position.tsrx';
 
@@ -198,6 +199,34 @@ export function App(props: { rows: any[] }) @{
 			],
 		];
 
+		for (const directive of DIRECTIVES) {
+			it(`keeps ${directive.name} arms in the type view from a callback`, () => {
+				const source = `export function App(props: { rows: any[] }) @{
+	const render = (row: any) => <Cell slot={${directive.inCallback}} />;
+	<div>{props.rows.map(render)}</div>
+}
+`;
+				const { code } = compileToVolarMappings(source, 'App.tsrx') as { code: string };
+				// Both arms have to survive for the type checker to see them.
+				expect(code).toContain('row.label');
+				expect(code).toContain('none');
+			});
+
+			it(`keeps ${directive.name} arms in the type view at module scope`, () => {
+				const source = `export const g = { on: true, xs: [1], k: 1 };
+
+const v = ${directive.atModule};
+
+export function App() @{
+	<div>{v}</div>
+}
+`;
+				const { code } = compileToVolarMappings(source, 'App.tsrx') as { code: string };
+				expect(code).toContain('armA');
+				expect(code).toContain('armB');
+			});
+		}
+
 		for (const [label, typeSource] of positions) {
 			it(`keeps both arms for a directive in ${label}`, () => {
 				// The type view carries the arms regardless of whether the emitters can
@@ -272,6 +301,41 @@ export function App(props: { rows: any[] }) @{
 		}
 	});
 
+	// Every control-flow directive, spelled against a `row` binding so each can be
+	// dropped into a callback, and against `g` so each can be dropped at module
+	// scope. `@try` has no control expression, which is why it has no frozen value.
+	const DIRECTIVES: {
+		name: string;
+		inCallback: string;
+		atModule: string;
+		control: string | null;
+	}[] = [
+		{
+			name: '@if',
+			inCallback: '@if (row.ok) { <b>{row.label}</b> } @else { <i>none</i> }',
+			atModule: '@if (g.on) { <armA /> } @else { <armB /> }',
+			control: 'g.on',
+		},
+		{
+			name: '@for',
+			inCallback: '@for (const x of row.xs; key x) { <b>{row.label}</b> } @empty { <i>none</i> }',
+			atModule: '@for (const x of g.xs; key x) { <armA /> } @empty { <armB /> }',
+			control: 'g.xs',
+		},
+		{
+			name: '@switch',
+			inCallback: '@switch (row.k) { @case 1: { <b>{row.label}</b> } @default: { <i>none</i> } }',
+			atModule: '@switch (g.k) { @case 1: { <armA /> } @default: { <armB /> } }',
+			control: 'g.k',
+		},
+		{
+			name: '@try',
+			inCallback: '@try { <b>{row.label}</b> } @pending { <i>p</i> } @catch (e) { <i>none</i> }',
+			atModule: '@try { <armA /> } @pending { <armP /> } @catch (e) { <armB /> }',
+			control: null,
+		},
+	];
+
 	describe('captures across a callback boundary', () => {
 		// A directive's arms are hoisted, so they cannot reach a callback's params
 		// lexically. They do not need to: captured values arrive through the
@@ -316,6 +380,24 @@ export function App(props: { rows: any[] }) @{
 					// `row` has to arrive through the construct's env channel — `__extra` on
 					// the client, the sub's env array on the server — because the helpers
 					// that read it are declared outside the callback.
+					const bound =
+						mode === 'client'
+							? /const \[[^\]]*\brow\b[^\]]*\] = __extra/
+							: /const \[[^\]]*\brow\b[^\]]*\] = __props/;
+					expect(code).toMatch(bound);
+				});
+			}
+		}
+
+		for (const directive of DIRECTIVES) {
+			for (const mode of ['client', 'server'] as const) {
+				it(`threads a callback param through ${directive.name} (${mode})`, () => {
+					const source = `export function App(props: { rows: any[] }) @{
+	const render = (row: any) => <Cell slot={${directive.inCallback}} />;
+	<div>{props.rows.map(render)}</div>
+}
+`;
+					const { code } = compile(source, 'App.tsrx', { mode });
 					const bound =
 						mode === 'client'
 							? /const \[[^\]]*\brow\b[^\]]*\] = __extra/
@@ -371,6 +453,26 @@ export function App(props: { rows: any[] }) @{
 			result.unmount();
 		});
 
+		it('renders a callback-owned @try, including its @catch arm', () => {
+			const ok = mount(CallbackTryDirective as any, props);
+			expect(ok.findAll('.try-ok').map((el) => el.textContent)).toEqual(['alpha', 'beta']);
+			ok.unmount();
+
+			// The @catch arm reads the callback's `row` too, so a throwing read proves
+			// the capture reaches every arm rather than just the happy one.
+			const failing = mount(CallbackTryDirective as any, {
+				...props,
+				read: (row: { id: string }) => {
+					throw new Error('boom-' + row.id);
+				},
+			});
+			expect(failing.findAll('.try-error').map((el) => el.textContent)).toEqual([
+				'a:boom-a',
+				'b:boom-b',
+			]);
+			failing.unmount();
+		});
+
 		it('renders a module-level directive value', () => {
 			const result = mount(ModuleDirectiveValue as any, {});
 			expect(result.find('#module-if').textContent).toBe('module-on');
@@ -379,6 +481,7 @@ export function App(props: { rows: any[] }) @{
 
 		const serverCases: [string, string, Record<string, unknown>, string[]][] = [
 			['CallbackDirective', 'CallbackDirective', props, ['alpha', 'beta', 'cb-long']],
+			['CallbackTryDirective', 'CallbackTryDirective', props, ['alpha', 'beta', 'try-ok']],
 			['NestedCallbackDirective', 'NestedCallbackDirective', props, ['alpha!', 'beta!']],
 			['ModuleDirectiveValue', 'ModuleDirectiveValue', {}, ['module-on']],
 		];
@@ -468,6 +571,100 @@ export function App() @{
 					.replace(/^import[\s\S]*?from '[^']+';$/m, '')
 					.replace(/^export /gm, '');
 				expect(() => new Function(evaluable)).not.toThrow();
+			});
+		}
+
+		it('computes once at the point of definition, like a plain ternary', () => {
+			// `const v = @if (…) { … }` is a module-level const, so it is computed where
+			// it is written — exactly like `const v = cond ? <A/> : <B/>`, and like a
+			// React element created at module scope. The client gets this from its hole
+			// lowering; the server compiles the directive into a sub it calls per
+			// render, so the control expression has to be lifted to the definition site
+			// or the two emitters answer differently from the same input.
+			const directive = `export const flag = { on: true };
+
+const branch = @if (flag.on) { <b id="x">ON</b> } @else { <i id="x">OFF</i> };
+
+export function App() @{
+	<div>{branch}</div>
+}
+`;
+			const ternary = directive.replace(
+				'@if (flag.on) { <b id="x">ON</b> } @else { <i id="x">OFF</i> }',
+				'flag.on ? <b id="x">ON</b> : <i id="x">OFF</i>',
+			);
+
+			const render = (source: string, id: string) => {
+				const serverModule = loadCompiledFixtureSource(source, { id, mode: 'server' });
+				const clientModule = loadCompiledFixtureSource(source, { id, mode: 'client' });
+				// Both modules have loaded; flipping the flag now must change nothing,
+				// because the value was already computed.
+				serverModule.flag.on = false;
+				clientModule.flag.on = false;
+				const { html } = ServerRuntime.renderToString(serverModule.App, {});
+				const container = document.createElement('div');
+				container.innerHTML = html;
+				document.body.appendChild(container);
+				const root = hydrateRoot(container, clientModule.App, {});
+				flushSync(() => {});
+				const client = container.innerHTML.replace(/<!--[^>]*-->/g, '');
+				root.unmount();
+				container.remove();
+				return { server: html.replace(/<!--[^>]*-->/g, ''), client };
+			};
+
+			const fromDirective = render(directive, '/freeze-directive.tsrx');
+			const fromTernary = render(ternary, '/freeze-ternary.tsrx');
+
+			// Frozen at definition, so the pre-mutation arm is what renders.
+			expect(fromDirective.server).toContain('ON');
+			expect(fromDirective.client).toContain('ON');
+			// Server and client agree, and the directive agrees with the ternary.
+			expect(fromDirective.client).toBe(fromDirective.server);
+			expect(fromDirective.server).toBe(fromTernary.server);
+			expect(fromDirective.client).toBe(fromTernary.client);
+		});
+
+		for (const directive of DIRECTIVES) {
+			for (const mode of ['client', 'server'] as const) {
+				it(`folds ${directive.name} at module scope (${mode})`, () => {
+					const source = `export const g = { on: true, xs: [1], k: 1 };
+
+const v = ${directive.atModule};
+
+export function App() @{
+	<div>{v}</div>
+}
+`;
+					const { code } = compile(source, 'App.tsrx', { mode });
+					expect(code).toContain('armA');
+					expect(code).toContain('armB');
+					const evaluable = code
+						.replace(/^import[\s\S]*?from '[^']+';$/m, '')
+						.replace(/^export /gm, '');
+					expect(() => new Function(evaluable)).not.toThrow();
+				});
+			}
+
+			it(`${directive.control === null ? 'has no control expression to freeze for' : 'freezes the control expression of'} ${directive.name}`, () => {
+				const source = `export const g = { on: true, xs: [1], k: 1 };
+
+const v = ${directive.atModule};
+
+export function App() @{
+	<div>{v}</div>
+}
+`;
+				const { code } = compile(source, 'App.tsrx', { mode: 'server' });
+				const definition = code.split('\n').find((line) => line.includes('const v =')) ?? '';
+				if (directive.control === null) {
+					// Nothing to lift: `@try` selects its arm from what the body does at
+					// render time, which both emitters already do per render.
+					expect(definition).not.toContain('env:');
+				} else {
+					// Read where the value is WRITTEN, so the server matches the client.
+					expect(definition).toContain(`env: [${directive.control}]`);
+				}
 			});
 		}
 

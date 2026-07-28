@@ -49,6 +49,23 @@ export function CallbackDirective(props: Props) @{
 	<section id="callback-value">{props.rows.map(renderRow)}</section>
 }
 
+// `@try` inside a callback: its arms capture the callback's parameter too, and
+// the @catch arm has to be reachable from inside the callback.
+export function CallbackTryDirective(props: Props) @{
+	const renderRow = (row: Row) => <div class="try-row" data-id={row.id}>
+		@try {
+			<b class="try-ok">
+				{props.read ? props.read(row) : row.label}
+			</b>
+		} @pending {
+			<i class="try-pending">loading</i>
+		} @catch (error) {
+			<s class="try-error">{row.id + ':' + error.message}</s>
+		}
+	</div>;
+	<section id="callback-try">{props.rows.map(renderRow)}</section>
+}
+
 // The same capture, with the directive at CHILD position rather than in an
 // attribute value, and a second callback nested inside the first.
 export function NestedCallbackDirective(props: Props) @{

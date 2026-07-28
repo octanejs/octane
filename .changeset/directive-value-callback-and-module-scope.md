@@ -21,9 +21,20 @@ an arm may read from every enclosing scope.
 
 **At module scope.** `const v = @if (…) { … };` has no component body to own it
 and needs none — it can only close over module bindings, which every hoisted
-helper already sees, so its arms hoist beside it with no env at all. Both
-emitters fold it to their own shape; previously neither did, and the client's DOM
-helpers could be emitted into a server module.
+helper already sees, so its arms hoist beside it. Both emitters fold it to their
+own shape; previously neither did, and the client's DOM helpers could be emitted
+into a server module.
+
+A module-level value is computed once, where it is written, exactly like
+`const v = cond ? <A/> : <B/>` and like a React element built at module scope.
+The client already did that — its fold lifts the control expression out as a hole
+evaluated at the definition site — but the server compiles the directive into a
+sub it calls per render, so it re-read the expression every time. Given the same
+module state the two emitters could then disagree, and hydration reported
+nothing. The server now lifts the same expression (`@if`'s test, `@for`'s
+iterable, `@switch`'s discriminant) to the definition site, so both freeze
+together. `@try` has no control expression: it selects an arm from what its body
+does at render time, which both emitters already did per render.
 
 What remains unsupported is a directive inside a MODULE-level callback: the env
 channel is built per component, and there is no component to build it against.

@@ -13338,6 +13338,33 @@ function rejectUnownedValueDirective(node) {
 	);
 }
 
+// Lift a directive's control expression — `@if`'s test, `@for`'s iterable,
+// `@switch`'s discriminant — into a name the caller supplies, so the value is read
+// where the directive is WRITTEN rather than each time the compiled body runs.
+// `@try` has no control expression and needs no lift. Returns null when there is
+// nothing to lift; the rewrite is copy-on-write, per the parser-AST rule.
+function liftDirectiveControl(ctx, directive) {
+	const key =
+		directive.type === 'JSXIfExpression'
+			? 'test'
+			: directive.type === 'JSXForExpression'
+				? 'right'
+				: directive.type === 'JSXSwitchExpression'
+					? 'discriminant'
+					: null;
+	if (key === null) return null;
+	const value = directive[key];
+	if (value == null) return null;
+	// An identifier or literal reads the same in either place, so leave it inline
+	// and keep the emitted output as small as it was.
+	if (value.type === 'Identifier' || value.type === 'Literal') return null;
+	const frozenName = allocCompilerName(ctx, `__c$${ctx.nextFragId++}`);
+	return {
+		directive: { ...directive, [key]: inheritOriginLoc(b.id(frozenName), value) },
+		entry: { name: frozenName, value },
+	};
+}
+
 // Build the SERVER fold for a directive at value position: the directive body
 // compiles to a local `__sfragment` sub-render pushed into `inlinedSubs`, and a
 // per-site module wrapper gives server replays a stable component identity. The
@@ -13348,8 +13375,16 @@ function rejectUnownedValueDirective(node) {
 // own list so the sub can close over setup values; module-level statements pass
 // the hoisted-helper list, where a module-level directive's only possible
 // references already live.
-function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash) {
-	return (directive) => {
+function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, freezeControl = false) {
+	return (rawDirective) => {
+		// A module-level value is computed ONCE, where it is written. The client gets
+		// that for free — its fold lifts the control expression out as a hole
+		// evaluated at the definition site — but the server compiles the directive
+		// into a sub it calls per render, which would re-read the expression every
+		// time. Lift the same expression here so both sides freeze together, matching
+		// a plain `const v = cond ? <A/> : <B/>` and React's module-level elements.
+		const frozen = freezeControl ? liftDirectiveControl(ctx, rawDirective) : null;
+		const directive = frozen === null ? rawDirective : frozen.directive;
 		const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
 		const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
 		// The sub is declared in the OWNING body, so it closes over that body's values
@@ -13358,12 +13393,18 @@ function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash) {
 		// array through the wrapper instead. Every other fold sees an empty set here
 		// and keeps its previous output exactly.
 		const callbackScope = ctx._callbackScopeNames;
-		const env =
+		// Each entry is a name the sub binds plus the expression that supplies it at
+		// the call site: a callback capture supplies itself, a lifted control
+		// expression supplies the value it froze.
+		const envEntries =
 			callbackScope == null || callbackScope.size === 0
 				? []
 				: [...collectFreeIdentifiers(b.block([preparedDirective]), new Set())]
 						.filter((identifier) => callbackScope.has(identifier))
-						.sort();
+						.sort()
+						.map((identifier) => ({ name: identifier, value: b.id(identifier) }));
+		if (frozen !== null) envEntries.push(frozen.entry);
+		const env = envEntries.map((entry) => entry.name);
 		const subStmts = env.length
 			? [
 					inheritOriginLoc(
@@ -13413,7 +13454,7 @@ function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash) {
 		if (env.length) {
 			// Built HERE, at the call site, where the callback's names are in scope.
 			descriptorProps.push(
-				b.prop('init', b.id('env'), b.array(env.map((identifier) => b.id(identifier)))),
+				b.prop('init', b.id('env'), b.array(envEntries.map((entry) => entry.value))),
 			);
 		}
 		return inheritOriginLoc(
@@ -13452,7 +13493,7 @@ function rewriteModuleJsxValues(node, ctx) {
 	// what stops the client's DOM helpers being emitted into a server module.
 	ctx._valueDirectiveLowering =
 		ctx.mode === 'server'
-			? serverValueDirectiveFold(ctx, 'module', ctx.hoistedHelpers, null)
+			? serverValueDirectiveFold(ctx, 'module', ctx.hoistedHelpers, null, true)
 			: (directive) =>
 					lowerHostFragment(
 						setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, 'module')),
