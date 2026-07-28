@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  # A newer revision makes an older run for the same PR obsolete. Main pushes
+  # stay independent because release-merge CI can gate package publishing.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 env:
   # Named once: the sharded suite excludes these specs and website_e2e runs
   # them. Splitting the paths means a stale name could silently stop running
