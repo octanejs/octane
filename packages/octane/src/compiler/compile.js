@@ -14193,7 +14193,7 @@ function lowerJsxChild(child, ctx) {
 		// server export is the identity (`ssrChild` just renders the array).
 		ctx.runtimeNeeded.add('positionalChildren');
 		const children = inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
-		if (!jsxValueChildrenNeedRenderScope(child)) return children;
+		if (!jsxValueChildrenNeedRenderScope(child, true)) return children;
 
 		// A bare expression in a fragment has no parent element descriptor to
 		// defer it, so the fragment itself must own the represented render scope.
@@ -14247,7 +14247,7 @@ function isStaticJsxValueExpression(expression) {
 // syntax is effectful. Nested component/tag resolution and dynamic attributes
 // belong to their represented parent, so they make that parent's children lazy
 // even when the nested element has no expression children of its own.
-function jsxValueChildrenNeedRenderScope(node) {
+function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = false) {
 	for (const child of node.children || []) {
 		if (child == null || child.type === 'JSXText' || child.type === 'Text') continue;
 		if (child.type === 'JSXExpressionContainer') {
@@ -14261,7 +14261,7 @@ function jsxValueChildrenNeedRenderScope(node) {
 			continue;
 		}
 		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
-			if (jsxValueChildrenNeedRenderScope(child)) return true;
+			if (jsxValueChildrenNeedRenderScope(child, descendantElementsOwnChildren)) return true;
 			continue;
 		}
 		if (child.type !== 'Element' && child.type !== 'JSXElement') return true;
@@ -14272,7 +14272,9 @@ function jsxValueChildrenNeedRenderScope(node) {
 			if (attr.value?.type !== 'JSXExpressionContainer') continue;
 			if (!isStaticJsxValueExpression(attr.value.expression)) return true;
 		}
-		if (jsxValueChildrenNeedRenderScope(child)) return true;
+		// A fragment can retain its inspectable positional array when only a nested
+		// element's descendants are dynamic: that element already owns their scope.
+		if (!descendantElementsOwnChildren && jsxValueChildrenNeedRenderScope(child)) return true;
 	}
 	return false;
 }

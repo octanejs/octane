@@ -55,6 +55,20 @@ function Slot(props: { content: OctaneNode }) {
 	return <section data-outlet="slot">{props.content}</section>;
 }
 
+function InnerFragmentComponent() {
+	return <strong data-context="fragment-component-tag">inner</strong>;
+}
+
+function OuterFragmentComponent() {
+	return <strong data-context="fragment-component-tag">outer</strong>;
+}
+
+const contextualFragmentComponent = {
+	get current() {
+		return use(ValueContext) === 'inner' ? InnerFragmentComponent : OuterFragmentComponent;
+	},
+};
+
 function WrappedErrorBoundary(props: { children: OctaneNode }) {
 	return (
 		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>
@@ -173,6 +187,35 @@ export function FragmentArrayContext() {
 			<span data-context="fragment-array">{content[0]}</span>
 		</ValueContext.Provider>
 	);
+}
+
+export function FragmentNestedExpressionContext() {
+	const content = (
+		<>
+			<strong data-context="fragment-nested-expression">{getterValue.current}</strong>
+		</>
+	);
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
+}
+
+export function FragmentNestedAttributeContext() {
+	const content = (
+		<>
+			<strong data-context="fragment-nested-attribute" data-value={getterValue.current}>
+				attribute
+			</strong>
+		</>
+	);
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
+}
+
+export function FragmentDynamicComponentContext() {
+	const content = (
+		<>
+			<contextualFragmentComponent.current />
+		</>
+	);
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
 }
 
 export function ProxyContext() {
@@ -428,8 +471,33 @@ function InspectChild(props: { child: OctaneNode }) {
 	);
 }
 
+function InspectIndexedChildren(props: { children: OctaneNode }) {
+	const children = Children.toArray(props.children);
+	const indexed = children[1];
+	return (
+		<section
+			data-fragment-count={String(children.length)}
+			data-fragment-type={isValidElement(indexed) ? String(indexed.type) : 'missing'}
+		>
+			{indexed}
+		</section>
+	);
+}
+
 function collectionLabel() {
 	return 'inspected';
+}
+
+export function IndexedFragmentChildren(props: { name: string }) {
+	return (
+		<InspectIndexedChildren
+			children={
+				<>
+					Hello <strong data-indexed="yes">{props.name}</strong>
+				</>
+			}
+		/>
+	);
 }
 
 export function OrdinaryElementValue() {

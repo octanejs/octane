@@ -59,6 +59,20 @@ function Slot(props: { content: OctaneNode }) @{
 	<section data-outlet="slot">{props.content}</section>
 }
 
+function InnerFragmentComponent() @{
+	<strong data-context="fragment-component-tag">inner</strong>
+}
+
+function OuterFragmentComponent() @{
+	<strong data-context="fragment-component-tag">outer</strong>
+}
+
+const contextualFragmentComponent = {
+	get current() {
+		return use(ValueContext) === 'inner' ? InnerFragmentComponent : OuterFragmentComponent;
+	},
+};
+
 function WrappedErrorBoundary({ children }: { children: OctaneNode }) @{
 	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{children}</ErrorBoundary>
 }
@@ -151,6 +165,27 @@ export function FragmentArrayContext() @{
 	<ValueContext.Provider value="inner">
 		<span data-context="fragment-array">{content[0]}</span>
 	</ValueContext.Provider>
+}
+
+export function FragmentNestedExpressionContext() @{
+	const content = <>
+		<strong data-context="fragment-nested-expression">{getterValue.current as string}</strong>
+	</>;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+}
+
+export function FragmentNestedAttributeContext() @{
+	const content = <>
+		<strong data-context="fragment-nested-attribute" data-value={getterValue.current}>
+			attribute
+		</strong>
+	</>;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+}
+
+export function FragmentDynamicComponentContext() @{
+	const content = <><contextualFragmentComponent.current /></>;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
 }
 
 export function ProxyContext() @{
@@ -373,8 +408,27 @@ function InspectChild(props: { child: OctaneNode }) @{
 	</section>
 }
 
+function InspectIndexedChildren(props: { children: OctaneNode }) @{
+	const children = Children.toArray(props.children);
+	const indexed = children[1];
+	<section
+		data-fragment-count={String(children.length)}
+		data-fragment-type={isValidElement(indexed) ? String(indexed.type) : 'missing'}
+	>
+		{indexed}
+	</section>
+}
+
 function collectionLabel() {
 	return 'inspected';
+}
+
+export function IndexedFragmentChildren(props: { name: string }) @{
+	<InspectIndexedChildren
+		children={<>
+			Hello <strong data-indexed="yes">{props.name as string}</strong>
+		</>}
+	/>
 }
 
 export function OrdinaryElementValue() @{
@@ -444,6 +498,8 @@ const contextScenarios = [
 	['NestedFragmentContext', '[data-context="fragment-nested"]'],
 	['FragmentPropContext', '[data-context="fragment-prop"]'],
 	['FragmentArrayContext', '[data-context="fragment-array"]'],
+	['FragmentNestedExpressionContext', '[data-context="fragment-nested-expression"]'],
+	['FragmentDynamicComponentContext', '[data-context="fragment-component-tag"]'],
 	['ProxyContext', '[data-context="proxy"]'],
 	['CoercionContext', '[data-context="coercion"]'],
 	['IterableContext', '[data-context="iterable"]'],
@@ -496,6 +552,36 @@ for (const fixture of fixtures) {
 			const { html } = ServerRuntime.renderToString(fixture.server.GetterAttributeContext);
 			expect(html).toContain('data-value="inner"');
 			expect(html).not.toContain('data-value="outer"');
+		});
+
+		it('evaluates fragment-nested host attributes inside their represented provider', () => {
+			const result = mount(fixture.client.FragmentNestedAttributeContext);
+			expect(
+				result.find('[data-context="fragment-nested-attribute"]').getAttribute('data-value'),
+			).toBe('inner');
+			result.unmount();
+		});
+
+		it('server-renders fragment-nested host attributes inside their represented provider', () => {
+			const { html } = ServerRuntime.renderToString(fixture.server.FragmentNestedAttributeContext);
+			expect(html).toContain('data-value="inner"');
+			expect(html).not.toContain('data-value="outer"');
+		});
+
+		it('hydrates fragment-nested host attributes inside their represented provider', () => {
+			const { html } = ServerRuntime.renderToString(fixture.server.FragmentNestedAttributeContext);
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			document.body.appendChild(container);
+			const existing = container.querySelector('[data-context="fragment-nested-attribute"]');
+			expect(existing?.getAttribute('data-value')).toBe('inner');
+
+			const root = hydrateRoot(container, fixture.client.FragmentNestedAttributeContext);
+			flushSync(() => {});
+			expect(container.querySelector('[data-context="fragment-nested-attribute"]')).toBe(existing);
+			expect(existing?.getAttribute('data-value')).toBe('inner');
+			root.unmount();
+			container.remove();
 		});
 
 		it('keeps a shared JSX descriptor isolated across providers and updates', () => {
@@ -684,6 +770,47 @@ for (const fixture of fixtures) {
 				expect(html).toContain(expected);
 			});
 		}
+
+		it('preserves positional fragment siblings when nested child expressions are dynamic', () => {
+			const result = mount(fixture.client.IndexedFragmentChildren, { name: 'Ada' });
+			const parent = result.find('[data-fragment-count]');
+			expect(parent.getAttribute('data-fragment-count')).toBe('2');
+			expect(parent.getAttribute('data-fragment-type')).toBe('strong');
+			expect(result.find('[data-indexed="yes"]').textContent).toBe('Ada');
+			result.unmount();
+		});
+
+		it('server-renders inspectable positional fragment siblings', () => {
+			const { html } = ServerRuntime.renderToString(fixture.server.IndexedFragmentChildren, {
+				name: 'Ada',
+			});
+			const markup = document.createElement('div');
+			markup.innerHTML = html;
+			const parent = markup.querySelector('[data-fragment-count]');
+			expect(parent?.getAttribute('data-fragment-count')).toBe('2');
+			expect(parent?.getAttribute('data-fragment-type')).toBe('strong');
+			expect(parent?.querySelector('[data-indexed="yes"]')?.textContent).toBe('Ada');
+		});
+
+		it('hydrates inspectable positional fragment siblings', () => {
+			const props = { name: 'Ada' };
+			const { html } = ServerRuntime.renderToString(fixture.server.IndexedFragmentChildren, props);
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			document.body.appendChild(container);
+			const parent = container.querySelector('[data-fragment-count]');
+			const existing = parent?.querySelector('[data-indexed="yes"]');
+			expect(parent?.getAttribute('data-fragment-count')).toBe('2');
+			expect(parent?.getAttribute('data-fragment-type')).toBe('strong');
+			expect(existing?.textContent).toBe('Ada');
+
+			const root = hydrateRoot(container, fixture.client.IndexedFragmentChildren, props);
+			flushSync(() => {});
+			expect(container.querySelector('[data-indexed="yes"]')).toBe(existing);
+			expect(existing?.textContent).toBe('Ada');
+			root.unmount();
+			container.remove();
+		});
 	});
 }
 
