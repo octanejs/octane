@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '../_helpers';
 import { Box, Span } from '../_fixtures/boxes.tsrx';
+import { TsxDescriptorChildren, ToggleableTsxChildren } from '../_fixtures/tsx-descriptor-children';
 
 describe('motion.<tag> rendering', () => {
 	it('renders a real <div> with className + children', () => {
@@ -29,6 +30,33 @@ describe('motion.<tag> rendering', () => {
 		expect(sp.tagName).toBe('SPAN');
 		expect(sp.className).toBe('lbl');
 		expect(sp.textContent).toBe('label');
+		r.unmount();
+	});
+
+	it('renders and updates descriptor children produced by a TSX value position', () => {
+		const r = mount(TsxDescriptorChildren, { first: 'first', second: 'second' });
+		const motionDiv = r.find('#tsx-motion');
+		expect(motionDiv.textContent).toBe('firstsecond');
+		expect(motionDiv.contains(r.find('#tsx-first'))).toBe(true);
+		expect(motionDiv.contains(r.find('#tsx-second'))).toBe(true);
+
+		r.update(TsxDescriptorChildren, { first: 'updated', second: 'children' });
+		expect(motionDiv.textContent).toBe('updatedchildren');
+		r.unmount();
+	});
+
+	it('clears descriptor children when the TSX value position goes null', () => {
+		const r = mount(ToggleableTsxChildren, { show: true });
+		const motionDiv = r.find('#tsx-toggle');
+		expect(motionDiv.textContent).toBe('kid');
+
+		r.update(ToggleableTsxChildren, { show: false });
+		expect(motionDiv.textContent).toBe('');
+		expect(r.container.querySelector('#tsx-toggle-kid')).toBe(null);
+
+		// …and comes back, so the cleared slot is still reconcilable.
+		r.update(ToggleableTsxChildren, { show: true });
+		expect(motionDiv.textContent).toBe('kid');
 		r.unmount();
 	});
 });
