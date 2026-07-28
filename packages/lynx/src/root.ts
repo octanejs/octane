@@ -307,7 +307,11 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 	try {
 		uninstallNativeEvents = installLynxNativeEventReceiver(target as object, {
 			claims(root) {
-				return transport.acceptedIdentity()?.root === root;
+				// The transport knows its root from its first commit, which is
+				// necessarily earlier than main installing a token for it. Claiming on
+				// the accepted identity instead would drop every tap that lands before
+				// this thread processes the first acknowledgement.
+				return transport.ownedRoot() === root;
 			},
 			deliver(deliveries) {
 				transport.dispatchNativeEventBatch(deliveries);

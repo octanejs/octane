@@ -14,6 +14,12 @@ its own errors. Listener priority travels inside the token so the background can
 build a valid transported event message without a round trip to main, and one
 native propagation path is delivered as a single Octane event scope.
 
+A tap can also land between main applying a commit — which is when it installs
+the `__AddEvent` tokens, so the element becomes tappable — and the background
+accepting that commit's acknowledgement. Such a delivery is early, not stale, so
+it is held for the acknowledgement it is racing and dispatched once the host is
+published, rather than dropped.
+
 Mount cost is also down about a third to a half. Public handles for accepted
 host nodes are now compact entries whose frozen facade, `NodesRef` query
 binding, and defensive snapshot clone are built on first use rather than once

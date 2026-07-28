@@ -18,6 +18,11 @@ import type { UniversalComponent } from 'octane/universal/native';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createLynxRoot, type LynxRoot } from '../src/index.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
+import {
+	LYNX_MAIN_TO_BACKGROUND_EVENT,
+	type LynxContextProxy,
+	type LynxContextProxyEvent,
+} from '../src/core/protocol.js';
 import { NativeEventFixture } from './_fixtures/native-event.lynx.tsrx';
 
 interface FixtureProps {
@@ -76,6 +81,65 @@ function tap(dom: JSDOM, selector: string, kind = 'bindEvent', detail: unknown =
 	}
 	Object.assign(event, { timestamp: 1, detail });
 	element.dispatchEvent(event);
+}
+
+interface InboundGate {
+	readonly context: LynxContextProxy;
+	hold(): void;
+	held(): number;
+	release(): void;
+}
+
+/**
+ * A background ContextProxy whose main-to-background delivery can be held. That
+ * is the only half a real runtime delays independently: main applies a commit
+ * and installs its tokens before its acknowledgement crosses back.
+ */
+function gateBackgroundInbound(): InboundGate {
+	const inner = (
+		globalThis as typeof globalThis & { lynx: { getCoreContext(): LynxContextProxy } }
+	).lynx.getCoreContext();
+	const wrappers = new Map<
+		(event: LynxContextProxyEvent) => void,
+		(event: LynxContextProxyEvent) => void
+	>();
+	let holding = false;
+	let queue: Array<() => void> = [];
+	const context: LynxContextProxy = {
+		dispatchEvent: (event) => inner.dispatchEvent(event),
+		addEventListener(type, listener) {
+			if (type !== LYNX_MAIN_TO_BACKGROUND_EVENT) {
+				inner.addEventListener(type, listener);
+				return;
+			}
+			const gated = (event: LynxContextProxyEvent): void => {
+				if (holding) queue.push(() => listener(event));
+				else listener(event);
+			};
+			wrappers.set(listener, gated);
+			inner.addEventListener(type, gated);
+		},
+		removeEventListener(type, listener) {
+			const gated = wrappers.get(listener);
+			inner.removeEventListener(type, gated ?? listener);
+			wrappers.delete(listener);
+		},
+	};
+	return {
+		context,
+		hold() {
+			holding = true;
+		},
+		held() {
+			return queue.length;
+		},
+		release() {
+			holding = false;
+			const pending = queue;
+			queue = [];
+			for (const deliver of pending) deliver();
+		},
+	};
 }
 
 afterEach(async () => {
@@ -157,7 +221,44 @@ describe.sequential('@octanejs/lynx native background event delivery', () => {
 		expect(() => publishEvent('some-other-framework:handler', { type: 'tap' })).not.toThrow();
 	});
 
-	it('drops a tap that names a host the background no longer owns', async () => {
+	it('runs a tap that lands before the background accepts the acknowledgement', async () => {
+		// Main installs `__AddEvent` tokens while it applies a commit, so an element
+		// is tappable before the acknowledgement teaching the background its
+		// generation has been processed. A tap is an engine call, not a ContextProxy
+		// message, so it can overtake that acknowledgement. Holding main's inbound
+		// messages reproduces the window a real dual-thread runtime opens.
+		const { dom } = installEnvironment();
+		const gate = gateBackgroundInbound();
+		const log: string[] = [];
+		const diagnostics: Error[] = [];
+		backgroundRoot = createLynxRoot({
+			context: gate.context,
+			onDiagnostic: (error) => diagnostics.push(error),
+		});
+
+		gate.hold();
+		const rendered = backgroundRoot.render(fixture, { log: (entry) => log.push(entry) });
+		for (let turn = 0; turn < 8; turn++) await Promise.resolve();
+
+		// Main has applied the commit: the element and its token exist natively.
+		const target = dom.window.document.querySelector('#target');
+		expect(target).not.toBe(null);
+		expect(gate.held()).toBeGreaterThan(0);
+
+		tap(dom, '#target', 'bindEvent', { marker: 'early' });
+		for (let turn = 0; turn < 8; turn++) await Promise.resolve();
+		expect(log).toEqual([]);
+
+		gate.release();
+		await rendered;
+		await settle();
+
+		expect(log).toEqual(['target:tap:early', 'shell:0']);
+		expect(dom.window.document.querySelector('#shell')?.textContent).toContain('taps: 1');
+		expect(diagnostics).toEqual([]);
+	});
+
+	it('drops a tap that names a host the background never accepts', async () => {
 		const { dom } = installEnvironment();
 		const log: string[] = [];
 		const diagnostics: Error[] = [];
@@ -180,7 +281,17 @@ describe.sequential('@octanejs/lynx native background event delivery', () => {
 		});
 		await settle();
 
+		// It is held for the one acknowledgement it could be racing, so nothing is
+		// reported yet and nothing ran.
 		expect(log).toEqual([]);
+		expect(diagnostics).toEqual([]);
+
+		// A real tap produces the next commit and acknowledgement. That is the
+		// grace expiring for the unresolvable delivery.
+		tap(dom, '#target', 'bindEvent', { marker: 'live' });
+		await settle();
+
+		expect(log).toEqual(['target:tap:live', 'shell:0']);
 		expect(diagnostics.map((error) => error.message).join(' ')).toMatch(/stale native event/);
 	});
 
