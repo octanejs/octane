@@ -1165,6 +1165,11 @@ export default defineConfig({
 						'!packages/apollo-client/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
+					// inside the test body (same helper as base-ui/aria); keep the same 30s
+					// headroom so a loaded CI shard doesn't overrun the 5s vitest default.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -2109,6 +2114,11 @@ export default defineConfig({
 						'!packages/base-ui/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
+					// inside the test body; on a loaded CI shard that overran the 5s vitest
+					// default. Match the other differential-bearing projects at 30s.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// Differential precompile for base-ui fixtures: rewrites `@octanejs/base-ui/<sub>`
 					// → `@base-ui-components/react/<sub>` so the React side runs real Base UI.
 					globalSetup: ['packages/base-ui/tests/differential/_setup.ts'],
