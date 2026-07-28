@@ -35,11 +35,9 @@ export function DirectContext() @{
 }
 
 export function VariableContext() @{
-	const content = (
-		<ValueContext.Provider value="inner">
-			<span data-context="variable">{use(ValueContext) as string}</span>
-		</ValueContext.Provider>
-	);
+	const content = <ValueContext.Provider value="inner">
+		<span data-context="variable">{use(ValueContext) as string}</span>
+	</ValueContext.Provider>;
 	<section data-outlet="variable">{content}</section>
 }
 
@@ -65,35 +63,29 @@ export function NestedContext() @{
 }
 
 export function DirectiveContext(props: { visible: boolean }) @{
-	const content = (
-		<ValueContext.Provider value="inner">
-			<div data-outlet="directive">
-				@if (props.visible) {
-					<span data-context="directive">{use(ValueContext) as string}</span>
-				} @else {
-					<span data-context="directive">hidden</span>
-				}
-			</div>
-		</ValueContext.Provider>
-	);
+	const content = <ValueContext.Provider value="inner">
+		<div data-outlet="directive">
+			@if (props.visible) {
+				<span data-context="directive">{use(ValueContext) as string}</span>
+			} @else {
+				<span data-context="directive">hidden</span>
+			}
+		</div>
+	</ValueContext.Provider>;
 	<section>{content}</section>
 }
 
 export function BuiltInErrorValue() @{
-	const content = (
-		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>
-			<span>{readFailure() as string}</span>
-		</ErrorBoundary>
-	);
+	const content = <ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>
+		<span>{readFailure() as string}</span>
+	</ErrorBoundary>;
 	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>{content}</ErrorBoundary>
 }
 
 export function WrappedErrorValue() @{
-	const content = (
-		<WrappedErrorBoundary>
-			<span>{readFailure() as string}</span>
-		</WrappedErrorBoundary>
-	);
+	const content = <WrappedErrorBoundary>
+		<span>{readFailure() as string}</span>
+	</WrappedErrorBoundary>;
 	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>{content}</ErrorBoundary>
 }
 
@@ -104,20 +96,16 @@ export function DirectSuspense(props: { promise: Promise<string> }) @{
 }
 
 export function VariableSuspense(props: { promise: Promise<string> }) @{
-	const content = (
-		<Suspense fallback={<i data-fallback="pending">pending</i>}>
-			<span data-resolved="variable">{use(props.promise) as string}</span>
-		</Suspense>
-	);
+	const content = <Suspense fallback={<i data-fallback="pending">pending</i>}>
+		<span data-resolved="variable">{use(props.promise) as string}</span>
+	</Suspense>;
 	<section data-outlet="suspense">{content}</section>
 }
 
 export function WrappedSuspenseValue(props: { promise: Promise<string> }) @{
-	const content = (
-		<WrappedSuspense>
-			<span data-resolved="wrapped">{use(props.promise) as string}</span>
-		</WrappedSuspense>
-	);
+	const content = <WrappedSuspense>
+		<span data-resolved="wrapped">{use(props.promise) as string}</span>
+	</WrappedSuspense>;
 	<section data-outlet="suspense">{content}</section>
 }
 
