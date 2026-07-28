@@ -76,7 +76,8 @@ and expose the same button + table contract:
 ### Preact and Svelte 5 references
 
 - **`preact`** (`:5260`) is a native Preact hooks implementation using keyed
-  JSX rows and the public compat `flushSync`; it is not a React-alias build.
+  JSX rows. The harness awaits Preact's queued microtask commit inside each timed
+  click; it is not a React-alias build.
 - **`svelte`** (`:5271`) is a runes-mode Svelte 5 implementation using a raw
   row array, keyed `#each`, modern event attributes, and public `flushSync`.
 

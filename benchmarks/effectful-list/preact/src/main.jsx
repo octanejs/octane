@@ -1,5 +1,4 @@
 import { createElement, render } from 'preact';
-import { flushSync } from 'preact/compat';
 import App from './App.jsx';
 import './fx.js';
 import { remove100, toEmpty, toFresh1k, updateDeps, updateNodeps } from './ops.js';
@@ -15,12 +14,12 @@ let mounted = false;
 // scheduling and cleanup work without reaching into scheduler internals.
 const run = (fn) => {
 	const settled = waitForPassiveEffects();
-	flushSync(fn);
+	fn();
 	return settled;
 };
 
 window.__mount = () => {
-	flushSync(() => render(createElement(App), target));
+	render(createElement(App), target);
 	mounted = true;
 };
 
@@ -36,7 +35,7 @@ window.__opRemove100 = () => run(remove100);
 
 window.__unmount = () => {
 	if (mounted) {
-		flushSync(() => render(null, target));
+		render(null, target);
 		mounted = false;
 	}
 };

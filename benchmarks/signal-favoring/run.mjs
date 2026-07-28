@@ -58,8 +58,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // All ops mutate the DOM inside the adapter call — synchronously where the
 // framework allows it (ripple / octane / react via flushSync, solid via
-// flush()); an adapter with no public sync flush (vue-vapor) returns a
-// thenable (nextTick(), settling after Vue's flushJobs) and the timed window
+// flush()); native async adapters (Preact and vue-vapor) return a thenable after
+// their queued DOM update, and the timed window
 // extends until it settles — awaited BETWEEN reps so bumps can't coalesce
 // into one commit. Either way we time ONLY the framework's work and force a
 // GC right before each timed sample. This isolates framework JS work from
@@ -286,7 +286,7 @@ async function measureSweep(browser, url, batchFn) {
 						for (const idx of indices) {
 							const fn = window['__bumpAt' + idx];
 							if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
-							// An async-commit bump (vue-vapor) is awaited per change —
+							// An async-commit bump (Preact/vue-vapor) is awaited per change —
 							// that IS the "flush on every change" mode for a microtask
 							// scheduler (each await lets flushJobs run before the next).
 							const r = fn();

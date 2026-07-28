@@ -17,8 +17,8 @@
 // cost.
 //
 // Timing protocol matches ../todomvc/run.mjs: sync-commit frameworks flush
-// inside the call (octane/react/ripple flushSync, solid flush()); vue-vapor
-// exposes `__benchFlush` and the loop awaits it per interaction.
+// inside the call (octane/react/ripple flushSync, solid flush()); Preact and
+// vue-vapor expose `__benchFlush` and the loop awaits it per interaction.
 //
 // Usage:
 //   node benchmarks/chat-stream/run.mjs [iterations]      # default 8

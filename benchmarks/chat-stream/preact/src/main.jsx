@@ -1,10 +1,10 @@
 import { render } from 'preact';
 import { useState } from 'preact/hooks';
-import { flushSync } from 'preact/compat';
 import { initialConversations, nextReply, segText, userMessage } from './data.js';
 
-// Native Preact streaming-chat fixture. compat is used only for the public
-// synchronous flush that keeps network-pump and input work inside the timer.
+// Preact queues hook updates in a microtask. The harness awaits this after each
+// event/network update so native scheduling and the DOM commit stay timed.
+window.__benchFlush = () => Promise.resolve();
 function ChatApp() {
 	const [conversations, setConversations] = useState(initialConversations);
 	const [active, setActive] = useState(0);
@@ -15,20 +15,18 @@ function ChatApp() {
 		const text = draft.trim();
 		if (text === '') return;
 		const reply = nextReply();
-		flushSync(() => {
-			setConversations((items) =>
-				items.map((conversation, index) =>
-					index === active
-						? {
-								...conversation,
-								messages: [...conversation.messages, userMessage(text), reply],
-							}
-						: conversation,
-				),
-			);
-			setStreamingId(reply.id);
-			setDraft('');
-		});
+		setConversations((items) =>
+			items.map((conversation, index) =>
+				index === active
+					? {
+							...conversation,
+							messages: [...conversation.messages, userMessage(text), reply],
+						}
+					: conversation,
+			),
+		);
+		setStreamingId(reply.id);
+		setDraft('');
 	};
 
 	window.__pump = (count) => {
@@ -36,30 +34,27 @@ function ChatApp() {
 		const message = conversations[active].messages.find((item) => item.id === streamingId);
 		if (message === undefined) return 0;
 		const done = Math.min(message.total, message.done + count);
-		flushSync(() => {
-			setConversations((items) =>
-				items.map((conversation, index) =>
-					index === active
-						? {
-								...conversation,
-								messages: conversation.messages.map((item) =>
-									item.id === streamingId ? { ...item, done } : item,
-								),
-							}
-						: conversation,
-				),
-			);
-			if (done === message.total) setStreamingId(null);
-		});
+		setConversations((items) =>
+			items.map((conversation, index) =>
+				index === active
+					? {
+							...conversation,
+							messages: conversation.messages.map((item) =>
+								item.id === streamingId ? { ...item, done } : item,
+							),
+						}
+					: conversation,
+			),
+		);
+		if (done === message.total) setStreamingId(null);
 		return message.total - done;
 	};
-	window.__reset = () =>
-		flushSync(() => {
-			setConversations(initialConversations());
-			setActive(0);
-			setDraft('');
-			setStreamingId(null);
-		});
+	window.__reset = () => {
+		setConversations(initialConversations());
+		setActive(0);
+		setDraft('');
+		setStreamingId(null);
+	};
 
 	const conversation = conversations[active];
 	return (
@@ -72,7 +67,7 @@ function ChatApp() {
 							key={item.id}
 							class={'conv-tab' + (item.id === active ? ' active' : '')}
 							data-conv={String(item.id)}
-							onClick={() => flushSync(() => setActive(item.id))}
+							onClick={() => setActive(item.id)}
 						>
 							{item.title}
 						</button>
@@ -106,7 +101,7 @@ function ChatApp() {
 					class="prompt"
 					placeholder="Message…"
 					value={draft}
-					onInput={(event) => flushSync(() => setDraft(event.currentTarget.value))}
+					onInput={(event) => setDraft(event.currentTarget.value)}
 					onKeyDown={(event) => {
 						if (event.key === 'Enter') send();
 					}}

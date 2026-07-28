@@ -9,12 +9,11 @@
 // Timing protocol (shared with ../js-framework/run.mjs): interactions run
 // inside one page.evaluate, `performance.now()` around the batch. Frameworks
 // that commit synchronously on the dispatched event (octane native flush,
-// react/preact/ripple/Svelte flushSync in handlers, solid flush()) are fully
-// measured by the synchronous window; vue-vapor exposes
-// `window.__benchFlush = () => nextTick()`
-// and the loop awaits it after EACH interaction — one scheduler flush per
-// user action, matching how real input arrives (discrete tasks), with Vue's
-// own scheduling cost inside the measurement.
+// react/ripple/Svelte flushSync in handlers, solid flush()) are fully measured
+// by the synchronous window; Preact and vue-vapor expose
+// `window.__benchFlush` and the loop awaits it after EACH interaction — one
+// scheduler flush per user action, matching how real input arrives (discrete
+// tasks), with each framework's own scheduling cost inside the measurement.
 //
 // The `.new-todo` / `.edit` inputs are uncontrolled in every app: the driver
 // sets `input.value` directly and dispatches `keydown` (Enter/Escape) — the

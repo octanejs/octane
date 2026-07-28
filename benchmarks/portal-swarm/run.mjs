@@ -219,8 +219,8 @@ async function verifyTarget(browser, url) {
 
 // MOUNT — fresh page per sample (quiescent start); time __mount() with a
 // freshly-collected heap. All portals closed. An adapter whose commit is
-// scheduler-deferred returns a thenable (vue-vapor's update ops do — see its
-// main.js); every timed window below extends until it settles, so the
+// scheduler-deferred returns a thenable (Preact and vue-vapor do); every timed
+// window below extends until it settles, so the
 // scheduling cost stays inside the measurement.
 async function measureMountClosed(browser, url) {
 	const samples = [];

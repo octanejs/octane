@@ -24,7 +24,7 @@
 //
 // Methodology mirrors the sibling benches: ops commit inside the timed hook —
 // synchronously where the framework allows it (react flushSync, solid flush());
-// vue-vapor's hooks return a nextTick() thenable the harness awaits inside the
+// Preact and vue-vapor hooks return a thenable the harness awaits inside the
 // timed window — gc() is forced before every timed sample, and sub-millisecond
 // ops loop enough invocations inside the timed window to keep newly auto-memoized
 // regions above performance.now()'s resolution before dividing by the rep count.
@@ -191,9 +191,8 @@ async function measureLoop(browser, url, op) {
 			const gc = window.gc || (() => {});
 			const runBatch = async (count) => {
 				const t0 = performance.now();
-				// Async-commit targets (vue-vapor — hooks return a nextTick()
-				// thenable; see its main.js) await the flush BETWEEN reps so the
-				// reps don't coalesce into one commit; sync targets are unchanged.
+				// Async-commit targets (Preact and vue-vapor) await the flush BETWEEN
+				// reps so they don't coalesce into one commit; sync targets are unchanged.
 				for (let k = 0; k < count; k++) {
 					const r = fn();
 					if (r && typeof r.then === 'function') await r;

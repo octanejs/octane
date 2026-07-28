@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useState } from 'preact/hooks';
-import { flushSync, startTransition, Suspense } from 'preact/compat';
+import { startTransition, Suspense } from 'preact/compat';
 import { fetchData, LEVELS } from './data.js';
 
 const records = new WeakMap();
@@ -67,7 +67,7 @@ let version = 0;
 
 window.__init = () => {
 	const t0 = performance.now();
-	flushSync(() => render(<Main />, target));
+	render(<Main />, target);
 	return waitForDeep(`L${LEVELS - 1}:v0`, t0);
 };
 
