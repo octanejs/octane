@@ -5229,6 +5229,15 @@ function childrenAsBody(children: unknown): ComponentBody {
 	};
 }
 
+// Descriptor children remain inspectable values, but a scoped JSX descriptor
+// resolves them only after its represented boundary enters its try body. Reading
+// the accessor while constructing that body would move throws and suspension
+// outside the boundary, recreating the eager-JSX ownership bug.
+function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
+	if (!SCOPED_ELEMENT_PROPS.has(props)) return childrenAsBody(props.children);
+	return (_props, scope, extra) => childrenAsBody(props.children)(undefined, scope, extra);
+}
+
 /**
  * Records which children dialect (1 = compiled body, 2 = descriptor) a scope last rendered, so a
  * flip can be detected. Lives in the hook map, whose Symbol keys are disjoint from the numeric
@@ -6348,7 +6357,7 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> 
 				scope,
 				0,
 				block.parentNode,
-				childrenAsBody(props.children),
+				scopedChildrenAsBody(props),
 				null,
 				pendingBody,
 				block.endMarker,
@@ -6415,7 +6424,7 @@ export const ErrorBoundary: ComponentBody<{
 			scope,
 			0,
 			block.parentNode,
-			childrenAsBody(props.children),
+			scopedChildrenAsBody(props),
 			catchBody,
 			null,
 			block.endMarker,
@@ -13140,6 +13149,10 @@ function elementKeyWasProvided(descriptor: ElementDescriptor): boolean {
 // missing-key validation state out of band so rebasing an unkeyed element from
 // a dynamic collection does not accidentally silence the renderer warning.
 const ELEMENTS_MISSING_LIST_KEY = new WeakSet<object>();
+// Only compiler-authored descriptors with a deferred child body enter this
+// collection. Ordinary createElement calls retain their exact public shape and
+// allocation path.
+const SCOPED_ELEMENT_PROPS = new WeakSet<object>();
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
 	// A compiled ComponentBody (the fast/common case, e.g. `root.render(<App/>)`)
@@ -13207,6 +13220,68 @@ function finalizeElementDescriptor<P>(descriptor: ElementDescriptor<P>): Element
 	}
 	return descriptor;
 }
+
+/**
+ * Compiler-only JSX descriptor whose child tree resolves in its rendered scope.
+ *
+ * Matching accessors preserve the ordinary descriptor type, props, key, ref, and
+ * synchronously inspectable children without introducing component boundaries or
+ * hydration markers. Scope/context-aware memoization prevents one module-level
+ * element from retaining another provider's children or stale context values.
+ *
+ * @internal
+ */
+export function createScopedElement<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props: P | undefined,
+	readChildren: () => unknown,
+): ElementDescriptor<P> {
+	const src = (props ?? null) as any;
+	const hasKey = hasElementConfigKey(src);
+	const key = hasKey ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+
+	let resolved = false;
+	let resolvedScope: Scope | null = null;
+	let resolvedEpoch = 0;
+	let resolvedChildren: unknown;
+	const children = (): unknown => {
+		const scope = CURRENT_SCOPE;
+		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
+		if (!resolved || resolvedScope !== scope || resolvedEpoch !== epoch) {
+			const nextChildren = readChildren();
+			resolvedScope = scope;
+			resolvedEpoch = epoch;
+			resolvedChildren = nextChildren;
+			resolved = true;
+		}
+		return resolvedChildren;
+	};
+	const childProperty = { configurable: true, enumerable: true, get: children };
+	Object.defineProperty(copiedProps, 'children', childProperty);
+	SCOPED_ELEMENT_PROPS.add(copiedProps);
+
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		type,
+		props: copiedProps as P,
+		key,
+		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
+		children: null,
+	};
+	Object.defineProperty(descriptor, 'children', childProperty);
+	if (
+		key === null &&
+		src != null &&
+		(typeof src === 'object' || typeof src === 'function') &&
+		'key' in src
+	) {
+		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	}
+	return finalizeElementDescriptor(descriptor);
+}
+
 // React-shape `createElement(type, props, ...children)`. Two-arg calls
 // (`createElement(Comp, props)`) stay the component-value form the compiler emits
 // for `{<Comp/>}`. With a string `type` and/or explicit children it produces a

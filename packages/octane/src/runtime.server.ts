@@ -438,6 +438,11 @@ interface ElementDescriptor {
 	children: any;
 }
 
+// Scoped descriptors keep their ordinary public shape while deferring child
+// evaluation. The component serializer must pass these props through intact:
+// spreading them would invoke the child accessor before entering the component.
+const SCOPED_ELEMENT_PROPS = new WeakSet<object>();
+
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
 	// React's development-only props.key warning getter is not a real key, and
@@ -479,6 +484,45 @@ function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescri
 		Object.freeze(descriptor);
 	}
 	return descriptor;
+}
+
+/** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
+export function createScopedElement(
+	type: ServerComponent | string | typeof Fragment,
+	props: any,
+	readChildren: () => unknown,
+): ElementDescriptor {
+	const src = (props ?? null) as any;
+	const key = hasElementConfigKey(src) ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+
+	let resolved = false;
+	let resolvedScope: SSRScope | null = null;
+	let resolvedChildren: unknown;
+	const children = (): unknown => {
+		const scope = CURRENT_SCOPE;
+		if (!resolved || resolvedScope !== scope) {
+			const nextChildren = readChildren();
+			resolvedScope = scope;
+			resolvedChildren = nextChildren;
+			resolved = true;
+		}
+		return resolvedChildren;
+	};
+	const childProperty = { configurable: true, enumerable: true, get: children };
+	Object.defineProperty(copiedProps, 'children', childProperty);
+	SCOPED_ELEMENT_PROPS.add(copiedProps);
+	const descriptor: ElementDescriptor = {
+		$$kind: ELEMENT_TAG,
+		type,
+		props: copiedProps,
+		key,
+		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
+		children: null,
+	};
+	Object.defineProperty(descriptor, 'children', childProperty);
+	return finalizeElementDescriptor(descriptor);
 }
 
 // Server `createElement(type, props, ...children)` — produces the SAME descriptor
@@ -999,6 +1043,9 @@ export function ssrTextPre(v: unknown): string {
 // its descriptors the spread is a no-op copy — it stays as a defensive guard for
 // hand-rolled descriptors whose props/children were never reconciled.
 function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
+	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
+		return ssrComponent(scope, d.type as ServerComponent, d.props);
+	}
 	return ssrComponent(scope, d.type as ServerComponent, {
 		...d.props,
 		children: d.children ?? d.props?.children,

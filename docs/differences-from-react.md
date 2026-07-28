@@ -239,6 +239,47 @@ can be observed, preserving the existing runtime path and allocation profile for
 ordinary two-item destructuring. Escaped or ambiguous tuples conservatively
 receive the complete three-item shape.
 
+## JSX values follow the represented render scope
+
+Moving compiler-authored JSX into a variable, prop, array, or other value
+position does not move its represented context provider, Suspense boundary, or
+error boundary:
+
+```tsx
+const Theme = createContext('outer');
+const theme = {
+  get current() {
+    return use(Theme);
+  },
+};
+
+function Page() {
+  const content = (
+    <Theme.Provider value="inner">
+      <span>{theme.current}</span>
+    </Theme.Provider>
+  );
+
+  return <main>{content}</main>; // "inner", just like direct JSX output.
+}
+```
+
+When Octane renders that stored subtree, descendant expressions run after their
+represented provider or boundary has entered its scope. This includes implicit
+user code in getters, Proxy traps, coercion hooks, iterators, and computed keys,
+not only explicit function calls. React evaluates JSX child expressions while
+constructing the caller's element, before that element's represented provider or
+boundary renders; Octane intentionally follows the visible rendered tree
+instead.
+
+JSX values remain inspectable element descriptors: `isValidElement`,
+`Children.only`, `cloneElement`, and ordinary `type`/`props`/`children`
+inspection keep their existing contracts. Reading an element's children as data
+can evaluate them in the inspecting caller's current scope; it does not enter a
+provider or boundary that has not rendered. The root element's tag and props,
+explicit `createElement(...)` calls, and event or render-prop callbacks retain
+ordinary JavaScript evaluation semantics.
+
 ## Native event objects, no synthetic event layer
 
 Event propagation itself matches React and is **not a divergence**. Ordinary
