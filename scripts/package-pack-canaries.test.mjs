@@ -3,9 +3,13 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	createPackedExampleManifest,
+	createPackedTsrxConsumerConfig,
+	createPackedTsrxConsumerManifest,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
+	renderPackedTsrxConsumerSource,
+	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
 
 describe('isForbiddenNativeGraphModule', () => {
@@ -94,6 +98,81 @@ describe('renderPackedExampleWorkspace', () => {
   "octane": "file:/tmp/octane.tgz"
 `,
 		);
+	});
+});
+
+describe('packed TSRX source consumers', () => {
+	const archiveSpecs = {
+		'@octanejs/cmdk': 'file:/tmp/cmdk.tgz',
+		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
+		'@octanejs/radix': 'file:/tmp/radix.tgz',
+		'@octanejs/sonner': 'file:/tmp/sonner.tgz',
+		'@octanejs/tiptap': 'file:/tmp/tiptap.tgz',
+		octane: 'file:/tmp/octane.tgz',
+	};
+	const toolingVersions = {
+		nodeTypes: '24.13.3',
+		tsrxTypeScriptPlugin: '0.3.116',
+		typescript: '5.9.3',
+	};
+
+	test('installs the real packed bindings and the pinned consumer TSRX tooling', () => {
+		const manifest = createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions);
+
+		assert.deepEqual(manifest.dependencies, archiveSpecs);
+		assert.deepEqual(manifest.devDependencies, {
+			'@tsrx/typescript-plugin': '0.3.116',
+			'@types/node': '24.13.3',
+			typescript: '5.9.3',
+		});
+		assert.equal(manifest.private, true);
+	});
+
+	test('rejects a published binding omitted from the packed archive set', () => {
+		const { '@octanejs/tiptap': _missingTiptap, ...incompleteArchives } = archiveSpecs;
+
+		assert.throws(
+			() => createPackedTsrxConsumerManifest(incompleteArchives, toolingVersions),
+			/no packed archive was provided for @octanejs\/tiptap/,
+		);
+	});
+
+	test('typechecks TSRX with the Octane language plugin and full strict diagnostics', () => {
+		const config = createPackedTsrxConsumerConfig();
+
+		assert.equal(config.compilerOptions.strict, true);
+		assert.equal(config.compilerOptions.skipLibCheck, false);
+		assert.equal(config.compilerOptions.jsx, 'react-jsx');
+		assert.equal(config.compilerOptions.jsxImportSource, 'octane');
+		assert.deepEqual(config.compilerOptions.plugins, [{ name: '@tsrx/typescript-plugin' }]);
+		assert.deepEqual(config.include, ['src/**/*.ts', 'src/**/*.tsrx']);
+		assert.equal(config.compilerOptions.paths, undefined);
+	});
+
+	test('exercises all three published bindings from a real local TSRX component', () => {
+		const source = renderPackedTsrxConsumerSource();
+
+		assert.match(source, /from '@octanejs\/cmdk'/);
+		assert.match(source, /from '@octanejs\/sonner'/);
+		assert.match(source, /from '@octanejs\/tiptap'/);
+		assert.match(source, /<Command\b/);
+		assert.match(source, /<Toaster\b/);
+		assert.match(source, /<EditorProvider\b/);
+		assert.match(source, /<Tiptap\b/);
+	});
+
+	test('rejects erased component props and invalid published consumer contracts', () => {
+		const source = renderPackedTsrxConsumerTypeProbe();
+
+		assert.match(source, /type IsAny<T>/);
+		assert.match(source, /AssertNotAny<CommandProps>/);
+		assert.match(source, /AssertNotAny<Parameters<typeof Command>\[0\]>/);
+		assert.match(source, /AssertNotAny<ToasterProps>/);
+		assert.match(source, /AssertNotAny<Parameters<typeof Toaster>\[0\]>/);
+		assert.match(source, /AssertNotAny<EditorContentProps>/);
+		assert.match(source, /AssertNotAny<Parameters<typeof EditorContent>\[0\]>/);
+		assert.match(source, /--consumer-offset/);
+		assert.match(source, /@ts-expect-error/g);
 	});
 });
 

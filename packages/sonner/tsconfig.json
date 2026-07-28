@@ -10,7 +10,6 @@
     "resolveJsonModule": true,
     "noEmitOnError": true,
     "noErrorTruncation": true,
-    "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node"],
     "strict": true

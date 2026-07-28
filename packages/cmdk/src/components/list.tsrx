@@ -36,7 +36,7 @@ export function List(props: ListProps) @{
 	}, []);
 
 	<div
-		ref={[ref, props.ref]}
+		ref={[ref, props.ref ?? null]}
 		{...etc}
 		cmdk-list=""
 		role="listbox"

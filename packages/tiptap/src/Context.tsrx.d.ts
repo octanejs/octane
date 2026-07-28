@@ -1,9 +1,12 @@
+import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
+
 import type { EditorContentProps } from './EditorContent.tsrx';
 import type { EditorContextValue } from './Context';
 import type { UseEditorOptions } from './useEditor';
 
 export interface EditorConsumerProps {
-	children: (value: EditorContextValue) => unknown;
+	children: (value: EditorContextValue) => OctaneNode;
 }
 
 export type EditorContainerProps = Omit<EditorContentProps, 'editor' | 'innerRef' | 'ref'> & {
@@ -13,11 +16,11 @@ export type EditorContainerProps = Omit<EditorContentProps, 'editor' | 'innerRef
 };
 
 export type EditorProviderProps = UseEditorOptions & {
-	children?: unknown;
-	slotBefore?: unknown;
-	slotAfter?: unknown;
+	children?: OctaneNode;
+	slotBefore?: OctaneNode;
+	slotAfter?: OctaneNode;
 	editorContainerProps?: EditorContainerProps;
 };
 
-export declare function EditorConsumer(props: EditorConsumerProps): unknown;
-export declare function EditorProvider(props: EditorProviderProps): unknown;
+export declare function EditorConsumer(props: EditorConsumerProps): OctaneNode;
+export declare function EditorProvider(props: EditorProviderProps): Octane.JSX.Element | null;

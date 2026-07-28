@@ -10,5 +10,5 @@ export function Separator(props: SeparatorProps) @{
 	const render = useCmdk((s) => !s.search);
 
 	if (!alwaysRender && !render) return null;
-	<div ref={[ref, props.ref]} {...etc} cmdk-separator="" role="separator" />
+	<div ref={[ref, props.ref ?? null]} {...etc} cmdk-separator="" role="separator" />
 }

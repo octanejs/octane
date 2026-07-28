@@ -1,7 +1,9 @@
 // DOM lifecycle and portal-registry bridge ported from @tiptap/react 3.28.0.
+import type { Editor } from '@tiptap/core';
 import {
 	createPortal,
 	memo,
+	type OctaneNode,
 	useLayoutEffect,
 	useMemo,
 	useRef,
@@ -9,12 +11,32 @@ import {
 	useSyncExternalStore,
 } from 'octane';
 
-function PortalEntry({ entry }) {
+import type {
+	ContentComponent,
+	EditorWithContentComponent,
+	RendererPortalEntry,
+	RendererPortalSnapshot,
+} from './Editor';
+
+export type EditorContentRef<T> =
+	| { current: T | null }
+	| ((value: T | null) => void | (() => void))
+	| null;
+
+export interface EditorContentProps {
+	editor: Editor | null;
+	ref?: EditorContentRef<HTMLDivElement>;
+	innerRef?: EditorContentRef<HTMLDivElement>;
+	children?: OctaneNode;
+	[key: string]: unknown;
+}
+
+function PortalEntry({ entry }: { entry: RendererPortalEntry }) {
 	return entry.portal;
 }
 
 /** Render every custom view in this EditorContent's logical Octane tree. */
-function Portals({ contentComponent }) @{
+function Portals({ contentComponent }: { contentComponent: ContentComponent }) @{
 	const renderers = useSyncExternalStore(
 		contentComponent.subscribe,
 		contentComponent.getSnapshot,
@@ -30,9 +52,9 @@ function Portals({ contentComponent }) @{
 }
 
 /** Create the immutable external-store registry consumed by Portals. */
-export function createContentComponent() {
-	const subscribers = new Set();
-	let renderers = {};
+export function createContentComponent(): ContentComponent {
+	const subscribers = new Set<() => void>();
+	let renderers: RendererPortalSnapshot = {};
 	let isNotificationQueued = false;
 
 	const notifySubscribers = () => {
@@ -48,17 +70,17 @@ export function createContentComponent() {
 	};
 
 	return {
-		subscribe(callback) {
+		subscribe(callback: () => void): () => void {
 			subscribers.add(callback);
 			return () => subscribers.delete(callback);
 		},
-		getSnapshot() {
+		getSnapshot(): RendererPortalSnapshot {
 			return renderers;
 		},
-		getServerSnapshot() {
+		getServerSnapshot(): RendererPortalSnapshot {
 			return renderers;
 		},
-		setRenderer(id, renderer) {
+		setRenderer(id: string, renderer: Parameters<ContentComponent['setRenderer']>[1]): void {
 			renderers = {
 				...renderers,
 				[id]: {
@@ -68,8 +90,8 @@ export function createContentComponent() {
 			};
 			notifySubscribers();
 		},
-		removeRenderer(id) {
-			const nextRenderers = { ...renderers };
+		removeRenderer(id: string): void {
+			const nextRenderers: Record<string, RendererPortalEntry> = { ...renderers };
 			delete nextRenderers[id];
 			renderers = nextRenderers;
 			notifySubscribers();
@@ -77,10 +99,11 @@ export function createContentComponent() {
 	};
 }
 
-export function PureEditorContent(props) @{
-	const { editor, innerRef, ref, ...rest } = props;
-	const editorContentRef = useRef(null);
-	const [contentComponent, setContentComponent] = useState(null);
+export function PureEditorContent(props: EditorContentProps) @{
+	const { editor: providedEditor, innerRef, ref, ...rest } = props;
+	const editor = providedEditor as EditorWithContentComponent | null;
+	const editorContentRef = useRef<HTMLDivElement | null>(null);
+	const [contentComponent, setContentComponent] = useState<ContentComponent | null>(null);
 
 	useLayoutEffect(() => {
 		if (!editor || editor.isDestroyed || editor.isEditorContentInitialized) {
@@ -139,14 +162,14 @@ export function PureEditorContent(props) @{
 	}, [editor]);
 
 	<>
-		<div {...rest} ref={[ref, innerRef, editorContentRef]} />
+		<div {...rest} ref={[ref ?? null, innerRef ?? null, editorContentRef]} />
 		@if (contentComponent) {
 			<Portals contentComponent={contentComponent} />
 		}
 	</>
 }
 
-function EditorContentWithKey(props) @{
+function EditorContentWithKey(props: EditorContentProps) @{
 	// Remount the host whenever the Editor identity changes, matching the keyed
 	// wrapper in @tiptap/react and preventing one editor from retaining another
 	// editor's managed DOM.

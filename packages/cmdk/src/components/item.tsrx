@@ -80,7 +80,7 @@ export function Item(props: ItemProps) @{
 	} = props;
 
 	<div
-		ref={[ref, props.ref]}
+		ref={[ref, props.ref ?? null]}
 		{...etc}
 		id={id}
 		cmdk-item=""

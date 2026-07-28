@@ -674,7 +674,7 @@ export function CommandRoot(props: CommandProps) @{
 	};
 
 	<div
-		ref={props.ref}
+		ref={props.ref ?? null}
 		tabIndex={-1}
 		{...etc}
 		cmdk-root=""

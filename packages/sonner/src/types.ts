@@ -1,12 +1,18 @@
-import type { ElementDescriptor } from 'octane';
+import type { ElementDescriptor, OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 
 // Octane renderable holes accept descriptors, primitives, arrays and nullish
 // values. Keep this deliberately broad: it is the Sonner-facing equivalent of
 // ReactNode, while ElementDescriptor gives custom() its upstream element-only
 // return contract.
-export type ToastContent = any;
+export type ToastContent = OctaneNode;
 export type ToastElement = ElementDescriptor<any>;
-export type CSSProperties = Record<string, any>;
+export type CSSProperties = Exclude<
+	Octane.JSX.IntrinsicElements['div']['style'],
+	string | undefined
+> & {
+	[customProperty: `--${string}`]: string | number | undefined;
+};
 export type StateSetter<T> = (value: T | ((previous: T) => T)) => void;
 export type Ref<T> = ((value: T | null) => void) | { current: T | null } | null;
 
