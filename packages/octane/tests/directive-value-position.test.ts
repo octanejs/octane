@@ -32,6 +32,41 @@ const props = { visible: true, rows, mode: 'primary' };
 // directive silently, emit a bare `{expr}` block that could not parse, or hand
 // the raw TSRX node to the printer. Every case below is one of those positions.
 describe('directives at value position', () => {
+	// Every control-flow directive, spelled against a `row` binding so each can be
+	// dropped into a callback, and against `g` so each can be dropped at module
+	// scope. `@try` has no control expression, which is why it has no frozen value.
+	const DIRECTIVES: {
+		name: string;
+		inCallback: string;
+		atModule: string;
+		control: string | null;
+	}[] = [
+		{
+			name: '@if',
+			inCallback: '@if (row.ok) { <b>{row.label}</b> } @else { <i>none</i> }',
+			atModule: '@if (g.on) { <armA /> } @else { <armB /> }',
+			control: 'g.on',
+		},
+		{
+			name: '@for',
+			inCallback: '@for (const x of row.xs; key x) { <b>{row.label}</b> } @empty { <i>none</i> }',
+			atModule: '@for (const x of g.xs; key x) { <armA /> } @empty { <armB /> }',
+			control: 'g.xs',
+		},
+		{
+			name: '@switch',
+			inCallback: '@switch (row.k) { @case 1: { <b>{row.label}</b> } @default: { <i>none</i> } }',
+			atModule: '@switch (g.k) { @case 1: { <armA /> } @default: { <armB /> } }',
+			control: 'g.k',
+		},
+		{
+			name: '@try',
+			inCallback: '@try { <b>{row.label}</b> } @pending { <i>p</i> } @catch (e) { <i>none</i> }',
+			atModule: '@try { <armA /> } @pending { <armP /> } @catch (e) { <armB /> }',
+			control: null,
+		},
+	];
+
 	describe('client', () => {
 		it('renders a directive used as the whole initializer', () => {
 			const result = mount(BareDirectiveValue as any, props);
@@ -300,41 +335,6 @@ export function App() @{
 			});
 		}
 	});
-
-	// Every control-flow directive, spelled against a `row` binding so each can be
-	// dropped into a callback, and against `g` so each can be dropped at module
-	// scope. `@try` has no control expression, which is why it has no frozen value.
-	const DIRECTIVES: {
-		name: string;
-		inCallback: string;
-		atModule: string;
-		control: string | null;
-	}[] = [
-		{
-			name: '@if',
-			inCallback: '@if (row.ok) { <b>{row.label}</b> } @else { <i>none</i> }',
-			atModule: '@if (g.on) { <armA /> } @else { <armB /> }',
-			control: 'g.on',
-		},
-		{
-			name: '@for',
-			inCallback: '@for (const x of row.xs; key x) { <b>{row.label}</b> } @empty { <i>none</i> }',
-			atModule: '@for (const x of g.xs; key x) { <armA /> } @empty { <armB /> }',
-			control: 'g.xs',
-		},
-		{
-			name: '@switch',
-			inCallback: '@switch (row.k) { @case 1: { <b>{row.label}</b> } @default: { <i>none</i> } }',
-			atModule: '@switch (g.k) { @case 1: { <armA /> } @default: { <armB /> } }',
-			control: 'g.k',
-		},
-		{
-			name: '@try',
-			inCallback: '@try { <b>{row.label}</b> } @pending { <i>p</i> } @catch (e) { <i>none</i> }',
-			atModule: '@try { <armA /> } @pending { <armP /> } @catch (e) { <armB /> }',
-			control: null,
-		},
-	];
 
 	describe('captures across a callback boundary', () => {
 		// A directive's arms are hoisted, so they cannot reach a callback's params
