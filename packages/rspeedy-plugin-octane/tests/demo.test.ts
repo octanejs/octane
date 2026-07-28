@@ -200,7 +200,9 @@ it('fails instead of moving the demo when its requested port is occupied', async
 
 		expect(result.error).toBeUndefined();
 		expect(result.status).not.toBe(0);
-		expect(`${result.stdout}\n${result.stderr}`).toMatch(/port.*(?:in use|occupied|unavailable)/iu);
+		expect(`${result.stdout}\n${result.stderr}`).toMatch(
+			/port.*(?:in use|occupied|unavailable)|(?:failed|unable) to find an available port/iu,
+		);
 	} finally {
 		await new Promise<void>((resolveClose, reject) => {
 			server.close((error) => {

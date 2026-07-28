@@ -5229,6 +5229,15 @@ function childrenAsBody(children: unknown): ComponentBody {
 	};
 }
 
+// Descriptor children remain inspectable values, but a scoped JSX descriptor
+// resolves them only after its represented boundary enters its try body. Reading
+// the accessor while constructing that body would move throws and suspension
+// outside the boundary, recreating the eager-JSX ownership bug.
+function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
+	if (!SCOPED_ELEMENT_PROPS.has(props)) return childrenAsBody(props.children);
+	return (_props, scope, extra) => childrenAsBody(props.children)(undefined, scope, extra);
+}
+
 /**
  * Records which children dialect (1 = compiled body, 2 = descriptor) a scope last rendered, so a
  * flip can be detected. Lives in the hook map, whose Symbol keys are disjoint from the numeric
@@ -6348,7 +6357,7 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> 
 				scope,
 				0,
 				block.parentNode,
-				childrenAsBody(props.children),
+				scopedChildrenAsBody(props),
 				null,
 				pendingBody,
 				block.endMarker,
@@ -6415,7 +6424,7 @@ export const ErrorBoundary: ComponentBody<{
 			scope,
 			0,
 			block.parentNode,
-			childrenAsBody(props.children),
+			scopedChildrenAsBody(props),
 			catchBody,
 			null,
 			block.endMarker,
@@ -13140,6 +13149,10 @@ function elementKeyWasProvided(descriptor: ElementDescriptor): boolean {
 // missing-key validation state out of band so rebasing an unkeyed element from
 // a dynamic collection does not accidentally silence the renderer warning.
 const ELEMENTS_MISSING_LIST_KEY = new WeakSet<object>();
+// Only compiler-authored descriptors with a deferred child body enter this
+// collection. Ordinary createElement calls retain their exact public shape and
+// allocation path.
+const SCOPED_ELEMENT_PROPS = new WeakSet<object>();
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
 	// A compiled ComponentBody (the fast/common case, e.g. `root.render(<App/>)`)
@@ -13207,6 +13220,129 @@ function finalizeElementDescriptor<P>(descriptor: ElementDescriptor<P>): Element
 	}
 	return descriptor;
 }
+
+const SCOPED_VALUE_RECORD: unique symbol = Symbol('octane.scopedValue');
+
+type ScopedValueDescriptor<P> = ElementDescriptor<P> & {
+	readonly [SCOPED_VALUE_RECORD]?: () => ElementDescriptor<P>;
+};
+
+/**
+ * Preserve an inspectable JSX descriptor while deferring its complete record.
+ *
+ * The marker stays eagerly available to public element checks, while inspecting
+ * any actual field resolves type, props, key, ref, and children together in the
+ * current render scope. A shared value is rebuilt when its provider scope or
+ * context epoch changes, just like a scoped element's deferred children.
+ *
+ * @internal
+ */
+export function createScopedValue<P>(
+	readElement: () => ElementDescriptor<P>,
+): ElementDescriptor<P> {
+	let resolved: ElementDescriptor<P> | undefined;
+	let resolvedScope: Scope | null = null;
+	let resolvedEpoch = 0;
+
+	const resolve = (): ElementDescriptor<P> => {
+		const scope = CURRENT_SCOPE;
+		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
+		if (resolved === undefined || resolvedScope !== scope || resolvedEpoch !== epoch) {
+			const next = readElement();
+			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
+				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+			}
+			resolvedScope = scope;
+			resolvedEpoch = epoch;
+			resolved = next;
+		}
+		return resolved;
+	};
+
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		get type() {
+			return resolve().type;
+		},
+		get props() {
+			return resolve().props;
+		},
+		get key() {
+			return resolve().key;
+		},
+		get ref() {
+			return resolve().ref;
+		},
+		get children() {
+			return resolve().children;
+		},
+	};
+	Object.defineProperty(descriptor, SCOPED_VALUE_RECORD, { value: resolve });
+	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
+	return descriptor;
+}
+
+/**
+ * Compiler-only JSX descriptor whose child tree resolves in its rendered scope.
+ *
+ * Matching accessors preserve the ordinary descriptor type, props, key, ref, and
+ * synchronously inspectable children without introducing component boundaries or
+ * hydration markers. Scope/context-aware memoization prevents one module-level
+ * element from retaining another provider's children or stale context values.
+ *
+ * @internal
+ */
+export function createScopedElement<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props: P | undefined,
+	readChildren: () => unknown,
+): ElementDescriptor<P> {
+	const src = (props ?? null) as any;
+	const hasKey = hasElementConfigKey(src);
+	const key = hasKey ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+
+	let resolved = false;
+	let resolvedScope: Scope | null = null;
+	let resolvedEpoch = 0;
+	let resolvedChildren: unknown;
+	const children = (): unknown => {
+		const scope = CURRENT_SCOPE;
+		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
+		if (!resolved || resolvedScope !== scope || resolvedEpoch !== epoch) {
+			const nextChildren = readChildren();
+			resolvedScope = scope;
+			resolvedEpoch = epoch;
+			resolvedChildren = nextChildren;
+			resolved = true;
+		}
+		return resolvedChildren;
+	};
+	const childProperty = { configurable: true, enumerable: true, get: children };
+	Object.defineProperty(copiedProps, 'children', childProperty);
+	SCOPED_ELEMENT_PROPS.add(copiedProps);
+
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		type,
+		props: copiedProps as P,
+		key,
+		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
+		children: null,
+	};
+	Object.defineProperty(descriptor, 'children', childProperty);
+	if (
+		key === null &&
+		src != null &&
+		(typeof src === 'object' || typeof src === 'function') &&
+		'key' in src
+	) {
+		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	}
+	return finalizeElementDescriptor(descriptor);
+}
+
 // React-shape `createElement(type, props, ...children)`. Two-arg calls
 // (`createElement(Comp, props)`) stay the component-value form the compiler emits
 // for `{<Comp/>}`. With a string `type` and/or explicit children it produces a
@@ -13305,9 +13441,23 @@ export function cloneElement<P>(
 	if (!isElementDescriptor(element)) {
 		throw new Error(formatClientError(4));
 	}
-	const props = copyElementConfig(element.props);
+	let scopedChildren: (() => unknown) | undefined;
+	let props: any;
+	if (SCOPED_ELEMENT_PROPS.has(element.props as object)) {
+		// Copy a scoped descriptor's child accessor without evaluating it in the caller's scope.
+		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		props = {};
+		for (const name in element.props) {
+			if (name !== 'key' && name !== 'children' && hasOwnProp.call(element.props, name)) {
+				props[name] = (element.props as any)[name];
+			}
+		}
+	} else {
+		props = copyElementConfig(element.props);
+	}
 	let key = element.key;
 	let hasKeyOverride = false;
+	let replacedChildren = false;
 	if (config != null) {
 		hasKeyOverride = hasElementConfigKey(config);
 		if (hasKeyOverride) key = '' + config.key;
@@ -13316,16 +13466,25 @@ export function cloneElement<P>(
 			// React 19 keeps refs as props, but cloneElement treats an explicitly
 			// undefined ref as absent for backwards compatibility.
 			if (name === 'ref' && config.ref === undefined) continue;
-			if (hasOwnProp.call(config, name)) props[name] = config[name];
+			if (hasOwnProp.call(config, name)) {
+				props[name] = config[name];
+				if (name === 'children') replacedChildren = true;
+			}
 		}
 	}
 	const n = children.length;
 	let kids: any;
+	let childProperty: PropertyDescriptor | undefined;
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
 		POSITIONAL_CHILDREN.add(children);
 		kids = children;
+	} else if (scopedChildren !== undefined && !replacedChildren) {
+		childProperty = { configurable: true, enumerable: true, get: scopedChildren };
+		Object.defineProperty(props, 'children', childProperty);
+		SCOPED_ELEMENT_PROPS.add(props);
+		kids = null;
 	} else {
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
@@ -13339,6 +13498,7 @@ export function cloneElement<P>(
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
 	};
+	if (childProperty !== undefined) Object.defineProperty(descriptor, 'children', childProperty);
 	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
 		key === null &&
@@ -13357,14 +13517,22 @@ export function cloneElement<P>(
 }
 
 function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
+	const scoped = SCOPED_ELEMENT_PROPS.has(element.props);
 	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props: element.props,
 		key,
 		ref: element.ref,
-		children: element.children,
+		children: scoped ? null : element.children,
 	};
+	if (scoped) {
+		Object.defineProperty(descriptor, 'children', {
+			configurable: true,
+			enumerable: true,
+			get: Object.getOwnPropertyDescriptor(element, 'children')!.get!,
+		});
+	}
 	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
 	return finalizeElementDescriptor(descriptor);
@@ -14836,7 +15004,13 @@ function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 	return (n as Node & DeoptStamped)[DEOPT_DESC];
 }
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
-	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
+	// Preserve the record committed to this DOM node. A deferred JSX shell can
+	// resolve differently after a Provider update; stamping the shell itself
+	// would make both sides of the next prop diff observe the new record and
+	// would run user code outside render while Suspense detaches subtree refs.
+	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
+	(el as Element & DeoptStamped)[DEOPT_DESC] =
+		resolveScopedRecord === undefined ? d : resolveScopedRecord();
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';

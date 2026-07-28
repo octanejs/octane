@@ -13215,6 +13215,18 @@ function lowerReturnJsx(node, ctx, compInlinedSubs, cssHash = null) {
 	// the existing returned-JSX head contract; titles crossing a nested component
 	// boundary are rewritten by rewriteOpaqueTitles itself.
 	const rewritten = rewriteOpaqueTitles(node, ctx, 'html');
+	if (VALUE_DIRECTIVE_ARM_TYPES.has(rewritten.type)) {
+		// A lowered built-in ErrorBoundary can be the returned root itself. Fragment
+		// extraction folds directive CHILDREN into owning-body helpers; handing it a
+		// bare directive instead strands captured props/locals in a module helper.
+		return lowerHostFragment(
+			setupDirectiveFragment(rewritten),
+			ctx,
+			compInlinedSubs,
+			'opaque',
+			cssHash,
+		);
+	}
 	if (
 		(rewritten.type === 'Element' || rewritten.type === 'JSXElement') &&
 		!isComponentTag(rewritten)
@@ -14134,9 +14146,8 @@ function rewriteJsxValues(node, ctx) {
 			return jsxElementToCreateElement(n, ctx);
 		}
 		if (t === 'Fragment' || t === 'JSXFragment') {
-			// `<>…</>` at a value position → an array of its lowered children (the
-			// de-opt childSlot flattens nested arrays, matching React's fragment).
-			// lowerJsxChild owns the single implementation of fragment lowering.
+			// lowerJsxChild keeps static fragments as positional arrays and defers
+			// dynamic fragment children until their represented render scope.
 			return lowerJsxChild(n, ctx);
 		}
 		// The fold above already replaced every directive this body owns, so one still
@@ -14154,7 +14165,7 @@ function rewriteJsxValues(node, ctx) {
 // Lower one JSX child node to a `createElement` argument expression (or null to
 // drop it). Text → string literal (whitespace-only-with-newline indentation is
 // dropped, JSX rule); `{expr}` → the lowered inner expression; nested element →
-// recurse; fragment → array of children.
+// recurse; fragment → positional children or a scope-preserving descriptor.
 function lowerJsxChild(child, ctx) {
 	const t = child && child.type;
 	if (t === 'JSXText' || t === 'Text') {
@@ -14181,7 +14192,22 @@ function lowerJsxChild(child, ctx) {
 		// runtime-built arrays (`.map()` results). Emitted in BOTH modes — the
 		// server export is the identity (`ssrChild` just renders the array).
 		ctx.runtimeNeeded.add('positionalChildren');
-		return inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
+		const children = inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
+		if (!jsxValueChildrenNeedRenderScope(child, true)) return children;
+
+		// A bare expression in a fragment has no parent element descriptor to
+		// defer it, so the fragment itself must own the represented render scope.
+		ctx.runtimeNeeded.add('Fragment');
+		ctx.runtimeNeeded.add('createScopedElement');
+		return inheritOriginLoc(
+			b.call(
+				rtAlias('createScopedElement'),
+				inheritOriginLoc(b.id(rtAlias('Fragment')), child),
+				inheritOriginLoc(b.object([]), child),
+				inheritOriginLoc(b.arrow([], children), child),
+			),
+			child,
+		);
 	}
 	return null; // Comment / unknown — drop.
 }
@@ -14203,10 +14229,79 @@ function jsxNameToExpr(name) {
 	return b.id(String(name.name || name));
 }
 
+// JSX text and primitive literals cannot execute user code. Every other child
+// expression must stay in its represented render scope: even an identifier can
+// hit the TDZ, while a member, coercion, spread, or computed key can invoke
+// user code without containing a call. Function expressions are values here;
+// their bodies still run only when an event/render-prop consumer invokes them.
+function isStaticJsxValueExpression(expression) {
+	const value = unwrapTsExpr(expression);
+	return (
+		isInvariantLiteral(value) ||
+		value?.type === 'ArrowFunctionExpression' ||
+		value?.type === 'FunctionExpression'
+	);
+}
+
+// A root member tag, spread, or dynamic prop can invoke user code before its
+// descriptor exists. Defer the complete record rather than just its children.
+function jsxValueRootNeedsRenderScope(node) {
+	const name = node.openingElement?.name || node.id;
+	if (
+		name?.type === 'MemberExpression' ||
+		name?.type === 'JSXMemberExpression' ||
+		name?.type === 'JSXExpressionContainer'
+	) {
+		return true;
+	}
+	for (const attr of node.attributes || node.openingElement?.attributes || []) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		if (attr.value?.type !== 'JSXExpressionContainer') continue;
+		if (!isStaticJsxValueExpression(attr.value.expression)) return true;
+	}
+	return false;
+}
+
+// Prove a whole descendant tree static instead of guessing which JavaScript
+// syntax is effectful. Nested component/tag resolution and dynamic attributes
+// belong to their represented parent, so they make that parent's children lazy
+// even when the nested element has no expression children of its own.
+function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = false) {
+	for (const child of node.children || []) {
+		if (child == null || child.type === 'JSXText' || child.type === 'Text') continue;
+		if (child.type === 'JSXExpressionContainer') {
+			if (
+				child.expression &&
+				child.expression.type !== 'JSXEmptyExpression' &&
+				!isStaticJsxValueExpression(child.expression)
+			) {
+				return true;
+			}
+			continue;
+		}
+		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
+			if (jsxValueChildrenNeedRenderScope(child, descendantElementsOwnChildren)) return true;
+			continue;
+		}
+		if (child.type !== 'Element' && child.type !== 'JSXElement') return true;
+		if (isComponentTag(child)) return true;
+		for (const attr of child.attributes || child.openingElement?.attributes || []) {
+			if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return true;
+			if (attr.value?.type !== 'JSXExpressionContainer') continue;
+			if (!isStaticJsxValueExpression(attr.value.expression)) return true;
+		}
+		// A fragment can retain its inspectable positional array when only a nested
+		// element's descendants are dynamic: that element already owns their scope.
+		if (!descendantElementsOwnChildren && jsxValueChildrenNeedRenderScope(child)) return true;
+	}
+	return false;
+}
+
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
 // component Element node. Recurses into prop values so nested JSX values lower too.
 function jsxElementToCreateElement(node, ctx) {
-	ctx.runtimeNeeded.add('createElement');
 	const nameNode = node.openingElement?.name || node.id;
 	const componentTag = isComponentTag(node);
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
@@ -14280,7 +14375,9 @@ function jsxElementToCreateElement(node, ctx) {
 			);
 		}
 	}
-	const args = [compNode, b.object(properties)];
+	const propsNode = inheritOriginLoc(b.object(properties), node);
+	const childrenNeedRenderScope = jsxValueChildrenNeedRenderScope(node);
+	const loweredChildren = [];
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
 	// string). The runtime collects these into `descriptor.children`.
@@ -14293,7 +14390,7 @@ function jsxElementToCreateElement(node, ctx) {
 		// the same whole-script neutralization.
 		const content = normalizeStaticScriptDescriptorContent(authoredStaticScriptContent);
 		if (content !== '') {
-			args.push(b.literal(content));
+			loweredChildren.push(inheritOriginLoc(b.literal(content), node));
 		}
 	} else {
 		for (const child of node.children || []) {
@@ -14301,12 +14398,40 @@ function jsxElementToCreateElement(node, ctx) {
 				componentTag ? rewriteOpaqueTitles(child, ctx, 'opaque') : child,
 				ctx,
 			);
-			if (lowered !== null) args.push(lowered);
+			if (lowered !== null) loweredChildren.push(lowered);
 		}
 	}
-	// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
-	// static-content literals) maps to the authored JSX element.
-	return inheritOriginLoc(b.call('_$createElement', ...args), node);
+	let descriptor;
+	if (childrenNeedRenderScope && loweredChildren.length > 0) {
+		let childrenValue = loweredChildren[0];
+		if (loweredChildren.length > 1) {
+			ctx.runtimeNeeded.add('positionalChildren');
+			childrenValue = inheritOriginLoc(
+				b.call(rtAlias('positionalChildren'), inheritOriginLoc(b.array(loweredChildren), node)),
+				node,
+			);
+		}
+		ctx.runtimeNeeded.add('createScopedElement');
+		const readChildren = inheritOriginLoc(b.arrow([], childrenValue), node);
+		descriptor = inheritOriginLoc(
+			b.call('_$createScopedElement', compNode, propsNode, readChildren),
+			node,
+		);
+	} else {
+		ctx.runtimeNeeded.add('createElement');
+		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
+		// static-content literals) maps to the authored JSX element.
+		descriptor = inheritOriginLoc(
+			b.call('_$createElement', compNode, propsNode, ...loweredChildren),
+			node,
+		);
+	}
+	if (!jsxValueRootNeedsRenderScope(node)) return descriptor;
+	ctx.runtimeNeeded.add('createScopedValue');
+	return inheritOriginLoc(
+		b.call(rtAlias('createScopedValue'), inheritOriginLoc(b.arrow([], descriptor), node)),
+		node,
+	);
 }
 
 // Short, unique, path-free slot description for non-HMR output: a djb2 hash of

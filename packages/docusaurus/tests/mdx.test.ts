@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as ServerRuntime from 'octane/server';
+import * as ServerMdx from '@octanejs/mdx/server';
+import { evalModuleCode, stripMarkers } from '../../mdx/tests/_helpers.js';
 import { compileDocusaurusMdxSync, remarkDocusaurusPageData } from '../src/mdx.js';
 import { docusaurusMdx } from '../src/vite.js';
 
@@ -19,7 +22,7 @@ title: Guide
 
 describe('Docusaurus-aware MDX', () => {
 	it('emits the Docusaurus document export surface through Octane compilation', () => {
-		const result = compileDocusaurusMdxSync(SOURCE, '/site/docs/guide.mdx', {
+		const options = {
 			metadata: {
 				id: 'guide',
 				frontMatter: { image: './social.png' },
@@ -27,12 +30,22 @@ describe('Docusaurus-aware MDX', () => {
 			resolveMarkdownLink: ({ linkPathname }) => linkPathname.replace('./', '/guide/'),
 			resolveMarkdownImage: ({ url }) => url.replace('./', '/assets/'),
 			createAssets: ({ frontMatter }) => ({ image: frontMatter.image }),
-		});
+		};
+		const result = compileDocusaurusMdxSync(SOURCE, '/site/docs/guide.mdx', options);
 
 		expect(result.diagnostics).toEqual([]);
 		expect(result.code).toContain('export const frontMatter = frontmatter');
 		expect(result.code).toContain('export const contentTitle = "Guide"');
-		expect(result.code).toContain('_$createElement(_components.header');
+		const serverResult = compileDocusaurusMdxSync(SOURCE, '/site/docs/guide.mdx', {
+			...options,
+			mode: 'server',
+		});
+		const compiledModule = evalModuleCode(serverResult.code, {
+			'octane/server': ServerRuntime,
+			'@octanejs/mdx/server': ServerMdx,
+		});
+		const { html } = ServerRuntime.renderToString(compiledModule.default, {});
+		expect(stripMarkers(html)).toContain('<header><h1 id="guide">Guide</h1></header>');
 		expect(result.code).toContain('id: "install"');
 		expect(result.code).toContain('id: "install-1"');
 		expect(result.code).toContain('"/guide/next.md"');

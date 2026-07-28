@@ -687,6 +687,52 @@ describe('conformance: Fizz public streaming behavior', () => {
 		expect(result.html).toContain('<span id="deep-leaf">done</span>');
 	});
 
+	// Per ReactDOMFizzServer-test.js:8734.
+	it('renders a component tree one thousand levels deep through a readable stream', async () => {
+		const result = await collectReadableStream(server.DeepTree, { depth: 1_000 });
+		expect(result.errors).toEqual([]);
+		expect(result.html).toContain('<span id="deep-leaf">done</span>');
+	});
+
+	// Per ReactDOMFizzServer-test.js:8734.
+	it('renders a component tree one thousand levels deep through buffered SSR', () => {
+		const result = ServerRuntime.renderToString(server.DeepTree, { depth: 1_000 });
+		expect(result.html).toContain('<span id="deep-leaf">done</span>');
+	});
+
+	// Per ReactDOMFizzServer-test.js:8734 and ReactDOMFizzServerNode-test.js:453.
+	it('preserves Provider values around a component tree one thousand levels deep', async () => {
+		const ContextValue = ({ id }: { id: string }) =>
+			ServerRuntime.createElement('span', { id }, ServerRuntime.use(server.StreamContext));
+		const ProvidedDeepTree = () =>
+			ServerRuntime.createElement(
+				'section',
+				{ id: 'deep-context-root' },
+				ServerRuntime.createElement(
+					server.StreamContext.Provider,
+					{ value: 'deeply provided' },
+					ServerRuntime.createElement(server.DeepTree, { depth: 1_000 }),
+					ServerRuntime.createElement(ContextValue, { id: 'inside-deep-provider' }),
+				),
+				ServerRuntime.createElement(ContextValue, { id: 'outside-deep-provider' }),
+			);
+
+		const pipeable = await collectPipeableStream(ProvidedDeepTree);
+		const readable = await collectReadableStream(ProvidedDeepTree);
+		expect(pipeable.errors).toEqual([]);
+		expect(readable.errors).toEqual([]);
+
+		for (const result of [pipeable, readable, ServerRuntime.renderToString(ProvidedDeepTree)]) {
+			const template = document.createElement('template');
+			template.innerHTML = result.html;
+			expect(template.content.querySelector('#deep-leaf')?.textContent).toBe('done');
+			expect(template.content.querySelector('#inside-deep-provider')?.textContent).toBe(
+				'deeply provided',
+			);
+			expect(template.content.querySelector('#outside-deep-provider')?.textContent).toBe('default');
+		}
+	});
+
 	// Per ReactDOMServerIntegrationHooks-test.js:122, a state updater invoked
 	// outside its owning component's current render is inert on the server.
 	it('keeps a parent render-phase dispatcher isolated from a call-free child getter', async () => {

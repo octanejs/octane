@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { type ComponentBody } from '../src/index.js';
 import { mount } from './_helpers';
-import { compile } from 'octane/compiler';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { App, AppFrag } from './_fixtures/render-prop.tsrx';
 
 // React-style render-prop children: `<Comp>{(data) => <jsx/>}</Comp>`. The arrow
@@ -26,15 +27,21 @@ describe('render-prop children (bare-JSX arrow)', () => {
 		r.unmount();
 	});
 
-	it('lowers a parenthesised arrow body to createElement (kept callable)', () => {
-		// The prettier plugin canonicalises `(v) => (<span/>)`, so assert the
-		// parenthesised source compiles via a string literal the formatter can't
-		// rewrite. The arrow is preserved; only its body is lowered.
+	it('keeps a parenthesised JSX render prop callable and renders its returned element', () => {
+		// Keep the authored parentheses in source bytes because formatting a fixture
+		// canonicalizes them away. Executing the output proves the render prop stays
+		// callable and its JSX result remains renderable without pinning a factory.
 		const src =
 			'function Provide(props) @{ <div>{props.children("hi")}</div> }\n' +
 			'export function App() @{ <Provide>{(v) => (<span class="rendered">{v as string}</span>)}</Provide> }';
-		const { code } = compile(src, 'rp-paren.tsrx', { mode: 'client' });
-		expect(code).not.toMatch(/<span/); // no raw (unlowered) JSX leaked
-		expect(code).toContain('(v) => _$createElement');
+		const fixture = loadCompiledFixtureSource<{ App: ComponentBody }>(src, {
+			id: 'rp-paren.tsrx',
+			mode: 'client',
+		});
+		const result = mount(fixture.App);
+		const rendered = result.find('.rendered');
+		expect(rendered.tagName).toBe('SPAN');
+		expect(rendered.textContent).toBe('hi');
+		result.unmount();
 	});
 });

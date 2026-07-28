@@ -103,6 +103,8 @@ export {
 	// Compiler-emitted codegen helpers (private ABI — see module doc)
 	markChildrenBlock,
 	createElement,
+	createScopedValue,
+	createScopedElement,
 	positionalChildren,
 	escapeHtml,
 	escapeAttr,

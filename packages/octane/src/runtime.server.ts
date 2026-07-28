@@ -438,6 +438,11 @@ interface ElementDescriptor {
 	children: any;
 }
 
+// Scoped descriptors keep their ordinary public shape while deferring child
+// evaluation. The component serializer must pass these props through intact:
+// spreading them would invoke the child accessor before entering the component.
+const SCOPED_ELEMENT_PROPS = new WeakSet<object>();
+
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
 	// React's development-only props.key warning getter is not a real key, and
@@ -479,6 +484,82 @@ function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescri
 		Object.freeze(descriptor);
 	}
 	return descriptor;
+}
+
+/** Server twin of the compiler-only complete JSX-record deferral helper. */
+export function createScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
+	let resolved: ElementDescriptor | undefined;
+	let resolvedScope: SSRScope | null = null;
+
+	const resolve = (): ElementDescriptor => {
+		const scope = CURRENT_SCOPE;
+		if (resolved === undefined || resolvedScope !== scope) {
+			const next = readElement();
+			resolvedScope = scope;
+			resolved = next;
+		}
+		return resolved;
+	};
+
+	const descriptor: ElementDescriptor = {
+		$$kind: ELEMENT_TAG,
+		get type() {
+			return resolve().type;
+		},
+		get props() {
+			return resolve().props;
+		},
+		get key() {
+			return resolve().key;
+		},
+		get ref() {
+			return resolve().ref;
+		},
+		get children() {
+			return resolve().children;
+		},
+	};
+	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
+	return descriptor;
+}
+
+/** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
+export function createScopedElement(
+	type: ServerComponent | string | typeof Fragment,
+	props: any,
+	readChildren: () => unknown,
+): ElementDescriptor {
+	const src = (props ?? null) as any;
+	const key = hasElementConfigKey(src) ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+
+	let resolved = false;
+	let resolvedScope: SSRScope | null = null;
+	let resolvedChildren: unknown;
+	const children = (): unknown => {
+		const scope = CURRENT_SCOPE;
+		if (!resolved || resolvedScope !== scope) {
+			const nextChildren = readChildren();
+			resolvedScope = scope;
+			resolvedChildren = nextChildren;
+			resolved = true;
+		}
+		return resolvedChildren;
+	};
+	const childProperty = { configurable: true, enumerable: true, get: children };
+	Object.defineProperty(copiedProps, 'children', childProperty);
+	SCOPED_ELEMENT_PROPS.add(copiedProps);
+	const descriptor: ElementDescriptor = {
+		$$kind: ELEMENT_TAG,
+		type,
+		props: copiedProps,
+		key,
+		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
+		children: null,
+	};
+	Object.defineProperty(descriptor, 'children', childProperty);
+	return finalizeElementDescriptor(descriptor);
 }
 
 // Server `createElement(type, props, ...children)` — produces the SAME descriptor
@@ -664,46 +745,82 @@ export function cloneElement(
 	if (!isElementDescriptor(element)) {
 		throw new Error(formatServerError(4));
 	}
-	const props = copyElementConfig(element.props);
+	// Preserve deferred children until their represented component owns the read.
+	let scopedChildren: (() => unknown) | undefined;
+	let props: any;
+	if (SCOPED_ELEMENT_PROPS.has(element.props)) {
+		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		props = {};
+		for (const name in element.props) {
+			if (
+				name !== 'key' &&
+				name !== 'children' &&
+				Object.prototype.hasOwnProperty.call(element.props, name)
+			) {
+				props[name] = element.props[name];
+			}
+		}
+	} else {
+		props = copyElementConfig(element.props);
+	}
 	let key = element.key;
+	let replacedChildren = false;
 	if (config != null) {
 		if (hasElementConfigKey(config)) key = '' + config.key;
 		for (const name in config) {
 			if (name === 'key') continue;
 			if (name === 'ref' && config.ref === undefined) continue;
-			if (Object.prototype.hasOwnProperty.call(config, name)) props[name] = config[name];
+			if (Object.prototype.hasOwnProperty.call(config, name)) {
+				props[name] = config[name];
+				if (name === 'children') replacedChildren = true;
+			}
 		}
 	}
 	const n = children.length;
 	let kids: any;
+	let childProperty: PropertyDescriptor | undefined;
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
 		kids = children;
+	} else if (scopedChildren !== undefined && !replacedChildren) {
+		childProperty = { configurable: true, enumerable: true, get: scopedChildren };
+		Object.defineProperty(props, 'children', childProperty);
+		SCOPED_ELEMENT_PROPS.add(props);
+		kids = null;
 	} else {
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
 	}
 	if (n > 0) props.children = kids;
-	return finalizeElementDescriptor({
+	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props,
 		key,
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
-	});
+	};
+	if (childProperty !== undefined) Object.defineProperty(descriptor, 'children', childProperty);
+	return finalizeElementDescriptor(descriptor);
 }
 
 function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
-	return finalizeElementDescriptor({
+	// Traversal changes only the key, never the scope that resolves its children.
+	const scopedChildren = SCOPED_ELEMENT_PROPS.has(element.props);
+	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props: element.props,
 		key,
 		ref: element.ref,
-		children: element.children,
-	});
+		children: scopedChildren ? null : element.children,
+	};
+	if (scopedChildren) {
+		const get = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		Object.defineProperty(descriptor, 'children', { configurable: true, enumerable: true, get });
+	}
+	return finalizeElementDescriptor(descriptor);
 }
 
 function escapeElementKey(key: string): string {
@@ -999,6 +1116,9 @@ export function ssrTextPre(v: unknown): string {
 // its descriptors the spread is a no-op copy — it stays as a defensive guard for
 // hand-rolled descriptors whose props/children were never reconciled.
 function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
+	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
+		return ssrComponent(scope, d.type as ServerComponent, d.props);
+	}
 	return ssrComponent(scope, d.type as ServerComponent, {
 		...d.props,
 		children: d.children ?? d.props?.children,
@@ -2714,6 +2834,30 @@ function rewindComponentReplayState(
 // byte-identical to a single pass rendered directly with the settled state. A
 // suspension or real error propagates as before (the discarded updates die with
 // the pass; the suspense retry re-runs the initializers, exactly like Fizz).
+function replayUpdatedComponentBody(
+	comp: ServerComponent,
+	props: any,
+	scope: SSRScope,
+	frame: Frame | null,
+	hp: HookPass,
+	snapshot: ReturnType<typeof captureComponentReplayState>,
+	warmPlanCheckpoint: number,
+): unknown {
+	let passes = 1;
+	let out: unknown;
+	do {
+		if (++passes > MAX_RENDER_PHASE_PASSES) {
+			throw new Error(formatServerError(9));
+		}
+		hp.update = false;
+		hp.occ = new Map();
+		rewindComponentReplayState(snapshot, scope, frame);
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
+		out = comp(props ?? {}, scope, undefined);
+	} while (hp.update);
+	return out;
+}
+
 function invokeComponentBody(
 	comp: ServerComponent,
 	props: any,
@@ -2727,17 +2871,9 @@ function invokeComponentBody(
 	HOOK_PASS = hp;
 	try {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		let out = comp(props ?? {}, scope, undefined);
-		let passes = 1;
-		while (hp.update) {
-			if (++passes > MAX_RENDER_PHASE_PASSES) {
-				throw new Error(formatServerError(9));
-			}
-			hp.update = false;
-			hp.occ = new Map();
-			rewindComponentReplayState(snapshot, scope, frame);
-			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-			out = comp(props ?? {}, scope, undefined);
+		let out: unknown = comp(props ?? {}, scope, undefined);
+		if (hp.update) {
+			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
 		return out;
 	} finally {
@@ -2783,10 +2919,36 @@ function renderComponentFramed(
 		// instead, mirroring the client where such a return flows through the block's
 		// childSlot. Normalize it the same way (ssrChild = the server childSlot), or it
 		// would stringify to `[object Object]`.
-		// Every component gets an independent replay boundary. A body with no
-		// syntactic calls can still execute user code through a getter, Proxy, or
-		// coercion; that code may call hooks or schedule render-phase updates.
-		const out = invokeComponentBody(comp, props, scope, frame);
+		// Every component gets an independent replay boundary. Invoke its first
+		// pass directly in this frame: otherwise each recursive component retains
+		// an extra invokeComponentBody frame and a legitimate 1,000-level Fizz tree
+		// exceeds the cold JavaScript stack. Render-phase retries are uncommon, so
+		// their shared loop lives behind a cold branch without charging that extra
+		// frame to normal component nesting.
+		const previousHookPass = HOOK_PASS;
+		const hookPass: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+		const replaySnapshot = captureComponentReplayState(scope, frame);
+		const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
+		let out: unknown;
+		HOOK_PASS = hookPass;
+		try {
+			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
+			out = comp(props ?? {}, scope, undefined);
+			if (hookPass.update) {
+				out = replayUpdatedComponentBody(
+					comp,
+					props,
+					scope,
+					frame,
+					hookPass,
+					replaySnapshot,
+					warmPlanCheckpoint,
+				);
+			}
+		} finally {
+			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
+			HOOK_PASS = previousHookPass;
+		}
 		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
