@@ -145,6 +145,7 @@ describe('packed TSRX source consumers', () => {
 		assert.equal(config.compilerOptions.jsx, 'react-jsx');
 		assert.equal(config.compilerOptions.jsxImportSource, 'octane');
 		assert.deepEqual(config.compilerOptions.plugins, [{ name: '@tsrx/typescript-plugin' }]);
+		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
 		assert.deepEqual(config.include, ['src/**/*.ts', 'src/**/*.tsrx']);
 		assert.equal(config.compilerOptions.paths, undefined);
 	});

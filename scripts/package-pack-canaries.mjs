@@ -108,6 +108,9 @@ export function createPackedTsrxConsumerConfig() {
 			target: 'esnext',
 			types: ['node'],
 		},
+		tsrx: {
+			compiler: 'octane/compiler/volar',
+		},
 		include: ['src/**/*.ts', 'src/**/*.tsrx'],
 	};
 }
