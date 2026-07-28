@@ -19746,9 +19746,23 @@ function renderBranchSlot(
 		const oldBoundaryShared = sharesBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd);
 		if (state.block) {
 			unmountBlock(state.block);
+			if (parentBlock.disposed) return;
 			state.block = null;
 		}
 		state.branch = next;
+		if (state.start === null && body !== null && oldBoundaryShared) {
+			// A sole-root ancestor can borrow the outgoing branch's host as its
+			// own boundary. Publish a durable replacement before rendering the
+			// incoming arm: a nested Suspense may otherwise observe that removed
+			// host and pass a detached insertion anchor to its try block.
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
+			domParent.insertBefore(s, after);
+			domParent.insertBefore(e, after);
+			state.start = s;
+			state.end = e;
+			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
+		}
 		if (state.start !== null) {
 			// MARKER path — hydration-adopted, or already markered (multi-node / post-
 			// swap). The branch borrows the slot's start/end (exclusiveMarkers teardown
