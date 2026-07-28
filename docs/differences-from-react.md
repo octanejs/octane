@@ -210,7 +210,8 @@ witnesses keeps its old value. Pass such state through
 
 ## `useState` / `useReducer` current-state getters
 
-Both state hooks have an Octane-only third tuple member:
+Both state hooks have an Octane-only third tuple member: a stable `getState`
+function that reads the latest scheduled state.
 
 ```tsx
 const [draft, setDraft, getDraft] = useState('');
@@ -227,8 +228,9 @@ function add(amount) {
 }
 ```
 
-The stable zero-argument getter replaces the common React pattern of
-synchronizing a ref solely for delayed or async callbacks.
+`getState` is the conventional generic name for this stable zero-argument
+getter; the example uses domain-specific names instead. It replaces the common
+React pattern of synchronizing a ref solely for delayed or async callbacks.
 
 The getter reads the latest scheduled hook-cell value and does not subscribe or
 render. During pending work it can therefore be newer than the currently
