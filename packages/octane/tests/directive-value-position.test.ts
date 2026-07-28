@@ -668,6 +668,47 @@ export function App() @{
 			});
 		}
 
+		it('freezes a bare identifier control, not just a member expression', () => {
+			// A module `let` can be reassigned between the definition and the first
+			// render. The client snapshots the identifier into a hole at the definition
+			// site no matter what it is, so leaving it inline on the server — as an
+			// "identifiers read the same either way" shortcut would — reintroduces the
+			// divergence this lift exists to prevent.
+			const source = `export let flag = true;
+
+const branch = @if (flag) { <b id="x">ON</b> } @else { <i id="x">OFF</i> };
+
+flag = false;
+
+export function App() @{
+	<div>{branch}</div>
+}
+`;
+			const serverModule = loadCompiledFixtureSource(source, {
+				id: '/freeze-ident.tsrx',
+				mode: 'server',
+			});
+			const clientModule = loadCompiledFixtureSource(source, {
+				id: '/freeze-ident.tsrx',
+				mode: 'client',
+			});
+			const { html } = ServerRuntime.renderToString(serverModule.App, {});
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			document.body.appendChild(container);
+			const root = hydrateRoot(container, clientModule.App, {});
+			flushSync(() => {});
+			const client = container.innerHTML.replace(/<!--[^>]*-->/g, '');
+			root.unmount();
+			container.remove();
+
+			// `flag` was true when the value was defined, so both sides render the
+			// pre-reassignment arm and agree.
+			expect(html).toContain('ON');
+			expect(client).toContain('ON');
+			expect(client).toBe(html.replace(/<!--[^>]*-->/g, ''));
+		});
+
 		it('emits each mode against its own runtime', () => {
 			// The fold has a client shape and a server shape. Emitting the client's DOM
 			// helpers into a server module would import them from `octane/server`, where

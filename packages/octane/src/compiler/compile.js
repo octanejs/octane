@@ -13355,9 +13355,12 @@ function liftDirectiveControl(ctx, directive) {
 	if (key === null) return null;
 	const value = directive[key];
 	if (value == null) return null;
-	// An identifier or literal reads the same in either place, so leave it inline
-	// and keep the emitted output as small as it was.
-	if (value.type === 'Identifier' || value.type === 'Literal') return null;
+	// A literal is the same value whenever it is read, so inlining it keeps the
+	// output smaller with no change in meaning. An IDENTIFIER is not: a module
+	// `let` can be reassigned between the definition and the first render, and the
+	// client snapshots it into a hole at the definition site regardless. Leaving it
+	// inline here is precisely the divergence this lift exists to prevent.
+	if (value.type === 'Literal') return null;
 	const frozenName = allocCompilerName(ctx, `__c$${ctx.nextFragId++}`);
 	return {
 		directive: { ...directive, [key]: inheritOriginLoc(b.id(frozenName), value) },
