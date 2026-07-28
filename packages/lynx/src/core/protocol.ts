@@ -14,6 +14,7 @@ import type {
 	UniversalTransportRejectMessage,
 } from 'octane/universal/native';
 import type { LynxFirstTreeSnapshot } from './first-screen.js';
+import { LYNX_DEVELOPMENT } from './environment.js';
 import { decodeLynxPortalTargetId } from './portal.js';
 import { LYNX_RENDERER_ID } from './renderer-id.js';
 
@@ -260,26 +261,50 @@ export type LynxBackgroundInboundMessage =
 	| LynxDisposeAcknowledgement
 	| LynxDisposeRetryMessage;
 
-function fail(label: string, message: string): never {
-	throw new TypeError(`Octane Lynx transport ${label}: ${message}`);
+/**
+ * Compose a message path only when a validation actually fails.
+ *
+ * A commit carries one command per accepted host node and each command carries
+ * its props, so building `commit.batch.commands[7412].props` eagerly allocated
+ * several strings per node on the success path. `index` and `field` are the two
+ * suffixes the per-node validators need; everything else stays a plain label.
+ */
+function composePath(label: string, index?: number, field?: string): string {
+	const indexed = index === undefined ? label : `${label}[${index}]`;
+	return field === undefined ? indexed : `${indexed}.${field}`;
 }
 
-function record(value: unknown, label: string): Record<string, unknown> {
+function fail(label: string, message: string, index?: number, field?: string): never {
+	throw new TypeError(`Octane Lynx transport ${composePath(label, index, field)}: ${message}`);
+}
+
+function record(
+	value: unknown,
+	label: string,
+	index?: number,
+	field?: string,
+): Record<string, unknown> {
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-		return fail(label, 'must be an object.');
+		return fail(label, 'must be an object.', index, field);
 	}
 	const prototype = Object.getPrototypeOf(value);
 	if (prototype !== Object.prototype && prototype !== null) {
-		return fail(label, 'must be a plain object.');
+		return fail(label, 'must be a plain object.', index, field);
 	}
 	if (Object.getOwnPropertySymbols(value).length !== 0) {
-		return fail(label, 'contains symbol fields.');
+		return fail(label, 'contains symbol fields.', index, field);
 	}
+	// Enumerability and accessor freedom are what make a later read of this
+	// message safe: an accessor could hand the validator one value and the host
+	// driver another. The descriptor walk is the only way to prove that, so it
+	// stays on the receive path.
 	for (const key of Object.getOwnPropertyNames(value)) {
 		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
-		if (!descriptor.enumerable) fail(`${label}.${key}`, 'must be enumerable.');
+		if (!descriptor.enumerable) {
+			fail(composePath(label, index, field), 'must be enumerable.', undefined, key);
+		}
 		if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-			fail(`${label}.${key}`, 'must not be an accessor.');
+			fail(composePath(label, index, field), 'must not be an accessor.', undefined, key);
 		}
 	}
 	return value as Record<string, unknown>;
@@ -289,27 +314,44 @@ function exactKeys(
 	value: Record<string, unknown>,
 	expected: readonly string[],
 	label: string,
+	index?: number,
 ): void {
-	for (const key of Object.keys(value)) {
-		if (!expected.includes(key)) fail(label, `contains unknown field ${JSON.stringify(key)}.`);
-	}
+	// Every caller runs `record` on the same object first, which already proved
+	// the value carries no symbol fields and only enumerable data properties.
+	// So a present-count match plus a per-expected-key lookup is exact, and it
+	// avoids a linear `expected` scan for each of the object's own keys.
+	let present = 0;
 	for (const key of expected) {
-		if (!Object.prototype.hasOwnProperty.call(value, key)) {
-			fail(label, `is missing field ${JSON.stringify(key)}.`);
+		if (Object.prototype.hasOwnProperty.call(value, key)) present++;
+		else fail(label, `is missing field ${JSON.stringify(key)}.`, index);
+	}
+	if (Object.keys(value).length === present) return;
+	for (const key of Object.keys(value)) {
+		if (!expected.includes(key)) {
+			fail(label, `contains unknown field ${JSON.stringify(key)}.`, index);
 		}
 	}
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
-		fail(label, 'contains symbol fields.');
+}
+
+function nonEmptyString(
+	value: unknown,
+	label: string,
+	index?: number,
+	field?: string,
+): asserts value is string {
+	if (typeof value !== 'string' || value.length === 0) {
+		fail(label, 'must be a non-empty string.', index, field);
 	}
 }
 
-function nonEmptyString(value: unknown, label: string): asserts value is string {
-	if (typeof value !== 'string' || value.length === 0) fail(label, 'must be a non-empty string.');
-}
-
-function positiveInteger(value: unknown, label: string): asserts value is number {
+function positiveInteger(
+	value: unknown,
+	label: string,
+	index?: number,
+	field?: string,
+): asserts value is number {
 	if (!Number.isSafeInteger(value) || (value as number) <= 0) {
-		fail(label, 'must be a positive safe integer.');
+		fail(label, 'must be a positive safe integer.', index, field);
 	}
 }
 
@@ -319,15 +361,22 @@ function nonNegativeInteger(value: unknown, label: string): asserts value is num
 	}
 }
 
-function nullableHostId(value: unknown, label: string): asserts value is number | null {
-	if (value !== null) positiveInteger(value, label);
+function nullableHostId(
+	value: unknown,
+	label: string,
+	index?: number,
+	field?: string,
+): asserts value is number | null {
+	if (value !== null) positiveInteger(value, label, index, field);
 }
 
-function hostParent(value: unknown, label: string): void {
+function hostParent(value: unknown, base: string, index?: number, field?: string): void {
 	if (value === null || typeof value === 'number') {
-		nullableHostId(value, label);
+		nullableHostId(value, base, index, field);
 		return;
 	}
+	// Only a portal target reaches here, so composing the full path is cold.
+	const label = composePath(base, index, field);
 	const handle = record(value, label);
 	exactKeys(handle, ['$$kind', 'renderer', 'root', 'id'], label);
 	if (handle.$$kind !== 'octane.universal.portal-target') {
@@ -342,34 +391,40 @@ function hostParent(value: unknown, label: string): void {
 	}
 }
 
-function assertWireValue(value: unknown, label: string, seen = new Set<object>()): void {
-	if (
+/** Values that need no walk, and therefore no message path and no cycle set. */
+function isWireLeaf(value: unknown): boolean {
+	return (
 		value === null ||
 		value === undefined ||
 		typeof value === 'string' ||
 		typeof value === 'number' ||
 		typeof value === 'bigint' ||
 		typeof value === 'boolean'
-	) {
-		return;
+	);
+}
+
+function assertWireValue(value: unknown, label: string, seen: Set<object> | null = null): void {
+	if (isWireLeaf(value)) return;
+	if (typeof value !== 'object' || value === null) {
+		fail(label, 'contains a non-serializable value.');
 	}
-	if (typeof value !== 'object') fail(label, 'contains a non-serializable value.');
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	const composite: object = value;
+	if (Object.getOwnPropertySymbols(composite).length !== 0) {
 		fail(label, 'contains symbol fields.');
 	}
-	if (seen.has(value)) fail(label, 'contains a cycle.');
-	seen.add(value);
+	// Allocated on the first descent into an object, not once per validated
+	// value: almost every host prop is a leaf.
+	const scope = seen ?? new Set<object>();
+	if (scope.has(composite)) fail(label, 'contains a cycle.');
+	scope.add(composite);
 	try {
-		if (Array.isArray(value)) {
-			if (Object.getOwnPropertySymbols(value).length !== 0) {
-				fail(label, 'contains symbol fields.');
-			}
-			const names = Object.getOwnPropertyNames(value);
-			if (names.length !== value.length + 1) {
+		if (Array.isArray(composite)) {
+			const names = Object.getOwnPropertyNames(composite);
+			if (names.length !== composite.length + 1) {
 				fail(label, 'must be a dense array without extra fields.');
 			}
-			for (let index = 0; index < value.length; index++) {
-				const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+			for (let index = 0; index < composite.length; index++) {
+				const descriptor = Object.getOwnPropertyDescriptor(composite, String(index));
 				if (
 					descriptor === undefined ||
 					!descriptor.enumerable ||
@@ -377,17 +432,19 @@ function assertWireValue(value: unknown, label: string, seen = new Set<object>()
 				) {
 					fail(`${label}[${index}]`, 'must be an enumerable data property.');
 				}
-				assertWireValue(descriptor.value, `${label}[${index}]`, seen);
+				if (!isWireLeaf(descriptor.value)) {
+					assertWireValue(descriptor.value, `${label}[${index}]`, scope);
+				}
 			}
 			return;
 		}
-		const object = record(value, label);
+		const object = record(composite, label);
 		for (const name of Object.keys(object)) {
-			const descriptor = Object.getOwnPropertyDescriptor(object, name)!;
-			assertWireValue(descriptor.value, `${label}.${name}`, seen);
+			const child = object[name];
+			if (!isWireLeaf(child)) assertWireValue(child, `${label}.${name}`, scope);
 		}
 	} finally {
-		seen.delete(value);
+		scope.delete(composite);
 	}
 }
 
@@ -419,70 +476,84 @@ function assertEventListener(value: unknown, label: string): void {
 	}
 }
 
-function assertProps(value: unknown, label: string): void {
-	const props = record(value, label);
-	if (Object.getOwnPropertySymbols(props).length !== 0) fail(label, 'contains symbol fields.');
-	for (const [name, prop] of Object.entries(props)) {
-		assertWireValue(prop, `${label}.${name}`);
+function assertProps(value: unknown, label: string, index?: number, field?: string): void {
+	// `record` already rejected symbol fields, accessors, and non-enumerable own
+	// keys, so reading each value once here is safe. Leaves skip the walk without
+	// composing a path, which is the common shape of a host prop bag.
+	const props = record(value, label, index, field);
+	for (const name of Object.keys(props)) {
+		const prop = props[name];
+		if (isWireLeaf(prop)) continue;
+		assertWireValue(prop, `${composePath(label, index, field)}.${name}`);
 	}
 }
 
+const COMMANDS_LABEL = 'commit.batch.commands';
+const CREATE_KEYS = Object.freeze(['op', 'id', 'type', 'props']);
+const UPDATE_KEYS = Object.freeze(['op', 'id', 'props']);
+const PLACEMENT_KEYS = Object.freeze(['op', 'parent', 'id', 'before']);
+const EVENT_KEYS = Object.freeze(['op', 'id', 'type', 'listener']);
+const VISIBILITY_KEYS = Object.freeze(['op', 'id', 'state']);
+const REMOVE_KEYS = Object.freeze(['op', 'parent', 'id']);
+const DESTROY_KEYS = Object.freeze(['op', 'id']);
+
 function assertCommand(value: unknown, index: number): asserts value is UniversalHostCommand {
-	const label = `commit.batch.commands[${index}]`;
-	const command = record(value, label);
-	if (typeof command.op !== 'string') fail(`${label}.op`, 'must be a string.');
+	// One call per accepted host node. Every path below is composed lazily.
+	const label = COMMANDS_LABEL;
+	const command = record(value, label, index);
+	if (typeof command.op !== 'string') fail(label, 'must be a string.', index, 'op');
 	switch (command.op) {
 		case 'create':
-			exactKeys(command, ['op', 'id', 'type', 'props'], label);
-			positiveInteger(command.id, `${label}.id`);
-			nonEmptyString(command.type, `${label}.type`);
-			assertProps(command.props, `${label}.props`);
+			exactKeys(command, CREATE_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
+			nonEmptyString(command.type, label, index, 'type');
+			assertProps(command.props, label, index, 'props');
 			return;
 		case 'update':
-			exactKeys(command, ['op', 'id', 'props'], label);
-			positiveInteger(command.id, `${label}.id`);
-			assertProps(command.props, `${label}.props`);
+			exactKeys(command, UPDATE_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
+			assertProps(command.props, label, index, 'props');
 			return;
 		case 'recreate':
-			exactKeys(command, ['op', 'id', 'type', 'props'], label);
-			positiveInteger(command.id, `${label}.id`);
-			nonEmptyString(command.type, `${label}.type`);
-			assertProps(command.props, `${label}.props`);
+			exactKeys(command, CREATE_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
+			nonEmptyString(command.type, label, index, 'type');
+			assertProps(command.props, label, index, 'props');
 			return;
 		case 'insert':
 		case 'move':
-			exactKeys(command, ['op', 'parent', 'id', 'before'], label);
-			hostParent(command.parent, `${label}.parent`);
-			positiveInteger(command.id, `${label}.id`);
-			nullableHostId(command.before, `${label}.before`);
+			exactKeys(command, PLACEMENT_KEYS, label, index);
+			hostParent(command.parent, label, index, 'parent');
+			positiveInteger(command.id, label, index, 'id');
+			nullableHostId(command.before, label, index, 'before');
 			return;
 		case 'event':
-			exactKeys(command, ['op', 'id', 'type', 'listener'], label);
-			positiveInteger(command.id, `${label}.id`);
-			nonEmptyString(command.type, `${label}.type`);
-			assertEventListener(command.listener, `${label}.listener`);
+			exactKeys(command, EVENT_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
+			nonEmptyString(command.type, label, index, 'type');
+			assertEventListener(command.listener, composePath(label, index, 'listener'));
 			return;
 		case 'lifecycle':
 		case 'local-callback':
-			fail(`${label}.op`, `${command.op} is not supported by the Lynx async host.`);
+			fail(label, `${command.op} is not supported by the Lynx async host.`, index, 'op');
 		case 'visibility':
-			exactKeys(command, ['op', 'id', 'state'], label);
-			positiveInteger(command.id, `${label}.id`);
+			exactKeys(command, VISIBILITY_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
 			if (command.state !== 'hidden' && command.state !== 'visible') {
-				fail(`${label}.state`, 'must be hidden or visible.');
+				fail(label, 'must be hidden or visible.', index, 'state');
 			}
 			return;
 		case 'remove':
-			exactKeys(command, ['op', 'parent', 'id'], label);
-			hostParent(command.parent, `${label}.parent`);
-			positiveInteger(command.id, `${label}.id`);
+			exactKeys(command, REMOVE_KEYS, label, index);
+			hostParent(command.parent, label, index, 'parent');
+			positiveInteger(command.id, label, index, 'id');
 			return;
 		case 'destroy':
-			exactKeys(command, ['op', 'id'], label);
-			positiveInteger(command.id, `${label}.id`);
+			exactKeys(command, DESTROY_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
 			return;
 		default:
-			fail(`${label}.op`, `uses unsupported operation ${JSON.stringify(command.op)}.`);
+			fail(label, `uses unsupported operation ${JSON.stringify(command.op)}.`, index, 'op');
 	}
 }
 
@@ -705,6 +776,27 @@ function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | Lyn
 	else positiveInteger(message.request, `${label}.request`);
 	if (hasFirstTree) assertFirstTreeSnapshot(message.firstTree, `${label}.firstTree`);
 	return message as unknown as LynxMainReadyRequest | LynxMainReadyReply;
+}
+
+/**
+ * Validate a message this thread just constructed, on the way out.
+ *
+ * Every outbound message is built by this package from an already-frozen
+ * universal batch, so re-walking it before `dispatchEvent` is a self-check
+ * against protocol drift, not a trust boundary: the receiving thread validates
+ * every inbound message unconditionally. The walk is O(commands x props), so a
+ * mount pays for it once per node per direction. Keep it in development, where
+ * drift should fail loudly at its origin, and drop it from production sends.
+ */
+export function selfCheckLynxBackgroundOutboundMessage<Message>(message: Message): Message {
+	if (LYNX_DEVELOPMENT) validateLynxBackgroundOutboundMessage(message);
+	return message;
+}
+
+/** Send-side self-check for main's inbound-shaped messages. See the outbound note. */
+export function selfCheckLynxBackgroundInboundMessage<Message>(message: Message): Message {
+	if (LYNX_DEVELOPMENT) validateLynxBackgroundInboundMessage(message);
+	return message;
 }
 
 export function validateLynxBackgroundOutboundMessage(

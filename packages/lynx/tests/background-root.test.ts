@@ -1254,6 +1254,10 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 			/replaced|disposed/,
 		);
 		expect(firstAHandle.active).toBe(false);
+		// This handle was never queried while it was live, so its NodesRef binding
+		// is built here for the first time — after the invalidation. The recorded
+		// reason must still surface instead of a fresh, apparently-usable binding.
+		await expect(firstAHandle.measure()).rejects.toThrow(/replaced|disposed/);
 		expect(counterRefs.at(-1)).toBeNull();
 		expect(logs).toEqual(
 			expect.arrayContaining(['counter-ref:null', 'layout-cleanup:1', 'passive-cleanup:1']),

@@ -532,6 +532,18 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Native Lynx dual-thread render cost (Node-only): drives the real
+		// background root, async transport, main receiver, and host driver through
+		// a cheap fake Element PAPI, so the milliseconds are Octane's own per-node
+		// CPU cost. It also gates that a native tap reaches its background handler
+		// through the engine's own `publishEvent` receiver. No device timing claim.
+		name: 'lynx-render',
+		cwd: 'lynx-render',
+		servers: [],
+		iter: { normal: 5, quick: 1 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Production Rspeedy preview/IFR bundles (Node-only): decodes both real
 		// compiler graphs, verifies semantic markers, and reports deterministic
 		// encoded and per-thread bytes. This is build evidence, not native timing.

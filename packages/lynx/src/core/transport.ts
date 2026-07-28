@@ -6,12 +6,15 @@ import {
 	type UniversalRoot,
 	type UniversalTransportAcknowledgement,
 	type UniversalTransportCommitMessage,
+	type UniversalEventPriority,
+	type UniversalTransportEventDelivery,
 	type UniversalTransportIdentity,
 	type UniversalSerializableValue,
 } from 'octane/universal/native';
 import {
 	applyLynxHostAttachments,
 	invalidateLynxClientContainer,
+	isLynxClientEventTarget,
 	prepareLynxHandleDeltas,
 	type LynxClientContainer,
 } from './client-driver.js';
@@ -22,6 +25,7 @@ import {
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
 	sameLynxTransportIdentity,
+	selfCheckLynxBackgroundOutboundMessage,
 	validateLynxBackgroundInboundMessage,
 	validateLynxBackgroundOutboundMessage,
 	type LynxBackgroundInboundMessage,
@@ -40,6 +44,7 @@ import {
 	type LynxMainThreadWorkletWireDescriptor,
 	type LynxTransportAcknowledgement,
 } from './protocol.js';
+import type { LynxBackgroundNativeEventDelivery } from './native-event-receiver.js';
 import {
 	isLynxMainThreadWorkletDescriptor,
 	isolateLynxWorkletValue,
@@ -70,9 +75,16 @@ export interface LynxBackgroundTransport extends UniversalAsyncCommitTransport<L
 	readonly mode: 'async';
 	readonly ready: Promise<void>;
 	bindRoot(root: Pick<UniversalRoot, 'dispatchTransportEvent'>): void;
+	/** Deliver one native propagation path received on the background thread. */
+	dispatchNativeEventBatch(deliveries: readonly LynxBackgroundNativeEventDelivery[]): void;
 	/** Bind logical background cleanup to the native page lifetime broadcast. */
 	bindPageDestroy(handler: () => void | Promise<void>): void;
 	acceptedIdentity(): UniversalTransportIdentity | null;
+	/**
+	 * Root this transport serves, known from its first commit — before any
+	 * acknowledgement, and therefore before main can install a native token.
+	 */
+	ownedRoot(): number | null;
 	/** Cancel commits that have not crossed the readiness/send boundary. */
 	cancelPendingBeforeReady(reason?: unknown): Promise<boolean>;
 	/** Internal facade state used to classify teardown without probing the host. */
@@ -296,7 +308,7 @@ export function createLynxBackgroundTransport(
 
 	const dispatch = (message: Parameters<typeof validateLynxBackgroundOutboundMessage>[0]) => {
 		if (closedError !== null) throw closedError;
-		const validated = validateLynxBackgroundOutboundMessage(message);
+		const validated = selfCheckLynxBackgroundOutboundMessage(message);
 		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
 	};
 
@@ -550,6 +562,8 @@ export function createLynxBackgroundTransport(
 	): boolean => {
 		if (closedError !== null) return false;
 		closeThreadCalls(error, notifyMain);
+		// Nothing will acknowledge a held native event once the transport closes.
+		dropDeferredNativeEvents();
 		closedError = error;
 		readyDeferred.reject(error);
 		for (const entry of [...pending.values()]) closeEntry(entry, error);
@@ -762,6 +776,9 @@ export function createLynxBackgroundTransport(
 			}
 		}
 		publishAcknowledgementMainCalls(message);
+		// The acknowledgement just published this batch's hosts, which is what a
+		// tap racing main's apply was waiting for.
+		flushDeferredNativeEvents();
 	};
 
 	const settleCommitResponse = (entry: PendingCommit, message: CommitSettlement): void => {
@@ -837,6 +854,119 @@ export function createLynxBackgroundTransport(
 		}
 		if (dispatchingCommit === entry) entry.deferredResponse = message;
 		else settleCommitResponse(entry, message);
+	};
+
+	/**
+	 * A native tap can land between main applying a commit and this thread
+	 * accepting its acknowledgement.
+	 *
+	 * Main installs `__AddEvent` tokens while it applies a commit, so the element
+	 * is tappable the moment that apply lands. The acknowledgement that teaches
+	 * this thread the host's generation and attachment is still in flight, and a
+	 * tap is an engine call rather than a ContextProxy message, so it can arrive
+	 * first. Such a delivery is early, not stale: it names a host that genuinely
+	 * exists on main. Hold it for the acknowledgement it is racing, then dispatch
+	 * or diagnose it. `acknowledgements` is the grace it has left; one is exact,
+	 * because main sends the acknowledgement immediately after the apply that
+	 * installed the token.
+	 */
+	interface DeferredNativeEventBatch {
+		readonly deliveries: readonly LynxBackgroundNativeEventDelivery[];
+		readonly priority: UniversalEventPriority;
+		acknowledgements: number;
+	}
+
+	const MAX_DEFERRED_NATIVE_EVENT_DELIVERIES = 64;
+	let deferredNativeEvents: DeferredNativeEventBatch[] = [];
+
+	const resolveNativeEventBatch = (
+		batch: DeferredNativeEventBatch,
+	): readonly UniversalTransportEventDelivery[] | null => {
+		if (accepted === null) return null;
+		const transported: UniversalTransportEventDelivery[] = [];
+		for (const delivery of batch.deliveries) {
+			const { identity } = delivery;
+			// The background owns the listener table but main owns the physical
+			// tree, so the generation and attachment recorded at acknowledgement
+			// are what prove this token still names a live, mounted host.
+			if (
+				identity.root !== accepted.root ||
+				!isLynxClientEventTarget(container, identity.root, identity.id, identity.generation)
+			) {
+				return null;
+			}
+			transported.push({ listener: identity.listener, payload: delivery.payload });
+		}
+		return Object.freeze(transported);
+	};
+
+	const dispatchNativeEventBatchNow = (
+		batch: DeferredNativeEventBatch,
+		transported: readonly UniversalTransportEventDelivery[],
+	): void => {
+		handleEvent({
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: accepted!.root,
+			version: accepted!.version,
+			type: 'event',
+			priority: batch.priority,
+			deliveries: transported,
+		});
+	};
+
+	const reportUnresolvedNativeEventBatch = (batch: DeferredNativeEventBatch): void => {
+		const first = batch.deliveries[0]!.identity;
+		report(
+			new Error(
+				`Octane Lynx received a stale native event for host ${first.id}:${first.generation}.`,
+			),
+		);
+	};
+
+	const deferNativeEventBatch = (batch: DeferredNativeEventBatch): void => {
+		const transported = resolveNativeEventBatch(batch);
+		if (transported !== null) {
+			dispatchNativeEventBatchNow(batch, transported);
+			return;
+		}
+		const queued = deferredNativeEvents.reduce((count, held) => count + held.deliveries.length, 0);
+		if (queued + batch.deliveries.length > MAX_DEFERRED_NATIVE_EVENT_DELIVERIES) {
+			report(
+				new Error(
+					`Octane Lynx dropped a native event batch after ${MAX_DEFERRED_NATIVE_EVENT_DELIVERIES} deliveries awaiting acknowledgement.`,
+				),
+			);
+			return;
+		}
+		deferredNativeEvents.push(batch);
+	};
+
+	/** Retry deliveries held for an acknowledgement, once that acknowledgement lands. */
+	const flushDeferredNativeEvents = (): void => {
+		if (deferredNativeEvents.length === 0) return;
+		const held = deferredNativeEvents;
+		deferredNativeEvents = [];
+		for (const batch of held) {
+			const transported = resolveNativeEventBatch(batch);
+			if (transported !== null) {
+				dispatchNativeEventBatchNow(batch, transported);
+				continue;
+			}
+			if (--batch.acknowledgements <= 0) {
+				reportUnresolvedNativeEventBatch(batch);
+				continue;
+			}
+			deferredNativeEvents.push(batch);
+		}
+	};
+
+	/** Fail deliveries that can no longer be acknowledged by anything. */
+	const dropDeferredNativeEvents = (): void => {
+		if (deferredNativeEvents.length === 0) return;
+		const held = deferredNativeEvents;
+		deferredNativeEvents = [];
+		for (const batch of held) reportUnresolvedNativeEventBatch(batch);
 	};
 
 	const handleEvent = (message: Extract<LynxBackgroundInboundMessage, { type: 'event' }>) => {
@@ -1263,7 +1393,7 @@ export function createLynxBackgroundTransport(
 				batch: preparedBatch,
 			};
 			try {
-				validateLynxBackgroundOutboundMessage(commit);
+				selfCheckLynxBackgroundOutboundMessage(commit);
 			} catch (error) {
 				finalizeWorkletBatch(preparedBatch, false);
 				throw error;
@@ -1382,6 +1512,31 @@ export function createLynxBackgroundTransport(
 		},
 		acceptedIdentity() {
 			return accepted;
+		},
+		ownedRoot() {
+			return transportRoot;
+		},
+		dispatchNativeEventBatch(deliveries) {
+			if (deliveries.length === 0) return;
+			if (closedError !== null) {
+				report(closedError, 'Octane Lynx received a native event after the transport closed.');
+				return;
+			}
+			const priority = deliveries[0]!.identity.priority;
+			for (const delivery of deliveries) {
+				const { identity } = delivery;
+				if (transportRoot !== null && identity.root !== transportRoot) {
+					report(
+						new Error(`Octane Lynx received a foreign native event for root ${identity.root}.`),
+					);
+					return;
+				}
+				if (identity.priority !== priority) {
+					report(new Error('Octane Lynx native event batch mixes listener priorities.'));
+					return;
+				}
+			}
+			deferNativeEventBatch({ deliveries, priority, acknowledgements: 1 });
 		},
 		async cancelPendingBeforeReady(reason) {
 			if (closedError !== null || accepted !== null || pending.size === 0) return false;

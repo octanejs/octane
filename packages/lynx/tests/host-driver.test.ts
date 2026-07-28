@@ -1178,6 +1178,8 @@ describe('Lynx Element PAPI host driver', () => {
 			priority: 'discrete',
 		});
 
+		// A re-rendered handler is a new closure with the same listener identity.
+		// That must not churn the native binding.
 		papi.resetCalls();
 		prepareLynxHostBatch(
 			container,
@@ -1186,29 +1188,52 @@ describe('Lynx Element PAPI host driver', () => {
 					op: 'event',
 					id: 1,
 					type: 'bindtap',
-					listener: { id: 101, priority: 'default' },
+					listener: { id: 101, priority: 'discrete' },
 				},
 			]),
 		).apply();
 		expect(papi.calls).not.toContain('setEvent');
 		expect(first.events.get('bindEvent:tap')).toBe(originalToken);
-		expect(resolveLynxHostNativeEvent(container, originalToken)?.priority).toBe('default');
+		expect(resolveLynxHostNativeEvent(container, originalToken)?.priority).toBe('discrete');
+
+		// The token carries the listener priority so the background thread can
+		// build a valid event message from a native delivery alone, so a priority
+		// change is an identity change and does rebind. The Lynx renderer derives
+		// priority from the event name, so this cannot happen through the
+		// compiler; it is asserted here to pin the token's identity contract.
+		papi.resetCalls();
+		prepareLynxHostBatch(
+			container,
+			batch(3, [
+				{
+					op: 'event',
+					id: 1,
+					type: 'bindtap',
+					listener: { id: 101, priority: 'default' },
+				},
+			]),
+		).apply();
+		expect(papi.calls).toContain('setEvent');
+		const repriced = first.events.get('bindEvent:tap')!;
+		expect(repriced).not.toBe(originalToken);
+		expect(resolveLynxHostNativeEvent(container, repriced)?.priority).toBe('default');
+		expect(resolveLynxHostNativeEvent(container, originalToken)).toBe(null);
 
 		prepareLynxHostBatch(
 			container,
-			batch(3, [{ op: 'visibility', id: 1, state: 'hidden' }]),
+			batch(4, [{ op: 'visibility', id: 1, state: 'hidden' }]),
 		).apply();
 		expect(first.events.size).toBe(0);
 		expect(resolveLynxHostNativeEvent(container, originalToken)).toBe(null);
 		prepareLynxHostBatch(
 			container,
-			batch(4, [{ op: 'visibility', id: 1, state: 'visible' }]),
+			batch(5, [{ op: 'visibility', id: 1, state: 'visible' }]),
 		).apply();
 		expect(first.events.size).toBe(5);
 
 		prepareLynxHostBatch(
 			container,
-			batch(5, [{ op: 'recreate', id: 1, type: 'view', props: {} }]),
+			batch(6, [{ op: 'recreate', id: 1, type: 'view', props: {} }]),
 		).apply();
 		const replacement = page.children[0];
 		expect(replacement.events.size).toBe(5);
@@ -1220,7 +1245,7 @@ describe('Lynx Element PAPI host driver', () => {
 
 		prepareLynxHostBatch(
 			container,
-			batch(6, [
+			batch(7, [
 				{ op: 'remove', parent: null, id: 1 },
 				{ op: 'destroy', id: 1 },
 			]),

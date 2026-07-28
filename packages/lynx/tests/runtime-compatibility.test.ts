@@ -103,6 +103,7 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/environment.ts',
 				'src/core/host-props.ts',
 				'src/core/lifecycle-data.ts',
+				'src/core/native-event-receiver.ts',
 				'src/core/native-events.ts',
 				'src/core/nodes-ref.ts',
 				'src/core/portal.ts',
@@ -117,6 +118,7 @@ describe('Lynx runtime compatibility evidence', () => {
 		});
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/main-thread.ts'))).toEqual({
 			files: [
+				'src/core/environment.ts',
 				'src/core/first-screen.ts',
 				'src/core/host-driver.ts',
 				'src/core/host-props.ts',

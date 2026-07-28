@@ -1,3 +1,5 @@
+import type { UniversalEventPriority } from 'octane/universal/native';
+
 export type LynxNativeEventPrefix =
 	'bind' | 'catch' | 'capture-bind' | 'capture-catch' | 'global-bind';
 
@@ -66,11 +68,23 @@ export interface LynxNativeEventTokenIdentity {
 	readonly id: number;
 	readonly generation: number;
 	readonly listener: number;
+	/**
+	 * The listener's scheduling priority, carried in the token itself.
+	 *
+	 * A native `bind*` handler is delivered straight to the background thread by
+	 * the engine, which knows nothing but this string. The background owns the
+	 * listener table but not the physical host, so without the priority here it
+	 * could not build a valid transported event message without asking main —
+	 * an extra thread round trip on every tap.
+	 */
+	readonly priority: UniversalEventPriority;
 }
 
 const TOKEN_PREFIX = 'octane-lynx:event:';
-const TOKEN_PATTERN = /^octane-lynx:event:([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*)$/;
-const TOKEN_IDENTITY_KEYS = ['root', 'id', 'generation', 'listener'] as const;
+const TOKEN_PATTERN =
+	/^octane-lynx:event:([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*):([1-9][0-9]*):(discrete|continuous|default)$/;
+const TOKEN_IDENTITY_KEYS = ['root', 'id', 'generation', 'listener', 'priority'] as const;
+const TOKEN_NUMERIC_KEYS = ['root', 'id', 'generation', 'listener'] as const;
 
 function tokenError(message: string): TypeError {
 	return new TypeError(`Octane Lynx native event token ${message}`);
@@ -98,9 +112,16 @@ function validateTokenIdentity(value: unknown): asserts value is LynxNativeEvent
 		keys.some((key) => !(TOKEN_IDENTITY_KEYS as readonly string[]).includes(key)) ||
 		Object.getOwnPropertySymbols(record).length !== 0
 	) {
-		throw tokenError('identity must contain only root, id, generation, and listener.');
+		throw tokenError('identity must contain only root, id, generation, listener, and priority.');
 	}
-	for (const key of TOKEN_IDENTITY_KEYS) assertPositiveSafeInteger(record[key], `identity.${key}`);
+	for (const key of TOKEN_NUMERIC_KEYS) assertPositiveSafeInteger(record[key], `identity.${key}`);
+	if (!isLynxEventPriority(record.priority)) {
+		throw tokenError('identity.priority must be discrete, continuous, or default.');
+	}
+}
+
+function isLynxEventPriority(value: unknown): value is UniversalEventPriority {
+	return value === 'discrete' || value === 'continuous' || value === 'default';
 }
 
 /** Encode a root/host-generation/listener identity for `__AddEvent`. */
@@ -108,7 +129,7 @@ export function encodeLynxNativeEventToken(
 	identity: LynxNativeEventTokenIdentity,
 ): LynxNativeEventToken {
 	validateTokenIdentity(identity);
-	return `${TOKEN_PREFIX}${identity.root}:${identity.id}:${identity.generation}:${identity.listener}` as LynxNativeEventToken;
+	return `${TOKEN_PREFIX}${identity.root}:${identity.id}:${identity.generation}:${identity.listener}:${identity.priority}` as LynxNativeEventToken;
 }
 
 /** Decode and validate a native listener token without accepting non-canonical aliases. */
@@ -121,8 +142,9 @@ export function decodeLynxNativeEventToken(value: unknown): LynxNativeEventToken
 		id: Number(match[2]),
 		generation: Number(match[3]),
 		listener: Number(match[4]),
+		priority: match[5] as UniversalEventPriority,
 	};
-	for (const key of TOKEN_IDENTITY_KEYS) assertPositiveSafeInteger(identity[key], key);
+	for (const key of TOKEN_NUMERIC_KEYS) assertPositiveSafeInteger(identity[key], key);
 	return Object.freeze(identity);
 }
 

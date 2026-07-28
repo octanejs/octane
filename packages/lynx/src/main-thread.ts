@@ -43,6 +43,7 @@ import {
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
 	sameLynxTransportIdentity,
+	selfCheckLynxBackgroundInboundMessage,
 	validateLynxBackgroundInboundMessage,
 	validateLynxBackgroundOutboundMessage,
 	type LynxBackgroundInboundMessage,
@@ -562,7 +563,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	};
 
 	const dispatch = (message: LynxBackgroundInboundMessage): void => {
-		const validated = validateLynxBackgroundInboundMessage(message);
+		const validated = selfCheckLynxBackgroundInboundMessage(message);
 		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: validated });
 	};
 
