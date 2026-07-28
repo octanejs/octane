@@ -50,14 +50,7 @@ export function useTiptap(): TiptapContextType {
 /** Select a reactive slice of editor state from the context editor. */
 export function useTiptapState<TSelectorResult>(
 	selector: (context: EditorStateSnapshot<Editor>) => TSelectorResult,
-	equalityFn?: (left: TSelectorResult, right: TSelectorResult | null) => boolean,
-): TSelectorResult;
-export function useTiptapState<TSelectorResult>(
-	selector: (context: EditorStateSnapshot<Editor>) => TSelectorResult,
-	...args: [
-		equalityFn?: (left: TSelectorResult, right: TSelectorResult | null) => boolean,
-		slot?: symbol,
-	]
+	...args: [equalityFn?: (left: TSelectorResult, right: TSelectorResult | null) => boolean]
 ): TSelectorResult {
 	const [userArgs, slot] = splitSlot(args);
 	const equalityFn = userArgs[0] as
