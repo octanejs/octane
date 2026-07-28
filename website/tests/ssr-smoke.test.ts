@@ -1,57 +1,28 @@
 // @vitest-environment node
 //
-// Production SSR smoke test — runs the real TanStack Start + Nitro build and
-// drives the generated server over HTTP. Complements smoke.test.ts
-// (client-side render): this proves the deployable artifact serves every route
-// server-side.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawn, type ChildProcess } from 'node:child_process';
+// Production SSR smoke test — drives the real TanStack Start + Nitro build over
+// HTTP. Complements smoke.test.ts (client-side render): this proves the built
+// artifact serves every route server-side.
+//
+// The build and the server it talks to belong to the project's globalSetup
+// (tests/setup/production-server.ts), which produces them once for every
+// server-backed spec. This file used to run a second, `node-server`-preset build
+// of its own purely to obtain an HTTP origin; the assertions below are all
+// markup- and asset-level, so they hold against either preset's output. See the
+// setup file for the coverage that consolidating on `vercel` gave up.
+import { describe, it, expect, inject } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'node:net';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
-const websiteRoot = fileURLToPath(new URL('..', import.meta.url));
-const serverEntry = path.join(websiteRoot, '.output/server/index.mjs');
-
-let server: ChildProcess;
-let origin: string;
+const origin = inject('productionOrigin');
+const outputDir = inject('productionOutputDir');
+const staticRoot = path.join(outputDir, 'static');
+const serverEntry = path.join(outputDir, 'functions/__server.func/index.mjs');
 
 async function get(url: string) {
 	const response = await fetch(origin + url);
 	return { response, html: await response.text() };
-}
-
-async function getFreePort(): Promise<number> {
-	return new Promise((resolve, reject) => {
-		const socket = createServer();
-		socket.once('error', reject);
-		socket.listen(0, '127.0.0.1', () => {
-			const { port } = socket.address() as import('node:net').AddressInfo;
-			socket.close(() => resolve(port));
-		});
-	});
-}
-
-async function waitForServer(child: ChildProcess, url: string): Promise<void> {
-	const deadline = Date.now() + 30_000;
-	while (Date.now() < deadline) {
-		if (child.exitCode !== null) {
-			throw new Error(`Nitro server exited with code ${child.exitCode} before listening`);
-		}
-		try {
-			const response = await fetch(url);
-			if (response.status < 500) {
-				await response.body?.cancel();
-				return;
-			}
-		} catch {
-			// Server is still starting.
-		}
-		await new Promise((resolve) => setTimeout(resolve, 100));
-	}
-	throw new Error(`Nitro server at ${url} never came up`);
 }
 
 function classCount(html: string, className: string): number {
@@ -68,50 +39,10 @@ function readJavaScriptFiles(root: string): string[] {
 	});
 }
 
-beforeAll(async () => {
-	await new Promise<void>((resolve, reject) => {
-		const build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
-			cwd: websiteRoot,
-			stdio: 'ignore',
-			env: { ...process.env, NODE_ENV: 'production', NITRO_PRESET: 'node-server' },
-		});
-		build.once('error', reject);
-		build.once('exit', (code) => {
-			if (code === 0) resolve();
-			else reject(new Error(`vite build exited with code ${code}`));
-		});
-	});
-	const port = await getFreePort();
-	origin = `http://127.0.0.1:${port}`;
-	server = spawn(process.execPath, [serverEntry], {
-		cwd: websiteRoot,
-		stdio: 'ignore',
-		env: {
-			...process.env,
-			NODE_ENV: 'production',
-			HOST: '127.0.0.1',
-			PORT: String(port),
-		},
-	});
-	await waitForServer(server, origin + '/');
-}, 240_000);
-
-afterAll(async () => {
-	if (!server || server.exitCode !== null) return;
-	server.kill('SIGTERM');
-	await new Promise((resolve) => {
-		server.once('exit', resolve);
-		setTimeout(resolve, 3000);
-	});
-	if (server.exitCode === null) server.kill('SIGKILL');
-});
-
 describe('built Start server', () => {
 	it('produced Nitro server and public asset output', () => {
 		expect(fs.existsSync(serverEntry)).toBe(true);
-		expect(fs.existsSync(path.join(websiteRoot, '.output/public/playground-runtime.json'))).toBe(
-			true,
-		);
+		expect(fs.existsSync(path.join(staticRoot, 'playground-runtime.json'))).toBe(true);
 	});
 
 	it('server-renders the home page with the hydration payload', async () => {
@@ -144,7 +75,6 @@ describe('built Start server', () => {
 
 	it('keeps route-only components out of the home-page asset graph', async () => {
 		const { html } = await get('/');
-		const publicRoot = path.join(websiteRoot, '.output/public');
 		const initialAssetPaths = Array.from(
 			new Set(
 				Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"?]+\.js)(?:\?[^" ]*)?"/g)).map(
@@ -155,9 +85,9 @@ describe('built Start server', () => {
 		expect(initialAssetPaths.length).toBeGreaterThan(0);
 
 		const initialJavaScript = initialAssetPaths
-			.map((assetPath) => fs.readFileSync(path.join(publicRoot, assetPath.slice(1)), 'utf8'))
+			.map((assetPath) => fs.readFileSync(path.join(staticRoot, assetPath.slice(1)), 'utf8'))
 			.join('\n');
-		const allJavaScript = readJavaScriptFiles(path.join(publicRoot, 'assets')).join('\n');
+		const allJavaScript = readJavaScriptFiles(path.join(staticRoot, 'assets')).join('\n');
 		const routeOnlySentinels = [
 			'This link contains shared code.',
 			'Every suite at a glance',

@@ -14,15 +14,20 @@
 // Runs inside the website vitest project (playwright as a library). Chromium is
 // a required prerequisite; CI installs it (see ci.yml), and local runs fail
 // with the exact setup command when it is missing.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, inject } from 'vitest';
 import { build } from 'esbuild';
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { createServer } from 'node:net';
 import { join, relative } from 'node:path';
 import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
+import {
+	getFreePort,
+	spawnServer as spawnServerIn,
+	stopServer,
+	waitForServer,
+} from './support/server-process.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
 const PLAYWRIGHT_ACTION_TIMEOUT = 10_000;
@@ -144,22 +149,6 @@ async function installReactCdnMirror(
 	});
 }
 
-// A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
-// leftover server from an earlier run (or another checkout) already listening
-// there makes the spawned `--strictPort` server die instantly while
-// waitForHttp happily connects to the imposter — and the suite silently
-// asserts against foreign code. That exact failure mode shipped a red main.
-function getFreePort(): Promise<number> {
-	return new Promise((resolve, reject) => {
-		const srv = createServer();
-		srv.once('error', reject);
-		srv.listen(0, '127.0.0.1', () => {
-			const { port } = srv.address() as import('node:net').AddressInfo;
-			srv.close(() => resolve(port));
-		});
-	});
-}
-
 // One shared browser for both the development and production passes.
 let chromium: typeof import('playwright').chromium;
 let browser: import('playwright').Browser;
@@ -181,81 +170,10 @@ afterAll(async () => {
 	await browser.close();
 });
 
-// Spawn a server in its OWN process group so stop() can kill the whole tree.
-// `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the real
-// node server underneath, which then squats the port for every later run.
-function spawnServer(args: string[], env: NodeJS.ProcessEnv = {}): ChildProcess {
-	return spawn('pnpm', args, {
-		cwd: WEBSITE,
-		stdio: 'ignore',
-		detached: true,
-		env: { ...process.env, ...env },
-	});
-}
-
-// Wait until the SPAWNED server answers. Rejects the moment the child exits —
-// without that, a startup death (port conflict, build error) is invisible and
-// the probe loop can end up talking to some other process entirely.
-function waitForServer(child: ChildProcess, url: string, timeoutMs: number): Promise<void> {
-	const deadline = Date.now() + timeoutMs;
-	return new Promise((resolve, reject) => {
-		let settled = false;
-		const onExit = (code: number | null) => {
-			settled = true;
-			reject(new Error(`server for ${url} exited with code ${code} before listening`));
-		};
-		child.once('exit', onExit);
-		const probe = async () => {
-			if (settled) return;
-			try {
-				const res = await fetch(url);
-				if (res.status < 500) {
-					// An HTTP answer proves something listens on the port — not that
-					// it's OUR child: it may have died mid-fetch with its 'exit'
-					// dispatch still queued while a foreign process answers. Give the
-					// exit event a beat to land, then require the child to be alive.
-					await new Promise((r) => setTimeout(r, 50));
-					if (settled) return; // onExit rejected meanwhile
-					if (child.exitCode !== null || child.signalCode !== null) {
-						settled = true;
-						child.off('exit', onExit);
-						return reject(new Error(`server at ${url} answered but the spawned process is dead`));
-					}
-					settled = true;
-					child.off('exit', onExit);
-					return resolve();
-				}
-			} catch {
-				// not up yet
-			}
-			if (Date.now() > deadline) {
-				settled = true;
-				child.off('exit', onExit);
-				return reject(new Error(`server at ${url} never came up`));
-			}
-			setTimeout(probe, 250);
-		};
-		probe();
-	});
-}
-
-// Kill the child's whole process group (see spawnServer), SIGKILL fallback.
-async function stop(child: ChildProcess | undefined): Promise<void> {
-	if (!child || child.pid === undefined || child.exitCode !== null) return;
-	const signalGroup = (sig: NodeJS.Signals) => {
-		try {
-			process.kill(-child.pid!, sig);
-		} catch {
-			child.kill(sig); // group already gone — signal the child directly
-		}
-	};
-	signalGroup('SIGTERM');
-	await new Promise((r) => {
-		child.once('exit', r);
-		setTimeout(r, 3000);
-	});
-	if (child.exitCode === null) signalGroup('SIGKILL');
-}
+// This suite still owns its dev server; the production build and its preview
+// server belong to the project (tests/setup/production-server.ts).
+const spawnServer = (args: string[], env: NodeJS.ProcessEnv = {}): ChildProcess =>
+	spawnServerIn(WEBSITE, args, env);
 
 // Load `path`, collecting console errors and page errors. Interactive callers
 // may also wait for the hydration entry's dynamic imports to go idle before the
@@ -797,6 +715,14 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 	}
 }
 
+// The SUITE is sequential but its cases are `it.concurrent`: every case opens
+// its OWN page against one shared dev server, so they are independent of each
+// other, while the suite boundary keeps this dev server's cold optimizeDeps boot
+// from competing with the production suite's own concurrent load. (Marking the
+// suites themselves concurrent runs both at once and times the dev boot out.)
+// The single exception is the HMR case, which edits files on disk and is pinned
+// `it.sequential` — declared last, it runs after the concurrent batch drains.
+// maxConcurrency lives on the project config.
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	let server: ChildProcess;
 	let DEV_PORT: number;
@@ -820,10 +746,10 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	}, 120_000);
 
 	afterAll(async () => {
-		await stop(server);
+		await stopServer(server);
 	});
 
-	it.for(ROUTES)(
+	it.concurrent.for(ROUTES)(
 		'%s hydrates with no mismatch and no page errors',
 		{ timeout: 30_000 },
 		async (route) => {
@@ -840,580 +766,626 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		},
 	);
 
-	it('the homepage benchmark explorer preserves its complete SSR view through hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
-		try {
-			const explorer = page.locator('section.explorer .bx');
-			await explorer.waitFor();
+	it.concurrent(
+		'the homepage benchmark explorer preserves its complete SSR view through hydration',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
+			try {
+				const explorer = page.locator('section.explorer .bx');
+				await explorer.waitFor();
 
-			// The bar chart and heatmap are already present in SSR output. Keeping them
-			// through hydration prevents the large footer jump the fallback swap caused.
-			expect(await page.locator('.bx-plot').count()).toBe(1);
-			expect(await page.locator('.bx-heat').count()).toBe(1);
-			expect(await page.locator('.bx-fallback-table').count()).toBe(0);
+				// The bar chart and heatmap are already present in SSR output. Keeping them
+				// through hydration prevents the large footer jump the fallback swap caused.
+				expect(await page.locator('.bx-plot').count()).toBe(1);
+				expect(await page.locator('.bx-heat').count()).toBe(1);
+				expect(await page.locator('.bx-fallback-table').count()).toBe(0);
 
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
 
-	it('the benchmark bar charts preserve their server geometry through hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
-		try {
-			const plots = page.locator('.bench-card .bench-plot');
-			expect(await plots.count()).toBe(18);
-			const firstPlot = plots.first();
-			const serverPlot = await firstPlot.elementHandle();
-			expect(serverPlot).toBeTruthy();
-			const geometry = await firstPlot.evaluate((plot) => ({
-				bars: plot.querySelectorAll('.bench-fill').length,
-				widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
-					bar.getAttribute('style'),
-				),
-			}));
-
-			await page.waitForTimeout(750);
-
-			expect(await page.locator('.recharts-wrapper').count()).toBe(0);
-			expect(await page.locator('.bench-plot-shell').count()).toBe(0);
-			expect(await plots.count()).toBe(18);
-			// Hydration adopts the server-rendered chart node instead of replacing it.
-			expect(
-				await page.evaluate(
-					(original) => document.querySelector('.bench-card .bench-plot') === original,
-					serverPlot,
-				),
-			).toBe(true);
-			expect(
-				await firstPlot.evaluate((plot) => ({
+	it.concurrent(
+		'the benchmark bar charts preserve their server geometry through hydration',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
+			try {
+				const plots = page.locator('.bench-card .bench-plot');
+				expect(await plots.count()).toBe(18);
+				const firstPlot = plots.first();
+				const serverPlot = await firstPlot.elementHandle();
+				expect(serverPlot).toBeTruthy();
+				const geometry = await firstPlot.evaluate((plot) => ({
 					bars: plot.querySelectorAll('.bench-fill').length,
 					widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
 						bar.getAttribute('style'),
 					),
-				})),
-			).toEqual(geometry);
-			expect(geometry.bars).toBeGreaterThan(0);
+				}));
 
-			// The adopted card is live: picking another operation flips the pressed
-			// state of the picker it hydrated.
-			const firstOps = page.locator('.bench-card').first().locator('.bench-op');
-			await firstOps.nth(1).click();
-			await page.waitForFunction(
-				() =>
-					document
-						.querySelector('.bench-card .bench-op:nth-child(2)')
-						?.getAttribute('aria-pressed') === 'true',
-				null,
-				{ timeout: 5_000 },
-			);
+				await page.waitForTimeout(750);
 
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('the Core APIs state, list, and search events work after hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			const count = page.locator('.demo-count');
-			await waitForLocatorText(count, '0');
-			await page.getByRole('button', { name: 'Add one' }).click();
-			await waitForLocatorText(count, '1');
-
-			const packingDemo = page.locator('[data-demo="lists"]');
-			const packingStatus = packingDemo.locator('.packing-summary');
-			const passport = packingDemo.getByRole('checkbox', { name: 'Passport' });
-			expect(await passport.isChecked()).toBe(false);
-			expect(await packingDemo.getByRole('button', { name: /^(Pack|Unpack) / }).count()).toBe(0);
-			await passport.check();
-			await waitForLocatorText(packingStatus, '2 of 3 packed');
-			expect(await passport.isChecked()).toBe(true);
-
-			await passport.blur();
-			await page.keyboard.press('/');
-			expect(await page.evaluate(() => document.activeElement?.id)).toBe('core-api-search');
-
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('the Core APIs async data and transition demos work after hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			await page.getByRole('button', { name: 'Load profile' }).click();
-			await waitForLocatorText(
-				page.locator('[data-demo="data"] .data-loading'),
-				'Loading profile…',
-			);
-			await waitForLocatorText(
-				page.locator('[data-demo="data"] .profile-card strong'),
-				'Ada Lovelace',
-			);
-
-			const transitionDemo = page.locator('[data-demo="transition"]');
-			const overviewTab = transitionDemo.getByRole('tab', { name: 'Overview' });
-			const activityTab = transitionDemo.getByRole('tab', { name: 'Activity' });
-			const deploymentsTab = transitionDemo.getByRole('tab', { name: 'Deployments' });
-			expect(await overviewTab.getAttribute('aria-selected')).toBe('true');
-			expect(await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
-				await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
-			);
-			await activityTab.click();
-			await waitForLocatorText(
-				transitionDemo.locator('.transition-status'),
-				'Loading Activity — Overview stays on screen.',
-			);
-			expect(await transitionDemo.locator('[data-report]').getAttribute('data-report')).toBe(
-				'overview',
-			);
-			expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
-				await deploymentsTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
-			);
-			await transitionDemo.locator('[data-report="activity"]').waitFor();
-			await waitForLocatorText(transitionDemo.locator('.transition-status'), 'Activity is ready.');
-			expect(await activityTab.getAttribute('aria-selected')).toBe('true');
-			expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
-				await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
-			);
-
-			const deferredDemo = page.locator('[data-demo="deferred-value"]');
-			await deferredDemo.getByRole('searchbox', { name: 'Search products' }).fill('camera');
-			await deferredDemo.locator('.search-updating').waitFor();
-			expect(await deferredDemo.locator('.product-result').count()).toBe(6);
-			await page.waitForFunction(
-				() =>
-					document.querySelectorAll('[data-demo="deferred-value"] .product-result').length === 2,
-			);
-			expect(await deferredDemo.locator('.product-result').allTextContents()).toEqual([
-				'Pocket cameraCategory: Photography',
-				'Camera shoulder bagCategory: Photography',
-			]);
-
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('the Core APIs form and portal events work after hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			await page.locator('#core-api-profile-name').fill('Grace Hopper');
-			await page.getByRole('button', { name: 'Save name' }).click();
-			await waitForLocatorText(page.locator('[data-demo="form"] button[type="submit"]'), 'Saving…');
-			await waitForLocatorText(
-				page.locator('[data-demo="form"] .form-result'),
-				'Saved Grace Hopper.',
-			);
-
-			const portalDemo = page.locator('[data-demo="portal"]');
-			await portalDemo.getByRole('button', { name: 'Show saved toast' }).click();
-			const portalToast = portalDemo.locator('.portal-demo-toast');
-			await portalToast.waitFor();
-			expect(await portalToast.evaluate((toast) => getComputedStyle(toast).display)).toBe('flex');
-			expect(
-				await portalDemo.evaluate((root) => {
-					const toast = root.querySelector('.portal-demo-toast');
-					return {
-						inTarget: root.querySelector('.portal-demo-layer')?.contains(toast) ?? false,
-						inLogicalParent: root.querySelector('.portal-demo-parent')?.contains(toast) ?? false,
-					};
-				}),
-			).toEqual({ inTarget: true, inLogicalParent: false });
-			await portalToast.getByRole('button', { name: 'Dismiss' }).click();
-			await waitForLocatorText(
-				portalDemo.locator('.portal-demo-result'),
-				'Clicks observed by the logical parent: 1',
-			);
-
-			expect(await page.locator('.api-index-card li > p').count()).toBe(0);
-			const badgeColors = await page
-				.locator('.api-index-card li > code')
-				.evaluateAll((badges) => badges.map((badge) => getComputedStyle(badge).color));
-			expect(new Set(badgeColors).size).toBe(1);
-
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('the embedded View Transitions controls run native transitions after hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			const demo = page.locator('[data-demo="view-transitions"]');
-			const supported = await page.evaluate(
-				() => typeof (document as any).startViewTransition === 'function',
-			);
-			expect(supported).toBe(true);
-
-			// Wrap the native API before the first hydrated interaction so this observes
-			// Octane's controller without replacing Chromium's snapshots or animations.
-			await page.evaluate(() => {
-				const original = (document as any).startViewTransition.bind(document);
-				(window as any).__octaneViewTransitionCalls = 0;
-				(window as any).__octaneViewTransitionFinished = Promise.resolve();
-				(document as any).startViewTransition = (update: unknown) => {
-					(window as any).__octaneViewTransitionCalls++;
-					const transition = original(update);
-					(window as any).__octaneViewTransitionFinished = transition.finished;
-					return transition;
-				};
-			});
-
-			const finishTransition = async (expectedCalls: number) => {
-				await page.waitForFunction(
-					(expected) => (window as any).__octaneViewTransitionCalls === expected,
-					expectedCalls,
-				);
-				await page.evaluate(() => (window as any).__octaneViewTransitionFinished);
-			};
-
-			const cardToggle = demo.locator('#vt-toggle-card');
-			await cardToggle.click();
-			await waitForLocatorText(cardToggle, 'Add card');
-			await finishTransition(1);
-
-			await demo.locator('#vt-toggle-hero').click();
-			await demo.locator('.vtdemo-hero-big').waitFor();
-			await finishTransition(2);
-
-			await demo.getByRole('tab', { name: 'Details' }).click();
-			await waitForLocatorText(demo.locator('.vtdemo-panel'), 'Details');
-			await finishTransition(3);
-
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('resets a new documentation page to the top without animating from the old section', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools');
-		try {
-			await page.click('.on-this-page a[href="#renderer-targets"]');
-			await page.waitForFunction(
-				() =>
-					location.hash === '#renderer-targets' &&
-					Math.abs(window.scrollY - (document.documentElement.scrollHeight - window.innerHeight)) <
-						2,
-				null,
-				{ timeout: 10_000 },
-			);
-			expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
-
-			await page.click('.sidebar-link[href="/docs/quick-start"]');
-			await page.waitForFunction(
-				() =>
-					location.pathname === '/docs/quick-start' &&
-					document.querySelector('.prose h1')?.textContent === 'Quick start',
-				null,
-				{ timeout: 10_000 },
-			);
-
-			// The new document is already at its initial position on its first
-			// rendered frame; it must not animate upward from the old page's anchor.
-			expect(await page.evaluate(() => scrollY)).toBe(0);
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('cancels a deferred mobile section jump when another docs page wins', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			await page.setViewportSize({ width: 390, height: 667 });
-			await page.click('.sidebar-mobile-toggle');
-			await page.waitForFunction(
-				() =>
-					document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-						'true' &&
-					getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
-			);
-
-			await page.click('.on-this-page a[href="#rspack"]');
-			// The first click intentionally starts collapsing the mobile panel. Fire
-			// the competing Link activation through the DOM so this cancellation
-			// test does not race Playwright's hit-testing against that CSS animation.
-			await page.locator('.sidebar-link[href="/docs/quick-start"]').dispatchEvent('click');
-			await page.waitForFunction(
-				() =>
-					location.pathname === '/docs/quick-start' &&
-					document.querySelector('.prose h1')?.textContent === 'Quick start',
-				null,
-				{ timeout: 10_000 },
-			);
-
-			// Let the superseded panel-close promise settle. It must not append the
-			// old page's section hash or move the replacement document afterward.
-			await page.waitForTimeout(400);
-			expect(await page.evaluate(() => location.hash)).toBe('');
-			expect(await page.evaluate(() => scrollY)).toBe(0);
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
-
-	it('keeps the mobile docs menu anchored and scrollable when expanded', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			await page.setViewportSize({ width: 390, height: 667 });
-			await page.evaluate(
-				() =>
-					new Promise<void>((resolve) =>
-						requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+				expect(await page.locator('.recharts-wrapper').count()).toBe(0);
+				expect(await page.locator('.bench-plot-shell').count()).toBe(0);
+				expect(await plots.count()).toBe(18);
+				// Hydration adopts the server-rendered chart node instead of replacing it.
+				expect(
+					await page.evaluate(
+						(original) => document.querySelector('.bench-card .bench-plot') === original,
+						serverPlot,
 					),
-			);
+				).toBe(true);
+				expect(
+					await firstPlot.evaluate((plot) => ({
+						bars: plot.querySelectorAll('.bench-fill').length,
+						widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
+							bar.getAttribute('style'),
+						),
+					})),
+				).toEqual(geometry);
+				expect(geometry.bars).toBeGreaterThan(0);
 
-			await page.evaluate(() => window.scrollTo({ top: 900, behavior: 'instant' }));
-			const closed = await page.evaluate(() => {
-				const header = document.querySelector<HTMLElement>('.topnav')!;
-				const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
-				return {
-					expanded: document.querySelector('.sidebar-mobile-toggle')!.getAttribute('aria-expanded'),
-					headerBottom: header.getBoundingClientRect().bottom,
-					position: getComputedStyle(sidebar).position,
-					sidebarTop: sidebar.getBoundingClientRect().top,
-				};
+				// The adopted card is live: picking another operation flips the pressed
+				// state of the picker it hydrated.
+				const firstOps = page.locator('.bench-card').first().locator('.bench-op');
+				await firstOps.nth(1).click();
+				await page.waitForFunction(
+					() =>
+						document
+							.querySelector('.bench-card .bench-op:nth-child(2)')
+							?.getAttribute('aria-pressed') === 'true',
+					null,
+					{ timeout: 5_000 },
+				);
+
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'the Core APIs state, list, and search events work after hydration',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+				waitForNetworkIdle: true,
 			});
-			expect(closed.expanded).toBe('false');
-			expect(closed.position).toBe('sticky');
-			expect(Math.abs(closed.sidebarTop - closed.headerBottom)).toBeLessThanOrEqual(2);
+			try {
+				const count = page.locator('.demo-count');
+				await waitForLocatorText(count, '0');
+				await page.getByRole('button', { name: 'Add one' }).click();
+				await waitForLocatorText(count, '1');
 
-			await page.click('.sidebar-mobile-toggle');
-			await page.waitForFunction(
-				() => {
-					const header = document.querySelector('.topnav')!.getBoundingClientRect();
-					const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
-					const panel = document.querySelector('.sidebar-panel')!.getBoundingClientRect();
-					const panelInner = document.querySelector<HTMLElement>('.sidebar-panel-inner')!;
-					const sidebarRect = sidebar.getBoundingClientRect();
-					const panelMaxHeight = Number.parseFloat(getComputedStyle(panelInner).maxHeight);
-					return (
+				const packingDemo = page.locator('[data-demo="lists"]');
+				const packingStatus = packingDemo.locator('.packing-summary');
+				const passport = packingDemo.getByRole('checkbox', { name: 'Passport' });
+				expect(await passport.isChecked()).toBe(false);
+				expect(await packingDemo.getByRole('button', { name: /^(Pack|Unpack) / }).count()).toBe(0);
+				await passport.check();
+				await waitForLocatorText(packingStatus, '2 of 3 packed');
+				expect(await passport.isChecked()).toBe(true);
+
+				await passport.blur();
+				await page.keyboard.press('/');
+				expect(await page.evaluate(() => document.activeElement?.id)).toBe('core-api-search');
+
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'the Core APIs async data and transition demos work after hydration',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+				waitForNetworkIdle: true,
+			});
+			try {
+				await page.getByRole('button', { name: 'Load profile' }).click();
+				await waitForLocatorText(
+					page.locator('[data-demo="data"] .data-loading'),
+					'Loading profile…',
+				);
+				await waitForLocatorText(
+					page.locator('[data-demo="data"] .profile-card strong'),
+					'Ada Lovelace',
+				);
+
+				const transitionDemo = page.locator('[data-demo="transition"]');
+				const overviewTab = transitionDemo.getByRole('tab', { name: 'Overview' });
+				const activityTab = transitionDemo.getByRole('tab', { name: 'Activity' });
+				const deploymentsTab = transitionDemo.getByRole('tab', { name: 'Deployments' });
+				expect(await overviewTab.getAttribute('aria-selected')).toBe('true');
+				expect(await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
+					await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
+				);
+				await activityTab.click();
+				await waitForLocatorText(
+					transitionDemo.locator('.transition-status'),
+					'Loading Activity — Overview stays on screen.',
+				);
+				expect(await transitionDemo.locator('[data-report]').getAttribute('data-report')).toBe(
+					'overview',
+				);
+				expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
+					await deploymentsTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
+				);
+				await transitionDemo.locator('[data-report="activity"]').waitFor();
+				await waitForLocatorText(
+					transitionDemo.locator('.transition-status'),
+					'Activity is ready.',
+				);
+				expect(await activityTab.getAttribute('aria-selected')).toBe('true');
+				expect(await activityTab.evaluate((tab) => getComputedStyle(tab).backgroundColor)).not.toBe(
+					await overviewTab.evaluate((tab) => getComputedStyle(tab).backgroundColor),
+				);
+
+				const deferredDemo = page.locator('[data-demo="deferred-value"]');
+				await deferredDemo.getByRole('searchbox', { name: 'Search products' }).fill('camera');
+				await deferredDemo.locator('.search-updating').waitFor();
+				expect(await deferredDemo.locator('.product-result').count()).toBe(6);
+				await page.waitForFunction(
+					() =>
+						document.querySelectorAll('[data-demo="deferred-value"] .product-result').length === 2,
+				);
+				expect(await deferredDemo.locator('.product-result').allTextContents()).toEqual([
+					'Pocket cameraCategory: Photography',
+					'Camera shoulder bagCategory: Photography',
+				]);
+
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'the Core APIs form and portal events work after hydration',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+				waitForNetworkIdle: true,
+			});
+			try {
+				await page.locator('#core-api-profile-name').fill('Grace Hopper');
+				await page.getByRole('button', { name: 'Save name' }).click();
+				await waitForLocatorText(
+					page.locator('[data-demo="form"] button[type="submit"]'),
+					'Saving…',
+				);
+				await waitForLocatorText(
+					page.locator('[data-demo="form"] .form-result'),
+					'Saved Grace Hopper.',
+				);
+
+				const portalDemo = page.locator('[data-demo="portal"]');
+				await portalDemo.getByRole('button', { name: 'Show saved toast' }).click();
+				const portalToast = portalDemo.locator('.portal-demo-toast');
+				await portalToast.waitFor();
+				expect(await portalToast.evaluate((toast) => getComputedStyle(toast).display)).toBe('flex');
+				expect(
+					await portalDemo.evaluate((root) => {
+						const toast = root.querySelector('.portal-demo-toast');
+						return {
+							inTarget: root.querySelector('.portal-demo-layer')?.contains(toast) ?? false,
+							inLogicalParent: root.querySelector('.portal-demo-parent')?.contains(toast) ?? false,
+						};
+					}),
+				).toEqual({ inTarget: true, inLogicalParent: false });
+				await portalToast.getByRole('button', { name: 'Dismiss' }).click();
+				await waitForLocatorText(
+					portalDemo.locator('.portal-demo-result'),
+					'Clicks observed by the logical parent: 1',
+				);
+
+				expect(await page.locator('.api-index-card li > p').count()).toBe(0);
+				const badgeColors = await page
+					.locator('.api-index-card li > code')
+					.evaluateAll((badges) => badges.map((badge) => getComputedStyle(badge).color));
+				expect(new Set(badgeColors).size).toBe(1);
+
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'the embedded View Transitions controls run native transitions after hydration',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+				waitForNetworkIdle: true,
+			});
+			try {
+				const demo = page.locator('[data-demo="view-transitions"]');
+				const supported = await page.evaluate(
+					() => typeof (document as any).startViewTransition === 'function',
+				);
+				expect(supported).toBe(true);
+
+				// Wrap the native API before the first hydrated interaction so this observes
+				// Octane's controller without replacing Chromium's snapshots or animations.
+				await page.evaluate(() => {
+					const original = (document as any).startViewTransition.bind(document);
+					(window as any).__octaneViewTransitionCalls = 0;
+					(window as any).__octaneViewTransitionFinished = Promise.resolve();
+					(document as any).startViewTransition = (update: unknown) => {
+						(window as any).__octaneViewTransitionCalls++;
+						const transition = original(update);
+						(window as any).__octaneViewTransitionFinished = transition.finished;
+						return transition;
+					};
+				});
+
+				const finishTransition = async (expectedCalls: number) => {
+					await page.waitForFunction(
+						(expected) => (window as any).__octaneViewTransitionCalls === expected,
+						expectedCalls,
+					);
+					await page.evaluate(() => (window as any).__octaneViewTransitionFinished);
+				};
+
+				const cardToggle = demo.locator('#vt-toggle-card');
+				await cardToggle.click();
+				await waitForLocatorText(cardToggle, 'Add card');
+				await finishTransition(1);
+
+				await demo.locator('#vt-toggle-hero').click();
+				await demo.locator('.vtdemo-hero-big').waitFor();
+				await finishTransition(2);
+
+				await demo.getByRole('tab', { name: 'Details' }).click();
+				await waitForLocatorText(demo.locator('.vtdemo-panel'), 'Details');
+				await finishTransition(3);
+
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'resets a new documentation page to the top without animating from the old section',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools');
+			try {
+				await page.click('.on-this-page a[href="#renderer-targets"]');
+				await page.waitForFunction(
+					() =>
+						location.hash === '#renderer-targets' &&
+						Math.abs(
+							window.scrollY - (document.documentElement.scrollHeight - window.innerHeight),
+						) < 2,
+					null,
+					{ timeout: 10_000 },
+				);
+				expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+
+				await page.click('.sidebar-link[href="/docs/quick-start"]');
+				await page.waitForFunction(
+					() =>
+						location.pathname === '/docs/quick-start' &&
+						document.querySelector('.prose h1')?.textContent === 'Quick start',
+					null,
+					{ timeout: 10_000 },
+				);
+
+				// The new document is already at its initial position on its first
+				// rendered frame; it must not animate upward from the old page's anchor.
+				expect(await page.evaluate(() => scrollY)).toBe(0);
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'cancels a deferred mobile section jump when another docs page wins',
+		async () => {
+			const { page, errors } = await loadRoute(
+				`http://localhost:${DEV_PORT}`,
+				'/docs/build-tools',
+				{
+					waitForNetworkIdle: true,
+				},
+			);
+			try {
+				await page.setViewportSize({ width: 390, height: 667 });
+				await page.click('.sidebar-mobile-toggle');
+				await page.waitForFunction(
+					() =>
 						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
 							'true' &&
-						getComputedStyle(sidebar).position === 'sticky' &&
-						Math.abs(sidebarRect.top - header.bottom) <= 2 &&
-						Math.abs(panel.top - sidebarRect.bottom) <= 2 &&
-						panel.bottom <= innerHeight + 1 &&
-						getComputedStyle(panelInner).overflowY === 'auto' &&
-						panelInner.clientHeight >= panelMaxHeight - 2 &&
-						panelInner.scrollHeight > panelInner.clientHeight
-					);
+						getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
+				);
+
+				await page.click('.on-this-page a[href="#rspack"]');
+				// The first click intentionally starts collapsing the mobile panel. Fire
+				// the competing Link activation through the DOM so this cancellation
+				// test does not race Playwright's hit-testing against that CSS animation.
+				await page.locator('.sidebar-link[href="/docs/quick-start"]').dispatchEvent('click');
+				await page.waitForFunction(
+					() =>
+						location.pathname === '/docs/quick-start' &&
+						document.querySelector('.prose h1')?.textContent === 'Quick start',
+					null,
+					{ timeout: 10_000 },
+				);
+
+				// Let the superseded panel-close promise settle. It must not append the
+				// old page's section hash or move the replacement document afterward.
+				await page.waitForTimeout(400);
+				expect(await page.evaluate(() => location.hash)).toBe('');
+				expect(await page.evaluate(() => scrollY)).toBe(0);
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'keeps the mobile docs menu anchored and scrollable when expanded',
+		async () => {
+			const { page, errors } = await loadRoute(
+				`http://localhost:${DEV_PORT}`,
+				'/docs/build-tools',
+				{
+					waitForNetworkIdle: true,
 				},
-				null,
-				{ timeout: 10_000 },
 			);
-			expect(await page.evaluate(() => scrollY)).toBe(900);
+			try {
+				await page.setViewportSize({ width: 390, height: 667 });
+				await page.evaluate(
+					() =>
+						new Promise<void>((resolve) =>
+							requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+						),
+				);
 
-			await page.evaluate(() => window.scrollTo({ top: 1200, behavior: 'instant' }));
-			const anchoredOpen = await page.evaluate(() => {
-				const header = document.querySelector('.topnav')!.getBoundingClientRect();
-				const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect();
-				const panel = document.querySelector('.sidebar-panel')!.getBoundingClientRect();
-				return {
-					headerBottom: header.bottom,
-					sidebarTop: sidebar.top,
-					sidebarBottom: sidebar.bottom,
-					panelTop: panel.top,
-				};
-			});
-			expect(Math.abs(anchoredOpen.sidebarTop - anchoredOpen.headerBottom)).toBeLessThanOrEqual(2);
-			expect(Math.abs(anchoredOpen.panelTop - anchoredOpen.sidebarBottom)).toBeLessThanOrEqual(2);
+				await page.evaluate(() => window.scrollTo({ top: 900, behavior: 'instant' }));
+				const closed = await page.evaluate(() => {
+					const header = document.querySelector<HTMLElement>('.topnav')!;
+					const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
+					return {
+						expanded: document
+							.querySelector('.sidebar-mobile-toggle')!
+							.getAttribute('aria-expanded'),
+						headerBottom: header.getBoundingClientRect().bottom,
+						position: getComputedStyle(sidebar).position,
+						sidebarTop: sidebar.getBoundingClientRect().top,
+					};
+				});
+				expect(closed.expanded).toBe('false');
+				expect(closed.position).toBe('sticky');
+				expect(Math.abs(closed.sidebarTop - closed.headerBottom)).toBeLessThanOrEqual(2);
 
-			await page.click('.on-this-page a[href="#rspack"]');
-			await page.waitForFunction(
-				() => {
+				await page.click('.sidebar-mobile-toggle');
+				await page.waitForFunction(
+					() => {
+						const header = document.querySelector('.topnav')!.getBoundingClientRect();
+						const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
+						const panel = document.querySelector('.sidebar-panel')!.getBoundingClientRect();
+						const panelInner = document.querySelector<HTMLElement>('.sidebar-panel-inner')!;
+						const sidebarRect = sidebar.getBoundingClientRect();
+						const panelMaxHeight = Number.parseFloat(getComputedStyle(panelInner).maxHeight);
+						return (
+							document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
+								'true' &&
+							getComputedStyle(sidebar).position === 'sticky' &&
+							Math.abs(sidebarRect.top - header.bottom) <= 2 &&
+							Math.abs(panel.top - sidebarRect.bottom) <= 2 &&
+							panel.bottom <= innerHeight + 1 &&
+							getComputedStyle(panelInner).overflowY === 'auto' &&
+							panelInner.clientHeight >= panelMaxHeight - 2 &&
+							panelInner.scrollHeight > panelInner.clientHeight
+						);
+					},
+					null,
+					{ timeout: 10_000 },
+				);
+				expect(await page.evaluate(() => scrollY)).toBe(900);
+
+				await page.evaluate(() => window.scrollTo({ top: 1200, behavior: 'instant' }));
+				const anchoredOpen = await page.evaluate(() => {
+					const header = document.querySelector('.topnav')!.getBoundingClientRect();
 					const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect();
-					const panel = document.querySelector<HTMLElement>('.sidebar-panel')!;
-					const panelInner = document
-						.querySelector('.sidebar-panel-inner')!
-						.getBoundingClientRect();
-					const target = document.querySelector('#rspack')!.getBoundingClientRect();
-					return (
-						location.hash === '#rspack' &&
-						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-							'false' &&
-						getComputedStyle(panel).visibility === 'hidden' &&
-						panelInner.height < 1 &&
-						target.top >= sidebar.bottom + 8 &&
-						target.top <= sidebar.bottom + 30
-					);
-				},
-				null,
-				{ timeout: 10_000 },
-			);
-			// The clicked row must remain current after the scroll-spy's post-scroll
-			// settle window releases its temporary click lock.
-			await page.waitForTimeout(400);
-			expect(
-				await page.locator('.on-this-page a[href="#rspack"]').getAttribute('aria-current'),
-			).toBe('true');
-			const real = errors.filter((error) => !error.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
+					const panel = document.querySelector('.sidebar-panel')!.getBoundingClientRect();
+					return {
+						headerBottom: header.bottom,
+						sidebarTop: sidebar.top,
+						sidebarBottom: sidebar.bottom,
+						panelTop: panel.top,
+					};
+				});
+				expect(Math.abs(anchoredOpen.sidebarTop - anchoredOpen.headerBottom)).toBeLessThanOrEqual(
+					2,
+				);
+				expect(Math.abs(anchoredOpen.panelTop - anchoredOpen.sidebarBottom)).toBeLessThanOrEqual(2);
 
-	it('the first router event after hydration does not remount the app', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
-			waitForNetworkIdle: true,
-		});
-		try {
-			// Let hydrateStart's post-networkidle tail (router match commit +
-			// hydrateRoot) finish before firing the event.
-			await page.waitForTimeout(500);
-			// A hash replaceState is the smallest router event: it reloads and bumps
-			// the router's loadedAt without changing matches. The hydrated tree must
-			// update in place — a remount would replace every DOM node (and lose all
-			// component state) on the first interaction after page load.
-			const survived = await page.evaluate(async () => {
-				const router = (window as any).__TSR_ROUTER__;
-				const before = router.stores.loadedAt.get() as number;
-				const header = document.querySelector('header');
-				const main = document.querySelector('main');
-				history.replaceState(history.state, '', '#post-hydration');
-				// Positive control: the router must actually process the event —
-				// without this the assertion could pass vacuously (event fired
-				// before the router subscribed to history).
-				const deadline = Date.now() + 5000;
-				while (router.stores.loadedAt.get() === before && Date.now() < deadline) {
-					await new Promise((resolve) => setTimeout(resolve, 25));
-				}
-				await new Promise((resolve) => setTimeout(resolve, 100));
-				return {
-					processed: router.stores.loadedAt.get() !== before,
-					header: document.querySelector('header') === header,
-					main: document.querySelector('main') === main,
-				};
+				await page.click('.on-this-page a[href="#rspack"]');
+				await page.waitForFunction(
+					() => {
+						const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect();
+						const panel = document.querySelector<HTMLElement>('.sidebar-panel')!;
+						const panelInner = document
+							.querySelector('.sidebar-panel-inner')!
+							.getBoundingClientRect();
+						const target = document.querySelector('#rspack')!.getBoundingClientRect();
+						return (
+							location.hash === '#rspack' &&
+							document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
+								'false' &&
+							getComputedStyle(panel).visibility === 'hidden' &&
+							panelInner.height < 1 &&
+							target.top >= sidebar.bottom + 8 &&
+							target.top <= sidebar.bottom + 30
+						);
+					},
+					null,
+					{ timeout: 10_000 },
+				);
+				// The clicked row must remain current after the scroll-spy's post-scroll
+				// settle window releases its temporary click lock.
+				await page.waitForTimeout(400);
+				expect(
+					await page.locator('.on-this-page a[href="#rspack"]').getAttribute('aria-current'),
+				).toBe('true');
+				const real = errors.filter((error) => !error.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'the first router event after hydration does not remount the app',
+		async () => {
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
+				waitForNetworkIdle: true,
 			});
-			expect(survived).toEqual({ processed: true, header: true, main: true });
-			const real = errors.filter((e) => !e.includes('Failed to load resource'));
-			expect(real).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
+			try {
+				// Let hydrateStart's post-networkidle tail (router match commit +
+				// hydrateRoot) finish before firing the event.
+				await page.waitForTimeout(500);
+				// A hash replaceState is the smallest router event: it reloads and bumps
+				// the router's loadedAt without changing matches. The hydrated tree must
+				// update in place — a remount would replace every DOM node (and lose all
+				// component state) on the first interaction after page load.
+				const survived = await page.evaluate(async () => {
+					const router = (window as any).__TSR_ROUTER__;
+					const before = router.stores.loadedAt.get() as number;
+					const header = document.querySelector('header');
+					const main = document.querySelector('main');
+					history.replaceState(history.state, '', '#post-hydration');
+					// Positive control: the router must actually process the event —
+					// without this the assertion could pass vacuously (event fired
+					// before the router subscribed to history).
+					const deadline = Date.now() + 5000;
+					while (router.stores.loadedAt.get() === before && Date.now() < deadline) {
+						await new Promise((resolve) => setTimeout(resolve, 25));
+					}
+					await new Promise((resolve) => setTimeout(resolve, 100));
+					return {
+						processed: router.stores.loadedAt.get() !== before,
+						header: document.querySelector('header') === header,
+						main: document.querySelector('main') === main,
+					};
+				});
+				expect(survived).toEqual({ processed: true, header: true, main: true });
+				const real = errors.filter((e) => !e.includes('Failed to load resource'));
+				expect(real).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
 
-	it('playground highlights every control-flow keyword in the compiled code', async () => {
-		await assertControlFlowKeywordMapping(`http://localhost:${DEV_PORT}`);
-	}, 45_000);
+	it.concurrent(
+		'playground highlights every control-flow keyword in the compiled code',
+		async () => {
+			await assertControlFlowKeywordMapping(`http://localhost:${DEV_PORT}`);
+		},
+		45_000,
+	);
 
 	// Editing a route and the router invalidates both the client and SSR module
 	// graphs. A full reload on that hot server must still hydrate through one
 	// current router graph. Keep this last: Vite's cache-busting timestamps stay
 	// in the server graph for the rest of its lifetime.
-	it('hydrates cleanly on reload after HMR edits (hot server)', async () => {
-		const files = [
-			join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
-			join(WEBSITE, 'src/router.ts'),
-		];
-		const originals = files.map((f) => readFileSync(f, 'utf8'));
-		const restore = () => files.forEach((f, i) => writeFileSync(f, originals[i]));
-		try {
-			// Prime the dev server's client + SSR module graphs and keep the page —
-			// with its live HMR websocket — OPEN while editing (the editing-session
-			// shape: the route is on screen while its files are edited). A plain
-			// navigation: this first visit may race Vite's dependency-optimization
-			// reload, which is irrelevant to the assertion below.
-			const primer = await browser.newPage();
-			await primer.goto(`http://localhost:${DEV_PORT}/benchmarks`, { waitUntil: 'networkidle' });
-
-			// Touch each file — every write triggers the paired `(client) hmr
-			// update` / full-reload + `(ssr) page reload` invalidations.
-			for (let i = 0; i < files.length; i++) {
-				writeFileSync(files[i], originals[i] + `\n// e2e-hmr-touch ${i}\n`);
-				await new Promise((r) => setTimeout(r, 700));
-			}
-			restore();
-			await new Promise((r) => setTimeout(r, 700));
-			await primer.close();
-
-			// A FULL reload after the edits must hydrate the route cleanly. Let the
-			// module fetches and Start router load finish before judging —
-			// hydration (and its mismatch warnings) lands well after `load` here.
-			const { page, errors, main } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
+	//
+	// `sequential` is load-bearing, not stylistic: this is the only case that
+	// edits files on disk, so it would corrupt any sibling sharing the dev server.
+	// Declared last, it runs once the concurrent batch above has drained.
+	it.sequential(
+		'hydrates cleanly on reload after HMR edits (hot server)',
+		async () => {
+			const files = [
+				join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
+				join(WEBSITE, 'src/router.ts'),
+			];
+			const originals = files.map((f) => readFileSync(f, 'utf8'));
+			const restore = () => files.forEach((f, i) => writeFileSync(f, originals[i]));
 			try {
-				await page.waitForLoadState('networkidle');
-				await page.waitForTimeout(500);
-				const real = errors.filter((e) => !e.includes('Failed to load resource'));
-				expect(real).toEqual([]);
-				expect(main).toContain('Benchmark');
+				// Prime the dev server's client + SSR module graphs and keep the page —
+				// with its live HMR websocket — OPEN while editing (the editing-session
+				// shape: the route is on screen while its files are edited). A plain
+				// navigation: this first visit may race Vite's dependency-optimization
+				// reload, which is irrelevant to the assertion below.
+				const primer = await browser.newPage();
+				await primer.goto(`http://localhost:${DEV_PORT}/benchmarks`, { waitUntil: 'networkidle' });
+
+				// Touch each file — every write triggers the paired `(client) hmr
+				// update` / full-reload + `(ssr) page reload` invalidations.
+				for (let i = 0; i < files.length; i++) {
+					writeFileSync(files[i], originals[i] + `\n// e2e-hmr-touch ${i}\n`);
+					await new Promise((r) => setTimeout(r, 700));
+				}
+				restore();
+				await new Promise((r) => setTimeout(r, 700));
+				await primer.close();
+
+				// A FULL reload after the edits must hydrate the route cleanly. Let the
+				// module fetches and Start router load finish before judging —
+				// hydration (and its mismatch warnings) lands well after `load` here.
+				const { page, errors, main } = await loadRoute(
+					`http://localhost:${DEV_PORT}`,
+					'/benchmarks',
+				);
+				try {
+					await page.waitForLoadState('networkidle');
+					await page.waitForTimeout(500);
+					const real = errors.filter((e) => !e.includes('Failed to load resource'));
+					expect(real).toEqual([]);
+					expect(main).toContain('Benchmark');
+				} finally {
+					await page.close();
+				}
 			} finally {
-				await page.close();
+				restore();
 			}
-		} finally {
-			restore();
-		}
-	}, 45_000);
+		},
+		45_000,
+	);
 });
 
+// The build and preview server are the project's, not this suite's: see
+// tests/setup/production-server.ts. One build now feeds both this pass and the
+// HTTP-level ssr-smoke spec.
+// Sequential suite, `it.concurrent` cases — same shape and same reason as the
+// dev suite above: page-per-case against one shared server, nothing here writes
+// to disk.
 describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
-	let server: ChildProcess;
-	let PREVIEW_PORT: number;
-	const vercelEnv = { NODE_ENV: 'production', NITRO_PRESET: 'vercel' };
-	const outputDir = join(WEBSITE, '.vercel/output');
+	const PREVIEW_ORIGIN = inject('productionOrigin');
+	const outputDir = inject('productionOutputDir');
 
-	beforeAll(async () => {
-		PREVIEW_PORT = await getFreePort();
-		await new Promise<void>((resolve, reject) => {
-			const build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
-				cwd: WEBSITE,
-				stdio: 'ignore',
-				env: { ...process.env, ...vercelEnv },
-			});
-			build.once('exit', (code) =>
-				code === 0 ? resolve() : reject(new Error(`vite build exited ${code}`)),
-			);
-		});
-		server = spawnServer(
-			[
-				'exec',
-				'vite',
-				'preview',
-				'--configLoader',
-				'runner',
-				'--port',
-				String(PREVIEW_PORT),
-				'--strictPort',
-			],
-			vercelEnv,
-		);
-		await waitForServer(server, `http://localhost:${PREVIEW_PORT}/`, 30_000);
-	}, 180_000);
-
-	afterAll(async () => {
-		await stop(server);
-	});
-
-	it('emits the Vercel Build Output API contract', () => {
+	it.concurrent('emits the Vercel Build Output API contract', () => {
 		const config = JSON.parse(readFileSync(join(outputDir, 'config.json'), 'utf8')) as {
 			version?: number;
 			routes?: Array<{
@@ -1450,35 +1422,43 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		expect(functionConfig.supportsResponseStreaming).toBe(true);
 	});
 
-	it.for(ROUTES)('%s renders and runs with no errors', { timeout: 30_000 }, async (route) => {
-		const { page, errors, main } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, route);
-		try {
-			expect(errors).toEqual([]);
-			expect(main.length).toBeGreaterThan(0);
-		} finally {
-			await page.close();
-		}
-	});
+	it.concurrent.for(ROUTES)(
+		'%s renders and runs with no errors',
+		{ timeout: 30_000 },
+		async (route) => {
+			const { page, errors, main } = await loadRoute(PREVIEW_ORIGIN, route);
+			try {
+				expect(errors).toEqual([]);
+				expect(main.length).toBeGreaterThan(0);
+			} finally {
+				await page.close();
+			}
+		},
+	);
 
-	it('keeps no-JS SSR and hydrated layout geometry identical', { timeout: 30_000 }, async () => {
-		const base = `http://localhost:${PREVIEW_PORT}`;
-		for (const route of ['/', '/docs', '/docs/core-apis']) {
-			const noJs = await measureRouteGeometry(base, route, false);
-			const hydrated = await measureRouteGeometry(base, route, true);
-			for (const key of Object.keys(noJs) as (keyof RouteGeometry)[]) {
-				const serverValue = noJs[key];
-				const clientValue = hydrated[key];
-				if (serverValue === null || clientValue === null) {
-					expect(clientValue, `${route} ${key}`).toBe(serverValue);
-				} else {
-					expect(Math.abs(clientValue - serverValue), `${route} ${key}`).toBeLessThan(1);
+	it.concurrent(
+		'keeps no-JS SSR and hydrated layout geometry identical',
+		{ timeout: 30_000 },
+		async () => {
+			const base = PREVIEW_ORIGIN;
+			for (const route of ['/', '/docs', '/docs/core-apis']) {
+				const noJs = await measureRouteGeometry(base, route, false);
+				const hydrated = await measureRouteGeometry(base, route, true);
+				for (const key of Object.keys(noJs) as (keyof RouteGeometry)[]) {
+					const serverValue = noJs[key];
+					const clientValue = hydrated[key];
+					if (serverValue === null || clientValue === null) {
+						expect(clientValue, `${route} ${key}`).toBe(serverValue);
+					} else {
+						expect(Math.abs(clientValue - serverValue), `${route} ${key}`).toBeLessThan(1);
+					}
 				}
 			}
-		}
-	});
+		},
+	);
 
-	it('client-side navigation works after hydration', { timeout: 30_000 }, async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/');
+	it.concurrent('client-side navigation works after hydration', { timeout: 30_000 }, async () => {
+		const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/');
 		try {
 			await page.click('a.nav-link[href="/benchmarks"]');
 			await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
@@ -1493,527 +1473,644 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	});
 
-	it('playground compiles, runs, and handles an event inside its sandbox', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			const preview = page.frameLocator('iframe[title="Playground preview"]');
-			const heading = preview.locator('h2');
-			await waitForLocatorText(heading, 'Count: 0', 20_000);
-			await preview.getByRole('button', { name: 'Increment' }).click();
-			await waitForLocatorText(heading, 'Count: 1');
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
+	it.concurrent(
+		'playground compiles, runs, and handles an event inside its sandbox',
+		async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				const preview = page.frameLocator('iframe[title="Playground preview"]');
+				const heading = preview.locator('h2');
+				await waitForLocatorText(heading, 'Count: 0', 20_000);
+				await preview.getByRole('button', { name: 'Increment' }).click();
+				await waitForLocatorText(heading, 'Count: 1');
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
 
-	it('playground reveals and pins source AST ranges from the mobile controls', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
-		try {
-			await page.setViewportSize({ width: 390, height: 667 });
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			const source = page.locator('.pg-panel[aria-label="Source editor"] .cm-content');
-			// Mobile reflow can move fixed coordinates onto whitespace. Select
-			// the visible useState call so Inspect always has a real AST range.
-			await source.getByText('useState', { exact: true }).nth(1).click();
-			await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
-			// Inspect opens the compiled CODE view, same as desktop; the AST is
-			// one switch away, and switching reveals what the editor selected.
-			await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
-			// Browsers may deliver the source editor's mouseleave after its mobile
-			// panel is hidden. It must not clear the AST node we just revealed.
-			await source.dispatchEvent('mouseleave');
+	it.concurrent(
+		'playground reveals and pins source AST ranges from the mobile controls',
+		async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+			try {
+				await page.setViewportSize({ width: 390, height: 667 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				const source = page.locator('.pg-panel[aria-label="Source editor"] .cm-content');
+				// Mobile reflow can move fixed coordinates onto whitespace. Select
+				// the visible useState call so Inspect always has a real AST range.
+				await source.getByText('useState', { exact: true }).nth(1).click();
+				await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
+				// Inspect opens the compiled CODE view, same as desktop; the AST is
+				// one switch away, and switching reveals what the editor selected.
+				await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
+				// Browsers may deliver the source editor's mouseleave after its mobile
+				// panel is hidden. It must not clear the AST node we just revealed.
+				await source.dispatchEvent('mouseleave');
 
-			const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
-			await leaf.waitFor({ timeout: 10_000 });
-			await leaf.locator(':scope > details > summary').click();
-			await page.waitForFunction(
-				() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),
-				null,
-				{ timeout: 10_000 },
-			);
-
-			await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
-			await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
-			// CodeMirror may split one logical marked range across lines and
-			// syntax spans. The observable contract is that the pinned source
-			// range remains visibly highlighted after returning to the editor.
-			await page.waitForFunction(
-				() =>
-					Array.from(
-						document.querySelectorAll('.pg-panel[aria-label="Source editor"] .cm-mapped'),
-					).some((mark) => getComputedStyle(mark).backgroundColor === 'rgba(255, 234, 0, 0.42)'),
-				null,
-				{ timeout: 10_000 },
-			);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 45_000);
-
-	it('playground selects client, server, types, and parsed code or AST output', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			const outputIncludes = (needle: string) =>
-				page.waitForFunction(
-					(text) =>
-						(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
-							text,
-						),
-					needle,
-					{ timeout: 15_000 },
+				const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
+				await leaf.waitFor({ timeout: 10_000 });
+				await leaf.locator(':scope > details > summary').click();
+				await page.waitForFunction(
+					() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),
+					null,
+					{ timeout: 10_000 },
 				);
-			// Click the Nth occurrence of a token inside an editor pane (Shiki
-			// splits tokens into their own spans, so search per text node). The
-			// rect is measured after a double rAF: CodeMirror applies a prior
-			// reveal's scroll in a DEFERRED measure phase, and clicking a rect
-			// captured before that flush lands on whatever scrolled into the
-			// stale coordinates (a CI-speed flake). A token outside the
-			// scroller's visible box resolves null instead of clicking through.
-			const tokenPoint = async (paneIndex: number, token: string, occurrence: number) => {
-				const point = await page.evaluate(
-					([index, needle, wanted]) =>
-						new Promise<{ x: number; y: number } | null>((resolve) =>
-							requestAnimationFrame(() =>
-								requestAnimationFrame(() => {
-									const content =
-										document.querySelectorAll('.pg-editor .cm-content')[index as number];
-									const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-									let seen = 0;
-									while (walker.nextNode()) {
-										const node = walker.currentNode;
-										let at = -1;
-										while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
-											if (++seen < (wanted as number)) continue;
-											const range = document.createRange();
-											range.setStart(node, at + 1);
-											range.setEnd(node, at + 2);
-											const rect = range.getBoundingClientRect();
-											const scroller = content.closest('.cm-scroller')!.getBoundingClientRect();
-											if (rect.top < scroller.top || rect.bottom > scroller.bottom) {
-												return resolve(null);
-											}
-											return resolve({
-												x: rect.x + rect.width / 2,
-												y: rect.y + rect.height / 2,
-											});
-										}
-									}
-									resolve(null);
-								}),
-							),
-						),
-					[paneIndex, token, occurrence] as const,
-				);
-				expect(
-					point,
-					`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
-				).not.toBeNull();
-				return point!;
-			};
-			// CodeMirror renders only the lines around its scroll position, so a
-			// token scrolled far out of view is not in the DOM to be found at all.
-			// Rewind the pane before hunting for one.
-			const rewindPane = (paneIndex: number) =>
-				page.evaluate((index) => {
-					const scroller = document
-						.querySelectorAll('.pg-editor .cm-content')
-						[index as number]?.closest('.cm-scroller');
-					if (scroller) scroller.scrollTop = 0;
-				}, paneIndex);
-			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
-				const point = await tokenPoint(paneIndex, token, occurrence);
-				await page.mouse.click(point.x, point.y);
-			};
-			const hoverToken = async (paneIndex: number, token: string, occurrence: number) => {
-				const point = await tokenPoint(paneIndex, token, occurrence);
-				await page.mouse.move(point.x, point.y);
-			};
-			// One authored range can emit several times (a mount and an update
-			// binding, an open and a close tag), so assert that the token IS
-			// highlighted rather than that it is the first highlight.
-			const mappedAnywhere = (paneIndex: number, token: string) =>
-				page.waitForFunction(
-					([index, text]) =>
+
+				await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
+				await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
+				// CodeMirror may split one logical marked range across lines and
+				// syntax spans. The observable contract is that the pinned source
+				// range remains visibly highlighted after returning to the editor.
+				await page.waitForFunction(
+					() =>
 						Array.from(
+							document.querySelectorAll('.pg-panel[aria-label="Source editor"] .cm-mapped'),
+						).some((mark) => getComputedStyle(mark).backgroundColor === 'rgba(255, 234, 0, 0.42)'),
+					null,
+					{ timeout: 10_000 },
+				);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		45_000,
+	);
+
+	it.concurrent(
+		'playground selects client, server, types, and parsed code or AST output',
+		async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				const outputIncludes = (needle: string) =>
+					page.waitForFunction(
+						(text) =>
+							(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+								text,
+							),
+						needle,
+						{ timeout: 15_000 },
+					);
+				// Click the Nth occurrence of a token inside an editor pane (Shiki
+				// splits tokens into their own spans, so search per text node). The
+				// rect is measured after a double rAF: CodeMirror applies a prior
+				// reveal's scroll in a DEFERRED measure phase, and clicking a rect
+				// captured before that flush lands on whatever scrolled into the
+				// stale coordinates (a CI-speed flake). A token outside the
+				// scroller's visible box resolves null instead of clicking through.
+				const tokenPoint = async (paneIndex: number, token: string, occurrence: number) => {
+					const point = await page.evaluate(
+						([index, needle, wanted]) =>
+							new Promise<{ x: number; y: number } | null>((resolve) =>
+								requestAnimationFrame(() =>
+									requestAnimationFrame(() => {
+										const content =
+											document.querySelectorAll('.pg-editor .cm-content')[index as number];
+										const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+										let seen = 0;
+										while (walker.nextNode()) {
+											const node = walker.currentNode;
+											let at = -1;
+											while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
+												if (++seen < (wanted as number)) continue;
+												const range = document.createRange();
+												range.setStart(node, at + 1);
+												range.setEnd(node, at + 2);
+												const rect = range.getBoundingClientRect();
+												const scroller = content.closest('.cm-scroller')!.getBoundingClientRect();
+												if (rect.top < scroller.top || rect.bottom > scroller.bottom) {
+													return resolve(null);
+												}
+												return resolve({
+													x: rect.x + rect.width / 2,
+													y: rect.y + rect.height / 2,
+												});
+											}
+										}
+										resolve(null);
+									}),
+								),
+							),
+						[paneIndex, token, occurrence] as const,
+					);
+					expect(
+						point,
+						`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
+					).not.toBeNull();
+					return point!;
+				};
+				// CodeMirror renders only the lines around its scroll position, so a
+				// token scrolled far out of view is not in the DOM to be found at all.
+				// Rewind the pane before hunting for one.
+				const rewindPane = (paneIndex: number) =>
+					page.evaluate((index) => {
+						const scroller = document
+							.querySelectorAll('.pg-editor .cm-content')
+							[index as number]?.closest('.cm-scroller');
+						if (scroller) scroller.scrollTop = 0;
+					}, paneIndex);
+				const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+					const point = await tokenPoint(paneIndex, token, occurrence);
+					await page.mouse.click(point.x, point.y);
+				};
+				const hoverToken = async (paneIndex: number, token: string, occurrence: number) => {
+					const point = await tokenPoint(paneIndex, token, occurrence);
+					await page.mouse.move(point.x, point.y);
+				};
+				// One authored range can emit several times (a mount and an update
+				// binding, an open and a close tag), so assert that the token IS
+				// highlighted rather than that it is the first highlight.
+				const mappedAnywhere = (paneIndex: number, token: string) =>
+					page.waitForFunction(
+						([index, text]) =>
+							Array.from(
+								document
+									.querySelectorAll('.pg-editor .cm-content')
+									[index as number]?.querySelectorAll('.cm-mapped') ?? [],
+							).some((mark) => mark.textContent === text),
+						[paneIndex, token] as const,
+						{ timeout: 10_000 },
+					);
+				const mappedIn = (paneIndex: number, token: string) =>
+					page.waitForFunction(
+						([index, text]) =>
 							document
 								.querySelectorAll('.pg-editor .cm-content')
-								[index as number]?.querySelectorAll('.cm-mapped') ?? [],
-						).some((mark) => mark.textContent === text),
-					[paneIndex, token] as const,
-					{ timeout: 10_000 },
-				);
-			const mappedIn = (paneIndex: number, token: string) =>
-				page.waitForFunction(
-					([index, text]) =>
-						document
-							.querySelectorAll('.pg-editor .cm-content')
-							[index as number]?.querySelector('.cm-mapped')?.textContent === text,
-					[paneIndex, token] as const,
-					{ timeout: 10_000 },
-				);
-			// Client code is the default compiled artifact. Server and Types use
-			// the same output selector; Parsed exists only for AST inspection.
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			const outputSelector = page.locator('[aria-label="Compiler output"]');
-			const outputFormat = page.locator('[aria-label="Output format"]');
-			await outputIncludes("from 'octane'");
-			expect(await outputSelector.inputValue()).toBe('client');
-			expect(await outputSelector.locator('option').allTextContents()).toEqual([
-				'Client',
-				'Server',
-				'Types',
-			]);
-			expect(await outputFormat.locator('button.active', { hasText: 'Code' }).count()).toBe(1);
-			// Client and Server code map through the compiler's inspection
-			// segments, the same as Types does through the Volar token map. WHICH
-			// nodes resolve is pinned per node, against the same Counter example,
-			// in playground-mapping.test.ts; what this proves is that the wiring
-			// reaches the runtime targets at all.
-			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
-			await mappedAnywhere(1, 'useState');
-			await mappedAnywhere(0, 'useState');
-			await outputSelector.selectOption('server');
-			await outputIncludes("from 'octane/server'");
-			await clickToken(0, 'useState', 2);
-			await mappedAnywhere(1, 'useState');
-			await outputSelector.selectOption('types');
-			await outputIncludes('@jsxImportSource octane');
-			await rewindPane(1);
-			// Clicking a source token reveals the mapped token in Types code…
-			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
-			await mappedIn(1, 'useState');
-			// …and hovering the output maps back into the source too.
-			await hoverToken(1, 'setCount', 1);
-			await mappedIn(0, 'setCount');
-			await mappedIn(1, 'setCount');
-			// Clicking keeps that bidirectional mapping and scrolls it into view.
-			await clickToken(1, 'setCount', 1);
-			await mappedIn(0, 'setCount');
-
-			await outputFormat.locator('button', { hasText: 'AST' }).click();
-			await page.locator('.pg-ast-tree').waitFor();
-			expect(await outputSelector.locator('option').allTextContents()).toEqual([
-				'Client',
-				'Server',
-				'Types',
-				'Parsed',
-			]);
-			// The Types AST reveals the deepest node containing the cursor.
-			await clickToken(0, 'useState', 2);
-			await page.waitForFunction(
-				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
-				null,
-				{ timeout: 10_000 },
-			);
-			expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
-			expect(await page.locator('.cm-mapped').count()).toBe(1);
-			await page.waitForFunction(
-				() =>
-					getComputedStyle(document.querySelector('.pg-editor .cm-mapped')!).backgroundColor ===
-					'rgba(255, 234, 0, 0.42)',
-				null,
-				{ timeout: 10_000 },
-			);
-			// Client AST exposes the final Program plus template IR. Template
-			// origins keep the selected static tag in authored-source coordinates.
-			await outputSelector.selectOption('client');
-			await hoverToken(0, 'button', 1);
-			await mappedIn(0, 'button');
-			expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
-			await outputSelector.selectOption('server');
-			await page
-				.getByText('The final server-rendering Program. Tap a node to pin its highlight.')
-				.waitFor();
-			await outputSelector.selectOption('source');
-			await page
-				.getByText('The parser tree for the authored source. Tap a node to pin its highlight.')
-				.waitFor();
-			// Parsed has no code form, so switching to Code falls back to the
-			// most common output: Client.
-			await outputFormat.locator('button', { hasText: 'Code' }).click();
-			expect(await outputSelector.inputValue()).toBe('client');
-			expect(await outputSelector.locator('option', { hasText: 'Parsed' }).count()).toBe(0);
-			await outputIncludes("from 'octane'");
-			// A cached Types document must not retain an AST source highlight.
-			await outputSelector.selectOption('types');
-			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
-				timeout: 5_000,
-			});
-			// Switching to Preview clears every mark; Compiled returns clean.
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
-			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
-				timeout: 5_000,
-			});
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await outputIncludes('@jsxImportSource octane');
-			// A broken edit clears both marks and replaces the typed document
-			// with the current parser error instead of leaving stale output.
-			await clickToken(0, 'useState', 2);
-			await mappedIn(1, 'useState');
-			await page.keyboard.type('{');
-			await page.locator('.pg-error').waitFor({ timeout: 10_000 });
-			await page.waitForFunction(
-				() => {
-					const out = document.querySelectorAll('.pg-editor .cm-content')[1];
-					return (
-						!!out &&
-						!out.querySelector('.cm-mapped') &&
-						(out.textContent ?? '').includes('// Types generation failed:')
+								[index as number]?.querySelector('.cm-mapped')?.textContent === text,
+						[paneIndex, token] as const,
+						{ timeout: 10_000 },
 					);
-				},
-				null,
-				{ timeout: 10_000 },
-			);
-			// A failed AST generation replaces the prior tree and cannot map
-			// source hover through its stale ranges.
-			await outputFormat.locator('button', { hasText: 'AST' }).click();
-			await page
-				.getByText('AST generation failed. Fix the source to generate a new tree.')
-				.waitFor();
-			expect(await page.locator('.pg-ast-tree').count()).toBe(0);
-			await hoverToken(0, 'import', 1);
-			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
-				timeout: 5_000,
-			});
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 45_000);
+				// Client code is the default compiled artifact. Server and Types use
+				// the same output selector; Parsed exists only for AST inspection.
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+				const outputSelector = page.locator('[aria-label="Compiler output"]');
+				const outputFormat = page.locator('[aria-label="Output format"]');
+				await outputIncludes("from 'octane'");
+				expect(await outputSelector.inputValue()).toBe('client');
+				expect(await outputSelector.locator('option').allTextContents()).toEqual([
+					'Client',
+					'Server',
+					'Types',
+				]);
+				expect(await outputFormat.locator('button.active', { hasText: 'Code' }).count()).toBe(1);
+				// Client and Server code map through the compiler's inspection
+				// segments, the same as Types does through the Volar token map. WHICH
+				// nodes resolve is pinned per node, against the same Counter example,
+				// in playground-mapping.test.ts; what this proves is that the wiring
+				// reaches the runtime targets at all.
+				await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+				await mappedAnywhere(1, 'useState');
+				await mappedAnywhere(0, 'useState');
+				await outputSelector.selectOption('server');
+				await outputIncludes("from 'octane/server'");
+				await clickToken(0, 'useState', 2);
+				await mappedAnywhere(1, 'useState');
+				await outputSelector.selectOption('types');
+				await outputIncludes('@jsxImportSource octane');
+				await rewindPane(1);
+				// Clicking a source token reveals the mapped token in Types code…
+				await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+				await mappedIn(1, 'useState');
+				// …and hovering the output maps back into the source too.
+				await hoverToken(1, 'setCount', 1);
+				await mappedIn(0, 'setCount');
+				await mappedIn(1, 'setCount');
+				// Clicking keeps that bidirectional mapping and scrolls it into view.
+				await clickToken(1, 'setCount', 1);
+				await mappedIn(0, 'setCount');
 
-	it('playground keeps both panel heads the same height in every mode', async () => {
-		// The compiled pane's head carries a select and a segmented control; the
-		// source pane's carries text. Letting the taller one size the row makes
-		// the layout jump on every Preview↔Compiled switch, so both reserve that
-		// height from the start.
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			const heights = () =>
-				page.evaluate(() =>
-					Array.from(document.querySelectorAll('.pg-panel-head')).map((head) =>
-						Math.round(head.getBoundingClientRect().height),
-					),
+				await outputFormat.locator('button', { hasText: 'AST' }).click();
+				await page.locator('.pg-ast-tree').waitFor();
+				expect(await outputSelector.locator('option').allTextContents()).toEqual([
+					'Client',
+					'Server',
+					'Types',
+					'Parsed',
+				]);
+				// The Types AST reveals the deepest node containing the cursor.
+				await clickToken(0, 'useState', 2);
+				await page.waitForFunction(
+					() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
+					null,
+					{ timeout: 10_000 },
 				);
-			const inPreview = await heights();
-			expect(inPreview.length).toBe(2);
-			expect(inPreview[0], `preview heads differ: ${JSON.stringify(inPreview)}`).toBe(inPreview[1]);
+				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
+				expect(await page.locator('.cm-mapped').count()).toBe(1);
+				await page.waitForFunction(
+					() =>
+						getComputedStyle(document.querySelector('.pg-editor .cm-mapped')!).backgroundColor ===
+						'rgba(255, 234, 0, 0.42)',
+					null,
+					{ timeout: 10_000 },
+				);
+				// Client AST exposes the final Program plus template IR. Template
+				// origins keep the selected static tag in authored-source coordinates.
+				await outputSelector.selectOption('client');
+				await hoverToken(0, 'button', 1);
+				await mappedIn(0, 'button');
+				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
+				await outputSelector.selectOption('server');
+				await page
+					.getByText('The final server-rendering Program. Tap a node to pin its highlight.')
+					.waitFor();
+				await outputSelector.selectOption('source');
+				await page
+					.getByText('The parser tree for the authored source. Tap a node to pin its highlight.')
+					.waitFor();
+				// Parsed has no code form, so switching to Code falls back to the
+				// most common output: Client.
+				await outputFormat.locator('button', { hasText: 'Code' }).click();
+				expect(await outputSelector.inputValue()).toBe('client');
+				expect(await outputSelector.locator('option', { hasText: 'Parsed' }).count()).toBe(0);
+				await outputIncludes("from 'octane'");
+				// A cached Types document must not retain an AST source highlight.
+				await outputSelector.selectOption('types');
+				await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+					timeout: 5_000,
+				});
+				// Switching to Preview clears every mark; Compiled returns clean.
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
+				await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+					timeout: 5_000,
+				});
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+				await outputIncludes('@jsxImportSource octane');
+				// A broken edit clears both marks and replaces the typed document
+				// with the current parser error instead of leaving stale output.
+				await clickToken(0, 'useState', 2);
+				await mappedIn(1, 'useState');
+				await page.keyboard.type('{');
+				await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+				await page.waitForFunction(
+					() => {
+						const out = document.querySelectorAll('.pg-editor .cm-content')[1];
+						return (
+							!!out &&
+							!out.querySelector('.cm-mapped') &&
+							(out.textContent ?? '').includes('// Types generation failed:')
+						);
+					},
+					null,
+					{ timeout: 10_000 },
+				);
+				// A failed AST generation replaces the prior tree and cannot map
+				// source hover through its stale ranges.
+				await outputFormat.locator('button', { hasText: 'AST' }).click();
+				await page
+					.getByText('AST generation failed. Fix the source to generate a new tree.')
+					.waitFor();
+				expect(await page.locator('.pg-ast-tree').count()).toBe(0);
+				await hoverToken(0, 'import', 1);
+				await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+					timeout: 5_000,
+				});
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		45_000,
+	);
 
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await page.locator('[aria-label="Compiler output"]').waitFor();
-			const inCompiled = await heights();
-			expect(inCompiled[0], `compiled heads differ: ${JSON.stringify(inCompiled)}`).toBe(
-				inCompiled[1],
-			);
-			// And switching modes must not resize the row at all.
-			expect(inCompiled).toEqual(inPreview);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 45_000);
+	it.concurrent(
+		'playground keeps both panel heads the same height in every mode',
+		async () => {
+			// The compiled pane's head carries a select and a segmented control; the
+			// source pane's carries text. Letting the taller one size the row makes
+			// the layout jump on every Preview↔Compiled switch, so both reserve that
+			// height from the start.
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				const heights = () =>
+					page.evaluate(() =>
+						Array.from(document.querySelectorAll('.pg-panel-head')).map((head) =>
+							Math.round(head.getBoundingClientRect().height),
+						),
+					);
+				const inPreview = await heights();
+				expect(inPreview.length).toBe(2);
+				expect(inPreview[0], `preview heads differ: ${JSON.stringify(inPreview)}`).toBe(
+					inPreview[1],
+				);
 
-	it('playground highlights every control-flow keyword in the compiled code', async () => {
-		await assertControlFlowKeywordMapping(`http://localhost:${PREVIEW_PORT}`);
-	}, 45_000);
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+				await page.locator('[aria-label="Compiler output"]').waitFor();
+				const inCompiled = await heights();
+				expect(inCompiled[0], `compiled heads differ: ${JSON.stringify(inCompiled)}`).toBe(
+					inCompiled[1],
+				);
+				// And switching modes must not resize the row at all.
+				expect(inCompiled).toEqual(inPreview);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		45_000,
+	);
 
-	it('playground refreshes the active AST when another workspace file fails', async () => {
-		const appSource =
-			"import { value } from './Value';\nexport default function App() @{ <p>{'Value: ' + value}</p> }";
-		const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-		const hash = encodePlaygroundHash({
-			lang: 'tsrx',
-			entry: 'App.tsrx',
-			files: [
-				{
-					name: 'App.tsrx',
-					source: appSource,
-				},
-				{ name: 'Value.tsrx', source: 'export const value = 1;' },
-			],
-		});
-		const { page, errors } = await loadRoute(
-			`http://localhost:${PREVIEW_PORT}`,
-			`/playground#${hash}`,
-		);
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
-			await page.locator('.pg-ast-tree').waitFor();
+	it.concurrent(
+		'playground highlights every control-flow keyword in the compiled code',
+		async () => {
+			await assertControlFlowKeywordMapping(PREVIEW_ORIGIN);
+		},
+		45_000,
+	);
 
-			// Break an inactive dependency so the runnable module graph fails.
-			await page.locator('.pg-tab', { hasText: 'Value.tsrx' }).click();
-			await page.locator('.pg-editor .cm-content').first().click();
-			await page.keyboard.press(selectAll);
-			await page.keyboard.type('export const value = ;');
-			await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+	// A hover highlight has to survive the compile that finishes AFTER it.
+	// `.pg-grid.ready` goes up while compileAndRun is still awaiting its module
+	// graph, so the compile's showOutput() lands a few hundred milliseconds into
+	// an interactive pane — with a pointer possibly already resting on a mapped
+	// keyword. showOutput() used to clear the mark pair unconditionally, before
+	// deciding the artifact was unchanged and returning without touching a
+	// document; since only mousemove restores marks and the pointer never moved,
+	// the highlight stayed gone until the reader jiggled the mouse. Hold the
+	// pointer still across that window and require the mark to still be there.
+	it.concurrent(
+		'playground keeps a hover highlight through the compile that follows it',
+		async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
 
-			// The active App source still has a valid compiler AST. Editing it
-			// briefly invalidates the tree, then must restore it even though the
-			// dependency keeps the module graph in its failed state.
-			await page.locator('.pg-tab', { hasText: 'App.tsrx' }).click();
-			await page.locator('.pg-ast-tree').waitFor();
-			await page.locator('.pg-editor .cm-content').first().click();
-			await page.keyboard.press(selectAll);
-			await page.keyboard.type(appSource + '\n');
-			await page.getByText('Waiting for the next successful compile…').waitFor({ timeout: 5_000 });
-			await page.locator('.pg-ast-tree').waitFor({ timeout: 10_000 });
-			expect(await page.locator('.pg-error').count()).toBe(1);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
+				const marked = () =>
+					page.evaluate(() =>
+						Array.from(
+							document
+								.querySelectorAll('.pg-editor .cm-content')[0]
+								?.querySelectorAll('.cm-mapped') ?? [],
+						).map((mark) => mark.textContent),
+					);
+				const point = await page.evaluate(async () => {
+					const find = () => {
+						const content = document.querySelectorAll('.pg-editor .cm-content')[0];
+						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+						while (walker.nextNode()) {
+							const at = walker.currentNode.textContent!.indexOf('@if');
+							if (at !== -1) return { node: walker.currentNode, at };
+						}
+						return null;
+					};
+					if (!find()) return null;
+					(find()!.node.parentElement as HTMLElement)?.scrollIntoView({
+						block: 'center',
+						behavior: 'instant',
+					});
+					await new Promise((resolve) =>
+						requestAnimationFrame(() => requestAnimationFrame(resolve)),
+					);
+					const hit = find();
+					if (!hit) return null;
+					const range = document.createRange();
+					range.setStart(hit.node, hit.at + 1);
+					range.setEnd(hit.node, hit.at + 2);
+					const rect = range.getBoundingClientRect();
+					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+				});
+				expect(point, '@if not found in the source pane').not.toBeNull();
 
-	it('playground shows compiler warnings without treating runnable code as an error', async () => {
-		const source = `export function App() @{ <input onChange={() => {}} /> }`;
-		const hash = encodePlaygroundHash({
-			lang: 'tsrx',
-			entry: 'App.tsrx',
-			files: [{ name: 'App.tsrx', source }],
-		});
-		const { page, errors } = await loadRoute(
-			`http://localhost:${PREVIEW_PORT}`,
-			`/playground#${hash}`,
-		);
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			const warnings = page.getByRole('region', { name: 'Compiler warnings' });
-			await warnings.waitFor();
-			expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
-			expect(await warnings.textContent()).toContain('App.tsrx:1:');
-			expect(await page.locator('.pg-error').count()).toBe(0);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 30_000);
+				await page.mouse.move(0, 0);
+				await page.mouse.move(point!.x, point!.y);
+				await page.waitForFunction(
+					() =>
+						Array.from(
+							document
+								.querySelectorAll('.pg-editor .cm-content')[0]
+								?.querySelectorAll('.cm-mapped') ?? [],
+						).some((mark) => mark.textContent === '@if'),
+					null,
+					{ timeout: 5_000 },
+				);
 
-	it('playground runs a multi-file example selected from the dropdown', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			// The tab strip is absent for the single-file default…
-			expect(await page.locator('.pg-tabs').count()).toBe(0);
-			await page.selectOption('.pg-select', 'parallel-use');
-			// …and appears with one tab per virtual file for the example.
-			await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).waitFor({ timeout: 10_000 });
-			const preview = page.frameLocator('iframe[title="Playground preview"]');
-			// Both fake fetches resolve through the sibling module (no network).
-			await preview.locator('body').getByText('City: Reykjavík (1)').waitFor({ timeout: 20_000 });
-			// Switching tabs swaps the editor buffer to the sibling file.
-			await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).click();
-			await page.waitForFunction(
-				() =>
-					document
-						.querySelector('.pg-editor .cm-content')
-						?.textContent?.includes('fetchForecast') ?? false,
-				null,
-				{ timeout: 10_000 },
-			);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 45_000);
+				// Comfortably past the observed clear window (~150-750ms after hover),
+				// with the pointer untouched.
+				await page.waitForTimeout(1_500);
+				expect(
+					await marked(),
+					'the hover highlight was cleared while the pointer never moved',
+				).toContain('@if');
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
 
-	it('playground Format button reprints the active file with Prettier', async () => {
-		const source = `export default function App() @{ <button onClick={()=>{}}>go</button> }`;
-		const hash = encodePlaygroundHash({
-			lang: 'tsrx',
-			entry: 'App.tsrx',
-			files: [{ name: 'App.tsrx', source }],
-		});
-		const { page, errors } = await loadRoute(
-			`http://localhost:${PREVIEW_PORT}`,
-			`/playground#${hash}`,
-		);
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			await page.click('.pg-format');
-			// Prettier normalizes the squashed arrow — formatting works even while
-			// the shared payload is still consent-gated (it never executes code).
-			await page.waitForFunction(
-				() =>
-					document
-						.querySelector('.pg-editor .cm-content')
-						?.textContent?.includes('onClick={() => {}}') ?? false,
-				null,
-				{ timeout: 15_000 },
-			);
-			expect(await page.locator('.pg-error').count()).toBe(0);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 45_000);
+	it.concurrent(
+		'playground refreshes the active AST when another workspace file fails',
+		async () => {
+			const appSource =
+				"import { value } from './Value';\nexport default function App() @{ <p>{'Value: ' + value}</p> }";
+			const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+			const hash = encodePlaygroundHash({
+				lang: 'tsrx',
+				entry: 'App.tsrx',
+				files: [
+					{
+						name: 'App.tsrx',
+						source: appSource,
+					},
+					{ name: 'Value.tsrx', source: 'export const value = 1;' },
+				],
+			});
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+				await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
+				await page.locator('.pg-ast-tree').waitFor();
 
-	it('playground gates a shared multi-file link behind consent, then runs it', async () => {
-		const hash = encodePlaygroundHash({
-			lang: 'tsrx',
-			entry: 'App.tsrx',
-			files: [
-				{
-					name: 'App.tsrx',
-					source:
-						"import { label } from './Shared.tsrx';\n\nexport default function App() @{\n\t<h2>{'Shared: ' + label}</h2>\n}",
-				},
-				{ name: 'Shared.tsrx', source: "export const label = 'from-a-link';" },
-			],
-		});
-		const { page, errors } = await loadRoute(
-			`http://localhost:${PREVIEW_PORT}`,
-			`/playground#${hash}`,
-		);
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			// Untrusted payload: visible and compiled, but not executed.
-			await page.locator('.pg-consent').waitFor();
-			await page.click('.pg-consent-run');
-			const preview = page.frameLocator('iframe[title="Playground preview"]');
-			const heading = preview.locator('h2');
-			await waitForLocatorText(heading, 'Shared: from-a-link', 20_000);
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 45_000);
+				// Break an inactive dependency so the runnable module graph fails.
+				await page.locator('.pg-tab', { hasText: 'Value.tsrx' }).click();
+				await page.locator('.pg-editor .cm-content').first().click();
+				await page.keyboard.press(selectAll);
+				await page.keyboard.type('export const value = ;');
+				await page.locator('.pg-error').waitFor({ timeout: 10_000 });
 
-	it('playground runs the OctaneCompat React-host example end to end', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground', {
-			beforeNavigation: installReactCdnMirror,
-		});
-		try {
-			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
-			await page.selectOption('.pg-select', 'octane-compat');
-			await page.locator('.pg-tab', { hasText: 'Island.tsrx' }).waitFor({ timeout: 10_000 });
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await page.locator('[aria-label="Compiler output"]').selectOption('types');
-			await page.waitForFunction(
-				() =>
-					(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
-						'OctaneCompat',
-					),
-				null,
-				{ timeout: 10_000 },
-			);
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
-			const preview = page.frameLocator('iframe[title="Playground preview"]');
-			// Real react-dom mounts the host; the compiled Octane island renders
-			// inside it and resolves its own @try/@pending fetch.
-			await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
-			await preview.locator('body').getByText('island data #1').waitFor({ timeout: 20_000 });
-			// Native events keep working across the boundary.
-			await preview.getByRole('button', { name: 'clicks: 3' }).click();
-			await preview.getByRole('button', { name: 'clicks: 4' }).waitFor({ timeout: 10_000 });
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	}, 90_000);
+				// The active App source still has a valid compiler AST. Editing it
+				// briefly invalidates the tree, then must restore it even though the
+				// dependency keeps the module graph in its failed state.
+				await page.locator('.pg-tab', { hasText: 'App.tsrx' }).click();
+				await page.locator('.pg-ast-tree').waitFor();
+				await page.locator('.pg-editor .cm-content').first().click();
+				await page.keyboard.press(selectAll);
+				await page.keyboard.type(appSource + '\n');
+				await page
+					.getByText('Waiting for the next successful compile…')
+					.waitFor({ timeout: 5_000 });
+				await page.locator('.pg-ast-tree').waitFor({ timeout: 10_000 });
+				expect(await page.locator('.pg-error').count()).toBe(1);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'playground shows compiler warnings without treating runnable code as an error',
+		async () => {
+			const source = `export function App() @{ <input onChange={() => {}} /> }`;
+			const hash = encodePlaygroundHash({
+				lang: 'tsrx',
+				entry: 'App.tsrx',
+				files: [{ name: 'App.tsrx', source }],
+			});
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				const warnings = page.getByRole('region', { name: 'Compiler warnings' });
+				await warnings.waitFor();
+				expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+				expect(await warnings.textContent()).toContain('App.tsrx:1:');
+				expect(await page.locator('.pg-error').count()).toBe(0);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		30_000,
+	);
+
+	it.concurrent(
+		'playground runs a multi-file example selected from the dropdown',
+		async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				// The tab strip is absent for the single-file default…
+				expect(await page.locator('.pg-tabs').count()).toBe(0);
+				await page.selectOption('.pg-select', 'parallel-use');
+				// …and appears with one tab per virtual file for the example.
+				await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).waitFor({ timeout: 10_000 });
+				const preview = page.frameLocator('iframe[title="Playground preview"]');
+				// Both fake fetches resolve through the sibling module (no network).
+				await preview.locator('body').getByText('City: Reykjavík (1)').waitFor({ timeout: 20_000 });
+				// Switching tabs swaps the editor buffer to the sibling file.
+				await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).click();
+				await page.waitForFunction(
+					() =>
+						document
+							.querySelector('.pg-editor .cm-content')
+							?.textContent?.includes('fetchForecast') ?? false,
+					null,
+					{ timeout: 10_000 },
+				);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		45_000,
+	);
+
+	it.concurrent(
+		'playground Format button reprints the active file with Prettier',
+		async () => {
+			const source = `export default function App() @{ <button onClick={()=>{}}>go</button> }`;
+			const hash = encodePlaygroundHash({
+				lang: 'tsrx',
+				entry: 'App.tsrx',
+				files: [{ name: 'App.tsrx', source }],
+			});
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.click('.pg-format');
+				// Prettier normalizes the squashed arrow — formatting works even while
+				// the shared payload is still consent-gated (it never executes code).
+				await page.waitForFunction(
+					() =>
+						document
+							.querySelector('.pg-editor .cm-content')
+							?.textContent?.includes('onClick={() => {}}') ?? false,
+					null,
+					{ timeout: 15_000 },
+				);
+				expect(await page.locator('.pg-error').count()).toBe(0);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		45_000,
+	);
+
+	it.concurrent(
+		'playground gates a shared multi-file link behind consent, then runs it',
+		async () => {
+			const hash = encodePlaygroundHash({
+				lang: 'tsrx',
+				entry: 'App.tsrx',
+				files: [
+					{
+						name: 'App.tsrx',
+						source:
+							"import { label } from './Shared.tsrx';\n\nexport default function App() @{\n\t<h2>{'Shared: ' + label}</h2>\n}",
+					},
+					{ name: 'Shared.tsrx', source: "export const label = 'from-a-link';" },
+				],
+			});
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				// Untrusted payload: visible and compiled, but not executed.
+				await page.locator('.pg-consent').waitFor();
+				await page.click('.pg-consent-run');
+				const preview = page.frameLocator('iframe[title="Playground preview"]');
+				const heading = preview.locator('h2');
+				await waitForLocatorText(heading, 'Shared: from-a-link', 20_000);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		45_000,
+	);
+
+	it.concurrent(
+		'playground runs the OctaneCompat React-host example end to end',
+		async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
+				beforeNavigation: installReactCdnMirror,
+			});
+			try {
+				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.selectOption('.pg-select', 'octane-compat');
+				await page.locator('.pg-tab', { hasText: 'Island.tsrx' }).waitFor({ timeout: 10_000 });
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+				await page.locator('[aria-label="Compiler output"]').selectOption('types');
+				await page.waitForFunction(
+					() =>
+						(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+							'OctaneCompat',
+						),
+					null,
+					{ timeout: 10_000 },
+				);
+				await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
+				const preview = page.frameLocator('iframe[title="Playground preview"]');
+				// Real react-dom mounts the host; the compiled Octane island renders
+				// inside it and resolves its own @try/@pending fetch.
+				await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
+				await preview.locator('body').getByText('island data #1').waitFor({ timeout: 20_000 });
+				// Native events keep working across the boundary.
+				await preview.getByRole('button', { name: 'clicks: 3' }).click();
+				await preview.getByRole('button', { name: 'clicks: 4' }).waitFor({ timeout: 10_000 });
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+		90_000,
+	);
 });

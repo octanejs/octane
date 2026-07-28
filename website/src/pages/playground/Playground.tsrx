@@ -608,10 +608,25 @@ export function Playground() @{
 				}
 				const output = codeEntry(currentFile, resultModeRef.current.outputTarget);
 				const code = output.code;
-				// AST and code highlights describe different artifacts. Clear the
-				// pair even when the cached Types document needs no replacement.
-				clearMappedPair();
-				astPreview.clear();
+				// AST and code highlights describe different artifacts, so a switch
+				// between them clears the pair even when the cached Types document
+				// needs no replacement.
+				//
+				// A refresh that lands on the SAME artifact must leave marks alone.
+				// This runs from compileAndRun AFTER its awaited buildModuleGraph, so
+				// the initial compile completes a few hundred ms after the pane is
+				// interactive — long enough for a pointer to be resting on a mapped
+				// keyword. Clearing unconditionally wiped that highlight while the
+				// pointer never moved, and mousemove is the only thing that restores
+				// it, so the mark stayed gone until the reader jiggled the mouse.
+				// Identity is the conservative test: entries are cached per (file,
+				// target, source), and any miss yields a fresh object that falls back
+				// to clearing.
+				const sameArtifact = output === lastShownCode && code === lastShownOutput;
+				if (!sameArtifact) {
+					clearMappedPair();
+					astPreview.clear();
+				}
 				// Preserve a graph-level error when switching output artifacts.
 				setError(output.error || lastGraphError);
 				lastShownCode = output;
