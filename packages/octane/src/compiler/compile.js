@@ -13420,10 +13420,13 @@ function lowerReturnJsx(node, ctx, compInlinedSubs, cssHash = null) {
 		(rewritten.type === 'Element' || rewritten.type === 'JSXElement') &&
 		!isComponentTag(rewritten)
 	) {
-		return lowerHostFragment(rewritten, ctx, compInlinedSubs, 'opaque', cssHash);
+		return lowerHostFragment(rewritten, ctx, compInlinedSubs, 'opaque', cssHash, true);
 	}
 	if (requiresTemplateNormalization(rewritten)) {
-		return lowerHostFragment(rewritten, ctx, compInlinedSubs, 'opaque', cssHash);
+		return lowerHostFragment(rewritten, ctx, compInlinedSubs, 'opaque', cssHash, true);
+	}
+	if (rewritten.type === 'Element' || rewritten.type === 'JSXElement') {
+		return jsxElementToCreateElement(rewritten, ctx, true);
 	}
 	return rewriteJsxValues(rewritten, ctx);
 }
@@ -13560,7 +13563,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				newChildren.push(extractFragmentComponent(child, ctx, holeProps, childNs));
 			} else if (isComponentTag(child)) {
 				const hn = `h${holeProps.length}`;
-				holeProps.push(objectProp(hn, jsxElementToCreateElement(child, ctx)));
+				holeProps.push(
+					objectProp(
+						hn,
+						jsxElementToCreateElement(child, ctx, ctx._foldCtx?.immediateRenderedOutput === true),
+					),
+				);
 				newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
 			} else {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
@@ -13887,7 +13895,14 @@ function extractFragmentRoot(node, ctx, holeProps, parentNs = 'html') {
 // renderer + `createElement(_frag$N, {...})`.
 // `compInlinedSubs` is the COMPONENT's inlinedSubs: a folded directive's branch
 // helper functions are emitted there (closure preserved), not in the renderer.
-function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHash = null) {
+function lowerHostFragment(
+	node,
+	ctx,
+	compInlinedSubs,
+	parentNs = 'html',
+	cssHash = null,
+	immediateRenderedOutput = false,
+) {
 	const holeProps = [];
 	const directiveCalls = { ifCalls: [], forCalls: [], switchCalls: [], tryCalls: [] };
 	// extractFragment reads `ctx._foldCtx` for any directive child it folds (and to
@@ -13902,6 +13917,9 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 					parentNs,
 					cssHash,
 					templateComponentChildren,
+					// Direct return holes run in their owning component's current render
+					// scope; setup/escaped values still need complete-record deferral.
+					immediateRenderedOutput,
 				}
 			: null;
 	const rendererEl = extractFragmentRoot(node, ctx, holeProps, parentNs);
