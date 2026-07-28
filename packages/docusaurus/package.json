@@ -1,0 +1,77 @@
+{
+  "name": "@octanejs/docusaurus",
+  "version": "0.0.1",
+  "description": "Docusaurus content and MDX integration for Octane",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/docusaurus"
+  },
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "octane-docusaurus": "src/bin.js"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./mdx": {
+      "types": "./types/mdx.d.ts",
+      "import": "./src/mdx.js",
+      "default": "./src/mdx.js"
+    },
+    "./vite": {
+      "types": "./types/vite.d.ts",
+      "import": "./src/vite.js",
+      "default": "./src/vite.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "cd ../.. && vitest run --project docusaurus"
+  },
+  "dependencies": {
+    "@octanejs/mdx": "workspace:*",
+    "github-slugger": "1.5.0"
+  },
+  "peerDependencies": {
+    "@docusaurus/core": "3.10.1",
+    "octane": "workspace:*",
+    "vite": ">=7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@docusaurus/core": "3.10.1",
+    "@docusaurus/plugin-content-docs": "3.10.1",
+    "@types/node": "catalog:default",
+    "octane": "workspace:*",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

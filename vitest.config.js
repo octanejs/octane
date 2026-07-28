@@ -2381,6 +2381,22 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'docusaurus',
+					include: ['packages/docusaurus/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mdx\/compile$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
 					environment: 'node',
