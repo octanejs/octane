@@ -155,6 +155,56 @@ export function GetterAttributeContext() @{
 	<section>{content}</section>
 }
 
+export function MappedContext() @{
+	const content = <span data-context="mapped">{getterValue.current as string}</span>;
+	const mapped = Children.map(content, (child) => child);
+	<ValueContext.Provider value="inner">{mapped}</ValueContext.Provider>
+}
+
+export function FlattenedContext() @{
+	const content = <span data-context="flattened">{getterValue.current as string}</span>;
+	const flattened = Children.toArray(content);
+	<ValueContext.Provider value="inner">{flattened}</ValueContext.Provider>
+}
+
+export function ClonedContext() @{
+	const content = <span data-context="cloned">{getterValue.current as string}</span>;
+	const cloned = cloneElement(content as ElementDescriptor, { 'data-cloned': 'yes' });
+	<ValueContext.Provider value="inner">{cloned}</ValueContext.Provider>
+}
+
+export function MappedClonedContext() @{
+	const content = <span data-context="mapped-cloned">{getterValue.current as string}</span>;
+	const mapped = Children.map(content, (child) =>
+		cloneElement(child as ElementDescriptor, { 'data-cloned': 'yes' }),
+	);
+	<ValueContext.Provider value="inner">{mapped}</ValueContext.Provider>
+}
+
+export function ConfigReplacedScopedChild() @{
+	const content = <span data-replacement="config">{throwingGetter.current as string}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, { children: 'configured' });
+	<section>{replaced}</section>
+}
+
+export function ConfigUndefinedReplacedScopedChild() @{
+	const content = <span data-replacement="config-undefined">{throwingGetter.current as string}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, { children: undefined });
+	<section>{replaced}</section>
+}
+
+export function PositionalReplacedScopedChild() @{
+	const content = <span data-replacement="positional">{throwingGetter.current as string}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, {}, 'first-', 'second');
+	<section>{replaced}</section>
+}
+
+export function UndefinedReplacedScopedChild() @{
+	const content = <span data-replacement="undefined">{throwingGetter.current as string}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, {}, undefined);
+	<section>{replaced}</section>
+}
+
 export function SharedDescriptorProviders(props: { first: string; second: string }) @{
 	<section data-outlet="shared">
 		<ValueContext.Provider value={props.first}>{sharedContextChild}</ValueContext.Provider>
@@ -196,6 +246,24 @@ export function WrappedGetterErrorValue() @{
 	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>{content}</ErrorBoundary>
 }
 
+export function MappedErrorValue() @{
+	const content = <span>{throwingGetter.current as string}</span>;
+	const mapped = Children.map(content, (child) => child);
+	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{mapped}</ErrorBoundary>
+}
+
+export function FlattenedErrorValue() @{
+	const content = <span>{throwingGetter.current as string}</span>;
+	const flattened = Children.toArray(content);
+	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{flattened}</ErrorBoundary>
+}
+
+export function ClonedErrorValue() @{
+	const content = <span>{throwingGetter.current as string}</span>;
+	const cloned = cloneElement(content as ElementDescriptor, {});
+	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{cloned}</ErrorBoundary>
+}
+
 export function DirectSuspense(props: { promise: Promise<string> }) @{
 	<Suspense fallback={<i data-fallback="pending">pending</i>}>
 		<span data-resolved="direct">{use(props.promise) as string}</span>
@@ -226,6 +294,24 @@ export function GetterSuspenseValue(props: { promise: Promise<string> }) @{
 		<span data-resolved="getter">{suspendedValue.current as string}</span>
 	</WrappedSuspense>;
 	<section data-outlet="suspense">{content}</section>
+}
+
+export function MappedSuspense(props: { promise: Promise<string> }) @{
+	const content = <span data-resolved="mapped">{use(props.promise) as string}</span>;
+	const mapped = Children.map(content, (child) => child);
+	<Suspense fallback={<i data-fallback="pending">pending</i>}>{mapped}</Suspense>
+}
+
+export function FlattenedSuspense(props: { promise: Promise<string> }) @{
+	const content = <span data-resolved="flattened">{use(props.promise) as string}</span>;
+	const flattened = Children.toArray(content);
+	<Suspense fallback={<i data-fallback="pending">pending</i>}>{flattened}</Suspense>
+}
+
+export function ClonedSuspense(props: { promise: Promise<string> }) @{
+	const content = <span data-resolved="cloned">{use(props.promise) as string}</span>;
+	const cloned = cloneElement(content as ElementDescriptor, {});
+	<Suspense fallback={<i data-fallback="pending">pending</i>}>{cloned}</Suspense>
 }
 
 function InspectChild(props: { child: OctaneNode }) @{
@@ -310,6 +396,10 @@ const contextScenarios = [
 	['CoercionContext', '[data-context="coercion"]'],
 	['IterableContext', '[data-context="iterable"]'],
 	['OptionalComputedKeyContext', '[data-context="optional-key"]'],
+	['MappedContext', '[data-context="mapped"]'],
+	['FlattenedContext', '[data-context="flattened"]'],
+	['ClonedContext', '[data-context="cloned"]'],
+	['MappedClonedContext', '[data-context="mapped-cloned"]'],
 ] as const;
 
 for (const fixture of fixtures) {
@@ -422,10 +512,51 @@ for (const fixture of fixtures) {
 			container.remove();
 		});
 
+		for (const [exportName, kind, expected] of [
+			['ConfigReplacedScopedChild', 'config', 'configured'],
+			['ConfigUndefinedReplacedScopedChild', 'config-undefined', ''],
+			['PositionalReplacedScopedChild', 'positional', 'first-second'],
+			['UndefinedReplacedScopedChild', 'undefined', ''],
+		] as const) {
+			const selector = `[data-replacement="${kind}"]`;
+
+			it(`${exportName} replaces children without evaluating the original subtree`, () => {
+				const result = mount(fixture.client[exportName]);
+				expect(result.find(selector).textContent).toBe(expected);
+				result.unmount();
+			});
+
+			it(`${exportName} server-renders only its explicitly replaced children`, () => {
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
+				const markup = document.createElement('div');
+				markup.innerHTML = html;
+				expect(markup.querySelector(selector)?.textContent).toBe(expected);
+			});
+
+			it(`${exportName} hydrates its explicitly replaced children`, () => {
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
+				const container = document.createElement('div');
+				container.innerHTML = html;
+				document.body.appendChild(container);
+				const existing = container.querySelector(selector);
+				expect(existing?.textContent).toBe(expected);
+
+				const root = hydrateRoot(container, fixture.client[exportName]);
+				flushSync(() => {});
+				expect(container.querySelector(selector)).toBe(existing);
+				expect(existing?.textContent).toBe(expected);
+				root.unmount();
+				container.remove();
+			});
+		}
+
 		for (const exportName of [
 			'BuiltInErrorValue',
 			'WrappedErrorValue',
 			'WrappedGetterErrorValue',
+			'MappedErrorValue',
+			'FlattenedErrorValue',
+			'ClonedErrorValue',
 		] as const) {
 			it(`${exportName} assigns a synchronous error to its nearest boundary`, () => {
 				const result = mount(fixture.client[exportName]);
@@ -446,6 +577,9 @@ for (const fixture of fixtures) {
 			['VariableSuspense', 'variable'],
 			['WrappedSuspenseValue', 'wrapped'],
 			['GetterSuspenseValue', 'getter'],
+			['MappedSuspense', 'mapped'],
+			['FlattenedSuspense', 'flattened'],
+			['ClonedSuspense', 'cloned'],
 		] as const) {
 			it(`${exportName} suspends and resolves inside its represented boundary`, async () => {
 				const pending = deferred();

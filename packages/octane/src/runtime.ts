@@ -13380,9 +13380,23 @@ export function cloneElement<P>(
 	if (!isElementDescriptor(element)) {
 		throw new Error(formatClientError(4));
 	}
-	const props = copyElementConfig(element.props);
+	let scopedChildren: (() => unknown) | undefined;
+	let props: any;
+	if (SCOPED_ELEMENT_PROPS.has(element.props as object)) {
+		// Copy a scoped descriptor's child accessor without evaluating it in the caller's scope.
+		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		props = {};
+		for (const name in element.props) {
+			if (name !== 'key' && name !== 'children' && hasOwnProp.call(element.props, name)) {
+				props[name] = (element.props as any)[name];
+			}
+		}
+	} else {
+		props = copyElementConfig(element.props);
+	}
 	let key = element.key;
 	let hasKeyOverride = false;
+	let replacedChildren = false;
 	if (config != null) {
 		hasKeyOverride = hasElementConfigKey(config);
 		if (hasKeyOverride) key = '' + config.key;
@@ -13391,16 +13405,25 @@ export function cloneElement<P>(
 			// React 19 keeps refs as props, but cloneElement treats an explicitly
 			// undefined ref as absent for backwards compatibility.
 			if (name === 'ref' && config.ref === undefined) continue;
-			if (hasOwnProp.call(config, name)) props[name] = config[name];
+			if (hasOwnProp.call(config, name)) {
+				props[name] = config[name];
+				if (name === 'children') replacedChildren = true;
+			}
 		}
 	}
 	const n = children.length;
 	let kids: any;
+	let childProperty: PropertyDescriptor | undefined;
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
 		POSITIONAL_CHILDREN.add(children);
 		kids = children;
+	} else if (scopedChildren !== undefined && !replacedChildren) {
+		childProperty = { configurable: true, enumerable: true, get: scopedChildren };
+		Object.defineProperty(props, 'children', childProperty);
+		SCOPED_ELEMENT_PROPS.add(props);
+		kids = null;
 	} else {
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
@@ -13414,6 +13437,7 @@ export function cloneElement<P>(
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
 	};
+	if (childProperty !== undefined) Object.defineProperty(descriptor, 'children', childProperty);
 	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
 		key === null &&
@@ -13432,14 +13456,22 @@ export function cloneElement<P>(
 }
 
 function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
+	const scoped = SCOPED_ELEMENT_PROPS.has(element.props);
 	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props: element.props,
 		key,
 		ref: element.ref,
-		children: element.children,
+		children: scoped ? null : element.children,
 	};
+	if (scoped) {
+		Object.defineProperty(descriptor, 'children', {
+			configurable: true,
+			enumerable: true,
+			get: Object.getOwnPropertyDescriptor(element, 'children')!.get!,
+		});
+	}
 	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
 	return finalizeElementDescriptor(descriptor);

@@ -708,46 +708,82 @@ export function cloneElement(
 	if (!isElementDescriptor(element)) {
 		throw new Error(formatServerError(4));
 	}
-	const props = copyElementConfig(element.props);
+	// Preserve deferred children until their represented component owns the read.
+	let scopedChildren: (() => unknown) | undefined;
+	let props: any;
+	if (SCOPED_ELEMENT_PROPS.has(element.props)) {
+		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		props = {};
+		for (const name in element.props) {
+			if (
+				name !== 'key' &&
+				name !== 'children' &&
+				Object.prototype.hasOwnProperty.call(element.props, name)
+			) {
+				props[name] = element.props[name];
+			}
+		}
+	} else {
+		props = copyElementConfig(element.props);
+	}
 	let key = element.key;
+	let replacedChildren = false;
 	if (config != null) {
 		if (hasElementConfigKey(config)) key = '' + config.key;
 		for (const name in config) {
 			if (name === 'key') continue;
 			if (name === 'ref' && config.ref === undefined) continue;
-			if (Object.prototype.hasOwnProperty.call(config, name)) props[name] = config[name];
+			if (Object.prototype.hasOwnProperty.call(config, name)) {
+				props[name] = config[name];
+				if (name === 'children') replacedChildren = true;
+			}
 		}
 	}
 	const n = children.length;
 	let kids: any;
+	let childProperty: PropertyDescriptor | undefined;
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
 		kids = children;
+	} else if (scopedChildren !== undefined && !replacedChildren) {
+		childProperty = { configurable: true, enumerable: true, get: scopedChildren };
+		Object.defineProperty(props, 'children', childProperty);
+		SCOPED_ELEMENT_PROPS.add(props);
+		kids = null;
 	} else {
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
 	}
 	if (n > 0) props.children = kids;
-	return finalizeElementDescriptor({
+	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props,
 		key,
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
-	});
+	};
+	if (childProperty !== undefined) Object.defineProperty(descriptor, 'children', childProperty);
+	return finalizeElementDescriptor(descriptor);
 }
 
 function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
-	return finalizeElementDescriptor({
+	// Traversal changes only the key, never the scope that resolves its children.
+	const scopedChildren = SCOPED_ELEMENT_PROPS.has(element.props);
+	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props: element.props,
 		key,
 		ref: element.ref,
-		children: element.children,
-	});
+		children: scopedChildren ? null : element.children,
+	};
+	if (scopedChildren) {
+		const get = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		Object.defineProperty(descriptor, 'children', { configurable: true, enumerable: true, get });
+	}
+	return finalizeElementDescriptor(descriptor);
 }
 
 function escapeElementKey(key: string): string {

@@ -173,6 +173,56 @@ export function GetterAttributeContext() {
 	return <section>{content}</section>;
 }
 
+export function MappedContext() {
+	const content = <span data-context="mapped">{getterValue.current}</span>;
+	const mapped = Children.map(content, (child) => child);
+	return <ValueContext.Provider value="inner">{mapped}</ValueContext.Provider>;
+}
+
+export function FlattenedContext() {
+	const content = <span data-context="flattened">{getterValue.current}</span>;
+	const flattened = Children.toArray(content);
+	return <ValueContext.Provider value="inner">{flattened}</ValueContext.Provider>;
+}
+
+export function ClonedContext() {
+	const content = <span data-context="cloned">{getterValue.current}</span>;
+	const cloned = cloneElement(content as ElementDescriptor, { 'data-cloned': 'yes' });
+	return <ValueContext.Provider value="inner">{cloned}</ValueContext.Provider>;
+}
+
+export function MappedClonedContext() {
+	const content = <span data-context="mapped-cloned">{getterValue.current}</span>;
+	const mapped = Children.map(content, (child) =>
+		cloneElement(child as ElementDescriptor, { 'data-cloned': 'yes' }),
+	);
+	return <ValueContext.Provider value="inner">{mapped}</ValueContext.Provider>;
+}
+
+export function ConfigReplacedScopedChild() {
+	const content = <span data-replacement="config">{throwingGetter.current}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, { children: 'configured' });
+	return <section>{replaced}</section>;
+}
+
+export function ConfigUndefinedReplacedScopedChild() {
+	const content = <span data-replacement="config-undefined">{throwingGetter.current}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, { children: undefined });
+	return <section>{replaced}</section>;
+}
+
+export function PositionalReplacedScopedChild() {
+	const content = <span data-replacement="positional">{throwingGetter.current}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, {}, 'first-', 'second');
+	return <section>{replaced}</section>;
+}
+
+export function UndefinedReplacedScopedChild() {
+	const content = <span data-replacement="undefined">{throwingGetter.current}</span>;
+	const replaced = cloneElement(content as ElementDescriptor, {}, undefined);
+	return <section>{replaced}</section>;
+}
+
 export function SharedDescriptorProviders(props: { first: string; second: string }) {
 	return (
 		<section data-outlet="shared">
@@ -215,6 +265,32 @@ export function WrappedGetterErrorValue() {
 	);
 }
 
+export function MappedErrorValue() {
+	const content = <span>{throwingGetter.current}</span>;
+	const mapped = Children.map(content, (child) => child);
+	return (
+		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{mapped}</ErrorBoundary>
+	);
+}
+
+export function FlattenedErrorValue() {
+	const content = <span>{throwingGetter.current}</span>;
+	const flattened = Children.toArray(content);
+	return (
+		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>
+			{flattened}
+		</ErrorBoundary>
+	);
+}
+
+export function ClonedErrorValue() {
+	const content = <span>{throwingGetter.current}</span>;
+	const cloned = cloneElement(content as ElementDescriptor, {});
+	return (
+		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{cloned}</ErrorBoundary>
+	);
+}
+
 export function DirectSuspense(props: { promise: Promise<string> }) {
 	return (
 		<Suspense fallback={<i data-fallback="pending">pending</i>}>
@@ -253,6 +329,24 @@ export function GetterSuspenseValue(props: { promise: Promise<string> }) {
 		</WrappedSuspense>
 	);
 	return <section data-outlet="suspense">{content}</section>;
+}
+
+export function MappedSuspense(props: { promise: Promise<string> }) {
+	const content = <span data-resolved="mapped">{use(props.promise)}</span>;
+	const mapped = Children.map(content, (child) => child);
+	return <Suspense fallback={<i data-fallback="pending">pending</i>}>{mapped}</Suspense>;
+}
+
+export function FlattenedSuspense(props: { promise: Promise<string> }) {
+	const content = <span data-resolved="flattened">{use(props.promise)}</span>;
+	const flattened = Children.toArray(content);
+	return <Suspense fallback={<i data-fallback="pending">pending</i>}>{flattened}</Suspense>;
+}
+
+export function ClonedSuspense(props: { promise: Promise<string> }) {
+	const content = <span data-resolved="cloned">{use(props.promise)}</span>;
+	const cloned = cloneElement(content as ElementDescriptor, {});
+	return <Suspense fallback={<i data-fallback="pending">pending</i>}>{cloned}</Suspense>;
 }
 
 function InspectChild(props: { child: OctaneNode }) {
