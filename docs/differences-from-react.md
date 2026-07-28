@@ -210,7 +210,8 @@ witnesses keeps its old value. Pass such state through
 
 ## `useState` / `useReducer` current-state getters
 
-Both state hooks have an Octane-only third tuple member:
+Both state hooks have an Octane-only third tuple member: a stable `getState`
+function that reads the latest scheduled state.
 
 ```tsx
 const [draft, setDraft, getDraft] = useState('');
