@@ -37,16 +37,19 @@ function createSharedState(options) {
 	async function refresh() {
 		if (loading) return loading;
 		loading = (async () => {
-			loaded = await loadDocusaurusSite({
+			const nextLoaded = await loadDocusaurusSite({
 				siteDir: root,
 				outDir: options.outDir,
 				config: options.config,
 				locale: options.locale,
 				allowUnsupportedVersion: options.allowUnsupportedVersion,
 			});
-			manifest = await createDocusaurusManifest(loaded);
-			contentIndex = createContentIndex(manifest);
-			return manifest;
+			const nextManifest = await createDocusaurusManifest(nextLoaded);
+			const nextContentIndex = createContentIndex(nextManifest);
+			loaded = nextLoaded;
+			manifest = nextManifest;
+			contentIndex = nextContentIndex;
+			return nextManifest;
 		})().finally(() => {
 			loading = undefined;
 		});

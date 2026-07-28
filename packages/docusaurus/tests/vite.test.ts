@@ -97,6 +97,29 @@ describe('Docusaurus Vite bridge', () => {
 		expect(reloadedManifest).toBe(manifest);
 	});
 
+	it('keeps the previous site snapshot when a reload cannot produce a manifest', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({ siteDir: fixture.siteDir });
+		await plugin.configResolved({ root: fixture.siteDir, command: 'serve' });
+		const previousManifest = await plugin.api.getManifest();
+		const configFile = path.join(fixture.siteDir, 'docusaurus.config.mjs');
+		writeFileSync(
+			configFile,
+			readFileSync(configFile, 'utf8')
+				.replace('exact: true,', 'exact: true,\n\t\t\t\tbroken: () => {},')
+				.replace("'watched.txt'", "'failed-watched.txt'"),
+		);
+
+		await expect(plugin.api.reload()).rejects.toThrow('not serializable');
+		const addWatchFile = vi.fn();
+		await plugin.buildStart.call({ addWatchFile });
+
+		expect(await plugin.api.getManifest()).toBe(previousManifest);
+		expect(addWatchFile).toHaveBeenCalledWith(path.join(fixture.siteDir, 'watched.txt'));
+		expect(addWatchFile).not.toHaveBeenCalledWith(path.join(fixture.siteDir, 'failed-watched.txt'));
+	});
+
 	it('feeds content-plugin metadata into the MDX transform', async () => {
 		const fixture = createSiteFixture();
 		disposals.push(fixture.dispose);
