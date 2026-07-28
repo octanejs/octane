@@ -4018,24 +4018,41 @@ function isJsxReturningMapCall(node) {
 
 /**
  * Convert a `{xs.map((item[, index]) => <jsx key={K}>…)}` JSX child into a
- * synthetic `@for` (ForOfStatement) so it lowers to the SAME `forBlock` keyed
- * fast path as `@for` — a compiled per-item body + the raw items array — instead
- * of eagerly building a `createElement` descriptor per row on every render and
- * reconciling that array through `childSlot`/`reconcileKeyed`. The result flows
- * straight into the existing ForOfStatement fold path (makeForCall + items/body
- * holes), so the JSX `.map` and the directive `@for` produce identical output.
+ * guarded synthetic `@for` dispatched through the shared map slot so a genuine,
+ * dense native Array map lowers to the SAME keyed fast path as `@for`. Arbitrary `.map` methods are
+ * user code, not syntax: custom receivers, Array subclasses/overrides, sparse
+ * arrays, and additional call arguments must retain the original dispatch.
+ * Evaluate both receiver and method exactly once before choosing the branch.
  *
  * Returns null for shapes we don't lower — a named/ref callback, a block-body
  * arrow (`{ … return <jsx> }`), a fragment/non-element return, more than two
  * params, or a non-identifier index — so the caller keeps the childSlot path.
  */
-function mapCallToForOf(expr) {
+function mapCallToForOf(expr, ctx) {
 	if (!isJsxReturningMapCall(expr)) return null;
+	if (
+		!ctx?.currentMapTemps ||
+		expr.arguments.length !== 1 ||
+		expr.optional ||
+		expr.callee.optional ||
+		expr.callee.computed
+	) {
+		return null;
+	}
 	const arrow = expr.arguments[0];
 	const params = arrow.params || [];
 	// `(item)` and `(item, index)` map to a for-of header; the rarely-used
 	// `array`/thisArg params (or a destructured index) don't, so bail to childSlot.
-	if (params.length < 1 || params.length > 2) return null;
+	if (
+		arrow.async ||
+		params.length < 1 ||
+		params.length > 2 ||
+		params[0].type === 'AssignmentPattern' ||
+		params[0].type === 'RestElement' ||
+		mapCallbackCapturesLexicalReceiver(arrow.body)
+	) {
+		return null;
+	}
 	if (params[1] && params[1].type !== 'Identifier') return null;
 	// Only an EXPRESSION-body arrow returning a single JSX ELEMENT (host or
 	// component). Block bodies and fragment roots keep the childSlot path.
@@ -4059,11 +4076,54 @@ function mapCallToForOf(expr) {
 			? { ...body, openingElement: { ...body.openingElement, attributes: kept } }
 			: { ...body, attributes: kept };
 	}
-	return Object.assign(b.for_of(b.const(params[0], null), expr.callee.object, b.block([bodyEl])), {
-		key: keyExpr,
-		index: params[1] || null,
-		empty: null,
-	});
+	const directReceiver = expr.callee.object.type === 'Identifier';
+	const receiverName = directReceiver
+		? expr.callee.object.name
+		: allocCompilerName(ctx, '__mapItems');
+	const directFold = directReceiver && ctx._foldCtx != null;
+	const methodName = directFold ? null : allocCompilerName(ctx, '__mapMethod');
+	if (!directReceiver) ctx.currentMapTemps.push(receiverName);
+	if (methodName !== null) ctx.currentMapTemps.push(methodName);
+	// Synthetic branch helpers can move to module scope. Include their captures
+	// in the existing environment proof so the receiver/method remain available.
+	if (!directReceiver) ctx.currentComponentLocals?.add(receiverName);
+	if (methodName !== null) ctx.currentComponentLocals?.add(methodName);
+	const forNode = Object.assign(
+		b.for_of(b.const(params[0], null), b.id(receiverName), b.block([bodyEl])),
+		{
+			key: keyExpr,
+			index: params[1] || null,
+			empty: null,
+			nativeArrayMap: {
+				receiver: expr.callee.object,
+				receiverName,
+				methodName,
+				directReceiver,
+				callback: arrow,
+			},
+		},
+	);
+	return inheritOriginLoc(forNode, expr);
+}
+
+function mapCallbackCapturesLexicalReceiver(root) {
+	const seen = new WeakSet();
+	const walk = (node) => {
+		if (!node || typeof node !== 'object') return false;
+		if (Array.isArray(node)) return node.some(walk);
+		if (seen.has(node)) return false;
+		seen.add(node);
+		if (node.type === 'ThisExpression') return true;
+		if (node.type === 'Identifier' && node.name === 'arguments') return true;
+		if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression') return false;
+		if (node.type === 'MemberExpression' && !node.computed) return walk(node.object);
+		if (node.type === 'Property' && !node.computed) return walk(node.value);
+		for (const key in node) {
+			if (!AST_WALK_SKIP_KEYS.has(key) && walk(node[key])) return true;
+		}
+		return false;
+	};
+	return walk(root);
 }
 
 // Recognise `{style (expr)}` — TSRX parses it as a plain
@@ -5959,6 +6019,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
+		currentMapTemps: null, // receiver/method temps owned by the current emitted function
 		currentAutoMemoOffset: 0, // flat compiler-cache cell offset for the body being emitted
 		currentAutoMemoCacheName: null, // collision-free local bound to the body's cache array
 		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
@@ -6956,6 +7017,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		cssInjections: [],
 		moduleCssInjections: [],
 		currentComponentLocals: null,
+		currentMapTemps: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
 		nextFragId: 0,
@@ -7221,7 +7283,40 @@ function ssrCompileBody(
 	returnedFragmentTemplate = false,
 	returnedFragmentRoot = false,
 ) {
+	const prevMapTemps = ctx.currentMapTemps;
+	ctx.currentMapTemps = [];
+	try {
+		return ssrCompileBodyWithMapTemps(
+			node,
+			ctx,
+			name,
+			cssHash,
+			cssEntries,
+			parentNs,
+			localSetupSlots,
+			componentNs,
+			returnedFragmentTemplate,
+			returnedFragmentRoot,
+		);
+	} finally {
+		ctx.currentMapTemps = prevMapTemps;
+	}
+}
+
+function ssrCompileBodyWithMapTemps(
+	node,
+	ctx,
+	name,
+	cssHash,
+	cssEntries,
+	parentNs,
+	localSetupSlots,
+	componentNs,
+	returnedFragmentTemplate,
+	returnedFragmentRoot,
+) {
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
+	const mapTemps = ctx.currentMapTemps;
 
 	let statements;
 	let jsxNodes;
@@ -7318,7 +7413,7 @@ function ssrCompileBody(
 	// Partition hoisted `<title>`/`<meta>`/`<link>` out of the body (mirrors the
 	// client planJsx): they accumulate into render()'s `head` via `ssrHeadEl`, NOT
 	// the body HTML — so the body collapses to its single real root.
-	const normalized = normalizeChildren(jsxNodes, parentNs === 'svg');
+	const normalized = normalizeChildren(jsxNodes, parentNs === 'svg', ctx);
 	const headNodes = normalized.filter((n) => n.type === 'HeadHoist');
 	const bodyNodes = normalized.filter((n) => n.type !== 'HeadHoist');
 	// A `return <jsx>` body (a React-style `.tsx` component) is VALUE position: the
@@ -7386,6 +7481,9 @@ function ssrCompileBody(
 		}
 	}
 	// `ssrHeadEl(…)` side-effect statements (one per hoisted head element), like injectStyle.
+	if (mapTemps.length > 0) {
+		body.push(...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)));
+	}
 	body.push(...emitHeadServer(headNodes, ctx), ...rewritten, ...inlinedSubs);
 	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
 	// `__props` placeholder stands in when there are no user params, so a verbatim
@@ -8407,7 +8505,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	if (tag !== 'option') lit += '>'; // option: ssrOption assembles the tag (attrs-only here)
 	const normChildren =
 		authoredStaticScriptContent === undefined
-			? normalizeChildren(node.children || [], childNs === 'svg')
+			? normalizeChildren(node.children || [], childNs === 'svg', ctx)
 			: [];
 	const hasNestedChildren = hasAuthoredStaticScriptBody || normChildren.length > 0;
 	const effectiveChildrenPropSources = hasNestedChildren ? [] : childrenPropSources;
@@ -8937,6 +9035,7 @@ function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, compon
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @for iterable expression.
 	const itemsExpr = rewriteHookCalls(node.right, ctx, name);
+	const mapCall = node.nativeArrayMap || null;
 	const itemId = node.left.declarations[0].id; // Identifier or destructuring Pattern
 	const params = [itemId];
 	if (node.index) params.push(node.index);
@@ -9054,7 +9153,9 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		b.block([
 			b.const(
 				'__items',
-				b.call(b.member(b.id('Array'), 'from'), b.logical('??', itemsExpr, b.array([]))),
+				mapCall !== null
+					? itemsExpr
+					: b.call(b.member(b.id('Array'), 'from'), b.logical('??', itemsExpr, b.array([]))),
 			),
 			b.if(
 				b.binary('===', b.member(items, 'length'), b.literal(0)),
@@ -9071,7 +9172,34 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			b.return(ssrCall('ssrForBlock', [b.id('__html'), b.literal(true, 'true')], node)),
 		]),
 	);
-	return ssrCall('ssrControl', [b.literal(ssrControlKey('for', node)), render], node);
+	const fast = ssrCall('ssrControl', [b.literal(ssrControlKey('for', node)), render], node);
+	if (mapCall === null) return fast;
+	ctx.runtimeNeeded.add('mapSlot');
+	ctx.runtimeNeeded.add('ssrChild');
+	const receiver = b.id(mapCall.receiverName);
+	const method = b.id(mapCall.methodName);
+	const evaluated = b.sequence([
+		...(mapCall.directReceiver
+			? []
+			: [b.assignment('=', receiver, rewriteHookCalls(mapCall.receiver, ctx, name))]),
+		b.assignment('=', method, b.member(receiver, 'map')),
+		receiver,
+	]);
+	return inheritOriginLoc(
+		b.conditional(
+			b.call('_$mapSlot', evaluated, method),
+			fast,
+			ssrCall(
+				'ssrChild',
+				[
+					b.call('_$mapSlot', receiver, method, rewriteJsxValues(mapCall.callback, ctx)),
+					b.id('__s'),
+				],
+				node,
+			),
+		),
+		node,
+	);
 }
 
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
@@ -10006,6 +10134,9 @@ function compileComponent(node, ctx, options) {
  */
 function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null, options = null) {
 	const returnedOutput = options?.returnedOutput === true;
+	const prevMapTemps = ctx.currentMapTemps;
+	const mapTemps = [];
+	ctx.currentMapTemps = mapTemps;
 	const prevAutoMemoOffset = ctx.currentAutoMemoOffset;
 	const prevAutoMemoCacheName = ctx.currentAutoMemoCacheName;
 	const prevAutoMemoCommittedName = ctx.currentAutoMemoCommittedName;
@@ -10310,6 +10441,9 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			),
 		);
 	}
+	if (mapTemps.length > 0) {
+		bodyStatements.push(...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)));
+	}
 	bodyStatements.push(...rewrittenStatements);
 	// Inlined sub-helpers (children render fns, legacy-placement construct
 	// bodies, hoisted `<tsrx>` blocks) are function DECLARATION nodes embedded
@@ -10404,6 +10538,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentHookMemoOffset = prevHookMemoOffset;
 	ctx.currentHookMemoCacheProperty = prevHookMemoCacheProperty;
 	ctx.currentHookMemoNames = prevHookMemoNames;
+	ctx.currentMapTemps = prevMapTemps;
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
 	return inheritOriginLoc(
@@ -13062,34 +13197,60 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// can hold a directive this body must fold. Publishing the fold here is what
 	// keeps that form compiling on the client; the server already reaches it through
 	// compileServerComponent, and without this the two emitters disagree.
+	// Returned JSX keeps its descriptor ABI, but the compiled fragment inside
+	// that descriptor still owns ordinary keyed-list render regions. Give those
+	// regions the same component-local purity/capture analysis as `@{}` bodies;
+	// otherwise JSX `.map()` always misses the existing PURE and autoMemo paths.
 	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
+	const prevLocals = ctx.currentComponentLocals;
+	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
+	const prevMapTemps = ctx.currentMapTemps;
+	const mapTemps = [];
 	ctx._valueDirectiveLowering = lowerBodyValueDirective;
-	const newStatements = (node.body.body || []).map((sourceStatement) => {
-		// A return-based component's undefined output is ambiguous with the compiled
-		// void-body signal at runtime. Preserve JSX roots for the specialized lowering
-		// below, but normalize every other owned return to an explicit empty value.
-		const s = normalizeOwnRenderableReturns(sourceStatement, true);
-		const prepared =
-			s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument)
-				? s
-				: lowerSetupValueDirectives(s, lowerBodyValueDirective);
-		// Same hook handling as the `@{}` path: base hooks take a trailing hook slot,
-		// custom hooks are wrapped in withSlot (unified across both component forms).
-		const h = rewriteHookCalls(prepared, ctx, name);
-		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
-		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
-		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
-			return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash) };
-		}
-		return rewriteJsxValues(h, ctx);
-	});
-	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
+	ctx.currentComponentLocals = collectComponentLocals(node);
+	ctx.currentAutoMemoCallsitesSafe = ctx.componentInfo.get(name)?.autoMemoCallsitesSafe !== false;
+	ctx.currentMapTemps = mapTemps;
+	let newStatements;
+	try {
+		newStatements = (node.body.body || []).map((sourceStatement) => {
+			// A return-based component's undefined output is ambiguous with the compiled
+			// void-body signal at runtime. Preserve JSX roots for the specialized lowering
+			// below, but normalize every other owned return to an explicit empty value.
+			const s = normalizeOwnRenderableReturns(sourceStatement, true);
+			const prepared =
+				s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument)
+					? s
+					: lowerSetupValueDirectives(s, lowerBodyValueDirective);
+			// Same hook handling as the `@{}` path: base hooks take a trailing hook slot,
+			// custom hooks are wrapped in withSlot (unified across both component forms).
+			const h = rewriteHookCalls(prepared, ctx, name);
+			// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
+			// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
+			if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
+				return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash) };
+			}
+			return rewriteJsxValues(h, ctx);
+		});
+	} finally {
+		ctx._valueDirectiveLowering = prevValueDirectiveLowering;
+		ctx.currentComponentLocals = prevLocals;
+		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
+		ctx.currentMapTemps = prevMapTemps;
+	}
 	// The rebuilt function shell maps to the authored declaration. Hoisted
 	// helper fns (compInlinedSubs — filled by the statement mapping above) are
 	// function DECLARATION nodes embedded at the top of the body, matching the
 	// historical after-the-`{` splice.
 	const fn = inheritOriginLoc(
-		b.function_declaration(node.id, node.params, b.block([...compInlinedSubs, ...newStatements])),
+		b.function_declaration(
+			node.id,
+			node.params,
+			b.block([
+				...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)),
+				...compInlinedSubs,
+				...newStatements,
+			]),
+		),
 		node,
 	);
 	// M2 AST emit: return the function declaration NODE plus any HMR-rebind /
@@ -13314,7 +13475,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	const fragChildren = ctx._foldCtx
 		? (node.children || []).map((child) =>
 				child && child.type === 'JSXExpressionContainer'
-					? mapCallToForOf(child.expression) || child
+					? mapCallToForOf(child.expression, ctx) || child
 					: child,
 			)
 		: node.children || [];
@@ -13466,11 +13627,44 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// See the `@else` claim above — the same rewrite happens here.
 			registerClauseOrigin(ctx, forNode.emptyKeyword, [rec.emptyHelper]);
 			const itemsHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
-			const bodyHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(bodyHole, b.id(rec.bodyHelper)));
+			const mapCall = forNode.nativeArrayMap;
+			const itemsValue = mapCall
+				? mapCall.methodName === null
+					? b.id(mapCall.receiverName)
+					: b.sequence([
+							...(mapCall.directReceiver
+								? []
+								: [b.assignment('=', b.id(mapCall.receiverName), mapCall.receiver)]),
+							b.assignment(
+								'=',
+								b.id(mapCall.methodName),
+								b.member(b.id(mapCall.receiverName), 'map'),
+							),
+							b.id(mapCall.receiverName),
+						])
+				: forNode.right;
+			holeProps.push(objectProp(itemsHole, rewriteJsxValues(itemsValue, ctx)));
 			rec.itemsExpr = memberProps(itemsHole, forNode.right);
-			rec.bodyHelper = `props.${bodyHole}`;
+			if (!mapCall) {
+				const bodyHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(bodyHole, b.id(rec.bodyHelper)));
+				rec.bodyHelper = `props.${bodyHole}`;
+			}
+			if (mapCall) {
+				const methodHole = `h${holeProps.length}`;
+				holeProps.push(
+					objectProp(
+						methodHole,
+						mapCall.methodName === null
+							? b.member(b.id(mapCall.receiverName), 'map')
+							: b.id(mapCall.methodName),
+					),
+				);
+				rec.mapMethodExpr = memberProps(methodHole, mapCall.callback);
+				const callbackHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(callbackHole, rewriteJsxValues(mapCall.callback, ctx)));
+				rec.mapCallbackExpr = memberProps(callbackHole, mapCall.callback);
+			}
 			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
 				const emptyHole = `h${holeProps.length}`;
 				holeProps.push(objectProp(emptyHole, b.id(rec.emptyHelper)));
@@ -13487,10 +13681,24 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				return expression;
 			};
 			if (rec.depNames.length) {
-				// Thread each dep value as its own hole so the reconciler's deps-equality
-				// check (and the Phase 2 env stamp — deps doubles as the helpers' env
-				// tuple) sees the component-scope values, not undefined renderer locals.
-				rec.depNames = rec.depNames.map(captureDependency);
+				if (
+					mapCall &&
+					rec.hasPerItemEventClosure &&
+					rec.autoMemoDeps === null &&
+					rec.depNames.length > 1
+				) {
+					// Event-bearing mapped rows cannot share the whole-list cache. Their
+					// helpers already receive one deps/env array, so capture that complete
+					// tuple as one fragment hole instead of forwarding each local separately.
+					const depHole = `h${holeProps.length}`;
+					holeProps.push(objectProp(depHole, b.array(rec.depNames.map((name) => b.id(name)))));
+					rec.packedDepsExpr = memberProps(depHole, forNode);
+				} else {
+					// Thread each dep value as its own hole so the reconciler's deps-equality
+					// check (and the Phase 2 env stamp — deps doubles as the helpers' env
+					// tuple) sees component-scope values, not undefined renderer locals.
+					rec.depNames = rec.depNames.map(captureDependency);
+				}
 			}
 			if (rec.autoMemoDeps !== null) {
 				// The whole-list cache guard is emitted inside the hoisted renderer too.
@@ -13796,7 +14004,7 @@ function prepareSetupValueDirective(directive, ctx, componentName) {
 		// the server does not mistake the code-block node for another setup value
 		// and recurse indefinitely. normalizeChildren also owns the durable error
 		// for setup-bearing child blocks, keeping client/server diagnostics aligned.
-		return inheritOriginLoc(b.jsx_fragment(normalizeChildren([opaque])), opaque);
+		return inheritOriginLoc(b.jsx_fragment(normalizeChildren([opaque], false, ctx)), opaque);
 	} finally {
 		ctx._puInlineLowering = prevPuInlineLowering;
 	}
@@ -14981,7 +15189,7 @@ function emitHeadServer(headNodes, ctx) {
 // `inSvg`: the children being normalized sit inside an SVG-namespace subtree.
 // SVG has its own `<title>` (the accessibility tooltip element) — it must stay
 // where it is, NOT hoist to document.head (React 19 makes the same exception).
-function normalizeChildren(nodes, inSvg = false) {
+function normalizeChildren(nodes, inSvg = false, ctx = null) {
 	const out = [];
 	if (!nodes) return out;
 	for (const n of nodes) {
@@ -15012,7 +15220,7 @@ function normalizeChildren(nodes, inSvg = false) {
 			// server stay in lockstep (required for hydration). The client .tsx
 			// host-fragment path does the same conversion in extractFragment (which
 			// hoists the items array as a hole before this runs).
-			const mapForNode = mapCallToForOf(n.expression);
+			const mapForNode = mapCallToForOf(n.expression, ctx);
 			if (mapForNode) {
 				out.push(mapForNode);
 				continue;
@@ -15056,10 +15264,10 @@ function normalizeChildren(nodes, inSvg = false) {
 					const refInner =
 						refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					out.push({ type: 'FragmentStart', refExpr: refInner });
-					out.push(...normalizeChildren(n.children || [], inSvg));
+					out.push(...normalizeChildren(n.children || [], inSvg, ctx));
 					out.push({ type: 'FragmentEnd' });
 				} else {
-					out.push(...normalizeChildren(n.children || [], inSvg));
+					out.push(...normalizeChildren(n.children || [], inSvg, ctx));
 				}
 				continue;
 			}
@@ -15121,7 +15329,7 @@ function normalizeChildren(nodes, inSvg = false) {
 			}
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || [], inSvg));
+			out.push(...normalizeChildren(n.children || [], inSvg, ctx));
 		} else if (n.type === 'JSXStyleElement') {
 			// Drop a `<style>` block at child position — its CSS gets registered
 			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
@@ -15133,7 +15341,7 @@ function normalizeChildren(nodes, inSvg = false) {
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg));
+			out.push(...normalizeChildren([n.expression], inSvg, ctx));
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -15198,7 +15406,7 @@ function normalizeChildren(nodes, inSvg = false) {
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg));
+				out.push(...normalizeChildren([render], inSvg, ctx));
 			} else {
 				throw new Error(
 					'`@{ … }` with setup statements is not supported at JSX child position. ' +
@@ -15616,7 +15824,7 @@ function planJsx(
 	// `null` outside dev → zero work, prod output byte-identical.
 	const _prevElemLocs = ctx._elemLocs;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
-	const allNodes = normalizeChildren(jsxNodesRaw, parentNs === 'svg');
+	const allNodes = normalizeChildren(jsxNodesRaw, parentNs === 'svg', ctx);
 	// Partition hoisted `<title>`/`<meta>`/`<link>` out of the BODY-root set:
 	// `jsxNodes` (the body) drives single/multi-root + the template, while head
 	// elements are mounted out-of-band into document.head. Excluding them (like
@@ -16451,10 +16659,16 @@ function planJsx(
 				: null;
 	const pushAfterStmt = (id, org, node) => pushAfter(id, inheritOriginLoc(node, org));
 	for (const fc of forCalls) {
-		ctx.runtimeNeeded.add('forBlock');
+		const isMappedList = fc.mapMethodExpr !== null;
+		ctx.runtimeNeeded.add(isMappedList ? 'mapSlot' : 'forBlock');
 		const slotIndex = fc.slotIndex;
 		const org = fc.origin ?? planOrigin;
-		registerDirectiveOrigin(ctx, org, ['_$forBlock', fc.keyHelper, fc.bodyHelper, fc.emptyHelper]);
+		registerDirectiveOrigin(ctx, org, [
+			isMappedList ? '_$mapSlot' : '_$forBlock',
+			fc.keyHelper,
+			fc.bodyHelper,
+			fc.emptyHelper,
+		]);
 		registerClauseOrigin(ctx, fc.emptyKeyword, [fc.emptyHelper]);
 		// Control-flow-only bodies have no bag: the host is __block.parentNode directly.
 		const hostExpr = () => hostNodeFor(`_for$${fc.id}`);
@@ -16507,9 +16721,11 @@ function planJsx(
 				),
 			);
 		}
-		const tailArgs = [helperRefNode(fc.keyHelper), helperRefNode(fc.bodyHelper)];
+		const keyNode = fc.inlineKey || helperRefNode(fc.keyHelper);
+		const depsNode = fc.packedDepsExpr || b.array(fc.depNames.map(depNode));
+		const tailArgs = [keyNode, helperRefNode(fc.bodyHelper)];
 		if (flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor) tailArgs.push(flagsExpr);
-		if (hasDeps) tailArgs.push(b.array(fc.depNames.map(depNode)));
+		if (hasDeps) tailArgs.push(depsNode);
 		else if (hasEmpty || hasAnchor) tailArgs.push(undefinedNode());
 		// Anchor the `@empty` arm at its own keyword: every other token of the
 		// lowering maps to the `@for`, which would leave `@empty` unreachable.
@@ -16521,6 +16737,71 @@ function planJsx(
 		// list's trailing boundary. Let forBlock reuse it as its end marker instead
 		// of retaining it beside a newly-created `/for` comment.
 		if (fc.anchorVar) tailArgs.push(b.literal(true));
+		if (isMappedList) {
+			const nativeName = allocCompilerName(ctx, '__mapNative');
+			if (fc.autoMemoDeps !== null) {
+				const mappedCall = b.stmt(
+					b.call(
+						'_$mapSlot',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						b.id('_v'),
+						fc.mapMethodExpr,
+						b.id(nativeName),
+						fc.mapCallbackExpr,
+						keyNode,
+						helperRefNode(fc.bodyHelper),
+						flagsExpr,
+						hasDeps ? depsNode : undefinedNode(),
+						hasAnchor ? anchorExpr : nullNode(),
+						fc.anchorVar ? b.literal(1) : undefinedNode(),
+					),
+				);
+				const prefix = [
+					b.const('_v', fc.itemsExpr),
+					b.const(nativeName, b.call('_$mapSlot', b.id('_v'), fc.mapMethodExpr)),
+				];
+				const witnessMiss = fc.autoMemoWitnesses.length
+					? witnessMissChain(fc.autoMemoWitnesses)
+					: null;
+				const customMiss = b.unary('!', b.id(nativeName));
+				const forcedMiss = witnessMiss ? b.logical('||', customMiss, witnessMiss) : customMiss;
+				const guarded = emitAutoMemoRegion(
+					ctx,
+					['_v', ...fc.autoMemoDeps],
+					slotIndex,
+					mappedCall,
+					forcedMiss,
+					fc.autoMemoContextAware,
+					depNode,
+				);
+				pushAfterStmt(fc.id, org, b.block([...prefix, guarded]));
+			} else {
+				pushAfterStmt(
+					fc.id,
+					org,
+					b.stmt(
+						b.call(
+							'_$mapSlot',
+							b.id('__s'),
+							b.literal(slotIndex),
+							hostExpr(),
+							fc.itemsExpr,
+							fc.mapMethodExpr,
+							fc.mapCallbackExpr,
+							keyNode,
+							helperRefNode(fc.bodyHelper),
+							flagsExpr,
+							hasDeps ? depsNode : undefinedNode(),
+							hasAnchor ? anchorExpr : nullNode(),
+							fc.anchorVar ? b.literal(1) : undefinedNode(),
+						),
+					),
+				);
+			}
+			continue;
+		}
 		if (fc.autoMemoDeps !== null) {
 			const witnessMiss = fc.autoMemoWitnesses.length
 				? witnessMissChain(fc.autoMemoWitnesses)
@@ -19186,7 +19467,7 @@ function emitElementHtml(
 		appendTemplatePart(html, escapeInlineScriptContent(authoredStaticScriptContent), 'raw');
 	}
 
-	const children = normalizeChildren(sourceChildren, childNs === 'svg');
+	const children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
 	// Special case: a single Text child (only-child text fast path).
 	if (children.length === 1 && children[0].type === 'Text') {
 		const txtChild = children[0];
@@ -20655,7 +20936,20 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// the key arrow's own origin, then the module origin.
 	const keyHelper = `_key$${ctx.nextHelperId++}`;
 	const keyOrigin = node.loc ? node : keyFn.loc ? keyFn : ctx._moduleOrigin;
-	ctx.hoistedHelpers.push(inheritOriginLoc(b.const(keyHelper, keyFn), keyOrigin));
+	const keyBody = keyFn.body;
+	const inlineKey =
+		node.nativeArrayMap !== undefined &&
+		mapCallbackHasEventClosure(node.nativeArrayMap.callback) &&
+		!isDestructured &&
+		!node.index &&
+		keyBody?.type === 'MemberExpression' &&
+		keyBody.computed !== true &&
+		keyBody.object?.type === 'Identifier' &&
+		keyBody.object.name === itemName &&
+		keyBody.property?.name === 'id';
+	if (!inlineKey) {
+		ctx.hoistedHelpers.push(inheritOriginLoc(b.const(keyHelper, keyFn), keyOrigin));
+	}
 
 	// When the for-of header declared `index <name>`, expose it as a `const`
 	// at the top of the body — the runtime stamps `block.itemIndex` per item
@@ -20704,6 +20998,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let autoMemoDeps = null;
 	let autoMemoWitnesses = [];
 	let autoMemoContextAware = false;
+	const hasPerItemEventClosure =
+		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
 	if (ctx.currentComponentLocals) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
@@ -20806,6 +21102,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		}
 		let listSafe =
 			ctx.autoMemo === true &&
+			!hasPerItemEventClosure &&
 			isAutoMemoCalculationDependency(node.right) &&
 			!hasHook &&
 			!containsRenderCall(regionStmts, ctx) &&
@@ -20888,10 +21185,15 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
 	// The synthetic item param maps to the authored for-of binding.
 	const itemParams = [b.id(itemName, leftDeclId)];
-	const envNames = unionEnv(ctx, [
+	let envNames = unionEnv(ctx, [
 		{ stmts: itemAllStmts, params: itemParams },
 		emptyStmts && { stmts: emptyStmts, params: [] },
 	]);
+	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
+		// The helper and its packed tuple share this internal ordering. Grouping
+		// event-row captures in the same order improves the compressed fragment.
+		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
+	}
 	// The helper destructures only component-local captures (`envNames`) from the
 	// tuple prefix. Compiler memoization may additionally need live imported
 	// bindings as dependency witnesses; append them without disturbing that ABI.
@@ -20980,13 +21282,36 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		}
 	}
 
+	const mapCall = node.nativeArrayMap || null;
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
 		origin: node,
-		itemsExpr: node.right, // the fold replaces this with a `props.hN` member read
+		itemsExpr: mapCall
+			? mapCall.methodName === null
+				? b.id(mapCall.receiverName)
+				: b.sequence([
+						...(mapCall.directReceiver
+							? []
+							: [b.assignment('=', b.id(mapCall.receiverName), mapCall.receiver)]),
+						b.assignment(
+							'=',
+							b.id(mapCall.methodName),
+							b.member(b.id(mapCall.receiverName), 'map'),
+						),
+						b.id(mapCall.receiverName),
+					])
+			: node.right, // the fold replaces this with a `props.hN` member read
+		mapMethodExpr: mapCall
+			? mapCall.methodName === null
+				? b.member(b.id(mapCall.receiverName), 'map')
+				: b.id(mapCall.methodName)
+			: null,
+		mapCallbackExpr: mapCall ? rewriteJsxValues(mapCall.callback, ctx) : null,
 		keyHelper,
+		inlineKey: inlineKey ? keyFn : null,
 		bodyHelper: itemHelperName,
+		hasPerItemEventClosure,
 		pure,
 		singleRoot,
 		singleRootExpr,
@@ -21017,6 +21342,35 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		emptyKeyword: node.emptyKeyword ?? null,
 		hostPath: null,
 	};
+}
+
+function mapCallbackHasEventClosure(callback) {
+	const stack = [callback.body];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (!node || typeof node !== 'object') continue;
+		if (Array.isArray(node)) {
+			stack.push(...node);
+			continue;
+		}
+		if (node.type === 'JSXAttribute' || node.type === 'Attribute') {
+			const name = node.name?.name || node.name;
+			const expression =
+				node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value;
+			if (
+				typeof name === 'string' &&
+				/^on[A-Z]/.test(name) &&
+				(expression?.type === 'ArrowFunctionExpression' ||
+					expression?.type === 'FunctionExpression')
+			) {
+				return true;
+			}
+		}
+		for (const key in node) {
+			if (!AST_WALK_SKIP_KEYS.has(key)) stack.push(node[key]);
+		}
+	}
+	return false;
 }
 
 // ===========================================================================

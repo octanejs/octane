@@ -8521,7 +8521,18 @@ function parseSeedJson(raw: string): unknown[] | null {
 	}
 }
 
+// A mapped-list fallback owns its host through the descriptor reconciler. On
+// the first transition to the compiled item body, let that body's existing
+// clone() mount adopt the same host and initialize its ordinary binding bag.
+// Armed only around that one mapped survivor render; all other clones see null.
+let MAPPED_ITEM_ADOPTION: { node: Node | null } | null = null;
+
 export function clone<T extends Node>(node: T, loc?: string): T {
+	if (MAPPED_ITEM_ADOPTION !== null && MAPPED_ITEM_ADOPTION.node !== null) {
+		const adopted = MAPPED_ITEM_ADOPTION.node;
+		MAPPED_ITEM_ADOPTION.node = null;
+		return adopted as T;
+	}
 	// Compiler templates are inert module-scope tokens. Parse each concrete
 	// namespace on its first real mount, then clone the cached node thereafter.
 	// Non-compiler callers can still hand clone() an ordinary DOM Node directly.
@@ -8651,6 +8662,13 @@ export function htext(el: Node, value: unknown): Text {
 	const text = coerceText(value);
 	const hydration = activeHydration();
 	if (hydration !== null) return hydration.htext(el, text);
+	if (MAPPED_ITEM_ADOPTION !== null) {
+		const existing = el.firstChild;
+		if (existing?.nodeType === 3 && existing.nextSibling === null) {
+			if (existing.nodeValue !== text) existing.nodeValue = text;
+			return existing as Text;
+		}
+	}
 	const t = document.createTextNode(text);
 	el.appendChild(t);
 	return t;
@@ -8674,6 +8692,10 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	const text = coerceText(value);
 	const hydration = activeHydration();
 	if (hydration !== null) return hydration.htextSwap(posNode, text);
+	if (MAPPED_ITEM_ADOPTION !== null && posNode?.nodeType === 3) {
+		if (posNode.nodeValue !== text) posNode.nodeValue = text;
+		return posNode as Text;
+	}
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
 	const t = document.createTextNode(text);
 	const parent = posNode!.parentNode!;
@@ -13310,12 +13332,21 @@ export function createScopedElement<P>(
 	const children = (): unknown => {
 		const scope = CURRENT_SCOPE;
 		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
-		if (!resolved || resolvedScope !== scope || resolvedEpoch !== epoch) {
+		const sameScope =
+			resolvedScope === scope ||
+			(resolvedScope !== null && scope !== null && scope.block.parentBlock === resolvedScope.block);
+		if (!resolved || !sameScope || resolvedEpoch !== epoch) {
 			const nextChildren = readChildren();
 			resolvedScope = scope;
 			resolvedEpoch = epoch;
 			resolvedChildren = nextChildren;
 			resolved = true;
+		} else if (resolvedScope !== scope) {
+			// Host classification previews scoped children in the parent block before
+			// hostElementBody immediately renders them in its direct child block.
+			// Reuse that same-context preview once, then move ownership to the child
+			// so sibling/provider scopes cannot inherit another subtree's values.
+			resolvedScope = scope;
 		}
 		return resolvedChildren;
 	};
@@ -15573,7 +15604,11 @@ function deoptItemBody(item: any, scope: Scope): void {
 	}
 	// Switching Blocks → pure: unmount the childSlot content the Blocks path mounted
 	// (effect cleanups + DOM) by reconciling it to null. Idempotent once cleared.
-	if (scope.slots[0] !== undefined && scope.slots[0] !== null) {
+	if (
+		scope.slots[0] !== undefined &&
+		scope.slots[0] !== null &&
+		(scope.slots[0] as any).__kind === 'childSlot'
+	) {
 		childSlot(scope, 0, block.parentNode, null, block.endMarker);
 	}
 	// Pure host/text item → reconcile in place, REUSING the item's existing node so
@@ -15971,6 +16006,133 @@ function isPortalTarget(block: Block, domParent: Node): boolean {
 	return false;
 }
 
+const NATIVE_ARRAY_MAP = Array.prototype.map;
+const NATIVE_REFLECT_APPLY = Reflect.apply;
+const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+// Components hand the reconciler immutable array snapshots. Memoizing indexed
+// accessor classification by snapshot identity avoids a descriptor allocation
+// per row on every unchanged parent render; holes and intrinsic overrides are
+// still rechecked each time. Mutating an existing data index into an accessor
+// without changing the snapshot identity/length is outside that contract.
+const NATIVE_ARRAY_ACCESSORS = new WeakMap<object, { length: number; accessor: boolean }>();
+
+/** Shared compiler ABI: native-array eligibility query plus stable keyed map dispatch. */
+export function mapSlot(
+	scopeOrItems: any,
+	slotOrMethod: any,
+	domParent?: Node,
+	items?: any,
+	method?: any,
+	native?: boolean | ((...args: any[]) => any),
+	callback?: (...args: any[]) => any,
+	getKey?: (item: any, index: number) => any,
+	itemBody?: (item: any, scope: Scope) => void,
+	flags?: number,
+	deps?: any[],
+	anchor?: Node | null,
+	ownEnd?: boolean | 1,
+): boolean | void {
+	if (arguments.length === 2) {
+		const receiver = scopeOrItems;
+		if (
+			!Array.isArray(receiver) ||
+			Object.getPrototypeOf(receiver) !== Array.prototype ||
+			slotOrMethod !== NATIVE_ARRAY_MAP ||
+			Object.prototype.hasOwnProperty.call(receiver, 'constructor') ||
+			Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
+			Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
+		) {
+			return false;
+		}
+		const length = receiver.length;
+		let accessor = NATIVE_ARRAY_ACCESSORS.get(receiver);
+		if (accessor === undefined || accessor.length !== length) {
+			let found = false;
+			for (let index = 0; index < length; index++) {
+				const descriptor = Object.getOwnPropertyDescriptor(receiver, index);
+				if (descriptor === undefined || descriptor.get !== undefined) {
+					found = true;
+					break;
+				}
+			}
+			accessor = { length, accessor: found };
+			NATIVE_ARRAY_ACCESSORS.set(receiver, accessor);
+		}
+		if (accessor.accessor) return false;
+		for (let index = 0; index < length; index++) {
+			if (!(index in receiver)) return false;
+		}
+		return true;
+	}
+	// Unmemoized mapped regions do not need the eligibility answer separately.
+	// Accept their compact one-call ABI and run the same guard exactly once.
+	if (typeof native === 'function') {
+		ownEnd = anchor as boolean | 1 | undefined;
+		anchor = deps as Node | null | undefined;
+		deps = flags as any[] | undefined;
+		flags = itemBody as unknown as number | undefined;
+		itemBody = getKey as unknown as (item: any, scope: Scope) => void;
+		getKey = callback as (item: any, index: number) => any;
+		callback = native;
+		native = mapSlot(items, method) as boolean;
+	}
+	if (ownEnd === 1) ownEnd = true;
+	if (native === true) {
+		childSlot(
+			scopeOrItems,
+			slotOrMethod,
+			domParent!,
+			items,
+			anchor,
+			ownEnd,
+			undefined,
+			false,
+			true,
+			itemBody,
+			getKey,
+			flags,
+			deps,
+		);
+	} else {
+		let mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
+		if (Array.isArray(mapped)) {
+			let packed: any[] | null = null;
+			for (let index = 0; index < mapped.length; index++) {
+				if (!(index in mapped)) {
+					packed = [];
+					break;
+				}
+			}
+			if (packed !== null) {
+				for (let index = 0; index < mapped.length; index++) {
+					if (index in mapped) packed.push(mapped[index]);
+				}
+				mapped = packed;
+			}
+		}
+		childSlot(
+			scopeOrItems,
+			slotOrMethod,
+			domParent!,
+			mapped,
+			anchor,
+			ownEnd,
+			undefined,
+			false,
+			true,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true,
+		);
+		const state = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined;
+		if (state?.forSlot !== null && state?.forSlot !== undefined) {
+			state.forSlot.mappedNative = false;
+		}
+	}
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -15994,6 +16156,11 @@ export function childSlot(
 	// nested child slot must render the descriptor directly rather than wrap it
 	// in another one-item list.
 	includeKeyedSingle: boolean = true,
+	compiledMapBody?: (item: any, scope: Scope) => void,
+	compiledMapKey?: (item: any, index: number) => any,
+	compiledMapFlags?: number,
+	compiledMapDeps?: any[],
+	mappedFallback?: boolean,
 ): void {
 	// Reading the host's tag costs two DOM accessors and this runs for every
 	// renderable hole on every render, so lead with the cheap facts. A de-opt list
@@ -16031,6 +16198,11 @@ export function childSlot(
 				ownsHost,
 				compactable,
 				includeKeyedSingle,
+				compiledMapBody,
+				compiledMapKey,
+				compiledMapFlags,
+				compiledMapDeps,
+				mappedFallback,
 			),
 		);
 		return;
@@ -16067,7 +16239,10 @@ export function childSlot(
 		)?.[HYDRATION_RANGE_BOUNDARY] !== 'owner';
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
-	const preparedList = prepareDeoptList(value, false, includeKeyedSingle);
+	const preparedList =
+		compiledMapBody !== undefined
+			? { items: value as any[], keys: null }
+			: prepareDeoptList(value, false, includeKeyedSingle);
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
 	// portals, no render functions). Computed once per call: the slot init below
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
@@ -16117,6 +16292,11 @@ export function childSlot(
 				ownsHost,
 				compactable,
 				includeKeyedSingle,
+				compiledMapBody,
+				compiledMapKey,
+				compiledMapFlags,
+				compiledMapDeps,
+				mappedFallback,
 			);
 			return;
 		}
@@ -16316,16 +16496,139 @@ export function childSlot(
 			}
 		}
 		const { items, keys } = preparedList;
-		const getKey = (_item: any, i: number) => keys[i];
+		const markerlessMappedFallback =
+			mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
+		const getKey = compiledMapKey
+			? (item: any, index: number) => 'k' + String(compiledMapKey(item, index))
+			: (_item: any, i: number) => keys![i];
+		const wasMappedNative = state.forSlot.mappedNative === true;
+		let body = compiledMapBody || (deoptItemBody as any);
+		if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
+			for (let index = 0; index < items.length; index++) {
+				const item = items[index];
+				if (!isHostDescriptor(item)) continue;
+				const block = state.forSlot.items.get(getKey(item, index));
+				if (
+					block !== undefined &&
+					block.startMarker !== null &&
+					block.startMarker === block.endMarker &&
+					block.startMarker.nodeType === 1 &&
+					(block.startMarker as Element).localName === item.type
+				) {
+					const root = block.startMarker as Element;
+					const text = root.firstChild;
+					if (text?.nodeType === 3 && text.nextSibling === null) {
+						const children = Object.getOwnPropertyDescriptor(item, 'children');
+						const primitive =
+							children !== undefined &&
+							'value' in children &&
+							(typeof children.value === 'string' ||
+								typeof children.value === 'number' ||
+								typeof children.value === 'bigint');
+						if (primitive) {
+							(text as any).$$deoptKey = 0;
+						} else if (children?.get !== undefined) {
+							// Scoped JSX descriptors defer children until their represented
+							// render scope. Prove this node came from the compiled binding bag
+							// without invoking that scope-sensitive accessor in the parent.
+							const bag = block.slots[0];
+							if (bag !== null && bag !== undefined) {
+								for (const field in bag) {
+									if (bag[field] === text) {
+										(text as any).$$deoptKey = 0;
+										break;
+									}
+								}
+							}
+						}
+					}
+					block.deoptNode = block.startMarker;
+				}
+			}
+		}
+		if (compiledMapBody !== undefined) {
+			if (state.forSlot.mappedNative === false) {
+				body = (item: any, scope: Scope, extra?: any[]): void => {
+					const adopted = scope.slots[0] === undefined ? scope.block.deoptNode : null;
+					if (adopted === null || adopted.nodeType !== 1) {
+						(compiledMapBody as any)(item, scope, extra);
+						return;
+					}
+					const previous = MAPPED_ITEM_ADOPTION;
+					const adoption = { node: adopted };
+					MAPPED_ITEM_ADOPTION = adoption;
+					try {
+						(compiledMapBody as any)(item, scope, extra);
+						if (adoption.node === null) scope.block.deoptNode = null;
+					} finally {
+						MAPPED_ITEM_ADOPTION = previous;
+					}
+				};
+			}
+			state.forSlot.mappedNative = true;
+		}
+		if (markerlessMappedFallback) {
+			const descriptorBody = body;
+			body = (item: any, scope: Scope): void => {
+				const root = scope.block.startMarker;
+				if (
+					root !== null &&
+					root === scope.block.endMarker &&
+					root.nodeType === 1 &&
+					scope.block.deoptNode === null
+				) {
+					scope.block.deoptNode = root;
+				}
+				descriptorBody(item, scope);
+			};
+		}
+		const fastFlags = compiledMapFlags || 0;
+		const ssrMarkerless =
+			compiledMapBody === undefined ? markerlessMappedFallback : (fastFlags & 16) !== 0;
+		let pure = (fastFlags & 1) !== 0;
+		let lite = false;
+		if (compiledMapBody !== undefined) {
+			state.forSlot.env = compiledMapDeps;
+			if ((fastFlags & 4) !== 0 && compiledMapDeps !== undefined) {
+				if (
+					state.forSlot.cachedDeps !== null &&
+					depsEqual(state.forSlot.cachedDeps, compiledMapDeps)
+				) {
+					pure = true;
+				} else {
+					lite = true;
+				}
+				state.forSlot.cachedDeps = compiledMapDeps;
+			}
+		}
 		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 		// no `it` pair per item — resolved per item value in mountItem; shape
 		// flips promote to a minted pair in place (deoptItemBody).
 		// First fill dispatches to the linear pass directly (see mountItemsLinear)
 		// so a de-opt list's hydration adopt skips the full reconciler too.
 		if (state.forSlot.size === 0) {
-			mountItemsLinear(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, 2, false);
+			mountItemsLinear(
+				parentBlock,
+				state.forSlot,
+				items,
+				getKey,
+				body,
+				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+				ssrMarkerless,
+			);
 		} else {
-			reconcileKeyed(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, false, 2);
+			reconcileKeyed(
+				parentBlock,
+				state.forSlot,
+				items,
+				getKey,
+				body,
+				pure,
+				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+				lite,
+				(fastFlags & 8) !== 0,
+				ssrMarkerless,
+			);
 		}
 		// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 		// children whose keys have no new item) are orphans inside the range —
@@ -20666,6 +20969,9 @@ interface ForSlot {
 	// focus, input state survive — React parity) instead of rebuilding.
 	// Consumed and nulled within the same render.
 	adopt: Array<{ key: any; node: Node }> | null;
+	// Present only on a childSlot owned by the compiler's guarded map ABI.
+	// Keeps descriptor↔compiled adoption off every ordinary descriptor list.
+	mappedNative?: boolean;
 }
 
 export function forBlock<T>(
