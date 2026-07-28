@@ -231,6 +231,10 @@ function userAppEvalSubmission() {
 export default defineConfig({
 	test: {
 		...configDefaults,
+		// This root-only option applies to every project below. For local
+		// diagnostics, a CLI value such as `--silent=false` or
+		// `--silent=passed-only` overrides this default.
+		silent: true,
 		projects: [
 			{
 				test: {

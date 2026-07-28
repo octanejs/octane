@@ -1,4 +1,7 @@
+// Browser consumers import this subpath directly, so it stays free of Node
+// builtins. The Vite plugin lives behind `octane/compiler/vite` (and
+// `@octanejs/vite-plugin`), which is where its `node:fs`/`node:path` graph
+// belongs.
 export { compile } from './compile.js';
 export { analyzeNativeChangeDiagnostics as __analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
-export { octane } from './vite.js';
 export { compileToVolarMappings } from './volar.js';

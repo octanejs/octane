@@ -698,6 +698,19 @@ pnpm typecheck    # type-check packages, website, and examples
 pnpm format       # format with Prettier
 ```
 
+`pnpm test` runs the projects declared in the root `vitest.config.js` through a
+single Vitest invocation rather than calling each package's `test` script. Test
+console output is silent by default for every project, including failures. Pass
+`--silent=false` through the root script when debugging, or use
+`--silent=passed-only` to print output only for failing tests:
+
+```bash
+pnpm test -- --silent=false
+pnpm test -- --silent=passed-only
+```
+
+Command-line options override the root Vitest config.
+
 ### Playground
 
 The playground under [`playground/octane`](./playground/octane) covers state, keyed
