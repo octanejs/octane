@@ -14542,7 +14542,10 @@ export function hostComponent(
 	slot: number,
 	tag: string,
 	props: Record<string, any> | null,
-	childrenBody?: unknown,
+	// A compiled TSRX call site passes its children render-body; a TSX/createElement
+	// value position passes a descriptor. `OctaneNode` is the alias for "whatever a
+	// hole may render", and covers both — see the branch below.
+	childrenBody?: ComponentBody | OctaneNode,
 	anchor?: Node | null,
 ): Element {
 	const block = scope.block;
@@ -14574,10 +14577,19 @@ export function hostComponent(
 			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
 		}
 		childSlot(state.childScope!, 0, el, state.body, null, false, el);
-	} else if (childrenBody != null) {
+	} else if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
 		// createElement/descriptor callers already supply a renderable value. Let
 		// childSlot reconcile it directly instead of assuming every child is callable.
-		childSlot(state.childScope!, 0, el, childrenBody, null, false, el);
+		//
+		// A TSX value position can go null between renders (`{cond ? <x/> : null}`),
+		// unlike the compiled TSRX body which is statically present or absent. Once
+		// the slot exists it must keep receiving the value — including null — or the
+		// previous Block and its DOM stay stranded inside the host (hostElementBody
+		// reconciles unconditionally for the same reason). A host that never had
+		// children stays out of childSlot: under hydration `ownsHost` is ignored, so
+		// an unconditional call would mint a stray end marker inside every childless
+		// host component.
+		childSlot(state.childScope!, 0, el, childrenBody ?? null, null, false, el);
 	}
 	return el;
 }
