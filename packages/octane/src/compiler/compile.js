@@ -6761,8 +6761,11 @@ function ssrCompileBody(
 		ctx._pendingWarm = warm.warmNode ?? null;
 	}
 	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
-	const preparedStatements = workingStatements.map((statement) =>
-		lowerSetupValueDirectives(statement, (directive) => {
+	// Fold one directive found at value position into a server sub-render owned by
+	// THIS body. Mirrors the client's lowerBodyValueDirective: the arms compile
+	// against this body's scope and the helper lands in this body's inlinedSubs.
+	const lowerBodyValueDirective = (directive) => {
+		{
 			const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
 			const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
 			const sub = ssrCompileSub(
@@ -6799,8 +6802,17 @@ function ssrCompileBody(
 				b.id(wrapperName),
 				b.object([b.prop('init', b.id('body'), b.id(sub.fnName))]),
 			);
-		}),
+		}
+	};
+	const preparedStatements = workingStatements.map((statement) =>
+		lowerSetupValueDirectives(statement, lowerBodyValueDirective),
 	);
+	// Publish the fold for value-position JSX lowering (attribute values,
+	// expression-container children, children of an element that is itself a
+	// value), which runs deep inside ssrEmitNodes/rewriteJsxValues. Restored after
+	// this body so a nested body never folds into its parent's helper list.
+	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
+	ctx._valueDirectiveLowering = lowerBodyValueDirective;
 	const rewritten = preparedStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
@@ -6851,6 +6863,7 @@ function ssrCompileBody(
 	ctx._ssrInheritRoot = prevInheritRoot;
 	ctx._returnedFragmentTemplate = prevReturnedFragmentTemplate;
 	ctx._tsxValuePos = prevValuePos;
+	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 
 	const body = [];
 	if (cssEntries && cssEntries.length) {
@@ -9647,17 +9660,27 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	}
 	ctx._puInlineLowering = prevPuInlineLowering;
 
+	// Fold one directive found at value position into a hoisted renderer owned by
+	// THIS body, so its arms close over this body's scope and its helpers land in
+	// this body's inlinedSubs.
+	const lowerBodyValueDirective = (directive) =>
+		lowerHostFragment(
+			setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+			ctx,
+			inlinedSubs,
+			'opaque',
+			cssHash,
+		);
 	const preparedStatements = workingStatements.map((statement) =>
-		lowerSetupValueDirectives(statement, (directive) =>
-			lowerHostFragment(
-				setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
-				ctx,
-				inlinedSubs,
-				'opaque',
-				cssHash,
-			),
-		),
+		lowerSetupValueDirectives(statement, lowerBodyValueDirective),
 	);
+	// Value-position JSX lowering (attribute values, expression-container children,
+	// children of an element that is itself a value) runs deep inside planJsx and
+	// rewriteJsxValues, far from this scope. Publish the fold so those paths can
+	// reach it, and restore the previous owner once this body is emitted — nested
+	// bodies must never fold into their parent's helper list.
+	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
+	ctx._valueDirectiveLowering = lowerBodyValueDirective;
 
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
@@ -9735,6 +9758,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx._inheritBody = prevInheritBody;
 	ctx._fnOrigin = prevFnOrigin;
 	ctx._foldedDirectiveCalls = prevFDC;
+	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 
 	const bodyStatements = [];
 	const autoMemoSize = ctx.currentAutoMemoOffset;
@@ -13246,20 +13270,34 @@ function prepareSetupValueDirective(directive, ctx, componentName) {
 	}
 }
 
+// Node kinds whose `children` array is JSX child position. A directive found
+// anywhere else in one of these nodes (an attribute value, a dynamic tag name)
+// is an ordinary expression, not a child.
+const JSX_CHILDREN_BEARING_TYPES = new Set([
+	'JSXElement',
+	'Element',
+	'JSXFragment',
+	'Fragment',
+	'Tsx',
+	'Tsrx',
+]);
+
 // Setup JSX is still a first-class element value: keep its authored outer
 // host/component descriptor (including key/ref/cloneElement behavior) and
 // replace only compiler-owned directive children with a renderable fragment.
 // Nested functions are separate lexical owners; lowering them with the outer
 // component's helper list would strand callback params outside their scope.
 function lowerSetupValueDirectives(node, lowerDirective) {
-	return visit(node);
+	return visit(node, false);
 
-	function visit(current) {
+	// `jsxChild` tracks whether `current` sits in JSX child position, which is the
+	// only place the lowered descriptor still has to print as a `{…}` container.
+	function visit(current, jsxChild) {
 		if (current == null || typeof current !== 'object') return current;
 		if (Array.isArray(current)) {
 			let out = current;
 			for (let index = 0; index < current.length; index++) {
-				const value = visit(current[index]);
+				const value = visit(current[index], jsxChild);
 				if (value !== current[index]) {
 					if (out === current) out = current.slice();
 					out[index] = value;
@@ -13269,12 +13307,18 @@ function lowerSetupValueDirectives(node, lowerDirective) {
 		}
 		if (isFunctionNode(current)) return current;
 		if (SETUP_VALUE_DIRECTIVE_TYPES.has(current.type)) {
-			return b.jsx_expression_container(lowerDirective(current), current);
+			const lowered = lowerDirective(current);
+			// At every other position the directive IS the expression — an
+			// initializer, an attribute value, a call argument. Wrapping those in a
+			// JSXExpressionContainer prints a bare `{expr}`, which is a block
+			// statement, not an expression, so the emitted module fails to parse.
+			return jsxChild ? b.jsx_expression_container(lowered, current) : lowered;
 		}
+		const childrenAreJsx = JSX_CHILDREN_BEARING_TYPES.has(current.type);
 		let out = current;
 		for (const key in current) {
 			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
-			const value = visit(current[key]);
+			const value = visit(current[key], childrenAreJsx && key === 'children');
 			if (value !== current[key]) {
 				if (out === current) out = { ...current };
 				out[key] = value;
@@ -13316,8 +13360,29 @@ function rewriteJsxValues(node, ctx) {
 			// lowerJsxChild owns the single implementation of fragment lowering.
 			return lowerJsxChild(n, ctx);
 		}
+		if (SETUP_VALUE_DIRECTIVE_TYPES.has(t)) {
+			// `prop={@if …}` / `{@for …}` — a directive standing directly at a value
+			// position. Only the template compiler can emit control flow, so fold it
+			// into a hoisted renderer and hand back the descriptor.
+			const lowered = lowerValueDirective(n, ctx);
+			if (lowered !== null) return lowered;
+		}
 		return null;
 	});
+}
+
+// A compiler-owned directive reached at VALUE position — an attribute value, an
+// expression-container child, or a child of an element that is itself a value.
+// esrap cannot print these TSRX-only nodes, so without this they either crash
+// the printer or get silently dropped by lowerJsxChild. Fold them through the
+// same hoisted-renderer path setup directive values use, which compiles each arm
+// once and yields an ordinary renderable descriptor.
+//
+// Returns null when no owning function body published a fold context (module
+// top level), leaving the pre-existing diagnostic in place.
+function lowerValueDirective(node, ctx) {
+	const lower = ctx._valueDirectiveLowering;
+	return lower == null ? null : lower(node);
 }
 
 // Lower one JSX child node to a `createElement` argument expression (or null to
@@ -13337,6 +13402,12 @@ function lowerJsxChild(child, ctx) {
 		return rewriteJsxValues(child.expression, ctx);
 	}
 	if (t === 'JSXElement' || t === 'Element') return jsxElementToCreateElement(child, ctx);
+	if (SETUP_VALUE_DIRECTIVE_TYPES.has(t)) {
+		// `<Child prop={<h1>@if …</h1>} />` — the host element is a value, so its
+		// children never reach normalizeChildren. Fold the directive here instead of
+		// dropping it through the unknown-node bail below.
+		return lowerValueDirective(child, ctx);
+	}
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
 		for (const c of child.children || []) {
