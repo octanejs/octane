@@ -21,7 +21,10 @@ const STATIC_SPECIFIER = /(?:^|\n)\s*(?:import|export)\b[\s\S]*?from\s*['"]([^'"
  * imports, returning every Node builtin specifier found and the import chain
  * that reaches it.
  */
-function findNodeBuiltins(entry: string) {
+function findNodeBuiltins(
+	entry: string,
+	readSource: (file: string) => string = (file) => readFileSync(file, 'utf8'),
+) {
 	const found: Array<{ builtin: string; chain: string[] }> = [];
 	const seen = new Set<string>();
 
@@ -29,7 +32,7 @@ function findNodeBuiltins(entry: string) {
 		if (seen.has(file)) return;
 		seen.add(file);
 
-		const source = readFileSync(file, 'utf8');
+		const source = readSource(file);
 		const here = [...chain, file.slice(COMPILER_SRC.length + 1)];
 
 		for (const [, specifier] of source.matchAll(STATIC_SPECIFIER)) {
@@ -54,11 +57,28 @@ describe('octane/compiler in the browser', () => {
 		);
 	});
 
-	it('detects a Node builtin the entry pulls in transitively', () => {
-		// Pins the oracle: the walk follows relative imports rather than only
-		// scanning the entry file, so a builtin one hop away is still caught.
-		const offenders = findNodeBuiltins(join(COMPILER_SRC, 'vite.js'));
+	it('follows relative imports to detect a transitive Node builtin', () => {
+		const entry = join(COMPILER_SRC, 'oracle-entry.js');
+		const dependency = join(COMPILER_SRC, 'oracle-dependency.js');
+		const modules = new Map([
+			[entry, "export { sentinel } from './oracle-dependency.js';"],
+			[
+				dependency,
+				"import { readFileSync } from 'node:fs';\nexport const sentinel = readFileSync;",
+			],
+		]);
 
-		expect(offenders.map(({ builtin }) => builtin)).toContain('node:fs');
+		const offenders = findNodeBuiltins(entry, (file) => {
+			const source = modules.get(file);
+			if (source === undefined) throw new Error(`Unexpected oracle module: ${file}`);
+			return source;
+		});
+
+		expect(offenders).toEqual([
+			{
+				builtin: 'node:fs',
+				chain: ['oracle-entry.js', 'oracle-dependency.js'],
+			},
+		]);
 	});
 });
