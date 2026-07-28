@@ -39,7 +39,7 @@ function descriptorFactories(code: string): Set<string> {
 	return runtimeImports(code, ['createElement', 'createScopedElement']);
 }
 
-function elementDescriptorCalls(code: string, component: string): any[] {
+function elementDescriptorCalls(code: string, component: string, root?: any): any[] {
 	const factories = descriptorFactories(code);
 	const calls: any[] = [];
 	const seen = new WeakSet<object>();
@@ -59,7 +59,7 @@ function elementDescriptorCalls(code: string, component: string): any[] {
 			else visit(value);
 		}
 	};
-	visit(parseModule(code, 'compiled.js'));
+	visit(root ?? parseModule(code, 'compiled.js'));
 	return calls;
 }
 
@@ -104,16 +104,15 @@ describe('.tsx return-form component children — server matches client (descrip
 
 	it('server passes return-form children as an element descriptor, not a render block', () => {
 		const code = serverCode(RETURN_FORM);
-		const factories = descriptorFactories(code);
+		const childrenBlockFactories = runtimeImports(code, ['markChildrenBlock']);
 		// The child remains an inspectable descriptor rather than a template-only
-		// children block, whichever descriptor factory preserves its render scope.
+		// children block, even when its complete record is deferred until inspection.
 		const values = childrenValues(code);
 		expect(
 			values.some(
 				(value) =>
-					value.type === 'CallExpression' &&
-					factories.has(value.callee?.name) &&
-					value.arguments[0]?.name === 'Inner',
+					!(value.type === 'CallExpression' && childrenBlockFactories.has(value.callee?.name)) &&
+					elementDescriptorCalls(code, 'Inner', value).length > 0,
 			),
 		).toBe(true);
 	});

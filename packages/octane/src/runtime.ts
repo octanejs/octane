@@ -13221,6 +13221,67 @@ function finalizeElementDescriptor<P>(descriptor: ElementDescriptor<P>): Element
 	return descriptor;
 }
 
+const SCOPED_VALUE_RECORD: unique symbol = Symbol('octane.scopedValue');
+
+type ScopedValueDescriptor<P> = ElementDescriptor<P> & {
+	readonly [SCOPED_VALUE_RECORD]?: () => ElementDescriptor<P>;
+};
+
+/**
+ * Preserve an inspectable JSX descriptor while deferring its complete record.
+ *
+ * The marker stays eagerly available to public element checks, while inspecting
+ * any actual field resolves type, props, key, ref, and children together in the
+ * current render scope. A shared value is rebuilt when its provider scope or
+ * context epoch changes, just like a scoped element's deferred children.
+ *
+ * @internal
+ */
+export function createScopedValue<P>(
+	readElement: () => ElementDescriptor<P>,
+): ElementDescriptor<P> {
+	let resolved: ElementDescriptor<P> | undefined;
+	let resolvedScope: Scope | null = null;
+	let resolvedEpoch = 0;
+
+	const resolve = (): ElementDescriptor<P> => {
+		const scope = CURRENT_SCOPE;
+		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
+		if (resolved === undefined || resolvedScope !== scope || resolvedEpoch !== epoch) {
+			const next = readElement();
+			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
+				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+			}
+			resolvedScope = scope;
+			resolvedEpoch = epoch;
+			resolved = next;
+		}
+		return resolved;
+	};
+
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		get type() {
+			return resolve().type;
+		},
+		get props() {
+			return resolve().props;
+		},
+		get key() {
+			return resolve().key;
+		},
+		get ref() {
+			return resolve().ref;
+		},
+		get children() {
+			return resolve().children;
+		},
+	};
+	Object.defineProperty(descriptor, SCOPED_VALUE_RECORD, { value: resolve });
+	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
+	return descriptor;
+}
+
 /**
  * Compiler-only JSX descriptor whose child tree resolves in its rendered scope.
  *
@@ -14943,7 +15004,13 @@ function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 	return (n as Node & DeoptStamped)[DEOPT_DESC];
 }
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
-	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
+	// Preserve the record committed to this DOM node. A deferred JSX shell can
+	// resolve differently after a Provider update; stamping the shell itself
+	// would make both sides of the next prop diff observe the new record and
+	// would run user code outside render while Suspense detaches subtree refs.
+	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
+	(el as Element & DeoptStamped)[DEOPT_DESC] =
+		resolveScopedRecord === undefined ? d : resolveScopedRecord();
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';

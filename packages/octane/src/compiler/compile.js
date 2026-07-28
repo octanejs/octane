@@ -14243,6 +14243,26 @@ function isStaticJsxValueExpression(expression) {
 	);
 }
 
+// A root member tag, spread, or dynamic prop can invoke user code before its
+// descriptor exists. Defer the complete record rather than just its children.
+function jsxValueRootNeedsRenderScope(node) {
+	const name = node.openingElement?.name || node.id;
+	if (
+		name?.type === 'MemberExpression' ||
+		name?.type === 'JSXMemberExpression' ||
+		name?.type === 'JSXExpressionContainer'
+	) {
+		return true;
+	}
+	for (const attr of node.attributes || node.openingElement?.attributes || []) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		if (attr.value?.type !== 'JSXExpressionContainer') continue;
+		if (!isStaticJsxValueExpression(attr.value.expression)) return true;
+	}
+	return false;
+}
+
 // Prove a whole descendant tree static instead of guessing which JavaScript
 // syntax is effectful. Nested component/tag resolution and dynamic attributes
 // belong to their represented parent, so they make that parent's children lazy
@@ -14381,6 +14401,7 @@ function jsxElementToCreateElement(node, ctx) {
 			if (lowered !== null) loweredChildren.push(lowered);
 		}
 	}
+	let descriptor;
 	if (childrenNeedRenderScope && loweredChildren.length > 0) {
 		let childrenValue = loweredChildren[0];
 		if (loweredChildren.length > 1) {
@@ -14392,15 +14413,25 @@ function jsxElementToCreateElement(node, ctx) {
 		}
 		ctx.runtimeNeeded.add('createScopedElement');
 		const readChildren = inheritOriginLoc(b.arrow([], childrenValue), node);
-		return inheritOriginLoc(
+		descriptor = inheritOriginLoc(
 			b.call('_$createScopedElement', compNode, propsNode, readChildren),
 			node,
 		);
+	} else {
+		ctx.runtimeNeeded.add('createElement');
+		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
+		// static-content literals) maps to the authored JSX element.
+		descriptor = inheritOriginLoc(
+			b.call('_$createElement', compNode, propsNode, ...loweredChildren),
+			node,
+		);
 	}
-	ctx.runtimeNeeded.add('createElement');
-	// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
-	// static-content literals) maps to the authored JSX element.
-	return inheritOriginLoc(b.call('_$createElement', compNode, propsNode, ...loweredChildren), node);
+	if (!jsxValueRootNeedsRenderScope(node)) return descriptor;
+	ctx.runtimeNeeded.add('createScopedValue');
+	return inheritOriginLoc(
+		b.call(rtAlias('createScopedValue'), inheritOriginLoc(b.arrow([], descriptor), node)),
+		node,
+	);
 }
 
 // Short, unique, path-free slot description for non-HMR output: a djb2 hash of

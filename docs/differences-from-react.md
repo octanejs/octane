@@ -256,29 +256,30 @@ const theme = {
 function Page() {
   const content = (
     <Theme.Provider value="inner">
-      <span>{theme.current}</span>
+      <span data-theme={theme.current}>{theme.current}</span>
     </Theme.Provider>
   );
 
-  return <main>{content}</main>; // "inner", just like direct JSX output.
+  return <main>{content}</main>; // data-theme="inner" and text "inner".
 }
 ```
 
-When Octane renders that stored subtree, descendant expressions run after their
-represented provider or boundary has entered its scope. This includes implicit
-user code in getters, Proxy traps, coercion hooks, iterators, and computed keys,
-not only explicit function calls. React evaluates JSX child expressions while
-constructing the caller's element, before that element's represented provider or
-boundary renders; Octane intentionally follows the visible rendered tree
-instead.
+When Octane renders that stored subtree, the entire compiler-authored element
+record, including a dynamic root type, its props, and descendant expressions,
+resolves after its represented provider or boundary has entered its scope. This
+includes implicit user code in getters, Proxy traps, coercion hooks, iterators,
+and computed keys, not only explicit function calls. React evaluates JSX
+expressions while constructing the caller's element, before that element's
+represented provider or boundary renders; Octane intentionally follows the
+visible rendered tree instead.
 
 JSX values remain inspectable element descriptors: `isValidElement`,
 `Children.only`, `cloneElement`, and ordinary `type`/`props`/`children`
-inspection keep their existing contracts. Reading an element's children as data
-can evaluate them in the inspecting caller's current scope; it does not enter a
-provider or boundary that has not rendered. The root element's tag and props,
-explicit `createElement(...)` calls, and event or render-prop callbacks retain
-ordinary JavaScript evaluation semantics.
+inspection keep their existing contracts. Inspecting a deferred element record
+as data resolves it in the inspecting caller's current scope; it does not enter
+a provider or boundary that has not rendered. Static JSX, explicit
+`createElement(...)` calls, and event or render-prop callbacks retain ordinary
+JavaScript evaluation semantics.
 
 ## Native event objects, no synthetic event layer
 

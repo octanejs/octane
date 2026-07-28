@@ -486,6 +486,43 @@ function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescri
 	return descriptor;
 }
 
+/** Server twin of the compiler-only complete JSX-record deferral helper. */
+export function createScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
+	let resolved: ElementDescriptor | undefined;
+	let resolvedScope: SSRScope | null = null;
+
+	const resolve = (): ElementDescriptor => {
+		const scope = CURRENT_SCOPE;
+		if (resolved === undefined || resolvedScope !== scope) {
+			const next = readElement();
+			resolvedScope = scope;
+			resolved = next;
+		}
+		return resolved;
+	};
+
+	const descriptor: ElementDescriptor = {
+		$$kind: ELEMENT_TAG,
+		get type() {
+			return resolve().type;
+		},
+		get props() {
+			return resolve().props;
+		},
+		get key() {
+			return resolve().key;
+		},
+		get ref() {
+			return resolve().ref;
+		},
+		get children() {
+			return resolve().children;
+		},
+	};
+	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
+	return descriptor;
+}
+
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
 	type: ServerComponent | string | typeof Fragment,

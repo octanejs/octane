@@ -21,6 +21,12 @@ const getterValue = {
 	},
 };
 
+const contextualAttributes = {
+	get 'data-value'() {
+		return use(ValueContext);
+	},
+};
+
 const proxyValue = new Proxy(
 	{ current: 'outer' },
 	{
@@ -53,6 +59,28 @@ const sharedContextChild = <span data-context="shared">{getterValue.current}</sp
 
 function Slot(props: { content: OctaneNode }) {
 	return <section data-outlet="slot">{props.content}</section>;
+}
+
+function ContextAttributeComponent(props: { value: string }) {
+	return (
+		<strong data-context="root-component-attribute" data-value={props.value}>
+			attribute
+		</strong>
+	);
+}
+
+function InspectContextAttribute(props: { child: OctaneNode }) {
+	const child = Children.only(props.child) as ElementDescriptor;
+	const cloned = cloneElement(child, { 'data-inspected': 'yes' });
+	return (
+		<section
+			data-root-valid={String(isValidElement(child))}
+			data-root-type={String(child.type)}
+			data-observed-value={String(child.props['data-value'])}
+		>
+			{cloned}
+		</section>
+	);
 }
 
 function InnerFragmentComponent() {
@@ -95,6 +123,75 @@ export function DirectContext() {
 	return (
 		<ValueContext.Provider value="inner">
 			<span data-context="direct">{use(ValueContext)}</span>
+		</ValueContext.Provider>
+	);
+}
+
+export function DirectGetterAttributeContext() {
+	return (
+		<ValueContext.Provider value="inner">
+			<span data-context="direct-attribute" data-value={getterValue.current}>
+				attribute
+			</span>
+		</ValueContext.Provider>
+	);
+}
+
+export function DirectSpreadAttributeContext() {
+	return (
+		<ValueContext.Provider value="inner">
+			<span data-context="direct-spread-attribute" {...contextualAttributes}>
+				attribute
+			</span>
+		</ValueContext.Provider>
+	);
+}
+
+export function DirectDynamicComponentContext() {
+	return (
+		<ValueContext.Provider value="inner">
+			<contextualFragmentComponent.current />
+		</ValueContext.Provider>
+	);
+}
+
+export function RootHostAttributeContext() {
+	const content = (
+		<span data-context="root-host-attribute" data-value={getterValue.current}>
+			attribute
+		</span>
+	);
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
+}
+
+export function RootSpreadAttributeContext() {
+	const content = (
+		<span data-context="root-spread-attribute" {...contextualAttributes}>
+			attribute
+		</span>
+	);
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
+}
+
+export function RootComponentAttributeContext() {
+	const content = <ContextAttributeComponent value={getterValue.current} />;
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
+}
+
+export function RootDynamicComponentContext() {
+	const content = <contextualFragmentComponent.current />;
+	return <ValueContext.Provider value="inner">{content}</ValueContext.Provider>;
+}
+
+export function RootInspectedAttributeContext() {
+	const content = (
+		<span data-context="root-inspected-attribute" data-value={getterValue.current}>
+			attribute
+		</span>
+	);
+	return (
+		<ValueContext.Provider value="inner">
+			<InspectContextAttribute child={content} />
 		</ValueContext.Provider>
 	);
 }
@@ -324,6 +421,20 @@ export function SharedDescriptorProviders(props: { first: string; second: string
 	);
 }
 
+export function SharedRootAttributeProviders(props: { first: string; second: string }) {
+	const content = (
+		<span data-context="shared-root" data-value={getterValue.current}>
+			{getterValue.current}
+		</span>
+	);
+	return (
+		<section data-outlet="shared-root">
+			<ValueContext.Provider value={props.first}>{content}</ValueContext.Provider>
+			<ValueContext.Provider value={props.second}>{content}</ValueContext.Provider>
+		</section>
+	);
+}
+
 export function BuiltInErrorValue() {
 	const content = (
 		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>
@@ -359,6 +470,13 @@ export function WrappedGetterErrorValue() {
 
 export function FragmentErrorValue() {
 	const content = <>{throwingGetter.current}</>;
+	return (
+		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{content}</ErrorBoundary>
+	);
+}
+
+export function RootGetterErrorValue() {
+	const content = <span data-root-error={throwingGetter.current}>unreachable</span>;
 	return (
 		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{content}</ErrorBoundary>
 	);
@@ -437,6 +555,20 @@ export function FragmentSuspense(props: { promise: Promise<string> }) {
 			<span data-resolved="fragment">{content}</span>
 		</Suspense>
 	);
+}
+
+export function RootGetterSuspense(props: { promise: Promise<string> }) {
+	const suspendedValue = {
+		get current() {
+			return use(props.promise);
+		},
+	};
+	const content = (
+		<span data-resolved="root-attribute" data-value={suspendedValue.current}>
+			{'resolved'}
+		</span>
+	);
+	return <Suspense fallback={<i data-fallback="pending">pending</i>}>{content}</Suspense>;
 }
 
 export function MappedSuspense(props: { promise: Promise<string> }) {

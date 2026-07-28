@@ -28,6 +28,12 @@ const getterValue = {
 	},
 };
 
+const contextualAttributes = {
+	get 'data-value'() {
+		return use(ValueContext);
+	},
+};
+
 const proxyValue = new Proxy({ current: 'outer' }, {
 	get(target, key, receiver) {
 		return key === 'current' ? use(ValueContext) : Reflect.get(target, key, receiver);
@@ -57,6 +63,24 @@ const sharedContextChild = <span data-context="shared">{getterValue.current as s
 
 function Slot(props: { content: OctaneNode }) @{
 	<section data-outlet="slot">{props.content}</section>
+}
+
+function ContextAttributeComponent(props: { value: string }) @{
+	<strong data-context="root-component-attribute" data-value={props.value}>
+		attribute
+	</strong>
+}
+
+function InspectContextAttribute(props: { child: OctaneNode }) @{
+	const child = Children.only(props.child) as ElementDescriptor;
+	const cloned = cloneElement(child, { 'data-inspected': 'yes' });
+	<section
+		data-root-valid={String(isValidElement(child))}
+		data-root-type={String(child.type)}
+		data-observed-value={String(child.props['data-value'])}
+	>
+		{cloned}
+	</section>
 }
 
 function InnerFragmentComponent() @{
@@ -94,6 +118,61 @@ const throwingGetter = {
 export function DirectContext() @{
 	<ValueContext.Provider value="inner">
 		<span data-context="direct">{use(ValueContext) as string}</span>
+	</ValueContext.Provider>
+}
+
+export function DirectGetterAttributeContext() @{
+	<ValueContext.Provider value="inner">
+		<span data-context="direct-attribute" data-value={getterValue.current}>
+			attribute
+		</span>
+	</ValueContext.Provider>
+}
+
+export function DirectSpreadAttributeContext() @{
+	<ValueContext.Provider value="inner">
+		<span data-context="direct-spread-attribute" {...contextualAttributes}>
+			attribute
+		</span>
+	</ValueContext.Provider>
+}
+
+export function DirectDynamicComponentContext() @{
+	<ValueContext.Provider value="inner">
+		<contextualFragmentComponent.current />
+	</ValueContext.Provider>
+}
+
+export function RootHostAttributeContext() @{
+	const content = <span data-context="root-host-attribute" data-value={getterValue.current}>
+		attribute
+	</span>;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+}
+
+export function RootSpreadAttributeContext() @{
+	const content = <span data-context="root-spread-attribute" {...contextualAttributes}>
+		attribute
+	</span>;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+}
+
+export function RootComponentAttributeContext() @{
+	const content = <ContextAttributeComponent value={getterValue.current} />;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+}
+
+export function RootDynamicComponentContext() @{
+	const content = <contextualFragmentComponent.current />;
+	<ValueContext.Provider value="inner">{content}</ValueContext.Provider>
+}
+
+export function RootInspectedAttributeContext() @{
+	const content = <span data-context="root-inspected-attribute" data-value={getterValue.current}>
+		attribute
+	</span>;
+	<ValueContext.Provider value="inner">
+		<InspectContextAttribute child={content} />
 	</ValueContext.Provider>
 }
 
@@ -282,6 +361,16 @@ export function SharedDescriptorProviders(props: { first: string; second: string
 	</section>
 }
 
+export function SharedRootAttributeProviders(props: { first: string; second: string }) @{
+	const content = <span data-context="shared-root" data-value={getterValue.current}>
+		{getterValue.current as string}
+	</span>;
+	<section data-outlet="shared-root">
+		<ValueContext.Provider value={props.first}>{content}</ValueContext.Provider>
+		<ValueContext.Provider value={props.second}>{content}</ValueContext.Provider>
+	</section>
+}
+
 export function DirectiveContext(props: { visible: boolean }) @{
 	const content = <ValueContext.Provider value="inner">
 		<div data-outlet="directive">
@@ -318,6 +407,11 @@ export function WrappedGetterErrorValue() @{
 
 export function FragmentErrorValue() @{
 	const content = <>{throwingGetter.current as string}</>;
+	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{content}</ErrorBoundary>
+}
+
+export function RootGetterErrorValue() @{
+	const content = <span data-root-error={throwingGetter.current}>unreachable</span>;
 	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{content}</ErrorBoundary>
 }
 
@@ -376,6 +470,18 @@ export function FragmentSuspense(props: { promise: Promise<string> }) @{
 	<Suspense fallback={<i data-fallback="pending">pending</i>}>
 		<span data-resolved="fragment">{content}</span>
 	</Suspense>
+}
+
+export function RootGetterSuspense(props: { promise: Promise<string> }) @{
+	const suspendedValue = {
+		get current() {
+			return use(props.promise);
+		},
+	};
+	const content = <span data-resolved="root-attribute" data-value={suspendedValue.current}>
+		{'resolved' as string}
+	</span>;
+	<Suspense fallback={<i data-fallback="pending">pending</i>}>{content}</Suspense>
 }
 
 export function MappedSuspense(props: { promise: Promise<string> }) @{
@@ -487,8 +593,22 @@ function deferred() {
 	return { promise, resolve };
 }
 
+function expectSharedValues(
+	elements: Iterable<Element>,
+	expected: string[],
+	inspectAttributes: boolean,
+) {
+	const values = Array.from(elements);
+	expect(values.map((element) => element.textContent)).toEqual(expected);
+	if (inspectAttributes) {
+		expect(values.map((element) => element.getAttribute('data-value'))).toEqual(expected);
+	}
+}
+
 const contextScenarios = [
 	['DirectContext', '[data-context="direct"]'],
+	['DirectDynamicComponentContext', '[data-context="fragment-component-tag"]'],
+	['RootDynamicComponentContext', '[data-context="fragment-component-tag"]'],
 	['VariableContext', '[data-context="variable"]'],
 	['PropContext', '[data-context="prop"]'],
 	['NestedContext', '[data-context="nested"]'],
@@ -554,6 +674,87 @@ for (const fixture of fixtures) {
 			expect(html).not.toContain('data-value="outer"');
 		});
 
+		for (const [exportName, selector] of [
+			['DirectGetterAttributeContext', '[data-context="direct-attribute"]'],
+			['DirectSpreadAttributeContext', '[data-context="direct-spread-attribute"]'],
+			['RootHostAttributeContext', '[data-context="root-host-attribute"]'],
+			['RootSpreadAttributeContext', '[data-context="root-spread-attribute"]'],
+			['RootComponentAttributeContext', '[data-context="root-component-attribute"]'],
+		] as const) {
+			it(`${exportName} evaluates host attributes inside its provider`, () => {
+				const result = mount(fixture.client[exportName]);
+				expect(result.find(selector).getAttribute('data-value')).toBe('inner');
+				result.unmount();
+			});
+
+			it(`${exportName} server-renders host attributes inside its provider`, () => {
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
+				expect(html).toContain('data-value="inner"');
+				expect(html).not.toContain('data-value="outer"');
+			});
+
+			it(`${exportName} hydrates host attributes inside its provider`, () => {
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName]);
+				const container = document.createElement('div');
+				container.innerHTML = html;
+				document.body.appendChild(container);
+				const existing = container.querySelector(selector);
+				expect(existing?.getAttribute('data-value')).toBe('inner');
+
+				const root = hydrateRoot(container, fixture.client[exportName]);
+				flushSync(() => {});
+				expect(container.querySelector(selector)).toBe(existing);
+				expect(existing?.getAttribute('data-value')).toBe('inner');
+				root.unmount();
+				container.remove();
+			});
+		}
+
+		it('RootInspectedAttributeContext preserves inspectable descriptors under its provider', () => {
+			const result = mount(fixture.client.RootInspectedAttributeContext);
+			const parent = result.find('[data-root-valid]');
+			const child = result.find('[data-context="root-inspected-attribute"]');
+			expect(parent.getAttribute('data-root-valid')).toBe('true');
+			expect(parent.getAttribute('data-root-type')).toBe('span');
+			expect(parent.getAttribute('data-observed-value')).toBe('inner');
+			expect(child.getAttribute('data-value')).toBe('inner');
+			expect(child.getAttribute('data-inspected')).toBe('yes');
+			result.unmount();
+		});
+
+		it('RootInspectedAttributeContext server-renders inspected descriptors under its provider', () => {
+			const { html } = ServerRuntime.renderToString(fixture.server.RootInspectedAttributeContext);
+			const markup = document.createElement('div');
+			markup.innerHTML = html;
+			const parent = markup.querySelector('[data-root-valid]');
+			const child = markup.querySelector('[data-context="root-inspected-attribute"]');
+			expect(parent?.getAttribute('data-root-valid')).toBe('true');
+			expect(parent?.getAttribute('data-root-type')).toBe('span');
+			expect(parent?.getAttribute('data-observed-value')).toBe('inner');
+			expect(child?.getAttribute('data-value')).toBe('inner');
+			expect(child?.getAttribute('data-inspected')).toBe('yes');
+		});
+
+		it('RootInspectedAttributeContext hydrates inspected descriptors under its provider', () => {
+			const { html } = ServerRuntime.renderToString(fixture.server.RootInspectedAttributeContext);
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			document.body.appendChild(container);
+			const existing = container.querySelector('[data-context="root-inspected-attribute"]');
+			expect(existing?.getAttribute('data-value')).toBe('inner');
+
+			const root = hydrateRoot(container, fixture.client.RootInspectedAttributeContext);
+			flushSync(() => {});
+			expect(container.querySelector('[data-context="root-inspected-attribute"]')).toBe(existing);
+			expect(
+				container.querySelector('[data-root-valid]')?.getAttribute('data-observed-value'),
+			).toBe('inner');
+			expect(existing?.getAttribute('data-value')).toBe('inner');
+			expect(existing?.getAttribute('data-inspected')).toBe('yes');
+			root.unmount();
+			container.remove();
+		});
+
 		it('evaluates fragment-nested host attributes inside their represented provider', () => {
 			const result = mount(fixture.client.FragmentNestedAttributeContext);
 			expect(
@@ -584,71 +785,73 @@ for (const fixture of fixtures) {
 			container.remove();
 		});
 
-		it('keeps a shared JSX descriptor isolated across providers and updates', () => {
-			const result = mount(fixture.client.SharedDescriptorProviders, {
-				first: 'first',
-				second: 'second',
-			});
-			const values = () =>
-				result.findAll('[data-context="shared"]').map((element) => element.textContent);
-			expect(values()).toEqual(['first', 'second']);
+		for (const [exportName, selector, inspectAttributes] of [
+			['SharedDescriptorProviders', '[data-context="shared"]', false],
+			['SharedRootAttributeProviders', '[data-context="shared-root"]', true],
+		] as const) {
+			it(`${exportName} isolates one descriptor across providers and updates`, () => {
+				const result = mount(fixture.client[exportName], {
+					first: 'first',
+					second: 'second',
+				});
+				expectSharedValues(result.findAll(selector), ['first', 'second'], inspectAttributes);
 
-			result.update(fixture.client.SharedDescriptorProviders, {
-				first: 'updated-first',
-				second: 'updated-second',
-			});
-			expect(values()).toEqual(['updated-first', 'updated-second']);
-			result.unmount();
-		});
-
-		it('isolates a shared JSX descriptor across providers and server requests', () => {
-			const first = ServerRuntime.renderToString(fixture.server.SharedDescriptorProviders, {
-				first: 'first',
-				second: 'second',
-			});
-			const next = ServerRuntime.renderToString(fixture.server.SharedDescriptorProviders, {
-				first: 'next-first',
-				second: 'next-second',
+				result.update(fixture.client[exportName], {
+					first: 'updated-first',
+					second: 'updated-second',
+				});
+				expectSharedValues(
+					result.findAll(selector),
+					['updated-first', 'updated-second'],
+					inspectAttributes,
+				);
+				result.unmount();
 			});
 
-			const firstMarkup = document.createElement('div');
-			firstMarkup.innerHTML = first.html;
-			const nextMarkup = document.createElement('div');
-			nextMarkup.innerHTML = next.html;
-			expect(
-				Array.from(
-					firstMarkup.querySelectorAll('[data-context="shared"]'),
-					(element) => element.textContent,
-				),
-			).toEqual(['first', 'second']);
-			expect(
-				Array.from(
-					nextMarkup.querySelectorAll('[data-context="shared"]'),
-					(element) => element.textContent,
-				),
-			).toEqual(['next-first', 'next-second']);
-		});
+			it(`${exportName} isolates one descriptor across providers and server requests`, () => {
+				const first = ServerRuntime.renderToString(fixture.server[exportName], {
+					first: 'first',
+					second: 'second',
+				});
+				const next = ServerRuntime.renderToString(fixture.server[exportName], {
+					first: 'next-first',
+					second: 'next-second',
+				});
 
-		it('hydrates a shared JSX descriptor without leaking provider values', () => {
-			const props = { first: 'first', second: 'second' };
-			const { html } = ServerRuntime.renderToString(
-				fixture.server.SharedDescriptorProviders,
-				props,
-			);
-			const container = document.createElement('div');
-			container.innerHTML = html;
-			document.body.appendChild(container);
-			const existing = Array.from(container.querySelectorAll('[data-context="shared"]'));
-			expect(existing.map((element) => element.textContent)).toEqual(['first', 'second']);
+				const firstMarkup = document.createElement('div');
+				firstMarkup.innerHTML = first.html;
+				const nextMarkup = document.createElement('div');
+				nextMarkup.innerHTML = next.html;
+				expectSharedValues(
+					firstMarkup.querySelectorAll(selector),
+					['first', 'second'],
+					inspectAttributes,
+				);
+				expectSharedValues(
+					nextMarkup.querySelectorAll(selector),
+					['next-first', 'next-second'],
+					inspectAttributes,
+				);
+			});
 
-			const root = hydrateRoot(container, fixture.client.SharedDescriptorProviders, props);
-			flushSync(() => {});
-			const adopted = Array.from(container.querySelectorAll('[data-context="shared"]'));
-			expect(adopted).toEqual(existing);
-			expect(adopted.map((element) => element.textContent)).toEqual(['first', 'second']);
-			root.unmount();
-			container.remove();
-		});
+			it(`${exportName} hydrates one descriptor without leaking provider values`, () => {
+				const props = { first: 'first', second: 'second' };
+				const { html } = ServerRuntime.renderToString(fixture.server[exportName], props);
+				const container = document.createElement('div');
+				container.innerHTML = html;
+				document.body.appendChild(container);
+				const existing = Array.from(container.querySelectorAll(selector));
+				expectSharedValues(existing, ['first', 'second'], inspectAttributes);
+
+				const root = hydrateRoot(container, fixture.client[exportName], props);
+				flushSync(() => {});
+				const adopted = Array.from(container.querySelectorAll(selector));
+				expect(adopted).toEqual(existing);
+				expectSharedValues(adopted, ['first', 'second'], inspectAttributes);
+				root.unmount();
+				container.remove();
+			});
+		}
 
 		for (const [exportName, kind, expected] of [
 			['ConfigReplacedScopedChild', 'config', 'configured'],
@@ -693,6 +896,7 @@ for (const fixture of fixtures) {
 			'WrappedErrorValue',
 			'WrappedGetterErrorValue',
 			'FragmentErrorValue',
+			'RootGetterErrorValue',
 			'MappedErrorValue',
 			'FlattenedErrorValue',
 			'ClonedErrorValue',
@@ -717,6 +921,7 @@ for (const fixture of fixtures) {
 			['WrappedSuspenseValue', 'wrapped'],
 			['GetterSuspenseValue', 'getter'],
 			['FragmentSuspense', 'fragment'],
+			['RootGetterSuspense', 'root-attribute'],
 			['MappedSuspense', 'mapped'],
 			['FlattenedSuspense', 'flattened'],
 			['ClonedSuspense', 'cloned'],
@@ -730,7 +935,11 @@ for (const fixture of fixtures) {
 					pending.resolve('resolved');
 				});
 
-				expect(result.find(`[data-resolved="${resolved}"]`).textContent).toBe('resolved');
+				const resolvedElement = result.find(`[data-resolved="${resolved}"]`);
+				expect(resolvedElement.textContent).toBe('resolved');
+				if (exportName === 'RootGetterSuspense') {
+					expect(resolvedElement.getAttribute('data-value')).toBe('resolved');
+				}
 				expect(result.findAll('[data-fallback="pending"]')).toHaveLength(0);
 				result.unmount();
 			});
