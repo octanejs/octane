@@ -2960,6 +2960,11 @@ function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
 	return ssrChild(children, scope);
 }
 
+/** Server twin of the compiler-only scoped JSX value component. */
+export function renderScopedValue(props: { read: () => unknown }, scope: SSRScope): string {
+	return ssrChild(props.read(), scope);
+}
+
 function streamTokenForPendingHtml(html: string): string | null {
 	const stream = STREAM;
 	return stream !== null && html.includes(STREAM_BOUNDARY_ATTR + '="' + stream.token + '-')
