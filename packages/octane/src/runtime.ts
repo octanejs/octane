@@ -658,10 +658,10 @@ interface EffectSlot {
 	cleanup: Cleanup | undefined;
 	/** Render token of the latest completed attempt that reached this call site. */
 	renderVersion: number;
-	/** Invalidates queued work superseded by a later render of this call site. */
+	/** Invalidates queued work superseded by a later render or presence transition. */
 	revision: number;
-	/** True while the current revision has commit work queued but not yet drained. */
-	pending: boolean;
+	/** Whether the latest completed render reached this registered call site. */
+	active: boolean;
 	/** Stable first-enqueue order within the owning scope. */
 	order: number;
 	/** Hook key retained so a bailed Suspense descendant can reconnect at commit. */
@@ -686,7 +686,7 @@ interface EffectSlot {
 interface EffectStateSnapshot {
 	deps: any[] | undefined;
 	revision: number;
-	pending: boolean;
+	active: boolean;
 }
 
 type EffectDepsSnapshot = Map<EffectSlot, EffectStateSnapshot>;
@@ -2892,7 +2892,6 @@ function fireEffectCleanup(e: PendingEffect): void {
 		// Publish the absence before user cleanup runs. A cleanup may schedule a
 		// render; that render must see this call site as disconnected and must not
 		// queue a duplicate teardown while the current one is still unwinding.
-		slot.pending = false;
 		slot.connectedFn = null;
 		slot.connectedArgs = undefined;
 		slot.disconnected = false;
@@ -2916,7 +2915,6 @@ function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 	if (slot === undefined || slot.revision !== e.revision) return;
-	slot.pending = false;
 	slot.connectedFn = e.fn;
 	slot.connectedArgs = e.args;
 	slot.disconnected = false;
@@ -4532,24 +4530,20 @@ function ensureEffectRenderVersion(): number {
 function finishEffectRender(scope: Scope): void {
 	const effects = scope.effectSlots;
 	if (effects === null || CURRENT_EFFECT_RENDER_VERSION === 0) return;
-	// Compiler-owned effect call sites cannot repeat in a plain loop, so reaching
-	// the registered slot count proves there is no conditional omission. This is
-	// the overwhelmingly common path and avoids scanning the slot list.
+	// enqueueEffect counts each registered slot at most once per render. Reaching
+	// the registered slot count therefore proves there is no conditional
+	// omission, even when custom-hook composition invokes one effective slot more
+	// than once. This common path avoids scanning the slot list.
 	if (CURRENT_EFFECT_REACHED === effects.length) return;
 	for (let i = 0; i < effects.length; i++) {
 		const effect = effects[i];
 		if (effect.renderVersion === CURRENT_EFFECT_RENDER_VERSION) continue;
+		if (!effect.active) continue;
 		// Reaching this call site again must recreate even when its authored deps
 		// are unchanged.
 		effect.deps = undefined;
-		// A disconnected Activity/Suspense slot still retains connectedFn solely
-		// so reveal can reconnect a bailed subtree. Queueing it here clears that
-		// retained body at commit, preventing an omitted call site from returning.
-		if (!effect.pending && effect.connectedFn === null && effect.cleanup === undefined) {
-			continue;
-		}
+		effect.active = false;
 		const revision = ++effect.revision;
-		effect.pending = true;
 		const target =
 			WIP_CAPTURE !== null ? WIP_CAPTURE.effects[effect.phase] : effectQueues[effect.phase];
 		target.push({
@@ -4569,8 +4563,11 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
 	const renderVersion = ensureEffectRenderVersion();
-	CURRENT_EFFECT_REACHED++;
-	if (prev) prev.renderVersion = renderVersion;
+	const firstReach = prev !== undefined && prev.renderVersion !== renderVersion;
+	if (firstReach) {
+		CURRENT_EFFECT_REACHED++;
+		prev!.renderVersion = renderVersion;
+	}
 	// Hidden <Activity> subtree: render (state + DOM) but DON'T run effects. Record
 	// that this call site was reached, then skip lifecycle state so the effect is
 	// treated as fresh and re-fires when the Activity becomes visible
@@ -4579,17 +4576,39 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 	// hot path, so this extra walk is cheap.
 	// INSERTION effects are exempt (React: they stay connected while hidden and an
 	// update in a hidden-but-rendered subtree still fires them — Activity-test.js:1428).
-	if (phase !== INSERTION && inInactiveSubtree(scope.block)) return;
-	if (prev && !depsChanged(prev.deps, deps)) return;
+	if (phase !== INSERTION && inInactiveSubtree(scope.block)) {
+		if (prev && !prev.active) {
+			// A hidden re-reach supersedes teardown from an earlier completed
+			// hidden render. Advance the presence revision so its fn:null entry
+			// cannot clear the retained body needed by a bailed reveal.
+			prev.active = true;
+			prev.revision++;
+		}
+		return;
+	}
+	if (prev) {
+		let reactivated = false;
+		if (!prev.active) {
+			prev.active = true;
+			prev.revision++;
+			reactivated = true;
+		}
+		if (!depsChanged(prev.deps, deps)) return;
+		// Multiple calls may legitimately compose onto one effective slot through
+		// plain-TypeScript custom-hook paths. Advance once for a later render, not
+		// once per enqueue, so every call from this render remains observable.
+		if (firstReach && !reactivated) prev.revision++;
+	}
 	let effect: EffectSlot;
 	if (!prev) {
+		CURRENT_EFFECT_REACHED++;
 		const order = scope.effectSlots === null ? 0 : scope.effectSlots.length;
 		const slotObj: EffectSlot = {
 			deps,
 			cleanup: undefined,
 			renderVersion,
 			revision: 0,
-			pending: false,
+			active: true,
 			order,
 			effect: true,
 			phase,
@@ -4608,8 +4627,6 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 		prev.deps = deps;
 		effect = prev;
 	}
-	const revision = ++effect.revision;
-	effect.pending = true;
 	// Tag with the enqueue sequence (DFS pre-order). The commit drains turn this +
 	// the parentBlock chain into React's post-order commit order — see PendingEffect.seq.
 	const entry = {
@@ -4617,7 +4634,7 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 		slot,
 		fn,
 		order: effect.order,
-		revision,
+		revision: effect.revision,
 		args: deps,
 		phase,
 		seq: commitSeq++,
@@ -18209,7 +18226,7 @@ function snapshotSubtreeEffectDeps(scope: Scope): EffectDepsSnapshot {
 					snapshot.set(effect, {
 						deps: effect.deps,
 						revision: effect.revision,
-						pending: effect.pending,
+						active: effect.active,
 					});
 				}
 			}
@@ -18234,11 +18251,11 @@ function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot): v
 					// but none of that attempt's commit work is still pending.
 					effect.deps = undefined;
 					effect.revision = 0;
-					effect.pending = false;
+					effect.active = false;
 				} else {
 					effect.deps = previous.deps;
 					effect.revision = previous.revision;
-					effect.pending = previous.pending;
+					effect.active = previous.active;
 				}
 			}
 		}
@@ -18285,6 +18302,7 @@ function reconnectBailedEffects(block: Block): void {
 			for (let i = 0; i < effects.length; i++) {
 				const effect = effects[i];
 				if (
+					effect.active &&
 					effect.disconnected &&
 					effect.connectedFn !== null &&
 					!context.queuedSlots.has(effect)
@@ -18302,14 +18320,12 @@ function reconnectBailedEffects(block: Block): void {
 	// key and reconnect earlier-declared effects after later ones.
 	for (let i = 0; i < disconnected.length; i++) {
 		const { scope, effect } = disconnected[i];
-		const revision = ++effect.revision;
-		effect.pending = true;
 		context.queues[effect.phase].push({
 			scope,
 			slot: effect.slot,
 			fn: effect.connectedFn!,
 			order: effect.order,
-			revision,
+			revision: effect.revision,
 			args: effect.connectedArgs,
 			phase: effect.phase,
 			seq: commitSeq++,

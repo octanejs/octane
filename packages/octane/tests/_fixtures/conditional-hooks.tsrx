@@ -1,4 +1,5 @@
 import { Activity, memo, use, useState, useEffect } from 'octane';
+import { useRepeatedSharedEffects } from './conditional-effect-helpers';
 
 // React-style guarded component: `if (cond) return;` early-exit followed by
 // hooks. octane supports runtime-conditional hooks (each call site has
@@ -46,6 +47,15 @@ export function ConditionalTsrxEffect(props: {
 		}, [props.label, props.log]);
 	}
 	<div class="conditional-tsrx">{props.label}</div>
+}
+
+export function ConditionalRepeatedEffects(props: { enabled: boolean; log: string[] }) @{
+	if (props.enabled) {
+		useRepeatedSharedEffects(props.log);
+	}
+	<div class="conditional-repeated">
+		{props.enabled ? 'enabled' : 'disabled'}
+	</div>
 }
 
 function ConditionalSuspendingEffect(props: {
@@ -96,5 +106,39 @@ export function ConditionalActivityEffect(props: {
 }) @{
 	<Activity mode={props.mode}>
 		<ConditionalActivityChild enabled={props.enabled} log={props.log} />
+	</Activity>
+}
+
+function ConditionalActivityReentryChildImpl(props: {
+	expose: (setEnabled: (enabled: boolean) => void) => void;
+	log: string[];
+}) @{
+	const [enabled, setEnabled] = useState(true);
+	props.expose(setEnabled);
+	if (enabled) {
+		useEffect(() => {
+			props.log.push('reentry:create');
+			return () => props.log.push('reentry:cleanup');
+		}, [props.log]);
+	} else {
+		// This slot is first reached while Activity is hidden, so no EffectSlot is
+		// registered. It must not count as evidence that the earlier slot above
+		// was reached by this render.
+		useEffect(() => {}, [props.log]);
+	}
+	<span class="conditional-activity-reentry">
+		{enabled ? 'enabled' : 'disabled'}
+	</span>
+}
+
+const ConditionalActivityReentryChild = memo(ConditionalActivityReentryChildImpl);
+
+export function ConditionalActivityReentryEffect(props: {
+	expose: (setEnabled: (enabled: boolean) => void) => void;
+	log: string[];
+	mode: 'visible' | 'hidden';
+}) @{
+	<Activity mode={props.mode}>
+		<ConditionalActivityReentryChild expose={props.expose} log={props.log} />
 	</Activity>
 }

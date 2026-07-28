@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { act, mount, nextPaint } from './_helpers';
 import {
 	ConditionalActivityEffect,
+	ConditionalActivityReentryEffect,
+	ConditionalRepeatedEffects,
 	ConditionalSuspenseEffect,
 	ConditionalTsrxEffect,
 	Guarded,
@@ -226,5 +228,70 @@ describe('conditional hooks — guard before useEffect', () => {
 			'activity:create',
 			'activity:cleanup',
 		]);
+	});
+
+	it('preserves repeated enqueues through one effective custom-hook slot', async () => {
+		const log: string[] = [];
+		const r = mount(ConditionalRepeatedEffects, { enabled: true, log });
+		await nextPaint();
+		expect(log).toEqual(['shared:create:first', 'shared:create:second']);
+
+		r.update(ConditionalRepeatedEffects, { enabled: false, log });
+		await nextPaint();
+		expect(log).toEqual(['shared:create:first', 'shared:create:second', 'shared:cleanup:second']);
+
+		r.update(ConditionalRepeatedEffects, { enabled: true, log });
+		await nextPaint();
+		expect(log.slice(-2)).toEqual(['shared:create:first', 'shared:create:second']);
+		r.unmount();
+	});
+
+	it('invalidates hidden teardown when the effect call site is reached again', async () => {
+		const log: string[] = [];
+		let setEnabled!: (enabled: boolean) => void;
+		const expose = (set: (enabled: boolean) => void) => {
+			setEnabled = set;
+		};
+		const r = mount(ConditionalActivityReentryEffect, {
+			expose,
+			log,
+			mode: 'visible',
+		});
+		await nextPaint();
+		expect(log).toEqual(['reentry:create']);
+
+		r.update(ConditionalActivityReentryEffect, { expose, log, mode: 'hidden' });
+		expect(log).toEqual(['reentry:create', 'reentry:cleanup']);
+
+		setEnabled(false);
+		setEnabled(true);
+		r.update(ConditionalActivityReentryEffect, { expose, log, mode: 'visible' });
+		await nextPaint();
+		expect(r.find('.conditional-activity-reentry').textContent).toBe('enabled');
+		expect(log).toEqual(['reentry:create', 'reentry:cleanup', 'reentry:create']);
+		r.unmount();
+	});
+
+	it('does not let an unregistered hidden call site mask an omitted effect', async () => {
+		const log: string[] = [];
+		let setEnabled!: (enabled: boolean) => void;
+		const expose = (set: (enabled: boolean) => void) => {
+			setEnabled = set;
+		};
+		const r = mount(ConditionalActivityReentryEffect, {
+			expose,
+			log,
+			mode: 'visible',
+		});
+		await nextPaint();
+
+		r.update(ConditionalActivityReentryEffect, { expose, log, mode: 'hidden' });
+		setEnabled(false);
+		r.update(ConditionalActivityReentryEffect, { expose, log, mode: 'visible' });
+		await nextPaint();
+
+		expect(r.find('.conditional-activity-reentry').textContent).toBe('disabled');
+		expect(log).toEqual(['reentry:create', 'reentry:cleanup']);
+		r.unmount();
 	});
 });
