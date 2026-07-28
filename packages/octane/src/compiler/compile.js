@@ -3055,9 +3055,14 @@ function hoistCaptureFreeHookCallbacks(ast, options = {}) {
 			const args = n.arguments.map((arg) => {
 				const walked = mapAst(arg, visit);
 				if (ownsIdentity || arg?.type === 'SpreadElement') return walked;
-				if (!isHoistableHookCallback(walked, componentBound)) return walked;
+				// A callback written `((s) => …) as Sel` is still a function; the
+				// assertion is erased from the emitted module either way. The
+				// UNWRAPPED node is what moves, so a component-local type alias
+				// cannot be dragged out of the scope that declares it.
+				const fn = unwrapTsExpr(walked);
+				if (!isHoistableHookCallback(fn, componentBound)) return walked;
 				const name = `_fn$${nextId++}`;
-				hoisted.push(inheritOriginLoc(b.const(name, walked), arg));
+				hoisted.push(inheritOriginLoc(b.const(name, fn), arg));
 				return inheritOriginLoc(b.id(name), arg);
 			});
 			return { ...n, arguments: args };
@@ -3222,7 +3227,10 @@ function wrapCapturingHookCallbacks(ast, options = {}) {
 			const args = n.arguments.map((arg, index) => {
 				const walked = mapAst(arg, visit);
 				if (ownsIdentity || arg?.type === 'SpreadElement') return walked;
-				if (!isMovableHookCallback(walked)) return walked;
+				// Same as the lift: peel the assertion so a typed callback is still
+				// recognised as one, and key the unwrapped function.
+				const fn = unwrapTsExpr(walked);
+				if (!isMovableHookCallback(fn)) return walked;
 				// An argument that looks like a dependency list immediately after the
 				// callback means the hook already owns when that callback is
 				// considered fresh. An explicit `null` is the author's "re-run every
@@ -3242,9 +3250,9 @@ function wrapCapturingHookCallbacks(ast, options = {}) {
 				}
 				// A callback that captures nothing is the LIFT's job — a module-scope
 				// identity is strictly better than a per-instance memo cell.
-				if (!capturesComponentBindings(walked, componentBound)) return walked;
+				if (!capturesComponentBindings(fn, componentBound)) return walked;
 				wrapped = true;
-				return inheritOriginLoc(b.call(b.id(AUTO_CALLBACK_ALIAS), walked), arg);
+				return inheritOriginLoc(b.call(b.id(AUTO_CALLBACK_ALIAS), fn), arg);
 			});
 			return { ...n, arguments: args };
 		};

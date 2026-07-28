@@ -189,4 +189,46 @@ describe('data-callback hooks', () => {
 			expect(wraps(code), `deps written as \`${deps}\``).toBe(0);
 		}
 	});
+
+	it('recognises a callback through a type assertion', () => {
+		// `((s) => …) as Sel` is still a function. Missing that skipped BOTH the
+		// module-scope lift and dep-keying, so a typed selector silently kept its
+		// per-render identity churn.
+		const code = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        type Sel = (s: any) => any;
+        export function App(props) @{
+          const free = useSelector(props.store, ((s) => s.total) as Sel);
+          const captured = useSelector(props.store, ((s) => s.items[props.id]) as Sel);
+          <p>{free + '/' + captured}</p>
+        }
+      `,
+			'typed-callback.tsrx',
+			{ ...PROD, dataCallbackHooks: DECLARED },
+		).code;
+		// Same routing as the unasserted forms: capture-free lifts, capturing keys.
+		expect(lifts(code)).toBe(1);
+		expect(wraps(code)).toBe(1);
+		expect(code).toMatch(/\[props\.id\]/);
+	});
+
+	it('keeps a locally declared type out of module scope when lifting', () => {
+		// The lift moves the UNWRAPPED function, so a type alias declared inside
+		// the component cannot be dragged along to module scope.
+		const code = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        export function App(props) @{
+          type LocalSel = (s: any) => any;
+          const free = useSelector(props.store, ((s) => s.total) as LocalSel);
+          <p>{free as string}</p>
+        }
+      `,
+			'local-type.tsrx',
+			{ ...PROD, dataCallbackHooks: DECLARED },
+		).code;
+		expect(lifts(code)).toBe(1);
+		expect(code).not.toMatch(/_fn\$\d+ = [^\n]*LocalSel/);
+	});
 });
