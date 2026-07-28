@@ -532,7 +532,12 @@ function PopoverRootComponent<Payload>(props: any): any {
 	});
 }
 
-function PopoverRoot<Payload = unknown>(props: any): any {
+interface PopoverRootProps<Payload> {
+	handle?: PopoverHandle<Payload>;
+	[key: string]: unknown;
+}
+
+function PopoverRoot<Payload = unknown>(props: PopoverRootProps<Payload>): any {
 	const slot = S('PopoverRootWrapper');
 	// Top-level popovers establish a FloatingTree; nested ones reuse the parent's.
 	if (usePopoverRootContext(true)) {
