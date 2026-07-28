@@ -451,12 +451,14 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 						?.scrollTop ?? 0,
 			);
 			// A production output swap can finish rendering before CodeMirror's
-			// hover listener is ready. Retry the genuine pointer movement until
-			// THIS keyword is highlighted; never replay a click or accept a stale
-			// decoration from an earlier probe.
+			// hover listener is ready. Re-enter the editor on every retry so each
+			// one produces a genuine pointer transition at THIS keyword.
 			for (let attempt = 0; attempt < (action === 'hover' ? 3 : 1); attempt++) {
 				if (action === 'click') await page.mouse.click(point.x, point.y);
-				else await page.mouse.move(point.x, point.y);
+				else {
+					await page.mouse.move(0, 0);
+					await page.mouse.move(point.x, point.y);
+				}
 
 				const highlighted = await page
 					.waitForFunction(
