@@ -30,6 +30,7 @@ export interface DocusaurusBridgePlugin {
 	};
 	configResolved(config: { root?: string; command: string }): Promise<void>;
 	buildStart(this: { addWatchFile?(id: string): void }): Promise<void>;
+	watchChange(id: string): Promise<void>;
 	resolveId(id: string): Promise<string | null>;
 	load(id: string): Promise<string | null>;
 }

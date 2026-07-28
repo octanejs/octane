@@ -99,6 +99,9 @@ export function docusaurusBridge(options = {}, shared = createSharedState(option
 				if (resolved !== null) this.addWatchFile?.(cleanId(resolved));
 			}
 		},
+		async watchChange() {
+			await shared.refresh();
+		},
 		async resolveId(id) {
 			if (id === DOCUSAURUS_MANIFEST_ID) return RESOLVED_DOCUSAURUS_MANIFEST_ID;
 			const manifest = await shared.getManifest();

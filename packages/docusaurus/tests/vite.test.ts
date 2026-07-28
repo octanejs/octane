@@ -45,6 +45,26 @@ describe('Docusaurus Vite bridge', () => {
 		).toBe(true);
 	});
 
+	it('reloads the manifest when a watched input changes', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({ siteDir: fixture.siteDir });
+		await plugin.configResolved({ root: fixture.siteDir, command: 'serve' });
+		await plugin.buildStart.call({ addWatchFile: vi.fn() });
+		const sourceFile = path.join(fixture.siteDir, 'docs/intro.md');
+		const updatedDescription = 'Watched fixture document metadata';
+		writeFileSync(
+			sourceFile,
+			readFileSync(sourceFile, 'utf8').replace('Fixture document metadata', updatedDescription),
+		);
+
+		await plugin.watchChange(sourceFile);
+		const manifest = await plugin.api.getManifest();
+		const document = Object.values(manifest.content).find((metadata) => metadata.id === 'intro');
+
+		expect(document?.description).toBe(updatedDescription);
+	});
+
 	it('waits for an in-flight reload before serving manifest data', async () => {
 		const fixture = createSiteFixture();
 		disposals.push(fixture.dispose);
