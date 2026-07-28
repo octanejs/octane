@@ -18,6 +18,7 @@ jobs:
   release-pr:
     if: github.repository == 'octanejs/octane' && github.ref == 'refs/heads/main'
     permissions:
+      actions: write
       contents: write
       issues: read
       pull-requests: write
@@ -222,3 +223,59 @@ jobs:
         run: |
           echo "::error title=Release PR sync failed::Both synchronization attempts failed while the GitHub API probe was healthy or returned a non-outage error (${OCTANE_RELEASE_API_STATUS:-unknown})."
           exit 1
+
+      # GITHUB_TOKEN-created pull requests intentionally do not emit another
+      # pull_request workflow. Explicit workflow_dispatch is exempt from that
+      # recursion guard, so request the small authenticated release-PR path in
+      # ci.yml and attach its skipped required jobs to the generated head SHA.
+      - name: Request lightweight release pull request checks
+        if: >-
+          always() &&
+          (
+            steps.release_pr_first.outcome == 'success' ||
+            steps.release_pr_retry.outcome == 'success'
+          )
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pulls = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: "open",
+              head: `${owner}:changeset-release/main`,
+              base: "main",
+              per_page: 100,
+            });
+            const matches = pulls.filter(
+              (pull) =>
+                pull.title === "Version Packages" &&
+                pull.user?.login === "github-actions[bot]" &&
+                pull.head.repo?.full_name === `${owner}/${repo}` &&
+                pull.base.repo?.full_name === `${owner}/${repo}`,
+            );
+
+            if (matches.length === 0) {
+              core.info("No generated Changesets release PR needs checks.");
+              return;
+            }
+            if (matches.length !== 1) {
+              throw new Error(
+                `Expected one generated Changesets release PR; found ${matches.length}.`,
+              );
+            }
+
+            const pull = matches[0];
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: "ci.yml",
+              ref: pull.head.ref,
+              inputs: {
+                release_pr_number: String(pull.number),
+                release_head_sha: pull.head.sha,
+              },
+            });
+            core.notice(
+              `Requested lightweight CI for Changesets PR #${pull.number} at ${pull.head.sha}.`,
+            );
