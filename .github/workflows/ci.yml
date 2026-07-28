@@ -499,7 +499,7 @@ jobs:
     needs: release_change
     # A skipped job reports success, including when it is a required check. The
     # classifier only takes this path for the exact bot-owned metadata commit.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -639,7 +639,7 @@ jobs:
   typecheck:
     name: typecheck
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -706,7 +706,7 @@ jobs:
   examples:
     name: examples
     needs: [release_change, example_shard]
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
