@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCUSAURUS_MANIFEST_ID, docusaurus, docusaurusBridge } from '../src/vite.js';
@@ -43,6 +43,26 @@ describe('Docusaurus Vite bridge', () => {
 				([value]) => value === path.join(fixture.siteDir, 'docs/intro.md'),
 			),
 		).toBe(true);
+	});
+
+	it('waits for an in-flight reload before serving manifest data', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({ siteDir: fixture.siteDir });
+		await plugin.configResolved({ root: fixture.siteDir, command: 'serve' });
+		const sourceFile = path.join(fixture.siteDir, 'docs/intro.md');
+		const updatedDescription = 'Reloaded fixture document metadata';
+		writeFileSync(
+			sourceFile,
+			readFileSync(sourceFile, 'utf8').replace('Fixture document metadata', updatedDescription),
+		);
+
+		const reload = plugin.api.reload();
+		const [manifest, reloadedManifest] = await Promise.all([plugin.api.getManifest(), reload]);
+		const document = Object.values(manifest.content).find((metadata) => metadata.id === 'intro');
+
+		expect(document?.description).toBe(updatedDescription);
+		expect(reloadedManifest).toBe(manifest);
 	});
 
 	it('feeds content-plugin metadata into the MDX transform', async () => {

@@ -282,9 +282,32 @@ function compileOptions(options) {
 }
 
 function escapeMarkdownHeadingIds(source) {
-	return source.replace(/(?:^|\n)#{1,6}(?!#).*/g, (heading) =>
-		heading.replace('{#', '\\{#').replace('\\\\{#', '\\{#'),
-	);
+	const lines = source.split('\n');
+	let fence;
+
+	for (let index = 0; index < lines.length; index++) {
+		const line = lines[index];
+		const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+		if (match) {
+			const marker = match[1];
+			if (fence === undefined) {
+				fence = { character: marker[0], length: marker.length };
+			} else if (
+				marker[0] === fence.character &&
+				marker.length >= fence.length &&
+				/^[\t ]*\r?$/.test(line.slice(match[0].length))
+			) {
+				fence = undefined;
+			}
+			continue;
+		}
+		if (fence !== undefined) continue;
+		lines[index] = line.replace(/^#{1,6}(?!#).*/, (heading) =>
+			heading.replace('{#', '\\{#').replace('\\\\{#', '\\{#'),
+		);
+	}
+
+	return lines.join('\n');
 }
 
 export function compileDocusaurusMdx(source, id, options = {}) {

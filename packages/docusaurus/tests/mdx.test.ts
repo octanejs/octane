@@ -58,6 +58,29 @@ describe('Docusaurus-aware MDX', () => {
 		expect(result.code).toContain('export const contentTitle = undefined');
 	});
 
+	it('preserves heading examples inside fenced code blocks', () => {
+		const source = [
+			'```md',
+			'# Backtick example {#backtick-id}',
+			'```',
+			'',
+			'~~~md',
+			'# Tilde example {#tilde-id}',
+			'~~~',
+			'',
+			'## Actual heading {#actual-id}',
+		].join('\n');
+
+		const result = compileDocusaurusMdxSync(source, '/site/docs/code-examples.mdx');
+
+		expect(result.diagnostics).toEqual([]);
+		expect(result.code).toContain('"# Backtick example {#backtick-id}\\n"');
+		expect(result.code).toContain('"# Tilde example {#tilde-id}\\n"');
+		expect(result.code).toContain('id: "actual-id"');
+		expect(result.code).not.toContain('\\{#backtick-id}');
+		expect(result.code).not.toContain('\\{#tilde-id}');
+	});
+
 	it('can remove the first h1 while retaining it as contentTitle', () => {
 		const tree = {
 			type: 'root',

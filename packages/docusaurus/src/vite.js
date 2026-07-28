@@ -59,7 +59,7 @@ function createSharedState(options) {
 		},
 		refresh,
 		async getManifest() {
-			return manifest ?? refresh();
+			return loading ?? manifest ?? refresh();
 		},
 		getLoaded() {
 			return loaded;
