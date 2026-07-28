@@ -4049,6 +4049,7 @@ function mapCallToForOf(expr, ctx) {
 		params.length > 2 ||
 		params[0].type === 'AssignmentPattern' ||
 		params[0].type === 'RestElement' ||
+		params.some(mapCallbackPatternCapturesLexicalReceiver) ||
 		mapCallbackCapturesLexicalReceiver(arrow.body)
 	) {
 		return null;
@@ -4104,6 +4105,33 @@ function mapCallToForOf(expr, ctx) {
 		},
 	);
 	return inheritOriginLoc(forNode, expr);
+}
+
+function mapCallbackPatternCapturesLexicalReceiver(pattern) {
+	if (!pattern || typeof pattern !== 'object') return false;
+	switch (pattern.type) {
+		case 'AssignmentPattern':
+			return (
+				mapCallbackPatternCapturesLexicalReceiver(pattern.left) ||
+				mapCallbackCapturesLexicalReceiver(pattern.right)
+			);
+		case 'ObjectPattern':
+			return (pattern.properties || []).some((property) => {
+				if (property.type === 'RestElement') {
+					return mapCallbackPatternCapturesLexicalReceiver(property.argument);
+				}
+				return (
+					(property.computed && mapCallbackCapturesLexicalReceiver(property.key)) ||
+					mapCallbackPatternCapturesLexicalReceiver(property.value || property.key)
+				);
+			});
+		case 'ArrayPattern':
+			return (pattern.elements || []).some(mapCallbackPatternCapturesLexicalReceiver);
+		case 'RestElement':
+			return mapCallbackPatternCapturesLexicalReceiver(pattern.argument);
+		default:
+			return false;
+	}
 }
 
 function mapCallbackCapturesLexicalReceiver(root) {

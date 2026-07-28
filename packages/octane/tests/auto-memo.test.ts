@@ -1194,6 +1194,135 @@ describe('compiler-owned component-region memoization', () => {
 		},
 	);
 
+	it.each([
+		{
+			capture: 'object default using lexical this',
+			callback: '({ id, label = this.prefix }) => <li key={id}>{label}</li>',
+			rows: [{ id: 1 }],
+			expected: (_prefix: string) => 'receiver',
+		},
+		{
+			capture: 'array default using lexical this',
+			callback: '([id, label = this.prefix]) => <li key={id}>{label}</li>',
+			rows: [[1]],
+			expected: (_prefix: string) => 'receiver',
+		},
+		{
+			capture: 'object default using lexical arguments',
+			callback: '({ id, label = arguments[0].prefix }) => <li key={id}>{label}</li>',
+			rows: [{ id: 1 }],
+			expected: (prefix: string) => prefix,
+		},
+		{
+			capture: 'array default using lexical arguments',
+			callback: '([id, label = arguments[0].prefix]) => <li key={id}>{label}</li>',
+			rows: [[1]],
+			expected: (prefix: string) => prefix,
+		},
+		{
+			capture: 'computed object key using lexical this',
+			callback: '({ id, [this.field]: label }) => <li key={id}>{label}</li>',
+			rows: [{ id: 1, label: 'computed' }],
+			expected: (_prefix: string) => 'computed',
+		},
+		{
+			capture: 'computed object key using lexical arguments',
+			callback: '({ id, [arguments[0].field]: label }) => <li key={id}>{label}</li>',
+			rows: [{ id: 1, label: 'computed' }],
+			expected: (_prefix: string) => 'computed',
+		},
+		{
+			capture: 'computed object key using lexical this and arguments',
+			callback:
+				'({ id, [this.fieldStart + arguments[0].fieldEnd]: label }) => <li key={id}>{label}</li>',
+			rows: [{ id: 1, label: 'computed' }],
+			expected: (_prefix: string) => 'computed',
+		},
+	])(
+		'preserves $capture in arrow map parameters on client and server',
+		({ capture, callback, rows, expected }) => {
+			const source = `
+				const owner = { prefix: 'receiver', field: 'label', fieldStart: 'lab' };
+				function LexicalParameterMapApp(props) {
+					return <ul id="tsx-lexical-parameter-map">{props.rows.map(${callback})}</ul>;
+				}
+				export const App = LexicalParameterMapApp.bind(owner);
+			`;
+			const id = `tsx-map-lexical-parameter-${capture.replaceAll(' ', '-')}.tsx`;
+			const client = loadCompiledFixtureSource(source, {
+				id,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const root = mount(client.App, { rows, prefix: 'client', field: 'label', fieldEnd: 'el' });
+			expect(root.findAll('#tsx-lexical-parameter-map li').map((row) => row.textContent)).toEqual([
+				expected('client'),
+			]);
+			root.unmount();
+
+			const compiled = compile(source, id, { hmr: false, dev: false }).code;
+			expect(compiled).not.toContain('mapSlot');
+
+			const server = loadCompiledFixtureSource(source, {
+				id,
+				mode: 'server',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const { html } = ServerRuntime.renderToString(server.App, {
+				rows,
+				prefix: 'server',
+				field: 'label',
+				fieldEnd: 'el',
+			});
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			expect(Array.from(container.querySelectorAll('li')).map((row) => row.textContent)).toEqual([
+				expected('server'),
+			]);
+		},
+	);
+
+	it.each([
+		{
+			kind: 'safe object destructuring',
+			callback: '({ id, label }) => <li key={id}>{label}</li>',
+			rows: [{ id: 1, label: 'safe' }],
+			expected: 'safe',
+		},
+		{
+			kind: 'safe array destructuring',
+			callback: '([id, label]) => <li key={id}>{label}</li>',
+			rows: [[1, 'safe']],
+			expected: 'safe',
+		},
+		{
+			kind: 'nested normal-function receiver and arguments',
+			callback:
+				"({ id, label = (function () { return this.prefix + ':' + arguments[0]; }).call({ prefix: 'nested' }, 'own') }) => <li key={id}>{label}</li>",
+			rows: [{ id: 1 }],
+			expected: 'nested:own',
+		},
+	])('keeps $kind in arrow map parameters optimized', ({ kind, callback, rows, expected }) => {
+		const source = `
+			function SafeParameterMapApp(props) {
+				return <ul id="tsx-safe-parameter-map">{props.rows.map(${callback})}</ul>;
+			}
+			export const App = SafeParameterMapApp;
+		`;
+		const id = `tsx-map-safe-parameter-${kind.replaceAll(' ', '-')}.tsx`;
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App, { rows });
+		expect(root.findAll('#tsx-safe-parameter-map li').map((row) => row.textContent)).toEqual([
+			expected,
+		]);
+		root.unmount();
+		expect(compile(source, id, { hmr: false, dev: false }).code).toContain('mapSlot');
+	});
+
 	it('reads native-array indexed getters exactly once in callback order on every render', () => {
 		const events: string[] = [];
 		const items = [
