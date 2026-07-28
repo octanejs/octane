@@ -189,6 +189,47 @@ describe('directives at value position', () => {
 		}
 	});
 
+	describe('return-JSX bodies', () => {
+		// `function C() { return <jsx> }` owns its returned JSX exactly as a `@{}`
+		// body owns its render output, so a directive in one of its attribute values
+		// or expression containers belongs to it. The client and server reach that
+		// JSX through different emitters, and they have to agree.
+		const cases: [string, string][] = [
+			[
+				'attribute value',
+				`export function App(props: { ok: boolean }) {
+	return <Child prop={<h1>@if (props.ok) { <armA /> } @else { <armB /> }</h1>} />;
+}
+`,
+			],
+			[
+				'expression-container child',
+				`export function App(props: { ok: boolean }) {
+	return <div>{<h1>@if (props.ok) { <armA /> } @else { <armB /> }</h1>}</div>;
+}
+`,
+			],
+			[
+				'bare directive at an attribute value',
+				`export function App(props: { ok: boolean }) {
+	return <Child prop={@if (props.ok) { <armA /> } @else { <armB /> }} />;
+}
+`,
+			],
+		];
+
+		for (const [label, source] of cases) {
+			it(`compiles a directive at a ${label} in both modes`, () => {
+				for (const mode of ['client', 'server'] as const) {
+					const { code } = compile(source, 'App.tsrx', { mode });
+					// Both arms survive, so the directive was folded rather than dropped.
+					expect(code, mode).toContain('armA');
+					expect(code, mode).toContain('armB');
+				}
+			});
+		}
+	});
+
 	describe('ownership across a callback boundary', () => {
 		// A directive's arms are hoisted into the body that owns them, and the values
 		// they read are threaded in from that body. A callback is a separate lexical

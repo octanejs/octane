@@ -12558,6 +12558,23 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// their closure over setup locals/props — and only their values + the control
 	// expression are threaded into the renderer as `props.hN` holes.
 	const compInlinedSubs = [];
+	// Fold a directive found at value position into a hoisted renderer owned by THIS
+	// body — the same fold the `@{}` body and the server emitter build.
+	const lowerBodyValueDirective = (directive) =>
+		lowerHostFragment(
+			setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+			ctx,
+			compInlinedSubs,
+			'opaque',
+			cssHash,
+		);
+	// A `return <jsx>` body owns its returned JSX just as much as a `@{}` body owns
+	// its render output, so an attribute value or expression-container child in it
+	// can hold a directive this body must fold. Publishing the fold here is what
+	// keeps that form compiling on the client; the server already reaches it through
+	// compileServerComponent, and without this the two emitters disagree.
+	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
+	ctx._valueDirectiveLowering = lowerBodyValueDirective;
 	const newStatements = (node.body.body || []).map((sourceStatement) => {
 		// A return-based component's undefined output is ambiguous with the compiled
 		// void-body signal at runtime. Preserve JSX roots for the specialized lowering
@@ -12566,15 +12583,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		const prepared =
 			s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument)
 				? s
-				: lowerSetupValueDirectives(s, (directive) =>
-						lowerHostFragment(
-							setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
-							ctx,
-							compInlinedSubs,
-							'opaque',
-							cssHash,
-						),
-					);
+				: lowerSetupValueDirectives(s, lowerBodyValueDirective);
 		// Same hook handling as the `@{}` path: base hooks take a trailing hook slot,
 		// custom hooks are wrapped in withSlot (unified across both component forms).
 		const h = rewriteHookCalls(prepared, ctx, name);
@@ -12585,6 +12594,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		}
 		return rewriteJsxValues(h, ctx);
 	});
+	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 	// The rebuilt function shell maps to the authored declaration. Hoisted
 	// helper fns (compInlinedSubs — filled by the statement mapping above) are
 	// function DECLARATION nodes embedded at the top of the body, matching the
