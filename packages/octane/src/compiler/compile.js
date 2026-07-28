@@ -9220,7 +9220,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			ssrCall(
 				'ssrChild',
 				[
-					b.call('_$mapSlot', receiver, method, rewriteJsxValues(mapCall.callback, ctx)),
+					b.call('_$mapSlot', receiver, method, rewriteMapCallbackJsxValues(mapCall.callback, ctx)),
 					b.id('__s'),
 				],
 				node,
@@ -13690,7 +13690,9 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				);
 				rec.mapMethodExpr = memberProps(methodHole, mapCall.callback);
 				const callbackHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(callbackHole, rewriteJsxValues(mapCall.callback, ctx)));
+				holeProps.push(
+					objectProp(callbackHole, rewriteMapCallbackJsxValues(mapCall.callback, ctx)),
+				);
 				rec.mapCallbackExpr = memberProps(callbackHole, mapCall.callback);
 			}
 			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
@@ -14289,6 +14291,12 @@ function rewriteModuleJsxValues(node, ctx) {
 	}
 }
 
+// A map callback must evaluate its returned JSX record during the callback; only
+// that record's descendants keep their independently represented render scopes.
+function rewriteMapCallbackJsxValues(callback, ctx) {
+	return rewriteJsxValues(callback, ctx, true, unwrapTsExpr(callback));
+}
+
 /**
  * Lower a JSX COMPONENT element used at VALUE position (not as a component body's
  * rendered output) into a `createElement(Comp, props)` call, so JSX-as-a-value
@@ -14302,7 +14310,7 @@ function rewriteModuleJsxValues(node, ctx) {
  * recursively. This never touches a component body's OUTPUT JSX — that is split
  * out as `jsxNodes` and handled by planJsx before this runs.
  */
-function rewriteJsxValues(node, ctx) {
+function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCallbackOwner = null) {
 	// A compiler-owned directive can sit anywhere an expression is allowed — an
 	// attribute value, an expression-container child, a child of an element that is
 	// itself a value. esrap cannot print those TSRX-only nodes, so fold them first,
@@ -14314,6 +14322,42 @@ function rewriteJsxValues(node, ctx) {
 	if (lower != null) node = lowerSetupValueDirectives(node, lower);
 	return mapAst(node, (n) => {
 		const t = n && n.type;
+		if (t === 'CallExpression') {
+			const callee = n.callee;
+			const callback = unwrapTsExpr(n.arguments?.[0]);
+			const mapMethod =
+				callee?.type === 'MemberExpression' &&
+				(callee.computed
+					? callee.property?.type === 'Literal' && callee.property.value === 'map'
+					: callee.property?.name === 'map');
+			if (mapMethod && isFunctionNode(callback)) {
+				let out = n;
+				const mappedCallee = rewriteJsxValues(
+					callee,
+					ctx,
+					eagerMapCallbackRoots,
+					eagerMapCallbackOwner,
+				);
+				if (mappedCallee !== callee) out = { ...out, callee: mappedCallee };
+				const mappedArgs = n.arguments.map((argument, index) =>
+					index === 0
+						? rewriteMapCallbackJsxValues(argument, ctx)
+						: rewriteJsxValues(argument, ctx, eagerMapCallbackRoots, eagerMapCallbackOwner),
+				);
+				if (mappedArgs.some((argument, index) => argument !== n.arguments[index])) {
+					out = { ...out, arguments: mappedArgs };
+				}
+				return out;
+			}
+		}
+		if (
+			eagerMapCallbackRoots &&
+			lower == null &&
+			isFunctionNode(n) &&
+			n !== eagerMapCallbackOwner
+		) {
+			return rewriteJsxValues(n, ctx);
+		}
 		// A nested function is a separate LEXICAL owner, but a folded arm never needs
 		// lexical access to it: arms are hoisted to module scope and receive what they
 		// capture through the `__extra` env tuple, and that tuple is built at the
@@ -14358,7 +14402,12 @@ function rewriteJsxValues(node, ctx) {
 					if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
 					const child = n[key];
 					if (child === null || typeof child !== 'object') continue;
-					const mapped = rewriteJsxValues(child, ctx);
+					const mapped = rewriteJsxValues(
+						child,
+						ctx,
+						eagerMapCallbackRoots && n === eagerMapCallbackOwner && key === 'body',
+						eagerMapCallbackOwner,
+					);
 					if (mapped !== child) {
 						if (out === n) out = { ...n };
 						out[key] = mapped;
@@ -14379,7 +14428,7 @@ function rewriteJsxValues(node, ctx) {
 		// `jsxNodes` and handled by planJsx, which gives keyed `@for` lists their
 		// fast path.) `jsxElementToCreateElement` recurses, so mapAst need not.
 		if (t === 'Element' || t === 'JSXElement') {
-			return jsxElementToCreateElement(n, ctx);
+			return jsxElementToCreateElement(n, ctx, eagerMapCallbackRoots);
 		}
 		if (t === 'Fragment' || t === 'JSXFragment') {
 			// lowerJsxChild keeps static fragments as positional arrays and defers
@@ -14537,7 +14586,7 @@ function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = f
 
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
 // component Element node. Recurses into prop values so nested JSX values lower too.
-function jsxElementToCreateElement(node, ctx) {
+function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
 	const componentTag = isComponentTag(node);
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
@@ -14662,7 +14711,7 @@ function jsxElementToCreateElement(node, ctx) {
 			node,
 		);
 	}
-	if (!jsxValueRootNeedsRenderScope(node)) return descriptor;
+	if (eagerRoot || !jsxValueRootNeedsRenderScope(node)) return descriptor;
 	ctx.runtimeNeeded.add('createScopedValue');
 	return inheritOriginLoc(
 		b.call(rtAlias('createScopedValue'), inheritOriginLoc(b.arrow([], descriptor), node)),
@@ -21335,7 +21384,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 				? b.member(b.id(mapCall.receiverName), 'map')
 				: b.id(mapCall.methodName)
 			: null,
-		mapCallbackExpr: mapCall ? rewriteJsxValues(mapCall.callback, ctx) : null,
+		mapCallbackExpr: mapCall ? rewriteMapCallbackJsxValues(mapCall.callback, ctx) : null,
 		keyHelper,
 		inlineKey: inlineKey ? keyFn : null,
 		bodyHelper: itemHelperName,
