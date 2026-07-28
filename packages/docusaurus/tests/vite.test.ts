@@ -39,6 +39,20 @@ describe('Docusaurus Vite bridge', () => {
 		);
 	});
 
+	it('forwards localization options when loading the site', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({
+			siteDir: fixture.siteDir,
+			locale: 'fr',
+			automaticBaseUrlLocalizationDisabled: true,
+		});
+
+		await plugin.configResolved({ root: fixture.siteDir, command: 'serve' });
+
+		expect((await plugin.api.getManifest()).baseUrl).toBe('/docs/');
+	});
+
 	it('registers concrete config, plugin, and content watch inputs', async () => {
 		const fixture = createSiteFixture();
 		disposals.push(fixture.dispose);

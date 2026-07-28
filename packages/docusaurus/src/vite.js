@@ -42,6 +42,7 @@ function createSharedState(options) {
 				outDir: options.outDir,
 				config: options.config,
 				locale: options.locale,
+				automaticBaseUrlLocalizationDisabled: options.automaticBaseUrlLocalizationDisabled,
 				allowUnsupportedVersion: options.allowUnsupportedVersion,
 			});
 			const nextManifest = await createDocusaurusManifest(nextLoaded);
