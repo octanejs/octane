@@ -44,9 +44,11 @@ Octane is the day-to-day feel:
   effect events. It is the no-bookkeeping dependency DX associated with signal
   frameworks, while keeping the hooks model you already know. Explicit arrays
   remain authoritative; pass `null` when you intentionally want every render.
-  Locally declared custom hooks in a full-compiled `.tsrx`/`.tsx` module get
-  the same inference when they transparently forward a callback and final
-  dependency parameter to one of these hooks.
+  Built-in hook calls retain this inference inside custom hooks, including
+  compiler-processed plain `.ts`/`.js` modules. A separate, narrower rule also
+  infers omitted dependency arguments at calls to locally declared custom
+  wrappers in fully compiled `.tsrx`/`.tsx` modules when they transparently
+  forward a callback and final dependency parameter to one of these hooks.
 - **No rules of hooks.** Hooks are tracked by call site, not call order, so a
   hook can live inside an `if` or after an early return — the usual React
   footguns simply aren't there. The one rule that remains is enforced for you:
@@ -408,6 +410,27 @@ setters, reducer dispatchers, refs, and state getters. It also omits
 `useEffectEvent` results because Effect Events are non-reactive captures, even
 though React-compatible wrappers have a fresh identity on each render.
 
+This applies to built-in hook calls inside compiler-processed custom hooks,
+including custom hooks written in plain `.ts` or `.js` modules:
+
+```ts
+import { useEffect, useMemo } from 'octane';
+
+export function useLoggedValue(value: string, log: (value: string) => void) {
+  const formatted = useMemo(() => value.toUpperCase());
+
+  useEffect(() => {
+    log(formatted);
+  });
+
+  return formatted;
+}
+```
+
+The memo's inferred dependency is `value`; the effect's inferred dependencies
+are `formatted` and `log`. Changes propagate through the custom hook without
+requiring its caller to pass a dependency array.
+
 Explicit arrays keep their React meaning and are never rewritten. Pass `null`
 for the uncommon every-render form:
 
@@ -418,9 +441,10 @@ useEffect(() => sync(room.id), [room.id]); // explicit dependencies
 useEffect(() => measure(), null); // explicitly after every commit
 ```
 
-The same inference applies to a locally declared custom hook in a full-compiled
-`.tsrx`/`.tsx` module when its implementation transparently forwards a callback
-and final dependency parameter:
+Inferring a missing dependency argument at a **call to a custom wrapper** is a
+separate case. In a fully compiled `.tsrx`/`.tsx` module, a locally declared
+wrapper qualifies when it transparently forwards a callback and its final
+dependency parameter:
 
 ```jsx
 function useTrackedEffect(callback, dependencies) {
@@ -430,9 +454,11 @@ function useTrackedEffect(callback, dependencies) {
 useTrackedEffect(() => sync(room.id)); // inferred from the closure
 ```
 
-This proof is deliberately local and conservative. Plain `.ts`/`.js` modules,
-imported custom hooks, and wrappers that transform or otherwise inspect those
-parameters still require an explicit dependency argument.
+This proof is deliberately local and conservative. The surgical pass for plain
+`.ts`/`.js` modules still infers direct built-in hook calls, but it does not
+infer dependency arguments at calls to custom wrappers. Imported or method-style
+wrappers and wrappers that transform or inspect their callback or dependency
+parameter also require an explicit dependency argument.
 
 `useState` and `useReducer` also expose an optional third tuple member: a stable getter for
 the hook's latest state. It is useful in async callbacks and other long-lived

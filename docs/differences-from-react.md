@@ -33,6 +33,30 @@ refs, and state getters. It also omits `useEffectEvent` results because Effect
 Events are non-reactive captures, despite their intentionally fresh wrapper
 identity.
 
+This inference applies to a supported built-in hook wherever Octane processes
+its call, including inside a custom hook authored in `.tsrx`, `.tsx`, or a plain
+`.ts`/`.js` module. For example, a custom hook in plain TypeScript can omit both
+dependency arrays:
+
+```ts
+import { useEffect, useMemo } from 'octane';
+
+export function useLoggedValue(value: string, log: (value: string) => void) {
+  const formatted = useMemo(() => value.toUpperCase());
+
+  useEffect(() => {
+    log(formatted);
+  });
+
+  return formatted;
+}
+```
+
+The memo captures `value`, and the effect captures `formatted` and `log`.
+Changing `value` recomputes the memo; if the resulting `formatted` value changes,
+the effect reruns with the updated result. Changing `log` also reruns the
+effect. The custom hook's caller does not need to supply a dependency array.
+
 A dependency array tracks what can change *between renders*, so a binding that
 is evaluated once for the program's lifetime is not a dependency. Alongside
 imports, the compiler omits module-scope `const` declarations and module-scope
@@ -46,18 +70,24 @@ hold such state in a store or in state, not a module singleton. Module-scope
 `const` that only names one of these values, or that binds a literal, is
 likewise omitted — naming a fixed value does not make it reactive.
 
-The full `.tsrx`/`.tsx` compiler also recognizes locally declared custom hooks
-that transparently forward a callback parameter and their final dependency
-parameter to one of those hooks. Nested transparent wrappers are followed
-within the module. This does not guess from a `use*` name alone: plain
-`.ts`/`.js` modules, imported custom hooks, method hooks, and wrappers that
-transform or inspect those parameters require an explicit dependency argument.
+Inferring an omitted dependency argument at a **call to a custom wrapper** is a
+separate, narrower operation. The full `.tsrx`/`.tsx` compiler can infer that
+argument only when a locally declared custom hook transparently forwards its
+callback and final dependency parameter to a supported built-in hook. Nested
+transparent wrappers can also be followed within the same module.
 
-An explicit array is authoritative and retains React's exact behavior. Pass
-`null` to opt out of tracking and run an effect—or recompute a memo—after every
-render. Opaque callback creation such as `useEffect(makeEffect())` requires an
-explicit array or `null`, because evaluating it again to construct a dependency
-would change program behavior.
+The surgical pass for plain `.ts`/`.js` modules still infers direct built-in
+hook calls, including those inside custom hooks, but it does not infer or append
+dependency arguments at calls to custom wrappers. Imported wrappers,
+method-style wrappers, and wrappers that transform or inspect their callback or
+dependency parameter also require an explicit dependency argument. The compiler
+does not guess a wrapper's contract from its `use*` name.
+
+An explicit array, including `[]`, is authoritative and retains React's exact
+behavior. Pass `null` to opt out of tracking and run an effect—or recompute a
+memo—after every render. Opaque callback creation such as
+`useEffect(makeEffect())` requires an explicit array or `null`, because
+evaluating it again to construct a dependency would change program behavior.
 
 ## Automatic memoization and calls in templates
 
