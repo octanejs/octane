@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–10 have private source/test/build, demo-harness, or repository-stabilization implementations but their formal exits remain blocked; Milestone 11 adds a pinned macOS native runner and first-paint evidence without closing the Android/iOS or native-event gates**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–10 have private source/test/build, demo-harness, or repository-stabilization implementations but their formal exits remain blocked; Milestone 11 adds a pinned macOS native runner and first-paint evidence without closing the Android/iOS gates; background native-event delivery is now implemented and covered in the official JavaScript environment, but it rides the private `lynxCoreInject.tt.publishEvent` receiver and has no device evidence**
 
 Upstream audit date: **2026-07-22**
 
@@ -29,6 +29,9 @@ Milestone 11 macOS Explorer execution evidence date: **2026-07-23**
 Post-Milestone-9 public page-destroy source/test evidence date: **2026-07-22**
 
 Post-Milestone-9 typed data-lifecycle source/test evidence date: **2026-07-22**
+
+Background native-event delivery and dual-thread render-cost evidence date:
+**2026-07-28**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -751,9 +754,7 @@ late ACKs/events and stale roots are rejected.
 > tokens and priority scopes, acknowledgement-gated asynchronous NodesRef
 > handles, core-element PAPI creation, and retained visibility are implemented
 > and covered by unit or official-JavaScript-environment tests. This is not the
-> Milestone 3 exit: `__AddEvent` publicly installs tokens, but production native
-> delivery still depends on the private `lynxCoreInject.tt.publishEvent`
-> receiver; CSS import/CSS Module extraction and template/asset assembly remain
+> Milestone 3 exit: CSS import/CSS Module extraction and template/asset assembly remain
 > Milestone 5 work; the testing environment cannot prove dataset-key deletion
 > or native query/layout behavior; and no pinned ReactLynx differential has run
 > on Explorer, Android, or iOS.
@@ -764,6 +765,17 @@ late ACKs/events and stale roots are rejected.
 - Add image load/error, text, scroll view, input, and textarea behavior.
 - Implement background bind/catch/capture/global event kinds, priorities,
   replacement/removal, native payloads, and event-scope batching.
+- Receive native deliveries on the background thread. `__AddEvent` installs an
+  Octane token, and the engine resolves that token by calling
+  `lynxCoreInject.tt.publishEvent` on the **background** thread; it does not
+  route an ordinary background event through main-thread JavaScript. The
+  receiver is therefore part of the event path, not an optional extra: without
+  it every token is installed correctly and every tap is dropped. Because
+  `lynxCoreInject` is a private core injection, the receiver chains any
+  previously installed handler, declines tokens it does not own, and contains
+  its own errors. The listener priority travels inside the token so the
+  background can build a valid transported event message without a round trip
+  to main.
 - Implement background `NodesRef`, query, asynchronous measure, UI method
   invocation, ref churn on recreation, and cleanup.
 - Add visibility for retained Activity/Suspense content.

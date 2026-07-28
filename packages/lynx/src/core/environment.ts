@@ -2,6 +2,12 @@ interface LynxAmbientGlobals {
 	readonly lynx?: unknown;
 	readonly NativeModules?: unknown;
 	readonly queueMicrotask?: (callback: () => void) => void;
+	lynxCoreInject?: LynxCoreInject;
+}
+
+/** Private core injection carrying the engine's background event entry points. */
+export interface LynxCoreInject {
+	tt?: Record<string, unknown>;
 }
 
 // Rspeedy's official runtime wrapper provides these values as bundle-factory
@@ -10,9 +16,41 @@ interface LynxAmbientGlobals {
 // preserving the globalThis fallback used by tests and non-wrapped hosts.
 declare const lynx: unknown;
 declare const NativeModules: unknown;
+declare const lynxCoreInject: LynxCoreInject | undefined;
+
+// This package compiles without Node types on purpose: a native bundle has no
+// Node globals. Rspeedy, Rspack, and Vite all substitute `process.env.NODE_ENV`
+// with a literal, so the reference below folds to a constant and its guarded
+// branches leave the emitted bundle entirely.
+declare const process: { readonly env?: { readonly NODE_ENV?: string } } | undefined;
+
+/**
+ * Whether this is a development build.
+ *
+ * A native Lynx engine has no `process`, so an unsubstituted engine bundle
+ * reads as production — which is what it is. Node-hosted source tests keep
+ * `process`, so they exercise the development branches.
+ */
+export const LYNX_DEVELOPMENT: boolean =
+	typeof process !== 'undefined' && process?.env?.NODE_ENV !== 'production';
 
 function injectedLynx(): unknown {
 	return typeof lynx === 'undefined' ? undefined : lynx;
+}
+
+/**
+ * Resolve the object the engine calls background event entry points on.
+ *
+ * `lynxCoreInject` is a private core injection, so it can arrive either as a
+ * wrapper-supplied lexical binding or as a property of the global object.
+ * Prefer whichever already exists; otherwise create it on the global object,
+ * which is where an engine that injects late will look.
+ */
+export function readLynxCoreInject(): LynxCoreInject {
+	const injected = typeof lynxCoreInject === 'undefined' ? undefined : lynxCoreInject;
+	if (injected !== undefined) return injected;
+	const globals = globalThis as unknown as LynxAmbientGlobals;
+	return (globals.lynxCoreInject ??= {});
 }
 
 function injectedNativeModules(): unknown {

@@ -6,12 +6,14 @@ import {
 	type UniversalRoot,
 	type UniversalTransportAcknowledgement,
 	type UniversalTransportCommitMessage,
+	type UniversalTransportEventDelivery,
 	type UniversalTransportIdentity,
 	type UniversalSerializableValue,
 } from 'octane/universal/native';
 import {
 	applyLynxHostAttachments,
 	invalidateLynxClientContainer,
+	isLynxClientEventTarget,
 	prepareLynxHandleDeltas,
 	type LynxClientContainer,
 } from './client-driver.js';
@@ -22,6 +24,7 @@ import {
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
 	sameLynxTransportIdentity,
+	selfCheckLynxBackgroundOutboundMessage,
 	validateLynxBackgroundInboundMessage,
 	validateLynxBackgroundOutboundMessage,
 	type LynxBackgroundInboundMessage,
@@ -40,6 +43,7 @@ import {
 	type LynxMainThreadWorkletWireDescriptor,
 	type LynxTransportAcknowledgement,
 } from './protocol.js';
+import type { LynxBackgroundNativeEventDelivery } from './native-event-receiver.js';
 import {
 	isLynxMainThreadWorkletDescriptor,
 	isolateLynxWorkletValue,
@@ -70,6 +74,8 @@ export interface LynxBackgroundTransport extends UniversalAsyncCommitTransport<L
 	readonly mode: 'async';
 	readonly ready: Promise<void>;
 	bindRoot(root: Pick<UniversalRoot, 'dispatchTransportEvent'>): void;
+	/** Deliver one native propagation path received on the background thread. */
+	dispatchNativeEventBatch(deliveries: readonly LynxBackgroundNativeEventDelivery[]): void;
 	/** Bind logical background cleanup to the native page lifetime broadcast. */
 	bindPageDestroy(handler: () => void | Promise<void>): void;
 	acceptedIdentity(): UniversalTransportIdentity | null;
@@ -296,7 +302,7 @@ export function createLynxBackgroundTransport(
 
 	const dispatch = (message: Parameters<typeof validateLynxBackgroundOutboundMessage>[0]) => {
 		if (closedError !== null) throw closedError;
-		const validated = validateLynxBackgroundOutboundMessage(message);
+		const validated = selfCheckLynxBackgroundOutboundMessage(message);
 		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
 	};
 
@@ -1263,7 +1269,7 @@ export function createLynxBackgroundTransport(
 				batch: preparedBatch,
 			};
 			try {
-				validateLynxBackgroundOutboundMessage(commit);
+				selfCheckLynxBackgroundOutboundMessage(commit);
 			} catch (error) {
 				finalizeWorkletBatch(preparedBatch, false);
 				throw error;
@@ -1382,6 +1388,53 @@ export function createLynxBackgroundTransport(
 		},
 		acceptedIdentity() {
 			return accepted;
+		},
+		dispatchNativeEventBatch(deliveries) {
+			if (deliveries.length === 0) return;
+			if (closedError !== null) {
+				report(closedError, 'Octane Lynx received a native event after the transport closed.');
+				return;
+			}
+			if (accepted === null) {
+				report(new Error('Octane Lynx received a native event before a commit was accepted.'));
+				return;
+			}
+			const priority = deliveries[0]!.identity.priority;
+			const transported: UniversalTransportEventDelivery[] = [];
+			for (const delivery of deliveries) {
+				const { identity } = delivery;
+				if (identity.root !== accepted.root) {
+					report(
+						new Error(`Octane Lynx received a foreign native event for root ${identity.root}.`),
+					);
+					return;
+				}
+				if (identity.priority !== priority) {
+					report(new Error('Octane Lynx native event batch mixes listener priorities.'));
+					return;
+				}
+				// The background owns the listener table but main owns the physical
+				// tree, so the generation and attachment recorded at acknowledgement
+				// are what prove this token still names a live, mounted host.
+				if (!isLynxClientEventTarget(container, identity.root, identity.id, identity.generation)) {
+					report(
+						new Error(
+							`Octane Lynx received a stale native event for host ${identity.id}:${identity.generation}.`,
+						),
+					);
+					return;
+				}
+				transported.push({ listener: identity.listener, payload: delivery.payload });
+			}
+			handleEvent({
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: accepted.root,
+				version: accepted.version,
+				type: 'event',
+				priority,
+				deliveries: Object.freeze(transported),
+			});
 		},
 		async cancelPendingBeforeReady(reason) {
 			if (closedError !== null || accepted !== null || pending.size === 0) return false;

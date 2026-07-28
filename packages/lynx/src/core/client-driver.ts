@@ -56,100 +56,198 @@ export interface LynxPublicHandle {
 	setNativeProps(props: Readonly<Record<string, UniversalSerializableValue>>): Promise<void>;
 }
 
-interface MutableHandleState {
+/**
+ * The background's record of one accepted host node.
+ *
+ * A mount acknowledges one of these per node, so the entry is the shape the
+ * whole subsystem is tuned around: a single monomorphic object holding
+ * identity plus mutable acknowledgement state, allocated once and mutated in
+ * place. Everything a consumer can *observe* about a node — the frozen
+ * `LynxPublicHandle` facade, its `NodesRef` query binding, and the defensive
+ * snapshot clone — is built on first use instead. Refs, queries, and portals
+ * reach a handful of nodes in a real screen; eagerly building three objects
+ * and a WeakMap entry for all of them charged every mount for a feature
+ * almost none of its nodes use.
+ */
+interface LynxHandleEntry {
+	readonly root: number;
+	readonly id: number;
+	readonly type: string;
+	readonly generation: number;
+	readonly createSelectorQuery: LynxCreateSelectorQuery;
 	active: boolean;
 	attached: boolean;
 	listDescendant: boolean;
 	attachmentEpoch: number;
-	snapshot: UniversalSerializableValue;
-	readonly binding: LynxNodesRefBinding;
+	/** Acknowledged snapshot, still owned by the inbound message. */
+	rawSnapshot: UniversalSerializableValue;
+	/** Cached defensive clone handed to consumers; built on first read. */
+	clonedSnapshot: UniversalSerializableValue | undefined;
+	facade: LynxPublicHandle | null;
+	binding: LynxNodesRefBinding | null;
+	/** Sticky invalidation recorded while `binding` was still unmaterialized. */
+	invalidation: { readonly reason: unknown } | null;
 }
 
-const HANDLE_STATE = new WeakMap<LynxPublicHandle, MutableHandleState>();
+/** The mutable half of an entry, captured so a rejected acknowledgement can roll back. */
+interface LynxHandleStateSnapshot {
+	readonly active: boolean;
+	readonly attached: boolean;
+	readonly listDescendant: boolean;
+	readonly attachmentEpoch: number;
+	readonly rawSnapshot: UniversalSerializableValue;
+	readonly clonedSnapshot: UniversalSerializableValue | undefined;
+}
 
-function nextAttachmentEpoch(state: MutableHandleState, attached: boolean): number {
-	if (state.attached === attached) return state.attachmentEpoch;
-	if (state.attachmentEpoch === Number.MAX_SAFE_INTEGER) {
+/** Reverse lookup for the few facades that were actually handed out. */
+const FACADE_ENTRY = new WeakMap<LynxPublicHandle, LynxHandleEntry>();
+
+function captureHandleState(entry: LynxHandleEntry): LynxHandleStateSnapshot {
+	return {
+		active: entry.active,
+		attached: entry.attached,
+		listDescendant: entry.listDescendant,
+		attachmentEpoch: entry.attachmentEpoch,
+		rawSnapshot: entry.rawSnapshot,
+		clonedSnapshot: entry.clonedSnapshot,
+	};
+}
+
+function restoreHandleState(
+	entry: LynxHandleEntry,
+	state: LynxHandleStateSnapshot,
+	attachmentEpoch = state.attachmentEpoch,
+): void {
+	entry.active = state.active;
+	entry.attached = state.attached;
+	entry.listDescendant = state.listDescendant;
+	entry.attachmentEpoch = attachmentEpoch;
+	entry.rawSnapshot = state.rawSnapshot;
+	entry.clonedSnapshot = state.clonedSnapshot;
+}
+
+function nextAttachmentEpoch(entry: LynxHandleEntry, attached: boolean): number {
+	if (entry.attached === attached) return entry.attachmentEpoch;
+	if (entry.attachmentEpoch === Number.MAX_SAFE_INTEGER) {
 		throw new Error('Octane Lynx physical attachment epoch is exhausted.');
 	}
-	return state.attachmentEpoch + 1;
+	return entry.attachmentEpoch + 1;
 }
 
-function createPublicHandle(
-	root: number,
-	id: number,
-	type: string,
-	generation: number,
-	snapshot: UniversalSerializableValue,
-	createSelectorQuery: LynxCreateSelectorQuery,
-): LynxPublicHandle {
-	let handle!: LynxPublicHandle;
+/**
+ * Invalidate a handle's query binding, replaying the reason if the binding has
+ * not been materialized yet. An unmaterialized binding owns no pending
+ * operations, so nothing observable is deferred by recording the reason here.
+ */
+function invalidateHandleBinding(entry: LynxHandleEntry, reason: unknown): void {
+	if (entry.binding !== null) {
+		entry.binding.invalidate(reason);
+		return;
+	}
+	entry.invalidation ??= { reason };
+}
+
+/** Reject in-flight operations owned by a detached cell. Inert without a binding. */
+function invalidateHandleAttachment(entry: LynxHandleEntry): void {
+	entry.binding?.invalidateAttachment();
+}
+
+function handleBinding(entry: LynxHandleEntry): LynxNodesRefBinding {
+	let binding = entry.binding;
+	if (binding !== null) return binding;
+	const { root, id, type, generation } = entry;
 	const selector = createLynxNodesRefSelector(root, id, generation);
-	const binding = createLynxNodesRef({
+	binding = createLynxNodesRef({
 		identity: { root, id, type, generation, selector },
-		createSelectorQuery,
+		createSelectorQuery: entry.createSelectorQuery,
 		readState() {
-			const current = HANDLE_STATE.get(handle);
-			if (current === undefined) return null;
 			return {
 				root,
 				id,
 				type,
 				generation,
 				selector,
-				active: current.active && current.attached,
-				attachmentEpoch: current.attachmentEpoch,
+				active: entry.active && entry.attached,
+				attachmentEpoch: entry.attachmentEpoch,
 			};
 		},
 	});
-	const facade: LynxPublicHandle = {
+	entry.binding = binding;
+	if (entry.invalidation !== null) binding.invalidate(entry.invalidation.reason);
+	return binding;
+}
+
+/** Build the frozen public facade for one entry, once. */
+function handleFacade(entry: LynxHandleEntry): LynxPublicHandle {
+	let facade = entry.facade;
+	if (facade !== null) return facade;
+	facade = Object.freeze({
 		renderer: LYNX_TRANSPORT_RENDERER,
-		root,
-		id,
-		type,
-		generation,
+		root: entry.root,
+		id: entry.id,
+		type: entry.type,
+		generation: entry.generation,
 		get active(): boolean {
-			return HANDLE_STATE.get(handle)!.active;
+			return entry.active;
 		},
 		get attached(): boolean {
-			return HANDLE_STATE.get(handle)!.attached;
+			return entry.attached;
 		},
 		get snapshot(): UniversalSerializableValue {
-			return HANDLE_STATE.get(handle)!.snapshot;
+			return (entry.clonedSnapshot ??= cloneSnapshot(entry.rawSnapshot));
 		},
 		invoke<Result extends UniversalSerializableValue = UniversalSerializableValue>(
 			method: string,
 			params?: Readonly<Record<string, UniversalSerializableValue>>,
 		) {
-			return binding.handle.invoke<Result>(method, params);
+			return handleBinding(entry).handle.invoke<Result>(method, params);
 		},
 		measure(options?: LynxMeasureOptions) {
-			return binding.handle.measure(options);
+			return handleBinding(entry).handle.measure(options);
 		},
 		fields(options: LynxNodesRefFieldsOptions) {
-			return binding.handle.fields(options);
+			return handleBinding(entry).handle.fields(options);
 		},
 		path() {
-			return binding.handle.path();
+			return handleBinding(entry).handle.path();
 		},
 		setNativeProps(props: Readonly<Record<string, UniversalSerializableValue>>) {
-			return binding.handle.setNativeProps(props);
+			return handleBinding(entry).handle.setNativeProps(props);
 		},
-	};
-	handle = Object.freeze(facade);
-	HANDLE_STATE.set(handle, {
+	}) as LynxPublicHandle;
+	entry.facade = facade;
+	FACADE_ENTRY.set(facade, entry);
+	return facade;
+}
+
+function createHandleEntry(
+	root: number,
+	id: number,
+	type: string,
+	generation: number,
+	snapshot: UniversalSerializableValue,
+	createSelectorQuery: LynxCreateSelectorQuery,
+): LynxHandleEntry {
+	return {
+		root,
+		id,
+		type,
+		generation,
+		createSelectorQuery,
 		active: false,
 		attached: false,
 		listDescendant: false,
 		attachmentEpoch: 0,
-		snapshot,
-		binding,
-	});
-	return handle;
+		rawSnapshot: snapshot,
+		clonedSnapshot: undefined,
+		facade: null,
+		binding: null,
+		invalidation: null,
+	};
 }
 
 interface LynxClientContainerState {
-	handles: Map<number, LynxPublicHandle>;
+	handles: Map<number, LynxHandleEntry>;
 	readonly generations: Map<number, number>;
 	readonly worklets?: LynxBackgroundFunctionRegistry;
 	readonly createSelectorQuery: LynxCreateSelectorQuery;
@@ -185,7 +283,8 @@ export function createLynxClientContainer(
 	const container: LynxClientContainer = Object.freeze({
 		renderer: LYNX_TRANSPORT_RENDERER,
 		getPublicHandle(id: number) {
-			return CONTAINER_STATE.get(container)!.handles.get(id) ?? null;
+			const entry = CONTAINER_STATE.get(container)!.handles.get(id);
+			return entry === undefined ? null : handleFacade(entry);
 		},
 	});
 	CONTAINER_STATE.set(container, {
@@ -264,14 +363,24 @@ function containerState(container: LynxClientContainer): LynxClientContainerStat
 function cloneSnapshot(value: UniversalSerializableValue): UniversalSerializableValue {
 	if (value === null || typeof value !== 'object') return value;
 	if (Array.isArray(value)) return Object.freeze(value.map(cloneSnapshot));
+	const source = value as Record<string, UniversalSerializableValue>;
 	const output: Record<string, UniversalSerializableValue> = {};
-	for (const [name, child] of Object.entries(value)) {
-		Object.defineProperty(output, name, {
-			configurable: true,
-			enumerable: true,
-			value: cloneSnapshot(child),
-			writable: true,
-		});
+	// Assignment, not defineProperty: this runs once per accepted host node, and
+	// a property definition per field is measurably slower. `__proto__` is the
+	// one name assignment would route to the prototype setter instead of an own
+	// data property, so it keeps the explicit definition.
+	for (const name of Object.keys(source)) {
+		const child = cloneSnapshot(source[name]!);
+		if (name === '__proto__') {
+			Object.defineProperty(output, name, {
+				configurable: true,
+				enumerable: true,
+				value: child,
+				writable: true,
+			});
+		} else {
+			output[name] = child;
+		}
 	}
 	return Object.freeze(output);
 }
@@ -286,22 +395,24 @@ function validateSnapshotIdentity(
 			`Octane Lynx acknowledgement snapshot for handle ${delta.id} is not an object.`,
 		);
 	}
+	// One acknowledged node per accepted host node runs this, so the checks are
+	// written as direct comparisons: an expected-shape object plus Object.entries
+	// allocated two objects and an array of pairs per node, and the selector
+	// string was built even when the snapshot already carried a matching one.
 	const value = snapshot as Record<string, UniversalSerializableValue>;
-	const expected: Readonly<Record<string, UniversalSerializableValue>> = {
-		$$kind: 'octane.lynx.element',
-		renderer: LYNX_TRANSPORT_RENDERER,
-		root: identity.root,
-		id: delta.id,
-		type: delta.type,
-		generation: delta.generation,
-		selector: createLynxNodesRefSelector(identity.root, delta.id, delta.generation),
+	const foreign = (name: string): never => {
+		throw new Error(
+			`Octane Lynx acknowledgement snapshot has foreign ${name} for handle ${delta.id}.`,
+		);
 	};
-	for (const [name, expectedValue] of Object.entries(expected)) {
-		if (value[name] !== expectedValue) {
-			throw new Error(
-				`Octane Lynx acknowledgement snapshot has foreign ${name} for handle ${delta.id}.`,
-			);
-		}
+	if (value.$$kind !== 'octane.lynx.element') foreign('$$kind');
+	if (value.renderer !== LYNX_TRANSPORT_RENDERER) foreign('renderer');
+	if (value.root !== identity.root) foreign('root');
+	if (value.id !== delta.id) foreign('id');
+	if (value.type !== delta.type) foreign('type');
+	if (value.generation !== delta.generation) foreign('generation');
+	if (value.selector !== createLynxNodesRefSelector(identity.root, delta.id, delta.generation)) {
+		foreign('selector');
 	}
 }
 
@@ -311,7 +422,7 @@ export interface LynxPreparedHandleDeltas {
 }
 
 interface LynxHandleTransition {
-	readonly initial: LynxPublicHandle | undefined;
+	readonly initial: LynxHandleEntry | undefined;
 	present: boolean;
 	type: string | null;
 	identityChanged: boolean;
@@ -346,8 +457,8 @@ export function prepareLynxHandleDeltas(
 		throw new Error('Octane Lynx acknowledgement has a foreign transport identity.');
 	}
 	const originalHandles = state.handles;
-	const stagedHandles = new Map<number, LynxPublicHandle | null>();
-	const finalHandle = (id: number): LynxPublicHandle | undefined => {
+	const stagedHandles = new Map<number, LynxHandleEntry | null>();
+	const finalHandle = (id: number): LynxHandleEntry | undefined => {
 		if (!stagedHandles.has(id)) return originalHandles.get(id);
 		return stagedHandles.get(id) ?? undefined;
 	};
@@ -405,9 +516,9 @@ export function prepareLynxHandleDeltas(
 	}
 
 	const seen = new Set<number>();
-	const priorStates = new Map<LynxPublicHandle, MutableHandleState>();
-	const nextStates = new Map<LynxPublicHandle, MutableHandleState>();
-	const createdHandles = new Set<LynxPublicHandle>();
+	const priorStates = new Map<LynxHandleEntry, LynxHandleStateSnapshot>();
+	const nextStates = new Map<LynxHandleEntry, LynxHandleStateSnapshot>();
+	const createdHandles = new Set<LynxHandleEntry>();
 	const priorGenerations = new Map<number, number | undefined>();
 	const nextGenerations = new Map<number, number>();
 	// Main owns the accepted host topology and publishes this derived bit. The
@@ -429,13 +540,11 @@ export function prepareLynxHandleDeltas(
 		const expected = transition === undefined ? 'none' : expectedHandleDelta(transition);
 		if (delta.op === 'list-ancestry') {
 			const handle = originalHandles.get(delta.id);
-			const current = handle === undefined ? undefined : HANDLE_STATE.get(handle);
 			if (
 				!hasTopologyMutation ||
 				expected !== 'none' ||
 				handle === undefined ||
-				current === undefined ||
-				!current.active ||
+				!handle.active ||
 				handle.root !== identity.root ||
 				handle.generation !== delta.generation
 			) {
@@ -443,13 +552,16 @@ export function prepareLynxHandleDeltas(
 					`Octane Lynx acknowledgement changes list ancestry for stale or transitioning handle ${delta.id}:${delta.generation}.`,
 				);
 			}
-			if (current.listDescendant === delta.listDescendant) {
+			if (handle.listDescendant === delta.listDescendant) {
 				throw new Error(
 					`Octane Lynx acknowledgement publishes unchanged list ancestry for handle ${delta.id}.`,
 				);
 			}
-			priorStates.set(handle, { ...current });
-			nextStates.set(handle, { ...current, listDescendant: delta.listDescendant });
+			priorStates.set(handle, captureHandleState(handle));
+			nextStates.set(handle, {
+				...captureHandleState(handle),
+				listDescendant: delta.listDescendant,
+			});
 			continue;
 		}
 		if (transition === undefined || expected === 'none') {
@@ -465,7 +577,7 @@ export function prepareLynxHandleDeltas(
 					`Octane Lynx acknowledgement removes stale handle ${delta.id}:${delta.generation}.`,
 				);
 			}
-			priorStates.set(previous, { ...HANDLE_STATE.get(previous)! });
+			priorStates.set(previous, captureHandleState(previous));
 			stagedHandles.set(delta.id, null);
 			continue;
 		}
@@ -480,24 +592,25 @@ export function prepareLynxHandleDeltas(
 			if (delta.type !== finalType || delta.generation <= previousGeneration) {
 				throw new Error(`Octane Lynx acknowledgement has invalid created handle ${delta.id}.`);
 			}
-			const handle = createPublicHandle(
+			const handle = createHandleEntry(
 				identity.root,
 				delta.id,
 				delta.type,
 				delta.generation,
-				cloneSnapshot(delta.snapshot),
+				delta.snapshot,
 				state.createSelectorQuery,
 			);
 			createdHandles.add(handle);
 			stageGeneration(delta.id, delta.generation);
-			const current = HANDLE_STATE.get(handle)!;
-			nextStates.set(handle, {
-				...current,
-				active: true,
-				attached: delta.attached,
-				listDescendant: delta.listDescendant,
-				attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
-			});
+			// A handle this preparation just built is unreachable until apply()
+			// publishes it into `state.handles`, so its state is written directly
+			// rather than staged. Rollback drops the handle outright, so there is
+			// no prior state to restore. This keeps a mount from allocating two
+			// state clones and two map entries per accepted node.
+			handle.active = true;
+			handle.attachmentEpoch = nextAttachmentEpoch(handle, delta.attached);
+			handle.attached = delta.attached;
+			handle.listDescendant = delta.listDescendant;
 			stagedHandles.set(delta.id, handle);
 			continue;
 		}
@@ -514,40 +627,40 @@ export function prepareLynxHandleDeltas(
 			) {
 				throw new Error(`Octane Lynx acknowledgement has stale recreated handle ${delta.id}.`);
 			}
-			priorStates.set(previous, { ...HANDLE_STATE.get(previous)! });
-			const handle = createPublicHandle(
+			priorStates.set(previous, captureHandleState(previous));
+			const handle = createHandleEntry(
 				identity.root,
 				delta.id,
 				delta.type,
 				delta.generation,
-				cloneSnapshot(delta.snapshot),
+				delta.snapshot,
 				state.createSelectorQuery,
 			);
 			createdHandles.add(handle);
 			stageGeneration(delta.id, delta.generation);
-			const current = HANDLE_STATE.get(handle)!;
-			nextStates.set(handle, {
-				...current,
-				active: true,
-				attached: delta.attached,
-				listDescendant: delta.listDescendant,
-				attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
-			});
+			// A handle this preparation just built is unreachable until apply()
+			// publishes it into `state.handles`, so its state is written directly
+			// rather than staged. Rollback drops the handle outright, so there is
+			// no prior state to restore. This keeps a mount from allocating two
+			// state clones and two map entries per accepted node.
+			handle.active = true;
+			handle.attachmentEpoch = nextAttachmentEpoch(handle, delta.attached);
+			handle.attached = delta.attached;
+			handle.listDescendant = delta.listDescendant;
 			stagedHandles.set(delta.id, handle);
 			continue;
 		}
 		if (delta.type !== finalType || delta.generation !== previous.generation) {
 			throw new Error(`Octane Lynx acknowledgement changes retained handle ${delta.id}.`);
 		}
-		const current = HANDLE_STATE.get(previous)!;
-		priorStates.set(previous, { ...current });
+		priorStates.set(previous, captureHandleState(previous));
 		nextStates.set(previous, {
-			...current,
 			active: true,
 			attached: delta.attached,
 			listDescendant: delta.listDescendant,
-			attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
-			snapshot: cloneSnapshot(delta.snapshot),
+			attachmentEpoch: nextAttachmentEpoch(previous, delta.attached),
+			rawSnapshot: delta.snapshot,
+			clonedSnapshot: undefined,
 		});
 	}
 
@@ -567,25 +680,27 @@ export function prepareLynxHandleDeltas(
 			applied = true;
 			for (const handle of priorStates.keys()) {
 				if (finalHandle(handle.id) !== handle) {
-					const current = HANDLE_STATE.get(handle)!;
-					current.active = false;
-					current.attached = false;
-					current.binding.invalidate(
+					handle.active = false;
+					handle.attached = false;
+					invalidateHandleBinding(
+						handle,
 						new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was replaced.`),
 					);
 				}
 			}
 			for (const [handle, next] of nextStates) {
-				const current = HANDLE_STATE.get(handle)!;
-				const detached = current.attached && !next.attached;
-				Object.assign(current, next);
-				if (detached) current.binding.invalidateAttachment();
+				const detached = handle.attached && !next.attached;
+				restoreHandleState(handle, next);
+				if (detached) invalidateHandleAttachment(handle);
 			}
-			for (const [id, handle] of stagedHandles) {
+			// forEach, not for-of destructuring: Map iteration allocates an iterator
+			// result and a two-element entry array per step, and a mount walks one
+			// entry per accepted node.
+			stagedHandles.forEach((handle, id) => {
 				if (handle === null) originalHandles.delete(id);
 				else originalHandles.set(id, handle);
-			}
-			for (const [id, generation] of nextGenerations) state.generations.set(id, generation);
+			});
+			nextGenerations.forEach((generation, id) => state.generations.set(id, generation));
 		},
 		rollback() {
 			if (!applied || rolledBack) return;
@@ -596,17 +711,15 @@ export function prepareLynxHandleDeltas(
 				else originalHandles.set(id, previous);
 			}
 			for (const [handle, previous] of priorStates) {
-				const current = HANDLE_STATE.get(handle)!;
-				const detached = current.attached && !previous.attached;
-				const attachmentEpoch = nextAttachmentEpoch(current, previous.attached);
-				Object.assign(current, previous, { attachmentEpoch });
-				if (detached) current.binding.invalidateAttachment();
+				const detached = handle.attached && !previous.attached;
+				restoreHandleState(handle, previous, nextAttachmentEpoch(handle, previous.attached));
+				if (detached) invalidateHandleAttachment(handle);
 			}
 			for (const handle of createdHandles) {
-				const current = HANDLE_STATE.get(handle)!;
-				current.active = false;
-				current.attached = false;
-				current.binding.invalidate(
+				handle.active = false;
+				handle.attached = false;
+				invalidateHandleBinding(
+					handle,
 					new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was rolled back.`),
 				);
 			}
@@ -616,6 +729,30 @@ export function prepareLynxHandleDeltas(
 			}
 		},
 	};
+}
+
+/**
+ * @internal Whether a decoded native event token still names a live, physically
+ * attached host of this container.
+ *
+ * The engine delivers a background `bind*` event straight to this thread, so
+ * this is the background's own staleness gate: it stands in for the main-thread
+ * host-tree check that a main-delivered event would get.
+ */
+export function isLynxClientEventTarget(
+	container: LynxClientContainer,
+	root: number,
+	id: number,
+	generation: number,
+): boolean {
+	const entry = containerState(container).handles.get(id);
+	return (
+		entry !== undefined &&
+		entry.active &&
+		entry.attached &&
+		entry.root === root &&
+		entry.generation === generation
+	);
 }
 
 /** @internal Releases query handles when their background transport closes. */
@@ -637,28 +774,19 @@ export function invalidateLynxClientContainer(container: LynxClientContainer): v
 		}
 	};
 	for (const handle of handles) {
-		const current = HANDLE_STATE.get(handle);
-		if (current === undefined) {
-			if (!hasError) {
-				hasError = true;
-				firstError = new Error(
-					`Octane Lynx handle ${handle.id}:${handle.generation} lost its client state.`,
-				);
-			}
-			continue;
-		}
-		if (current.active && current.attached) {
+		if (handle.active && handle.attached) {
 			capture(() => {
-				current.attachmentEpoch = nextAttachmentEpoch(current, false);
+				handle.attachmentEpoch = nextAttachmentEpoch(handle, false);
 			});
-			current.attached = false;
+			handle.attached = false;
 			detached.push(handle.id);
-			capture(() => current.binding.invalidateAttachment());
+			capture(() => invalidateHandleAttachment(handle));
 		}
-		current.active = false;
-		current.attached = false;
+		handle.active = false;
+		handle.attached = false;
 		capture(() =>
-			current.binding.invalidate(
+			invalidateHandleBinding(
+				handle,
 				new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was disposed.`),
 			),
 		);
@@ -688,7 +816,7 @@ export function applyLynxHostAttachments(
 	}
 	const state = containerState(container);
 	const staged: Array<{
-		readonly handle: LynxPublicHandle;
+		readonly handle: LynxHandleEntry;
 		readonly attached: boolean;
 		readonly attachmentEpoch: number;
 	}> = [];
@@ -712,23 +840,22 @@ export function applyLynxHostAttachments(
 				`Octane Lynx host attachment targets stale or invalid handle ${change.id}:${change.generation}.`,
 			);
 		}
-		const current = HANDLE_STATE.get(handle)!;
-		if (current.attached !== change.attached) {
+		if (handle.attached !== change.attached) {
 			staged.push({
 				handle,
 				attached: change.attached,
-				attachmentEpoch: nextAttachmentEpoch(current, change.attached),
+				attachmentEpoch: nextAttachmentEpoch(handle, change.attached),
 			});
 		}
 	}
 	const detached: number[] = [];
 	const attached: number[] = [];
 	for (const change of staged) {
-		const current = HANDLE_STATE.get(change.handle)!;
-		current.attached = change.attached;
-		current.attachmentEpoch = change.attachmentEpoch;
-		if (!change.attached) current.binding.invalidateAttachment();
-		(change.attached ? attached : detached).push(change.handle.id);
+		const entry = change.handle;
+		entry.attached = change.attached;
+		entry.attachmentEpoch = change.attachmentEpoch;
+		if (!change.attached) invalidateHandleAttachment(entry);
+		(change.attached ? attached : detached).push(entry.id);
 	}
 	const batch = Object.freeze({
 		detached: Object.freeze(detached),
@@ -767,22 +894,22 @@ export function createLynxClientDriver(): UniversalHostDriver<
 				createPortalTargetHandle,
 			}: UniversalPortalTargetContext<LynxClientContainer>): UniversalPortalTargetRegistration {
 				const state = containerState(container);
-				const handleState =
+				const entry =
 					target !== null && typeof target === 'object'
-						? HANDLE_STATE.get(target as LynxPublicHandle)
+						? FACADE_ENTRY.get(target as LynxPublicHandle)
 						: undefined;
 				const handle = target as LynxPublicHandle;
 				if (
 					!transported ||
-					handleState === undefined ||
-					state.handles.get(handle.id) !== handle ||
-					!handleState.active
+					entry === undefined ||
+					state.handles.get(entry.id) !== entry ||
+					!entry.active
 				) {
 					throw new TypeError(
 						'Octane Lynx portals require a current, active LynxPublicHandle from this root. Initial portals must wait for the target ref acknowledgement.',
 					);
 				}
-				if (!handleState.attached) {
+				if (!entry.attached) {
 					throw new Error(
 						`Octane Lynx portal target ${handle.id}:${handle.generation} is not physically attached.`,
 					);
@@ -797,7 +924,7 @@ export function createLynxClientDriver(): UniversalHostDriver<
 						`Octane Lynx portal target type ${JSON.stringify(handle.type)} is not supported.`,
 					);
 				}
-				if (handleState.listDescendant) {
+				if (entry.listDescendant) {
 					throw new Error(
 						`Octane Lynx portal target ${handle.id}:${handle.generation} is a native-list descendant.`,
 					);
@@ -894,7 +1021,8 @@ export function createLynxClientDriver(): UniversalHostDriver<
 			);
 		},
 		getPublicInstance(container: LynxClientContainer, id: number) {
-			return containerState(container).handles.get(id) ?? null;
+			const entry = containerState(container).handles.get(id);
+			return entry === undefined ? null : handleFacade(entry);
 		},
 	};
 	return Object.freeze(driver);
