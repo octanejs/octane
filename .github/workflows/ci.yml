@@ -15,7 +15,7 @@ env:
   WEBSITE_SSR_SPEC: website/tests/ssr-smoke.test.ts
 
 jobs:
-  release_merge:
+  release_change:
     name: classify changeset release
     runs-on: ubuntu-latest
     permissions:
@@ -24,54 +24,81 @@ jobs:
       pull-requests: read
     outputs:
       is_release: ${{ steps.classify.outputs.is_release }}
+      is_release_pr: ${{ steps.classify.outputs.is_release_pr }}
+      is_release_merge: ${{ steps.classify.outputs.is_release_merge }}
 
     steps:
-      # Changesets release PRs are created with GITHUB_TOKEN, so GitHub does not
-      # run pull_request workflows for them. Authenticate the merge from the PR
-      # metadata and git trees, then prove its parent passed the full test suite.
-      # Any missing or unexpected data falls back to the full test matrix.
-      - name: Identify a generated Changesets release merge
+      # Authenticate both a generated release PR event and the eventual main
+      # merge from PR metadata, commit ancestry, authorship, and changed files.
+      # Any missing or unexpected data falls back to normal CI.
+      - name: Identify a generated Changesets release change
         id: classify
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             core.setOutput("is_release", "false");
-
-            const message = context.payload.head_commit?.message ?? "";
-            const commits = context.payload.commits ?? [];
-            if (
-              context.eventName !== "push" ||
-              context.ref !== "refs/heads/main" ||
-              !message.startsWith("Version Packages") ||
-              commits.length !== 1
-            ) {
-              return;
-            }
+            core.setOutput("is_release_pr", "false");
+            core.setOutput("is_release_merge", "false");
 
             try {
               const { owner, repo } = context.repo;
-              const { data: pulls } =
-                await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                  owner,
-                  repo,
-                  commit_sha: context.sha,
-                });
-              const matches = pulls.filter(
-                (pull) =>
-                  pull.merged_at !== null &&
-                  pull.merge_commit_sha === context.sha &&
-                  pull.title === "Version Packages" &&
-                  pull.user?.login === "github-actions[bot]" &&
-                  pull.base.ref === "main" &&
-                  pull.base.repo?.full_name === `${owner}/${repo}` &&
-                  pull.head.ref === "changeset-release/main" &&
-                  pull.head.repo?.full_name === `${owner}/${repo}`,
-              );
+              const expectedPull = (pull) =>
+                pull.title === "Version Packages" &&
+                pull.user?.login === "github-actions[bot]" &&
+                pull.base.ref === "main" &&
+                pull.base.repo?.full_name === `${owner}/${repo}` &&
+                pull.head.ref === "changeset-release/main" &&
+                pull.head.repo?.full_name === `${owner}/${repo}`;
 
-              if (matches.length !== 1) {
-                core.warning(
-                  `Expected one generated Changesets PR for ${context.sha}; found ${matches.length}. Running the full tests.`,
+              let pull;
+              let generatedSha;
+              let expectedParentSha;
+              let merged;
+              let releaseKind;
+
+              if (context.eventName === "pull_request") {
+                const candidate = context.payload.pull_request;
+                if (!candidate || !expectedPull(candidate)) {
+                  return;
+                }
+                pull = candidate;
+                generatedSha = candidate.head.sha;
+                expectedParentSha = candidate.base.sha;
+                releaseKind = "pr";
+              } else if (context.eventName === "push") {
+                const message = context.payload.head_commit?.message ?? "";
+                const commits = context.payload.commits ?? [];
+                if (
+                  context.ref !== "refs/heads/main" ||
+                  !message.startsWith("Version Packages") ||
+                  commits.length !== 1
+                ) {
+                  return;
+                }
+
+                const { data: pulls } =
+                  await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                    owner,
+                    repo,
+                    commit_sha: context.sha,
+                  });
+                const matches = pulls.filter(
+                  (candidate) =>
+                    candidate.merged_at !== null &&
+                    candidate.merge_commit_sha === context.sha &&
+                    expectedPull(candidate),
                 );
+                if (matches.length !== 1) {
+                  core.warning(
+                    `Expected one generated Changesets PR for ${context.sha}; found ${matches.length}. Running the full CI suite.`,
+                  );
+                  return;
+                }
+
+                pull = matches[0];
+                generatedSha = pull.head.sha;
+                releaseKind = "merge";
+              } else {
                 return;
               }
 
@@ -80,7 +107,7 @@ jobs:
                 {
                   owner,
                   repo,
-                  pull_number: matches[0].number,
+                  pull_number: pull.number,
                   per_page: 100,
                 },
               );
@@ -100,6 +127,7 @@ jobs:
                   file.filename === "docs/bindings-status.md" ||
                   file.filename === "docs/packages.md" ||
                   file.filename.startsWith("packages/shadcn/registry/") ||
+                  file.filename === "packages/cli/src/data/octane-data.json" ||
                   file.filename ===
                     "packages/octane-evals/datasets/train/user-apps-v1/manifest.jsonl"
                 );
@@ -111,24 +139,16 @@ jobs:
                   .map((file) => file.filename)
                   .join(", ");
                 core.warning(
-                  `Changesets PR #${matches[0].number} contains unexpected files${sample ? `: ${sample}` : ""}. Running the full tests.`,
+                  `Changesets PR #${pull.number} contains unexpected files${sample ? `: ${sample}` : ""}. Running the full CI suite.`,
                 );
                 return;
               }
 
-              const [{ data: merged }, { data: generated }] = await Promise.all([
-                github.rest.repos.getCommit({ owner, repo, ref: context.sha }),
-                github.rest.repos.getCommit({
-                  owner,
-                  repo,
-                  ref: matches[0].head.sha,
-                }),
-              ]);
-              const sameTree = merged.commit.tree.sha === generated.commit.tree.sha;
-              const sameParent =
-                merged.parents.length === 1 &&
-                generated.parents.length === 1 &&
-                merged.parents[0].sha === generated.parents[0].sha;
+              const { data: generated } = await github.rest.repos.getCommit({
+                owner,
+                repo,
+                ref: generatedSha,
+              });
               const expectedReleaseCommit =
                 generated.commit.message === "Version Packages" &&
                 generated.commit.author?.email ===
@@ -136,9 +156,46 @@ jobs:
                 generated.commit.committer?.email ===
                   "41898282+github-actions[bot]@users.noreply.github.com";
 
-              if (!sameTree || !sameParent || !expectedReleaseCommit) {
+              if (!expectedReleaseCommit) {
                 core.warning(
-                  `Changesets merge ${context.sha} does not match its generated PR commit. Running the full tests.`,
+                  `Changesets PR #${pull.number} does not have the expected generated commit. Running the full CI suite.`,
+                );
+                return;
+              }
+
+              if (releaseKind === "pr") {
+                const basedOnCurrentMain =
+                  generated.parents.length === 1 &&
+                  generated.parents[0].sha === expectedParentSha;
+                if (!basedOnCurrentMain) {
+                  core.warning(
+                    `Changesets PR #${pull.number} is not based directly on its current main base. Running the full CI suite.`,
+                  );
+                  return;
+                }
+
+                core.setOutput("is_release", "true");
+                core.setOutput("is_release_pr", "true");
+                core.notice(
+                  `Authenticated generated Changesets PR #${pull.number}; skipping duplicate PR CI.`,
+                );
+                return;
+              }
+
+              ({ data: merged } = await github.rest.repos.getCommit({
+                owner,
+                repo,
+                ref: context.sha,
+              }));
+              const sameTree =
+                merged.commit.tree.sha === generated.commit.tree.sha;
+              const sameParent =
+                merged.parents.length === 1 &&
+                generated.parents.length === 1 &&
+                merged.parents[0].sha === generated.parents[0].sha;
+              if (!sameTree || !sameParent) {
+                core.warning(
+                  `Changesets merge ${context.sha} does not match its generated PR commit. Running the full CI suite.`,
                 );
                 return;
               }
@@ -193,20 +250,21 @@ jobs:
               }
 
               core.setOutput("is_release", "true");
+              core.setOutput("is_release_merge", "true");
             } catch (error) {
               core.warning(
-                `Could not authenticate Changesets merge ${context.sha}: ${error.message}. Running the full tests.`,
+                `Could not authenticate Changesets release ${context.sha}: ${error.message}. Running the full CI suite.`,
               );
             }
 
   test_shard:
     name: test shard (Node ${{ matrix.node-version }}, ${{ matrix.shard }})
-    needs: release_merge
+    needs: release_change
     # Each source change has already passed this matrix before Changesets
     # generates its metadata-only release commit. Keep the post-merge CI run
     # (publishing waits for it), but do not repeat the full suite once the merge
     # has been authenticated above.
-    if: ${{ always() && !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -261,8 +319,10 @@ jobs:
   # gates. An authenticated release skip must satisfy every prerequisite.
   test:
     name: test (${{ matrix.required-context }})
-    needs: [release_merge, test_shard, website_e2e, heavy_integration]
-    if: ${{ always() }}
+    needs: [release_change, test_shard, website_e2e, heavy_integration]
+    # The release PR does not need test contexts. The post-merge release run does:
+    # publish.yml verifies these stable aggregate names before publishing.
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -273,7 +333,7 @@ jobs:
     steps:
       - name: Verify all test suites passed
         env:
-          IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_merge.outputs.is_release }}
+          IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_change.outputs.is_release_merge }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
           WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
           HEAVY_INTEGRATION_RESULT: ${{ needs.heavy_integration.result }}
@@ -290,10 +350,10 @@ jobs:
 
   website_e2e:
     name: website integration suite
-    needs: release_merge
+    needs: release_change
     # Same authenticated-release skip as the shards above: a metadata-only
     # Changesets merge has already passed this on its parent commit.
-    if: ${{ always() && !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -333,10 +393,10 @@ jobs:
 
   heavy_integration:
     name: heavy integration (${{ matrix.lane }})
-    needs: release_merge
+    needs: release_change
     # Run build and browser coverage once on the newest supported Node. The
     # ordinary suite still runs on both Node 22 and 24 above.
-    if: ${{ always() && !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -385,6 +445,10 @@ jobs:
         run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
 
   lint:
+    needs: release_change
+    # A skipped job reports success, including when it is a required check. The
+    # classifier only takes this path for the exact bot-owned metadata commit.
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -523,6 +587,8 @@ jobs:
 
   typecheck:
     name: typecheck
+    needs: release_change
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -549,6 +615,8 @@ jobs:
 
   example_shard:
     name: example apps (${{ matrix.shard }})
+    needs: release_change
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -586,8 +654,8 @@ jobs:
   # `always()` makes a failed shard produce a failed example check, not a skip.
   examples:
     name: examples
-    needs: example_shard
-    if: ${{ always() }}
+    needs: [release_change, example_shard]
+    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -598,6 +666,8 @@ jobs:
 
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
+    needs: release_change
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
     # This matrix intentionally rewrites one importer without changing the
     # repository lockfile after the frozen base install.
@@ -658,6 +728,8 @@ jobs:
 
   lynx_compat:
     name: Lynx compatibility (${{ matrix.lane }})
+    needs: release_change
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -696,6 +768,8 @@ jobs:
 
   package:
     name: validate publishable packages
+    needs: release_change
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
