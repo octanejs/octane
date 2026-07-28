@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { List } from './_fixtures/forlist.tsrx';
+import { IndexedList, List } from './_fixtures/forlist.tsrx';
 
 // SSR Phase 6 (M2) — a keyed @for list hydrates: the server wraps the @for in
 // one block range and lets each proven direct-host item self-delimit. The client
@@ -32,6 +32,30 @@ beforeEach(() => {
 afterEach(() => container.remove());
 
 describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
+	it('adopts explicit index-keyed rows and preserves their positional identity', () => {
+		const items = [
+			{ id: 1, name: 'Alpha' },
+			{ id: 2, name: 'Beta' },
+			{ id: 3, name: 'Gamma' },
+		];
+		const { html } = ServerRT.renderToString(server.IndexedList, { items });
+		container.innerHTML = html;
+		const rows = [...container.querySelectorAll('li.indexed-row')];
+
+		const root = hydrateRoot(container, IndexedList, { items });
+		flushSync(() => {});
+		expect([...container.querySelectorAll('li.indexed-row')]).toEqual(rows);
+
+		flushSync(() => root.render(IndexedList, { items: [items[2], items[1], items[0]] }));
+		expect([...container.querySelectorAll('li.indexed-row')]).toEqual(rows);
+		expect(rows.map((row) => row.querySelector('.name')?.textContent)).toEqual([
+			'Gamma',
+			'Beta',
+			'Alpha',
+		]);
+		root.unmount();
+	});
+
 	it('adopts the server-rendered items (no rebuild) and per-item handlers work', async () => {
 		const items = [
 			{ id: 1, name: 'Alpha' },
