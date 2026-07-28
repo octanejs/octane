@@ -1,12 +1,16 @@
-import type { Editor } from '@tiptap/core';
 // Ported from @tiptap/react 3.28.0 Tiptap.tsx. Refs remain ordinary props in
 // Octane, and the compound Tiptap.Content component needs no forwardRef layer.
+import type { Editor } from '@tiptap/core';
 import { createContext, useContext, useMemo, type Context, type OctaneNode } from 'octane';
 
 import { EditorContext } from './Context';
 import { EditorContent, type EditorContentProps } from './EditorContent.tsrx';
 import { splitSlot, subSlot } from './internal';
-import { useEditorState, type EditorStateSnapshot } from './useEditorState';
+import {
+	useEditorState,
+	type EditorStateSnapshot,
+	type UseEditorStateOptions,
+} from './useEditorState';
 
 export type TiptapContextType = {
 	editor: Editor;
@@ -63,7 +67,10 @@ export function useTiptapState<TSelectorResult>(
 
 	// Call through a non-hook-named alias because this source is itself compiled:
 	// the public call site's slot is already being forwarded explicitly here.
-	const selectEditorState = useEditorState;
+	const selectEditorState = useEditorState as (
+		options: UseEditorStateOptions<TSelectorResult, Editor>,
+		slot: symbol,
+	) => TSelectorResult;
 	return selectEditorState(
 		{
 			editor,
