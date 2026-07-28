@@ -16,16 +16,12 @@ function Slot(props: { content: OctaneNode }) @{
 	<section data-outlet="slot">{props.content}</section>
 }
 
-function WrappedErrorBoundary(props: { children: OctaneNode }) @{
-	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>
-		{props.children}
-	</ErrorBoundary>
+function WrappedErrorBoundary({ children }: { children: OctaneNode }) @{
+	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{children}</ErrorBoundary>
 }
 
 function WrappedSuspense(props: { children: OctaneNode }) @{
-	<Suspense fallback={<i data-fallback="pending">pending</i>}>
-		{props.children}
-	</Suspense>
+	<Suspense fallback={<i data-fallback="pending">pending</i>}>{props.children}</Suspense>
 }
 
 function readFailure(): string {
@@ -89,9 +85,7 @@ export function BuiltInErrorValue() @{
 			<span>{readFailure() as string}</span>
 		</ErrorBoundary>
 	);
-	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>
-		{content}
-	</ErrorBoundary>
+	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>{content}</ErrorBoundary>
 }
 
 export function WrappedErrorValue() @{
@@ -100,9 +94,7 @@ export function WrappedErrorValue() @{
 			<span>{readFailure() as string}</span>
 		</WrappedErrorBoundary>
 	);
-	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>
-		{content}
-	</ErrorBoundary>
+	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>{content}</ErrorBoundary>
 }
 
 export function DirectSuspense(props: { promise: Promise<string> }) @{
