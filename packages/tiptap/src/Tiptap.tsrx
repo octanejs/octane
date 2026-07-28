@@ -25,14 +25,16 @@ export type TiptapWrapperEditorInstanceProps =
 			instance: Editor;
 	  };
 
-export type TiptapWrapperProps = TiptapWrapperEditorInstanceProps & {
-	children: OctaneNode;
-};
+export type TiptapWrapperProps =
+	TiptapWrapperEditorInstanceProps & {
+		children: OctaneNode;
+	};
 
-export type TiptapContentProps = Omit<EditorContentProps, 'editor' | 'ref'> & {
-	editor?: never;
-	ref?: never;
-};
+export type TiptapContentProps =
+	Omit<EditorContentProps, 'editor' | 'ref'> & {
+		editor?: never;
+		ref?: never;
+	};
 
 export const TiptapContext: Context<TiptapContextType> & { displayName?: string } = createContext({
 	get editor(): Editor {
@@ -47,23 +49,21 @@ export function useTiptap(): TiptapContextType {
 	return useContext(TiptapContext);
 }
 
+type TiptapStateSelector<TSelectorResult> =
+	(options: UseEditorStateOptions<TSelectorResult, Editor>, slot: symbol) => TSelectorResult;
+
 /** Select a reactive slice of editor state from the context editor. */
 export function useTiptapState<TSelectorResult>(
 	selector: (context: EditorStateSnapshot<Editor>) => TSelectorResult,
 	...args: [equalityFn?: (left: TSelectorResult, right: TSelectorResult | null) => boolean]
 ): TSelectorResult {
 	const [userArgs, slot] = splitSlot(args);
-	const equalityFn = userArgs[0] as
-		| ((left: TSelectorResult, right: TSelectorResult | null) => boolean)
-		| undefined;
+	const equalityFn = userArgs[0] as UseEditorStateOptions<TSelectorResult, Editor>['equalityFn'];
 	const { editor } = useTiptap();
 
 	// Call through a non-hook-named alias because this source is itself compiled:
 	// the public call site's slot is already being forwarded explicitly here.
-	const selectEditorState = useEditorState as (
-		options: UseEditorStateOptions<TSelectorResult, Editor>,
-		slot: symbol,
-	) => TSelectorResult;
+	const selectEditorState = useEditorState as TiptapStateSelector<TSelectorResult>;
 	return selectEditorState(
 		{
 			editor,
@@ -105,4 +105,4 @@ export const Tiptap = Object.assign(TiptapWrapper, {
 	Content: TiptapContent,
 });
 
-export default Tiptap;
+export default Tiptap

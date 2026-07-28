@@ -11,18 +11,20 @@ export interface EditorConsumerProps {
 	children: (value: EditorContextValue) => OctaneNode;
 }
 
-export type EditorContainerProps = Omit<EditorContentProps, 'editor' | 'innerRef' | 'ref'> & {
-	editor?: never;
-	innerRef?: never;
-	ref?: never;
-};
+export type EditorContainerProps =
+	Omit<EditorContentProps, 'editor' | 'innerRef' | 'ref'> & {
+		editor?: never;
+		innerRef?: never;
+		ref?: never;
+	};
 
-export type EditorProviderProps = UseEditorOptions & {
-	children?: OctaneNode;
-	slotBefore?: OctaneNode;
-	slotAfter?: OctaneNode;
-	editorContainerProps?: EditorContainerProps;
-};
+export type EditorProviderProps =
+	UseEditorOptions & {
+		children?: OctaneNode;
+		slotBefore?: OctaneNode;
+		slotAfter?: OctaneNode;
+		editorContainerProps?: EditorContainerProps;
+	};
 
 export function EditorConsumer(props: EditorConsumerProps): OctaneNode {
 	const value = useCurrentEditor();
