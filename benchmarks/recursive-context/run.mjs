@@ -4,8 +4,8 @@
 // Methodology: every op (mount, update_root, update_partial, partial_unmount /
 // remount, unmount) mutates the DOM inside its adapter call — synchronously
 // where the framework allows it (ripple / octane / react via `flushSync`,
-// solid via `flush()`); an adapter with no public sync flush (vue-vapor)
-// returns a thenable (nextTick(), settling after Vue's flushJobs) and the
+// solid via `flush()`); native async adapters (Preact and vue-vapor) return a
+// thenable settling after their queued update and the
 // timed window extends until it settles. Either way we time ONLY the op (the
 // framework's JS work) and force a GC right before each timed sample, so a
 // surprise mid-sample collection can't inflate it. This isolates framework

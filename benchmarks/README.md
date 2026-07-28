@@ -12,9 +12,10 @@ result contract**.
 
 The comparative suites include native Preact and Svelte 5 fixtures alongside
 the existing React, Solid, Ripple, and Vue Vapor references. Preact fixtures use
-`preact`/`preact/hooks` directly (with `preact/compat` only for APIs such as
-portals, Suspense, and `flushSync`); Svelte fixtures use runes, keyed `#each`,
-modern event attributes, and the public imperative APIs. Framework-specific
+`preact`/`preact/hooks` directly, including native scheduler timing, with
+`preact/compat` only for React-shaped APIs that core does not expose, such as
+portals, Suspense, `memo`, and `useSyncExternalStore`; Svelte fixtures use runes,
+keyed `#each`, modern event attributes, and the public imperative APIs. Framework-specific
 capability gaps stay explicit: Svelte's public server renderer is buffered, so
 `streaming-ssr` reports no Svelte target rather than wrapping buffered HTML in a
 fake stream. `codegen-size`, `dbmon-deopt`, and `js-framework-deopt` remain
