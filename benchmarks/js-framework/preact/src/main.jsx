@@ -1,20 +1,15 @@
 import { render } from 'preact';
 import { useCallback, useReducer } from 'preact/hooks';
-import { flushSync, memo } from 'preact/compat';
+import { memo } from 'preact/compat';
 
 // Native Preact hooks implementation, modeled on the js-framework-benchmark
 // frameworks/keyed/react-hooks reference, for the same
 // create/replace/update/select/swap/remove/runlots/clear ops the octane apps are
 // driven through by run.mjs.
 //
-// One adaptation: dispatch is wrapped in `flushSync` so Preact commits the update
-// SYNCHRONOUSLY inside the discrete click, the way octane flushes on the event
-// (and ripple/solid use flushSync/flush). The run.mjs harness times only the
-// synchronous click handler; Preact's `createRoot` otherwise schedules the
-// commit AFTER the click returns, so the timer would capture ~0ms of scheduling
-// instead of the actual render. flushSync forces the same commit work to run in
-// the timed window — it doesn't change the work (each op is a single dispatch,
-// so there's nothing to batch).
+// Preact queues hook updates in a microtask. The harness awaits this after each
+// click so native scheduling and the DOM commit stay inside the timed window.
+window.__benchFlush = () => Promise.resolve();
 
 const random = (max) => Math.round(Math.random() * 1000) % max;
 
@@ -320,9 +315,9 @@ const Jumbotron = memo(
 
 const Main = () => {
 	const [{ data, selected }, rawDispatch] = useReducer(listReducer, initialState);
-	// Commit synchronously inside the click so the sync-timed harness captures the
-	// real render (see the note up top). Stable identity keeps the memo'd children.
-	const dispatch = useCallback((action) => flushSync(() => rawDispatch(action)), []);
+	// Stable identity keeps the memo'd children; the harness awaits the queued
+	// commit after each click (see the note up top).
+	const dispatch = useCallback((action) => rawDispatch(action), []);
 	return (
 		<div className="container">
 			<Jumbotron dispatch={dispatch} />

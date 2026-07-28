@@ -7,8 +7,8 @@
 //
 // Methodology mirrors the sibling benches: every op mutates the DOM inside its
 // adapter call — synchronously where the framework allows it (octane/react via
-// flushSync, solid via flush()); an adapter with no public sync flush
-// (vue-vapor) returns a thenable and the timed window extends until it settles.
+// flushSync, solid via flush()); adapters using native async scheduling (Preact
+// and vue-vapor) return a thenable and the timed window extends until it settles.
 // Either way we time ONLY the framework's JS work, and force a GC right before
 // each timed sample so a stray collection can't inflate it. Medians are
 // framework cost, not paint.
@@ -172,7 +172,7 @@ async function semanticGate(browser, url) {
 
 // MOUNT — fresh page per sample (quiescent start); time __mount() with a
 // freshly-collected heap. An adapter whose commit is scheduler-deferred
-// returns a thenable (vue-vapor's update ops do; see its main.js) — the timed
+// returns a thenable (Preact and vue-vapor do) — the timed
 // window extends until it settles, so the scheduling cost stays inside the
 // measurement.
 async function measureMount(browser, url) {

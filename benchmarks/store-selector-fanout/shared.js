@@ -68,9 +68,9 @@ export function installStoreSelectorStress() {
 		unsubscribeCalls: 0,
 	};
 	const state = {
-		// Per-target synchronous flush, installed by each fixture entry so the
+		// Per-target commit boundary, installed by each fixture entry so the
 		// harness can drive N discrete parent renders without a Playwright round
-		// trip or a timer floor per render.
+		// trip or a timer floor per render. Async schedulers return a thenable.
 		flush: (run) => run(),
 		ready: false,
 		stats,
