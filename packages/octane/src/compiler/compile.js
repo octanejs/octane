@@ -41,7 +41,7 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
-import { applyHookDependencies, isInvariantLiteral } from './hook-deps.js';
+import { analyzeHookDependencies, applyHookDependencies, isInvariantLiteral } from './hook-deps.js';
 import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
 import {
 	expandDomRendererRegionsAst,
@@ -2947,27 +2947,20 @@ function hookOwnsCallbackIdentity(call) {
 }
 
 /**
- * Whether `fn` can be lifted to module scope without changing what it computes.
- * `componentBound` is the over-approximated set of names the enclosing
- * module-level function declares.
+ * Whether `fn` can be relocated or memoized at all — independent of what it
+ * captures. A function whose meaning is tied to the call site it was written
+ * in (`this`, `arguments`, JSX, a nested hook) has to stay exactly where it is.
  */
-function isHoistableHookCallback(fn, componentBound) {
-	if (fn.type !== 'ArrowFunctionExpression' && fn.type !== 'FunctionExpression') return false;
+function isMovableHookCallback(fn) {
+	if (!fn || (fn.type !== 'ArrowFunctionExpression' && fn.type !== 'FunctionExpression'))
+		return false;
 	// A JSX code-block body is a subtemplate with its own compile pass.
 	if (fn.body?.type === 'JSXCodeBlock') return false;
 
 	let disqualified = false;
 	const seen = new WeakSet();
 	scan(fn);
-	if (disqualified) return false;
-
-	// Any reference to a name the component declares makes the closure
-	// instance-specific, so it must stay where it was authored.
-	const free = collectFreeIdentifiers(fn, new Set());
-	for (const name of free) {
-		if (componentBound.has(name)) return false;
-	}
-	return true;
+	return !disqualified;
 
 	function scan(n) {
 		if (disqualified || !n || typeof n !== 'object') return;
@@ -3013,6 +3006,23 @@ function isHoistableHookCallback(fn, componentBound) {
 	}
 }
 
+/** Whether `fn` reads anything the enclosing component declares. */
+function capturesComponentBindings(fn, componentBound) {
+	for (const name of collectFreeIdentifiers(fn, new Set())) {
+		if (componentBound.has(name)) return true;
+	}
+	return false;
+}
+
+/**
+ * Whether `fn` can be lifted to module scope without changing what it computes.
+ * `componentBound` is the over-approximated set of names the enclosing
+ * module-level function declares.
+ */
+function isHoistableHookCallback(fn, componentBound) {
+	return isMovableHookCallback(fn) && !capturesComponentBindings(fn, componentBound);
+}
+
 /**
  * Lift capture-free function arguments of hook calls to module scope, so the
  * hook sees one identity for the module's lifetime. Returns the AST unchanged
@@ -3054,6 +3064,200 @@ function hoistCaptureFreeHookCallbacks(ast, options = {}) {
 		};
 		return mapAst(statement, visit);
 	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dep-keyed hook-callback memoization (production compiles).
+//
+// The companion to the capture-free lift. A callback that DOES read component
+// state cannot move to module scope, but its identity still only needs to
+// change when the values it reads change — so it is wrapped in `useCallback`
+// with its dependency list left for inference to fill.
+//
+// This runs BEFORE applyHookDependencies precisely so inference owns that list,
+// which matters more than it looks: coarse identifier deps (`[props]`) are
+// worthless here, because the props object is a fresh identity on every parent
+// render, so the memo never hits. Inference produces the member PATHS actually
+// read (`[props.offset]`), and that is what holds the identity across a
+// re-render which changed nothing relevant.
+//
+// The wrapper is emitted inline at the argument position rather than as a
+// preceding `const`, which keeps the rewrite local — no statement insertion, so
+// no chance of lifting a callback out of the block whose scope it depends on.
+//
+// `useCallback` is IMPORTED under a reserved alias rather than synthesized as a
+// bare identifier, because dependency inference resolves hooks through real
+// import bindings; an unresolvable callee would silently receive no
+// dependencies at all, which is the failure mode that still looks like it works.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AUTO_CALLBACK_ALIAS = '_$autoCb';
+
+/**
+ * Which hooks have DECLARED that a callback argument is data they memoize on,
+ * rather than a dependency subject they re-run. Entries are `module#hookName`
+ * (matched against the call site's import) or a bare `hookName` for a hook
+ * declared in the module being compiled.
+ *
+ * This is an explicit declaration rather than an inference because the fact
+ * lives in the hook's own package, and a single-module compile cannot read it.
+ * Guessing is not an option here: the compiler already refuses to attach
+ * dependency semantics to unproven custom hooks, and getting this wrong yields
+ * a STALE CLOSURE — silent, intermittent, and attributed to the application
+ * rather than to the compiler.
+ */
+function buildDataCallbackHookIndex(entries) {
+	const byModule = new Map();
+	const bareNames = new Set();
+	for (const entry of entries || []) {
+		if (typeof entry !== 'string') continue;
+		const hash = entry.indexOf('#');
+		if (hash === -1) {
+			bareNames.add(entry);
+			continue;
+		}
+		const moduleName = entry.slice(0, hash);
+		const hookName = entry.slice(hash + 1);
+		if (!moduleName || !hookName) continue;
+		let names = byModule.get(moduleName);
+		if (names === undefined) byModule.set(moduleName, (names = new Set()));
+		names.add(hookName);
+	}
+	return { byModule, bareNames };
+}
+
+/**
+ * How each imported local name entered the module. Bare declarations mean "a
+ * hook declared HERE", so every import form has to be recognised — otherwise a
+ * default or namespace import from another package falls through and silently
+ * matches a bare entry.
+ */
+function collectImportOrigins(ast) {
+	/** local -> { module, imported } */
+	const named = new Map();
+	/** local -> module, for `import * as NS` */
+	const namespaces = new Map();
+	/** locals bound by a default import: opaque, never declarable */
+	const opaque = new Set();
+	for (const statement of ast.body || []) {
+		if (statement?.type !== 'ImportDeclaration') continue;
+		const moduleName = statement.source?.value;
+		if (typeof moduleName !== 'string') continue;
+		for (const spec of statement.specifiers || []) {
+			const local = spec.local?.name;
+			if (typeof local !== 'string') continue;
+			if (spec.type === 'ImportSpecifier') {
+				named.set(local, { module: moduleName, imported: spec.imported?.name ?? local });
+			} else if (spec.type === 'ImportNamespaceSpecifier') {
+				namespaces.set(local, moduleName);
+			} else {
+				opaque.add(local);
+			}
+		}
+	}
+	return { named, namespaces, opaque };
+}
+
+function wrapCapturingHookCallbacks(ast, options = {}) {
+	if (options.enabled !== true) return ast;
+	if (!Array.isArray(ast?.body)) return ast;
+	const declared = buildDataCallbackHookIndex(options.dataCallbackHooks);
+	if (declared.byModule.size === 0 && declared.bareNames.size === 0) return ast;
+	const importOrigins = collectImportOrigins(ast);
+
+	/** Whether THIS call site's hook declared its callback is data. */
+	const hookDeclaresDataCallback = (call) => {
+		const callee = call.callee;
+		if (callee?.type === 'Identifier') {
+			const origin = importOrigins.named.get(callee.name);
+			if (origin !== undefined) {
+				return declared.byModule.get(origin.module)?.has(origin.imported) === true;
+			}
+			// A namespace or default import is not a module-local declaration, and
+			// its origin module cannot be attributed to this name.
+			if (importOrigins.namespaces.has(callee.name) || importOrigins.opaque.has(callee.name)) {
+				return false;
+			}
+			return declared.bareNames.has(callee.name);
+		}
+		// `NS.useThing(...)` is declarable only against the namespace's module.
+		if (
+			callee?.type === 'MemberExpression' &&
+			!callee.computed &&
+			callee.object?.type === 'Identifier' &&
+			callee.property?.type === 'Identifier'
+		) {
+			const moduleName = importOrigins.namespaces.get(callee.object.name);
+			if (moduleName === undefined) return false;
+			return declared.byModule.get(moduleName)?.has(callee.property.name) === true;
+		}
+		return false;
+	};
+
+	// Calls whose OWN dependency list the compiler infers — `useMemo(fn)` and,
+	// more importantly, custom dependency hooks like `useComputed(fn)` that
+	// forward to one. Inference requires their callback to still be an inline
+	// function at that call site, so wrapping it would turn a working inference
+	// into a hard compile error. Keyed by call node, which is why this analysis
+	// runs on the very AST the walk below visits.
+	let inferenceOwned;
+	try {
+		inferenceOwned = analyzeHookDependencies(ast, {
+			filename: options.filename,
+			hookRuntimeModules: options.hookRuntimeModules,
+		});
+	} catch {
+		// Inference reports its own diagnostics through applyHookDependencies
+		// moments later; this pass must not be the one to surface them.
+		return ast;
+	}
+
+	let wrapped = false;
+	const body = ast.body.map((statement) => {
+		const componentBound = collectSubtreeBindings(statement, new Set());
+		const visit = (n) => {
+			if (n.type !== 'CallExpression' || !isHookShapedCall(n)) return null;
+			const ownsIdentity =
+				hookOwnsCallbackIdentity(n) || inferenceOwned.has(n) || !hookDeclaresDataCallback(n);
+			const args = n.arguments.map((arg, index) => {
+				const walked = mapAst(arg, visit);
+				if (ownsIdentity || arg?.type === 'SpreadElement') return walked;
+				if (!isMovableHookCallback(walked)) return walked;
+				// An argument that looks like a dependency list immediately after the
+				// callback means the hook already owns when that callback is
+				// considered fresh. An explicit `null` is the author's "re-run every
+				// render" escape hatch, so memoizing the callback beneath it could
+				// hand the hook a stale closure.
+				// Peeled: `null as any` and `[dep] satisfies T` are the same escape
+				// hatch as the bare forms, and a type wrapper hiding one of them is
+				// exactly the stale-closure case this guard exists to prevent.
+				const next = unwrapTsExpr(n.arguments[index + 1]);
+				if (
+					next &&
+					(next.type === 'ArrayExpression' ||
+						(next.type === 'Literal' && next.value === null) ||
+						next.type === 'NullLiteral')
+				) {
+					return walked;
+				}
+				// A callback that captures nothing is the LIFT's job — a module-scope
+				// identity is strictly better than a per-instance memo cell.
+				if (!capturesComponentBindings(walked, componentBound)) return walked;
+				wrapped = true;
+				return inheritOriginLoc(b.call(b.id(AUTO_CALLBACK_ALIAS), walked), arg);
+			});
+			return { ...n, arguments: args };
+		};
+		return mapAst(statement, visit);
+	});
+	if (!wrapped) return ast;
+	return {
+		...ast,
+		body: [
+			inheritOriginLoc(b.imports([['useCallback', AUTO_CALLBACK_ALIAS]], 'octane'), ast.body[0]),
+			...body,
+		],
+	};
 }
 
 /**
@@ -5353,7 +5557,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -5637,6 +5841,22 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
 	// through untouched.
+	// Wrapping runs BEFORE inference so the synthesized `useCallback` receives a
+	// real inferred dependency list — member paths rather than the whole props
+	// object, which is the difference between a memo that holds and one that
+	// never hits. Gated exactly like the lift below.
+	ast = wrapCapturingHookCallbacks(ast, {
+		enabled:
+			(options?.hmr ?? false) === false &&
+			!(options && options.dev) &&
+			!(options && options.profile),
+		filename,
+		dataCallbackHooks: options?.dataCallbackHooks,
+		hookRuntimeModules: hookRuntimeModulesForCompile(
+			options,
+			rendererBoundaryPreparation?.universalUnits,
+		),
+	});
 	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(
