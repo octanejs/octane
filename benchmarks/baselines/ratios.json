@@ -24,6 +24,14 @@
     "note": "Same-run 512-subscriber useSyncExternalStore fan-out, gated on complete visible updates, rapid-write consistency, and exact listener teardown. A verified quick run measured about 1.01x; 2x leaves real-browser scheduling headroom."
   },
   {
+    "suite": "store-selector-fanout",
+    "op": "parent_rerenders",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.95,
+    "note": "Twenty unrelated parent re-renders across 512 selector-based subscribers with the store untouched, gated on every subscriber still showing the correct total and the new generation. Octane keeps one identity for a capture-free selector, so the selection is reused: verified full and quick runs measured 0.59x (0.586-0.597 across three quick runs), against 1.20x when that identity churns per render. 0.95x leaves roughly 60% headroom over the observed ratio while still failing if the selection is recomputed per render. The deterministic companion signal is meta.selectorCallsDuringRerenders, which is 0 rather than 10,240 while meta.subscriberRendersDuringRerenders stays at 10,240."
+  },
+  {
     "suite": "hydration-interactivity",
     "op": "uncontrolled_6x_hydration",
     "target": "octane-tsrx",
