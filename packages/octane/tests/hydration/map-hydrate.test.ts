@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { MapList, reorder } from './_fixtures/map-list.tsx';
+import { IndexKeyedFragmentHydrationMap, MapList, reorder } from './_fixtures/map-list.tsx';
 
 // A React-style `.tsx` `{items.map(x => <li key/>)}` keyed list lowers to the
 // forBlock fast path on the client and the matching ssrBlock path on the server
@@ -40,6 +40,30 @@ describe('hydrateRoot — `.tsx` `.map()` keyed list (forBlock parity)', () => {
 		expect(code).toContain('ssrBlock');
 		// No per-row createElement descriptor reconciled by ssrChild.
 		expect(code).not.toMatch(/ssrChild\([^)]*createElement\(\s*['"]li['"]/);
+	});
+
+	it('adopts index-keyed fragment rows and preserves their positional identity', () => {
+		const items = [
+			{ id: 1, label: 'a' },
+			{ id: 2, label: 'b' },
+			{ id: 3, label: 'c' },
+		];
+		const { html } = ServerRT.renderToString(server.IndexKeyedFragmentHydrationMap, { items });
+		container.innerHTML = html;
+		const rows = [...container.querySelectorAll('li.indexed-row')];
+
+		const root = hydrateRoot(container, IndexKeyedFragmentHydrationMap, { items });
+		flushSync(() => {});
+		expect([...container.querySelectorAll('li.indexed-row')]).toEqual(rows);
+
+		flushSync(() =>
+			root.render(IndexKeyedFragmentHydrationMap, {
+				items: [items[2], items[1], items[0]],
+			}),
+		);
+		expect([...container.querySelectorAll('li.indexed-row')]).toEqual(rows);
+		expect(rows.map((row) => row.textContent)).toEqual(['c', 'b', 'a']);
+		root.unmount();
 	});
 
 	it('adopts the server-rendered list items (same nodes) and a keyed reorder reuses them', async () => {

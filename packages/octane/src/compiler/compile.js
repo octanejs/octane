@@ -20238,14 +20238,16 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	//   2. `for (const x of y; key x.id) { ... }` — TSRX for-of header.
 	//   3. `for (const x, i of y) { ... }` — second loop param treated as the key.
 	//   4. Fallback: `x.id ?? x` (object identity).
-	// Builds `(item) => keyExpr` — when the for-of head is destructured we use
-	// the same destructure pattern as the arg so the user's `key id` (where
-	// `id` is a destructured field) actually resolves.
+	// Builds `(item, index) => keyExpr` when the for-of declares an index.
+	// For a destructured head, the item param uses the same pattern so both its
+	// fields and the declared index remain in scope for the authored key.
 	function mkKeyFn(keyExpr) {
-		// The synthesized key arrow maps to the authored key expression; its item
-		// param maps to the for-of binding it mirrors.
+		// The synthesized arrow and its params map to the authored expression and
+		// bindings without mutating their parsed AST nodes.
 		const param = isDestructured ? leftDeclId : b.id(itemName, leftDeclId);
-		return inheritOriginLoc(b.arrow([param], keyExpr), keyExpr);
+		const params = [param];
+		if (node.index) params.push(b.id(node.index.name, node.index));
+		return inheritOriginLoc(b.arrow(params, keyExpr), keyExpr);
 	}
 
 	let keyFn = null;

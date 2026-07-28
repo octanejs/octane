@@ -74,6 +74,38 @@ export function ForOfIndexAndKey(props) @{
 	</ul>
 }
 
+export function ForOfIndexAsKey(props) @{
+	<ul>
+		@for (const item of props.items; index i; key i) {
+			<li data-index={i}>{i + ':' + item as string}</li>
+		}
+	</ul>
+}
+
+export function ForOfIndexedHostKey(props) @{
+	<ul>
+		@for (const item of props.items; index i) {
+			<li key={i} data-index={i}>{i + ':' + item as string}</li>
+		}
+	</ul>
+}
+
+export function ForOfCompositeIndexKey(props) @{
+	<ul>
+		@for (const item of props.items; index i; key item.id + ':' + i) {
+			<li data-id={item.id} data-index={i}>{i + ':' + item.label as string}</li>
+		}
+	</ul>
+}
+
+export function ForOfDestructuredIndexKey(props) @{
+	<ul>
+		@for (const &{ id, label } of props.items; index i; key id + ':' + i) {
+			<li data-id={id} data-index={i}>{i + ':' + label as string}</li>
+		}
+	</ul>
+}
+
 // ---------------------------------------------------------------------------
 // Ternary with FRAGMENT branches — the only ternary-JSX form TSRX accepts.
 // Our compiler lowers it to ifBlock so each branch mounts real DOM.

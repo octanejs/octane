@@ -13,3 +13,13 @@ export function List(props) @{
 		}
 	</ul>
 }
+
+export function IndexedList(props) @{
+	<ul id="indexed-list">
+		@for (const item of props.items; index i; key i) {
+			<li class="indexed-row" data-index={i}>
+				<span class="name">{item.name as string}</span>
+			</li>
+		}
+	</ul>
+}

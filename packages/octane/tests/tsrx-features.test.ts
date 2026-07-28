@@ -20,6 +20,10 @@ import {
 	NamespacedAttr,
 	ForOfIndexOnly,
 	ForOfIndexAndKey,
+	ForOfIndexAsKey,
+	ForOfIndexedHostKey,
+	ForOfCompositeIndexKey,
+	ForOfDestructuredIndexKey,
 	TernaryFragmentChild,
 	HtmlOnlyChild,
 	KeyedFragmentItems,
@@ -29,6 +33,11 @@ import {
 	LazyForOfHead,
 	ShorthandComponentProp,
 } from './_fixtures/tsrx-features.tsrx';
+import {
+	CompositeKeyedDestructuredMap,
+	IndexKeyedFragmentMap,
+	IndexKeyedHostMap,
+} from './_fixtures/index-keyed-map.tsx';
 
 // ---------------------------------------------------------------------------
 // P1: spread attributes — `{...obj}` on DOM elements and components
@@ -243,6 +252,113 @@ describe('TSRX features — for-of with `index` AND `key`', () => {
 
 		r.update(ForOfIndexAndKey, { items: [c, b, a] }); // same refs, reversed
 		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['0:c', '1:b', '2:a']);
+		r.unmount();
+	});
+});
+
+describe('indexed keys across TSRX and TSX', () => {
+	it('uses the declared TSRX index as an explicit header key', () => {
+		const r = mount(ForOfIndexAsKey, { items: ['a', 'b', 'c'] });
+		const before = r.findAll('li');
+
+		expect(before.map((row) => row.textContent)).toEqual(['0:a', '1:b', '2:c']);
+		expect(before.map((row) => row.getAttribute('data-index'))).toEqual(['0', '1', '2']);
+
+		r.update(ForOfIndexAsKey, { items: ['c', 'b', 'a'] });
+		expect(r.findAll('li')).toEqual(before);
+		expect(r.findAll('li').map((row) => row.textContent)).toEqual(['0:c', '1:b', '2:a']);
+
+		r.update(ForOfIndexAsKey, { items: ['c'] });
+		expect(r.findAll('li')).toEqual([before[0]]);
+		expect(before[1].isConnected).toBe(false);
+		expect(before[2].isConnected).toBe(false);
+		r.unmount();
+	});
+
+	it('binds the declared index in an explicit TSRX host key', () => {
+		const r = mount(ForOfIndexedHostKey, { items: ['a', 'b'] });
+		const before = r.findAll('li');
+
+		expect(before.map((row) => row.textContent)).toEqual(['0:a', '1:b']);
+
+		r.update(ForOfIndexedHostKey, { items: ['b', 'a'] });
+		expect(r.findAll('li')).toEqual(before);
+		expect(r.findAll('li').map((row) => row.textContent)).toEqual(['0:b', '1:a']);
+		r.unmount();
+	});
+
+	it('evaluates composite TSRX keys using both the item and its declared index', () => {
+		const a = { id: 1, label: 'a' };
+		const b = { id: 2, label: 'b' };
+		const c = { id: 3, label: 'c' };
+		const r = mount(ForOfCompositeIndexKey, { items: [a, b, c] });
+		const before = r.findAll('li');
+
+		r.update(ForOfCompositeIndexKey, { items: [c, b, a] });
+		const after = r.findAll('li');
+
+		expect(after.map((row) => row.textContent)).toEqual(['0:c', '1:b', '2:a']);
+		expect(after[1]).toBe(before[1]);
+		expect(after[0]).not.toBe(before[2]);
+		expect(after[2]).not.toBe(before[0]);
+		r.unmount();
+	});
+
+	it('binds destructured TSRX items and the index in the same key selector', () => {
+		const r = mount(ForOfDestructuredIndexKey, {
+			items: [
+				{ id: 1, label: 'a' },
+				{ id: 2, label: 'b' },
+			],
+		});
+
+		expect(r.findAll('li').map((row) => row.textContent)).toEqual(['0:a', '1:b']);
+		expect(r.findAll('li').map((row) => row.getAttribute('data-id'))).toEqual(['1', '2']);
+		r.unmount();
+	});
+
+	it('uses the TSX map index as an explicit host key', () => {
+		const a = { id: 1, label: 'a' };
+		const b = { id: 2, label: 'b' };
+		const r = mount(IndexKeyedHostMap as any, { items: [a, b] });
+		const before = r.findAll('li');
+
+		expect(before.map((row) => row.textContent)).toEqual(['0:a', '1:b']);
+
+		r.update(IndexKeyedHostMap as any, { items: [b, a] });
+		expect(r.findAll('li')).toEqual(before);
+		expect(r.findAll('li').map((row) => row.textContent)).toEqual(['0:b', '1:a']);
+		r.unmount();
+	});
+
+	it('uses the TSX map index as an explicit Fragment key', () => {
+		const a = { id: 1, label: 'a' };
+		const b = { id: 2, label: 'b' };
+		const r = mount(IndexKeyedFragmentMap as any, { items: [a, b] });
+		const before = r.findAll('li');
+
+		expect(before.map((row) => row.textContent)).toEqual(['0:a', '1:b']);
+
+		r.update(IndexKeyedFragmentMap as any, { items: [b, a] });
+		expect(r.findAll('li')).toEqual(before);
+		expect(r.findAll('li').map((row) => row.textContent)).toEqual(['0:b', '1:a']);
+		r.unmount();
+	});
+
+	it('binds destructured TSX map items and indexes in composite keys', () => {
+		const a = { id: 1, label: 'a' };
+		const b = { id: 2, label: 'b' };
+		const c = { id: 3, label: 'c' };
+		const r = mount(CompositeKeyedDestructuredMap as any, { items: [a, b, c] });
+		const before = r.findAll('li');
+
+		r.update(CompositeKeyedDestructuredMap as any, { items: [c, b, a] });
+		const after = r.findAll('li');
+
+		expect(after.map((row) => row.textContent)).toEqual(['0:c', '1:b', '2:a']);
+		expect(after[1]).toBe(before[1]);
+		expect(after[0]).not.toBe(before[2]);
+		expect(after[2]).not.toBe(before[0]);
 		r.unmount();
 	});
 });
