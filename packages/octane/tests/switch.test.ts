@@ -1,8 +1,39 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { compile } from 'octane/compiler';
 import { mount } from './_helpers';
 import { PickKind, Cycle, NoDefault, HookInCase } from './_fixtures/switch.tsrx';
 
 describe('switchBlock', () => {
+	it('compiles the case and default grammar documented by authoring guidance', () => {
+		const guidancePaths = [
+			'.rulesync/rules/tsrx-authoring.md',
+			'packages/octane-mcp-server/skills/migrate-react-component.md',
+		];
+
+		for (const guidancePath of guidancePaths) {
+			const guidance = readFileSync(resolve(guidancePath), 'utf8');
+			const example = guidance.match(/@switch\s*\(v\)\s*\{[^\r\n]*\}/)?.[0];
+
+			expect(example, `${guidancePath} documents a switch example`).toBeDefined();
+			expect(example, `${guidancePath} documents a valid case clause`).toMatch(
+				/@case\s+a\s*:\s*\{/,
+			);
+			expect(example, `${guidancePath} documents a valid default clause`).toMatch(
+				/@default\s*:\s*\{/,
+			);
+
+			const source = `export function DocumentedSwitch(props) @{
+	const v = props.value;
+	const a = props.case;
+	<div>${example}</div>
+}`;
+
+			expect(() => compile(source, 'documented-switch.tsrx')).not.toThrow();
+		}
+	});
+
 	it('picks the first matching @case', () => {
 		const r = mount(PickKind, { kind: 'a' });
 		expect(r.findAll('.pick')).toHaveLength(1);

@@ -57,7 +57,7 @@ setup.
 ```tsx
 @if (c) { } @else { }
 @for (const x of xs; key x.id) { } @empty { }
-@switch (v) { @case (a) { } @default { } }
+@switch (v) { @case a: { } @default: { } }
 @try { } @pending { } @catch (e) { }
 ```
 
