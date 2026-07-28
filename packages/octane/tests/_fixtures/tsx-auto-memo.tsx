@@ -1,6 +1,6 @@
 /** @jsxImportSource octane */
 
-import { useState } from 'octane';
+import { useContext, useEffect, useState } from 'octane';
 import { AutoMemoChild, AutoMemoContext } from './auto-memo-child.tsrx';
 
 type Row = { id: number; label: string };
@@ -94,6 +94,61 @@ export function TsxStatefulMappedApp(props: { rows: MappableRows; prefix: string
 					/>
 				))}
 			</ul>
+		</AutoMemoContext.Provider>
+	);
+}
+
+type MappedComponentProps = {
+	rows: MappableRows;
+	prefix: string;
+	theme: string;
+	onEffect: (event: string) => void;
+	onItem: (id: number, index: number) => string;
+};
+
+function TsxTrackedMappedRow(props: {
+	id: number;
+	label: string;
+	onEffect: (event: string) => void;
+}) {
+	const theme = useContext(AutoMemoContext);
+	const [own, setOwn] = useState(0);
+
+	useEffect(() => {
+		props.onEffect(`mount:${props.id}`);
+		return () => props.onEffect(`cleanup:${props.id}`);
+	}, [props.id, props.onEffect]);
+
+	return (
+		<li data-id={props.id}>
+			<button className={`tracked-own-${props.id}`} onClick={() => setOwn(own + 1)}>
+				{`${theme}:${props.label}:${own}`}
+			</button>
+		</li>
+	);
+}
+
+function TsxMappedComponentRows(props: MappedComponentProps) {
+	const rows = props.rows;
+
+	return (
+		<ul id="tsx-mapped-component-rows">
+			{rows.map((item, index) => (
+				<TsxTrackedMappedRow
+					key={item.id}
+					id={item.id}
+					label={`${props.prefix}:${props.onItem(item.id, index)}:${item.label}`}
+					onEffect={props.onEffect}
+				/>
+			))}
+		</ul>
+	);
+}
+
+export function TsxMappedComponentApp(props: MappedComponentProps) {
+	return (
+		<AutoMemoContext.Provider value={props.theme}>
+			<TsxMappedComponentRows {...props} />
 		</AutoMemoContext.Provider>
 	);
 }

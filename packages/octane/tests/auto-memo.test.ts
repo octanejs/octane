@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { compile } from '../src/compiler/compile.js';
-import { flushSync, hydrateRoot } from '../src/index.js';
-import { mount } from './_helpers';
+import { createElement, flushSync, hydrateRoot } from '../src/index.js';
+import { flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
@@ -12,6 +12,7 @@ import {
 	TsxCustomMapApp,
 	TsxGetterMapApp,
 	TsxImpureRowsApp,
+	TsxMappedComponentApp,
 	TsxMapExtraArgumentApp,
 	TsxStatefulMappedApp,
 } from './_fixtures/tsx-auto-memo.tsx';
@@ -57,6 +58,58 @@ function loadMappedHydrationComponents() {
 		export const App = AppImpl;
 	`;
 	const id = 'tsx-custom-map-hydration.tsx';
+	return {
+		server: loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		}),
+		client: loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		}),
+	};
+}
+
+function loadMappedComponentHydrationComponents() {
+	const source = `
+		import { createContext, useContext, useState } from 'octane';
+
+		const Theme = createContext('default');
+
+		function Row(props) {
+			const theme = useContext(Theme);
+			const [own, setOwn] = useState(0);
+			return (
+				<li data-id={props.id}>
+					<button className={'hydrated-own-' + props.id} onClick={() => setOwn(own + 1)}>
+						{theme + ':' + props.label + ':' + own}
+					</button>
+				</li>
+			);
+		}
+
+		function Rows(props) {
+			const rows = props.rows;
+			return (
+				<ul id="tsx-mapped-component-hydration">
+					{rows.map((item, index) => (
+						<Row
+							key={item.id}
+							id={item.id}
+							label={props.prefix + ':' + props.onItem(item.id, index) + ':' + item.label}
+						/>
+					))}
+				</ul>
+			);
+		}
+
+		export function App(props) {
+			return <Theme.Provider value={props.theme}><Rows {...props} /></Theme.Provider>;
+		}
+	`;
+	const id = 'tsx-mapped-component-hydration.tsx';
 	return {
 		server: loadCompiledFixtureSource(source, {
 			id,
@@ -254,6 +307,320 @@ describe('compiler-owned component-region memoization', () => {
 		expect(second.textContent).toBe('t2:native again:1:second:0');
 		root.unmount();
 	});
+
+	it('preserves keyed component state and effects across native and custom map receivers', () => {
+		const compiled = compile(
+			`import { Row } from './row';
+			export function App(props) {
+				const rows = props.rows;
+				return <ul>{rows.map((item, index) => <Row key={item.id} label={index} />)}</ul>;
+			}`,
+			'tsx-mapped-component-roundtrip.tsx',
+			{ hmr: false, dev: false },
+		).code;
+		expect(compiled).toContain('mapSlot');
+		expect(compiled).toContain('componentSlot');
+
+		const items = [
+			{ id: 1, label: 'first' },
+			{ id: 2, label: 'second' },
+		];
+		const calls: string[] = [];
+		const effects: string[] = [];
+		const customRows = {
+			map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+				if (this !== customRows) throw new Error('component map lost its receiver');
+				calls.push('custom:start');
+				const mapped = [callback(items[1]!, 7), callback(items[0]!, 3)];
+				const first = mapped[0] as { type: unknown; key: unknown; props: { id: unknown } };
+				calls.push(`custom:component:${typeof first.type}:${String(first.key)}:${first.props.id}`);
+				calls.push('custom:end');
+				return mapped;
+			},
+		};
+		const onEffect = (event: string) => effects.push(event);
+		const onItem = (id: number, index: number): string => {
+			calls.push(`callback:${id}:${index}`);
+			return String(index);
+		};
+		const root = mount(TsxMappedComponentApp, {
+			rows: items,
+			prefix: 'native',
+			theme: 't0',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		const first = root.find('.tracked-own-1');
+		const second = root.find('.tracked-own-2');
+		expect(calls).toEqual(['callback:1:0', 'callback:2:1']);
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+		root.click('.tracked-own-1');
+		expect(first.textContent).toBe('t0:native:0:first:1');
+
+		calls.length = 0;
+		root.update(TsxMappedComponentApp, {
+			rows: customRows,
+			prefix: 'custom',
+			theme: 't1',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		expect(calls).toEqual([
+			'custom:start',
+			'callback:2:7',
+			'callback:1:3',
+			'custom:component:function:2:2',
+			'custom:end',
+		]);
+		expect(root.findAll('#tsx-mapped-component-rows button')).toEqual([second, first]);
+		expect(first.textContent).toBe('t1:custom:3:first:1');
+		expect(second.textContent).toBe('t1:custom:7:second:0');
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+
+		calls.length = 0;
+		root.update(TsxMappedComponentApp, {
+			rows: items,
+			prefix: 'native again',
+			theme: 't2',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		expect(calls).toEqual(['callback:1:0', 'callback:2:1']);
+		expect(root.findAll('#tsx-mapped-component-rows button')).toEqual([first, second]);
+		expect(first.textContent).toBe('t2:native again:0:first:1');
+		expect(second.textContent).toBe('t2:native again:1:second:0');
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+
+		root.unmount();
+		flushEffects();
+		expect(effects.slice(2).toSorted()).toEqual(['cleanup:1', 'cleanup:2']);
+	});
+
+	it('preserves components first mounted by a custom map when native maps take ownership', () => {
+		const items = [
+			{ id: 1, label: 'first' },
+			{ id: 2, label: 'second' },
+		];
+		const calls: string[] = [];
+		const effects: string[] = [];
+		const customRows = {
+			map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+				if (this !== customRows) throw new Error('initial component map lost its receiver');
+				calls.push('custom:map');
+				return [callback(items[1]!, 8), callback(items[0]!, 4)];
+			},
+		};
+		const onEffect = (event: string) => effects.push(event);
+		const onItem = (id: number, index: number): string => {
+			calls.push(`callback:${id}:${index}`);
+			return String(index);
+		};
+		const root = mount(TsxMappedComponentApp, {
+			rows: customRows,
+			prefix: 'custom',
+			theme: 't0',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		const first = root.find('.tracked-own-1');
+		const second = root.find('.tracked-own-2');
+		expect(calls).toEqual(['custom:map', 'callback:2:8', 'callback:1:4']);
+		expect(root.findAll('#tsx-mapped-component-rows button')).toEqual([second, first]);
+		expect(effects).toEqual(['mount:2', 'mount:1']);
+		root.click('.tracked-own-2');
+		expect(second.textContent).toBe('t0:custom:8:second:1');
+
+		calls.length = 0;
+		root.update(TsxMappedComponentApp, {
+			rows: items,
+			prefix: 'native',
+			theme: 't1',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		expect(calls).toEqual(['callback:1:0', 'callback:2:1']);
+		expect(root.findAll('#tsx-mapped-component-rows button')).toEqual([first, second]);
+		expect(first.textContent).toBe('t1:native:0:first:0');
+		expect(second.textContent).toBe('t1:native:1:second:1');
+		expect(effects).toEqual(['mount:2', 'mount:1']);
+
+		root.unmount();
+		flushEffects();
+		expect(effects.slice(2).toSorted()).toEqual(['cleanup:1', 'cleanup:2']);
+	});
+
+	it('reconciles mixed custom-map host and empty results before restoring keyed components', () => {
+		const items = [
+			{ id: 1, label: 'first' },
+			{ id: 2, label: 'second' },
+		];
+		const effects: string[] = [];
+		const customRows = {
+			map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+				if (this !== customRows) throw new Error('mixed component map lost its receiver');
+				const first = callback(items[0]!, 0);
+				callback(items[1]!, 1);
+				return [
+					first,
+					createElement('li', { key: 2, 'data-mixed': 'host' }, 'host replacement') as T,
+					null as T,
+				];
+			},
+		};
+		const onEffect = (event: string) => effects.push(event);
+		const onItem = (_id: number, index: number): string => String(index);
+		const root = mount(TsxMappedComponentApp, {
+			rows: items,
+			prefix: 'native',
+			theme: 't0',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		const first = root.find('.tracked-own-1');
+		root.click('.tracked-own-1');
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+
+		root.update(TsxMappedComponentApp, {
+			rows: customRows,
+			prefix: 'mixed',
+			theme: 't1',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		expect(root.find('.tracked-own-1')).toBe(first);
+		expect(first.textContent).toBe('t1:mixed:0:first:1');
+		expect(root.findAll('.tracked-own-2')).toHaveLength(0);
+		expect(root.find('[data-mixed="host"]').textContent).toBe('host replacement');
+		expect(effects).toEqual(['mount:1', 'mount:2', 'cleanup:2']);
+
+		root.update(TsxMappedComponentApp, {
+			rows: items,
+			prefix: 'restored',
+			theme: 't2',
+			onEffect,
+			onItem,
+		});
+		flushEffects();
+		expect(root.find('.tracked-own-1')).toBe(first);
+		expect(first.textContent).toBe('t2:restored:0:first:1');
+		expect(root.find('.tracked-own-2').textContent).toBe('t2:restored:1:second:0');
+		expect(root.findAll('[data-mixed="host"]')).toHaveLength(0);
+		expect(effects).toEqual(['mount:1', 'mount:2', 'cleanup:2', 'mount:2']);
+
+		root.unmount();
+		flushEffects();
+		expect(effects.filter((event) => event === 'cleanup:1')).toHaveLength(1);
+		expect(effects.filter((event) => event === 'cleanup:2')).toHaveLength(2);
+	});
+
+	it.each([
+		{ serverReceiver: 'native', clientReceiver: 'custom' },
+		{ serverReceiver: 'custom', clientReceiver: 'native' },
+	])(
+		'adopts keyed component rows when server rendering uses $serverReceiver map and hydration uses $clientReceiver map',
+		({ serverReceiver, clientReceiver }) => {
+			const { server, client } = loadMappedComponentHydrationComponents();
+			const items = [
+				{ id: 1, label: 'first' },
+				{ id: 2, label: 'second' },
+			];
+			const events: string[] = [];
+			const customRows = {
+				map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+					if (this !== customRows) throw new Error('hydrated component map lost its receiver');
+					events.push('custom:start');
+					const mapped = [callback(items[0]!, 0), callback(items[1]!, 1)];
+					const first = mapped[0] as { type: unknown; key: unknown };
+					events.push(`custom:component:${typeof first.type}:${String(first.key)}`);
+					events.push('custom:end');
+					return mapped;
+				},
+			};
+			const onItem = (id: number, index: number): string => {
+				events.push(`callback:${id}:${index}`);
+				return String(index);
+			};
+			const serverRows = serverReceiver === 'native' ? items : customRows;
+			const clientRows = clientReceiver === 'native' ? items : customRows;
+			const serverProps = {
+				rows: serverRows,
+				prefix: 'hydrated',
+				theme: 't0',
+				onItem,
+			};
+			const clientProps = { ...serverProps, rows: clientRows };
+			const { html } = ServerRuntime.renderToString(server.App, serverProps);
+			expect(events).toEqual([
+				...(serverReceiver === 'custom' ? ['custom:start'] : []),
+				'callback:1:0',
+				'callback:2:1',
+				...(serverReceiver === 'custom' ? ['custom:component:function:1', 'custom:end'] : []),
+			]);
+
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = html;
+			const originalRows = Array.from(container.querySelectorAll('li'));
+			const originalButtons = Array.from(container.querySelectorAll('button'));
+			expect(originalButtons.map((button) => button.textContent)).toEqual([
+				't0:hydrated:0:first:0',
+				't0:hydrated:1:second:0',
+			]);
+
+			events.length = 0;
+			const root = hydrateRoot(container, client.App as any, clientProps);
+			flushSync(() => {});
+			expect(events).toEqual([
+				...(clientReceiver === 'custom' ? ['custom:start'] : []),
+				'callback:1:0',
+				'callback:2:1',
+				...(clientReceiver === 'custom' ? ['custom:component:function:1', 'custom:end'] : []),
+			]);
+			expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
+			expect(Array.from(container.querySelectorAll('button'))).toEqual(originalButtons);
+
+			flushSync(() => originalButtons[0]!.click());
+			expect(originalButtons[0]!.textContent).toBe('t0:hydrated:0:first:1');
+
+			events.length = 0;
+			root.render(client.App, {
+				...clientProps,
+				rows: clientReceiver === 'native' ? customRows : items,
+				prefix: 'switched',
+				theme: 't1',
+			});
+			flushSync(() => {});
+			expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
+			expect(Array.from(container.querySelectorAll('button'))).toEqual(originalButtons);
+			expect(originalButtons[0]!.textContent).toBe('t1:switched:0:first:1');
+
+			root.render(client.App, {
+				...clientProps,
+				rows: [items[1]!, items[0]!],
+				prefix: 'reordered',
+				theme: 't2',
+			});
+			flushSync(() => {});
+			expect(Array.from(container.querySelectorAll('li'))).toEqual([
+				originalRows[1],
+				originalRows[0],
+			]);
+			expect(Array.from(container.querySelectorAll('button'))).toEqual([
+				originalButtons[1],
+				originalButtons[0],
+			]);
+			expect(originalButtons[0]!.textContent).toBe('t2:reordered:1:first:1');
+			root.unmount();
+			container.remove();
+		},
+	);
 
 	it('preserves keyed survivors and callback indices across dense and sparse array transitions', () => {
 		const events: string[] = [];

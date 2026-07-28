@@ -15647,6 +15647,58 @@ function deoptItemBody(item: any, scope: Scope): void {
 	block.deoptNode = node;
 }
 
+// Guarded native maps invoke componentSlot directly from their compiled item
+// body. Keep that same slot ownership when a custom map returns the matching
+// component descriptors, so switching dispatch modes preserves the component
+// Block, its hooks/effects, and its DOM without aliasing it as a ChildSlot.
+function mappedDeoptItemBody(item: any, scope: Scope): void {
+	const state = scope.slots[0] as CompSlot | ChildSlot | undefined;
+	const block = scope.block;
+	if (isElementDescriptor(item) && typeof item.type === 'function') {
+		if (state === undefined || state.__kind === 'componentSlotSlot') {
+			const stale = block.deoptNode;
+			if (stale !== null) {
+				detachDeoptTreeRefs(stale, null);
+				if (stale.parentNode === block.parentNode) block.parentNode.removeChild(stale);
+				block.deoptNode = null;
+			}
+			componentSlot(
+				scope,
+				0,
+				block.parentNode,
+				item.type,
+				item.props,
+				block.endMarker,
+				undefined,
+				true,
+				true,
+			);
+			return;
+		}
+	} else if (state?.__kind === 'componentSlotSlot') {
+		// An exotic map may replace a keyed component with a host or empty value.
+		// Preserve the item's boundaries before disposing its self-marked child;
+		// the ordinary descriptor reconciler can then fill that same keyed range.
+		const root = block.startMarker;
+		if (
+			root !== null &&
+			root === block.endMarker &&
+			root.nodeType !== 8 &&
+			root.parentNode !== null
+		) {
+			const start = document.createComment('it');
+			const end = document.createComment('/it');
+			root.parentNode.insertBefore(start, root);
+			root.parentNode.insertBefore(end, root.nextSibling);
+			block.startMarker = start;
+			block.endMarker = end;
+		}
+		disposeReturnSlot(block, state);
+		block.deoptNode = null;
+	}
+	deoptItemBody(item, scope);
+}
+
 // True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
 // descriptor anywhere in its tree. Such a subtree can't be a raw host reconcile —
 // its components need reconcilable, unmountable Blocks — so the de-opt
@@ -16078,6 +16130,37 @@ export function mapSlot(
 	}
 	if (ownEnd === 1) ownEnd = true;
 	if (native === true) {
+		const previous = ((scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined)
+			?.forSlot;
+		if (
+			previous?.mappedNative === false &&
+			previous.head !== null &&
+			(previous.head.slots[0] as CompSlot | undefined)?.__kind === 'componentSlotSlot'
+		) {
+			// A custom receiver may have reordered keyed component survivors. Its
+			// first native successor must still execute the authored map callback in
+			// ascending source order, before the reconciler walks the prior order.
+			const mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
+			childSlot(
+				scopeOrItems,
+				slotOrMethod,
+				domParent!,
+				mapped,
+				anchor,
+				ownEnd,
+				undefined,
+				false,
+				true,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				true,
+			);
+			const next = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot;
+			if (next.forSlot !== null) next.forSlot.mappedNative = true;
+			return;
+		}
 		childSlot(
 			scopeOrItems,
 			slotOrMethod,
@@ -16502,7 +16585,8 @@ export function childSlot(
 			? (item: any, index: number) => 'k' + String(compiledMapKey(item, index))
 			: (_item: any, i: number) => keys![i];
 		const wasMappedNative = state.forSlot.mappedNative === true;
-		let body = compiledMapBody || (deoptItemBody as any);
+		let body =
+			compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
 		if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
 			for (let index = 0; index < items.length; index++) {
 				const item = items[index];
