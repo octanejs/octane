@@ -227,8 +227,9 @@ function add(amount) {
 }
 ```
 
-The stable zero-argument getter replaces the common React pattern of
-synchronizing a ref solely for delayed or async callbacks.
+`getState` is the conventional generic name for this stable zero-argument
+getter; the example uses domain-specific names instead. It replaces the common
+React pattern of synchronizing a ref solely for delayed or async callbacks.
 
 The getter reads the latest scheduled hook-cell value and does not subscribe or
 render. During pending work it can therefore be newer than the currently
