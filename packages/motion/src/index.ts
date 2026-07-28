@@ -509,10 +509,6 @@ export function MotionConfig(props: any, scope: any): void {
 }
 
 function renderTransparentChildren(children: unknown, scope: any): void {
-	if (typeof children === 'function') {
-		children(undefined, scope);
-		return;
-	}
 	childSlot(scope, 0, scope.block.parentNode, children, scope.block.endMarker);
 }
 
