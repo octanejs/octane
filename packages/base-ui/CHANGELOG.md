@@ -1,5 +1,112 @@
 # @octanejs/base-ui
 
+## 0.1.16
+
+### Patch Changes
+
+- de6c342: Composite roving focus now skips list items that are not visible, and an explicit `disabledIndices`
+  no longer suppresses that check. This brings the vendored list-navigation helpers in line with Base
+  UI 1.6.0's `isListIndexDisabled`, where an explicit `disabledIndices` hit wins, an invisible element
+  is always disabled, and the `disabled`/`aria-disabled` attribute fallback applies only when no
+  `disabledIndices` was passed at all.
+- e3367f1: Port Base UI's `Menu` item family (Phase 3f stage 2).
+
+  `@octanejs/base-ui/menu` now also exposes `Menu.Item`, `Menu.LinkItem`,
+  `Menu.CheckboxItem` + `Menu.CheckboxItemIndicator`, `Menu.RadioGroup` /
+  `Menu.RadioItem` + `Menu.RadioItemIndicator`, `Menu.Group` /
+  `Menu.GroupLabel`, `Menu.Separator`, `Menu.Arrow`, `Menu.Backdrop` and
+  `Menu.Viewport` — 18 of upstream's 20 `menu` parts, ported from
+  `@base-ui/react` 1.6.0.
+
+  A menu now has content to navigate, so the list-navigation and typeahead layer
+  is exercised end-to-end for the first time: arrow keys and Home/End rove
+  `data-highlighted` and the roving `tabindex` between items, and typing matches
+  item labels, buffering across keystrokes until the typeahead reset interval
+  elapses. Checkbox and radio items expose their state as the
+  `data-checked`/`data-unchecked` attribute pair with transition-mounted
+  indicators, and `Group`/`RadioGroup` wire `aria-labelledby` to their
+  `GroupLabel`.
+
+  Submenus, `Menubar` and `ContextMenu` are not part of this change and land in
+  the following stages.
+
+- e1004af: Port Base UI's `Menu` open/close + roving-focus path (Phase 3f stage 1).
+
+  `@octanejs/base-ui/menu` now exposes `Menu.Root`, `Menu.Trigger`, `Menu.Portal`,
+  `Menu.Positioner`, `Menu.Popup`, `Menu.createHandle` and `Menu.Handle`, ported
+  from `@base-ui/react` 1.6.0's `menu/store`, `menu/root`, `menu/trigger`,
+  `menu/portal`, `menu/positioner` and `menu/popup`. A dropdown menu opens on
+  press, hover or an arrow key, dismisses on Escape or an outside press, moves
+  focus into the popup and returns it to the trigger, and positions itself with
+  the same `@floating-ui` middleware stack Base UI uses. Detached triggers work
+  through `Menu.createHandle()`.
+
+  This is the first consumer of the list-navigation and typeahead layer, so
+  `useListNavigation` and `useTypeahead` are now exercised by differential parity
+  against the real `@base-ui/react` rather than only ported.
+
+  Supporting additions: `useOpenInteractionType`, the `DROPDOWN_COLLISION_AVOIDANCE`
+  / `TYPEAHEAD_RESET_MS` / `PATIENT_CLICK_THRESHOLD` constants, `findRootOwnerId`,
+  and the `cancel-open` / `sibling-open` change reasons.
+
+  Menu items, submenus, `Menu.Viewport`/`Arrow`/`Backdrop`/`Separator`, `Menubar`
+  and `ContextMenu` are not part of this change and land in the following stages.
+
+- 962ca64: Port Base UI's `Menu` submenus (Phase 3f stage 3), completing the `menu` subpath.
+
+  `@octanejs/base-ui/menu` now also exposes `Menu.SubmenuRoot` and
+  `Menu.SubmenuTrigger`, ported from `@base-ui/react` 1.6.0 — all 20 of upstream's
+  `menu` parts are in place.
+
+  A `SubmenuTrigger` is simultaneously an item of its parent menu and the trigger
+  of its own, so it takes part in the parent's roving focus and typeahead while
+  opening and closing a nested menu of its own. Opening one activates the
+  sibling-close, parent-close and item-hover relays the positioner has carried
+  since the first stage: hovering a different item in the parent closes an open
+  branch, opening one submenu closes its siblings, and closing a parent closes its
+  children. Escape closes only the submenu unless `closeParentOnEsc` is set.
+  Nested menus place themselves at the inline end of their trigger and are marked
+  `data-nested`.
+
+  `Menubar` and `ContextMenu` are separate namespaces and are not part of this
+  change.
+
+- bbb668d: Port Base UI's `Menubar` and `ContextMenu` (Phase 3f stage 4), completing the menu family.
+
+  `@octanejs/base-ui/menubar` exposes `Menubar`, a container that turns a row of
+  `Menu.Root`s into one keyboard-navigable bar: its triggers become roving
+  composite menu items, opening one menu closes its sibling, and the bar reports
+  whether any of its menus is open so the others can open on hover.
+
+  `@octanejs/base-ui/context-menu` exposes `ContextMenu`, a menu opened by right
+  click or long press and anchored at the pointer rather than at an element. It
+  suppresses the browser's own context menu over its trigger, traps focus while
+  open, and ignores the mouse-up belonging to the gesture that opened it so the
+  item under the cursor is not activated by accident. Every part other than `Root`
+  and `Trigger` is `Menu`'s, re-exported through the namespace.
+
+  Both were the last consumers of code that shipped inert in the first Menu stage,
+  so the whole menu family — `Menu`, `Menubar`, `ContextMenu` — is now in place.
+
+- 03588b1: Preserve the Popover payload type through the root wrapper so strict source consumers do not report an unused generic parameter.
+- Updated dependencies [c3ba5e0]
+- Updated dependencies [430061e]
+- Updated dependencies [a21ff46]
+- Updated dependencies [1821f63]
+- Updated dependencies [3db74e9]
+- Updated dependencies [0d4ed9e]
+- Updated dependencies [7bdf1fa]
+- Updated dependencies [e1927d8]
+- Updated dependencies [dac0e66]
+- Updated dependencies [54c60fa]
+- Updated dependencies [59a95d6]
+- Updated dependencies [138fbd9]
+- Updated dependencies [50c1ab5]
+- Updated dependencies [e0c5490]
+- Updated dependencies [e6a158e]
+  - octane@0.1.18
+  - @octanejs/floating-ui@0.1.17
+
 ## 0.1.15
 
 ### Patch Changes
