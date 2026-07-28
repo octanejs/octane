@@ -31,10 +31,18 @@ deliberately hands back an unstable wrapper. Custom `use[A-Z]` hooks and
 `useSyncExternalStore` — whose `subscribe`/`getSnapshot` are data it reads —
 take the lift.
 
-Dev and HMR compiles keep the authored form, matching the inline hook-memo tier.
+Dev, HMR, and profile compiles keep the authored form, on the same gate as the
+neighbouring inline hook-memo tier.
 
-Also fixes free-variable analysis for a classic `for (let i = 0; …)`: the
-declaration sits in the loop's `init` rather than its `left`, so `i` was
-reported as a free variable and read as a capture of an enclosing binding the
-loop actually shadows. This made any callback containing a counting loop look
-instance-specific.
+Two free-variable analysis fixes come with it, both affecting capture analysis
+generally rather than only the lift:
+
+- A binding pattern's default initialisers and computed keys are expressions
+  evaluated at binding time, and were never walked — only the names a pattern
+  declared were collected. So `(s, scale = props.factor) => …` and
+  `({ [props.field]: picked }) => …` reported no reference to `props` at all,
+  and read as capture-free.
+- A classic `for (let i = 0; …)` carries its declaration in the loop's `init`
+  rather than its `left`, so `i` was reported free and read as a capture of an
+  enclosing binding the loop actually shadows. This made any callback containing
+  a counting loop look instance-specific.

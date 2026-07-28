@@ -2588,6 +2588,41 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 	walk(root, new Set(initiallyBound));
 	return free;
 
+	/**
+	 * Walk the EXPRESSION positions inside a binding pattern: default
+	 * initialisers and computed keys. `collectBindings` harvests the names a
+	 * pattern declares, but those two positions are ordinary expressions that
+	 * run at binding time and may reference outer values — so they carry free
+	 * identifiers that the pattern's names alone never reveal.
+	 */
+	function walkPatternExpressions(pattern, scope) {
+		if (!pattern || typeof pattern !== 'object') return;
+		switch (pattern.type) {
+			case 'AssignmentPattern':
+				walkPatternExpressions(pattern.left, scope);
+				walk(pattern.right, scope);
+				return;
+			case 'ObjectPattern':
+				for (const p of pattern.properties || []) {
+					if (p.type === 'RestElement') {
+						walkPatternExpressions(p.argument, scope);
+						continue;
+					}
+					if (p.computed) walk(p.key, scope);
+					walkPatternExpressions(p.value || p.key, scope);
+				}
+				return;
+			case 'ArrayPattern':
+				for (const e of pattern.elements || []) walkPatternExpressions(e, scope);
+				return;
+			case 'RestElement':
+				walkPatternExpressions(pattern.argument, scope);
+				return;
+			default:
+				return;
+		}
+	}
+
 	function walk(n, scope) {
 		if (!n) return;
 		if (Array.isArray(n)) {
@@ -2691,6 +2726,12 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			for (const p of n.params || []) collectBindings(p, newScope);
 			// `function name(){}` introduces its own name into the body scope too.
 			if (n.id) collectBindings(n.id, newScope);
+			// A parameter pattern is not only a set of bindings: default
+			// initialisers and computed destructuring keys are EXPRESSIONS that run
+			// when the function is called, and they can reference anything the
+			// function closes over. Walking only the body would miss
+			// `(s, x = outer) => …` and `({ [outer]: v }) => …` entirely.
+			for (const p of n.params || []) walkPatternExpressions(p, newScope);
 			walk(n.body, newScope);
 			return;
 		}
@@ -2710,8 +2751,10 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			return;
 		}
 
-		// VariableDeclarator's `id` is a binding, only walk the init.
+		// VariableDeclarator's `id` is a binding — but the pattern's defaults and
+		// computed keys are still live expressions (`const { [k]: a, b = c } = o`).
 		if (t === 'VariableDeclarator') {
+			walkPatternExpressions(n.id, scope);
 			walk(n.init, scope);
 			return;
 		}
@@ -2720,6 +2763,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		if (t === 'CatchClause') {
 			const newScope = new Set(scope);
 			if (n.param) collectBindings(n.param, newScope);
+			if (n.param) walkPatternExpressions(n.param, newScope);
 			walk(n.body, newScope);
 			return;
 		}
@@ -5593,10 +5637,6 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		);
 	}
 	const hmrEnabled = hmrDialect !== false;
-	// Runs AFTER dependency inference so materialised dep arrays are already in
-	// place: a lifted callback is module scope, which inference reads as
-	// non-reactive, and re-ordering the two would change what it infers.
-	ast = hoistCaptureFreeHookCallbacks(ast, { enabled: !hmrEnabled });
 	// Opt-in template-origin recording (`inspect: true`, client mode only): for
 	// every span baked into a hoisted template's HTML string (tag names, static
 	// attributes, static text), capture the authored source range that produced
@@ -5628,6 +5668,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// inline-cache-vs-elsewhere in one line.
 	const inlineHookMemoEnabled =
 		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+	// Same production-only gate as the tiers above, and for the same reason: a
+	// lifted callback has left the component, which dev tooling, HMR boundaries,
+	// and profile attribution all reason about. Runs AFTER dependency inference
+	// so materialised dep arrays are already in place — module scope reads as
+	// non-reactive, so re-ordering the two would change what inference produces.
+	ast = hoistCaptureFreeHookCallbacks(ast, {
+		enabled: !hmrEnabled && !devEnabled && !profileEnabled,
+	});
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	const ctx = {

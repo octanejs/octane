@@ -222,6 +222,58 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		expect(hoistCount(code)).toBe(1);
 	});
 
+	it('treats a parameter default that reads the component as a capture', () => {
+		// A default initialiser is an expression evaluated on every call, so it can
+		// read anything the callback closes over. Lifting one that reads `props`
+		// would leave that name unresolvable at module scope.
+		const code = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        export function App(props) @{
+          const a = useSelector(props.store, (s, scale = props.factor) => s.a * scale);
+          <p>{a as string}</p>
+        }
+      `,
+			'param-default.tsrx',
+			PROD,
+		).code;
+		expect(hoistCount(code)).toBe(0);
+		expect(selectorArgs(code)[0]).toContain('props.factor');
+	});
+
+	it('treats a computed destructuring key that reads the component as a capture', () => {
+		const code = compile(
+			`
+        import { useSelector } from '@octanejs/tanstack-store';
+        export function App(props) @{
+          const a = useSelector(props.store, ({ [props.field]: picked }) => picked);
+          <p>{a as string}</p>
+        }
+      `,
+			'computed-key.tsrx',
+			PROD,
+		).code;
+		expect(hoistCount(code)).toBe(0);
+		expect(selectorArgs(code)[0]).toContain('props.field');
+	});
+
+	it('keeps the authored form in dev and profile compiles, not just HMR', () => {
+		// The lift is production-only, on the same gate as the neighbouring
+		// inline hook-memo tier: a lifted callback has left the component, which
+		// dev tooling and profile attribution both reason about.
+		const source = `
+      import { useSelector } from '@octanejs/tanstack-store';
+      export function App(props) @{
+        const total = useSelector(props.store, (s) => s.total);
+        <p>{total as string}</p>
+      }
+    `;
+		expect(hoistCount(compile(source, 'dev-build.tsrx', { hmr: false, dev: true }).code)).toBe(0);
+		expect(
+			hoistCount(compile(source, 'profile.tsrx', { hmr: false, dev: false, profile: true }).code),
+		).toBe(0);
+	});
+
 	it('keeps the authored form in dev/HMR compiles', () => {
 		// Identity stability is a production optimization; an HMR edit should not
 		// have to reason about which closures left the component.
