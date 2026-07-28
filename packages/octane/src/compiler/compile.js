@@ -14146,9 +14146,8 @@ function rewriteJsxValues(node, ctx) {
 			return jsxElementToCreateElement(n, ctx);
 		}
 		if (t === 'Fragment' || t === 'JSXFragment') {
-			// `<>…</>` at a value position → an array of its lowered children (the
-			// de-opt childSlot flattens nested arrays, matching React's fragment).
-			// lowerJsxChild owns the single implementation of fragment lowering.
+			// lowerJsxChild keeps static fragments as positional arrays and defers
+			// dynamic fragment children until their represented render scope.
 			return lowerJsxChild(n, ctx);
 		}
 		// The fold above already replaced every directive this body owns, so one still
@@ -14166,7 +14165,7 @@ function rewriteJsxValues(node, ctx) {
 // Lower one JSX child node to a `createElement` argument expression (or null to
 // drop it). Text → string literal (whitespace-only-with-newline indentation is
 // dropped, JSX rule); `{expr}` → the lowered inner expression; nested element →
-// recurse; fragment → array of children.
+// recurse; fragment → positional children or a scope-preserving descriptor.
 function lowerJsxChild(child, ctx) {
 	const t = child && child.type;
 	if (t === 'JSXText' || t === 'Text') {
@@ -14193,7 +14192,22 @@ function lowerJsxChild(child, ctx) {
 		// runtime-built arrays (`.map()` results). Emitted in BOTH modes — the
 		// server export is the identity (`ssrChild` just renders the array).
 		ctx.runtimeNeeded.add('positionalChildren');
-		return inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
+		const children = inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
+		if (!jsxValueChildrenNeedRenderScope(child)) return children;
+
+		// A bare expression in a fragment has no parent element descriptor to
+		// defer it, so the fragment itself must own the represented render scope.
+		ctx.runtimeNeeded.add('Fragment');
+		ctx.runtimeNeeded.add('createScopedElement');
+		return inheritOriginLoc(
+			b.call(
+				rtAlias('createScopedElement'),
+				inheritOriginLoc(b.id(rtAlias('Fragment')), child),
+				inheritOriginLoc(b.object([]), child),
+				inheritOriginLoc(b.arrow([], children), child),
+			),
+			child,
+		);
 	}
 	return null; // Comment / unknown — drop.
 }

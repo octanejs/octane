@@ -118,6 +118,41 @@ export function GetterContext() @{
 	<section>{content}</section>
 }
 
+export function FragmentContext() @{
+	const content = <>{use(ValueContext) as string}</>;
+	<ValueContext.Provider value="inner">
+		<span data-context="fragment">{content}</span>
+	</ValueContext.Provider>
+}
+
+export function FragmentGetterContext() @{
+	const content = <>{getterValue.current as string}</>;
+	<ValueContext.Provider value="inner">
+		<span data-context="fragment-getter">{content}</span>
+	</ValueContext.Provider>
+}
+
+export function NestedFragmentContext() @{
+	const content = <><>{getterValue.current as string}</></>;
+	<ValueContext.Provider value="inner">
+		<span data-context="fragment-nested">{content}</span>
+	</ValueContext.Provider>
+}
+
+export function FragmentPropContext() @{
+	const content = <Slot content={<>{getterValue.current as string}</>} />;
+	<ValueContext.Provider value="inner">
+		<section data-context="fragment-prop">{content}</section>
+	</ValueContext.Provider>
+}
+
+export function FragmentArrayContext() @{
+	const content = [<>{getterValue.current as string}</>];
+	<ValueContext.Provider value="inner">
+		<span data-context="fragment-array">{content[0]}</span>
+	</ValueContext.Provider>
+}
+
 export function ProxyContext() @{
 	const content = <ValueContext.Provider value="inner">
 		<span data-context="proxy">{proxyValue.current as string}</span>
@@ -246,6 +281,11 @@ export function WrappedGetterErrorValue() @{
 	<ErrorBoundary fallback={<strong data-fallback="outer">outer</strong>}>{content}</ErrorBoundary>
 }
 
+export function FragmentErrorValue() @{
+	const content = <>{throwingGetter.current as string}</>;
+	<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{content}</ErrorBoundary>
+}
+
 export function MappedErrorValue() @{
 	const content = <span>{throwingGetter.current as string}</span>;
 	const mapped = Children.map(content, (child) => child);
@@ -294,6 +334,13 @@ export function GetterSuspenseValue(props: { promise: Promise<string> }) @{
 		<span data-resolved="getter">{suspendedValue.current as string}</span>
 	</WrappedSuspense>;
 	<section data-outlet="suspense">{content}</section>
+}
+
+export function FragmentSuspense(props: { promise: Promise<string> }) @{
+	const content = <>{use(props.promise) as string}</>;
+	<Suspense fallback={<i data-fallback="pending">pending</i>}>
+		<span data-resolved="fragment">{content}</span>
+	</Suspense>
 }
 
 export function MappedSuspense(props: { promise: Promise<string> }) @{
@@ -392,6 +439,11 @@ const contextScenarios = [
 	['PropContext', '[data-context="prop"]'],
 	['NestedContext', '[data-context="nested"]'],
 	['GetterContext', '[data-context="getter"]'],
+	['FragmentContext', '[data-context="fragment"]'],
+	['FragmentGetterContext', '[data-context="fragment-getter"]'],
+	['NestedFragmentContext', '[data-context="fragment-nested"]'],
+	['FragmentPropContext', '[data-context="fragment-prop"]'],
+	['FragmentArrayContext', '[data-context="fragment-array"]'],
 	['ProxyContext', '[data-context="proxy"]'],
 	['CoercionContext', '[data-context="coercion"]'],
 	['IterableContext', '[data-context="iterable"]'],
@@ -554,6 +606,7 @@ for (const fixture of fixtures) {
 			'BuiltInErrorValue',
 			'WrappedErrorValue',
 			'WrappedGetterErrorValue',
+			'FragmentErrorValue',
 			'MappedErrorValue',
 			'FlattenedErrorValue',
 			'ClonedErrorValue',
@@ -577,6 +630,7 @@ for (const fixture of fixtures) {
 			['VariableSuspense', 'variable'],
 			['WrappedSuspenseValue', 'wrapped'],
 			['GetterSuspenseValue', 'getter'],
+			['FragmentSuspense', 'fragment'],
 			['MappedSuspense', 'mapped'],
 			['FlattenedSuspense', 'flattened'],
 			['ClonedSuspense', 'cloned'],

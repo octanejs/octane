@@ -126,6 +126,55 @@ export function GetterContext() {
 	return <section>{content}</section>;
 }
 
+export function FragmentContext() {
+	const content = <>{use(ValueContext)}</>;
+	return (
+		<ValueContext.Provider value="inner">
+			<span data-context="fragment">{content}</span>
+		</ValueContext.Provider>
+	);
+}
+
+export function FragmentGetterContext() {
+	const content = <>{getterValue.current}</>;
+	return (
+		<ValueContext.Provider value="inner">
+			<span data-context="fragment-getter">{content}</span>
+		</ValueContext.Provider>
+	);
+}
+
+export function NestedFragmentContext() {
+	const content = (
+		<>
+			<>{getterValue.current}</>
+		</>
+	);
+	return (
+		<ValueContext.Provider value="inner">
+			<span data-context="fragment-nested">{content}</span>
+		</ValueContext.Provider>
+	);
+}
+
+export function FragmentPropContext() {
+	const content = <Slot content={<>{getterValue.current}</>} />;
+	return (
+		<ValueContext.Provider value="inner">
+			<section data-context="fragment-prop">{content}</section>
+		</ValueContext.Provider>
+	);
+}
+
+export function FragmentArrayContext() {
+	const content = [<>{getterValue.current}</>];
+	return (
+		<ValueContext.Provider value="inner">
+			<span data-context="fragment-array">{content[0]}</span>
+		</ValueContext.Provider>
+	);
+}
+
 export function ProxyContext() {
 	const content = (
 		<ValueContext.Provider value="inner">
@@ -265,6 +314,13 @@ export function WrappedGetterErrorValue() {
 	);
 }
 
+export function FragmentErrorValue() {
+	const content = <>{throwingGetter.current}</>;
+	return (
+		<ErrorBoundary fallback={<strong data-fallback="inner">inner</strong>}>{content}</ErrorBoundary>
+	);
+}
+
 export function MappedErrorValue() {
 	const content = <span>{throwingGetter.current}</span>;
 	const mapped = Children.map(content, (child) => child);
@@ -329,6 +385,15 @@ export function GetterSuspenseValue(props: { promise: Promise<string> }) {
 		</WrappedSuspense>
 	);
 	return <section data-outlet="suspense">{content}</section>;
+}
+
+export function FragmentSuspense(props: { promise: Promise<string> }) {
+	const content = <>{use(props.promise)}</>;
+	return (
+		<Suspense fallback={<i data-fallback="pending">pending</i>}>
+			<span data-resolved="fragment">{content}</span>
+		</Suspense>
+	);
 }
 
 export function MappedSuspense(props: { promise: Promise<string> }) {
