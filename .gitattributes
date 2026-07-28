@@ -1,1 +1,2 @@
 *.tsrx linguist-language=TSX
+packages/*/CHANGELOG.md whitespace=-space-before-tab
