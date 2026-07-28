@@ -2768,20 +2768,30 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			return;
 		}
 
-		// for / for-in / for-of — left declarator introduces bindings.
+		// for / for-in / for-of — a DECLARATION left introduces bindings, but a
+		// bare left-hand side is an ASSIGNMENT to something already in scope.
 		if (t === 'ForStatement' || t === 'ForInStatement' || t === 'ForOfStatement') {
 			const newScope = new Set(scope);
 			if (n.left && n.left.type === 'VariableDeclaration') {
-				for (const d of n.left.declarations || []) collectBindings(d.id, newScope);
+				for (const d of n.left.declarations || []) {
+					collectBindings(d.id, newScope);
+					walkPatternExpressions(d.id, newScope);
+				}
 			} else if (n.left) {
-				collectBindings(n.left, newScope);
+				// `for (acc of xs)` writes the enclosing `acc` — treating it as a
+				// fresh binding hides that reference, which reads as capture-free
+				// even though the loop mutates outer state.
+				walk(n.left, newScope);
 			}
 			// A CLASSIC for carries its declaration in `init`, not `left`, and that
 			// binding is visible to the test/update/body. Without this, `i` in
 			// `for (let i = 0; i < n; i++)` is reported free, which reads as a
 			// capture of an enclosing `i` that the loop actually shadows.
 			if (n.init && n.init.type === 'VariableDeclaration') {
-				for (const d of n.init.declarations || []) collectBindings(d.id, newScope);
+				for (const d of n.init.declarations || []) {
+					collectBindings(d.id, newScope);
+					walkPatternExpressions(d.id, newScope);
+				}
 			}
 			walk(n.init, newScope);
 			walk(n.test, newScope);
@@ -2795,9 +2805,14 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		if (t === 'JSXForExpression') {
 			const newScope = new Set(scope);
 			if (n.left?.type === 'VariableDeclaration') {
-				for (const d of n.left.declarations || []) collectBindings(d.id, newScope);
+				for (const d of n.left.declarations || []) {
+					collectBindings(d.id, newScope);
+					walkPatternExpressions(d.id, newScope);
+				}
 			} else if (n.left) {
-				collectBindings(n.left, newScope);
+				// Same as the JS loops above: a bare left-hand side assigns to an
+				// existing binding rather than introducing one.
+				walk(n.left, newScope);
 			}
 			if (n.index) collectBindings(n.index, newScope);
 			walk(n.right, scope);
