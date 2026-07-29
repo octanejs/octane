@@ -3141,7 +3141,17 @@ function hmrHandoffStatements(state, hot, origin) {
 	for (const component of state.hmrComponents) {
 		const componentOrigin = component.origin ?? origin;
 		const existing = b.member(hmrComponentStore(hot, componentOrigin), component.name);
-		const test = b.logical('&&', hmrComponentStore(hot, componentOrigin), existing);
+		// Webpack/rspack leave `hot.data` undefined until a previous instance of
+		// the module has disposed, so first evaluation must guard the bag itself.
+		const test = b.logical(
+			'&&',
+			b.logical(
+				'&&',
+				memberPath(hot, ['data'], componentOrigin),
+				hmrComponentStore(hot, componentOrigin),
+			),
+			existing,
+		);
 		const update = b.stmt(
 			b.call(
 				b.member(b.member(existing, b.id(state.helpers.hmrSymbol), true), 'update'),
