@@ -23,6 +23,8 @@ import {
 	TransitionRadioGroup,
 	TransitionKeyedRemoval,
 	TransitionListToEmpty,
+	TransitionKeyedAddition,
+	TransitionKeyedEmptyFill,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -825,6 +827,74 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(r.find('#empty').textContent).toBe('nothing');
 		await act(() => {});
 		expect(log.drain()).toEqual(['cleanup:a', 'cleanup:b']);
+		r.unmount();
+	});
+
+	it('tears down a row the aborted attempt freshly mounted, effects unfired', async () => {
+		// Step 0 unwraps synchronously so the FIRST mount never suspends — this
+		// test is about the transition's aborted attempt, not initial mount.
+		const fulfilled = {
+			status: 'fulfilled',
+			value: 'zero',
+			then: (fn: (v: string) => void) => void fn('zero'),
+		} as unknown as Promise<string>;
+		const d1 = deferred<string>();
+		const load = (step: number) => (step === 0 ? fulfilled : d1.promise);
+		const log = createLog();
+		const ids = () => r.findAll('#list li').map((li) => li.id);
+
+		const r = mount(TransitionKeyedAddition, { load, log: log.push });
+		await act(() => {});
+		expect(ids()).toEqual(['row-a']);
+		expect(log.drain()).toEqual(['mount:a']);
+
+		// The attempt mounts d, then the sibling suspends and the boundary holds.
+		// d's DOM comes out — and its queued mount effect must go with it, or it
+		// fires for a row that is not on screen and can never be cleaned up.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(ids()).toEqual(['row-a']);
+		await act(() => {});
+		expect(log.drain()).toEqual([]);
+
+		// The real commit mounts d fresh, exactly once.
+		await act(() => {
+			d1.resolve('one');
+		});
+		expect(ids()).toEqual(['row-a', 'row-d']);
+		expect(log.drain()).toEqual(['mount:d']);
+
+		r.unmount();
+		await act(() => {});
+		expect(log.drain()).toEqual(['cleanup:a', 'cleanup:d']);
+	});
+
+	it('holds an empty list empty when the attempt filled it before suspending', async () => {
+		const fulfilled = {
+			status: 'fulfilled',
+			value: 'zero',
+			then: (fn: (v: string) => void) => void fn('zero'),
+		} as unknown as Promise<string>;
+		const d1 = deferred<string>();
+		const load = (step: number) => (step === 0 ? fulfilled : d1.promise);
+		const log = createLog();
+		const ids = () => r.findAll('#list li').map((li) => li.id);
+
+		const r = mount(TransitionKeyedEmptyFill, { load, log: log.push });
+		await act(() => {});
+		expect(ids()).toEqual([]);
+
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(ids()).toEqual([]);
+		await act(() => {});
+		expect(log.drain()).toEqual([]);
+
+		await act(() => {
+			d1.resolve('one');
+		});
+		expect(ids()).toEqual(['row-d']);
+		expect(log.drain()).toEqual(['mount:d']);
 		r.unmount();
 	});
 });

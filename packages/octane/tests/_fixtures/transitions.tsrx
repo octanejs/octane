@@ -580,3 +580,61 @@ export function TransitionListToEmpty(props) @{
 		}
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// The transition ADDS a row and then a later sibling suspends. The fresh row
+// completed its mount before the hold was decided, so putting the list back is
+// not enough: the row's scope has to go too, or its queued mount effect fires
+// for a row that is not on screen and nothing can ever clean it up.
+// ---------------------------------------------------------------------------
+function AddedRow(props) @{
+	useEffect(() => {
+		props.log('mount:' + props.id);
+		return () => props.log('cleanup:' + props.id);
+	}, []);
+	<li id={'row-' + props.id}>{props.id as string}</li>
+}
+
+export function TransitionKeyedAddition(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a'] : ['a', 'd'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<AddedRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// The same shape from an EMPTY list: 0 -> N has no rows to put back, but the
+// freshly-filled rows still have to come out and their scopes go with them.
+export function TransitionKeyedEmptyFill(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? [] : ['d'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<AddedRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}

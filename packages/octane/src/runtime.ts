@@ -1276,6 +1276,18 @@ function restoreForSlot(
 	snapshot: any,
 	chain: Array<[Block, Block | null, Block | null]>,
 ): void {
+	// Rows the aborted attempt freshly mounted are not in the snapshot, so
+	// restoring the old chain would simply forget them. Their DOM goes with the
+	// range clear below, but the scope has to go NOW, before the overwrite makes
+	// them unreachable: the disposed stamp is what keeps their queued mount
+	// effects and ref attaches from firing for a row that never reached the
+	// screen, and it runs the render-time cleanups they registered. Parked rows
+	// are never on the chain, so this reaches exactly the fresh mounts.
+	const kept = new Set<Block>();
+	for (let i = 0; i < chain.length; i++) kept.add(chain[i][0]);
+	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+		if (!kept.has(b)) unmountBlock(b, false);
+	}
 	state.head = snapshot.head;
 	state.tail = snapshot.tail;
 	state.size = snapshot.size;
@@ -22194,6 +22206,12 @@ function mountItemsLinear<T>(
 ): void {
 	const newLen = items.length;
 	if (newLen === 0) return;
+	// Every 0 -> N fill funnels through here (forBlock, the value-position array
+	// path, and reconcileKeyed's own empty branch). An empty list is still a
+	// shape to go back to: a fill during a render that may yet hold must come
+	// back out — rows, scopes and queued effects together — or the held boundary
+	// shows fresh rows with their bindings half rolled back underneath them.
+	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
 	const parentNode = state.end.parentNode!;
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
@@ -22279,7 +22297,9 @@ function reconcileKeyed<T>(
 	const newLen = items.length;
 	const parentNode = state.end.parentNode!;
 	// Record the list's shape while a hold is still possible, so a boundary that
-	// suspends later in this render can put it back whole.
+	// suspends later in this render can put it back whole. The 0 -> N fast path
+	// journals inside mountItemsLinear, which also covers the callers that
+	// dispatch to it directly.
 	if (oldSize > 0 && TRANSITION_JOURNAL !== null) journalForSlot(state);
 
 	// Fast path: empty → fill — the linear first-fill pass (callers on the
