@@ -1240,6 +1240,20 @@ function itemRemovalDefers(): boolean {
 }
 
 /**
+ * True when rows removed from `state` may defer their teardown for a possible
+ * hold. Parking is only sound when this list's shape went into the journal:
+ * restoreForSlot is the only thing that brings parked rows back, and it can
+ * only find them through a JOURNAL_FOR entry. A caller tearing rows down
+ * OUTSIDE the journal's knowledge — a value-position slot leaving array mode
+ * discards the slot itself — must remove immediately, as it always did:
+ * parking there would strand the rows as deferred-but-unrestorable and push
+ * their cleanups past the rest of the attempt.
+ */
+function forSlotParkable(state: ForSlot): boolean {
+	return TRANSITION_JOURNAL !== null && TRANSITION_JOURNAL_BAGS!.has(state);
+}
+
+/**
  * Record a keyed list's shape before a reconcile that may have to be undone.
  *
  * The list is restored as a whole rather than per operation: the chain, the key
@@ -1288,6 +1302,12 @@ function restoreForSlot(
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
 		if (!kept.has(b)) unmountBlock(b, false);
 	}
+	// Those teardowns dispatch their cleanup errors immediately, and an error
+	// routed to the enclosing boundary flips it to @catch — disposing this
+	// slot's whole range out from under the restore. Same mid-render teardown
+	// invariant as renderReturnedValue's disposed check: stop here, and let
+	// flushParkedItems finish off whatever stayed parked.
+	if (state.end.parentNode === null) return;
 	state.head = snapshot.head;
 	state.tail = snapshot.tail;
 	state.size = snapshot.size;
@@ -1328,7 +1348,9 @@ function restoreForSlot(
 		if (state.emptyBlock !== null) unmountBlock(state.emptyBlock, false);
 		state.emptyBlock = snapshot.empty;
 	}
-	if (snapshot.empty !== null) {
+	// The @empty teardown above can dispose the range the same way the orphan
+	// walk can; re-check before inserting into it.
+	if (snapshot.empty !== null && state.end.parentNode !== null) {
 		const parkedEmpty = takeParkedItem(snapshot.empty);
 		const nodes = parkedEmpty ?? collectBlockRange(snapshot.empty);
 		for (let k = 0; k < nodes.length; k++) parent.insertBefore(nodes[k], state.end);
@@ -22798,9 +22820,11 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  */
 function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 	// The bulk paths below drop the nodes wholesale, which cannot be undone.
-	// While a hold is still possible, take each row individually so its nodes
-	// are kept and its teardown waits for the outcome.
-	if (itemRemovalDefers()) {
+	// While a hold is still possible AND this list's shape is journaled (see
+	// forSlotParkable — reconcileKeyed and the @empty flip journal before they
+	// clear; teardownChildForSlot never does), take each row individually so
+	// its nodes are kept and its teardown waits for the outcome.
+	if (forSlotParkable(state)) {
 		let next: Block | null;
 		for (let b: Block | null = state.head; b !== null; b = next) {
 			next = b.nextSibling;

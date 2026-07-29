@@ -1,6 +1,7 @@
 import {
 	use,
 	useEffect,
+	useLayoutEffect,
 	useReducer,
 	useState,
 	useTransition,
@@ -632,6 +633,47 @@ export function TransitionKeyedEmptyFill(props) @{
 					}
 				</ul>
 				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// A value-position keyed list whose slot LEAVES array mode during the
+// transition (the value flips to plain text), and then a later sibling
+// suspends. The slot itself is discarded on the flip, so there is nothing for
+// a rollback to restore the rows into — the teardown must run inline with the
+// attempt, exactly as it did before rows learned to wait for a hold. The
+// layout cleanups' position relative to the tail's render pins that.
+// ---------------------------------------------------------------------------
+function FlipRow(props) @{
+	useLayoutEffect(() => {
+		props.log('mount:' + props.id);
+		return () => props.log('cleanup:' + props.id);
+	}, []);
+	<li id={'row-' + props.id}>{props.id as string}</li>
+}
+
+function FlipTail(props) @{
+	props.log('render:tail:' + props.step);
+	const value = use(props.load(props.step));
+	<span id="value">{value as string}</span>
+}
+
+export function TransitionArrayModeExit(props) @{
+	const [step, setStep] = useState(0);
+	const rows =
+		step === 0 ? ['a', 'b'] : null;
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<div id="host">
+					{rows === null ? 'plain' : rows.map((id) => <FlipRow key={id} id={id} log={props.log} />)}
+				</div>
+				<FlipTail load={props.load} step={step} log={props.log} />
 			</>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
