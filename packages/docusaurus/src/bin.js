@@ -10,7 +10,7 @@ function usage() {
   octane-docusaurus clear [--site-dir DIR]
 
 The phase 1-3 command inspects Docusaurus's headless route/data graph. Static
-site build, hydration, and theme commands arrive with the renderer phases.
+site build and theme commands arrive with the document/theme phase.
 `;
 }
 

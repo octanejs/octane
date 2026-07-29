@@ -2387,12 +2387,44 @@ export default defineConfig({
 				plugins: [octane()],
 				test: {
 					name: 'docusaurus',
-					include: ['packages/docusaurus/tests/**/*.test.ts'],
+					include: [
+						'packages/docusaurus/tests/**/*.test.ts',
+						'!packages/docusaurus/tests/ssr/**/*.test.ts',
+					],
 					environment: 'node',
 					globals: false,
 				},
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/mdx\/compile$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
+						},
+						{
+							find: /^@octanejs\/remix-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				plugins: [octane({ ssr: true })],
+				test: {
+					name: 'docusaurus-ssr',
+					include: ['packages/docusaurus/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/docusaurus\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/docusaurus/src/server.js'),
+						},
 						{
 							find: /^@octanejs\/mdx\/compile$/,
 							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
