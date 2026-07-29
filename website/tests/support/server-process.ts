@@ -159,9 +159,12 @@ export async function stopServer(child: ChildProcess | undefined): Promise<void>
 		}
 	};
 	signalGroup('SIGTERM');
-	await new Promise((r) => {
-		child.once('exit', r);
-		setTimeout(r, 3000);
+	await new Promise<void>((resolve) => {
+		const timeout = setTimeout(resolve, 3000);
+		child.once('exit', () => {
+			clearTimeout(timeout);
+			resolve();
+		});
 	});
 	if (child.exitCode === null) signalGroup('SIGKILL');
 }

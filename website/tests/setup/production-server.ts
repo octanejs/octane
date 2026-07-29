@@ -80,6 +80,7 @@ let server: ChildProcess | undefined;
 let build: ChildProcess | undefined;
 let ready: Promise<void> | undefined;
 let readyFile: string | undefined;
+let tearingDown = false;
 
 function buildWebsite(): Promise<void> {
 	return new Promise((resolve, reject) => {
@@ -124,6 +125,7 @@ export async function setup(project: TestProject): Promise<void> {
 			if (!reuse) await buildWebsite();
 			build = undefined;
 			await reservation.release();
+			if (tearingDown) return;
 			server = spawnServer(
 				WEBSITE,
 				[
@@ -151,17 +153,11 @@ export async function setup(project: TestProject): Promise<void> {
 }
 
 export async function teardown(): Promise<void> {
-	// A cancelled run can land here with the build still going; settle the chain
-	// first so it cannot spawn a server after we have torn one down.
-	if (build?.pid !== undefined) {
-		try {
-			process.kill(-build.pid, 'SIGTERM');
-		} catch {
-			build.kill('SIGTERM');
-		}
-	}
+	// Stop either in-flight process before settling the chain; the flag closes
+	// the gap where the build has exited but the preview has not spawned yet.
+	tearingDown = true;
+	await Promise.all([stopServer(build), stopServer(server)]);
 	await ready?.catch(() => {});
-	await stopServer(server);
 	server = undefined;
 	build = undefined;
 	ready = undefined;
