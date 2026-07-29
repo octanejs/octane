@@ -346,6 +346,117 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it.each([
+		{
+			shape: 'dynamic text',
+			content: "{props.prefix + ':' + index + ':' + item.label}",
+			expected: ['native:0:first', 'native:1:second'],
+		},
+		{
+			shape: 'empty content',
+			content: '',
+			expected: ['', ''],
+		},
+		{
+			shape: 'nested static host and dynamic text',
+			content: '<strong data-child="native">{item.label}</strong>{props.prefix + \':\' + index}',
+			expected: ['firstnative:0', 'secondnative:1'],
+		},
+	])(
+		'repairs $shape inside preserved keyed hosts when a custom map switches to native rendering',
+		({ shape, content, expected }) => {
+			const source = `
+				function StructuredMapApp(props) {
+					const rows = props.rows;
+					return (
+						<ul id="tsx-structured-map-rows">
+							{rows.map((item, index) => (
+								<li
+									key={item.id}
+									data-native={props.onItem(item.id, index)}
+									onClick={() => props.onClick(item.id)}
+								>${content}</li>
+							))}
+						</ul>
+					);
+				}
+				export const App = StructuredMapApp;
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `tsx-structured-map-${shape.replaceAll(' ', '-')}.tsx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const items = [
+				{ id: 1, label: 'first' },
+				{ id: 2, label: 'second' },
+			];
+			const events: string[] = [];
+			const staleRefs: (Element | null)[] = [];
+			const customRows = {
+				map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+					if (this !== customRows) throw new Error('structured map lost its receiver');
+					events.push('custom:start');
+					callback(items[0]!, 7);
+					const compatible = callback(items[1]!, 3);
+					events.push('custom:end');
+					return [
+						createElement(
+							'li',
+							{
+								key: 1,
+								'data-custom': 'stale',
+								onClick: () => events.push('custom:click'),
+							},
+							createElement(
+								'span',
+								{
+									'data-stale': 'child',
+									ref: (value: Element | null) => staleRefs.push(value),
+								},
+								'stale',
+							),
+							'legacy',
+						) as T,
+						compatible,
+					];
+				},
+			};
+			const onItem = (id: number, index: number): string => {
+				events.push(`callback:${id}:${index}`);
+				return `${id}:${index}`;
+			};
+			const onClick = (id: number) => events.push(`native:click:${id}`);
+			const root = mount(client.App, { rows: customRows, prefix: 'custom', onItem, onClick });
+			expect(events).toEqual(['custom:start', 'callback:1:7', 'callback:2:3', 'custom:end']);
+			const originalRows = root.findAll('#tsx-structured-map-rows > li');
+			const staleChild = root.find('[data-stale="child"]');
+			expect(staleRefs).toEqual([staleChild]);
+			expect(originalRows[0]?.textContent).toBe('stalelegacy');
+			root.click('[data-custom="stale"]');
+			expect(events.at(-1)).toBe('custom:click');
+
+			events.length = 0;
+			root.update(client.App, { rows: items, prefix: 'native', onItem, onClick });
+			expect(events).toEqual(['callback:1:0', 'callback:2:1']);
+			const nativeRows = root.findAll('#tsx-structured-map-rows > li');
+			expect(nativeRows).toEqual(originalRows);
+			expect(nativeRows.map((row) => row.textContent)).toEqual(expected);
+			expect(nativeRows.map((row) => row.getAttribute('data-native'))).toEqual(['1:0', '2:1']);
+			expect(root.findAll('[data-stale="child"]')).toHaveLength(0);
+			expect(staleRefs).toEqual([staleChild, null]);
+			if (shape === 'nested static host and dynamic text') {
+				expect(nativeRows.map((row) => row.querySelector('strong')?.textContent)).toEqual([
+					'first',
+					'second',
+				]);
+			}
+			root.click('[data-native="1:0"]');
+			expect(events.at(-1)).toBe('native:click:1');
+			root.unmount();
+		},
+	);
+
 	it('preserves child state, context, and callback indices while map receivers change', () => {
 		const items = [
 			{ id: 1, label: 'first' },

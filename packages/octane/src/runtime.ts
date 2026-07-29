@@ -8540,6 +8540,13 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 			(adopted as Element).localName === (expected as Element).localName &&
 			(adopted as Element).namespaceURI === (expected as Element).namespaceURI
 		) {
+			for (let child = adopted.firstChild; child !== null; child = child.nextSibling) {
+				detachDeoptTreeRefs(child, null);
+			}
+			(adopted as Element).replaceChildren();
+			for (let child = expected.firstChild; child !== null; child = child.nextSibling) {
+				adopted.appendChild(child.cloneNode(true));
+			}
 			return adopted as T;
 		}
 		const replacement = expected.cloneNode(true);
@@ -8680,13 +8687,6 @@ export function htext(el: Node, value: unknown): Text {
 	const text = coerceText(value);
 	const hydration = activeHydration();
 	if (hydration !== null) return hydration.htext(el, text);
-	if (MAPPED_ITEM_ADOPTION !== null) {
-		const existing = el.firstChild;
-		if (existing?.nodeType === 3 && existing.nextSibling === null) {
-			if (existing.nodeValue !== text) existing.nodeValue = text;
-			return existing as Text;
-		}
-	}
 	const t = document.createTextNode(text);
 	el.appendChild(t);
 	return t;
@@ -8710,10 +8710,6 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	const text = coerceText(value);
 	const hydration = activeHydration();
 	if (hydration !== null) return hydration.htextSwap(posNode, text);
-	if (MAPPED_ITEM_ADOPTION !== null && posNode?.nodeType === 3) {
-		if (posNode.nodeValue !== text) posNode.nodeValue = text;
-		return posNode as Text;
-	}
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
 	const t = document.createTextNode(text);
 	const parent = posNode!.parentNode!;
