@@ -18,5 +18,6 @@ through loading → success or error. Toasts beyond the configured limit are
 flagged rather than removed so they can animate out, and the viewport mirrors
 high-priority toasts into a visually hidden assertive live region.
 
-Swipe-to-dismiss is ported but not covered by tests: it needs real pointer
-geometry, which jsdom does not provide.
+Swipe-to-dismiss is covered too: dragging past the threshold dismisses the toast,
+dragging back below it springs back, and a drag starting on a button inside the
+toast does not swipe it.

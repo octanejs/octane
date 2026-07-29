@@ -27,6 +27,51 @@ async function settleUntil(predicate: () => boolean, timeoutMs = 2000): Promise<
 	}
 }
 
+/**
+ * Dispatch a synthetic pointer event.
+ *
+ * Swipe IS drivable in jsdom: the gesture math is pure `clientX`/`clientY` deltas, and
+ * `getElementTransform` reading `transform: none` simply yields a `{0,0,1}` baseline. (What is NOT
+ * drivable is the hover/`safePolygon` family, which needs real `getBoundingClientRect` geometry.)
+ * `movementX`/`movementY` are getter-only on jsdom's MouseEvent, so they are defined rather than
+ * assigned.
+ */
+function pointer(
+	el: Element | Document,
+	type: string,
+	x: number,
+	y: number,
+	movement = { x: 0, y: 0 },
+) {
+	const event: any = new MouseEvent(type, {
+		bubbles: true,
+		cancelable: true,
+		clientX: x,
+		clientY: y,
+		button: 0,
+	});
+	event.pointerId = 1;
+	event.pointerType = 'mouse';
+	Object.defineProperty(event, 'movementX', { value: movement.x, configurable: true });
+	Object.defineProperty(event, 'movementY', { value: movement.y, configurable: true });
+	flushSync(() => {
+		el.dispatchEvent(event);
+	});
+	return event;
+}
+
+/** Drag from (x0,y0) to (x1,y1). The FIRST pointermove is consumed as an iOS baseline reset. */
+async function drag(el: Element, x0: number, y0: number, x1: number, y1: number): Promise<void> {
+	pointer(el, 'pointerdown', x0, y0);
+	await settle();
+	pointer(el, 'pointermove', x0, y0);
+	await settle();
+	pointer(el, 'pointermove', x1, y1, { x: x1 - x0, y: y1 - y0 });
+	await settle();
+	pointer(document, 'pointerup', x1, y1);
+	await settle();
+}
+
 function toastCount(m: { container: HTMLElement }): number {
 	return m.container.querySelectorAll('.toast-root').length;
 }
@@ -204,6 +249,72 @@ describe('@octanejs/base-ui — Toast behavior', () => {
 		manager.close();
 		await settleUntil(() => toastCount(m) === 0);
 
+		m.unmount();
+	});
+
+	it('swiping past the threshold dismisses the toast', async () => {
+		const m = mount(ToastManaged);
+		await settle();
+
+		manager.add({ title: 'Swipe me away' });
+		await settle();
+		expect(toastCount(m)).toBe(1);
+
+		// `swipeDirection` defaults to ['down', 'right']; 100px right clears the 40px threshold.
+		await drag(m.find('.toast-root'), 100, 100, 200, 100);
+		await settleUntil(() => toastCount(m) === 0);
+		expect(toastCount(m)).toBe(0);
+
+		m.unmount();
+	});
+
+	it('tracks the swipe direction and movement while dragging, and springs back below the threshold', async () => {
+		const m = mount(ToastManaged);
+		await settle();
+
+		manager.add({ title: 'Swipe me back' });
+		await settle();
+		const root = m.find('.toast-root') as HTMLElement;
+
+		pointer(root, 'pointerdown', 100, 100);
+		await settle();
+		expect(root.hasAttribute('data-swiping')).toBe(true);
+
+		pointer(root, 'pointermove', 100, 100);
+		await settle();
+		pointer(root, 'pointermove', 120, 100, { x: 20, y: 0 });
+		await settle();
+
+		// Direction is locked and the movement is published as a CSS variable for the animation.
+		expect(root.getAttribute('data-swipe-direction')).toBe('right');
+		expect(root.style.getPropertyValue('--toast-swipe-movement-x')).toBe('20px');
+
+		// 20px is under the 40px threshold, so releasing springs it back instead of dismissing.
+		pointer(document, 'pointerup', 120, 100);
+		await settle();
+		expect(toastCount(m)).toBe(1);
+		expect(m.find('.toast-root').hasAttribute('data-swiping')).toBe(false);
+		expect(m.find('.toast-root').getAttribute('data-swipe-direction')).toBe(null);
+
+		manager.close();
+		await settleUntil(() => toastCount(m) === 0);
+		m.unmount();
+	});
+
+	it('does not start a swipe from an interactive element inside the toast', async () => {
+		const m = mount(ToastManaged);
+		await settle();
+
+		manager.add({ title: 'Has a close button' });
+		await settle();
+
+		// A drag beginning on the close button must not swipe the toast — otherwise buttons would
+		// be unusable on touch.
+		await drag(m.find('.toast-close'), 100, 100, 200, 100);
+		expect(toastCount(m)).toBe(1);
+
+		manager.close();
+		await settleUntil(() => toastCount(m) === 0);
 		m.unmount();
 	});
 

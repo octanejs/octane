@@ -42,9 +42,19 @@ work around it in the binding.**
 > timer plus the `promise` helper's loading→success handoff, `limit` flagging rather than removing,
 > and the close button.
 >
-> Not covered: swipe-to-dismiss (pointer geometry, `getElementTransform` reads a computed CSS
-> matrix), and the close→remove gap — jsdom runs no animations, so `useOpenChangeComplete` resolves
-> in the same flush and only the ORDER of the two callbacks is deterministic.
+> **Swipe IS testable in jsdom — correcting an earlier claim.** After Menu I wrote that gesture
+> paths were jsdom-blind across the board. That is true only of the hover/`safePolygon` family,
+> which needs real `getBoundingClientRect` geometry. Swipe is pure `clientX`/`clientY` delta math,
+> and `getElementTransform` reading `transform: none` just yields a `{0,0,1}` baseline, so synthetic
+> pointer events drive it end to end. Three swipe tests now cover dismissal past the threshold,
+> direction locking + the movement CSS variable + spring-back below the threshold, and the guard
+> that a drag starting on an interactive element does not swipe. Two gotchas for whoever writes the
+> next one: `movementX`/`movementY` are getter-only on jsdom's MouseEvent so they must be
+> `defineProperty`'d, and the FIRST `pointermove` is consumed as the iOS baseline reset, so a drag
+> needs two moves.
+>
+> Still not covered: the close→remove gap — jsdom runs no animations, so `useOpenChangeComplete`
+> resolves in the same flush and only the ORDER of the two callbacks is deterministic.
 
 > **Phase 3f COMPLETE — stage 4, Menubar + ContextMenu (2026-07-27). Green: 142 base-ui tests
 > (93 differential + 49 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage
