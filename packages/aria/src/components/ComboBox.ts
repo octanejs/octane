@@ -18,6 +18,7 @@ import {
 	useContext,
 	useMemo,
 	useRef,
+	isChildrenBlock,
 	useState,
 } from 'octane';
 
@@ -162,7 +163,7 @@ export const ComboBox: <T, M extends SelectionMode = 'single'>(
 			createElement(ListBoxContext.Provider, {
 				value: { items: props.items ?? props.defaultItems },
 				children:
-					typeof children === 'function'
+					typeof children === 'function' && !isChildrenBlock(children)
 						? children({
 								isOpen: false,
 								isDisabled,
