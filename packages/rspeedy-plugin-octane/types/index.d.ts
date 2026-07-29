@@ -57,6 +57,8 @@ export interface LynxToolchainLane {
 	readonly targetSdk: '3.9';
 	readonly packages: Readonly<
 		Record<
+			| '@emnapi/core'
+			| '@emnapi/runtime'
 			| '@lynx-js/cache-events-webpack-plugin'
 			| '@lynx-js/chunk-loading-webpack-plugin'
 			| '@lynx-js/css-extract-webpack-plugin'
@@ -73,6 +75,7 @@ export interface LynxToolchainLane {
 			| '@lynx-js/webpack-dev-transport'
 			| '@lynx-js/webpack-runtime-globals'
 			| '@lynx-js/websocket'
+			| '@napi-rs/wasm-runtime'
 			| '@rsbuild/core'
 			| '@rsbuild/plugin-css-minimizer'
 			| '@rsdoctor/rspack-plugin'
