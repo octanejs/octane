@@ -233,6 +233,12 @@ function markerCount(value: object): number {
 interface CloneState {
 	readonly active: Set<object>;
 	readonly clones: Map<object, LynxWorkletValue>;
+	/**
+	 * Unwrap the native event envelope's `{ elementRefptr }` wrappers to their
+	 * raw main-thread element by identity instead of rejecting them. Only legal
+	 * for worklet arguments, which never leave the main thread.
+	 */
+	readonly unwrapElementReferences?: boolean;
 }
 
 function cloneValue(value: unknown, label: string, state: CloneState): LynxWorkletValue {
@@ -253,6 +259,24 @@ function cloneValue(value: unknown, label: string, state: CloneState): LynxWorkl
 	if (state.active.has(value)) fail(label, 'contains a cycle.');
 	const existing = state.clones.get(value);
 	if (existing !== undefined) return existing;
+	if (
+		state.unwrapElementReferences === true &&
+		!Array.isArray(value) &&
+		own(value, 'elementRefptr')
+	) {
+		// The pinned Lynx event envelope marks element targets with a wrapper
+		// object; the worklet observes the raw main-thread element, matching the
+		// value a `main-thread:ref` cell holds.
+		// PrimJS surfaces the element as an engine-owned reference whose typeof is
+		// not necessarily 'object'; reject only a missing reference.
+		const node = (value as { elementRefptr: unknown }).elementRefptr;
+		if (node === null || node === undefined) {
+			fail(`${label}.elementRefptr`, 'must reference a native element.');
+		}
+		const reference = node as LynxWorkletValue;
+		state.clones.set(value, reference);
+		return reference;
+	}
 
 	state.active.add(value);
 	try {
@@ -343,6 +367,19 @@ export function isolateLynxWorkletValue<T extends LynxWorkletValue>(
 		active: new Set(),
 		clones: new Map(),
 	}) as T;
+}
+
+/**
+ * Validate and copy main-thread worklet arguments. Native event envelopes are
+ * data except for `{ elementRefptr }` target wrappers, which pass through as
+ * their raw main-thread element by identity.
+ */
+export function isolateLynxWorkletArguments(values: readonly unknown[]): readonly unknown[] {
+	return cloneValue(values as LynxWorkletValue[], 'worklet arguments', {
+		active: new Set(),
+		clones: new Map(),
+		unwrapElementReferences: true,
+	}) as unknown as readonly unknown[];
 }
 
 export function assertLynxWorkletValue(
@@ -715,8 +752,8 @@ export function createLynxMainThreadWorkletRegistry(
 			...(captures === undefined ? null : { _c: captures as LynxWorkletRecord }),
 			_owlt: token,
 		};
-		const args = isolateLynxWorkletValue(params as LynxWorkletValue[], 'worklet arguments');
-		return definition.implementation.apply(receiver, args);
+		const args = isolateLynxWorkletArguments(params);
+		return definition.implementation.apply(receiver, args as unknown[]);
 	};
 
 	return {

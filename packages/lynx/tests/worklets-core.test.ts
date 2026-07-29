@@ -122,6 +122,46 @@ describe('Lynx main-thread worklets', () => {
 		background.close();
 	});
 
+	it('unwraps native event element references in worklet arguments', () => {
+		// The pinned Lynx event envelope marks `target`/`currentTarget` with an
+		// `{ elementRefptr }` wrapper holding a raw main-thread element. That
+		// element must reach the worklet by identity while sibling event data is
+		// still isolated by copy.
+		const nativeNode = Object.freeze({ native: 'element' });
+		const seen: unknown[] = [];
+		const descriptor = registerMainThreadWorklet(
+			'test:event-envelope',
+			undefined,
+			function (event) {
+				seen.push(event);
+				return true;
+			},
+			{ file: 'worklets.test.ts', line: 1, column: 0 },
+		);
+		const registry = createLynxMainThreadWorkletRegistry();
+		const active = registry.activate(descriptor);
+		const detail = { scrollTop: 12, scrollHeight: 340 };
+		const event = {
+			type: 'scroll',
+			detail,
+			target: { elementRefptr: nativeNode },
+			currentTarget: { elementRefptr: nativeNode },
+		};
+
+		expect(registry.runWorklet(active, [event])).toBe(true);
+		const received = seen[0] as {
+			detail: typeof detail;
+			target: unknown;
+			currentTarget: unknown;
+		};
+		expect(received.target).toBe(nativeNode);
+		expect(received.currentTarget).toBe(nativeNode);
+		expect(received.detail).toEqual(detail);
+		expect(received.detail).not.toBe(detail);
+		registry.release(active);
+		registry.close();
+	});
+
 	it('keeps ref cells live only for an explicit worklet activation', () => {
 		const ref = createLynxMainThreadRefDescriptor('test:counter');
 		const descriptor = registerMainThreadWorklet(
