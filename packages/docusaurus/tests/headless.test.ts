@@ -41,6 +41,14 @@ describe('headless Docusaurus site loading', () => {
 					component: '@site/src/pages/custom.js',
 					modules: expect.objectContaining({
 						data: expect.stringContaining('custom-page.json'),
+						nested: {
+							duplicate: expect.stringContaining('custom-page.json'),
+						},
+						queried: expect.objectContaining({
+							__import: true,
+							path: expect.stringContaining('custom-page.json?raw'),
+							query: { source: 'fixture' },
+						}),
 					}),
 				}),
 				expect.objectContaining({

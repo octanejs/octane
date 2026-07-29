@@ -3987,6 +3987,9 @@ importers:
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../mdx
+      '@octanejs/remix-router':
+        specifier: workspace:*
+        version: link:../remix-router
       github-slugger:
         specifier: 1.5.0
         version: 1.5.0

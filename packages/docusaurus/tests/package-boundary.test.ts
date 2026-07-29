@@ -16,9 +16,11 @@ describe('@octanejs/docusaurus package boundary', () => {
 		expect(manifest.exports).toEqual(
 			expect.objectContaining({
 				'.': expect.any(Object),
+				'./client': expect.any(Object),
 				'./mdx': expect.any(Object),
 				'./vite': expect.any(Object),
 			}),
 		);
+		expect(manifest.dependencies['@octanejs/remix-router']).toBe('workspace:*');
 	});
 });

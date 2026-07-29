@@ -41,17 +41,29 @@ export interface ImportedDocusaurusModule {
 
 export type DocusaurusModule = string | ImportedDocusaurusModule;
 
+export type DocusaurusRouteModule =
+	DocusaurusModule | DocusaurusRouteModules | DocusaurusRouteModule[];
+
+export interface DocusaurusRouteModules {
+	[name: string]: DocusaurusRouteModule;
+}
+
+export interface DocusaurusPluginIdentifier {
+	name: string;
+	id: string;
+}
+
 export interface DocusaurusManifestRoute {
 	id: string;
 	path: string;
 	component: DocusaurusModule;
 	exact: boolean;
 	priority?: number;
-	modules?: Record<string, DocusaurusModule | DocusaurusModule[]>;
-	context?: unknown;
-	props?: unknown;
+	modules?: DocusaurusRouteModules;
+	context?: DocusaurusRouteModules;
+	props?: Record<string, unknown>;
 	metadata?: unknown;
-	plugin?: unknown;
+	plugin?: DocusaurusPluginIdentifier;
 	attributes?: Record<string, unknown>;
 	children: DocusaurusManifestRoute[];
 }

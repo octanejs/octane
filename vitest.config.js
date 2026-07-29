@@ -2384,6 +2384,7 @@ export default defineConfig({
 				},
 			},
 			{
+				plugins: [octane()],
 				test: {
 					name: 'docusaurus',
 					include: ['packages/docusaurus/tests/**/*.test.ts'],
@@ -2395,6 +2396,10 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/mdx\/compile$/,
 							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
+						},
+						{
+							find: /^@octanejs\/remix-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src/index.ts'),
 						},
 					],
 				},

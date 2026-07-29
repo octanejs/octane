@@ -16,7 +16,15 @@ function fixtureContentPlugin(context) {
 				path: '/custom',
 				component: '@site/src/pages/custom.js',
 				exact: true,
-				modules: { data },
+				modules: {
+					data,
+					nested: { duplicate: data },
+					queried: {
+						__import: true,
+						path: `${data}?raw`,
+						query: { source: 'fixture' },
+					},
+				},
 			});
 		},
 		getPathsToWatch() {
