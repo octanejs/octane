@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { clampJsdomScrollTop } from 'octane/testing';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
 import { SelectApp, ItemAlignedSelectApp } from './_fixtures/select.tsx';
@@ -257,7 +258,13 @@ describe('@octanejs/radix — Select', () => {
 		expect(wrapper.style.position).toBe('fixed');
 		// Zero-size math ran without throwing and placed the content → selection focused.
 		expect(document.activeElement).toBe(inBody('[data-testid="item-b"]'));
-		// Scroll buttons stay unmounted (nothing to scroll in jsdom's zero layout).
+		// jsdom 30 retains the positive scrollTop written by item alignment even
+		// though its zero layout reports no scroll range. Browsers clamp that value
+		// to zero, so normalize the viewport through its native scroll boundary.
+		const viewport = inBody('[data-testid="viewport"]')!;
+		clampJsdomScrollTop(viewport);
+		await settle();
+		// With no overflow and the viewport at the top, neither control is needed.
 		expect(inBody('[data-testid="scroll-up"]')).toBe(null);
 		expect(inBody('[data-testid="scroll-down"]')).toBe(null);
 

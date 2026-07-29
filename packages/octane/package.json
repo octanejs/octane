@@ -35,6 +35,7 @@
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./static": "./src/static/index.ts",
+    "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
@@ -91,6 +92,10 @@
       "./static": {
         "types": "./dist/static/index.d.ts",
         "default": "./dist/static/index.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
       },
       "./constants": {
         "types": "./dist/constants.d.ts",
