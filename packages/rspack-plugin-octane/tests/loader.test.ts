@@ -250,6 +250,15 @@ describe('octane Rspack loader', () => {
 		);
 	});
 
+	it.each([true, false])('forwards strong: %s to the neutral compiler', (strong) => {
+		mocks.transform.mockReturnValue(null);
+		runLoader({ options: { strong } });
+
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({ root: '/project', strong }),
+		);
+	});
+
 	it('resolves a loader-only relative root from Rspack rootContext', () => {
 		mocks.transform.mockReturnValue(null);
 		runLoader({ options: { root: 'apps/site' } });

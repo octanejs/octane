@@ -95,6 +95,20 @@ extra render to correct the old value. The calculation can also read the previou
 `{ source, value }`, which is useful when a selection should survive if it is still
 valid.
 
+<h2 id="strong-mode">Strong mode is optional</h2>
+
+Strong mode helps catch state and ref patterns that React applications sometimes
+use as workarounds. Enable it for a single module with `"use strong"` before its
+imports, or across your application with `compiler: { strong: true }` in
+`octane.config.ts`.
+
+The compiler rejects state updates during render, state updates made directly
+while an effect is being set up, and writes to `ref.current` during render. Use
+`useLinkedState` when editable state should follow a changing prop. Event
+handlers, effects that synchronize external systems, and normal DOM or timer
+refs remain supported. Installed dependencies keep their existing behavior
+unless they opt in themselves.
+
 <h2 id="events-and-dom">Events come from the browser</h2>
 
 Handlers receive the browser's real `Event` object, not a synthetic wrapper. Bubbling,

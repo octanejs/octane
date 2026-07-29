@@ -1,7 +1,10 @@
 import { parseModule } from '@tsrx/core';
 import { describe, expect, it } from 'vitest';
+import { act, flushSync, hydrateRoot } from '../src/index.js';
+import { renderToString } from 'octane/server';
 import { createOctaneCompiler } from '../src/compiler/bundler.js';
 import { compile } from '../src/compiler/compile.js';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { decodeMappings } from './_source-map.js';
 
 const ROOT = '/project';
@@ -157,6 +160,110 @@ function mappedOriginalPosition(code: string, map: any, needle: string) {
 }
 
 describe('Hydrate compiler splitting', () => {
+	it('hydrates a Strong-mode linked-state component and remains interactive across Suspense', async () => {
+		const source = `'use strong';
+import { Suspense, use, useLinkedState } from 'octane';
+function Draft(props) @{
+  const [value, setValue] = useLinkedState(props.source, (next) => 'draft:' + next);
+  if (props.resource !== null) use(props.resource);
+  <button id="strong-draft" onClick={() => setValue(value + '!')}>{value as string}</button>
+}
+export function App(props) @{
+  <Suspense fallback={<p id="strong-pending">loading</p>}>
+    <Draft source={props.source} resource={props.resource} />
+  </Suspense>
+}
+`;
+		const id = '/src/StrongSuspense.tsrx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { strong: true },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { strong: true },
+		});
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(server.App, { source: 'first', resource: null }).html;
+		const serverButton = container.querySelector('#strong-draft') as HTMLButtonElement;
+		const root = hydrateRoot(container, client.App, { source: 'first', resource: null });
+
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#strong-draft')).toBe(serverButton);
+			expect(serverButton.textContent).toBe('draft:first');
+
+			flushSync(() => serverButton.click());
+			expect(serverButton.textContent).toBe('draft:first!');
+			flushSync(() => root.render(client.App, { source: 'second', resource: null }));
+			expect(container.querySelector('#strong-draft')).toBe(serverButton);
+			expect(serverButton.textContent).toBe('draft:second');
+
+			let resolve!: () => void;
+			const resource = new Promise<void>((complete) => (resolve = complete));
+			flushSync(() => root.render(client.App, { source: 'third', resource }));
+			expect(container.querySelector('#strong-pending')?.textContent).toBe('loading');
+			await act(() => resolve());
+			expect(container.querySelector('#strong-draft')?.textContent).toBe('draft:third');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps Strong-mode state migration valid across Suspense, server rendering, and hydrate chunks', () => {
+		const source = `'use strong';
+import { Hydrate, Suspense, useLinkedState } from 'octane';
+export function App(props) @{
+  const [value, setValue] = useLinkedState(props.value);
+  <Suspense fallback={<p>loading</p>}>
+    <Hydrate when={props.ready}>
+      <button onClick={() => setValue('updated')}>{value as string}</button>
+    </Hydrate>
+  </Suspense>
+}
+`;
+		const instance = createOctaneCompiler({ root: ROOT, hmr: false, dev: false, strong: true });
+		const client = instance.transform(source, FILE, { environment: 'client' })!;
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		const server = instance.transform(source, FILE, { environment: 'server' })!;
+
+		expect(dynamicImports(client.code)).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+		expect(child.code).toContain('updated');
+		expect(server.code).toContain('<button>');
+		expect(server.code).not.toContain('updated');
+		expect(client.map.sourcesContent).toEqual([source]);
+		expect(child.map.sourcesContent).toEqual([source]);
+		expect(server.map.sourcesContent).toEqual([source]);
+	});
+
+	it('rejects render-phase updates consistently for server rendering and hydrate chunks', () => {
+		const source = `'use strong';
+import { Hydrate, Suspense, useState } from 'octane';
+export function App(props) @{
+  const [value, setValue] = useState(props.value);
+  if (value !== props.value) setValue(props.value);
+  <Suspense fallback={<p>loading</p>}>
+    <Hydrate when={props.ready}><p>{value as string}</p></Hydrate>
+  </Suspense>
+}
+`;
+		const instance = compiler();
+
+		for (const [id, environment] of [
+			[FILE, 'client'],
+			[`${FILE}?octane-hydrate=0`, 'client'],
+			[FILE, 'server'],
+		] as const) {
+			expect(() => instance.transform(source, id, { environment })).toThrow(
+				/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+			);
+		}
+	});
+
 	it('extracts aliased direct children, closes over local values, and leaves server children inline', () => {
 		const source = `
 import { Hydrate as Deferred } from 'octane';

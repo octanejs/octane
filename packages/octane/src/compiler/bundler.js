@@ -31,6 +31,7 @@ import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
+import { assertStrongMode } from './strong-mode.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -306,6 +307,9 @@ export function findVoidComponentExports(source, id) {
 
 class OctaneBundlerCompiler {
 	constructor(options) {
+		if (options.strong !== undefined && typeof options.strong !== 'boolean') {
+			throw new TypeError('Octane compiler `strong` must be a boolean when provided.');
+		}
 		this.root = nodePath.resolve(options.root ?? process.cwd());
 		try {
 			this.realRoot = nodeFs.realpathSync(this.root);
@@ -318,6 +322,7 @@ class OctaneBundlerCompiler {
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
 			profile: options.profile === true,
+			strong: options.strong === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -447,6 +452,22 @@ class OctaneBundlerCompiler {
 			: nodePath.resolve(this.root, file);
 		if (/(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile)) return false;
 		return isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile);
+	}
+
+	_hasApplicationStrongPolicy(file, collected) {
+		if (!this._isProjectOwnedSource(file)) return false;
+		const absoluteFile = nodePath.isAbsolute(file)
+			? nodePath.resolve(file)
+			: nodePath.resolve(this.root, file);
+		const application = this._nearestOctanePackageRule(this.root);
+		const source = this._nearestOctanePackageRule(nodePath.dirname(absoluteFile));
+		addMetadata(collected, application);
+		addMetadata(collected, source);
+		return (
+			application.rule === null ||
+			source.rule === null ||
+			application.rule.root === source.rule.root
+		);
 	}
 
 	_isInstalledOctaneSource(file, collected) {
@@ -816,6 +837,13 @@ class OctaneBundlerCompiler {
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
+		// An application's global policy never leaks into installed or linked
+		// compatibility packages, including workspace packages nested inside the
+		// project root. Modules may still opt themselves in with their own
+		// directive, which the authored-source compiler resolves separately.
+		const strong =
+			(options.strong ?? this.defaults.strong) === true &&
+			this._hasApplicationStrongPolicy(file, collected);
 		const universalRuntime = normalizeUniversalRuntime(
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);
@@ -892,6 +920,7 @@ class OctaneBundlerCompiler {
 				dev,
 				profile,
 				profileFilename,
+				...(strong ? { strong: true } : null),
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
@@ -971,6 +1000,14 @@ class OctaneBundlerCompiler {
 				return this._passThrough(code, collected);
 			}
 			if (this._hasManualHookSlots(file, collected)) {
+				// Hand-slotted bindings still own their authored policy. Opting one
+				// module in must not require changing its established slot ABI.
+				if (strong || code.includes('use strong')) {
+					const authoredSource = code;
+					assertStrongMode(parseModule(authoredSource, filename), authoredSource, filename, {
+						strong,
+					});
+				}
 				return this._passThrough(code, collected);
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
@@ -981,6 +1018,7 @@ class OctaneBundlerCompiler {
 				hmr: !!hmr,
 				profile,
 				profileFilename,
+				...(strong ? { strong: true } : null),
 				...(specializeVoidRoot
 					? {
 							isVoidComponentImport: options.isVoidComponentImport,

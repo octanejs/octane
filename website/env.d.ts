@@ -29,6 +29,7 @@ declare module 'octane/compiler' {
 			mode?: 'client' | 'server';
 			hmr?: boolean;
 			dev?: boolean;
+			strong?: boolean;
 			inspect?: boolean;
 		},
 	): {
@@ -104,6 +105,7 @@ declare module 'octane/compiler/volar' {
 		options?: {
 			loose?: boolean;
 			renderers?: unknown;
+			strong?: boolean;
 		},
 	): {
 		code: string;
