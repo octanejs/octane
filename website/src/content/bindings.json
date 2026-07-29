@@ -28,11 +28,12 @@
   },
   {
     "title": "UI and interaction",
-    "description": "Primitives, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
+    "description": "Primitives, browser hooks, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
     "packages": [
       "@octanejs/radix",
       "@octanejs/base-ui",
       "@octanejs/aria",
+      "@octanejs/mantine-hooks",
       "@octanejs/floating-ui",
       "@octanejs/motion",
       "@octanejs/dnd-kit",
