@@ -4,7 +4,8 @@ import { DocusaurusRouterProvider } from './client-components.tsrx';
 import { createDocusaurusRoutes } from './routes.js';
 
 function toRequest(value) {
-	return value instanceof Request ? value : new Request(value);
+	if (value instanceof Request) return value;
+	return new Request(new URL(value, 'http://localhost'));
 }
 
 export function createDocusaurusStaticHandler(manifest, registry, options) {

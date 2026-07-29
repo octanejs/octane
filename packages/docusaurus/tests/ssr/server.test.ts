@@ -6,10 +6,10 @@ import {
 } from '../_fixtures/docusaurus-app.js';
 
 describe('Docusaurus static rendering', () => {
-	it('prerenders the matched nested route without loading sibling content', async () => {
+	it('prerenders a manifest route pathname without loading sibling content', async () => {
 		const loads: string[] = [];
 		const result = await prerenderDocusaurusRoute(
-			'https://example.com/docs/guide/intro',
+			'/docs/guide/intro',
 			createDocusaurusTestManifest(),
 			createDocusaurusTestRegistry(loads),
 		);
@@ -18,6 +18,7 @@ describe('Docusaurus static rendering', () => {
 		if (result instanceof Response) throw new Error('Unexpected redirect response.');
 
 		expect(result.context.statusCode).toBe(200);
+		expect(result.context.location.pathname).toBe('/docs/guide/intro');
 		expect(result.html).toContain('<section data-plugin="docs">');
 		expect(result.html).toContain('<article data-context="guides:doc"');
 		expect(result.html).toContain('<h1>Introduction</h1>');
