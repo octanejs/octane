@@ -1065,7 +1065,13 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	it.concurrent(
 		'resets a new documentation page to the top without animating from the old section',
 		async () => {
-			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools');
+			const { page, errors } = await loadRoute(
+				`http://localhost:${DEV_PORT}`,
+				'/docs/build-tools',
+				{
+					waitForNetworkIdle: true,
+				},
+			);
 			try {
 				await page.click('.on-this-page a[href="#renderer-targets"]');
 				await page.waitForFunction(
