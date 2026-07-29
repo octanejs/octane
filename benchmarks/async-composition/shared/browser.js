@@ -4,7 +4,14 @@ const TIMEOUT = 10_000;
 
 function readSignature(target) {
 	return [...target.querySelectorAll('[data-resource]')]
-		.map((element) => `${element.getAttribute('data-resource')}=${element.textContent}`)
+		.map(
+			(element) =>
+				`${element.getAttribute('data-resource')}=${
+					// The board's controlled input carries its state in `value`; text
+					// elements carry it in their content.
+					element.localName === 'input' ? element.value : element.textContent
+				}`,
+		)
 		.join('|');
 }
 
