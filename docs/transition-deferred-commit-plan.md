@@ -105,6 +105,60 @@ no flush in flight (the `useSuspenseQuery` urgent re-suspend shape).
 - `UrgentSupersedesTransition`, the async-Action suite, and
   `transition-held-audit.test.ts` unchanged.
 
+## P1 implementation findings (2026-07-30 attempt — reverted, unlanded)
+
+A full P1 implementation was built and reverted twice. Everything below is
+verified against real code and stays true for the next attempt.
+
+**What worked unconditionally** (both designs, all green): the whole-drain
+attempt with queue checkpoints, cell revert + urgent cue re-render (the
+`isPending` storage survives and only cue bindings write — the plan's core
+mechanism is sound), the release-gate on the boundary's in-place success
+(`heldSyncCellsIntact` — without it the cue re-render's old-content success
+releases the hold and kills the transition), and hold re-entry across rounds.
+The shell test held, effects did not leak, the flip-away case improved from a
+tear to a whole held screen.
+
+**Design A — resume replaced by promotion** (cells written forward at the
+staged-reveal barrier, ordinary transition drain re-renders): reached 132
+targeted tests green, full 16,314-suite green, zero mixed states, but the
+promoted drain re-created every warm-walk fetch each round —
+`update_calls` 17 vs the pinned 8 — because warm caches are EPISODE-scoped and
+a fresh drain cannot adopt them. Episode-resume attempts (RESUME_REPLAY wrap,
+one-shot flag, hold-time capture) each failed differently: the cue re-render
+both mints a new episode and re-registers warm plans over old props, so any
+whole-flush replay flag poisons later rounds (observed: v0 requests fired
+mid-v1 operation). Promotion needs `puSwaps` (hook-entry undo/redo — built,
+works, covers `useMemo`/`puPub`/`puAdopt`; prod inline bag caches are covered
+by the bag journal + a redo pass that was also built) and something
+episode-agnostic for warm-created values.
+
+**Design B — ride the existing resume replay** (forward-apply cells at the
+barrier, let `commitResumeInner` replay): the replay renders through the
+compiled env tuples the CUE re-render captured with old values, so standalone
+`startTransition` fixtures commit stale content — `useTransition` fixtures are
+rescued only by their listener re-render. The fix is an origin re-render after
+the last holder reveals (inline, before `commitEffects`), plus a warm HARVEST
+carried on the hold (episode-agnostic adoption; built as an `adoptWarmValue`
+fallback with per-round `taken` reset). This design ended at 11 failing tests
+with effect-ordering signatures that did not respond to refresh placement —
+the attempt-side hold path itself had regressed (attempt-render logs missing
+from the flip test), root cause not yet identified. Reverted rather than
+converged blind.
+
+**Hard-won specifics for the next session**: the flushed batch must be
+retained per-group for the drain (`flushTransitionActionBatch` clears it);
+promotion/forward-apply must re-retain what it applies or round 2 cannot
+revert; `swapToPendingFallback` must bring cells forward when the timeout
+fires; urgent supersede stays DISCARD for sync (gate on
+`Object.is(slot.value, baseValue)`); the per-boundary journal must NOT get pu
+journaling (per-boundary replay behavior is pinned — attempt-scoped only); and
+the ORIGIN's `__warmEpisode` is clobbered by the cue re-render, so any episode
+capture must happen inside the suspending render (`handleSuspense`), not at
+attempt end. A pre-existing sole-child hole array→text→array crash blocks the
+cue re-render's kind round-trips and is spun out separately with a ready
+failing test.
+
 ## Phases
 
 - **P0 (this PR)**: plan + correct the divergence audit's "decouple the cue"
