@@ -67,3 +67,20 @@ export function ResetErrorHost(props) @{
 		<ResetThrower state={props.state} />
 	</ErrorBoundary>
 }
+
+export function RetainedResetErrorHost(props) @{
+	<ErrorBoundary
+		resetRef={props.resetRef}
+		fallback={(error) => <span id="retained-reset-error">{'caught:' + String(error)}</span>}
+	>
+		<ResetThrower state={props.state} />
+	</ErrorBoundary>
+}
+
+export function RetainedResetSuspenseHost(props) @{
+	<ErrorBoundary resetRef={props.resetRef} fallback="error">
+		<Suspense fallback={<span id="retained-pending">pending</span>}>
+			<Suspender promise={props.promise} />
+		</Suspense>
+	</ErrorBoundary>
+}

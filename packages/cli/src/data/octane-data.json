@@ -188,6 +188,20 @@
       "verified": "2026-07-13"
     },
     {
+      "name": "@octanejs/mantine-hooks",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": { "package": "@mantine/hooks", "version": "9.5.0" },
+      "surface": "Complete @mantine/hooks 9.5.0 runtime export surface: state, timing, storage, viewport, input, focus, pointer, observer, hotkey, scrolling, collapse, drag, splitter, mask, and utility hooks.",
+      "divergences": [
+        "Hooks use Octane's compiler-injected hook slots and runtime lifecycle instead of React's dispatcher.",
+        "DOM subscriptions receive native browser events.",
+        "React is retained only as a source-compatibility type vocabulary for refs, events, actions, and CSS properties; it is not loaded at runtime."
+      ],
+      "ssr": "Dedicated Node-mode coverage verifies deterministic state-hook output and guarded media-query initial values without a browser. DOM-only effects remain inert during server rendering.",
+      "verified": "2026-07-28"
+    },
+    {
       "name": "@octanejs/mdx",
       "version": "0.1.16",
       "category": "Forms and content",
@@ -641,6 +655,7 @@
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@floating-ui/react": "@octanejs/floating-ui",
     "@lexical/react": "@octanejs/lexical",
+    "@mantine/hooks": "@octanejs/mantine-hooks",
     "@mdx-js/react": "@octanejs/mdx",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",

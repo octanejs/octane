@@ -297,6 +297,11 @@ export type { DragAndDropHooks, DragAndDropOptions } from './useDragAndDrop';
 // re-exports from the hooks surface, as upstream's index does
 export { VisuallyHidden } from '../visually-hidden/VisuallyHidden';
 export type { VisuallyHiddenProps } from '../visually-hidden/VisuallyHidden';
+// Upstream RAC's Focusable.d.ts is literally `export { Focusable } from
+// 'react-aria/Focusable'` — the same component the hooks surface already
+// exports, published under both entry points.
+export { Focusable } from '../interactions/useFocusable';
+export type { FocusableProps } from '../interactions/useFocusable';
 export type { Placement } from '../overlays/useOverlayPosition';
 export { useFilter } from '../i18n/useFilter';
 export type { Filter } from '../i18n/useFilter';

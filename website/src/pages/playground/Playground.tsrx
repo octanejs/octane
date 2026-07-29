@@ -588,20 +588,20 @@ export function Playground() @{
 				if (resultModeRef.current.compiledMode === 'ast') {
 					const { entry, error } = astEntry(currentFile);
 					if (entry && entry.ast !== lastShownAst?.ast) {
+						clearMappedPair();
 						astPreview.setAst(entry.ast, currentFile, {
 							label: entry.label,
 							notice: entry.notice,
 						});
 						lastShownAst = entry;
 					} else if (!entry) {
+						clearMappedPair();
 						const message = pgModules.isReactHostFile(currentFile)
 							? 'AST trace covers Octane-owned .tsrx and .tsx files. React-host files use the separate Sucrase pipeline.'
 							: 'AST generation failed. Fix the source to generate a new tree.';
 						astPreview.setUnavailable(message, currentFile);
 						lastShownAst = null;
 					}
-					clearMappedPair();
-					astPreview.clear();
 					// Preserve a graph-level error when per-file inspection succeeds.
 					setError(error || lastGraphError);
 					return error;

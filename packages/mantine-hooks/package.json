@@ -1,0 +1,45 @@
+{
+  "name": "@octanejs/mantine-hooks",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Mantine hooks for Octane, ported from @mantine/hooks with Octane-native lifecycle and state hooks.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/mantine-hooks"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project mantine-hooks --project mantine-hooks-ssr"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@mantine/hooks": "9.5.0",
+    "@types/react": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

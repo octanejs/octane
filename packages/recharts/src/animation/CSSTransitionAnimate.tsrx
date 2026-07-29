@@ -1,0 +1,142 @@
+import * as React from 'octane';
+import { CSSProperties, useCallback, useEffect, useRef, useState, type OctaneNode } from 'octane';
+import { noop } from '../util/DataUtils';
+import { resolveDefaultProps } from '../util/resolveDefaultProps';
+import { useAnimationController } from './useAnimationController';
+import { getTransitionVal } from './util';
+import { Global } from '../util/Global';
+import { usePrefersReducedMotion } from '../util/usePrefersReducedMotion';
+import { CSSTransitionAnimation } from './AnimationHandle';
+import { RequestAnimationFrameTimeoutController } from './timeoutController';
+import { EasingInput, NamedBezier } from './easing';
+import type { AnimationController } from './AnimationController';
+
+type CSSTransitionAnimateProps = {
+	animationId: string;
+	animationController?: AnimationController;
+	duration?: number;
+	begin?: number;
+	easing?: NamedBezier;
+	isActive?: boolean | 'auto';
+	canBegin?: boolean;
+	from: string;
+	to: string;
+	attributeName: string;
+	onAnimationStart?: () => void;
+	onAnimationEnd?: () => void;
+	children: (style: CSSProperties) => OctaneNode;
+};
+
+const defaultProps = {
+	begin: 0,
+	duration: 1000,
+	easing: 'ease',
+	isActive: true,
+	canBegin: true,
+	onAnimationEnd: () => {},
+	onAnimationStart: () => {},
+} as const satisfies Partial<CSSTransitionAnimateProps>;
+
+export function extractCssEasing(easingInput: EasingInput): NamedBezier | undefined {
+	if (easingInput === 'spring' || typeof easingInput !== 'string') {
+		return undefined;
+	}
+	return easingInput;
+}
+
+export function CSSTransitionAnimate(outsideProps: CSSTransitionAnimateProps) {
+	const props = resolveDefaultProps(outsideProps, defaultProps);
+	const {
+		animationId,
+		from,
+		to,
+		attributeName,
+		isActive: isActiveProp,
+		canBegin,
+		duration,
+		easing,
+		begin,
+		onAnimationEnd,
+		onAnimationStart: onAnimationStartFromProps,
+		children,
+	} = props;
+
+	const prefersReducedMotion = usePrefersReducedMotion();
+
+	const isActive =
+		isActiveProp === 'auto' ? !Global.isSsr && !prefersReducedMotion : isActiveProp;
+
+	const animationController = useAnimationController(props.animationController);
+	const [style, setStyle] = useState<string | number>(() => {
+		if (!isActive) {
+			return to;
+		}
+		return from;
+	});
+	const initialized = useRef(false);
+
+	const onAnimationStart = useCallback(() => {
+		setStyle(from);
+		onAnimationStartFromProps();
+	}, [from, onAnimationStartFromProps]);
+
+	useEffect(() => {
+		if (!isActive || !canBegin) {
+			return noop;
+		}
+
+		initialized.current = true;
+
+		const timeoutController = new RequestAnimationFrameTimeoutController();
+
+		const animation = new CSSTransitionAnimation({
+			animationId: animationId + attributeName,
+			easing,
+			animationDuration: duration,
+			animationBegin: begin,
+			onAnimationStart,
+			onAnimationEnd,
+			from,
+			to,
+		});
+
+		return animationController(timeoutController, animation, setStyle);
+	}, [
+		isActive,
+		canBegin,
+		duration,
+		easing,
+		begin,
+		onAnimationStart,
+		onAnimationEnd,
+		animationController,
+		to,
+		from,
+		animationId,
+		attributeName,
+	]);
+
+	if (!isActive) {
+		initialized.current = false;
+		return children({
+			[attributeName]: to,
+		});
+	}
+	if (!canBegin) {
+		initialized.current = false;
+		return children({
+			[attributeName]: from,
+		});
+	}
+
+	if (initialized.current) {
+		const transition = getTransitionVal([attributeName], duration, easing);
+		return children({
+			transition,
+			[attributeName]: style,
+		});
+	}
+	return children({
+		[attributeName]: from,
+	});
+}

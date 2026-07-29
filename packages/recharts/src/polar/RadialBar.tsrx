@@ -1,0 +1,887 @@
+import * as React from 'octane';
+import { MutableRefObject, ReactElement, ReactNode, useRef } from 'octane';
+import { clsx } from 'clsx';
+
+import { Series } from 'victory-vendor/d3-shape';
+import {
+	defaultRadialBarShape,
+	parseCornerRadius,
+	RadialBarSector,
+	RadialBarSectorProps,
+} from '../util/RadialBarUtils';
+import { Props as SectorProps } from '../shape/Sector';
+import { Layer } from '../container/Layer';
+import {
+	ImplicitLabelListType,
+	LabelListFromLabelProp,
+	PolarLabelListContextProvider,
+	PolarLabelListEntry,
+} from '../component/LabelList';
+import { interpolate, mathSign, noop } from '../util/DataUtils';
+import {
+	BarPositionPosition,
+	getCateCoordinateOfBar,
+	getNormalizedStackId,
+	getTooltipNameProp,
+	getValueByDataKey,
+	truncateByDomain,
+} from '../util/ChartUtils';
+import {
+	ActiveShape,
+	adaptEventsOfChild,
+	AnimationDuration,
+	EasingInput,
+	DataConsumer,
+	DataKey,
+	LayoutType,
+	LegendType,
+	PolarViewBoxRequired,
+	PresentationAttributesAdaptChildEvent,
+	ShapeAnimationProps,
+	TickItem,
+	TooltipType,
+	PolarLayout,
+} from '../util/types';
+import {
+	TooltipTriggerInfo,
+	useMouseClickItemDispatch,
+	useMouseEnterItemDispatch,
+	useMouseLeaveItemDispatch,
+} from '../context/tooltipContext';
+import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
+import { Formatter } from '../component/DefaultTooltipContent';
+import { BaseAxisWithScale } from '../state/selectors/axisSelectors';
+import { ChartData } from '../state/chartDataSlice';
+import {
+	selectRadialBarLegendPayload,
+	selectRadialBarSectors,
+} from '../state/selectors/radialBarSelectors';
+import { useAppSelector } from '../state/hooks';
+import { selectActiveTooltipIndex } from '../state/selectors/tooltipSelectors';
+import { SetPolarLegendPayload } from '../state/SetLegendPayload';
+import {
+	AnimatedItems,
+	AnimationInterpolateFn,
+	useAnimationCallbacks,
+} from '../animation/AnimatedItems';
+import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
+import { AxisId } from '../state/cartesianAxisSlice';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import type { RadialBarSettings } from '../state/types/RadialBarSettings';
+import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
+import {
+	svgPropertiesNoEvents,
+	svgPropertiesNoEventsFromUnknown,
+} from '../util/svgPropertiesNoEvents';
+import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
+import { WithIdRequired } from '../util/useUniqueId';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
+import { getZIndexFromUnknown } from '../zIndex/getZIndexFromUnknown';
+import { usePolarChartLayout } from '../context/chartLayoutContext';
+import { CellsContext, useCellRegistry } from '../context/CellsContext';
+
+const STABLE_EMPTY_ARRAY: readonly RadialBarDataItem[] = [];
+
+export type RadialBarDataItem =
+	SectorProps & PolarViewBoxRequired & TooltipTriggerInfo & {
+		value?: any;
+		payload?: any;
+		background?: SectorProps;
+	};
+
+type RadialBarBackground = boolean | (ActiveShape<SectorProps> & ZIndexable);
+
+type RadialBarSectorsProps =
+	ShapeAnimationProps & {
+		sectors: ReadonlyArray<RadialBarDataItem>;
+		allOtherRadialBarProps: InternalProps;
+		showLabels: boolean;
+	};
+
+function RadialBarLabelListProvider({
+	showLabels,
+	sectors,
+	children,
+}: {
+	showLabels: boolean;
+	sectors: ReadonlyArray<RadialBarDataItem>;
+	children: ReactNode;
+}) {
+	const labelListEntries: ReadonlyArray<PolarLabelListEntry> = sectors.map(
+		(sector: RadialBarDataItem): PolarLabelListEntry => ({
+			value: sector.value,
+			payload: sector.payload,
+			parentViewBox: undefined,
+			clockWise: false,
+			viewBox: {
+				cx: sector.cx,
+				cy: sector.cy,
+				innerRadius: sector.innerRadius,
+				outerRadius: sector.outerRadius,
+				startAngle: sector.startAngle,
+				endAngle: sector.endAngle,
+				clockWise: false,
+			},
+			fill: sector.fill,
+		}),
+	);
+
+	return <PolarLabelListContextProvider
+		value={showLabels ? labelListEntries : undefined}
+	>{children}</PolarLabelListContextProvider>;
+}
+
+function RadialBarSectors({
+	sectors,
+	allOtherRadialBarProps,
+	showLabels,
+	animationElapsedTime,
+	isAnimating,
+	isEntrance,
+}: RadialBarSectorsProps) {
+	const { shape, activeShape, cornerRadius, id, ...others } = allOtherRadialBarProps;
+	const baseProps = svgPropertiesNoEvents(others);
+
+	const activeIndex = useAppSelector(selectActiveTooltipIndex);
+	const {
+		onMouseEnter: onMouseEnterFromProps,
+		onClick: onItemClickFromProps,
+		onMouseLeave: onMouseLeaveFromProps,
+		...restOfAllOtherProps
+	} = allOtherRadialBarProps;
+
+	const onMouseEnterFromContext = useMouseEnterItemDispatch(
+		onMouseEnterFromProps,
+		allOtherRadialBarProps.dataKey,
+		id,
+	);
+	const onMouseLeaveFromContext = useMouseLeaveItemDispatch(onMouseLeaveFromProps);
+	const onClickFromContext = useMouseClickItemDispatch(
+		onItemClickFromProps,
+		allOtherRadialBarProps.dataKey,
+		id,
+	);
+
+	if (sectors == null) {
+		return null;
+	}
+
+	return <RadialBarLabelListProvider showLabels={showLabels} sectors={sectors}>
+		{sectors.map((entry: RadialBarDataItem, i: number) => {
+			const isActive: boolean = Boolean(activeShape && activeIndex === String(i));
+			const onMouseEnter = onMouseEnterFromContext(entry, i);
+			const onMouseLeave = onMouseLeaveFromContext(entry, i);
+			const onClick = onClickFromContext(entry, i);
+
+			const radialBarSectorProps: React.ComponentProps<typeof RadialBarSector> = {
+				...baseProps,
+				cornerRadius: parseCornerRadius(cornerRadius),
+				...entry,
+				...adaptEventsOfChild(restOfAllOtherProps, entry, i),
+				onMouseEnter,
+				onMouseLeave,
+				onClick,
+				className: `recharts-radial-bar-sector ${entry.className}`,
+				forceCornerRadius: others.forceCornerRadius,
+				cornerIsExternal: others.cornerIsExternal,
+				animationElapsedTime,
+				isAnimating,
+				isEntrance,
+				isActive,
+				option: isActive && activeShape != null ? activeShape : shape,
+				index: i,
+			};
+
+			if (isActive) {
+				return <ZIndexLayer
+					zIndex={DefaultZIndexes.activeBar}
+					key={`sector-${entry.cx}-${entry.cy}-${entry.innerRadius}-${entry.outerRadius}-${entry.startAngle}-${entry.endAngle}-${i}`}
+				>
+					<RadialBarSector {...radialBarSectorProps} />
+				</ZIndexLayer>;
+			}
+
+			return <RadialBarSector
+				key={`sector-${entry.cx}-${entry.cy}-${entry.innerRadius}-${entry.outerRadius}-${entry.startAngle}-${entry.endAngle}-${i}`}
+				{...radialBarSectorProps}
+			/>;
+		})}
+		<LabelListFromLabelProp label={allOtherRadialBarProps.label} />
+		{allOtherRadialBarProps.children}
+	</RadialBarLabelListProvider>;
+}
+
+const defaultRadialBarAnimateItems: AnimationInterpolateFn<RadialBarDataItem, PolarLayout> = (
+	items,
+	animationElapsedTime,
+) => {
+	if (items == null) return [];
+	if (animationElapsedTime === 1) {
+		return items.flatMap((item) => (item.status === 'removed' ? [] : [item.next]));
+	}
+	return items.flatMap((item) => {
+		if (item.status === 'removed') return [];
+		if (item.status === 'matched') {
+			return [
+				{
+					...item.next,
+					startAngle: interpolate(item.prev.startAngle, item.next.startAngle, animationElapsedTime),
+					endAngle: interpolate(item.prev.endAngle, item.next.endAngle, animationElapsedTime),
+				},
+			];
+		}
+		// added
+		return [
+			{
+				...item.next,
+				endAngle: interpolate(item.next.startAngle, item.next.endAngle, animationElapsedTime),
+			},
+		];
+	});
+};
+
+function SectorsWithAnimation({
+	props,
+	previousSectorsRef,
+}: {
+	props: InternalProps;
+	previousSectorsRef: MutableRefObject<ReadonlyArray<RadialBarDataItem> | null>;
+}) {
+	const {
+		sectors,
+		isAnimationActive,
+		animationBegin,
+		animationDuration,
+		animationEasing,
+		onAnimationStart,
+		onAnimationEnd,
+	} = props;
+	const animationInput = JSON.stringify(
+		sectors.map(
+			({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }) => [
+				cx,
+				cy,
+				innerRadius,
+				outerRadius,
+				startAngle,
+				endAngle,
+			],
+		),
+	);
+
+	const { isAnimating, handleAnimationStart, handleAnimationEnd } = useAnimationCallbacks(
+		onAnimationStart,
+		onAnimationEnd,
+	);
+
+	const layout = usePolarChartLayout();
+
+	if (layout == null) return null;
+
+	return <AnimatedItems
+		animationInput={animationInput}
+		animationIdPrefix="recharts-radialbar-"
+		items={sectors}
+		previousItemsRef={previousSectorsRef}
+		isAnimationActive={isAnimationActive}
+		animationBegin={animationBegin}
+		animationDuration={animationDuration}
+		animationEasing={animationEasing}
+		onAnimationStart={handleAnimationStart}
+		onAnimationEnd={handleAnimationEnd}
+		animationInterpolateFn={props.animationInterpolateFn}
+		animationMatchBy={props.animationMatchBy}
+		layout={layout}
+	>
+		{(stepData, animationElapsedTime, isEntrance) =>
+			<RadialBarSectors
+				sectors={stepData}
+				allOtherRadialBarProps={props}
+				showLabels={!isAnimating}
+				animationElapsedTime={animationElapsedTime}
+				isAnimating={isAnimating || animationElapsedTime < 1}
+				isEntrance={isEntrance}
+			/>}
+	</AnimatedItems>;
+}
+
+function RenderSectors(props: InternalProps) {
+	const previousSectorsRef = useRef<ReadonlyArray<RadialBarDataItem> | null>(null);
+
+	return <SectorsWithAnimation props={props} previousSectorsRef={previousSectorsRef} />;
+}
+
+interface InternalRadialBarProps<DataPointType = any, DataValueType = any> extends DataConsumer<
+	DataPointType,
+	DataValueType
+>, ZIndexable {
+	activeShape?: ActiveShape<RadialBarSectorProps, SVGPathElement>;
+	/**
+ * @defaultValue 0
+ */
+	angleAxisId?: AxisId;
+	/**
+ * Specifies when the animation should begin, the unit of this option is ms.
+ * @defaultValue 0
+ */
+	animationBegin?: number;
+	/**
+ * Specifies the duration of animation, the unit of this option is ms.
+ * @defaultValue 1500
+ */
+	animationDuration?: AnimationDuration;
+	/**
+ * The type of easing function.
+ * @defaultValue ease
+ */
+	animationEasing?: EasingInput;
+	/**
+ * Custom animation function for interpolating data items.
+ * When provided, this replaces the default animation interpolation.
+ *
+ * @param prevItems The items from the previous animation frame, or null on first render
+ * @param nextItems The target items to animate towards
+ * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
+ * @returns The interpolated items at time animationElapsedTime
+ *
+ * @since 3.9
+ * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
+ */
+	animationInterpolateFn?: AnimationInterpolateFn<RadialBarDataItem, PolarLayout>;
+	/**
+ * Strategy for matching previous items to next items during animation.
+ * Determines how Recharts pairs old data points with new data points
+ * to create smooth transitions.
+ *
+ * - `matchAppend` (default): match sequentially by index and treat newly appended items as new
+ * - `matchByIndex`: match by array position with proportional stretching
+ * - `matchByDataKey('someKey')`: match by a data key from the payload
+ * - Custom function `(item, index) => key`: match by the returned key
+ *
+ * @defaultValue append
+ * @see matchByIndex
+ * @see matchByDataKey
+ * @see matchAppend
+ */
+	animationMatchBy?: AnimationMatchByProp<RadialBarDataItem>;
+	/**
+ * Renders a background for each bar. Options:
+ *  - `false`: no background;
+ *  - `true`: renders default background;
+ *  - `object`: the props of background rectangle;
+ *  - `ReactElement`: a custom background element;
+ *  - `function`: a render function of custom background.
+ *
+ * @defaultValue false
+ */
+	background?: RadialBarBackground;
+	/**
+ * The width or height of each bar. If the barSize is not specified, the size of the bar will be calculated by the barCategoryGap, barGap and the quantity of bar groups.
+ */
+	barSize?: number;
+	className?: string;
+	/**
+ * @defaultValue false
+ */
+	cornerIsExternal?: boolean;
+	/**
+ * @defaultValue 0
+ */
+	cornerRadius?: string | number;
+	/**
+ * Calculated radial bar sectors
+ */
+	sectors: ReadonlyArray<RadialBarDataItem>;
+	/**
+ * @defaultValue false
+ */
+	forceCornerRadius?: boolean;
+	/**
+ * @defaultValue false
+ */
+	hide?: boolean;
+	/**
+ * If set false, animation of radial bars will be disabled.
+ * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
+ * @defaultValue auto
+ */
+	isAnimationActive?: boolean | 'auto';
+	/**
+ * Renders one label for each data point. Options:
+ * - `true`: renders default labels;
+ * - `false`: no labels are rendered;
+ * - `object`: the props of LabelList component;
+ * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
+ * - `function`: a render function of custom label.
+ *
+ * @defaultValue false
+ */
+	label?: ImplicitLabelListType;
+	/**
+ * The type of icon in legend.  If set to 'none', no legend item will be rendered.
+ * @defaultValue rect
+ */
+	legendType?: LegendType;
+	maxBarSize?: number;
+	/**
+ * @defaultValue 0
+ */
+	minPointSize?: number;
+	/**
+ * The customized event handler of animation end
+ */
+	onAnimationEnd?: () => void;
+	/**
+ * The customized event handler of animation start
+ */
+	onAnimationStart?: () => void;
+	/**
+ * The customized event handler of click in this chart.
+ */
+	onClick?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mousedown in this chart.
+ */
+	onMouseDown?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mouseup in this chart.
+ */
+	onMouseUp?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mousemove in this chart.
+ */
+	onMouseMove?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mouseover in this chart.
+ */
+	onMouseOver?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mouseout in this chart.
+ */
+	onMouseOut?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mouseenter in this chart.
+ */
+	onMouseEnter?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * The customized event handler of mouseleave in this chart.
+ */
+	onMouseLeave?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+		SVGGraphicsElement
+	>) => void;
+	onTouchStart?: (data: RadialBarDataItem, index: number, e: React.TouchEvent<
+		SVGGraphicsElement
+	>) => void;
+	onTouchMove?: (data: RadialBarDataItem, index: number, e: React.TouchEvent<
+		SVGGraphicsElement
+	>) => void;
+	onTouchEnd?: (data: RadialBarDataItem, index: number, e: React.TouchEvent<
+		SVGGraphicsElement
+	>) => void;
+	/**
+ * @defaultValue 0
+ */
+	radiusAxisId?: AxisId;
+	/**
+ * If set a ReactElement, the shape of radial bar sectors can be customized.
+ * If set a function, the function will be called to render customized shape.
+ * During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
+ * By default, renders a sector.
+ */
+	shape?: ActiveShape<RadialBarSectorProps, SVGPathElement>;
+	stackId?: string | number;
+	tooltipType?: TooltipType;
+	/**
+ * Formats the value displayed in the tooltip for this RadialBar.
+ * When set, takes precedence over the `formatter` prop on the Tooltip component.
+ */
+	formatter?: Formatter;
+	/**
+ * @defaultValue 300
+ */
+	zIndex?: number;
+}
+
+export type RadialBarProps<DataPointType = any, DataValueType = any> =
+	Omit<
+		PresentationAttributesAdaptChildEvent<RadialBarDataItem, SVGElement>,
+		'ref' | keyof InternalRadialBarProps<DataPointType, DataValueType>
+	> & Omit<InternalRadialBarProps<DataPointType, DataValueType>, 'sectors'>;
+
+type InternalProps = WithIdRequired<PropsWithDefaults> & Pick<InternalRadialBarProps, 'sectors'>;
+
+function SetRadialBarPayloadLegend(props: RadialBarProps) {
+	const legendPayload = useAppSelector(
+		(state) => selectRadialBarLegendPayload(state, props.legendType),
+	);
+	return <SetPolarLegendPayload legendPayload={legendPayload ?? []} />;
+}
+
+const SetRadialBarTooltipEntrySettings = React.memo(({
+	dataKey,
+	sectors,
+	stroke,
+	strokeWidth,
+	name,
+	hide,
+	fill,
+	tooltipType,
+	formatter,
+	id,
+}: Pick<
+	InternalProps,
+	| 'dataKey'
+	| 'sectors'
+	| 'stroke'
+	| 'strokeWidth'
+	| 'name'
+	| 'hide'
+	| 'fill'
+	| 'tooltipType'
+	| 'formatter'
+	| 'id'
+>) => {
+	const tooltipEntrySettings: TooltipPayloadConfiguration = {
+		dataDefinedOnItem: sectors,
+		getPosition: noop,
+		settings: {
+			graphicalItemId: id,
+			stroke,
+			strokeWidth,
+			fill,
+			nameKey: undefined, // RadialBar does not have nameKey, why?
+			dataKey,
+			name: getTooltipNameProp(name, dataKey),
+			hide,
+			type: tooltipType,
+			color: fill,
+			unit: '', // Why does RadialBar not support unit?
+			formatter,
+		},
+	};
+	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+});
+
+function renderBackground(props: InternalProps, sectors?: ReadonlyArray<RadialBarDataItem>) {
+	if (sectors == null) {
+		return null;
+	}
+	const { cornerRadius } = props;
+	const backgroundProps = svgPropertiesNoEventsFromUnknown(props.background);
+	return <ZIndexLayer
+		zIndex={getZIndexFromUnknown(props.background, DefaultZIndexes.barBackground)}
+	>{sectors.map((entry, i) => {
+		const { value, background, ...rest } = entry;
+
+		if (!background) {
+			return null;
+		}
+
+		const sectorProps: React.ComponentProps<typeof RadialBarSector> = {
+			cornerRadius: parseCornerRadius(cornerRadius),
+			...rest,
+			// @ts-expect-error backgroundProps is contributing unknown props
+			fill: '#eee',
+			...background,
+			...backgroundProps,
+			...adaptEventsOfChild(props, entry, i),
+			index: i,
+			className: clsx('recharts-radial-bar-background-sector', String(backgroundProps?.className)),
+			option: background,
+			isActive: false,
+		};
+
+		return <RadialBarSector
+			key={`background-${rest.cx}-${rest.cy}-${rest.innerRadius}-${rest.outerRadius}-${rest.startAngle}-${rest.endAngle}-${i}`}
+			{...sectorProps}
+		/>;
+	})}</ZIndexLayer>;
+}
+
+function RadialBarWithState(props: InternalProps) {
+	const { hide, sectors, className, background } = props;
+
+	if (hide) {
+		return props.children;
+	}
+
+	const layerClass = clsx('recharts-area', className);
+
+	return <ZIndexLayer zIndex={props.zIndex}>
+		<Layer className={layerClass}>
+			{background &&
+				<Layer className="recharts-radial-bar-background">{renderBackground(
+					props,
+					sectors,
+				)}</Layer>}
+			<Layer className="recharts-radial-bar-sectors">
+				<RenderSectors {...props} />
+			</Layer>
+		</Layer>
+	</ZIndexLayer>;
+}
+
+function RadialBarImpl(props: WithIdRequired<PropsWithDefaults>) {
+	const [cells, cellRegistry] = useCellRegistry();
+
+	const radialBarSettings: RadialBarSettings = React.useMemo(
+		() => ({
+			data: undefined,
+			hide: false,
+			id: props.id,
+			dataKey: props.dataKey,
+			minPointSize: props.minPointSize,
+			stackId: getNormalizedStackId(props.stackId),
+			maxBarSize: props.maxBarSize,
+			barSize: props.barSize,
+			type: 'radialBar',
+			angleAxisId: props.angleAxisId,
+			radiusAxisId: props.radiusAxisId,
+		}),
+		[
+			props.id,
+			props.dataKey,
+			props.minPointSize,
+			props.stackId,
+			props.maxBarSize,
+			props.barSize,
+			props.angleAxisId,
+			props.radiusAxisId,
+		],
+	);
+	const sectors: ReadonlyArray<RadialBarDataItem> =
+		useAppSelector(
+			(state) => selectRadialBarSectors(
+				state,
+				props.radiusAxisId,
+				props.angleAxisId,
+				radialBarSettings,
+				cells,
+			),
+		) ??
+			STABLE_EMPTY_ARRAY;
+	return <CellsContext.Provider value={cellRegistry}>
+		<SetRadialBarTooltipEntrySettings
+			dataKey={props.dataKey}
+			sectors={sectors}
+			stroke={props.stroke}
+			strokeWidth={props.strokeWidth}
+			name={props.name}
+			hide={props.hide}
+			fill={props.fill}
+			tooltipType={props.tooltipType}
+			formatter={props.formatter}
+			id={props.id}
+		/>
+		<RadialBarWithState {...props} sectors={sectors} />
+	</CellsContext.Provider>;
+}
+
+export const defaultRadialBarProps = {
+	angleAxisId: 0,
+	animationBegin: 0,
+	animationDuration: 1500,
+	animationEasing: 'ease',
+	animationMatchBy: matchAppend,
+	animationInterpolateFn: defaultRadialBarAnimateItems,
+	background: false,
+	cornerIsExternal: false,
+	cornerRadius: 0,
+	forceCornerRadius: false,
+	hide: false,
+	isAnimationActive: 'auto',
+	label: false,
+	legendType: 'rect',
+	minPointSize: 0,
+	radiusAxisId: 0,
+	shape: defaultRadialBarShape,
+	zIndex: DefaultZIndexes.bar,
+} as const satisfies Partial<RadialBarProps>;
+
+type PropsWithDefaults<DataPointType = any, DataValueType = any> =
+	RequiresDefaultProps<RadialBarProps<DataPointType, DataValueType>, typeof defaultRadialBarProps>;
+
+export function computeRadialBarDataItems({
+	displayedData,
+	stackedData,
+	dataStartIndex,
+	stackedDomain,
+	dataKey,
+	baseValue,
+	layout,
+	radiusAxis,
+	radiusAxisTicks,
+	bandSize,
+	pos,
+	angleAxis,
+	minPointSize,
+	cx,
+	cy,
+	angleAxisTicks,
+	cells,
+	startAngle: rootStartAngle,
+	endAngle: rootEndAngle,
+}: {
+	displayedData: ChartData;
+	stackedData: Series<Record<number, number>, DataKey<any>> | undefined;
+	dataStartIndex: number;
+	stackedDomain: ReadonlyArray<unknown> | null;
+	dataKey: DataKey<any> | undefined;
+	baseValue: number | unknown;
+	layout: LayoutType;
+	radiusAxis: BaseAxisWithScale;
+	radiusAxisTicks: ReadonlyArray<TickItem> | undefined;
+	bandSize: number;
+	pos: BarPositionPosition;
+	angleAxis: BaseAxisWithScale;
+	minPointSize: number;
+	cx: number;
+	cy: number;
+	angleAxisTicks: ReadonlyArray<TickItem> | undefined;
+	cells: ReadonlyArray<ReactElement> | undefined;
+	startAngle: number;
+	endAngle: number;
+}): ReadonlyArray<RadialBarDataItem> {
+	if (angleAxisTicks == null || radiusAxisTicks == null) {
+		return STABLE_EMPTY_ARRAY;
+	}
+
+	return (displayedData ?? []).map((entry: unknown, index: number) => {
+		let value, innerRadius: number | null | undefined, outerRadius: | number
+		| undefined, startAngle: number | null, endAngle: number, backgroundSector;
+
+		if (stackedData) {
+			// @ts-expect-error truncateByDomain expects only numerical domain, but it can received categorical domain too
+			value = truncateByDomain(stackedData[dataStartIndex + index], stackedDomain);
+		} else {
+			value = getValueByDataKey(entry, dataKey);
+			if (!Array.isArray(value)) {
+				value = [baseValue, value];
+			}
+		}
+
+		if (layout === 'radial') {
+			startAngle = angleAxis.scale.map(value[0]) ?? rootStartAngle;
+			endAngle = angleAxis.scale.map(value[1]) ?? rootEndAngle;
+			innerRadius = getCateCoordinateOfBar({
+				axis: radiusAxis,
+				ticks: radiusAxisTicks,
+				bandSize,
+				offset: pos.offset,
+				entry,
+				index,
+			});
+			if (innerRadius != null && endAngle != null && startAngle != null) {
+				outerRadius = innerRadius + pos.size;
+				const deltaAngle = endAngle - startAngle;
+
+				if (Math.abs(minPointSize) > 0 && Math.abs(deltaAngle) < Math.abs(minPointSize)) {
+					const delta =
+						mathSign(deltaAngle || minPointSize) * (Math.abs(minPointSize) - Math.abs(deltaAngle));
+
+					endAngle += delta;
+				}
+				backgroundSector = {
+					background: {
+						cx,
+						cy,
+						innerRadius,
+						outerRadius,
+						startAngle: rootStartAngle,
+						endAngle: rootEndAngle,
+					},
+				};
+			}
+		} else {
+			innerRadius = radiusAxis.scale.map(value[0]);
+			outerRadius = radiusAxis.scale.map(value[1]);
+			startAngle = getCateCoordinateOfBar({
+				axis: angleAxis,
+				ticks: angleAxisTicks,
+				bandSize,
+				offset: pos.offset,
+				entry,
+				index,
+			});
+			if (innerRadius != null && outerRadius != null && startAngle != null) {
+				endAngle = startAngle + pos.size;
+				const deltaRadius = outerRadius - innerRadius;
+
+				if (Math.abs(minPointSize) > 0 && Math.abs(deltaRadius) < Math.abs(minPointSize)) {
+					const delta =
+						mathSign(deltaRadius || minPointSize) *
+						(Math.abs(minPointSize) - Math.abs(deltaRadius));
+					outerRadius += delta;
+				}
+			}
+		}
+
+		return {
+			// @ts-expect-error can't spread unknown
+			...entry,
+			...backgroundSector,
+			payload: entry,
+			value: stackedData ? value : value[1],
+			cx,
+			cy,
+			innerRadius,
+			outerRadius,
+			startAngle,
+			// @ts-expect-error endAngle is used before assigned (?)
+			endAngle,
+			...cells && cells[index] && cells[index].props,
+		} satisfies RadialBarDataItem;
+	});
+}
+
+/**
+ * @consumes PolarChartContext
+ * @provides LabelListContext
+ * @provides CellReader
+ */
+export function RadialBar<DataPointType = any, DataValueType = any>(
+	outsideProps: RadialBarProps<DataPointType, DataValueType>,
+) {
+	const props: PropsWithDefaults<DataPointType, DataValueType> = resolveDefaultProps(
+		outsideProps,
+		defaultRadialBarProps,
+	);
+	return <RegisterGraphicalItemId id={props.id} type="radialBar">
+		{(id) => <>
+			<SetPolarGraphicalItem
+				type="radialBar"
+				id={id}
+				data={undefined}
+				dataKey={props.dataKey}
+				hide={props.hide ?? defaultRadialBarProps.hide}
+				angleAxisId={props.angleAxisId ?? defaultRadialBarProps.angleAxisId}
+				radiusAxisId={props.radiusAxisId ?? defaultRadialBarProps.radiusAxisId}
+				stackId={getNormalizedStackId(props.stackId)}
+				barSize={props.barSize}
+				minPointSize={props.minPointSize}
+				maxBarSize={props.maxBarSize}
+			/>
+			<SetRadialBarPayloadLegend {...props} />
+			<RadialBarImpl {...props} id={id} />
+		</>}
+	</RegisterGraphicalItemId>;
+}
+
+RadialBar.displayName = 'RadialBar';
