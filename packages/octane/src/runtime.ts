@@ -21483,10 +21483,12 @@ function detachDeoptTreeRefs(
  * slots so the setups re-fire on reactivation. Used by activityBlock on hide
  * AND by the tryBlock suspense-hide path (hideTryContentAndMountPending):
  * Activity disconnects layout + passive effects. Suspense passes
- * `disconnectPassive=false`: layout effects disconnect, while passive effects
- * remain subscribed until actual deletion, matching React's hidden-primary
- * lifetime. State, DOM, and blocks stay alive in either case. Refs remain
- * attached for Activity; Suspense cycles them separately via detachSubtreeRefs.
+ * `disconnectPassive=false`: layout effects disconnect, while CONNECTED passive
+ * effects remain subscribed until actual deletion, matching React's
+ * hidden-primary lifetime. A passive effect that never connected is not part of
+ * that hidden primary and resets like a layout one (see below). State, DOM, and
+ * blocks stay alive in either case. Refs remain attached for Activity; Suspense
+ * cycles them separately via detachSubtreeRefs.
  */
 function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void {
 	const hooks = scope.hooks;
@@ -21499,7 +21501,24 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 				// reveal re-render doesn't re-fire them. They own injected styles
 				// that must persist while a tree is merely hidden; only a real
 				// unmount (unmountScope's effect-slot walk) tears them down.
-				if (e.phase === INSERTION || (!disconnectPassive && e.phase === PASSIVE)) continue;
+				//
+				// Suspense's `disconnectPassive=false` spares passive effects for the
+				// same reason — but only ones that ACTUALLY connected. `connectedFn` is
+				// set exclusively by runEffectBody, so a null one has never run: it
+				// belongs to a subtree the boundary rendered but never committed —
+				// siblings ahead of the call that suspended, or children introduced by a
+				// later attempt. There is no subscription to preserve, and its deps are
+				// already stamped from that aborted attempt, so sparing it would let the
+				// reveal re-render compare equal deps and skip the enqueue, stranding the
+				// mount effect — and its cleanup — forever. React fires every mount effect
+				// in the subtree when a suspended mount finally commits, so an
+				// unconnected passive slot resets exactly like a layout one.
+				if (
+					e.phase === INSERTION ||
+					(!disconnectPassive && e.phase === PASSIVE && e.connectedFn !== null)
+				) {
+					continue;
+				}
 				if (typeof e.cleanup === 'function') {
 					const cleanup = e.cleanup;
 					// Clear it BEFORE firing so unmountScope's effect-slot walk sees
