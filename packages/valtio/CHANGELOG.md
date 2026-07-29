@@ -1,5 +1,15 @@
 # @octanejs/valtio
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [9d5d642]
+- Updated dependencies [f469b3f]
+- Updated dependencies [ac2ae2f]
+- Updated dependencies [3aada64]
+  - octane@0.1.19
+
 ## 0.1.1
 
 ### Patch Changes
