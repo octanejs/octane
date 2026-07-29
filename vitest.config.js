@@ -1455,8 +1455,9 @@ export default defineConfig({
 					environment: 'jsdom',
 					// The differential oracle (real recharts + vendored d3) is expensive
 					// to load and charts settle over many raf rounds — slow CI runners
-					// tripped the 5s default on the file's first test.
-					testTimeout: 30_000,
+					// can spend more than 30s transforming the oracle while the build
+					// integration projects saturate the machine.
+					testTimeout: 60_000,
 					// Differential precompile for recharts fixtures: rewrites
 					// `@octanejs/recharts` → `recharts` so the React side runs the real
 					// recharts as the byte-for-byte SVG oracle.
