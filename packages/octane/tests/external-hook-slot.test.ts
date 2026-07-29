@@ -661,6 +661,7 @@ describe('manifest-declared manual hook slots', () => {
 			'lexical',
 			'lucide',
 			'mdx',
+			'mobx',
 			'motion',
 			'radix',
 			'remix-router',
