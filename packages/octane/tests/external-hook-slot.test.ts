@@ -664,6 +664,7 @@ describe('manifest-declared manual hook slots', () => {
 			'mobx',
 			'motion',
 			'radix',
+			'react-error-boundary',
 			'remix-router',
 			'styled-components',
 			'stylex',

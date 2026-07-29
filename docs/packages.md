@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**57 publishable package(s), including 45 framework binding(s).**
+**58 publishable package(s), including 46 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -37,6 +37,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.18` | 1 |
 | `@octanejs/nuqs` | [`packages/nuqs`](../packages/nuqs) | framework binding | `0.1.8` | 7 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.18` | 1 |
+| `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.0` | 2 |
 | `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.16` | 1 |
 | `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.16` | 1 |
 | `@octanejs/redux-toolkit` | [`packages/redux-toolkit`](../packages/redux-toolkit) | framework binding | `0.1.14` | 4 |
