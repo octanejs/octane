@@ -1,8 +1,11 @@
+/// <reference path="./virtual.d.ts" />
+
 import type { CompileMdxResult } from '@octanejs/mdx/compile';
 import type { DocusaurusManifest, LoadDocusaurusSiteOptions } from './index.js';
 import type { CompileDocusaurusMdxOptions } from './mdx.js';
 
 export declare const DOCUSAURUS_MANIFEST_ID = 'virtual:octane-docusaurus-manifest';
+export declare const DOCUSAURUS_ROUTES_ID = 'virtual:octane-docusaurus-routes';
 
 export interface DocusaurusMdxPluginOptions extends Omit<
 	CompileDocusaurusMdxOptions,
@@ -28,6 +31,15 @@ export interface DocusaurusBridgePlugin {
 		getManifest(): Promise<DocusaurusManifest>;
 		reload(): Promise<DocusaurusManifest>;
 	};
+	configureServer(server: {
+		moduleGraph: {
+			getModuleById(id: string): unknown;
+			invalidateModule(module: unknown): void;
+		};
+		ws: {
+			send(payload: { type: 'full-reload' }): void;
+		};
+	}): void;
 	configResolved(config: { root?: string; command: string }): Promise<void>;
 	buildStart(this: { addWatchFile?(id: string): void }): Promise<void>;
 	watchChange(id: string): Promise<void>;

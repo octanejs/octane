@@ -1,18 +1,21 @@
 {
   "compilerOptions": {
     "module": "esnext",
-    "lib": ["esnext"],
+    "lib": ["esnext", "dom", "dom.iterable"],
     "target": "esnext",
     "noEmit": true,
     "moduleResolution": "bundler",
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane"
   },
-  "include": ["./types/"],
+  "include": ["./src/**/*.tsrx", "./types/"],
   "exclude": ["node_modules", "dist", "tests"]
 }

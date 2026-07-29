@@ -3,9 +3,12 @@ import { createOctaneCompiler } from 'octane/compiler/bundler';
 import { compileDocusaurusMdx } from './mdx.js';
 import { loadDocusaurusSite } from './load-site.js';
 import { createDocusaurusManifest, resolveDocusaurusId } from './manifest.js';
+import { collectDocusaurusRouteModuleReferences } from './route-modules.js';
 
 export const DOCUSAURUS_MANIFEST_ID = 'virtual:octane-docusaurus-manifest';
+export const DOCUSAURUS_ROUTES_ID = 'virtual:octane-docusaurus-routes';
 const RESOLVED_DOCUSAURUS_MANIFEST_ID = `\0${DOCUSAURUS_MANIFEST_ID}`;
+const RESOLVED_DOCUSAURUS_ROUTES_ID = `\0${DOCUSAURUS_ROUTES_ID}`;
 
 function cleanId(id) {
 	return id.split(/[?#]/, 1)[0];
@@ -25,6 +28,24 @@ function serializableManifest(manifest) {
 		.replace(/\u2028/g, '\\u2028')
 		.replace(/\u2029/g, '\\u2029')
 		.replace(/</g, '\\u003c');
+}
+
+function clientRoutesModule(manifest) {
+	const importers = [...collectDocusaurusRouteModuleReferences(manifest.routes)]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(
+			([key, specifier]) => `\t${JSON.stringify(key)}: () => import(${JSON.stringify(specifier)}),`,
+		)
+		.join('\n');
+	return `import { createDocusaurusRoutes } from "@octanejs/docusaurus/client";
+import manifest from ${JSON.stringify(DOCUSAURUS_MANIFEST_ID)};
+
+export { manifest };
+export const routeModules = {
+${importers}
+};
+export const routes = createDocusaurusRoutes(manifest, routeModules);
+`;
 }
 
 function createSharedState(options) {
@@ -76,12 +97,26 @@ function createSharedState(options) {
 }
 
 export function docusaurusBridge(options = {}, shared = createSharedState(options)) {
+	let server;
+
+	function invalidateVirtualModules() {
+		if (server === undefined) return;
+		for (const id of [RESOLVED_DOCUSAURUS_MANIFEST_ID, RESOLVED_DOCUSAURUS_ROUTES_ID]) {
+			const module = server.moduleGraph.getModuleById(id);
+			if (module !== undefined) server.moduleGraph.invalidateModule(module);
+		}
+		server.ws.send({ type: 'full-reload' });
+	}
+
 	return {
 		name: 'octane-docusaurus-bridge',
 		enforce: 'pre',
 		api: {
 			getManifest: () => shared.getManifest(),
 			reload: () => shared.refresh(),
+		},
+		configureServer(value) {
+			server = value;
 		},
 		async configResolved(config) {
 			shared.setRoot(config.root ?? process.cwd());
@@ -105,15 +140,22 @@ export function docusaurusBridge(options = {}, shared = createSharedState(option
 		},
 		async watchChange() {
 			await shared.refresh();
+			invalidateVirtualModules();
 		},
 		async resolveId(id) {
 			if (id === DOCUSAURUS_MANIFEST_ID) return RESOLVED_DOCUSAURUS_MANIFEST_ID;
+			if (id === DOCUSAURUS_ROUTES_ID) return RESOLVED_DOCUSAURUS_ROUTES_ID;
 			const manifest = await shared.getManifest();
 			return resolveDocusaurusId(id, manifest);
 		},
 		async load(id) {
-			if (id !== RESOLVED_DOCUSAURUS_MANIFEST_ID) return null;
-			return `export default ${serializableManifest(await shared.getManifest())};\n`;
+			if (id === RESOLVED_DOCUSAURUS_MANIFEST_ID) {
+				return `export default ${serializableManifest(await shared.getManifest())};\n`;
+			}
+			if (id === RESOLVED_DOCUSAURUS_ROUTES_ID) {
+				return clientRoutesModule(await shared.getManifest());
+			}
+			return null;
 		},
 	};
 }

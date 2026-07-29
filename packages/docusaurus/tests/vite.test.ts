@@ -1,7 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DOCUSAURUS_MANIFEST_ID, docusaurus, docusaurusBridge } from '../src/vite.js';
+import {
+	DOCUSAURUS_MANIFEST_ID,
+	DOCUSAURUS_ROUTES_ID,
+	docusaurus,
+	docusaurusBridge,
+} from '../src/vite.js';
 import { createSiteFixture } from './helpers.js';
 
 const disposals: Array<() => void> = [];
@@ -25,6 +30,26 @@ describe('Docusaurus Vite bridge', () => {
 		expect(await plugin.resolveId('@theme/Root')).toBe(
 			path.join(fixture.siteDir, 'src/theme/Root.js'),
 		);
+	});
+
+	it('emits statically analyzable importers for the client route graph', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({ siteDir: fixture.siteDir });
+		await plugin.configResolved({ root: fixture.siteDir, command: 'serve' });
+
+		const virtualId = await plugin.resolveId(DOCUSAURUS_ROUTES_ID);
+		const virtualModule = await plugin.load(virtualId!);
+
+		expect(virtualId).toBe(`\0${DOCUSAURUS_ROUTES_ID}`);
+		expect(virtualModule).toContain(
+			'import { createDocusaurusRoutes } from "@octanejs/docusaurus/client";',
+		);
+		expect(virtualModule).toContain('import("@site/src/pages/custom.js")');
+		expect(virtualModule).toContain('import("@theme/DocItem")');
+		expect(virtualModule).toContain('import("@site/docs/intro.md")');
+		expect(virtualModule).toContain('custom-page.json?raw&source=fixture');
+		expect(virtualModule).toContain('export const routes = createDocusaurusRoutes');
 	});
 
 	it('resolves a relative site directory from the Vite root', async () => {
@@ -89,6 +114,33 @@ describe('Docusaurus Vite bridge', () => {
 		const document = Object.values(manifest.content).find((metadata) => metadata.id === 'intro');
 
 		expect(document?.description).toBe(updatedDescription);
+	});
+
+	it('invalidates both virtual modules after reloading a watched input', async () => {
+		const fixture = createSiteFixture();
+		disposals.push(fixture.dispose);
+		const plugin = docusaurusBridge({ siteDir: fixture.siteDir });
+		await plugin.configResolved({ root: fixture.siteDir, command: 'serve' });
+		const manifestModule = {};
+		const routesModule = {};
+		const invalidateModule = vi.fn();
+		const wsSend = vi.fn();
+		plugin.configureServer({
+			moduleGraph: {
+				getModuleById(id: string) {
+					if (id === `\0${DOCUSAURUS_MANIFEST_ID}`) return manifestModule;
+					if (id === `\0${DOCUSAURUS_ROUTES_ID}`) return routesModule;
+				},
+				invalidateModule,
+			},
+			ws: { send: wsSend },
+		});
+
+		await plugin.watchChange(path.join(fixture.siteDir, 'watched.txt'));
+
+		expect(invalidateModule).toHaveBeenCalledWith(manifestModule);
+		expect(invalidateModule).toHaveBeenCalledWith(routesModule);
+		expect(wsSend).toHaveBeenCalledWith({ type: 'full-reload' });
 	});
 
 	it('waits for an in-flight reload before serving manifest data', async () => {

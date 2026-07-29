@@ -66,6 +66,40 @@ The bridge publishes `virtual:octane-docusaurus-manifest` and resolves
 Docusaurus aliases. Its MDX plugin chooses Octane client/server compilation per
 Vite environment and injects metadata discovered by the content plugins.
 
+## Client routing
+
+The route virtual module turns every component, content module, generated data
+module, and route-context module into a static dynamic import. Only the matched
+branch loads in the browser:
+
+```ts
+import { createDocusaurusBrowserRouter } from '@octanejs/docusaurus/client';
+import {
+	manifest,
+	routeModules,
+} from 'virtual:octane-docusaurus-routes';
+
+export const router = createDocusaurusBrowserRouter(manifest, routeModules);
+```
+
+Render it from an Octane component:
+
+```tsx
+import { DocusaurusRouterProvider } from '@octanejs/docusaurus/client';
+import { manifest } from 'virtual:octane-docusaurus-routes';
+import { router } from './router';
+
+export function App() @{
+	<DocusaurusRouterProvider manifest={manifest} router={router} />
+}
+```
+
+Nested Docusaurus routes render through `children`; route components also
+receive loaded `modules`, static `props`, `route`, `location`, `params`, and
+`navigate`. `useDocusaurusRouteContext()` exposes the inherited plugin identity
+and merged route data. Use `Link` from `@octanejs/remix-router` for client-side
+navigation.
+
 ## Docusaurus-aware MDX
 
 ```js
@@ -94,7 +128,7 @@ remain composable.
 
 ## Current scope
 
-Phases 1–3 are implemented here: headless loading, manifest/Vite integration,
-and MDX compilation. Client routing, static generation, hydration, and an
-Octane classic theme are deliberately left to the renderer/theme phases; the
-CLI therefore does not present `start` or `build` as working commands yet.
+Phases 1–4 are implemented here: headless loading, manifest/Vite integration,
+MDX compilation, and lazy client routing. Static generation, hydration, and an
+Octane classic theme remain renderer/theme phases; the CLI therefore does not
+present `start` or `build` as working commands yet.
