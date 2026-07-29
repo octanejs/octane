@@ -33,10 +33,40 @@ export function expectedResourceText(resource, version) {
 	return requestKey(resource, version, resource === 'owner' ? ownerIdFor(version) : '');
 }
 
+// The board is the transition-atomicity guard: a keyed list and a controlled
+// input inside the held boundary, derived synchronously from the version (no
+// requests, so wave/call ceilings are untouched). Every bump removes one row,
+// adds one, reorders the survivors and rewrites their text — the shapes the
+// runtime's hold-and-rollback machinery has to keep whole. The board joins the
+// dashboard signature, so any of it changing early is a mixed state.
+const BOARD_SURVIVORS = Object.freeze(['alpha', 'gamma']);
+
+export function boardRowsFor(version) {
+	if (version === 0) return ['alpha', 'beta', 'gamma'];
+	const survivors =
+		version % 2 === 1 ? [BOARD_SURVIVORS[1], BOARD_SURVIVORS[0]] : [...BOARD_SURVIVORS];
+	return [...survivors, `fresh-v${version}`];
+}
+
+export function boardRowText(id, version) {
+	return `${id}@v${version}`;
+}
+
+export function boardInputValue(version) {
+	return `input-v${version}`;
+}
+
+export function boardSegment(version) {
+	return boardRowsFor(version)
+		.map((id) => `row-${id}=${boardRowText(id, version)}`)
+		.concat(`board-input=${boardInputValue(version)}`)
+		.join('|');
+}
+
 export function expectedSignature(version) {
-	return RESOURCE_ORDER.map(
-		(resource) => `${resource}=${expectedResourceText(resource, version)}`,
-	).join('|');
+	return RESOURCE_ORDER.map((resource) => `${resource}=${expectedResourceText(resource, version)}`)
+		.concat(boardSegment(version))
+		.join('|');
 }
 
 export function beginOperation(version) {
