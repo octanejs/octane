@@ -1051,6 +1051,164 @@ let flushingStagedReveals = false;
 let deferringStagedRevealEffects = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Transition binding journal.
+//
+// Rendering and mutating happen in one walk, so a transition render patches a
+// boundary's own bindings on the way down and only afterwards discovers that a
+// descendant suspends. The boundary then holds its prior content, but those
+// earlier patches have already landed — the boundary shows part of the new
+// screen next to the old one. React renders the whole tree off the current one
+// and commits in a single step, so its boundary stays whole.
+//
+// While a VISIBLE try body re-renders and a hold is possible, each binding write
+// records what it replaced. If the body suspends and the boundary holds, the log
+// is replayed backwards to the checkpoint taken when that body started, leaving
+// the boundary exactly as it was. This all happens inside the flush that made
+// the change, so nothing reached the screen in between: there is no visible
+// rollback, only a boundary that never split.
+//
+// The log is scoped to the boundary, not the flush, so anything the same render
+// patched OUTSIDE the boundary keeps its new value. That is what lets the
+// `isPending` cue turn on while the content it describes stays put — React gets
+// the same result from a separate urgent render. Content outside a boundary that
+// belongs to the transition itself does still update early; holding that too
+// needs the global work-in-progress tree octane deliberately does not have
+// (SUSPENSE_DIVERGENCE.md #4).
+//
+// Compiled bindings guard on a cached copy of the last value (`if (_b.d !== _v)`)
+// and never read the DOM, so restoring a node without restoring that cache would
+// leave the guard convinced the node is already current and the value would
+// never reappear. The first write into a bag therefore snapshots the whole bag
+// next to the DOM entry.
+//
+// Controlled `value`/`checked` stay out. They are browser-owned state tracked
+// alongside the DOM in a per-element controlled record, and putting the node back
+// without that record would leave the two disagreeing about what the user last
+// typed. An input inside a boundary can therefore still show its new value early.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const JOURNAL_TEXT = 0;
+const JOURNAL_ATTR = 1;
+const JOURNAL_BAG = 2;
+/** Flat undo log, four slots per entry: kind, target, a, b. */
+let TRANSITION_JOURNAL: any[] | null = null;
+/** Bags already captured in the open window, so each is snapshotted once. */
+let TRANSITION_JOURNAL_BAGS: Set<object> | null = null;
+/** Open windows. Boundaries nest, and only the outermost may drop the log. */
+let TRANSITION_JOURNAL_DEPTH = 0;
+
+/**
+ * Snapshot the rendering scope's binding bag the first time it is written in the
+ * open window. Called from the binding helpers, which the compiler always emits
+ * BEFORE the matching `_b.x = _v`, so the captured values are the pre-render
+ * ones.
+ *
+ * Slot 0 only holds a bag when the body has a template root; a body made purely
+ * of control flow puts its first block slot there instead (`tryBlock(__s, 0, …)`).
+ * Every runtime slot is tagged with `__kind` and no compiler bag is, so that tag
+ * is the discriminator — restoring a boundary's own `branch`/`transitionHeld`
+ * from a "bag" snapshot would corrupt the very state driving the hold.
+ */
+function journalBag(): void {
+	const scope = CURRENT_SCOPE;
+	if (scope === null) return;
+	const bag = scope.slots[0];
+	if (bag === null || typeof bag !== 'object' || (bag as any).__kind !== undefined) return;
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	if (seen.has(bag)) return;
+	seen.add(bag);
+	const keys = Object.keys(bag);
+	const values: any[] = [];
+	for (let i = 0; i < keys.length; i++) values.push((bag as any)[keys[i]]);
+	TRANSITION_JOURNAL!.push(JOURNAL_BAG, bag, keys, values);
+}
+
+function journalText(node: Text): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, node.nodeValue, null);
+	journalBag();
+}
+
+function journalAttr(el: Element, name: string): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));
+	journalBag();
+}
+
+/**
+ * Open a journal window for a visible try body that is about to re-render, and
+ * return the checkpoint to roll back to. `-1` means "not journaling": either the
+ * boundary cannot hold (nothing committed to keep) or no transition is in play,
+ * which is the overwhelmingly common case and costs one comparison.
+ *
+ * The arming test mirrors handleSuspense's hold conditions. The body inherits
+ * its mode from the block currently rendering it (renderBlockInner walks
+ * `pendingMode ?? parent's mode`), so the ambient block answers "is this a
+ * transition" before the body runs. `transitionHeld` covers the boundary that is
+ * already holding and re-suspends at urgent priority — the useSuspenseQuery
+ * shape, where the observer notifies a macrotask after the transition window
+ * closed and handleSuspense continues the hold regardless of priority.
+ */
+function armTransitionJournal(state: TrySlot): number {
+	if (
+		!state.hasResolved ||
+		state.hiddenDom !== null ||
+		!(
+			state.transitionHeld ||
+			(state.tryBlock?.pendingMode ?? CURRENT_BLOCK?.currentRenderMode) === 'transition'
+		)
+	)
+		return -1;
+	TRANSITION_JOURNAL ??= [];
+	TRANSITION_JOURNAL_BAGS ??= new Set();
+	TRANSITION_JOURNAL_DEPTH++;
+	return TRANSITION_JOURNAL.length;
+}
+
+/**
+ * Close the window opened by `armTransitionJournal`.
+ *
+ * A committed inner boundary deliberately LEAVES its entries in the log: an
+ * enclosing boundary that suspends later still has to undo them, because its
+ * content includes everything the inner boundary just wrote. Only the outermost
+ * window drops the log — before that there is always someone left who might need
+ * to replay it.
+ */
+function disarmTransitionJournal(checkpoint: number): void {
+	if (checkpoint < 0) return;
+	if (--TRANSITION_JOURNAL_DEPTH === 0) {
+		TRANSITION_JOURNAL = null;
+		TRANSITION_JOURNAL_BAGS = null;
+	}
+}
+
+/** Undo every binding write recorded since `checkpoint`, newest first. */
+function rollbackTransitionJournal(checkpoint: number): void {
+	if (checkpoint < 0) return;
+	const log = TRANSITION_JOURNAL;
+	if (log === null) return;
+	for (let i = log.length - 4; i >= checkpoint; i -= 4) {
+		const target = log[i + 1];
+		const a = log[i + 2];
+		const b = log[i + 3];
+		switch (log[i]) {
+			case JOURNAL_TEXT:
+				(target as Text).nodeValue = a;
+				break;
+			case JOURNAL_ATTR:
+				if (b === null) (target as Element).removeAttribute(a);
+				else (target as Element).setAttribute(a, b);
+				break;
+			default:
+				for (let k = 0; k < a.length; k++) target[a[k]] = b[k];
+				// This bag is back to its pre-window values, so a later write in an
+				// enclosing window has to snapshot it again rather than trust the
+				// entry that just got replayed.
+				TRANSITION_JOURNAL_BAGS!.delete(target);
+		}
+	}
+	log.length = checkpoint;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // View Transitions (docs/view-transitions-plan.md, Phase 1).
 //
 // Octane renders AND mutates in one eager walk (flush → drainQueue) — there is
@@ -9152,6 +9310,7 @@ export function setText(node: Text, value: any): void {
 	// mutation choke point AND is prev-guarded (only ACTUAL changes reach it).
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	VIEW_TRANSITION_DRIVER?.markDirty();
+	if (TRANSITION_JOURNAL !== null) journalText(node);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -10165,6 +10324,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
@@ -10240,6 +10400,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 	}
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -10256,6 +10417,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -10270,6 +10432,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 	const next = value == null ? null : String(value);
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -10443,6 +10606,7 @@ export function setClassName(el: Element, value: unknown): void {
 	// an empty STRING still writes `class=""` — the differential rig pins that
 	// distinction against React). Same raw-value rule as setClassAttr: composition
 	// erases the null-vs-'' difference, so the check must be on `value`.
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (value == null || value === false) el.removeAttribute('class');
 	else (el as any).className = cls;
 }
@@ -10460,6 +10624,7 @@ export function setClassAttr(el: Element, value: unknown): void {
 		hydration.queueClass(el, cls, false, true, cls === null);
 		return;
 	}
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
 }
@@ -10494,6 +10659,9 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// `suppressHydrationWarning` keeps the complete server style unchanged.
 	const hydration = activeHydration();
 	if (hydration !== null && hydration.applyStyle(el, value, prev)) return;
+	// The whole style attribute, not the individual declarations applyStyleValue
+	// is about to touch: restoring the attribute text restores every one of them.
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
 	applyStyleValue(style, value, prev);
 }
 
@@ -18298,6 +18466,9 @@ export function tryBlock(
 		// whether to preserve the DOM (keep) or swap to pending (default).
 		s.tryBlock.body = s.tryBody;
 		s.tryBlock.extra = s.env;
+		// Everything this body patches is undoable until it either commits or
+		// suspends into a hold, so the boundary can never be left half-updated.
+		const journalCheckpoint = armTransitionJournal(s);
 		try {
 			renderBlock(s.tryBlock);
 			// Successful commit — this supersedes any in-flight transition
@@ -18314,8 +18485,10 @@ export function tryBlock(
 			if (isHostContextRequest(err)) throw err;
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
-				handleSuspense(s, err.thenable, s.tryBlock);
+				handleSuspense(s, err.thenable, s.tryBlock, journalCheckpoint);
 			} else switchToCatch(s, err);
+		} finally {
+			disarmTransitionJournal(journalCheckpoint);
 		}
 	} else {
 		mountTry(s);
@@ -18601,7 +18774,15 @@ function releaseHeldTransition(state: TrySlot): void {
 	}
 }
 
-function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBlock: Block): void {
+function handleSuspense(
+	state: TrySlot,
+	thenable: TrackedThenable<any>,
+	sourceBlock: Block,
+	// Journal position to restore if this suspend turns into a hold. `-1` from
+	// every caller that renders outside an armed window (a fresh mount or a
+	// retry, neither of which has committed content to keep whole).
+	journalCheckpoint = -1,
+): void {
 	// Transition-priority suspends on an ALREADY-committed try block keep the
 	// prior DOM visible — matches React's `useTransition` contract that the
 	// previous screen stays mounted until the new tree is fully ready. We also
@@ -18659,6 +18840,11 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		state.branch === 1 &&
 		state.hiddenDom === null
 	) {
+		// The body got part of the way through patching this boundary before the
+		// suspend, so put back what it changed. Nothing has been painted since —
+		// the render and this undo are the same synchronous flush — so the
+		// boundary simply never shows half of the new screen.
+		rollbackTransitionJournal(journalCheckpoint);
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -18969,6 +19155,12 @@ function commitResumeInner(state: TrySlot): void {
 				// Mark the replay window: useThenable's fresh-thenable reuse leniency
 				// and the waterfall diagnostic apply only while a resolved suspension
 				// is being replayed (ordinary updates must keep replacing thenables).
+				// A held boundary replaying its body is the other way it can end up
+				// half-updated: the resources that just resolved patch their nodes,
+				// and then a still-pending one behind a data dependency suspends
+				// again. The effects and refs of that attempt are already discarded
+				// below; its DOM writes need the same treatment.
+				const journalCheckpoint = armTransitionJournal(state);
 				const resumeCapture = createOffscreenCapture();
 				const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 				const previousCapture = WIP_CAPTURE;
@@ -18990,6 +19182,10 @@ function commitResumeInner(state: TrySlot): void {
 				} finally {
 					WIP_CAPTURE = previousCapture;
 					RESUME_REPLAY = prevReplay;
+					// A completed replay has nothing to undo, so close its window here
+					// where the unwind is already guaranteed. A suspended one keeps it
+					// open: handleSuspense below is what replays it.
+					if (!didThrow) disarmTransitionJournal(journalCheckpoint);
 				}
 				if (!didThrow) {
 					if (state.detachedRefs !== null) {
@@ -18999,13 +19195,21 @@ function commitResumeInner(state: TrySlot): void {
 					spliceOffscreenCapture(resumeCapture);
 					state.hasResolved = true;
 				} else {
-					refDetachQueue.splice(refDetachCheckpoint);
-					restoreSubtreeEffectDeps(tryBlock, effectDeps);
-					discardOffscreenCapture(resumeCapture);
-					if (isSuspenseException(renderError)) {
-						handleSuspense(state, renderError.thenable, tryBlock);
-					} else {
-						switchToCatch(state, renderError);
+					// The journal has to outlive handleSuspense, which is what replays it,
+					// so it is closed here rather than around the render — in a finally, or
+					// a throw out of switchToCatch would strand the window open and let the
+					// next boundary undo more than its own writes.
+					try {
+						refDetachQueue.splice(refDetachCheckpoint);
+						restoreSubtreeEffectDeps(tryBlock, effectDeps);
+						discardOffscreenCapture(resumeCapture);
+						if (isSuspenseException(renderError)) {
+							handleSuspense(state, renderError.thenable, tryBlock, journalCheckpoint);
+						} else {
+							switchToCatch(state, renderError);
+						}
+					} finally {
+						disarmTransitionJournal(journalCheckpoint);
 					}
 					if (state.parentBlock.disposed) return;
 				}

@@ -92,15 +92,26 @@ are visible, the coordinator (Divergence #1) retries detached primaries to compl
 reveals their DOM plus ref/layout lifecycle in one batch. Independent per-swap WIPs also
 retain their old content until ready (`entangled-commit.test.ts`).
 
-**Remaining limitation:** this is still not a global WIP. During an ordinary synchronous
-transition, a same-identity parent can patch bindings outside a suspending `@try` before a
-descendant throws. octane then holds the old boundary content beside already-updated
-parent/sibling UI; React retains the whole prior screen. The async Action batching in #6
-prevents that tear while an Action is in flight, but does not close the synchronous case.
-Likewise, a pre-timeout live boundary retry can resolve one use() and then suspend on a
-later true dependency after an earlier staged sibling has started committing; preventing
-that requires the same absent global WIP. Fallback-visible retries are capture-safe and do
-not have this limitation.
+**Binding tear inside a held boundary — CLOSED (2026-07-29).** A same-identity parent used
+to patch its own bindings on the way down and only then have a descendant throw, so the
+boundary held old content beside already-updated markup of its own. A pre-timeout live
+retry had the same shape: resolve one use(), patch, then suspend on a later true
+dependency. Both now run inside a journal (`TRANSITION_JOURNAL` in runtime.ts) that records
+what each binding write replaced — plus the compiled bag that guards it, or the guard would
+skip the re-patch on resume — and replays it if the attempt suspends into a hold. The undo
+happens in the flush that made the change, so no intermediate state is ever painted.
+`benchmarks/async-composition` pins the update at zero exposed states, level with React;
+`transitions.test.ts` covers the in-place and replay shapes.
+
+**Remaining limitation:** this is still not a global WIP, so the journal is scoped to the
+boundary. Content the same transition patched OUTSIDE a suspended boundary keeps its new
+value — which is what lets the `isPending` cue turn on while its content holds, but also
+means unrelated shell markup updates early where React would hold the whole prior screen.
+Structural mutations (a keyed list reordering above the boundary) are not journaled either:
+the reconciler navigates live DOM, so undoing writes it has already read back is not sound
+without the absent global WIP. The async Action batching in #6 prevents the shell tear while
+an Action is in flight, but does not close the synchronous case. Fallback-visible retries
+are capture-safe and never had this limitation.
 Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---

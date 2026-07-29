@@ -16,6 +16,8 @@ import {
 	UrgentSupersedesTransition,
 	AsyncStartTransition,
 	AsyncTransitionKeepsDom,
+	TransitionAtomicity,
+	TransitionResumeAtomicity,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -552,6 +554,91 @@ describe('useTransition — async actions (React 19)', () => {
 			d2.resolve('two');
 		});
 		expect(r.find('#value').textContent).toBe('two');
+		expect(r.find('#pending').textContent).toBe('idle');
+		r.unmount();
+	});
+});
+
+describe('useTransition — the old screen stays whole', () => {
+	it('a parent that renders in place does not update before its suspended child', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const promises = [first.promise, second.promise];
+		const load = (version: number) => promises[version];
+
+		const r = mount(TransitionAtomicity, { load });
+		await act(() => {
+			first.resolve('one');
+		});
+		expect(r.find('#panel').getAttribute('data-version')).toBe('0');
+		expect(r.find('#heading').textContent).toBe('v0');
+		expect(r.find('#value').textContent).toBe('one');
+
+		// The transition bumps to v1 and the child suspends on the new promise.
+		// The panel is the same component, so today it patches its own attribute
+		// and heading on the way down and leaves them ahead of the held value.
+		r.click('#bump');
+		expect(r.find('#pending').textContent).toBe('pending');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(r.find('#value').textContent).toBe('one');
+		expect(r.find('#panel').getAttribute('data-version')).toBe('0');
+		expect(r.find('#heading').textContent).toBe('v0');
+
+		// Once the promise settles the whole screen moves to v1 together.
+		await act(() => {
+			second.resolve('two');
+		});
+		expect(r.find('#panel').getAttribute('data-version')).toBe('1');
+		expect(r.find('#heading').textContent).toBe('v1');
+		expect(r.find('#value').textContent).toBe('two');
+		expect(r.find('#pending').textContent).toBe('idle');
+		r.unmount();
+	});
+
+	it('a boundary replaying its body does not commit one resolved value beside an old one', async () => {
+		const entries = new Map<string, Deferred<string>>();
+		const load = (name: string, step: number) => {
+			const key = `${name}${step}`;
+			let entry = entries.get(key);
+			if (entry === undefined) {
+				entry = deferred<string>();
+				entries.set(key, entry);
+			}
+			return entry.promise;
+		};
+		load('a', 0);
+		load('b', 0);
+		entries.get('a0')!.resolve('a0');
+		entries.get('b0')!.resolve('b0');
+
+		const r = mount(TransitionResumeAtomicity, { load });
+		await act(() => {});
+		expect(r.find('#a').textContent).toBe('a0');
+		expect(r.find('#b').textContent).toBe('b0');
+
+		// Both leaves move to step 1 and both suspend, so the boundary holds.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(r.find('#a').textContent).toBe('a0');
+		expect(r.find('#b').textContent).toBe('b0');
+
+		// Only the first leaf's data arrives. The replay renders it and then
+		// suspends again on the second, which must leave the boundary untouched
+		// rather than showing the new value next to the old one.
+		await act(() => {
+			entries.get('a1')!.resolve('a1');
+		});
+		expect(r.find('#a').textContent).toBe('a0');
+		expect(r.find('#b').textContent).toBe('b0');
+		expect(r.find('#pending').textContent).toBe('pending');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+
+		// Second one lands and both step together.
+		await act(() => {
+			entries.get('b1')!.resolve('b1');
+		});
+		expect(r.find('#a').textContent).toBe('a1');
+		expect(r.find('#b').textContent).toBe('b1');
 		expect(r.find('#pending').textContent).toBe('idle');
 		r.unmount();
 	});
