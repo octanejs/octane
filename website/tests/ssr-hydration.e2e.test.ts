@@ -31,7 +31,20 @@ import {
 } from './support/server-process.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
-const PLAYWRIGHT_ACTION_TIMEOUT = 10_000;
+// The single budget for an ordinary "wait for this to appear" in this file.
+//
+// It is both the `page.setDefaultTimeout` value (so it covers every call that
+// passes no timeout of its own — `.waitFor()`, `.textContent()`, `.click()`)
+// and what the explicit waits pass, rather than each restating a literal. That
+// matters because these cases run four-at-a-time against one shared preview
+// server: at the old 10s, waits were measuring machine load rather than
+// correctness, and a case with a 45s budget could still die after 10s because
+// every wait inside it was implicitly capped.
+//
+// Deliberate outliers stay explicit and are NOT covered by this: waits that
+// need longer than an ordinary one (30s), and the short ones that poll for a
+// highlight to clear (5s) or read a single frame (1s).
+const PLAYWRIGHT_ACTION_TIMEOUT = 20_000;
 const PLAYWRIGHT_NAVIGATION_TIMEOUT = 15_000;
 const REACT_CDN_ENTRY_PREFIX = 'octane-e2e-react-cdn:';
 const REACT_CDN_ENTRIES = {
@@ -278,14 +291,31 @@ async function measureRouteGeometry(
 async function waitForLocatorText(
 	locator: import('playwright').Locator,
 	expected: string,
-	timeoutMs = 10_000,
+	timeoutMs = PLAYWRIGHT_ACTION_TIMEOUT,
 ): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
+	let last: string | undefined;
+	// The per-read timeout must stay well under the caller's budget, and a read
+	// that finds nothing yet must not end the wait. `textContent()` otherwise
+	// inherits the page's default action timeout, so a caller asking for 20s died
+	// after 10s with Playwright's own TimeoutError the first time the node was
+	// not attached yet — the loop below never got a second iteration and the
+	// extra budget was silently unreachable. Under concurrent load that is
+	// exactly when a preview iframe needs the longer wait it was promised.
 	while (Date.now() < deadline) {
-		if ((await locator.textContent())?.trim() === expected) return;
+		try {
+			last = (await locator.textContent({ timeout: 1_000 }))?.trim();
+			if (last === expected) return;
+		} catch {
+			// Not attached yet, or the frame is mid-navigation. Keep polling until
+			// OUR deadline; a genuine failure still surfaces as the throw below.
+		}
 		await new Promise((resolve) => setTimeout(resolve, 50));
 	}
-	throw new Error(`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`);
+	throw new Error(
+		`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms ` +
+			`(last observed: ${JSON.stringify(last)})`,
+	);
 }
 
 // The end-to-end contract behind the compiler's exact-origin channel, run
@@ -302,7 +332,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 	// CodeMirror mark all have to hold up too.
 	const { page, errors } = await loadRoute(baseUrl, '/playground');
 	try {
-		await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+		await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 		await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
 		const outputSelector = page.locator('[aria-label="Compiler output"]');
 
@@ -446,7 +476,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 						mode === 'server' ? "from 'octane/server'" : "from 'octane'",
 					),
 				target,
-				{ timeout: 15_000 },
+				{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 			);
 			// HOVER first: the source keyword itself must light up in the left
 			// pane. This is the feedback that tells you the position is mapped
@@ -503,7 +533,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					'@jsxImportSource',
 				),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		for (const keyword of ['@if', '@for', '@empty']) {
 			const typesClick = await probeKeyword(keyword, 'click');
@@ -526,7 +556,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		await page.waitForFunction(
 			() => (document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('@switch'),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		await outputSelector.selectOption('client');
 		// CodeMirror renders only the lines around its scroll position, and the
@@ -544,7 +574,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					"from 'octane'",
 				),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		// The same keywords in the TYPES output. `@switch`/`@case`/`@default`
 		// survive the type-only transform as JavaScript, so the inspection entry
@@ -556,7 +586,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					'@jsxImportSource',
 				),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		for (const keyword of ['@case', '@default']) {
 			const inTypes = await probeKeyword(keyword, 'click');
@@ -578,7 +608,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					"from 'octane'",
 				),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 
 		for (const keyword of ['@case', '@default']) {
@@ -616,7 +646,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		await page.waitForFunction(
 			() => (document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('@pending'),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		await outputSelector.selectOption('types');
 		await page.waitForFunction(
@@ -625,7 +655,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 					'@jsxImportSource',
 				),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		for (const [keyword, expected] of [
 			['@try', 'Suspense'],
@@ -657,7 +687,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			() =>
 				(document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('useFormStatus'),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		// The probes above left the SOURCE pane scrolled deep into another example,
 		// and CodeMirror renders only around its scroll position — rewind so the
@@ -672,7 +702,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			() =>
 				(document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('defaultValue'),
 			null,
-			{ timeout: 15_000 },
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		for (const target of ['client', 'server']) {
 			await outputSelector.selectOption(target);
@@ -682,7 +712,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 						mode === 'server' ? "from 'octane/server'" : "from 'octane'",
 					),
 				target,
-				{ timeout: 15_000 },
+				{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 			);
 			// The example's opening comment writes `<form action={fn}>` before the
 			// form uses it, so `action` is probed from the END; `defaultValue`
@@ -1091,7 +1121,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 							window.scrollY - (document.documentElement.scrollHeight - window.innerHeight),
 						) < 2,
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
 
@@ -1101,7 +1131,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						location.pathname === '/docs/quick-start' &&
 						document.querySelector('.prose h1')?.textContent === 'Quick start',
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 
 				// The new document is already at its initial position on its first
@@ -1146,7 +1176,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						location.pathname === '/docs/quick-start' &&
 						document.querySelector('.prose h1')?.textContent === 'Quick start',
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 
 				// Let the superseded panel-close promise settle. It must not append the
@@ -1221,7 +1251,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						);
 					},
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(await page.evaluate(() => scrollY)).toBe(900);
 
@@ -1262,7 +1292,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						);
 					},
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				// The clicked row must remain current after the scroll-spy's post-scroll
 				// settle window releases its temporary click lock.
@@ -1484,10 +1514,10 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		try {
 			await page.click('a.nav-link[href="/benchmarks"]');
 			await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
-				timeout: 10_000,
+				timeout: PLAYWRIGHT_ACTION_TIMEOUT,
 			});
 			await page.waitForFunction(() => document.querySelector('main .benchpage') !== null, null, {
-				timeout: 10_000,
+				timeout: PLAYWRIGHT_ACTION_TIMEOUT,
 			});
 			expect(errors).toEqual([]);
 		} finally {
@@ -1500,10 +1530,10 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		async () => {
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				const preview = page.frameLocator('iframe[title="Playground preview"]');
 				const heading = preview.locator('h2');
-				await waitForLocatorText(heading, 'Count: 0', 20_000);
+				await waitForLocatorText(heading, 'Count: 0');
 				await preview.getByRole('button', { name: 'Increment' }).click();
 				await waitForLocatorText(heading, 'Count: 1');
 				expect(errors).toEqual([]);
@@ -1520,7 +1550,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 			try {
 				await page.setViewportSize({ width: 390, height: 667 });
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				const source = page.locator('.pg-panel[aria-label="Source editor"] .cm-content');
 				// Mobile reflow can move fixed coordinates onto whitespace. Select
 				// the visible useState call so Inspect always has a real AST range.
@@ -1534,12 +1564,12 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await source.dispatchEvent('mouseleave');
 
 				const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
-				await leaf.waitFor({ timeout: 10_000 });
+				await leaf.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await leaf.locator(':scope > details > summary').click();
 				await page.waitForFunction(
 					() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 
 				await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
@@ -1553,7 +1583,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 							document.querySelectorAll('.pg-panel[aria-label="Source editor"] .cm-mapped'),
 						).some((mark) => getComputedStyle(mark).backgroundColor === 'rgba(255, 234, 0, 0.42)'),
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(errors).toEqual([]);
 			} finally {
@@ -1568,7 +1598,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		async () => {
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				const outputIncludes = (needle: string) =>
 					page.waitForFunction(
 						(text) =>
@@ -1576,7 +1606,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 								text,
 							),
 						needle,
-						{ timeout: 15_000 },
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
 				// Click the Nth occurrence of a token inside an editor pane (Shiki
 				// splits tokens into their own spans, so search per text node). The
@@ -1656,7 +1686,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 									[index as number]?.querySelectorAll('.cm-mapped') ?? [],
 							).some((mark) => mark.textContent === text),
 						[paneIndex, token] as const,
-						{ timeout: 10_000 },
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
 				const mappedIn = (paneIndex: number, token: string) =>
 					page.waitForFunction(
@@ -1665,7 +1695,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 								.querySelectorAll('.pg-editor .cm-content')
 								[index as number]?.querySelector('.cm-mapped')?.textContent === text,
 						[paneIndex, token] as const,
-						{ timeout: 10_000 },
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
 				// Client code is the default compiled artifact. Server and Types use
 				// the same output selector; Parsed exists only for AST inspection.
@@ -1719,7 +1749,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await page.waitForFunction(
 					() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
 				expect(await page.locator('.cm-mapped').count()).toBe(1);
@@ -1728,7 +1758,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 						getComputedStyle(document.querySelector('.pg-editor .cm-mapped')!).backgroundColor ===
 						'rgba(255, 234, 0, 0.42)',
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				// Client AST exposes the final Program plus template IR. Template
 				// origins keep the selected static tag in authored-source coordinates.
@@ -1743,7 +1773,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await page.waitForFunction(
 					() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
 				await outputSelector.selectOption('server');
@@ -1777,7 +1807,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await clickToken(0, 'useState', 2);
 				await mappedIn(1, 'useState');
 				await page.keyboard.type('{');
-				await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+				await page.locator('.pg-error').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await page.waitForFunction(
 					() => {
 						const out = document.querySelectorAll('.pg-editor .cm-content')[1];
@@ -1788,7 +1818,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 						);
 					},
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				// A failed AST generation replaces the prior tree and cannot map
 				// source hover through its stale ranges.
@@ -1818,7 +1848,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// height from the start.
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				const heights = () =>
 					page.evaluate(() =>
 						Array.from(document.querySelectorAll('.pg-panel-head')).map((head) =>
@@ -1869,7 +1899,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		async () => {
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
 
 				const marked = () =>
@@ -1955,7 +1985,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			});
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
 				await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
 				await page.locator('.pg-ast-tree').waitFor();
@@ -1965,7 +1995,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await page.locator('.pg-editor .cm-content').first().click();
 				await page.keyboard.press(selectAll);
 				await page.keyboard.type('export const value = ;');
-				await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+				await page.locator('.pg-error').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 
 				// The active App source still has a valid compiler AST. Editing it
 				// briefly invalidates the tree, then must restore it even though the
@@ -1978,7 +2008,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await page
 					.getByText('Waiting for the next successful compile…')
 					.waitFor({ timeout: 5_000 });
-				await page.locator('.pg-ast-tree').waitFor({ timeout: 10_000 });
+				await page.locator('.pg-ast-tree').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				expect(await page.locator('.pg-error').count()).toBe(1);
 				expect(errors).toEqual([]);
 			} finally {
@@ -1999,7 +2029,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			});
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				const warnings = page.getByRole('region', { name: 'Compiler warnings' });
 				await warnings.waitFor();
 				expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
@@ -2018,15 +2048,20 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		async () => {
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				// The tab strip is absent for the single-file default…
 				expect(await page.locator('.pg-tabs').count()).toBe(0);
 				await page.selectOption('.pg-select', 'parallel-use');
 				// …and appears with one tab per virtual file for the example.
-				await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).waitFor({ timeout: 10_000 });
+				await page
+					.locator('.pg-tab', { hasText: 'Data.tsrx' })
+					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				const preview = page.frameLocator('iframe[title="Playground preview"]');
 				// Both fake fetches resolve through the sibling module (no network).
-				await preview.locator('body').getByText('City: Reykjavík (1)').waitFor({ timeout: 20_000 });
+				await preview
+					.locator('body')
+					.getByText('City: Reykjavík (1)')
+					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				// Switching tabs swaps the editor buffer to the sibling file.
 				await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).click();
 				await page.waitForFunction(
@@ -2035,7 +2070,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 							.querySelector('.pg-editor .cm-content')
 							?.textContent?.includes('fetchForecast') ?? false,
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(errors).toEqual([]);
 			} finally {
@@ -2056,7 +2091,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			});
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await page.click('.pg-format');
 				// Prettier normalizes the squashed arrow — formatting works even while
 				// the shared payload is still consent-gated (it never executes code).
@@ -2066,7 +2101,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 							.querySelector('.pg-editor .cm-content')
 							?.textContent?.includes('onClick={() => {}}') ?? false,
 					null,
-					{ timeout: 15_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				expect(await page.locator('.pg-error').count()).toBe(0);
 				expect(errors).toEqual([]);
@@ -2094,13 +2129,13 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			});
 			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				// Untrusted payload: visible and compiled, but not executed.
 				await page.locator('.pg-consent').waitFor();
 				await page.click('.pg-consent-run');
 				const preview = page.frameLocator('iframe[title="Playground preview"]');
 				const heading = preview.locator('h2');
-				await waitForLocatorText(heading, 'Shared: from-a-link', 20_000);
+				await waitForLocatorText(heading, 'Shared: from-a-link');
 				expect(errors).toEqual([]);
 			} finally {
 				await page.close();
@@ -2116,9 +2151,11 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				beforeNavigation: installReactCdnMirror,
 			});
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await page.selectOption('.pg-select', 'octane-compat');
-				await page.locator('.pg-tab', { hasText: 'Island.tsrx' }).waitFor({ timeout: 10_000 });
+				await page
+					.locator('.pg-tab', { hasText: 'Island.tsrx' })
+					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
 				await page.locator('[aria-label="Compiler output"]').selectOption('types');
 				await page.waitForFunction(
@@ -2127,17 +2164,22 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 							'OctaneCompat',
 						),
 					null,
-					{ timeout: 10_000 },
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
 				await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
 				const preview = page.frameLocator('iframe[title="Playground preview"]');
 				// Real react-dom mounts the host; the compiled Octane island renders
 				// inside it and resolves its own @try/@pending fetch.
 				await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
-				await preview.locator('body').getByText('island data #1').waitFor({ timeout: 20_000 });
+				await preview
+					.locator('body')
+					.getByText('island data #1')
+					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				// Native events keep working across the boundary.
 				await preview.getByRole('button', { name: 'clicks: 3' }).click();
-				await preview.getByRole('button', { name: 'clicks: 4' }).waitFor({ timeout: 10_000 });
+				await preview
+					.getByRole('button', { name: 'clicks: 4' })
+					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
 				expect(errors).toEqual([]);
 			} finally {
 				await page.close();
