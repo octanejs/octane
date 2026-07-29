@@ -25,6 +25,7 @@
 import { createRouter } from './router.js';
 import { createContext, runMiddlewareChain } from './middleware.js';
 import { handleRpcRequest } from './rpc.js';
+import { rpcIdCollision } from './rpc-registry.js';
 import { handleServerRoute } from './server-route.js';
 import { composeHtmlStream } from './html-stream.js';
 import {
@@ -110,7 +111,14 @@ function buildRpcDescriptors(rpcModules, hashFn) {
 	const descriptors = new Map();
 	for (const [entryPath, serverObj] of Object.entries(rpcModules)) {
 		for (const funcName of Object.keys(serverObj)) {
-			descriptors.set(hashFn(entryPath + '#' + funcName), { module: entryPath, export: funcName });
+			const id = hashFn(entryPath + '#' + funcName);
+			// Each manifest entry is listed once, so an id already taken here is a
+			// genuine collision. `build_rpc_lookup` would resolve it by overwriting.
+			const existing = descriptors.get(id);
+			if (existing !== undefined) {
+				throw rpcIdCollision(id, existing, { module: entryPath, export: funcName });
+			}
+			descriptors.set(id, { module: entryPath, export: funcName });
 		}
 	}
 	return descriptors;

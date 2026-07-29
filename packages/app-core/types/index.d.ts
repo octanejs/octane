@@ -209,6 +209,18 @@ export function getRequestContext(): Context;
 /** {@link getRequestContext}, returning `null` outside a request instead of throwing. */
 export function tryGetRequestContext(): Context | null;
 
+/**
+ * The `globalThis.rpc_modules` registry compiled `module server` declarations
+ * register into, guarding against an id collision.
+ *
+ * An id is a truncated hash of the module path and export name, so two exports
+ * can produce the same one. A plain Map would resolve that by overwriting, which
+ * makes one function unreachable and routes its calls to the other. This throws
+ * instead. Re-registering the same export is a no-op, which module reloads rely
+ * on.
+ */
+export function createRpcRegistry(): Map<string, [modulePath: string, exportName: string]>;
+
 // ============================================================================
 // Configuration
 // ============================================================================

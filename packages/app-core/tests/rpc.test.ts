@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Context, Middleware } from '@octanejs/app-core';
 import { createHandler } from '../src/server/production.js';
 import { getRequestContext, tryGetRequestContext } from '../src/server/request-context.js';
+import { createRpcRegistry } from '../src/server/rpc-registry.js';
 
 const TEMPLATE = `<!doctype html>
 <html><head><!--ssr-head--></head><body><div id="root"><!--ssr-body--></div>
@@ -18,6 +19,7 @@ interface RpcTestOptions {
 	middlewares?: Middleware[];
 	trustProxy?: boolean;
 	action?: (...args: unknown[]) => unknown;
+	rpcModules?: Record<string, Record<string, Function>>;
 }
 
 function createRpcHandler(options: RpcTestOptions = {}) {
@@ -34,7 +36,7 @@ function createRpcHandler(options: RpcTestOptions = {}) {
 				...(options.allowedOrigins === undefined ? {} : { allowedOrigins: options.allowedOrigins }),
 				...(options.maxBodyBytes === undefined ? {} : { maxBodyBytes: options.maxBodyBytes }),
 			},
-			rpcModules: { '/src/actions.ts': { action } },
+			rpcModules: options.rpcModules ?? { '/src/actions.ts': { action } },
 			runtime: {
 				hash: () => 'deadbeef',
 				createAsyncContext: <T>() => {
@@ -519,6 +521,14 @@ describe('server-function HTTP security', () => {
 		expect(target).toEqual({ id: 'aaaaaaaa', module: null, export: null });
 	});
 
+	it('refuses to boot when two server functions share an id', () => {
+		expect(() =>
+			createRpcHandler({
+				rpcModules: { '/src/actions.ts': { first: () => 'a', second: () => 'b' } },
+			}),
+		).toThrow(/share the id "deadbeef"/);
+	});
+
 	it('does not disclose server-action exception messages', async () => {
 		const secret = 'private database password';
 		const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -551,5 +561,25 @@ describe('server-function HTTP security', () => {
 		expect(await response.text()).not.toContain(secret);
 		expect(action).not.toHaveBeenCalled();
 		expect(loggedError).toHaveBeenCalledOnce();
+	});
+});
+
+describe('server-function id registry', () => {
+	it('rejects a second declaration under an id another export already took', () => {
+		const registry = createRpcRegistry();
+		registry.set('deadbeef', ['/src/a.ts', 'run']);
+
+		expect(() => registry.set('deadbeef', ['/src/b.ts', 'run'])).toThrow(
+			/Two server functions share the id "deadbeef"/,
+		);
+		expect(registry.get('deadbeef')).toEqual(['/src/a.ts', 'run']);
+	});
+
+	it('accepts re-registering the same export across a module reload', () => {
+		const registry = createRpcRegistry();
+		registry.set('deadbeef', ['/src/a.ts', 'run']);
+
+		expect(() => registry.set('deadbeef', ['/src/a.ts', 'run'])).not.toThrow();
+		expect(registry.get('deadbeef')).toEqual(['/src/a.ts', 'run']);
 	});
 });
