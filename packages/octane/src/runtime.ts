@@ -4318,6 +4318,9 @@ interface LinkedStateSlot<Source, Value> {
 	renderSource?: Source;
 	renderValue?: Value;
 	renderValueEqual?: (previous: Value, next: Value) => boolean;
+	renderSourceChanged?: boolean;
+	/** Preserve only drafts explicitly edited by their rendering owner. */
+	renderUpdated?: boolean;
 	renderVersion?: number;
 }
 
@@ -4391,6 +4394,7 @@ export function useLinkedState<Source, Value>(
 				if ((equal ?? Object.is)(previous, computed)) return;
 				if (renderingDraft) {
 					state!.renderValue = computed;
+					state!.renderUpdated = true;
 					scheduleRender(block);
 					return;
 				}
@@ -4419,24 +4423,39 @@ export function useLinkedState<Source, Value>(
 		return [value, state.setter] as unknown as LinkedStateTuple<Value>;
 	}
 
-	const sourceChanged = !(options?.sourceEqual ?? Object.is)(state.source, source);
-	if (!sourceChanged && state.valueEqual === equalValue) {
+	const equalSource = options?.sourceEqual ?? Object.is;
+	const sourceChanged = !equalSource(state.source, source);
+	const reuseUpdatedDraft =
+		state.renderPending === true &&
+		state.renderUpdated === true &&
+		state.renderSourceChanged === sourceChanged &&
+		state.renderValueEqual === equalValue &&
+		equalSource(state.renderSource as Source, source);
+	if (!reuseUpdatedDraft && !sourceChanged && state.valueEqual === equalValue) {
 		// A previous failed render can have left a private draft behind. It was
 		// never published, so a committed-source replay must discard it explicitly.
 		state.renderPending = false;
+		state.renderUpdated = false;
+		state.renderSourceChanged = false;
 		return [state.value, state.setter] as unknown as LinkedStateTuple<Value>;
 	}
 
-	let value = state.value;
-	if (sourceChanged) {
+	let value = reuseUpdatedDraft ? (state.renderValue as Value) : state.value;
+	if (sourceChanged && !reuseUpdatedDraft) {
 		const previous = { source: state.source, value: state.value };
 		const reconciled = reconcile(source, previous);
 		if (!(equalValue ?? Object.is)(state.value, reconciled)) value = reconciled;
 	}
 	state.renderPending = true;
-	state.renderSource = sourceChanged ? source : state.source;
+	state.renderSource = reuseUpdatedDraft
+		? state.renderSource
+		: sourceChanged
+			? source
+			: state.source;
 	state.renderValue = value;
 	state.renderValueEqual = equalValue;
+	state.renderSourceChanged = sourceChanged;
+	state.renderUpdated = reuseUpdatedDraft;
 	const version = (state.renderVersion = (state.renderVersion ?? 0) + 1);
 	const current = state;
 	const publish = () => {
@@ -4461,6 +4480,8 @@ export function useLinkedState<Source, Value>(
 		current.value = current.renderValue as Value;
 		current.valueEqual = current.renderValueEqual;
 		current.renderPending = false;
+		current.renderSourceChanged = false;
+		current.renderUpdated = false;
 	};
 	enqueueEffectEventCommitAction(publish);
 	return [value, state.setter] as unknown as LinkedStateTuple<Value>;

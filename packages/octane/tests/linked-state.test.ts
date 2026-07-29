@@ -342,6 +342,98 @@ describe('useLinkedState', () => {
 		root.unmount();
 	});
 
+	it('preserves render-time edits when a changed source schedules another render', () => {
+		const previous: Array<PreviousSource<string, string>> = [];
+		let controls!: LinkedControls<string>;
+		let editNextRender = false;
+		const props = {
+			source: 'A',
+			getter: true,
+			reconcile: (source: string, prior: PreviousSource<string, string>) => {
+				previous.push(prior);
+				return source;
+			},
+			observe: (next: LinkedControls<string>) => {
+				controls = next;
+				if (!editNextRender) return;
+				editNextRender = false;
+				next.set((value) => `${value}: first`);
+				next.set((value) => `${value}: second`);
+			},
+		};
+		const root = mount(LinkedComponent, props);
+
+		editNextRender = true;
+		root.update(LinkedComponent, { ...props, source: 'B' });
+		expect(root.find('#linked-value').textContent).toBe('B: first: second');
+		expect(controls.get!()).toBe('B: first: second');
+
+		root.update(LinkedComponent, { ...props, source: 'C' });
+		expect(previous.at(-1)).toEqual({ source: 'B', value: 'B: first: second' });
+		root.unmount();
+	});
+
+	it('preserves render-time edits while adopting a new value comparator', () => {
+		let controls!: LinkedControls<string>;
+		let editNextRender = false;
+		const props = {
+			source: 'A',
+			getter: true,
+			reconcile: (source: string) => source,
+			observe: (next: LinkedControls<string>) => {
+				controls = next;
+				if (!editNextRender) return;
+				editNextRender = false;
+				next.set((value) => `${value}: edited`);
+			},
+		};
+		const root = mount(LinkedComponent, props);
+		const valueEqual = (left: string, right: string) => left === right;
+
+		editNextRender = true;
+		root.update(LinkedComponent, { ...props, options: { valueEqual } });
+		expect(root.find('#linked-value').textContent).toBe('A: edited');
+		expect(controls.get!()).toBe('A: edited');
+		root.unmount();
+	});
+
+	it('preserves edited source drafts when their custom source comparator matches', () => {
+		type Source = { id: number; label: string };
+		const previous: Array<PreviousSource<Source, string>> = [];
+		let controls!: LinkedControls<string>;
+		let editNextRender = false;
+		const initial = { id: 1, label: 'A' };
+		const changed = { id: 2, label: 'B' };
+		const options = { sourceEqual: (left: Source, right: Source) => left.id === right.id };
+		const props = {
+			source: initial,
+			getter: true,
+			options,
+			reconcile: (source: Source, prior: PreviousSource<Source, string>) => {
+				previous.push(prior);
+				return source.label;
+			},
+			observe: (next: LinkedControls<string>) => {
+				controls = next;
+				if (!editNextRender) return;
+				editNextRender = false;
+				next.set((value) => `${value}: edited`);
+			},
+		};
+		const root = mount(LinkedComponent, props);
+
+		editNextRender = true;
+		root.update(LinkedComponent, { ...props, source: changed });
+		expect(root.find('#linked-value').textContent).toBe('B: edited');
+		expect(controls.get!()).toBe('B: edited');
+
+		root.update(LinkedComponent, { ...props, source: { id: 2, label: 'equivalent' } });
+		expect(root.find('#linked-value').textContent).toBe('B: edited');
+		root.update(LinkedComponent, { ...props, source: { id: 3, label: 'C' } });
+		expect(previous.at(-1)).toEqual({ source: changed, value: 'B: edited' });
+		root.unmount();
+	});
+
 	it('does not publish a source reconciliation from an aborted Suspense render', async () => {
 		const gate = deferred<string>();
 		const observed: Array<{ source: string; previous: PreviousSource<string, string> }> = [];

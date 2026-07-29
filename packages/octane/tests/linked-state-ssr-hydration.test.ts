@@ -49,6 +49,18 @@ export function RenderPhaseSource(props) @{
 	<span id="linked-render-phase">{value as string}</span>
 }
 
+export function HydratedRenderPhaseEdit(props) @{
+	const [value, setValue, getValue] = useLinkedState(
+		props.source,
+		(source) => 'draft:' + source,
+	);
+	if (props.edit && value === 'draft:' + props.source) {
+		setValue((previous) => previous + '!');
+	}
+	props.capture?.({ value, setValue, getValue });
+	<span id="hydrated-linked-edit">{value as string}</span>
+}
+
 export function ConditionalLinked(props) @{
 	let value = 'inactive';
 	if (props.active) {
@@ -89,6 +101,7 @@ type FixtureModule = {
 	LinkedDraft: any;
 	LinkedPair: any;
 	RenderPhaseSource: any;
+	HydratedRenderPhaseEdit: any;
 	ConditionalLinked: any;
 	NestedLinkedSuspense: any;
 };
@@ -261,6 +274,40 @@ describe('useLinkedState hydration', () => {
 			expect(container.querySelector('#linked-draft')).toBe(serverButton);
 			expect(serverButton.textContent).toBe('draft:second');
 			expect(captured?.getValue()).toBe('draft:second');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps a render-phase edit when an already-hydrated linked source changes', () => {
+		const server = serverComponents();
+		const client = clientComponents();
+		container.innerHTML = ServerRuntime.renderToString(server.HydratedRenderPhaseEdit, {
+			source: 'A',
+		}).html;
+		const serverNode = container.querySelector('#hydrated-linked-edit') as HTMLSpanElement;
+		let captured: CapturedLinked<string> | undefined;
+		const capture = (value: CapturedLinked<string>) => (captured = value);
+
+		const root = hydrateRoot(container, client.HydratedRenderPhaseEdit, {
+			source: 'A',
+			capture,
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#hydrated-linked-edit')).toBe(serverNode);
+			expect(serverNode.textContent).toBe('draft:A');
+
+			flushSync(() =>
+				root.render(client.HydratedRenderPhaseEdit, {
+					source: 'B',
+					edit: true,
+					capture,
+				}),
+			);
+			expect(container.querySelector('#hydrated-linked-edit')).toBe(serverNode);
+			expect(serverNode.textContent).toBe('draft:B!');
+			expect(captured?.getValue()).toBe('draft:B!');
 		} finally {
 			root.unmount();
 		}
