@@ -25,6 +25,7 @@ import {
 	TransitionListToEmpty,
 	TransitionKeyedAddition,
 	TransitionKeyedEmptyFill,
+	TransitionArrayModeExit,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -896,5 +897,46 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(ids()).toEqual(['row-d']);
 		expect(log.drain()).toEqual(['mount:d']);
 		r.unmount();
+	});
+
+	it('a slot leaving array mode tears its rows down inline, not deferred past the attempt', async () => {
+		const fulfilled = {
+			status: 'fulfilled',
+			value: 'zero',
+			then: (fn: (v: string) => void) => void fn('zero'),
+		} as unknown as Promise<string>;
+		const d1 = deferred<string>();
+		const load = (step: number) => (step === 0 ? fulfilled : d1.promise);
+		const log = createLog();
+
+		const r = mount(TransitionArrayModeExit, { load, log: log.push });
+		await act(() => {});
+		expect(r.findAll('#host li').map((li) => li.id)).toEqual(['row-a', 'row-b']);
+		expect(log.drain()).toEqual(['render:tail:0', 'mount:a', 'mount:b']);
+
+		// The flip discards the slot itself, so a hold has nothing to restore the
+		// rows into. Their teardown belongs to the attempt that removed them —
+		// layout cleanups fire before the tail's render, the pre-parking order —
+		// rather than parking them as deferred-but-unrestorable.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(log.drain()).toEqual(['cleanup:a', 'cleanup:b', 'render:tail:1']);
+		// The flipped-in text stays: a slot kind flip is not journaled (the
+		// retained per-swap limitation in SUSPENSE_DIVERGENCE.md #4), while the
+		// tail below it holds its prior value.
+		expect(r.find('#host').textContent).toBe('plain');
+		expect(r.find('#value').textContent).toBe('zero');
+
+		await act(() => {
+			d1.resolve('one');
+		});
+		expect(r.find('#host').textContent).toBe('plain');
+		expect(r.find('#value').textContent).toBe('one');
+		expect(log.drain()).toEqual(['render:tail:1']);
+
+		// Exactly-once: the rows were torn down by the flip and never again.
+		r.unmount();
+		await act(() => {});
+		expect(log.drain()).toEqual([]);
 	});
 });

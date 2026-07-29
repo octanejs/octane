@@ -129,6 +129,12 @@ the first:
    alongside dropped rows. `transitions.test.ts` pins the drop, the state survival, the
    cleanup timing, and both directions of the `@empty` swap.
 
+   Parking is gated on the slot's shape being journaled (`forSlotParkable`): a
+   value-position slot LEAVING array mode discards the slot itself, so its rows have
+   nothing to be restored into and tear down inline with the attempt, exactly as before —
+   that kind flip is part of the retained per-swap limitation above, and the flipped-in
+   content stays through a hold. `transitions.test.ts` pins the inline teardown order.
+
    **This one is NOT blocked by the pending cue, and it is the most visible of the two.** A
    keyed list between the `@try` and the suspending component sits inside the boundary's own
    journal window, so it needs no attempt-level widening. Reproduced 2026-07-29: a list of
