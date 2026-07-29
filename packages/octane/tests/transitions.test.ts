@@ -20,6 +20,7 @@ import {
 	TransitionResumeAtomicity,
 	TransitionNamespacedAttr,
 	TransitionControlledInput,
+	TransitionRadioGroup,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -722,6 +723,42 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(text.value).toBe('step-1');
 		expect(box.checked).toBe(true);
 		expect(r.find('#value').textContent).toBe('one');
+		r.unmount();
+	});
+
+	it('holds a radio group, including the cousin the platform cleared', async () => {
+		const entries = new Map<number, Deferred<string>>();
+		const load = (step: number) => {
+			let entry = entries.get(step);
+			if (entry === undefined) {
+				entry = deferred<string>();
+				entries.set(step, entry);
+			}
+			return entry.promise;
+		};
+		load(0);
+		entries.get(0)!.resolve('zero');
+
+		const r = mount(TransitionRadioGroup, { load });
+		await act(() => {});
+		const a = r.find('#r-a') as HTMLInputElement;
+		const b = r.find('#r-b') as HTMLInputElement;
+		expect(a.checked).toBe(false);
+		expect(b.checked).toBe(true);
+
+		// Step 1 checks a, which makes the platform clear b before b's own
+		// binding runs. The boundary then suspends, so the group has to go back
+		// to b — not to nothing selected.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(a.checked).toBe(false);
+		expect(b.checked).toBe(true);
+
+		await act(() => {
+			entries.get(1)!.resolve('one');
+		});
+		expect(a.checked).toBe(true);
+		expect(b.checked).toBe(false);
 		r.unmount();
 	});
 });

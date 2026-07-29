@@ -1146,7 +1146,46 @@ function journalControlled(el: Element, prop: string, defaultProp: string): void
 	log.push(JOURNAL_PROP, el, defaultProp, (el as any)[defaultProp]);
 	const ctrl = (el as any).$$ctrl;
 	if (ctrl !== undefined) journalObjectOnce(ctrl);
+	const input = el as HTMLInputElement;
+	if (prop === 'checked' && input.type === 'radio' && input.name !== '') journalRadioCousins(input);
 	journalBag();
+}
+
+/**
+ * Record the cousin a radio write is about to clear.
+ *
+ * Checking a radio makes the platform uncheck its same-name siblings as a side
+ * effect, so a cousin cannot record its own prior state: by the time its binding
+ * runs it has already been cleared, and an uncontrolled cousin never records at
+ * all. Only a currently-checked cousin can be cleared, and a well-formed group
+ * has at most one, so this scans the group but adds at most one entry.
+ *
+ * Group scope mirrors restoreRadioCousins: same non-empty name, same form owner
+ * when there is one. Re-recording a cousin across several writes in one window
+ * is harmless — the replay runs newest-first, so the earliest value is the one
+ * left standing.
+ */
+function journalRadioCousins(input: HTMLInputElement): void {
+	const name = input.name;
+	const group: ArrayLike<Node> =
+		input.form !== null
+			? input.form.elements
+			: typeof document !== 'undefined'
+				? document.getElementsByName(name)
+				: [];
+	for (let i = 0; i < group.length; i++) {
+		const other = group[i] as HTMLInputElement;
+		if (
+			other === input ||
+			!other.checked ||
+			other.localName !== 'input' ||
+			other.type !== 'radio' ||
+			other.name !== name
+		) {
+			continue;
+		}
+		TRANSITION_JOURNAL!.push(JOURNAL_PROP, other, 'checked', true);
+	}
 }
 
 function journalControlledOption(option: HTMLOptionElement, withDefault: boolean): void {

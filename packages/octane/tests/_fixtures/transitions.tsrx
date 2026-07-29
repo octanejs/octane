@@ -498,3 +498,25 @@ export function TransitionControlledInput(props) @{
 		}
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// A radio group inside a boundary. Checking one radio makes the platform clear
+// its same-name cousins, so by the time a cousin's own binding runs it has
+// already been cleared — recording it there would capture the wrong state and
+// the group would come back with nothing selected.
+// ---------------------------------------------------------------------------
+export function TransitionRadioGroup(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<input id="r-a" type="radio" name="pick-group" checked={step === 1} onChange={() => {}} />
+				<input id="r-b" type="radio" name="pick-group" checked={step === 0} onChange={() => {}} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
