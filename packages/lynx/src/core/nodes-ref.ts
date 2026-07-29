@@ -8,7 +8,10 @@ export function createLynxNodesRefSelector(root: number, id: number, generation:
 	positiveSafeInteger(root, 'selector root');
 	positiveSafeInteger(id, 'selector id');
 	positiveSafeInteger(generation, 'selector generation');
-	return `[${LYNX_NODES_REF_ATTRIBUTE}="r${root}-h${id}-g${generation}"]`;
+	// Native Lynx attribute-selector matching compares the text after `=`
+	// verbatim without stripping quotes, so the value must stay unquoted; the
+	// token is a plain CSS identifier, so DOM `querySelector` accepts it too.
+	return `[${LYNX_NODES_REF_ATTRIBUTE}=r${root}-h${id}-g${generation}]`;
 }
 
 /** Immutable native identity captured by one background query handle. */
