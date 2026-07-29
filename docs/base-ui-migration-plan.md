@@ -10,6 +10,52 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **Phase 3g — Toast (2026-07-28). Green: 155 base-ui tests (97 differential + 58 behavior/namespace),
+> typecheck + `format:check` clean.** Subpath coverage **31/43 → 32/43**.
+>
+> `packages/base-ui/src/toast.ts` (~1,900 loc) ports the store, `createToastManager`,
+> `useToastManager` and all 11 parts. Toast is the one overlay family with no trigger and no
+> floating store: toasts are created imperatively — from `useToastManager().add()` inside a
+> component or a `createToastManager()` handle outside one entirely — and the `ToastStore` owns the
+> list, the per-toast auto-dismiss timers, and the pause/resume rules (hover, focus, window blur,
+> touch). Supporting additions: `utils/generateId` (toast ids are minted outside render, so they
+> cannot come from a hook), `utils/useOnMount`, and the swipe-ignore attribute constants.
+>
+> **PLAN CORRECTION.** This phase was scoped at ~4,200 loc because "`useSwipeDismiss` is shared with
+> Drawer, so it lands here". That is wrong for 1.6.0: Toast implements its swipe inline in
+> `ToastRoot` and imports only two pure geometry helpers (`getDisplacement`, `getElementTransform`)
+> from that file, which are inlined here. The 1,208-line hook has exactly two consumers, both Drawer
+> (`DrawerViewport`, `DrawerSwipeArea`), so it moves to **Phase 6** where it is actually used. Real
+> size of this phase: ~2,850 loc of upstream source.
+>
+> **Parity bug caught by the rig**: `Toast.Title`/`Toast.Description` were written with
+> `useBaseUiId` "to match the rest of the binding", which prefixes ids with `base-ui-`. Upstream
+> reaches for the RAW `@base-ui/utils/useId` there, with no prefix — so every `aria-labelledby` /
+> `aria-describedby` diverged. Now uses octane's raw `useId`. This is the third time the
+> prefixed-vs-raw id distinction has bitten; the rule is that `useBaseUiId` is only correct where
+> upstream itself calls `internals/useBaseUiId`.
+>
+> Differential covers the empty viewport and the add path (one toast, two toasts, `limit`, high
+> priority), driven by clicking a real "add" button on both runtimes. Behavior tests cover what the
+> rig cannot see: the imperative manager (add/update/close, id-reuse upsert), `onClose`/`onRemove`
+> ordering, auto-dismiss, hover pausing and resuming the timer, `type: 'loading'` opting out of the
+> timer plus the `promise` helper's loading→success handoff, `limit` flagging rather than removing,
+> and the close button.
+>
+> **Swipe IS testable in jsdom — correcting an earlier claim.** After Menu I wrote that gesture
+> paths were jsdom-blind across the board. That is true only of the hover/`safePolygon` family,
+> which needs real `getBoundingClientRect` geometry. Swipe is pure `clientX`/`clientY` delta math,
+> and `getElementTransform` reading `transform: none` just yields a `{0,0,1}` baseline, so synthetic
+> pointer events drive it end to end. Three swipe tests now cover dismissal past the threshold,
+> direction locking + the movement CSS variable + spring-back below the threshold, and the guard
+> that a drag starting on an interactive element does not swipe. Two gotchas for whoever writes the
+> next one: `movementX`/`movementY` are getter-only on jsdom's MouseEvent so they must be
+> `defineProperty`'d, and the FIRST `pointermove` is consumed as the iOS baseline reset, so a drag
+> needs two moves.
+>
+> Still not covered: the close→remove gap — jsdom runs no animations, so `useOpenChangeComplete`
+> resolves in the same flush and only the ORDER of the two callbacks is deterministic.
+
 > **Phase 3f COMPLETE — stage 4, Menubar + ContextMenu (2026-07-27). Green: 142 base-ui tests
 > (93 differential + 49 behavior/namespace), typecheck + `format:check` clean.** Subpath coverage
 > **29/43 → 31/43**.
@@ -792,10 +838,12 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
   - *Stage 4* (DONE, ~650 loc): `Menubar` and `ContextMenu`, which fill in the
     already-transcribed `menubar` / `context-menu` parent branches and provide
     the two context-only modules stage 1 landed. ✅ **Phase 3f complete.**
-- **Phase 3g — Toast** (~4,200 loc): `useSwipeDismiss` + `focusVisible` + the 11
-  Toast parts. `useSwipeDismiss` is shared with Drawer, so it lands here.
-  *Exit:* differential on a rendered toast, behavior tests for timeout dismiss,
-  swipe dismiss, and the viewport focus model.
+- **Phase 3g — Toast** (DONE, ~2,850 loc): the store, `createToastManager`,
+  `useToastManager` and the 11 Toast parts. Differential on added toasts
+  (single, stacked, limited, high-priority); behavior tests for the imperative
+  manager, auto-dismiss, hover pause/resume, loading + promise toasts, and the
+  limit flag. `useSwipeDismiss` was NOT part of this phase — see the correction
+  in the progress entry; it moved to Phase 6, its only consumer. ✅
 - **Phase 4 — Disclosure, navigation, composite** (~6,000 loc), independent of
   the floating store and parallelisable with Phase 3: `Collapsible`
   (+ `collapsibleOpenStateMapping`) → `Accordion`; `Toolbar`; `Tabs`
@@ -807,9 +855,10 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
   `ComboboxInternalDismissButton`), then `Autocomplete` as a thin layer, then
   `OtpField` (+ `utils/otp`). *Exit:* differential on open lists, behavior tests
   for keyboard selection, typeahead, filtering, and Field integration.
-- **Phase 6 — Drawer + residual** (~5,300 loc): `NavigationMenu`
+- **Phase 6 — Drawer + residual** (~6,500 loc): `NavigationMenu`
   (+ `setSharedFixedSize`, `isOutsideMenuEvent`), `Drawer` (+ `getElementAtPoint`,
-  `scrollable`, reusing 3g's `useSwipeDismiss`), and `NumberField.ScrubArea` /
+  `scrollable`, and `useSwipeDismiss` itself — 1,208 loc, moved here from 3g
+  because Drawer is its only consumer), and `NumberField.ScrubArea` /
   `ScrubAreaCursor` with the real `usePressAndHold` (deletes stub C2).
 - **Phase 7 — Close-out**: barrel export of the full surface, open-overlay SSR +
   hydration coverage, README + divergence notes, `docs/bindings-status.md`
@@ -821,9 +870,10 @@ dedicated behavior tests for anything the rig cannot see, `pnpm typecheck`,
   with them.
 - Fix the octane `Provider` children shape-flip before Phase 3f — Menu, Select and
   Combobox each add several Roots that would otherwise inherit the workaround.
-- `useSwipeDismiss` (1,209 loc) is the single largest shared util and serves only
-  Toast and Drawer; keeping it in Phase 3g means Phase 6's Drawer is mostly
-  component code.
+- `useSwipeDismiss` (1,208 loc) is the single largest remaining util. The original
+  note here claimed it served Toast and Drawer; porting Toast proved it serves
+  ONLY Drawer (Toast borrows two pure helpers from the file), so it lands in
+  Phase 6 alongside its consumer.
 
 ### Historical phase plan (superseded)
 

@@ -701,6 +701,48 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	it('Toast: empty viewport (live region resting state)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToastEmpty', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Toast: adding a toast renders it byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToastBasic', undefined, CACHE);
+		await d.step('mount (empty)', () => {});
+		await d.step('add a toast', async (i, r) => {
+			await i.click('.toast-add');
+			await r.click('.toast-add');
+		});
+		await d.step('add a second toast', async (i, r) => {
+			await i.click('.toast-add');
+			await r.click('.toast-add');
+		});
+		d.unmount();
+	});
+
+	it('Toast: limit marks older toasts limited rather than removing them', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToastLimited', undefined, CACHE);
+		await d.step('add a toast', async (i, r) => {
+			await i.click('.toast-add');
+			await r.click('.toast-add');
+		});
+		await d.step('add a second toast (first becomes limited)', async (i, r) => {
+			await i.click('.toast-add');
+			await r.click('.toast-add');
+		});
+		d.unmount();
+	});
+
+	it('Toast: high priority renders alertdialog + the hidden alert live region', async () => {
+		const d = await mountDifferential(FIXTURE, 'ToastHighPriority', undefined, CACHE);
+		await d.step('add an urgent toast', async (i, r) => {
+			await i.click('.toast-add-high');
+			await r.click('.toast-add-high');
+		});
+		d.unmount();
+	});
+
 	it('Menubar: closed (composite root of menuitem triggers)', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenubarClosed', undefined, CACHE);
 		await d.step('mount', () => {});
