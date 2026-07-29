@@ -174,8 +174,8 @@ beforeAll(async () => {
 	} catch (error) {
 		throw new Error(
 			'[ssr-hydration.e2e] Chromium is required ' +
-				'(run `pnpm exec playwright install chromium`): ' +
-				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			'(run `pnpm exec playwright install chromium`): ' +
+			(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 		);
 	}
 }, 60_000);
@@ -237,7 +237,7 @@ async function loadRoute(
 			}
 		}
 	} catch (error) {
-		await page.close().catch(() => {});
+		await page.close().catch(() => { });
 		throw error;
 	}
 }
@@ -314,7 +314,7 @@ async function waitForLocatorText(
 	}
 	throw new Error(
 		`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms ` +
-			`(last observed: ${JSON.stringify(last)})`,
+		`(last observed: ${JSON.stringify(last)})`,
 	);
 }
 
@@ -432,7 +432,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 						Array.from(
 							document
 								.querySelectorAll('.pg-editor .cm-content')
-								[index]?.querySelectorAll('.cm-mapped') ?? [],
+							[index]?.querySelectorAll('.cm-mapped') ?? [],
 						).map((mark) => mark.textContent);
 					const scroller = document
 						.querySelectorAll('.pg-editor .cm-content')[1]
@@ -754,7 +754,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 // The single exception is the HMR case, which edits files on disk and is pinned
 // `it.sequential` — declared last, it runs after the concurrent batch drains.
 // maxConcurrency lives on the project config.
-describe.sequential('website dev-SSR → hydration (real browser)', () => {
+describe('website dev-SSR → hydration (real browser)', { concurrent: false }, () => {
 	let server: ChildProcess;
 	let DEV_PORT: number;
 
@@ -1162,7 +1162,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				await page.waitForFunction(
 					() =>
 						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-							'true' &&
+						'true' &&
 						getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
 				);
 
@@ -1240,7 +1240,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						const panelMaxHeight = Number.parseFloat(getComputedStyle(panelInner).maxHeight);
 						return (
 							document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-								'true' &&
+							'true' &&
 							getComputedStyle(sidebar).position === 'sticky' &&
 							Math.abs(sidebarRect.top - header.bottom) <= 2 &&
 							Math.abs(panel.top - sidebarRect.bottom) <= 2 &&
@@ -1284,7 +1284,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						return (
 							location.hash === '#rspack' &&
 							document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-								'false' &&
+							'false' &&
 							getComputedStyle(panel).visibility === 'hidden' &&
 							panelInner.height < 1 &&
 							target.top >= sidebar.bottom + 8 &&
@@ -1369,8 +1369,9 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	// `sequential` is load-bearing, not stylistic: this is the only case that
 	// edits files on disk, so it would corrupt any sibling sharing the dev server.
 	// Declared last, it runs once the concurrent batch above has drained.
-	it.sequential(
+	it(
 		'hydrates cleanly on reload after HMR edits (hot server)',
+		{ concurrent: false },
 		async () => {
 			const files = [
 				join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
@@ -1427,7 +1428,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 // Sequential suite, `it.concurrent` cases — same shape and same reason as the
 // dev suite above: page-per-case against one shared server, nothing here writes
 // to disk.
-describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
+describe('website production build → hydration (Nitro Vercel preview)', { concurrent: false }, () => {
 	const PREVIEW_ORIGIN = inject('productionOrigin');
 	const outputDir = inject('productionOutputDir');
 
@@ -1663,7 +1664,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					page.evaluate((index) => {
 						const scroller = document
 							.querySelectorAll('.pg-editor .cm-content')
-							[index as number]?.closest('.cm-scroller');
+						[index as number]?.closest('.cm-scroller');
 						if (scroller) scroller.scrollTop = 0;
 					}, paneIndex);
 				const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
@@ -1683,7 +1684,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 							Array.from(
 								document
 									.querySelectorAll('.pg-editor .cm-content')
-									[index as number]?.querySelectorAll('.cm-mapped') ?? [],
+								[index as number]?.querySelectorAll('.cm-mapped') ?? [],
 							).some((mark) => mark.textContent === text),
 						[paneIndex, token] as const,
 						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
@@ -1693,7 +1694,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 						([index, text]) =>
 							document
 								.querySelectorAll('.pg-editor .cm-content')
-								[index as number]?.querySelector('.cm-mapped')?.textContent === text,
+							[index as number]?.querySelector('.cm-mapped')?.textContent === text,
 						[paneIndex, token] as const,
 						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
