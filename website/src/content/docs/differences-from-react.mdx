@@ -82,6 +82,19 @@ await save(getDraft());
 
 Ordinary two-item destructuring stays on the normal two-item path.
 
+When local state should reset or adjust after another value changes, Octane adds
+`useLinkedState`:
+
+```tsrx
+const [name, setName] = useLinkedState(user.id, () => user.name);
+```
+
+The name remains editable while `user.id` stays the same. When the ID changes, the hook
+returns the next user's name immediately. There is no effect, render-time setter, or
+extra render to correct the old value. The calculation can also read the previous
+`{ source, value }`, which is useful when a selection should survive if it is still
+valid.
+
 <h2 id="events-and-dom">Events come from the browser</h2>
 
 Handlers receive the browser's real `Event` object, not a synthetic wrapper. Bubbling,

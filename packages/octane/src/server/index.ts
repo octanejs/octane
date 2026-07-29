@@ -43,9 +43,13 @@ export {
 
 	// Hooks (server semantics)
 	useState,
+	useLinkedState,
 	useReducer,
 	__useStateWithGetter,
+	__useLinkedStateWithGetter,
 	__useReducerWithGetter,
+	type LinkedStatePrevious,
+	type LinkedStateOptions,
 	useEffect,
 	useLayoutEffect,
 	useInsertionEffect,

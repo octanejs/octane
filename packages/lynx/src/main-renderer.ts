@@ -6,6 +6,8 @@
  * reconciler, effects, refs, event handlers, or background transport.
  */
 import type {
+	LinkedStateOptions,
+	LinkedStatePrevious,
 	UniversalComponent,
 	UniversalContext,
 	UniversalEventPriority,
@@ -1080,6 +1082,26 @@ export function useState<T>(
 }
 
 export const __useStateWithGetter = useState;
+
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	_optionsOrSlot?: LinkedStateOptions<Source, Value> | symbol | string | number,
+	_slot?: unknown,
+): [Value, (next: Value | ((previous: Value) => Value)) => void] {
+	currentOwner();
+	return [reconcile(source, undefined), NOOP_UPDATE];
+}
+
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot?: LinkedStateOptions<Source, Value> | symbol | string | number,
+	slot?: unknown,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value] {
+	const [value, setValue] = useLinkedState(source, reconcile, optionsOrSlot, slot);
+	return [value, setValue, () => value];
+}
 
 export function useReducer<S, A, I = S>(
 	_reducer: (state: S, action: A) => S,

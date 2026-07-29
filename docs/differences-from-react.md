@@ -239,6 +239,35 @@ can be observed, preserving the existing runtime path and allocation profile for
 ordinary two-item destructuring. Escaped or ambiguous tuples conservatively
 receive the complete three-item shape.
 
+## Linked state updates without a render-time setter
+
+React sometimes keeps local state in sync with a changing prop by calling a
+setter during render:
+
+```tsx
+const [previousUserId, setPreviousUserId] = useState(user.id);
+const [name, setName] = useState(user.name);
+
+if (previousUserId !== user.id) {
+  setPreviousUserId(user.id);
+  setName(user.name);
+}
+```
+
+Octane's `useLinkedState` expresses the same intent directly:
+
+```tsx
+const [name, setName] = useLinkedState(user.id, () => user.name);
+```
+
+The value remains editable with `setName`. When `user.id` changes, the hook
+returns the new name immediately, without an effect, a user setter during
+render, or a second render attempt. The calculation receives the previous
+`{ source, value }` when a source changes, or `undefined` on the first render,
+so it can preserve useful parts of the old value. `sourceEqual` and `valueEqual`
+default to `Object.is`; pass custom comparators as an optional third argument.
+The tuple also supports the same optional latest-value getter as `useState`.
+
 ## JSX values follow the represented render scope
 
 Moving compiler-authored JSX into a variable, prop, array, or other value

@@ -4341,6 +4341,277 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot)
 	return [pair[0], pair[1], getter];
 }
 
+/** The last successfully published source and its locally editable value. */
+export interface LinkedStatePrevious<Source, Value> {
+	source: Source;
+	value: Value;
+}
+
+/** Equality customizations for a source-linked local state cell. */
+export interface LinkedStateOptions<Source, Value> {
+	sourceEqual?: (previous: Source, next: Source) => boolean;
+	valueEqual?: (previous: Value, next: Value) => boolean;
+}
+
+interface LinkedStateSlot<Source, Value> {
+	source: Source;
+	value: Value;
+	setter: StateSetter<Value>;
+	getter?: () => Value;
+	valueEqual?: (previous: Value, next: Value) => boolean;
+	pendingActionBatch?: TransitionActionBatch;
+	pendingActionValue?: Value;
+	/** A source draft is visible to its rendering owner, never to committed readers. */
+	renderPending?: boolean;
+	renderSource?: Source;
+	renderValue?: Value;
+	renderValueEqual?: (previous: Value, next: Value) => boolean;
+	renderSourceChanged?: boolean;
+	/** Preserve only drafts explicitly edited by their rendering owner. */
+	renderUpdated?: boolean;
+	/** A completed draft is parked only after its hidden boundary defers publication. */
+	renderParked?: boolean;
+	/** Refresh the revealed owner after an outside update changed its parked draft. */
+	renderNeedsRefresh?: boolean;
+	renderPublish?: () => void;
+	renderVersion?: number;
+}
+
+type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
+
+// A sibling may finish rendering before another sibling suspends their shared
+// boundary. Keep its finished linked-state publication with that boundary: its
+// body may bail when the preserved primary reveals, so relying on a fresh hook
+// call would leave its committed getter behind the already-rendered DOM.
+let LINKED_STATE_REVEAL_ACTIONS: WeakMap<TrySlot, Array<() => void>> | null = null;
+
+function deferLinkedStateReveal(boundary: TrySlot, action: () => void): void {
+	const deferred = (LINKED_STATE_REVEAL_ACTIONS ??= new WeakMap());
+	const actions = deferred.get(boundary);
+	if (actions === undefined) deferred.set(boundary, [action]);
+	else actions.push(action);
+}
+
+function publishLinkedStateReveal(boundary: TrySlot): void {
+	const actions = LINKED_STATE_REVEAL_ACTIONS?.get(boundary);
+	if (actions === undefined) return;
+	LINKED_STATE_REVEAL_ACTIONS!.delete(boundary);
+	for (let i = 0; i < actions.length; i++) enqueueEffectEventCommitAction(actions[i]);
+}
+
+/**
+ * Local editable state linked to an external source. Source changes reconcile in
+ * the same render instead of scheduling a render-phase setter/effect replay.
+ * Publication uses the existing render/WIP transaction so a suspended subtree
+ * cannot leak a speculative source or value into the previously committed tree.
+ */
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value>,
+	slot?: symbol,
+): LinkedStateTuple<Value>;
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value> | symbol,
+	slot?: HookSlot,
+): LinkedStateTuple<Value> {
+	// A plain compiled module appends its Symbol in the omitted options slot;
+	// numeric-slot builds reserve that position and append the numeric fourth arg.
+	if (typeof options === 'symbol') {
+		if (slot === undefined) slot = options;
+		options = undefined;
+	}
+	slot = resolveSlot(slot);
+	if (slot === undefined) missingSlot('useLinkedState');
+	const scope = CURRENT_SCOPE!;
+	const block = CURRENT_BLOCK!;
+	const equalValue = options?.valueEqual;
+	let state = scope.hooks?.get(slot) as LinkedStateSlot<Source, Value> | undefined;
+	if (state === undefined) {
+		const value = reconcile(source, undefined);
+		state = {
+			source,
+			value,
+			valueEqual: equalValue,
+			setter: (next) => {
+				const renderingDraft = CURRENT_BLOCK === block && state!.renderPending === true;
+				let updatingParkedDraft = false;
+				if (
+					!renderingDraft &&
+					state!.renderPending === true &&
+					transitionActionBatchForUpdate() === null
+				) {
+					updatingParkedDraft = state!.renderParked === true;
+					if (!updatingParkedDraft && (block as any).__thenableDone === true) {
+						const hiddenBoundary = findSuspenseHiddenTry(block);
+						const publish = state!.renderPublish;
+						if (hiddenBoundary !== null && publish !== undefined) {
+							state!.renderParked = true;
+							deferLinkedStateReveal(hiddenBoundary, publish);
+							updatingParkedDraft = true;
+						}
+					}
+				}
+				const updatingDraft = renderingDraft || updatingParkedDraft;
+				const previous = updatingDraft
+					? (state!.renderValue as Value)
+					: stagedTransitionValue(state!);
+				const operation =
+					typeof next === 'function' ? (next as (value: Value) => Value) : () => next;
+				const computed = operation(previous);
+				const equal = updatingDraft ? state!.renderValueEqual : state!.valueEqual;
+				if ((equal ?? Object.is)(previous, computed)) return;
+				if (updatingDraft) {
+					state!.renderValue = computed;
+					state!.renderUpdated = true;
+					if (updatingParkedDraft) state!.renderNeedsRefresh = true;
+					else scheduleRender(block);
+					return;
+				}
+				if (stageTransitionValue(state!, block, operation, computed)) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+						const update = state!.pendingActionBatch?.updates.get(state!) as
+							TransitionActionUpdate<Value> | undefined;
+						if (update !== undefined) {
+							update.profileType = 'state';
+							update.profileSlot = slot;
+						}
+					}
+					return;
+				}
+				state!.value = computed;
+				if (
+					!block.disposed &&
+					typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+					__OCTANE_PROFILE_ENABLED__
+				)
+					__profileSchedule(block, 'state', slot);
+				scheduleRender(block);
+			},
+		};
+		ensureHooks(scope).set(slot, state);
+		return [value, state.setter] as unknown as LinkedStateTuple<Value>;
+	}
+
+	const equalSource = options?.sourceEqual ?? Object.is;
+	const sourceChanged = !equalSource(state.source, source);
+	const reuseUpdatedDraft =
+		state.renderPending === true &&
+		state.renderUpdated === true &&
+		state.renderSourceChanged === sourceChanged &&
+		equalSource(state.renderSource as Source, source);
+	if (!reuseUpdatedDraft && !sourceChanged && state.valueEqual === equalValue) {
+		// A previous failed render can have left a private draft behind. It was
+		// never published, so a committed-source replay must discard it explicitly.
+		state.renderPending = false;
+		state.renderUpdated = false;
+		state.renderSourceChanged = false;
+		state.renderParked = false;
+		state.renderNeedsRefresh = false;
+		state.renderPublish = undefined;
+		return [state.value, state.setter] as unknown as LinkedStateTuple<Value>;
+	}
+
+	const reuseParkedDraft = reuseUpdatedDraft && state.renderParked === true;
+	let value = reuseUpdatedDraft ? (state.renderValue as Value) : state.value;
+	if (sourceChanged && !reuseUpdatedDraft) {
+		const previous = { source: state.source, value: state.value };
+		const reconciled = reconcile(source, previous);
+		if (!(equalValue ?? Object.is)(state.value, reconciled)) value = reconciled;
+	}
+	state.renderPending = true;
+	state.renderSource = reuseUpdatedDraft
+		? state.renderSource
+		: sourceChanged
+			? source
+			: state.source;
+	state.renderValue = value;
+	state.renderValueEqual = equalValue;
+	state.renderSourceChanged = sourceChanged;
+	state.renderUpdated = reuseUpdatedDraft;
+	state.renderParked = reuseParkedDraft;
+	if (!reuseParkedDraft) state.renderNeedsRefresh = false;
+	// A hidden retry can suspend and discard its fresh commit action. Keep the
+	// original parked reveal action valid until this source draft is replaced.
+	const version = reuseParkedDraft
+		? (state.renderVersion as number)
+		: (state.renderVersion = (state.renderVersion ?? 0) + 1);
+	const current = state;
+	const publish = () => {
+		if (current.renderPending !== true || current.renderVersion !== version || block.disposed)
+			return;
+		// A setter staged for the old source belongs to its previous generation.
+		// Discard it before parking too: otherwise it can flush into the committed
+		// value while Suspense still hides the replacement source.
+		if (sourceChanged) {
+			const pendingBatch = current.pendingActionBatch;
+			if (pendingBatch !== undefined) {
+				pendingBatch.updates.delete(current);
+				current.pendingActionBatch = undefined;
+				current.pendingActionValue = undefined;
+			}
+		}
+		const hiddenBoundary = findSuspenseHiddenTry(block);
+		if (hiddenBoundary !== null) {
+			current.renderParked = true;
+			deferLinkedStateReveal(hiddenBoundary, publish);
+			return;
+		}
+		current.source = current.renderSource as Source;
+		current.value = current.renderValue as Value;
+		current.valueEqual = current.renderValueEqual;
+		const refresh = current.renderNeedsRefresh === true;
+		current.renderPending = false;
+		current.renderSourceChanged = false;
+		current.renderUpdated = false;
+		current.renderParked = false;
+		current.renderNeedsRefresh = false;
+		current.renderPublish = undefined;
+		if (refresh) scheduleRender(block);
+	};
+	state.renderPublish = publish;
+	enqueueEffectEventCommitAction(publish);
+	return [value, state.setter] as unknown as LinkedStateTuple<Value>;
+}
+
+/** Compiler-selected linked-state variant when the current-value getter is observed. */
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value>,
+	slot?: symbol,
+): LinkedStateTuple<Value>;
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value> | symbol,
+	slot?: HookSlot,
+): LinkedStateTuple<Value> {
+	if (typeof options === 'symbol') {
+		if (slot === undefined) slot = options;
+		options = undefined;
+	}
+	const pair = (useLinkedState as any)(source, reconcile, options, slot) as LinkedStateTuple<Value>;
+	const resolved = resolveSlot(slot);
+	if (resolved === undefined) missingSlot('useLinkedState');
+	const state = CURRENT_SCOPE!.hooks!.get(resolved) as LinkedStateSlot<Source, Value>;
+	const block = CURRENT_BLOCK!;
+	const getter =
+		state.getter ??
+		(state.getter = () => {
+			if (CURRENT_BLOCK === block && state.renderPending === true) {
+				return state.renderValue as Value;
+			}
+			const batch = state.pendingActionBatch;
+			if (batch === undefined) return state.value;
+			const update = batch.updates.get(state) as TransitionActionUpdate<Value> | undefined;
+			return update === undefined ? state.value : rebaseTransitionActionUpdate(update);
+		});
+	return [pair[0], pair[1], getter];
+}
+
 interface ReducerSlot<S, A> {
 	value: S;
 	dispatch: (action: A) => void;
@@ -18740,6 +19011,7 @@ function commitResumeInner(state: TrySlot): void {
 				}
 			}
 			if (state.branch === 1) {
+				publishLinkedStateReveal(state);
 				// Reveal: re-attach the host refs detached on hide (same preserved nodes),
 				// before commitEffects fires recreated layout effects. Enumerating now
 				// ensures an aborted A→B hidden retry never resurrects stale ref A.
@@ -19062,6 +19334,7 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 		// settles, its retry sees a mismatched pendingThenable and no-ops.
 		state.pendingThenable = null;
 		spliceOffscreenCapture(hiddenCapture);
+		publishLinkedStateReveal(state);
 		queueCurrentHiddenRefs(state);
 		if (state.transitionTimeoutId !== null) {
 			clearTimeout(state.transitionTimeoutId);

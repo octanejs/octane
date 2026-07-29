@@ -91,6 +91,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'mental-model', title: 'The mental model' },
 			{ id: 'components-and-props', title: 'Components and props' },
 			{ id: 'state-and-events', title: 'State and events' },
+			{ id: 'use-linked-state', title: 'useLinkedState', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
 			{ id: 'context', title: 'Sharing data' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },

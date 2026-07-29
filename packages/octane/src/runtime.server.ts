@@ -2565,6 +2565,15 @@ interface GetterHookRec extends HookRec {
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => unknown;
 }
+interface LinkedHookRec<Source = unknown, Value = unknown> {
+	source: Source;
+	value: Value;
+	pendingValue: Value;
+	queue: Value[];
+	valueEqual: (previous: Value, next: Value) => boolean;
+	dispatch: (action: Value | ((previous: Value) => Value)) => void;
+	getter?: () => Value;
+}
 interface MemoHookRec {
 	value: unknown;
 	deps: readonly unknown[];
@@ -2572,7 +2581,7 @@ interface MemoHookRec {
 interface RefHookRec {
 	ref: { current: unknown };
 }
-type AnyHookRec = HookRec | MemoHookRec | RefHookRec;
+type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec;
 type ServerHookSlot = symbol | string | number;
 
 // Server twin of the client helper/custom-hook ABI. Modules reserve a range
@@ -4524,6 +4533,116 @@ export function __useStateWithGetter<T>(
 		slot,
 		true,
 	) as [T, (next: any) => void, () => T];
+}
+
+export interface LinkedStatePrevious<Source, Value> {
+	source: Source;
+	value: Value;
+}
+
+export interface LinkedStateOptions<Source, Value> {
+	sourceEqual?: (previous: Source, next: Source) => boolean;
+	valueEqual?: (previous: Value, next: Value) => boolean;
+}
+
+function linkedStateHook<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot: LinkedStateOptions<Source, Value> | ServerHookSlot | undefined,
+	maybeSlot: ServerHookSlot | undefined,
+	withGetter: boolean,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, (() => Value)?] {
+	const options =
+		optionsOrSlot !== null && typeof optionsOrSlot === 'object' ? optionsOrSlot : undefined;
+	const slot = maybeSlot ?? (options === undefined ? optionsOrSlot : undefined);
+	const hp = HOOK_PASS;
+	if (hp === null) {
+		const value = reconcile(source, undefined);
+		return withGetter ? [value, NOOP, () => value] : [value, NOOP];
+	}
+
+	const position = hookPosition(slot)!;
+	const { list, index } = position;
+	let record = list[index] as LinkedHookRec<Source, Value> | undefined;
+	const sourceEqual = options?.sourceEqual ?? Object.is;
+	const valueEqual = options?.valueEqual ?? Object.is;
+	if (record === undefined) {
+		const initial = reconcile(source, undefined);
+		const current: LinkedHookRec<Source, Value> = {
+			source,
+			value: initial,
+			pendingValue: initial,
+			queue: [],
+			valueEqual,
+			dispatch(action) {
+				if (hp !== HOOK_PASS) return;
+				const previous = current.pendingValue;
+				const next =
+					typeof action === 'function' ? (action as (previous: Value) => Value)(previous) : action;
+				if (current.valueEqual(previous, next)) return;
+				current.pendingValue = next;
+				current.queue.push(next);
+				hp.update = true;
+			},
+		};
+		list[index] = record = current;
+	} else {
+		if (record.queue.length !== 0) {
+			record.value = record.pendingValue;
+			record.queue.length = 0;
+		}
+		record.valueEqual = valueEqual;
+		if (!sourceEqual(record.source, source)) {
+			const previous = { source: record.source, value: record.value };
+			const next = reconcile(source, previous);
+			record.value = valueEqual(record.value, next) ? record.value : next;
+			record.pendingValue = record.value;
+			record.source = source;
+		}
+	}
+
+	if (!withGetter) return [record.value, record.dispatch];
+	const getter = (record.getter ??= () => record.pendingValue);
+	return [record.value, record.dispatch, getter];
+}
+
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value>,
+	slot?: symbol,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot?: LinkedStateOptions<Source, Value> | ServerHookSlot,
+	maybeSlot?: ServerHookSlot,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value] {
+	return linkedStateHook(source, reconcile, optionsOrSlot, maybeSlot, false) as [
+		Value,
+		(next: Value | ((previous: Value) => Value)) => void,
+		() => Value,
+	];
+}
+
+/** Compiler-emitted linked-state variant when its latest-value getter is observed. */
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value>,
+	slot?: symbol,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot?: LinkedStateOptions<Source, Value> | ServerHookSlot,
+	maybeSlot?: ServerHookSlot,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value] {
+	return linkedStateHook(source, reconcile, optionsOrSlot, maybeSlot, true) as [
+		Value,
+		(next: Value | ((previous: Value) => Value)) => void,
+		() => Value,
+	];
 }
 
 export function useReducer<S, A, I = S>(

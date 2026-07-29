@@ -254,6 +254,46 @@ rules in one function. It supports the same optional third-item latest-state get
 `useState`. Most components should begin with `useState` and move to a reducer only when
 that makes the code easier to understand.
 
+<h3 id="use-linked-state">Keep editable state in sync with `useLinkedState`</h3>
+
+Sometimes local state belongs to something that can change. A profile editor should keep
+what you type while you are editing one person, but start with the right name when you
+open another profile:
+
+```tsrx
+import { useLinkedState } from 'octane';
+
+export function ProfileEditor(props) @{
+	const [name, setName] = useLinkedState(props.user.id, () => props.user.name);
+
+	<label>
+		Name
+		<input value={name} onInput={(event) => setName(event.currentTarget.value)} />
+	</label>
+}
+```
+
+The first argument is the **source**. While `props.user.id` stays the same, `name` keeps
+your edits. When the ID changes, the hook returns the new user's name immediately. You
+do not need an effect, a state update during render, or an extra render to catch up.
+
+The calculation also receives the previous source and local value. That lets you keep
+an existing selection when it is still available:
+
+```tsrx
+const [selection, setSelection] = useLinkedState(
+	items,
+	(nextItems, previous) =>
+		nextItems.find((item) => item.id === previous?.value?.id) ?? nextItems[0] ?? null,
+);
+```
+
+On the first render, `previous` is `undefined`. When the source changes, it is
+`{ source, value }`. Sources and values are compared with `Object.is` by default; pass
+`{ sourceEqual, valueEqual }` as a third argument when a custom comparison is useful.
+Like `useState`, the hook also offers an optional third tuple item, `getValue`, for
+reading the latest value inside an async or delayed callback.
+
 <details className="deep-dive">
 	<summary>Octane deep dive: state getters and conditional hooks</summary>
 	<div>
@@ -1111,6 +1151,10 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>useReducer</code>
 				<span>Centralize several related state updates.</span>
+			</li>
+			<li>
+				<code>useLinkedState</code>
+				<span>Keep editable state in sync with a changing value.</span>
 			</li>
 			<li>
 				<code>createContext</code>

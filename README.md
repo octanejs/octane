@@ -86,6 +86,9 @@ the exact pinned snapshot and source-attributed React counts come from the
   lists when you omit them. In production builds, `useMemo`/`useCallback`
   compile to inline caches: a dependency hit allocates nothing — no factory
   closure, no deps array.
+- **Editable state that follows its source** — `useLinkedState` resets or
+  adjusts local state as soon as an input changes, without an effect or a
+  state update during render.
 - **Promises in render are safe** — no `cache()` wrapper: creations feeding
   `use()` are memoized at their declarations, including local `.then` chains
   (`const p = fetchUser(id); const t = p.then(…); use(t)`). Independent
@@ -483,6 +486,46 @@ keep the existing two-item runtime path and allocate no getter. Escaped or
 ambiguous tuples conservatively receive the complete three-item shape. The
 getter reads the latest scheduled hook value, which may be newer than the
 currently committed DOM during a pending render.
+
+### State that follows another value
+
+Use `useLinkedState` when a value can be edited locally but should reset or
+adjust when another value changes. For example, a profile editor should keep
+unsaved edits while showing the same user, then start fresh when a different
+user is selected:
+
+```jsx
+import { useLinkedState } from 'octane';
+
+export function ProfileEditor({ user }) @{
+  const [name, setName] = useLinkedState(user.id, () => user.name);
+
+  <input value={name} onInput={(event) => setName(event.currentTarget.value)} />
+}
+```
+
+`user.id` is the source. When it changes, Octane calculates the new name before
+the component reads it. There is no effect, no state update during render, and
+no extra render just to correct stale state.
+
+The calculation also receives the previous source and local value. Use them when
+changing inputs should preserve a valid choice instead of always starting over:
+
+```jsx
+const [selection, setSelection] = useLinkedState(
+  items,
+  (nextItems, previous) =>
+    nextItems.find((item) => item.id === previous?.value?.id) ??
+    nextItems[0] ??
+    null,
+);
+```
+
+The first calculation receives `undefined` for `previous`; later source changes
+receive `{ source, value }`. Sources and values use `Object.is` by default. Pass
+`{ sourceEqual, valueEqual }` as a third argument when you need different
+comparisons. Like `useState`, `useLinkedState` also supports an optional third
+tuple item, `getValue`, for reading the latest value from a delayed callback.
 
 ### Conditional hooks
 

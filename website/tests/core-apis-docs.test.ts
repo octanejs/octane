@@ -65,6 +65,7 @@ describe('Core APIs documentation', () => {
 			expect(container.querySelector(`[data-demo="${id}"]`)).toBeTruthy();
 		}
 		for (const id of [
+			'use-linked-state',
 			'use-sync-external-store',
 			'hydrate-when',
 			'hydrate-split',
@@ -99,6 +100,8 @@ describe('Core APIs documentation', () => {
 		expect(highlightedSource.some((source) => source.includes('createRoot(container)'))).toBe(true);
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
 		for (const sourceMarker of [
+			'useLinkedState(props.user.id, () => props.user.name)',
+			'nextItems.find((item) => item.id === previous?.value?.id)',
 			'export function NetworkStatus()',
 			'<Hydrate when={visible({ rootMargin:',
 			'<Hydrate when={idle()} split={false}>',
@@ -126,6 +129,9 @@ describe('Core APIs documentation', () => {
 		expect(groupedApiCodeCount('isChildrenBlock')).toBe(3);
 		expect(
 			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'Hydrate'),
+		).toBe(true);
+		expect(
+			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'useLinkedState'),
 		).toBe(true);
 
 		const active = container.querySelector(

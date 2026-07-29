@@ -760,6 +760,42 @@ interface StateHook<T = unknown> {
 	get: () => T;
 }
 
+export interface LinkedStatePrevious<Source, Value> {
+	source: Source;
+	value: Value;
+}
+
+export interface LinkedStateOptions<Source, Value> {
+	sourceEqual?: (previous: Source, next: Source) => boolean;
+	valueEqual?: (previous: Value, next: Value) => boolean;
+}
+
+interface LinkedStateHook<Source = unknown, Value = unknown> {
+	kind: 'state';
+	linked: true;
+	source: Source;
+	generation: number;
+	generationBase: Value;
+	value: Value;
+	valueEqual: (previous: Value, next: Value) => boolean;
+	set: (value: Value | ((previous: Value) => Value)) => void;
+	get?: () => Value;
+}
+
+interface ParkedUniversalLinkedDraft<Source = unknown, Value = unknown> {
+	source: Source;
+	value: Value;
+	valueEqual: (previous: Value, next: Value) => boolean;
+	generation: number;
+	updated: boolean;
+}
+
+// Retained Suspense commits the old primary owner while discarding its speculative
+// replacement owner. Preserve only linked-state source drafts here; ordinary
+// state hooks never allocate, consult, or change this optional side table.
+let PARKED_UNIVERSAL_LINKED_DRAFTS: WeakMap<object, ParkedUniversalLinkedDraft<any, any>> | null =
+	null;
+
 interface ReducerHook<S = unknown, A = unknown> {
 	kind: 'reducer';
 	value: S;
@@ -820,6 +856,7 @@ interface EffectHook {
 
 type UniversalHook =
 	| StateHook<any>
+	| LinkedStateHook<any, any>
 	| ReducerHook<any, any>
 	| MemoHook
 	| ComponentMemoHook
@@ -3633,6 +3670,237 @@ export function useState<T>(
 }
 
 export const __useStateWithGetter = useState;
+
+function universalLinkedStateHook<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot: LinkedStateOptions<Source, Value> | unknown,
+	maybeSlot: unknown,
+	withGetter: boolean,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, (() => Value)?] {
+	const options =
+		optionsOrSlot !== null && typeof optionsOrSlot === 'object'
+			? (optionsOrSlot as LinkedStateOptions<Source, Value>)
+			: undefined;
+	const slot = maybeSlot ?? (options === undefined ? optionsOrSlot : undefined);
+	const owner = currentDraftOwner();
+	const resolved = resolveHookSlot(slot);
+	let hook = owner.hooks.get(resolved) as LinkedStateHook<Source, Value> | undefined;
+	const sourceEqual = options?.sourceEqual ?? Object.is;
+	const valueEqual = options?.valueEqual ?? Object.is;
+
+	if (hook?.linked !== true) {
+		const record = owner.record;
+		const initialValue = reconcile(source, undefined);
+		const current: LinkedStateHook<Source, Value> = {
+			kind: 'state',
+			linked: true,
+			source,
+			generation: 0,
+			generationBase: initialValue,
+			value: initialValue,
+			valueEqual,
+			set(update) {
+				if (record.disposed) return;
+				const draft = findDraftOwner(record);
+				if (draft !== null) {
+					const live = cloneStateHook<Value>(draft, resolved) as
+						LinkedStateHook<Source, Value> | undefined;
+					if (live?.linked !== true) return;
+					const next =
+						typeof update === 'function'
+							? (update as (previous: Value) => Value)(live.value)
+							: update;
+					if (live.valueEqual(live.value, next)) return;
+					live.value = next;
+					draft.needsRender = true;
+					return;
+				}
+
+				const committed = record.hooks.get(resolved) as LinkedStateHook<Source, Value> | undefined;
+				if (committed?.linked !== true) return;
+				const transition = universalTransitionBatchForUpdate();
+				const parked = PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed) as
+					ParkedUniversalLinkedDraft<Source, Value> | undefined;
+				if (
+					transition === null &&
+					record.visibility === 'suspense-hidden' &&
+					parked !== undefined &&
+					parked.generation === committed.generation
+				) {
+					const next =
+						typeof update === 'function'
+							? (update as (previous: Value) => Value)(parked.value)
+							: update;
+					if (parked.valueEqual(parked.value, next)) return;
+					parked.value = next;
+					parked.updated = true;
+					scheduleOwner(record, resolved);
+					return;
+				}
+				const previous =
+					transition === null
+						? visibleStateValue(record, resolved, committed.value)
+						: projectedStateValue(record, resolved, committed.value);
+				const next =
+					typeof update === 'function' ? (update as (previous: Value) => Value)(previous) : update;
+				const queue = record.updates.get(resolved);
+				const needsUrgentRebase =
+					transition === null && queue?.batches?.some((batch) => batch !== null) === true;
+				if (committed.valueEqual(previous, next) && !needsUrgentRebase) return;
+
+				const generation = committed.generation;
+				const apply = (previousValue: Value): Value => {
+					const latest = record.hooks.get(resolved) as LinkedStateHook<Source, Value> | undefined;
+					if (latest?.linked !== true) return previousValue;
+					// Source reconciliation publishes a new generation only on host
+					// acceptance. An old lane may still carry its former base state;
+					// replace it with the newly committed value instead of replaying
+					// a draft that belonged to the abandoned source.
+					if (latest.generation !== generation) return latest.generationBase;
+					const candidate =
+						typeof update === 'function'
+							? (update as (previous: Value) => Value)(previousValue)
+							: update;
+					return latest.valueEqual(previousValue, candidate) ? previousValue : candidate;
+				};
+				if (transition !== null) {
+					stageUniversalTransitionUpdate(transition, record, resolved, 'state', apply);
+					return;
+				}
+				enqueueUniversalHookUpdate(record, resolved, 'state', apply, null);
+				scheduleOwner(record, resolved);
+			},
+		};
+		owner.hooks.set(resolved, current);
+		owner.clonedHooks.add(resolved);
+		hook = current;
+	} else {
+		if (!owner.clonedHooks.has(resolved)) {
+			hook = { ...hook };
+			owner.hooks.set(resolved, hook);
+			owner.clonedHooks.add(resolved);
+			hook.value = applyUniversalHookUpdateQueue(
+				owner,
+				resolved,
+				'state',
+				hook.value,
+				(previous, update) =>
+					typeof update === 'function'
+						? (update as (previous: Value) => Value)(previous)
+						: (update as Value),
+			);
+		}
+		hook.valueEqual = valueEqual;
+		const committed = owner.record.hooks.get(resolved) as
+			LinkedStateHook<Source, Value> | undefined;
+		let parked =
+			committed === undefined
+				? undefined
+				: (PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed) as
+						ParkedUniversalLinkedDraft<Source, Value> | undefined);
+		if (parked !== undefined) {
+			if (committed?.generation !== parked.generation || !sourceEqual(parked.source, source)) {
+				PARKED_UNIVERSAL_LINKED_DRAFTS!.delete(committed!);
+				parked = undefined;
+			} else {
+				parked.valueEqual = valueEqual;
+			}
+		}
+		const sourceChanged = !sourceEqual(hook.source, source);
+		if (sourceChanged) {
+			const previous = { source: hook.source, value: hook.value };
+			const next = reconcile(source, previous);
+			const reconciled = valueEqual(hook.value, next) ? hook.value : next;
+			const reuseParked =
+				parked !== undefined &&
+				owner.record.visibility === 'suspense-hidden' &&
+				parked.updated &&
+				parked.generation === committed?.generation;
+			hook.value = reuseParked && parked !== undefined ? parked.value : reconciled;
+			if (!reuseParked && committed !== undefined) {
+				let boundary: DraftOwner | null = owner.parent;
+				while (boundary !== null && !(boundary.isBoundary && boundary.canHandleSuspense)) {
+					boundary = boundary.parent;
+				}
+				if (boundary !== null) {
+					(PARKED_UNIVERSAL_LINKED_DRAFTS ??= new WeakMap()).set(committed, {
+						source,
+						value: hook.value,
+						valueEqual,
+						generation: committed.generation,
+						updated: false,
+					});
+				}
+			}
+			hook.source = source;
+			hook.generation++;
+			hook.generationBase = hook.value;
+			const applied = owner.appliedUpdates.get(resolved);
+			if (applied?.lane) {
+				// Applied/queued updates exclude owner-only fast commits. The full
+				// transaction publishes this new linked origin to queue.baseState
+				// only after host acceptance; abandoned drafts leave both untouched.
+				owner.appliedUpdates.set(resolved, { ...applied, baseState: hook.value });
+			}
+		}
+	}
+
+	if (!withGetter) return [hook.value, hook.set];
+	const record = owner.record;
+	const initialValue = hook.value;
+	const getter = (hook.get ??= () => {
+		if (record.visibility === 'suspense-hidden' && findDraftOwner(record) === null) {
+			const committed = record.hooks.get(resolved) as LinkedStateHook<Source, Value> | undefined;
+			if (committed?.linked === true) {
+				const parked = PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed);
+				// Keep old-source lanes intact: an abandoned replacement must still
+				// apply its pending edit if the original source is restored.
+				if (parked?.generation === committed.generation) return committed.value;
+			}
+		}
+		return projectedStateValue(record, resolved, initialValue);
+	});
+	return [hook.value, hook.set, getter];
+}
+
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value>,
+	slot?: unknown,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+export function useLinkedState<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot?: LinkedStateOptions<Source, Value> | unknown,
+	maybeSlot?: unknown,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value] {
+	return universalLinkedStateHook(source, reconcile, optionsOrSlot, maybeSlot, false) as [
+		Value,
+		(next: Value | ((previous: Value) => Value)) => void,
+		() => Value,
+	];
+}
+
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Value>,
+	slot?: unknown,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+export function __useLinkedStateWithGetter<Source, Value>(
+	source: Source,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
+	optionsOrSlot?: LinkedStateOptions<Source, Value> | unknown,
+	maybeSlot?: unknown,
+): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value] {
+	return universalLinkedStateHook(source, reconcile, optionsOrSlot, maybeSlot, true) as [
+		Value,
+		(next: Value | ((previous: Value) => Value)) => void,
+		() => Value,
+	];
+}
 
 export function useReducer<S, A, I = S>(
 	reducer: (state: S, action: A) => S,

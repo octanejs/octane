@@ -10,6 +10,7 @@ const DOM_RENDERER = Object.freeze({ id: 'dom', module: 'octane', target: 'dom' 
 const AUTO_RUNTIME_HOOKS = new Set([
 	'use',
 	'useState',
+	'useLinkedState',
 	'useReducer',
 	'useEffect',
 	'useLayoutEffect',
