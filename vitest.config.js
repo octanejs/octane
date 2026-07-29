@@ -2243,10 +2243,6 @@ export default defineConfig({
 				plugins: [octane()],
 				resolve: {
 					alias: [
-						{
-							find: /^@octanejs\/shadcn$/,
-							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
-						},
 						// @octanejs/radix deliberately carries no alias: it resolves through
 						// node_modules like any other dependency. That used to mean the pinned
 						// published release (maintainer policy from the cmdk review); since the
@@ -2268,10 +2264,6 @@ export default defineConfig({
 						{
 							find: /^octane$/,
 							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/shadcn$/,
-							replacement: resolve(import.meta.dirname, 'packages/shadcn/src/index.ts'),
 						},
 					],
 				},
