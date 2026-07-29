@@ -1,5 +1,6 @@
 import {
 	use,
+	useEffect,
 	useReducer,
 	useState,
 	useTransition,
@@ -513,6 +514,123 @@ export function TransitionRadioGroup(props) @{
 			<>
 				<input id="r-a" type="radio" name="pick-group" checked={step === 1} onChange={() => {}} />
 				<input id="r-b" type="radio" name="pick-group" checked={step === 0} onChange={() => {}} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// A keyed list inside a boundary, with a suspending sibling after it. The
+// transition drops a row and then the sibling suspends, so the list reconciles
+// first and the boundary decides to hold second. The dropped row has to come
+// back — DOM, its own state, and without having run its cleanup.
+// ---------------------------------------------------------------------------
+function RemovalRow(props) @{
+	const [seen] = useState(props.id + '!');
+	useEffect(() => {
+		props.log('mount:' + props.id);
+		return () => props.log('cleanup:' + props.id);
+	}, []);
+	<li id={'row-' + props.id}>{seen as string}</li>
+}
+
+export function TransitionKeyedRemoval(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a', 'b', 'c'] : ['a', 'c'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<RemovalRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+export function TransitionListToEmpty(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a', 'b'] : [];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<RemovalRow id={id} log={props.log} />
+					} @empty {
+						<li id="empty">{'nothing'}</li>
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// The transition ADDS a row and then a later sibling suspends. The fresh row
+// completed its mount before the hold was decided, so putting the list back is
+// not enough: the row's scope has to go too, or its queued mount effect fires
+// for a row that is not on screen and nothing can ever clean it up.
+// ---------------------------------------------------------------------------
+function AddedRow(props) @{
+	useEffect(() => {
+		props.log('mount:' + props.id);
+		return () => props.log('cleanup:' + props.id);
+	}, []);
+	<li id={'row-' + props.id}>{props.id as string}</li>
+}
+
+export function TransitionKeyedAddition(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a'] : ['a', 'd'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<AddedRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// The same shape from an EMPTY list: 0 -> N has no rows to put back, but the
+// freshly-filled rows still have to come out and their scopes go with them.
+export function TransitionKeyedEmptyFill(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? [] : ['d'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<AddedRow id={id} log={props.log} />
+					}
+				</ul>
 				<ControlledValue load={props.load} step={step} />
 			</>
 		} @pending {
