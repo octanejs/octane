@@ -733,7 +733,7 @@ describe('universal useLinkedState', () => {
 		}
 	});
 
-	it('retains universal event edits applied while a replacement source waits behind Suspense', async () => {
+	it('retains universal event edits with an inline comparator while a replacement source waits behind Suspense', async () => {
 		const objectContainer = UniversalRuntime.createObjectContainer();
 		const root = UniversalRuntime.createUniversalRoot(
 			objectContainer,
@@ -754,6 +754,7 @@ describe('universal useLinkedState', () => {
 						const [value, setValue, getValue] = universalLinkedRuntime.__useLinkedStateWithGetter!(
 							props.source,
 							(source) => `draft:${source}`,
+							{ valueEqual: (previous, next) => Object.is(previous, next) },
 							'linked',
 						);
 						linked = { value, setValue, getValue: getValue! };
@@ -782,6 +783,199 @@ describe('universal useLinkedState', () => {
 			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:B!?' });
 			expect(linked.getValue()).toBe('draft:B!?');
 		} finally {
+			root.unmount();
+		}
+	});
+
+	it('honors the latest inline comparator for edits to a hidden replacement source', async () => {
+		const objectContainer = UniversalRuntime.createObjectContainer();
+		const root = UniversalRuntime.createUniversalRoot(
+			objectContainer,
+			UniversalRuntime.createObjectDriver(),
+		);
+		const blocker = deferred<string>();
+		let linked!: CapturedLinked<string>;
+		const fallbackPlan = UniversalRuntime.universalPlan('object', {
+			kind: 'host',
+			type: 'linked-pending',
+			props: { value: 'loading' },
+		});
+		const Scene = UniversalRuntime.defineUniversalComponent(
+			'object',
+			(props: { source: string; suspend?: boolean; ignoreCase?: boolean }) =>
+				UniversalRuntime.universalTry(
+					() => {
+						const [value, setValue, getValue] = universalLinkedRuntime.__useLinkedStateWithGetter!(
+							props.source,
+							(source) => `draft:${source}`,
+							{
+								valueEqual: (previous, next) =>
+									props.ignoreCase
+										? previous.toLowerCase() === next.toLowerCase()
+										: Object.is(previous, next),
+							},
+							'linked',
+						);
+						linked = { value, setValue, getValue: getValue! };
+						if (props.suspend) UniversalRuntime.use(blocker.promise);
+						return UniversalRuntime.universalValue(universalLinkedPlan, [value]);
+					},
+					() => UniversalRuntime.universalValue(fallbackPlan),
+				),
+		);
+
+		try {
+			root.render(Scene, { source: 'A' });
+			root.render(Scene, { source: 'B', suspend: true });
+			linked.setValue((previous) => `${previous}!`);
+			UniversalRuntime.flushUniversalSync(() => {});
+
+			root.render(Scene, { source: 'B', suspend: true, ignoreCase: true });
+			linked.setValue('DRAFT:B!');
+			linked.setValue((previous) => `${previous}?`);
+			UniversalRuntime.flushUniversalSync(() => {});
+			expect(linked.getValue()).toBe('draft:A');
+
+			blocker.resolve('ready');
+			await flushUniversalWork();
+
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:B!?' });
+			expect(linked.getValue()).toBe('draft:B!?');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps an old transition out of committed reads while its replacement source is hidden', async () => {
+		const objectContainer = UniversalRuntime.createObjectContainer();
+		const root = UniversalRuntime.createUniversalRoot(
+			objectContainer,
+			UniversalRuntime.createObjectDriver(),
+		);
+		const transitionBlocker = deferred<void>();
+		const suspenseBlocker = deferred<string>();
+		const renderValues: string[] = [];
+		let linked!: CapturedLinked<string>;
+		const fallbackPlan = UniversalRuntime.universalPlan('object', {
+			kind: 'host',
+			type: 'linked-pending',
+			props: { value: 'loading' },
+		});
+		const Scene = UniversalRuntime.defineUniversalComponent(
+			'object',
+			(props: { source: string; suspend?: boolean }) =>
+				UniversalRuntime.universalTry(
+					() => {
+						const [value, setValue, getValue] = universalLinkedRuntime.__useLinkedStateWithGetter!(
+							props.source,
+							(source) => `draft:${source}`,
+							'linked',
+						);
+						linked = { value, setValue, getValue: getValue! };
+						if (props.suspend) {
+							renderValues.push(getValue!());
+							UniversalRuntime.use(suspenseBlocker.promise);
+						}
+						return UniversalRuntime.universalValue(universalLinkedPlan, [value]);
+					},
+					() => UniversalRuntime.universalValue(fallbackPlan),
+				),
+		);
+
+		try {
+			root.render(Scene, { source: 'A' });
+			UniversalRuntime.startTransition(async () => {
+				linked.setValue('stale A');
+				await transitionBlocker.promise;
+			});
+			expect(linked.getValue()).toBe('stale A');
+
+			root.render(Scene, { source: 'B', suspend: true });
+			root.render(Scene, { source: 'B', suspend: true });
+			expect(renderValues.at(-1)).toBe('draft:B');
+			expect(universalValues(objectContainer)).toEqual({
+				'linked-state': 'draft:A',
+				'linked-pending': 'loading',
+			});
+			expect(linked.getValue()).toBe('draft:A');
+
+			transitionBlocker.resolve();
+			await flushUniversalWork();
+			expect(linked.getValue()).toBe('draft:A');
+			expect(universalValues(objectContainer)).toEqual({
+				'linked-state': 'draft:A',
+				'linked-pending': 'loading',
+			});
+
+			suspenseBlocker.resolve('ready');
+			await flushUniversalWork();
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:B' });
+			expect(linked.getValue()).toBe('draft:B');
+		} finally {
+			transitionBlocker.resolve();
+			suspenseBlocker.resolve('late');
+			await flushUniversalWork();
+			root.unmount();
+		}
+	});
+
+	it('preserves a pending edit when a hidden replacement source is abandoned', async () => {
+		const objectContainer = UniversalRuntime.createObjectContainer();
+		const root = UniversalRuntime.createUniversalRoot(
+			objectContainer,
+			UniversalRuntime.createObjectDriver(),
+		);
+		const transitionBlocker = deferred<void>();
+		const suspenseBlocker = deferred<string>();
+		let linked!: CapturedLinked<string>;
+		const fallbackPlan = UniversalRuntime.universalPlan('object', {
+			kind: 'host',
+			type: 'linked-pending',
+			props: { value: 'loading' },
+		});
+		const Scene = UniversalRuntime.defineUniversalComponent(
+			'object',
+			(props: { source: string; suspend?: boolean }) =>
+				UniversalRuntime.universalTry(
+					() => {
+						const [value, setValue, getValue] = universalLinkedRuntime.__useLinkedStateWithGetter!(
+							props.source,
+							(source) => `draft:${source}`,
+							'linked',
+						);
+						linked = { value, setValue, getValue: getValue! };
+						if (props.suspend) UniversalRuntime.use(suspenseBlocker.promise);
+						return UniversalRuntime.universalValue(universalLinkedPlan, [value]);
+					},
+					() => UniversalRuntime.universalValue(fallbackPlan),
+				),
+		);
+
+		try {
+			root.render(Scene, { source: 'A' });
+			UniversalRuntime.startTransition(async () => {
+				linked.setValue('legitimate A edit');
+				await transitionBlocker.promise;
+			});
+			root.render(Scene, { source: 'B', suspend: true });
+			expect(linked.getValue()).toBe('draft:A');
+
+			root.render(Scene, { source: 'A' });
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:A' });
+			expect(linked.getValue()).toBe('legitimate A edit');
+
+			transitionBlocker.resolve();
+			await flushUniversalWork();
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'legitimate A edit' });
+			expect(linked.getValue()).toBe('legitimate A edit');
+
+			suspenseBlocker.resolve('late');
+			await flushUniversalWork();
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'legitimate A edit' });
+		} finally {
+			transitionBlocker.resolve();
+			suspenseBlocker.resolve('late');
+			await flushUniversalWork();
 			root.unmount();
 		}
 	});

@@ -3799,14 +3799,13 @@ function universalLinkedStateHook<Source, Value>(
 				? undefined
 				: (PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed) as
 						ParkedUniversalLinkedDraft<Source, Value> | undefined);
-		if (
-			parked !== undefined &&
-			(committed?.generation !== parked.generation ||
-				!sourceEqual(parked.source, source) ||
-				parked.valueEqual !== valueEqual)
-		) {
-			PARKED_UNIVERSAL_LINKED_DRAFTS!.delete(committed!);
-			parked = undefined;
+		if (parked !== undefined) {
+			if (committed?.generation !== parked.generation || !sourceEqual(parked.source, source)) {
+				PARKED_UNIVERSAL_LINKED_DRAFTS!.delete(committed!);
+				parked = undefined;
+			} else {
+				parked.valueEqual = valueEqual;
+			}
 		}
 		const sourceChanged = !sourceEqual(hook.source, source);
 		if (sourceChanged) {
@@ -3850,7 +3849,18 @@ function universalLinkedStateHook<Source, Value>(
 	if (!withGetter) return [hook.value, hook.set];
 	const record = owner.record;
 	const initialValue = hook.value;
-	const getter = (hook.get ??= () => projectedStateValue(record, resolved, initialValue));
+	const getter = (hook.get ??= () => {
+		if (record.visibility === 'suspense-hidden' && findDraftOwner(record) === null) {
+			const committed = record.hooks.get(resolved) as LinkedStateHook<Source, Value> | undefined;
+			if (committed?.linked === true) {
+				const parked = PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed);
+				// Keep old-source lanes intact: an abandoned replacement must still
+				// apply its pending edit if the original source is restored.
+				if (parked?.generation === committed.generation) return committed.value;
+			}
+		}
+		return projectedStateValue(record, resolved, initialValue);
+	});
 	return [hook.value, hook.set, getter];
 }
 

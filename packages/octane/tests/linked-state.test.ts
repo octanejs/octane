@@ -545,6 +545,49 @@ describe('useLinkedState', () => {
 		root.unmount();
 	});
 
+	it('keeps parked edits while adopting an inline comparator on a hidden retry', async () => {
+		const gate = deferred();
+		const controls = {} as IndependentControls;
+		let ignoreCase = false;
+		const props = {
+			observe: (next: Partial<IndependentControls>) => Object.assign(controls, next),
+			optionsForSource: () => {
+				const caseInsensitive = ignoreCase;
+				return {
+					valueEqual: (previous: string, next: string) =>
+						caseInsensitive ? previous.toLowerCase() === next.toLowerCase() : previous === next,
+				};
+			},
+		};
+		const root = mount(IndependentSuspense, props);
+
+		flushSync(() => {
+			controls.setSource('B');
+			controls.setResource(gate.promise);
+		});
+		expect(root.find('#independent-pending').textContent).toBe('loading');
+
+		flushSync(() => {
+			controls.setValue((value) => `${value}: first`);
+			controls.setValue((value) => `${value}: second`);
+		});
+		expect(controls.getValue()).toBe('A');
+		ignoreCase = true;
+		root.update(IndependentSuspense, { ...props });
+		expect(root.find('#independent-pending').textContent).toBe('loading');
+		expect(controls.getValue()).toBe('A');
+		flushSync(() => {
+			controls.setValue('b: FIRST: SECOND');
+			controls.setValue((value) => `${value}!`);
+		});
+		expect(controls.getValue()).toBe('A');
+
+		await act(() => gate.resolve());
+		expect(root.find('#independent-linked-value').textContent).toBe('B: first: second!');
+		expect(controls.getValue()).toBe('B: first: second!');
+		root.unmount();
+	});
+
 	it('uses the parked value comparator while keeping committed getter reads isolated', async () => {
 		const gate = deferred();
 		const controls = {} as IndependentControls;

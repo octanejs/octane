@@ -4501,7 +4501,6 @@ export function useLinkedState<Source, Value>(
 		state.renderPending === true &&
 		state.renderUpdated === true &&
 		state.renderSourceChanged === sourceChanged &&
-		state.renderValueEqual === equalValue &&
 		equalSource(state.renderSource as Source, source);
 	if (!reuseUpdatedDraft && !sourceChanged && state.valueEqual === equalValue) {
 		// A previous failed render can have left a private draft behind. It was
