@@ -8531,7 +8531,25 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 	if (MAPPED_ITEM_ADOPTION !== null && MAPPED_ITEM_ADOPTION.node !== null) {
 		const adopted = MAPPED_ITEM_ADOPTION.node;
 		MAPPED_ITEM_ADOPTION.node = null;
-		return adopted as T;
+		const lazy =
+			(node as any).nodeType === undefined
+				? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
+				: undefined;
+		const expected = lazy === undefined ? node : resolveLazyTemplate(lazy);
+		if (
+			(adopted as Element).localName === (expected as Element).localName &&
+			(adopted as Element).namespaceURI === (expected as Element).namespaceURI
+		) {
+			return adopted as T;
+		}
+		const replacement = expected.cloneNode(true);
+		const block = CURRENT_SCOPE!.block;
+		detachDeoptTreeRefs(adopted, null);
+		adopted.parentNode!.replaceChild(replacement, adopted);
+		if (block.startMarker === adopted) block.startMarker = replacement;
+		if (block.endMarker === adopted) block.endMarker = replacement;
+		block.deoptNode = null;
+		return replacement as T;
 	}
 	// Compiler templates are inert module-scope tokens. Parse each concrete
 	// namespace on its first real mount, then clone the cached node thereafter.

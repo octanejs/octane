@@ -268,6 +268,84 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it('replaces incompatible keyed host rows when a custom map switches to native rendering', () => {
+		const source = `
+			function TaggedMapApp(props) {
+				const rows = props.rows;
+				return (
+					<ul id="tsx-tagged-map-rows">
+						{rows.map((item, index) => (
+							<li
+								key={item.id}
+								data-native={props.onItem(item.id, index)}
+								onClick={() => props.onClick(item.id)}
+							>
+								{props.prefix + ':' + index + ':' + item.label}
+							</li>
+						))}
+					</ul>
+				);
+			}
+			export const App = TaggedMapApp;
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'tsx-tagged-map-transition.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const items = [
+			{ id: 1, label: 'first' },
+			{ id: 2, label: 'second' },
+		];
+		const events: string[] = [];
+		const customRows = {
+			map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+				if (this !== customRows) throw new Error('tagged map lost its receiver');
+				events.push('custom:start');
+				callback(items[0]!, 7);
+				const compatible = callback(items[1]!, 3);
+				events.push('custom:end');
+				return [
+					createElement(
+						'span',
+						{
+							key: 1,
+							'data-custom': 'wrong-tag',
+							onClick: () => events.push('custom:click'),
+						},
+						'custom:first',
+					) as T,
+					compatible,
+				];
+			},
+		};
+		const onItem = (id: number, index: number): string => {
+			events.push(`callback:${id}:${index}`);
+			return `${id}:${index}`;
+		};
+		const onClick = (id: number) => events.push(`native:click:${id}`);
+		const root = mount(client.App, { rows: customRows, prefix: 'custom', onItem, onClick });
+		expect(events).toEqual(['custom:start', 'callback:1:7', 'callback:2:3', 'custom:end']);
+		const originalRows = root.findAll('#tsx-tagged-map-rows > *');
+		expect(originalRows.map((row) => row.tagName)).toEqual(['SPAN', 'LI']);
+		expect(originalRows.map((row) => row.textContent)).toEqual(['custom:first', 'custom:3:second']);
+		root.click('[data-custom="wrong-tag"]');
+		expect(events.at(-1)).toBe('custom:click');
+
+		events.length = 0;
+		root.update(client.App, { rows: items, prefix: 'native', onItem, onClick });
+		expect(events).toEqual(['callback:1:0', 'callback:2:1']);
+		const nativeRows = root.findAll('#tsx-tagged-map-rows > *');
+		expect(nativeRows.map((row) => row.tagName)).toEqual(['LI', 'LI']);
+		expect(nativeRows[0]).not.toBe(originalRows[0]);
+		expect(nativeRows[1]).toBe(originalRows[1]);
+		expect(nativeRows.map((row) => row.getAttribute('data-native'))).toEqual(['1:0', '2:1']);
+		expect(nativeRows.map((row) => row.textContent)).toEqual(['native:0:first', 'native:1:second']);
+		root.click('[data-native="1:0"]');
+		expect(events.at(-1)).toBe('native:click:1');
+		root.unmount();
+	});
+
 	it('preserves child state, context, and callback indices while map receivers change', () => {
 		const items = [
 			{ id: 1, label: 'first' },
