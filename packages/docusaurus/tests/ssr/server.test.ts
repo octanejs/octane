@@ -23,16 +23,21 @@ function classicThemeFixture(): {
 	manifest.site.themeConfig = {
 		navbar: {
 			title: 'Octane',
-			items: [{ label: 'Guide', to: '/docs/guide/intro' }],
+			logo: {
+				alt: 'Octane docs',
+				href: '/home',
+				src: '/img/logo.svg',
+			},
+			items: [{ label: 'Guide', to: '/guide/intro' }],
 		},
 		footer: {
 			links: [
 				{
 					title: 'Learn',
-					items: [{ label: 'Introduction', to: '/docs/guide/intro' }],
+					items: [{ label: 'Introduction', href: '/guide/intro' }],
 				},
 			],
-			copyright: 'Octane project',
+			copyright: '<a href="/license">Octane project</a> &copy; 2026',
 		},
 	};
 	manifest.routes = [
@@ -174,11 +179,16 @@ describe('Docusaurus static rendering', () => {
 		if (result instanceof Response) throw new Error('Unexpected redirect response.');
 
 		expect(result.html).toContain('class="octane-docs-navbar"');
+		expect(result.html).toContain('href="/docs/home"');
+		expect(result.html).toContain('src="/docs/img/logo.svg"');
+		expect(result.html.match(/href="\/docs\/guide\/intro"/g)).toHaveLength(3);
+		expect(result.html).not.toContain('href="/guide/intro"');
 		expect(result.html).toContain('aria-label="Documentation sidebar"');
 		expect(result.html).toContain('aria-current="page"');
 		expect(result.html).toContain('<p>Classic theme body</p>');
 		expect(result.html).toContain('href="/docs/guide/advanced"');
-		expect(result.html).toContain('Octane project');
+		expect(result.html).toContain('<a href="/license">Octane project</a> &copy; 2026');
+		expect(result.html).not.toContain('&lt;a href="/license"');
 		expect(result.head).toContain('<title>Introduction | Octane Docs</title>');
 		expect(result.head).toContain('content="Start building with Octane."');
 		expect(result.head).toContain('href="https://octane.example/docs/guide/intro"');
