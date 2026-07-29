@@ -78,6 +78,48 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
+const NATIVE_ARRAY_MAP = Array.prototype.map;
+const NATIVE_REFLECT_APPLY = Reflect.apply;
+const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+
+/** Server twin of the compiler's guarded native-array map ABI. */
+export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) => any): any {
+	if (arguments.length === 3) {
+		let mapped = NATIVE_REFLECT_APPLY(method, receiver, [callback]);
+		if (Array.isArray(mapped)) {
+			let packed: any[] | null = null;
+			for (let index = 0; index < mapped.length; index++) {
+				if (!(index in mapped)) {
+					packed = [];
+					break;
+				}
+			}
+			if (packed !== null) {
+				for (let index = 0; index < mapped.length; index++) {
+					if (index in mapped) packed.push(mapped[index]);
+				}
+				mapped = packed;
+			}
+		}
+		return mapped;
+	}
+	if (
+		!Array.isArray(receiver) ||
+		Object.getPrototypeOf(receiver) !== Array.prototype ||
+		method !== NATIVE_ARRAY_MAP ||
+		Object.prototype.hasOwnProperty.call(receiver, 'constructor') ||
+		Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
+		Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
+	) {
+		return false;
+	}
+	for (let index = 0; index < receiver.length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(receiver, index);
+		if (descriptor === undefined || descriptor.get !== undefined) return false;
+	}
+	return true;
+}
+
 interface SSRScope {
 	parent: SSRScope | null;
 	/** Context Provider values stamped on this scope (lazily allocated). */

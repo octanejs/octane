@@ -148,24 +148,24 @@
     "op": "parent_rerender_equal_A",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 600,
-    "note": "Known return-JSX autoMemo gap: the calibrated 8ms batches measured 469-491x through 2026-07-19. This intentionally loose ceiling catches added work until descriptor-output reuse closes the gap; deterministic work gates remain the primary oracle."
+    "maxRatio": 6,
+    "note": "Guarded native-array JSX lists reuse unchanged keyed work; the 20-sample production pairing measured 3.86x TSRX after preserving the ordinary return-descriptor boundary (previously 497x). Six leaves browser-noise headroom while preventing a return to 1000 survivor visits."
   },
   {
     "suite": "memo-wall",
     "op": "one_change_A",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 32,
-    "note": "Known return-JSX one-change gap measured 21.2-25.9x through 2026-07-19. The 32x ceiling allows normal paired variation while preventing more row/list work from landing."
+    "maxRatio": 10,
+    "note": "Guarded returned-JSX keyed lists enter only the changed row helper. Conservatively checking each fresh array snapshot for observable indexed accessors measured 7.41x TSRX, improving the prior 26.62x gap while preserving ordinary Array.map getter semantics. Ten leaves browser-noise headroom without allowing the old descriptor-rebuild path."
   },
   {
     "suite": "memo-wall",
     "op": "ctx_through_wall_A",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 3,
-    "note": "Context-through-wall TSX/TSRX ratio remained 2.24-2.37x through 2026-07-19. The ceiling protects leaf-only refresh behavior while the return-JSX wrapper work is optimized."
+    "maxRatio": 2.25,
+    "note": "Context-aware returned-JSX list caching keeps all 1000 leaf consumers reactive without revisiting keyed survivors; the 20-sample production pairing measured 1.94x TSRX. The ceiling allows browser variance while protecting the context invalidation path."
   },
   {
     "suite": "recursive-context",

@@ -142,6 +142,7 @@ export {
 	ssrBlock,
 	ssrActivity,
 	ssrForBlock,
+	mapSlot,
 	ssrControl,
 	ssrArm,
 	ssrTry,

@@ -119,6 +119,11 @@ describe('Milestone 9 Lynx toolchain guard', () => {
 		expect(LYNX_TOOLCHAIN_LANES.current.packages.webpack).toBe(
 			LYNX_TOOLCHAIN_LANES.minimum.packages.webpack,
 		);
+		for (const lane of Object.values(LYNX_TOOLCHAIN_LANES)) {
+			expect(lane.packages['@napi-rs/wasm-runtime']).toBe('1.1.6');
+			expect(lane.packages['@emnapi/core']).toBe('1.11.2');
+			expect(lane.packages['@emnapi/runtime']).toBe('1.11.2');
+		}
 		expect(Object.isFrozen(LYNX_TOOLCHAIN_LANES.current.packages)).toBe(true);
 	});
 
