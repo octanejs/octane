@@ -20,7 +20,9 @@ visible rollback, no invalid intermediate structure.
 `benchmarks/async-composition` records zero exposed intermediate states for a
 transition update, level with React, with its ceiling tightened from one to zero.
 
-Content the same transition patches outside a suspended boundary still updates
-early — that is what keeps `useTransition`'s `isPending` cue responsive — and
-structural changes such as a keyed list reordering above the boundary are not
-covered.
+Controlled `value`, `checked` and `selected` are held too, along with their
+`default*` mirrors and the record of what was last projected.
+
+Two things a transition can still change early: content it patched outside a
+suspended boundary, and a structural change above one such as a keyed list
+reordering.

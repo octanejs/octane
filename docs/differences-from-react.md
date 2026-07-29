@@ -600,10 +600,17 @@ change — nothing reaches the screen in between. Transitions stay monotonic: no
 visible rollback, no invalid intermediate structure, and a dependent value never
 renders against stale input.
 
-Content the same transition patched OUTSIDE a suspended boundary still updates
-early, and so does a structural change (a keyed list reordering above the
-boundary) rather than a binding. Holding those needs the global work-in-progress
-tree Octane deliberately does not have; see
+Controlled `value`, `checked` and `selected` are held too. Each carries a
+`default*` mirror and a record of what was last projected, and all of it goes
+back together — restoring the node alone would leave the record believing the new
+value had already landed, so re-projecting it on resume would be skipped.
+
+Two things a transition can still change early: content it patched OUTSIDE a
+suspended boundary, and a structural change above one, such as a keyed list
+reordering. Both need the transition to become a deferred commit — a keyed
+removal disposes blocks and runs their cleanups, which cannot be undone, and
+reverting content outside a boundary needs the reveal to re-render where the
+transition began rather than just the boundary. See
 [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
 benchmark pins the exposed-state count at zero.
 
