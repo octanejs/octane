@@ -2553,10 +2553,7 @@ export default defineConfig({
 					// quarantined path, and its `--exclude "$WEBSITE_DOCS_SPEC"` was
 					// silently a no-op — core-apis-docs ran in a shard AND in the
 					// website_e2e job that owns it. The shard sets the variable below to
-					// ask for the exclusion; website_e2e does not, so it still runs there,
-					// serially, on an unloaded runner. That matters: the spec renders the
-					// whole documentation graph (see testTimeout) and is exactly the kind
-					// of case a saturated shard turns into a spurious timeout.
+					// ask for the exclusion; website_e2e does not, so it still runs there.
 					exclude: [
 						'website/tests/ssr-smoke.test.ts',
 						'website/tests/ssr-hydration.e2e.test.ts',
@@ -2567,9 +2564,8 @@ export default defineConfig({
 					environment: 'jsdom',
 					setupFiles: ['website/tests/setup/unit.ts'],
 					globals: false,
-					// The Core APIs route test renders the whole documentation graph, so
-					// it runs longer than the five-second default even though it needs
-					// nothing but jsdom.
+					// Route tests render the real documentation graph. The heaviest
+					// Core APIs case owns a larger, contention-safe timeout inline.
 					testTimeout: 15_000,
 				},
 				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
