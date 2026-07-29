@@ -3839,9 +3839,9 @@ function universalLinkedStateHook<Source, Value>(
 			hook.generationBase = hook.value;
 			const applied = owner.appliedUpdates.get(resolved);
 			if (applied?.lane) {
-				// A skipped transition may still hold a base from the previous
-				// source. Publish the new linked value as its rebase origin only
-				// when this draft commits; abandoned attempts leave both untouched.
+				// Applied/queued updates exclude owner-only fast commits. The full
+				// transaction publishes this new linked origin to queue.baseState
+				// only after host acceptance; abandoned drafts leave both untouched.
 				owner.appliedUpdates.set(resolved, { ...applied, baseState: hook.value });
 			}
 		}

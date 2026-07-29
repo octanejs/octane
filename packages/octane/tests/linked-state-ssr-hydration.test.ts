@@ -824,30 +824,35 @@ describe('universal useLinkedState', () => {
 			objectContainer,
 			UniversalRuntime.createObjectDriver(),
 		);
-		let setValue!: (next: string | ((previous: string) => string)) => void;
+		let linked!: CapturedLinked<string>;
 		const Scene = UniversalRuntime.defineUniversalComponent(
 			'object',
 			(props: { source: string }) => {
-				const [value, update] = universalLinkedRuntime.useLinkedState!(
+				const [value, setValue, getValue] = universalLinkedRuntime.__useLinkedStateWithGetter!(
 					props.source,
 					(source) => `draft:${source}`,
 					'linked',
 				);
-				setValue = update;
+				linked = { value, setValue, getValue: getValue! };
 				return UniversalRuntime.universalValue(universalLinkedPlan, [value]);
 			},
 		);
 
 		try {
 			root.render(Scene, { source: 'first' });
-			UniversalRuntime.startTransition(() => setValue('stale first edit'));
+			expect(linked.getValue()).toBe('draft:first');
+			UniversalRuntime.startTransition(() => linked.setValue('stale first edit'));
 			root.render(Scene, { source: 'second' });
-			setValue((previous) => `${previous}!`);
+			expect(linked.getValue()).toBe('draft:second');
+			linked.setValue((previous) => `${previous}!`);
+			linked.setValue((previous) => `${previous}?`);
 			UniversalRuntime.flushUniversalSync(() => {});
-			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:second!' });
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:second!?' });
+			expect(linked.getValue()).toBe('draft:second!?');
 
 			await flushUniversalWork();
-			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:second!' });
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:second!?' });
+			expect(linked.getValue()).toBe('draft:second!?');
 		} finally {
 			root.unmount();
 		}
