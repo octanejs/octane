@@ -1,5 +1,16 @@
 # @octanejs/tanstack-pacer
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies [9d5d642]
+- Updated dependencies [f469b3f]
+- Updated dependencies [ac2ae2f]
+- Updated dependencies [3aada64]
+  - octane@0.1.19
+  - @octanejs/tanstack-store@0.0.13
+
 ## 0.0.7
 
 ### Patch Changes
