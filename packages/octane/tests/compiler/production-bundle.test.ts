@@ -3,7 +3,7 @@
 import { relative, resolve, sep } from 'node:path';
 import { build } from 'esbuild';
 import { describe, expect, it } from 'vitest';
-import { compile } from '../src/compiler/index.js';
+import { compile } from '../../src/compiler/index.js';
 
 describe('production component bundles', () => {
 	it('keeps pre-root hydration capture independent of the DOM tables', async () => {
@@ -11,7 +11,7 @@ describe('production component bundles', () => {
 			stdin: {
 				contents: `export { initializeHydrationEventCapture } from './src/hydration/index.ts';`,
 				loader: 'js',
-				resolveDir: resolve(import.meta.dirname, '..'),
+				resolveDir: resolve(import.meta.dirname, '../..'),
 				sourcefile: 'hydration-capture-entry.js',
 			},
 			bundle: true,
@@ -32,7 +32,7 @@ describe('production component bundles', () => {
 			stdin: {
 				contents: `import 'octane'; export const marker = 'package-root-marker';`,
 				loader: 'js',
-				resolveDir: resolve(import.meta.dirname, '..'),
+				resolveDir: resolve(import.meta.dirname, '../..'),
 				sourcefile: 'entry.js',
 			},
 			bundle: true,
@@ -46,7 +46,7 @@ describe('production component bundles', () => {
 		const code = result.outputFiles[0].text;
 		const output = Object.values(result.metafile.outputs)[0];
 		const sourcePrefix =
-			relative(process.cwd(), resolve(import.meta.dirname, '../src'))
+			relative(process.cwd(), resolve(import.meta.dirname, '../../src'))
 				.split(sep)
 				.join('/') + '/';
 

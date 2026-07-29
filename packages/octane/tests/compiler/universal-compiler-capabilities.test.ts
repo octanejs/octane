@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { lynxRenderer } from '../../lynx/src/config.js';
-import { compile } from '../src/compiler/compile.js';
+import { lynxRenderer } from '../../../lynx/src/config.js';
+import { compile } from '../../src/compiler/compile.js';
 
 const baseRenderer = {
 	id: 'object',

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { parseModule } from '@tsrx/core';
-import { compile } from '../src/compiler/compile.js';
-import { prepareServerRendererBoundaryRegions } from '../src/compiler/compile-renderer-boundaries.js';
-import { decodeMappings } from './_source-map.js';
+import { compile } from '../../src/compiler/compile.js';
+import { prepareServerRendererBoundaryRegions } from '../../src/compiler/compile-renderer-boundaries.js';
+import { decodeMappings } from '../_source-map.js';
 import {
 	analyzeRendererBoundaries,
 	assertRendererBoundaryAnalysis,
-} from '../src/compiler/renderer-boundaries.js';
-import { normalizeRendererConfig } from '../src/compiler/renderers.js';
+} from '../../src/compiler/renderer-boundaries.js';
+import { normalizeRendererConfig } from '../../src/compiler/renderers.js';
 
 const rendererConfig = normalizeRendererConfig({
 	registry: { three: '@octanejs/three/renderer' },

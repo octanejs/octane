@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { parseModule } from '@tsrx/core';
 import { describe, expect, it } from 'vitest';
-import { compile } from '../src/compiler/compile.js';
+import { compile } from '../../src/compiler/compile.js';
 
 const source = `
 module server {

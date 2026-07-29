@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
-import { slotHooks } from '../src/compiler/slot-hooks.js';
+import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
 // This file's contract is the INFERENCE — the dependency argument the
 // compiler attaches to the emitted hook call. Compile with the inline

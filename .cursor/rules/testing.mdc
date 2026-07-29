@@ -84,8 +84,11 @@ loaders into another test file.
 
 `packages/octane/tests/` is organized as:
 
-- top-level `*.test.ts`: feature and unit tests for runtime and compiler
-  behavior.
+- top-level `*.test.ts`: feature and unit tests for runtime behavior.
+- `compiler/`: suites that never mount a component — they pass the compiler a
+  source string plus their own options and assert on what comes back. That is
+  what keeps them out of the `octane-prod` project below, so a test that mounts
+  anything belongs at the top level instead.
 - `conformance/`: ports of `facebook/react` behaviors. Each `it` cites its
   source, like `// Per ReactHooksWithNoopRenderer-test.js:1885`.
 - `differential/`: the parity proof. `_rig.ts` runs the same `.tsrx` fixture
@@ -105,10 +108,12 @@ Run one file while iterating:
 
 Two regression layers sit beyond the `octane` project:
 
-- The **`octane-prod`** vitest project re-runs the same files with the plugin
+- The **`octane-prod`** vitest project re-runs the runtime files with the plugin
   forced to `hmr: false`, so the production compile branch gets runtime
   coverage. Tests asserting dev-only warnings check
-  `process.env.OCTANE_TEST_COMPILE_MODE === 'prod'`.
+  `process.env.OCTANE_TEST_COMPILE_MODE === 'prod'`. `compiler/` is excluded:
+  those suites choose their own compile options, so a second run would
+  reproduce the first exactly.
 - **`website/tests/ssr-hydration.e2e.test.ts`** boots the real Vite dev server
   and the production `octane-preview` server and drives every route in headless
   Chromium, failing on hydration-mismatch warnings or page errors.

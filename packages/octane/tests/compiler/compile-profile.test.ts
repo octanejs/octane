@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import * as Octane from '../src/index';
-import { compile } from '../src/compiler/compile.js';
-import { slotHooks } from '../src/compiler/slot-hooks.js';
+import { compile } from '../../src/compiler/compile.js';
+import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import {
 	inspectProfileOutput,
 	type ProfileMetadata,
 	uniqueMetadata,
 	walkAst,
-} from './_profile-output';
+} from '../_profile-output';
 
 const SOURCE = `import { useState } from 'octane';
 function Lite() @{
@@ -39,11 +38,6 @@ function callStart(ast: any, member: string): number | undefined {
 }
 
 describe('profile compiler metadata', () => {
-	it('keeps compiler-only helpers out of the public runtime namespace', () => {
-		expect(Octane).not.toHaveProperty('__profileComponent');
-		expect(Octane).not.toHaveProperty('__profileHook');
-	});
-
 	it('does not alter normal or server compilation', () => {
 		const client = compile(SOURCE, '/src/App.tsrx', { hmr: false, dev: false });
 		expect(

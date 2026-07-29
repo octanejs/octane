@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 // Vite plugin keep their Node dependencies behind `octane/compiler/bundler` and
 // `octane/compiler/vite`, which no browser consumer imports.
 
-const COMPILER_SRC = resolve(import.meta.dirname, '..', 'src', 'compiler');
+const COMPILER_SRC = resolve(import.meta.dirname, '..', '..', 'src', 'compiler');
 
 /** Matches the specifier of a static `import`/`export ... from` declaration. */
 const STATIC_SPECIFIER = /(?:^|\n)\s*(?:import|export)\b[\s\S]*?from\s*['"]([^'"]+)['"]/g;

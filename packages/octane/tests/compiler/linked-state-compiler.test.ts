@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseModule } from '@tsrx/core';
 import { compile } from 'octane/compiler';
-import { slotHooks } from '../src/compiler/slot-hooks.js';
+import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
 function importedLocal(code: string, imported: string, from = 'octane'): string | undefined {
 	const ast = parseModule(code, '/compiled/linked-state.js');

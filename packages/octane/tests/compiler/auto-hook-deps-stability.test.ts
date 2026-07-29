@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
-import { slotHooks } from '../src/compiler/slot-hooks.js';
+import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
 // Which captures a compiler-inferred dependency array may omit, and which it
 // must keep.
@@ -18,7 +18,7 @@ import { slotHooks } from '../src/compiler/slot-hooks.js';
 //
 // A same-module `const`/`function`/`class` is that same identity. Treating it
 // as reactive put a dead comparison slot in every array that touched one, and
-// made `import { fmt } from './fmt'` disagree with the byte-identical helper
+// made `import { fmt } from '../fmt'` disagree with the byte-identical helper
 // declared locally.
 //
 // The final describe block holds the boundary: `let`, shadowing, and derived

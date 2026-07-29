@@ -324,13 +324,19 @@ export default defineConfig({
 				// are unaffected — they control their own options).
 				test: {
 					name: 'octane-prod',
-					// Same contention budget as the `octane` project above: this one runs
-					// the identical file set a second time, so it is on the machine at the
-					// same moment and fails the same way.
+					// Same contention budget as the `octane` project above: this one re-runs
+					// the runtime suite, so it is on the machine at the same moment and
+					// fails the same way.
 					testTimeout: 20_000,
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
+						// tests/compiler/ holds the suites that never mount a component: they
+						// hand the compiler a source string and their own options, so the
+						// plugin config and OCTANE_TEST_COMPILE_MODE above cannot reach them
+						// and a second run reproduces the first one exactly. A test that
+						// mounts anything does not belong in that directory.
+						'packages/octane/tests/compiler/**',
 						'packages/octane/tests/profiling-runtime.test.tsrx',
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',

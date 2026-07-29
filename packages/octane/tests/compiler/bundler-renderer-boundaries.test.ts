@@ -7,12 +7,12 @@ const compilerMocks = vi.hoisted(() => ({
 	})),
 }));
 
-vi.mock('../src/compiler/compile.js', () => ({
+vi.mock('../../src/compiler/compile.js', () => ({
 	compile: compilerMocks.compile,
 	isVoidJsxCodeBlockFunction: () => false,
 }));
 
-import { createOctaneCompiler } from '../src/compiler/bundler.js';
+import { createOctaneCompiler } from '../../src/compiler/bundler.js';
 
 const BOUNDARIES = {
 	'/src/object-boundaries.js': {

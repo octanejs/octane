@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { compile } from '../src/compiler/compile.js';
-import { slotHooks } from '../src/compiler/slot-hooks.js';
-import { compileToVolarMappings } from '../src/compiler/volar.js';
+import { compile } from '../../src/compiler/compile.js';
+import { slotHooks } from '../../src/compiler/slot-hooks.js';
+import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
