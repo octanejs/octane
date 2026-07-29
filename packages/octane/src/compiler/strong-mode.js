@@ -285,8 +285,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						(node.arguments ?? []).some(alwaysAwaits) &&
 						!optionalChainCanSkip(node.callee))
 				);
+			case 'ClassExpression':
+				return alwaysAwaits(node.superClass);
 			case 'AssignmentExpression':
-				return alwaysAwaits(node.left) || alwaysAwaits(node.right);
+				return (
+					alwaysAwaits(node.left) ||
+					(node.operator !== '&&=' &&
+						node.operator !== '||=' &&
+						node.operator !== '??=' &&
+						alwaysAwaits(node.right))
+				);
 			case 'BinaryExpression':
 				return alwaysAwaits(node.left) || alwaysAwaits(node.right);
 			case 'LogicalExpression':
@@ -321,6 +329,27 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return alwaysAwaits(node.argument);
 			case 'TemplateLiteral':
 				return (node.expressions ?? []).some(alwaysAwaits);
+			case 'TaggedTemplateExpression':
+				return alwaysAwaits(node.tag) || alwaysAwaits(node.quasi);
+			default:
+				return false;
+		}
+	}
+
+	function patternAlwaysAwaits(pattern) {
+		switch (pattern?.type) {
+			case 'ArrayPattern':
+				return (pattern.elements ?? []).some(patternAlwaysAwaits);
+			case 'ObjectPattern':
+				return (pattern.properties ?? []).some(
+					(property) =>
+						(property.computed === true && alwaysAwaits(property.key)) ||
+						patternAlwaysAwaits(property.argument ?? property.value),
+				);
+			case 'AssignmentPattern':
+				return patternAlwaysAwaits(pattern.left);
+			case 'RestElement':
+				return patternAlwaysAwaits(pattern.argument);
 			default:
 				return false;
 		}
@@ -424,7 +453,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'ExpressionStatement':
 				return alwaysAwaits(statement.expression);
 			case 'VariableDeclaration':
-				return (statement.declarations ?? []).some((declaration) => alwaysAwaits(declaration.init));
+				return (statement.declarations ?? []).some(
+					(declaration) => alwaysAwaits(declaration.init) || patternAlwaysAwaits(declaration.id),
+				);
+			case 'ClassDeclaration':
+				return alwaysAwaits(statement.superClass);
 			case 'ReturnStatement':
 			case 'ThrowStatement':
 				return alwaysAwaits(statement.argument);
@@ -495,6 +528,48 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
+	function continuedChainAlwaysAwaits(expression, groupedOptional = false) {
+		if (expression?.type === 'ChainExpression') {
+			return groupedOptional
+				? continuedChainAlwaysAwaits(expression.expression)
+				: alwaysAwaits(expression);
+		}
+		const node = unwrap(expression);
+		if (node == null) return false;
+		if (node.type === 'MemberExpression') {
+			return (
+				continuedChainAlwaysAwaits(node.object) ||
+				(node.computed === true && alwaysAwaits(node.property))
+			);
+		}
+		if (node.type === 'CallExpression') {
+			return continuedChainAlwaysAwaits(node.callee) || (node.arguments ?? []).some(alwaysAwaits);
+		}
+		return alwaysAwaits(node);
+	}
+
+	function phaseAfter(expression, phase, continued = false, groupedOptional = false) {
+		if (!currentFunctionIsAsync || phase === 'deferred') return phase;
+		if (
+			alwaysAwaits(expression) ||
+			(continued &&
+				((optionalChainCanSkip(expression) && continuedChainAlwaysAwaits(expression)) ||
+					(groupedOptional && continuedChainAlwaysAwaits(expression, true))))
+		) {
+			return 'deferred';
+		}
+		return phase;
+	}
+
+	function visitExpressionList(expressions, scope, phase) {
+		let executionPhase = phase;
+		for (const expression of expressions ?? []) {
+			visit(expression, scope, executionPhase);
+			executionPhase = phaseAfter(expression, executionPhase);
+		}
+		return executionPhase;
+	}
+
 	function visitStatements(statements, scope, phase) {
 		let executionPhase = phase;
 		for (const statement of statements ?? []) {
@@ -534,19 +609,30 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function visitPatternExpressions(pattern, scope, phase) {
+		let executionPhase = phase;
 		if (pattern?.type === 'AssignmentPattern') {
-			visitPatternExpressions(pattern.left, scope, phase);
-			visit(pattern.right, scope, phase);
+			executionPhase = visitPatternExpressions(pattern.left, scope, executionPhase);
+			visit(pattern.right, scope, executionPhase);
 		} else if (pattern?.type === 'ArrayPattern') {
-			for (const element of pattern.elements ?? []) visitPatternExpressions(element, scope, phase);
+			for (const element of pattern.elements ?? []) {
+				executionPhase = visitPatternExpressions(element, scope, executionPhase);
+			}
 		} else if (pattern?.type === 'ObjectPattern') {
 			for (const property of pattern.properties ?? []) {
-				if (property.computed) visit(property.key, scope, phase);
-				visitPatternExpressions(property.argument ?? property.value, scope, phase);
+				if (property.computed) {
+					visit(property.key, scope, executionPhase);
+					executionPhase = phaseAfter(property.key, executionPhase);
+				}
+				executionPhase = visitPatternExpressions(
+					property.argument ?? property.value,
+					scope,
+					executionPhase,
+				);
 			}
 		} else if (pattern?.type === 'RestElement') {
-			visitPatternExpressions(pattern.argument, scope, phase);
+			executionPhase = visitPatternExpressions(pattern.argument, scope, executionPhase);
 		}
+		return executionPhase;
 	}
 
 	function bindDeclaration(declaration, declarationKind, scope, phase) {
@@ -577,8 +663,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				target.bindings.set(declaration.id.name, { kind: 'callback', node: initial, scope });
 			}
 		}
-		visitPatternExpressions(declaration.id, scope, phase);
 		visit(declaration.init, scope, phase);
+		return visitPatternExpressions(declaration.id, scope, phaseAfter(declaration.init, phase));
 	}
 
 	function visitCallback(node, parentScope, phase) {
@@ -589,6 +675,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		} finally {
 			activeCallbacks.delete(node);
 		}
+	}
+
+	function stateTupleUpdater(value, scope) {
+		const member = unwrap(value);
+		if (member?.type !== 'MemberExpression' || member.computed !== true) return false;
+		const property = unwrap(member.property);
+		return (
+			property?.type === 'Literal' &&
+			(property.value === 1 || property.value === '1') &&
+			unwrap(member.object)?.type === 'Identifier' &&
+			resolve(scope, unwrap(member.object).name)?.kind === 'state-tuple'
+		);
 	}
 
 	function visitSynchronousHookCallback(value, scope, phase) {
@@ -602,6 +700,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
 				reportSetter(callback, phase);
 			}
+			return true;
+		} else if (stateTupleUpdater(callback, scope)) {
+			if (phase === 'render' || phase === 'effect') reportSetter(callback, phase);
 			return true;
 		}
 		return false;
@@ -645,12 +746,56 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 			case 'IfStatement': {
 				visit(node.test, scope, phase);
-				const branchPhase =
-					currentFunctionIsAsync && phase !== 'deferred' && alwaysAwaits(node.test)
-						? 'deferred'
-						: phase;
+				const branchPhase = phaseAfter(node.test, phase);
 				visit(node.consequent, scope, branchPhase);
 				visit(node.alternate, scope, branchPhase);
+				return;
+			}
+			case 'ConditionalExpression': {
+				visit(node.test, scope, phase);
+				const branchPhase = phaseAfter(node.test, phase);
+				visit(node.consequent, scope, branchPhase);
+				visit(node.alternate, scope, branchPhase);
+				return;
+			}
+			case 'LogicalExpression':
+			case 'BinaryExpression':
+				visit(node.left, scope, phase);
+				visit(node.right, scope, phaseAfter(node.left, phase));
+				return;
+			case 'SequenceExpression':
+				visitExpressionList(node.expressions, scope, phase);
+				return;
+			case 'ArrayExpression':
+				visitExpressionList(node.elements, scope, phase);
+				return;
+			case 'TemplateLiteral':
+				visitExpressionList(node.expressions, scope, phase);
+				return;
+			case 'ObjectExpression': {
+				let executionPhase = phase;
+				for (const property of node.properties ?? []) {
+					if (property.type === 'SpreadElement') {
+						visit(property.argument, scope, executionPhase);
+						executionPhase = phaseAfter(property.argument, executionPhase);
+						continue;
+					}
+					if (property.computed === true) {
+						visit(property.key, scope, executionPhase);
+						executionPhase = phaseAfter(property.key, executionPhase);
+					}
+					if (property.kind === 'init' && property.method !== true) {
+						visit(property.value, scope, executionPhase);
+						executionPhase = phaseAfter(property.value, executionPhase);
+					}
+				}
+				return;
+			}
+			case 'MemberExpression': {
+				visit(node.object, scope, phase);
+				if (node.computed === true) {
+					visit(node.property, scope, phaseAfter(node.object, phase, true, node.optional === true));
+				}
 				return;
 			}
 			case 'LabeledStatement':
@@ -699,68 +844,116 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				return;
 			}
-			case 'VariableDeclaration':
+			case 'VariableDeclaration': {
+				let declarationPhase = phase;
 				for (const declaration of node.declarations ?? []) {
-					bindDeclaration(declaration, node.kind, scope, phase);
+					declarationPhase = bindDeclaration(declaration, node.kind, scope, declarationPhase);
 				}
 				return;
+			}
 			case 'CallExpression': {
 				const hook = importedHook(node.callee, scope);
 				const callee = unwrap(node.callee);
 				const calleeBinding = callee?.type === 'Identifier' ? resolve(scope, callee.name) : null;
-				const tupleProperty =
-					callee?.type === 'MemberExpression' && callee.computed === true
-						? unwrap(callee.property)
-						: null;
-				const tupleUpdater =
-					tupleProperty?.type === 'Literal' &&
-					(tupleProperty.value === 1 || tupleProperty.value === '1') &&
-					unwrap(callee.object)?.type === 'Identifier' &&
-					resolve(scope, unwrap(callee.object).name)?.kind === 'state-tuple';
+				const tupleUpdater = stateTupleUpdater(callee, scope);
+				if (!FUNCTION_TYPES.has(callee?.type)) {
+					visit(node.callee, scope, phase);
+				}
+				let executionPhase = phaseAfter(node.callee, phase, true, node.optional === true);
+				const synchronousHook = EFFECT_HOOKS.has(hook) || hook === 'useMemo';
+				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
+					const argument = node.arguments[index];
+					if (index !== 0 || !synchronousHook || !FUNCTION_TYPES.has(unwrap(argument)?.type)) {
+						visit(argument, scope, executionPhase);
+					}
+					executionPhase = phaseAfter(argument, executionPhase);
+				}
 				if (
-					(phase === 'render' || phase === 'effect') &&
-					(calleeBinding?.kind === 'setter' || tupleUpdater) &&
-					!(currentFunctionIsAsync && (node.arguments ?? []).some(alwaysAwaits))
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					(calleeBinding?.kind === 'setter' || tupleUpdater)
 				) {
-					reportSetter(callee, phase);
+					reportSetter(callee, executionPhase);
 				}
 				if (EFFECT_HOOKS.has(hook)) {
-					visit(node.callee, scope, phase);
 					visitSynchronousHookCallback(node.arguments?.[0], scope, 'effect');
-					for (let index = 1; index < (node.arguments?.length ?? 0); index++) {
-						visit(node.arguments[index], scope, phase);
-					}
 					return;
 				}
 				if (hook === 'useMemo') {
-					visit(node.callee, scope, phase);
-					if (!visitSynchronousHookCallback(node.arguments?.[0], scope, phase)) {
-						visit(node.arguments?.[0], scope, phase);
-					}
-					for (let index = 1; index < node.arguments.length; index++) {
-						visit(node.arguments[index], scope, phase);
-					}
+					visitSynchronousHookCallback(node.arguments?.[0], scope, executionPhase);
 					return;
 				}
 				if (FUNCTION_TYPES.has(callee?.type)) {
-					visitCallback(callee, scope, phase);
-					for (const argument of node.arguments ?? []) visit(argument, scope, phase);
-					return;
+					visitCallback(callee, scope, executionPhase);
+				} else if (
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					calleeBinding?.kind === 'callback'
+				) {
+					visitCallback(calleeBinding.node, calleeBinding.scope, executionPhase);
 				}
-				if ((phase === 'render' || phase === 'effect') && calleeBinding?.kind === 'callback') {
-					visitCallback(calleeBinding.node, calleeBinding.scope, phase);
-					for (const argument of node.arguments ?? []) visit(argument, scope, phase);
-					return;
-				}
-				visit(node.callee, scope, phase);
-				for (const argument of node.arguments ?? []) visit(argument, scope, phase);
 				return;
 			}
-			case 'AssignmentExpression':
-				if (phase === 'render' && currentRef(node.left, scope)) reportRef(node.left);
-				visit(node.left, scope, phase);
-				visit(node.right, scope, phase);
+			case 'NewExpression': {
+				const callee = unwrap(node.callee);
+				const binding = callee?.type === 'Identifier' ? resolve(scope, callee.name) : null;
+				const inlineConstructor =
+					(callee?.type === 'FunctionExpression' || callee?.type === 'FunctionDeclaration') &&
+					callee.async !== true &&
+					callee.generator !== true;
+				if (!FUNCTION_TYPES.has(callee?.type)) visit(node.callee, scope, phase);
+				const executionPhase = visitExpressionList(
+					node.arguments,
+					scope,
+					phaseAfter(node.callee, phase),
+				);
+				if (inlineConstructor) {
+					visitCallback(callee, scope, executionPhase);
+				} else if (
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					binding?.kind === 'callback' &&
+					(binding.node.type === 'FunctionExpression' ||
+						binding.node.type === 'FunctionDeclaration') &&
+					binding.node.async !== true &&
+					binding.node.generator !== true
+				) {
+					visitCallback(binding.node, binding.scope, executionPhase);
+				}
 				return;
+			}
+			case 'TaggedTemplateExpression': {
+				const tag = unwrap(node.tag);
+				const binding = tag?.type === 'Identifier' ? resolve(scope, tag.name) : null;
+				if (!FUNCTION_TYPES.has(tag?.type)) visit(node.tag, scope, phase);
+				const tagPhase = phaseAfter(node.tag, phase, true);
+				visit(node.quasi, scope, tagPhase);
+				const executionPhase = phaseAfter(node.quasi, tagPhase);
+				if (
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					binding?.kind === 'setter'
+				) {
+					reportSetter(tag, executionPhase);
+				} else if (FUNCTION_TYPES.has(tag?.type)) {
+					visitCallback(tag, scope, executionPhase);
+				} else if (
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					binding?.kind === 'callback'
+				) {
+					visitCallback(binding.node, binding.scope, executionPhase);
+				}
+				return;
+			}
+			case 'AssignmentExpression': {
+				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
+					visit(node.right, scope, phase);
+					visitPatternExpressions(node.left, scope, phaseAfter(node.right, phase));
+					return;
+				}
+				visit(node.left, scope, phase);
+				const rightPhase = phaseAfter(node.left, phase, true);
+				visit(node.right, scope, rightPhase);
+				const executionPhase = phaseAfter(node.right, rightPhase);
+				if (executionPhase === 'render' && currentRef(node.left, scope)) reportRef(node.left);
+				return;
+			}
 			case 'UpdateExpression':
 				if (phase === 'render' && currentRef(node.argument, scope)) reportRef(node.argument);
 				visit(node.argument, scope, phase);

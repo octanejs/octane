@@ -422,6 +422,35 @@ export function App() @{
 		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(EFFECT_STATE_UPDATE);
 	});
 
+	it.each([
+		['memo callbacks', 'useMemo(state[1], []);', RENDER_STATE_UPDATE],
+		['wrapped memo callback indices', 'useMemo(state[1 as const], []);', RENDER_STATE_UPDATE],
+		['effect callbacks', 'useEffect(state[1], []);', EFFECT_STATE_UPDATE],
+		['wrapped effect callback indices', 'useEffect(state[1 as const], []);', EFFECT_STATE_UPDATE],
+	])('rejects state tuple updaters used as %s', (_label, callback, code) => {
+		const source = `"use strong";
+import { useEffect, useMemo, useState } from 'octane';
+export function App() @{
+  const state = useState(0);
+  ${callback}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(code);
+	});
+
+	it('allows state tuple memo callbacks after yielded dependency arguments', () => {
+		const source = `"use strong";
+import { useMemo, useState } from 'octane';
+export function App() @{
+  const state = useState(0);
+  (async () => { useMemo(state[1], [await Promise.resolve(state[0])]); })();
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
 	it('catches synchronous local callback invocation inside effect setup', () => {
 		const source = `"use strong";\n${stateComponent(
 			'useEffect(() => { const apply = () => setCount(1); apply(); }, []);',
@@ -538,6 +567,283 @@ export function App() @{
 		for (const source of [render, effect, asyncEffect]) {
 			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
 		}
+	});
+
+	it.each([
+		[
+			'awaited ternary conditions',
+			'(await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);',
+		],
+		[
+			'conditionally selected branches that yield before updating',
+			'count > 0 ? (await Promise.resolve(), setCount(1)) : count;',
+		],
+		[
+			'ternary branches that both yield before a later operand',
+			'(count > 0 ? await Promise.resolve(1) : await Promise.resolve(2), setCount(3));',
+		],
+		['awaited logical AND operands', '(await Promise.resolve(true)) && setCount(1);'],
+		['awaited logical OR operands', '(await Promise.resolve(false)) || setCount(1);'],
+		['awaited nullish-coalescing operands', '(await Promise.resolve(null)) ?? setCount(1);'],
+		[
+			'conditionally selected logical branches that yield before updating',
+			'count > 0 && (await Promise.resolve(), setCount(1));',
+		],
+		['comma expressions', '(await Promise.resolve(), setCount(1));'],
+		['later comma operands', '(count, await Promise.resolve(), setCount(1));'],
+		[
+			'transparently wrapped awaited operands',
+			'((await Promise.resolve(true)) as boolean) ? setCount(1) : setCount(2);',
+		],
+		['binary operands', '(await Promise.resolve(1)) + setCount(1);'],
+		['array elements', '[await Promise.resolve(count), setCount(1)];'],
+		['object properties', 'void ({ first: await Promise.resolve(count), second: setCount(1) });'],
+		['computed object properties', 'void ({ [await Promise.resolve("value")]: setCount(1) });'],
+		[
+			'object spread properties',
+			'void ({ ...(await Promise.resolve({ count })), value: setCount(1) });',
+		],
+		['function arguments', 'Promise.resolve(await Promise.resolve(count), setCount(1));'],
+		['callee expressions', '([() => {}][await Promise.resolve(0)])(setCount(1));'],
+		[
+			'immediately invoked function arguments',
+			'(() => setCount(1))(await Promise.resolve(count));',
+		],
+		[
+			'named synchronously invoked function arguments',
+			'const apply = () => setCount(1); apply(await Promise.resolve(count));',
+		],
+		[
+			'default parameters after yielded function arguments',
+			'((value = setCount(1)) => value)(await Promise.resolve(undefined));',
+		],
+		[
+			'constructor arguments',
+			'new Error(await Promise.resolve("message"), { cause: setCount(1) });',
+		],
+		[
+			'named constructors after yielded arguments',
+			'function Update() { setCount(1); } new Update(await Promise.resolve(count));',
+		],
+		[
+			'inline constructors after yielded arguments',
+			'new (function Update() { setCount(1); })(await Promise.resolve(count));',
+		],
+		[
+			'constructor arguments after yielded class heritage',
+			'new (class extends (await Promise.resolve(Object)) { constructor(value) { super(); } })(setCount(1));',
+		],
+		[
+			'optional-call arguments when their earlier arguments yield',
+			'const target = { update() {} }; target?.update(await Promise.resolve(count), setCount(1));',
+		],
+		['computed member properties', '(await Promise.resolve({}))[setCount(1)];'],
+		['optional computed member properties', '(await Promise.resolve({}))?.[setCount(1)];'],
+		[
+			'later properties in a continuous optional chain',
+			'const target = count > 0 ? { value: {} } : null; target?.[await Promise.resolve("value")][setCount(1)];',
+		],
+		[
+			'optional properties after a grouped optional chain',
+			'const target = count > 0 ? { value: {} } : null; (target?.[await Promise.resolve("value")])?.[setCount(1)];',
+		],
+		[
+			'optional calls after a grouped optional property',
+			'const target = count > 0 ? { update() {} } : null; (target?.[await Promise.resolve("update")])?.(setCount(1));',
+		],
+		[
+			'optional properties after a grouped optional call',
+			'const target = count > 0 ? () => ({}) : null; (target?.(await Promise.resolve(count)))?.[setCount(1)];',
+		],
+		[
+			'assignment expressions',
+			'const target = {}; target[await Promise.resolve("value")] = setCount(1);',
+		],
+		[
+			'conditionally evaluated logical-assignment branches',
+			'let value = count; value &&= (await Promise.resolve(), setCount(1));',
+		],
+		['template expressions', '`first ${await Promise.resolve(count)} second ${setCount(1)}`;'],
+		['tagged template expressions', '(await Promise.resolve(String.raw))`count ${setCount(1)}`;'],
+		[
+			'tagged callbacks after yielded substitutions',
+			'const apply = () => setCount(1); apply`count ${await Promise.resolve(count)}`;',
+		],
+		[
+			'later variable declarators',
+			'const previous = await Promise.resolve(count), next = setCount(1);',
+		],
+		[
+			'destructuring defaults after yielded initializers',
+			'const { value = setCount(1) } = await Promise.resolve({});',
+		],
+		[
+			'destructuring defaults after yielded computed keys',
+			'const { [await Promise.resolve("value")]: value = setCount(1) } = {};',
+		],
+		[
+			'destructuring assignments after yielded values',
+			'let value; ({ value = setCount(1) } = await Promise.resolve({}));',
+		],
+		[
+			'destructuring assignments after yielded computed keys',
+			'let value; ({ [await Promise.resolve("value")]: value = setCount(1) } = {});',
+		],
+		[
+			'array destructuring assignments after yielded values',
+			'let value; [value = setCount(1)] = await Promise.resolve([]);',
+		],
+	])('allows expression updates after guaranteed yields in %s', (_label, body) => {
+		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+		const effect = `"use strong";\n${stateComponent(
+			`useEffect(() => { (async () => { ${body} })(); }, [count]);`,
+			'useState, useEffect',
+		)}`;
+		const asyncEffect = `"use strong";\n${stateComponent(
+			`useEffect(async () => { ${body} }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		for (const source of [render, effect, asyncEffect]) {
+			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
+		}
+	});
+
+	it.each([
+		[
+			'ternary updates before their branch yields',
+			'count > 0 ? (setCount(1), await Promise.resolve()) : count;',
+		],
+		[
+			'ternary updates when only the other branch yields',
+			'count > 0 ? setCount(1) : await Promise.resolve();',
+		],
+		[
+			'updates after conditionally awaited ternary expressions',
+			'(count > 0 ? await Promise.resolve() : count, setCount(1));',
+		],
+		[
+			'updates after conditionally awaited logical expressions',
+			'(count > 0 && await Promise.resolve(), setCount(1));',
+		],
+		[
+			'logical updates before their selected branch yields',
+			'count > 0 && (setCount(1), await Promise.resolve());',
+		],
+		['comma operands before their await', '(setCount(1), await Promise.resolve());'],
+		['binary operands before their await', 'setCount(1) + (await Promise.resolve(count));'],
+		['array elements before their await', '[setCount(1), await Promise.resolve(count)];'],
+		[
+			'object properties before their await',
+			'void ({ first: setCount(1), second: await Promise.resolve(count) });',
+		],
+		[
+			'function arguments before their await',
+			'Promise.resolve(setCount(1), await Promise.resolve(count));',
+		],
+		[
+			'optional calls whose arguments can be skipped',
+			'const target = count > 0 ? { update() {} } : null; (target?.update(await Promise.resolve()), setCount(1));',
+		],
+		[
+			'optional computed properties that can be skipped',
+			'const target = count > 0 ? {} : null; (target?.[await Promise.resolve("value")], setCount(1));',
+		],
+		[
+			'grouped optional chains whose computed properties can be skipped',
+			'const target = count > 0 ? {} : null; (target?.[await Promise.resolve("value")])[setCount(1)];',
+		],
+		[
+			'grouped optional calls whose arguments can be skipped',
+			'const target = count > 0 ? () => ({}) : null; (target?.(await Promise.resolve(count)))[setCount(1)];',
+		],
+		[
+			'assignment operands before their await',
+			'const target = {}; target[setCount(1)] = await Promise.resolve(count);',
+		],
+		[
+			'logical AND assignments whose awaited right side can be skipped',
+			'let value = count; value &&= await Promise.resolve(1); setCount(1);',
+		],
+		[
+			'logical OR assignments whose awaited right side can be skipped',
+			'let value = count; value ||= await Promise.resolve(1); setCount(1);',
+		],
+		[
+			'nullish assignments whose awaited right side can be skipped',
+			'let value = count; value ??= await Promise.resolve(1); setCount(1);',
+		],
+		[
+			'template expressions before their await',
+			'`first ${setCount(1)} second ${await Promise.resolve(count)}`;',
+		],
+		[
+			'variable declarators before their await',
+			'const previous = setCount(1), next = await Promise.resolve(count);',
+		],
+		[
+			'destructuring assignments whose defaults run synchronously',
+			'let value; ({ value = setCount(1) } = {});',
+		],
+		[
+			'destructuring assignment defaults before a later computed-key await',
+			'let first, second; ({ first = setCount(1), [await Promise.resolve("second")]: second } = {});',
+		],
+		[
+			'immediately invoked tagged callbacks before an await',
+			'const apply = () => setCount(1); apply`count`;',
+		],
+		[
+			'named constructors invoked before an await',
+			'function Update() { setCount(1); } new Update();',
+		],
+		['inline constructors invoked before an await', 'new (function Update() { setCount(1); })();'],
+	])('still rejects expression updates in %s', (_label, body) => {
+		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+		const effect = `"use strong";\n${stateComponent(
+			`useEffect(async () => { ${body} }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		expect(() => compile(render, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+		expect(() => compile(effect, '/src/Counter.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it.each([
+		['inline memo callbacks', 'useMemo(() => setCount(1), [await Promise.resolve(count)]);'],
+		[
+			'named memo callbacks',
+			'const calculate = () => setCount(1); useMemo(calculate, [await Promise.resolve(count)]);',
+		],
+		['state updaters as memo callbacks', 'useMemo(setCount, [await Promise.resolve(count)]);'],
+	])('allows %s when earlier arguments have yielded', (_label, body) => {
+		const source = `"use strong";\n${stateComponent(
+			`(async () => { ${body} })();`,
+			'useState, useMemo',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
+	});
+
+	it('still rejects memo callbacks when awaited arguments can be skipped', () => {
+		const source = `"use strong";\n${stateComponent(
+			'(async () => { useMemo(() => setCount(1), [count > 0 && await Promise.resolve(count)]); })();',
+			'useState, useMemo',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		['inline arrow functions', 'new (() => setCount(1))();'],
+		['named arrow functions', 'const Update = () => setCount(1); new Update();'],
+		['inline async functions', 'new (async function Update() { setCount(1); })();'],
+		['named async functions', 'async function Update() { setCount(1); } new Update();'],
+		['generator functions', 'new (function* Update() { setCount(1); })();'],
+	])('does not invoke nonconstructable %s during render', (_label, body) => {
+		const source = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
 	});
 
 	it.each([
@@ -1056,6 +1362,103 @@ export function useCounter() {
 		expect(rejected.errors).toContainEqual(
 			expect.objectContaining({ code: EFFECT_STATE_UPDATE, type: 'usage' }),
 		);
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])(
+		'preserves yielded expression evaluation during $mode compilation with dev=$dev',
+		(options) => {
+			const source = `"use strong";\n${stateComponent(
+				`useEffect(async () => {
+      (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
+      Promise.resolve(await Promise.resolve(count), setCount(3));
+      const { value = setCount(4) } = await Promise.resolve({});
+    }, [count]);`,
+				'useState, useEffect',
+			)}`;
+
+			expect(() => compile(source, '/src/Counter.tsrx', options)).not.toThrow();
+		},
+	);
+
+	it('applies yielded expression ordering to plain TypeScript custom hooks', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function useCounter() {
+  const [count, setCount] = useState(0);
+  useEffect(async () => {
+    (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
+    Promise.resolve(await Promise.resolve(count), setCount(3));
+  }, [count]);
+  return count;
+}`;
+		const synchronous = source.replace(
+			'(await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);',
+			'count > 0 ? setCount(1) : await Promise.resolve(count);',
+		);
+
+		expect(() => slotHooks(source, '/src/useCounter.ts')).not.toThrow();
+		expect(() => slotHooks(synchronous, '/src/useCounter.ts')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it('publishes editor errors only for synchronously evaluated expression updates', () => {
+		const source = `"use strong";\n${stateComponent(
+			`useEffect(async () => {
+      (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
+    }, [count]);`,
+			'useState, useEffect',
+		)}`;
+		const synchronous = source.replace(
+			'(await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);',
+			'count > 0 ? setCount(1) : await Promise.resolve(count);',
+		);
+		const valid = compileToVolarMappings(source, '/src/Counter.tsrx');
+		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
+
+		expect(valid.diagnostics).toEqual([]);
+		expect(valid.errors).toEqual([]);
+		expect(rejected.diagnostics).toContainEqual(
+			expect.objectContaining({ code: EFFECT_STATE_UPDATE, severity: 'error' }),
+		);
+		expect(rejected.errors).toContainEqual(
+			expect.objectContaining({ code: EFFECT_STATE_UPDATE, type: 'usage' }),
+		);
+	});
+
+	it.each([
+		['assignments', 'ref.current = await Promise.resolve(1);'],
+		['compound assignments', 'ref.current += await Promise.resolve(1);'],
+		[
+			'awaited conditional tests',
+			'(await Promise.resolve(true)) ? (ref.current = 1) : (ref.current = 2);',
+		],
+		['later comma operands', '(await Promise.resolve(), ref.current++);'],
+	])('allows ref writes after yields in %s', (_label, body) => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  (async () => { ${body} })();
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('still rejects ref writes evaluated before a later yield', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  (async () => { ref.current = (ref.current++, await Promise.resolve(1)); })();
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
 	});
 
 	it.each(['ref.current = 1;', 'ref.current++;', "ref['current'] = 1;"])(
