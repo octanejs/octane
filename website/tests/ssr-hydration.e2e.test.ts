@@ -174,8 +174,8 @@ beforeAll(async () => {
 	} catch (error) {
 		throw new Error(
 			'[ssr-hydration.e2e] Chromium is required ' +
-			'(run `pnpm exec playwright install chromium`): ' +
-			(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+				'(run `pnpm exec playwright install chromium`): ' +
+				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
 		);
 	}
 }, 60_000);
@@ -237,7 +237,7 @@ async function loadRoute(
 			}
 		}
 	} catch (error) {
-		await page.close().catch(() => { });
+		await page.close().catch(() => {});
 		throw error;
 	}
 }
@@ -314,7 +314,7 @@ async function waitForLocatorText(
 	}
 	throw new Error(
 		`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms ` +
-		`(last observed: ${JSON.stringify(last)})`,
+			`(last observed: ${JSON.stringify(last)})`,
 	);
 }
 
@@ -432,7 +432,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 						Array.from(
 							document
 								.querySelectorAll('.pg-editor .cm-content')
-							[index]?.querySelectorAll('.cm-mapped') ?? [],
+								[index]?.querySelectorAll('.cm-mapped') ?? [],
 						).map((mark) => mark.textContent);
 					const scroller = document
 						.querySelectorAll('.pg-editor .cm-content')[1]
@@ -1162,7 +1162,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				await page.waitForFunction(
 					() =>
 						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-						'true' &&
+							'true' &&
 						getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
 				);
 
@@ -1240,7 +1240,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 						const panelMaxHeight = Number.parseFloat(getComputedStyle(panelInner).maxHeight);
 						return (
 							document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-							'true' &&
+								'true' &&
 							getComputedStyle(sidebar).position === 'sticky' &&
 							Math.abs(sidebarRect.top - header.bottom) <= 2 &&
 							Math.abs(panel.top - sidebarRect.bottom) <= 2 &&
@@ -1284,7 +1284,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 						return (
 							location.hash === '#rspack' &&
 							document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
-							'false' &&
+								'false' &&
 							getComputedStyle(panel).visibility === 'hidden' &&
 							panelInner.height < 1 &&
 							target.top >= sidebar.bottom + 8 &&
@@ -1371,7 +1371,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 	// Declared last, it runs once the concurrent batch above has drained.
 	it(
 		'hydrates cleanly on reload after HMR edits (hot server)',
-		{ concurrent: false },
+		{ concurrent: false, timeout: 45_000 },
 		async () => {
 			const files = [
 				join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
@@ -1418,7 +1418,6 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				restore();
 			}
 		},
-		45_000,
 	);
 });
 
@@ -1428,764 +1427,770 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 // Sequential suite, `it.concurrent` cases — same shape and same reason as the
 // dev suite above: page-per-case against one shared server, nothing here writes
 // to disk.
-describe('website production build → hydration (Nitro Vercel preview)', { concurrent: false }, () => {
-	const PREVIEW_ORIGIN = inject('productionOrigin');
-	const outputDir = inject('productionOutputDir');
+describe(
+	'website production build → hydration (Nitro Vercel preview)',
+	{ concurrent: false },
+	() => {
+		const PREVIEW_ORIGIN = inject('productionOrigin');
+		const outputDir = inject('productionOutputDir');
 
-	// The setup starts the build in the background so the rest of the suite does
-	// not queue behind it; the origin is reserved but not yet answering when this
-	// module loads, and `outputDir` is not populated either. Both the browser
-	// cases and the Build Output assertions need it finished.
-	beforeAll(() => waitForReadyState(inject('productionReadyFile'), 300_000));
+		// The setup starts the build in the background so the rest of the suite does
+		// not queue behind it; the origin is reserved but not yet answering when this
+		// module loads, and `outputDir` is not populated either. Both the browser
+		// cases and the Build Output assertions need it finished.
+		beforeAll(() => waitForReadyState(inject('productionReadyFile'), 300_000));
 
-	it.concurrent('emits the Vercel Build Output API contract', () => {
-		const config = JSON.parse(readFileSync(join(outputDir, 'config.json'), 'utf8')) as {
-			version?: number;
-			routes?: Array<{
-				src?: string;
-				dest?: string;
-				handle?: string;
-				continue?: boolean;
-				headers?: Record<string, string>;
-			}>;
-		};
-		const routes = config.routes ?? [];
-		const assetsIndex = routes.findIndex(
-			(route) =>
-				route.src?.startsWith('/assets/') &&
-				route.headers?.['cache-control'] === 'public,max-age=31536000,immutable' &&
-				route.continue === true,
+		it.concurrent('emits the Vercel Build Output API contract', () => {
+			const config = JSON.parse(readFileSync(join(outputDir, 'config.json'), 'utf8')) as {
+				version?: number;
+				routes?: Array<{
+					src?: string;
+					dest?: string;
+					handle?: string;
+					continue?: boolean;
+					headers?: Record<string, string>;
+				}>;
+			};
+			const routes = config.routes ?? [];
+			const assetsIndex = routes.findIndex(
+				(route) =>
+					route.src?.startsWith('/assets/') &&
+					route.headers?.['cache-control'] === 'public,max-age=31536000,immutable' &&
+					route.continue === true,
+			);
+			const filesystemIndex = routes.findIndex((route) => route.handle === 'filesystem');
+			const serverFallbackIndex = routes.findIndex(
+				(route) => route.src === '/(.*)' && route.dest === '/__server',
+			);
+
+			expect(config.version).toBe(3);
+			expect(assetsIndex).toBeGreaterThanOrEqual(0);
+			expect(filesystemIndex).toBeGreaterThan(assetsIndex);
+			expect(serverFallbackIndex).toBeGreaterThan(filesystemIndex);
+			expect(existsSync(join(outputDir, 'static/playground-runtime.json'))).toBe(true);
+			expect(existsSync(join(outputDir, 'functions/__server.func/index.mjs'))).toBe(true);
+
+			const functionConfig = JSON.parse(
+				readFileSync(join(outputDir, 'functions/__server.func/.vc-config.json'), 'utf8'),
+			) as { runtime?: string; supportsResponseStreaming?: boolean };
+			expect(functionConfig.runtime).toBe('nodejs24.x');
+			expect(functionConfig.supportsResponseStreaming).toBe(true);
+		});
+
+		it.concurrent.for(ROUTES)(
+			'%s renders and runs with no errors',
+			{ timeout: 30_000 },
+			async (route) => {
+				const { page, errors, main } = await loadRoute(PREVIEW_ORIGIN, route);
+				try {
+					expect(errors).toEqual([]);
+					expect(main.length).toBeGreaterThan(0);
+				} finally {
+					await page.close();
+				}
+			},
 		);
-		const filesystemIndex = routes.findIndex((route) => route.handle === 'filesystem');
-		const serverFallbackIndex = routes.findIndex(
-			(route) => route.src === '/(.*)' && route.dest === '/__server',
-		);
 
-		expect(config.version).toBe(3);
-		expect(assetsIndex).toBeGreaterThanOrEqual(0);
-		expect(filesystemIndex).toBeGreaterThan(assetsIndex);
-		expect(serverFallbackIndex).toBeGreaterThan(filesystemIndex);
-		expect(existsSync(join(outputDir, 'static/playground-runtime.json'))).toBe(true);
-		expect(existsSync(join(outputDir, 'functions/__server.func/index.mjs'))).toBe(true);
-
-		const functionConfig = JSON.parse(
-			readFileSync(join(outputDir, 'functions/__server.func/.vc-config.json'), 'utf8'),
-		) as { runtime?: string; supportsResponseStreaming?: boolean };
-		expect(functionConfig.runtime).toBe('nodejs24.x');
-		expect(functionConfig.supportsResponseStreaming).toBe(true);
-	});
-
-	it.concurrent.for(ROUTES)(
-		'%s renders and runs with no errors',
-		{ timeout: 30_000 },
-		async (route) => {
-			const { page, errors, main } = await loadRoute(PREVIEW_ORIGIN, route);
-			try {
-				expect(errors).toEqual([]);
-				expect(main.length).toBeGreaterThan(0);
-			} finally {
-				await page.close();
-			}
-		},
-	);
-
-	it.concurrent(
-		'keeps no-JS SSR and hydrated layout geometry identical',
-		{ timeout: 30_000 },
-		async () => {
-			const base = PREVIEW_ORIGIN;
-			for (const route of ['/', '/docs', '/docs/core-apis']) {
-				const noJs = await measureRouteGeometry(base, route, false);
-				const hydrated = await measureRouteGeometry(base, route, true);
-				for (const key of Object.keys(noJs) as (keyof RouteGeometry)[]) {
-					const serverValue = noJs[key];
-					const clientValue = hydrated[key];
-					if (serverValue === null || clientValue === null) {
-						expect(clientValue, `${route} ${key}`).toBe(serverValue);
-					} else {
-						expect(Math.abs(clientValue - serverValue), `${route} ${key}`).toBeLessThan(1);
+		it.concurrent(
+			'keeps no-JS SSR and hydrated layout geometry identical',
+			{ timeout: 30_000 },
+			async () => {
+				const base = PREVIEW_ORIGIN;
+				for (const route of ['/', '/docs', '/docs/core-apis']) {
+					const noJs = await measureRouteGeometry(base, route, false);
+					const hydrated = await measureRouteGeometry(base, route, true);
+					for (const key of Object.keys(noJs) as (keyof RouteGeometry)[]) {
+						const serverValue = noJs[key];
+						const clientValue = hydrated[key];
+						if (serverValue === null || clientValue === null) {
+							expect(clientValue, `${route} ${key}`).toBe(serverValue);
+						} else {
+							expect(Math.abs(clientValue - serverValue), `${route} ${key}`).toBeLessThan(1);
+						}
 					}
 				}
-			}
-		},
-	);
+			},
+		);
 
-	it.concurrent('client-side navigation works after hydration', { timeout: 30_000 }, async () => {
-		const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/');
-		try {
-			await page.click('a.nav-link[href="/benchmarks"]');
-			await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
-				timeout: PLAYWRIGHT_ACTION_TIMEOUT,
-			});
-			await page.waitForFunction(() => document.querySelector('main .benchpage') !== null, null, {
-				timeout: PLAYWRIGHT_ACTION_TIMEOUT,
-			});
-			expect(errors).toEqual([]);
-		} finally {
-			await page.close();
-		}
-	});
-
-	it.concurrent(
-		'playground compiles, runs, and handles an event inside its sandbox',
-		async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+		it.concurrent('client-side navigation works after hydration', { timeout: 30_000 }, async () => {
+			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/');
 			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				const preview = page.frameLocator('iframe[title="Playground preview"]');
-				const heading = preview.locator('h2');
-				await waitForLocatorText(heading, 'Count: 0');
-				await preview.getByRole('button', { name: 'Increment' }).click();
-				await waitForLocatorText(heading, 'Count: 1');
+				await page.click('a.nav-link[href="/benchmarks"]');
+				await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
+					timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+				});
+				await page.waitForFunction(() => document.querySelector('main .benchpage') !== null, null, {
+					timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+				});
 				expect(errors).toEqual([]);
 			} finally {
 				await page.close();
 			}
-		},
-		30_000,
-	);
+		});
 
-	it.concurrent(
-		'playground reveals and pins source AST ranges from the mobile controls',
-		async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
-			try {
-				await page.setViewportSize({ width: 390, height: 667 });
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				const source = page.locator('.pg-panel[aria-label="Source editor"] .cm-content');
-				// Mobile reflow can move fixed coordinates onto whitespace. Select
-				// the visible useState call so Inspect always has a real AST range.
-				await source.getByText('useState', { exact: true }).nth(1).click();
-				await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
-				// Inspect opens the compiled CODE view, same as desktop; the AST is
-				// one switch away, and switching reveals what the editor selected.
-				await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
-				// Browsers may deliver the source editor's mouseleave after its mobile
-				// panel is hidden. It must not clear the AST node we just revealed.
-				await source.dispatchEvent('mouseleave');
+		it.concurrent(
+			'playground compiles, runs, and handles an event inside its sandbox',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					const heading = preview.locator('h2');
+					await waitForLocatorText(heading, 'Count: 0');
+					await preview.getByRole('button', { name: 'Increment' }).click();
+					await waitForLocatorText(heading, 'Count: 1');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			30_000,
+		);
 
-				const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
-				await leaf.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await leaf.locator(':scope > details > summary').click();
-				await page.waitForFunction(
-					() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
+		it.concurrent(
+			'playground reveals and pins source AST ranges from the mobile controls',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.setViewportSize({ width: 390, height: 667 });
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					const source = page.locator('.pg-panel[aria-label="Source editor"] .cm-content');
+					// Mobile reflow can move fixed coordinates onto whitespace. Select
+					// the visible useState call so Inspect always has a real AST range.
+					await source.getByText('useState', { exact: true }).nth(1).click();
+					await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
+					// Inspect opens the compiled CODE view, same as desktop; the AST is
+					// one switch away, and switching reveals what the editor selected.
+					await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
+					// Browsers may deliver the source editor's mouseleave after its mobile
+					// panel is hidden. It must not clear the AST node we just revealed.
+					await source.dispatchEvent('mouseleave');
 
-				await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
-				await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
-				// CodeMirror may split one logical marked range across lines and
-				// syntax spans. The observable contract is that the pinned source
-				// range remains visibly highlighted after returning to the editor.
-				await page.waitForFunction(
-					() =>
-						Array.from(
-							document.querySelectorAll('.pg-panel[aria-label="Source editor"] .cm-mapped'),
-						).some((mark) => getComputedStyle(mark).backgroundColor === 'rgba(255, 234, 0, 0.42)'),
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		45_000,
-	);
-
-	it.concurrent(
-		'playground selects client, server, types, and parsed code or AST output',
-		async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				const outputIncludes = (needle: string) =>
-					page.waitForFunction(
-						(text) =>
-							(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
-								text,
-							),
-						needle,
+					const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
+					await leaf.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await leaf.locator(':scope > details > summary').click();
+					await page.waitForFunction(
+						() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),
+						null,
 						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
-				// Click the Nth occurrence of a token inside an editor pane (Shiki
-				// splits tokens into their own spans, so search per text node). The
-				// rect is measured after a double rAF: CodeMirror applies a prior
-				// reveal's scroll in a DEFERRED measure phase, and clicking a rect
-				// captured before that flush lands on whatever scrolled into the
-				// stale coordinates (a CI-speed flake). A token outside the
-				// scroller's visible box resolves null instead of clicking through.
-				const tokenPoint = async (paneIndex: number, token: string, occurrence: number) => {
-					const point = await page.evaluate(
-						([index, needle, wanted]) =>
-							new Promise<{ x: number; y: number } | null>((resolve) =>
-								requestAnimationFrame(() =>
-									requestAnimationFrame(() => {
-										const content =
-											document.querySelectorAll('.pg-editor .cm-content')[index as number];
-										const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-										let seen = 0;
-										while (walker.nextNode()) {
-											const node = walker.currentNode;
-											let at = -1;
-											while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
-												if (++seen < (wanted as number)) continue;
-												const range = document.createRange();
-												range.setStart(node, at + 1);
-												range.setEnd(node, at + 2);
-												const rect = range.getBoundingClientRect();
-												const scroller = content.closest('.cm-scroller')!.getBoundingClientRect();
-												if (rect.top < scroller.top || rect.bottom > scroller.bottom) {
-													return resolve(null);
-												}
-												return resolve({
-													x: rect.x + rect.width / 2,
-													y: rect.y + rect.height / 2,
-												});
-											}
-										}
-										resolve(null);
-									}),
-								),
-							),
-						[paneIndex, token, occurrence] as const,
-					);
-					expect(
-						point,
-						`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
-					).not.toBeNull();
-					return point!;
-				};
-				// CodeMirror renders only the lines around its scroll position, so a
-				// token scrolled far out of view is not in the DOM to be found at all.
-				// Rewind the pane before hunting for one.
-				const rewindPane = (paneIndex: number) =>
-					page.evaluate((index) => {
-						const scroller = document
-							.querySelectorAll('.pg-editor .cm-content')
-						[index as number]?.closest('.cm-scroller');
-						if (scroller) scroller.scrollTop = 0;
-					}, paneIndex);
-				const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
-					const point = await tokenPoint(paneIndex, token, occurrence);
-					await page.mouse.click(point.x, point.y);
-				};
-				const hoverToken = async (paneIndex: number, token: string, occurrence: number) => {
-					const point = await tokenPoint(paneIndex, token, occurrence);
-					await page.mouse.move(point.x, point.y);
-				};
-				// One authored range can emit several times (a mount and an update
-				// binding, an open and a close tag), so assert that the token IS
-				// highlighted rather than that it is the first highlight.
-				const mappedAnywhere = (paneIndex: number, token: string) =>
-					page.waitForFunction(
-						([index, text]) =>
+
+					await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
+					await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
+					// CodeMirror may split one logical marked range across lines and
+					// syntax spans. The observable contract is that the pinned source
+					// range remains visibly highlighted after returning to the editor.
+					await page.waitForFunction(
+						() =>
 							Array.from(
+								document.querySelectorAll('.pg-panel[aria-label="Source editor"] .cm-mapped'),
+							).some(
+								(mark) => getComputedStyle(mark).backgroundColor === 'rgba(255, 234, 0, 0.42)',
+							),
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
+
+		it.concurrent(
+			'playground selects client, server, types, and parsed code or AST output',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					const outputIncludes = (needle: string) =>
+						page.waitForFunction(
+							(text) =>
+								(
+									document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? ''
+								).includes(text),
+							needle,
+							{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+						);
+					// Click the Nth occurrence of a token inside an editor pane (Shiki
+					// splits tokens into their own spans, so search per text node). The
+					// rect is measured after a double rAF: CodeMirror applies a prior
+					// reveal's scroll in a DEFERRED measure phase, and clicking a rect
+					// captured before that flush lands on whatever scrolled into the
+					// stale coordinates (a CI-speed flake). A token outside the
+					// scroller's visible box resolves null instead of clicking through.
+					const tokenPoint = async (paneIndex: number, token: string, occurrence: number) => {
+						const point = await page.evaluate(
+							([index, needle, wanted]) =>
+								new Promise<{ x: number; y: number } | null>((resolve) =>
+									requestAnimationFrame(() =>
+										requestAnimationFrame(() => {
+											const content =
+												document.querySelectorAll('.pg-editor .cm-content')[index as number];
+											const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+											let seen = 0;
+											while (walker.nextNode()) {
+												const node = walker.currentNode;
+												let at = -1;
+												while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
+													if (++seen < (wanted as number)) continue;
+													const range = document.createRange();
+													range.setStart(node, at + 1);
+													range.setEnd(node, at + 2);
+													const rect = range.getBoundingClientRect();
+													const scroller = content.closest('.cm-scroller')!.getBoundingClientRect();
+													if (rect.top < scroller.top || rect.bottom > scroller.bottom) {
+														return resolve(null);
+													}
+													return resolve({
+														x: rect.x + rect.width / 2,
+														y: rect.y + rect.height / 2,
+													});
+												}
+											}
+											resolve(null);
+										}),
+									),
+								),
+							[paneIndex, token, occurrence] as const,
+						);
+						expect(
+							point,
+							`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
+						).not.toBeNull();
+						return point!;
+					};
+					// CodeMirror renders only the lines around its scroll position, so a
+					// token scrolled far out of view is not in the DOM to be found at all.
+					// Rewind the pane before hunting for one.
+					const rewindPane = (paneIndex: number) =>
+						page.evaluate((index) => {
+							const scroller = document
+								.querySelectorAll('.pg-editor .cm-content')
+								[index as number]?.closest('.cm-scroller');
+							if (scroller) scroller.scrollTop = 0;
+						}, paneIndex);
+					const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+						const point = await tokenPoint(paneIndex, token, occurrence);
+						await page.mouse.click(point.x, point.y);
+					};
+					const hoverToken = async (paneIndex: number, token: string, occurrence: number) => {
+						const point = await tokenPoint(paneIndex, token, occurrence);
+						await page.mouse.move(point.x, point.y);
+					};
+					// One authored range can emit several times (a mount and an update
+					// binding, an open and a close tag), so assert that the token IS
+					// highlighted rather than that it is the first highlight.
+					const mappedAnywhere = (paneIndex: number, token: string) =>
+						page.waitForFunction(
+							([index, text]) =>
+								Array.from(
+									document
+										.querySelectorAll('.pg-editor .cm-content')
+										[index as number]?.querySelectorAll('.cm-mapped') ?? [],
+								).some((mark) => mark.textContent === text),
+							[paneIndex, token] as const,
+							{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+						);
+					const mappedIn = (paneIndex: number, token: string) =>
+						page.waitForFunction(
+							([index, text]) =>
 								document
 									.querySelectorAll('.pg-editor .cm-content')
-								[index as number]?.querySelectorAll('.cm-mapped') ?? [],
-							).some((mark) => mark.textContent === text),
-						[paneIndex, token] as const,
-						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-					);
-				const mappedIn = (paneIndex: number, token: string) =>
-					page.waitForFunction(
-						([index, text]) =>
-							document
-								.querySelectorAll('.pg-editor .cm-content')
-							[index as number]?.querySelector('.cm-mapped')?.textContent === text,
-						[paneIndex, token] as const,
-						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-					);
-				// Client code is the default compiled artifact. Server and Types use
-				// the same output selector; Parsed exists only for AST inspection.
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-				const outputSelector = page.locator('[aria-label="Compiler output"]');
-				const outputFormat = page.locator('[aria-label="Output format"]');
-				await outputIncludes("from 'octane'");
-				expect(await outputSelector.inputValue()).toBe('client');
-				expect(await outputSelector.locator('option').allTextContents()).toEqual([
-					'Client',
-					'Server',
-					'Types',
-				]);
-				expect(await outputFormat.locator('button.active', { hasText: 'Code' }).count()).toBe(1);
-				// Client and Server code map through the compiler's inspection
-				// segments, the same as Types does through the Volar token map. WHICH
-				// nodes resolve is pinned per node, against the same Counter example,
-				// in playground-mapping.test.ts; what this proves is that the wiring
-				// reaches the runtime targets at all.
-				await clickToken(0, 'useState', 2); // the useState(0) call, not the import
-				await mappedAnywhere(1, 'useState');
-				await mappedAnywhere(0, 'useState');
-				await outputSelector.selectOption('server');
-				await outputIncludes("from 'octane/server'");
-				await clickToken(0, 'useState', 2);
-				await mappedAnywhere(1, 'useState');
-				await outputSelector.selectOption('types');
-				await outputIncludes('@jsxImportSource octane');
-				await rewindPane(1);
-				// Clicking a source token reveals the mapped token in Types code…
-				await clickToken(0, 'useState', 2); // the useState(0) call, not the import
-				await mappedIn(1, 'useState');
-				// …and hovering the output maps back into the source too.
-				await hoverToken(1, 'setCount', 1);
-				await mappedIn(0, 'setCount');
-				await mappedIn(1, 'setCount');
-				// Clicking keeps that bidirectional mapping and scrolls it into view.
-				await clickToken(1, 'setCount', 1);
-				await mappedIn(0, 'setCount');
-
-				await outputFormat.locator('button', { hasText: 'AST' }).click();
-				await page.locator('.pg-ast-tree').waitFor();
-				expect(await outputSelector.locator('option').allTextContents()).toEqual([
-					'Client',
-					'Server',
-					'Types',
-					'Parsed',
-				]);
-				// The Types AST reveals the deepest node containing the cursor.
-				await clickToken(0, 'useState', 2);
-				await page.waitForFunction(
-					() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
-				expect(await page.locator('.cm-mapped').count()).toBe(1);
-				await page.waitForFunction(
-					() =>
-						getComputedStyle(document.querySelector('.pg-editor .cm-mapped')!).backgroundColor ===
-						'rgba(255, 234, 0, 0.42)',
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				// Client AST exposes the final Program plus template IR. Template
-				// origins keep the selected static tag in authored-source coordinates.
-				await outputSelector.selectOption('client');
-				await hoverToken(0, 'button', 1);
-				await mappedIn(0, 'button');
-				// Switching output re-renders the tree, which resets the status to the
-				// node-less `label · filename` form. The source highlight and the AST
-				// selection are separate effects of the same hover, so waiting on the
-				// editor mark alone can observe the status before the node resolves.
-				// The leaf marker is written by the same call that writes the range.
-				await page.waitForFunction(
-					() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
-				await outputSelector.selectOption('server');
-				await page
-					.getByText('The final server-rendering Program. Tap a node to pin its highlight.')
-					.waitFor();
-				await outputSelector.selectOption('source');
-				await page
-					.getByText('The parser tree for the authored source. Tap a node to pin its highlight.')
-					.waitFor();
-				// Parsed has no code form, so switching to Code falls back to the
-				// most common output: Client.
-				await outputFormat.locator('button', { hasText: 'Code' }).click();
-				expect(await outputSelector.inputValue()).toBe('client');
-				expect(await outputSelector.locator('option', { hasText: 'Parsed' }).count()).toBe(0);
-				await outputIncludes("from 'octane'");
-				// A cached Types document must not retain an AST source highlight.
-				await outputSelector.selectOption('types');
-				await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
-					timeout: 5_000,
-				});
-				// Switching to Preview clears every mark; Compiled returns clean.
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
-				await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
-					timeout: 5_000,
-				});
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-				await outputIncludes('@jsxImportSource octane');
-				// A broken edit clears both marks and replaces the typed document
-				// with the current parser error instead of leaving stale output.
-				await clickToken(0, 'useState', 2);
-				await mappedIn(1, 'useState');
-				await page.keyboard.type('{');
-				await page.locator('.pg-error').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await page.waitForFunction(
-					() => {
-						const out = document.querySelectorAll('.pg-editor .cm-content')[1];
-						return (
-							!!out &&
-							!out.querySelector('.cm-mapped') &&
-							(out.textContent ?? '').includes('// Types generation failed:')
+									[index as number]?.querySelector('.cm-mapped')?.textContent === text,
+							[paneIndex, token] as const,
+							{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 						);
-					},
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				// A failed AST generation replaces the prior tree and cannot map
-				// source hover through its stale ranges.
-				await outputFormat.locator('button', { hasText: 'AST' }).click();
-				await page
-					.getByText('AST generation failed. Fix the source to generate a new tree.')
-					.waitFor();
-				expect(await page.locator('.pg-ast-tree').count()).toBe(0);
-				await hoverToken(0, 'import', 1);
-				await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
-					timeout: 5_000,
-				});
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		45_000,
-	);
+					// Client code is the default compiled artifact. Server and Types use
+					// the same output selector; Parsed exists only for AST inspection.
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+					const outputSelector = page.locator('[aria-label="Compiler output"]');
+					const outputFormat = page.locator('[aria-label="Output format"]');
+					await outputIncludes("from 'octane'");
+					expect(await outputSelector.inputValue()).toBe('client');
+					expect(await outputSelector.locator('option').allTextContents()).toEqual([
+						'Client',
+						'Server',
+						'Types',
+					]);
+					expect(await outputFormat.locator('button.active', { hasText: 'Code' }).count()).toBe(1);
+					// Client and Server code map through the compiler's inspection
+					// segments, the same as Types does through the Volar token map. WHICH
+					// nodes resolve is pinned per node, against the same Counter example,
+					// in playground-mapping.test.ts; what this proves is that the wiring
+					// reaches the runtime targets at all.
+					await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+					await mappedAnywhere(1, 'useState');
+					await mappedAnywhere(0, 'useState');
+					await outputSelector.selectOption('server');
+					await outputIncludes("from 'octane/server'");
+					await clickToken(0, 'useState', 2);
+					await mappedAnywhere(1, 'useState');
+					await outputSelector.selectOption('types');
+					await outputIncludes('@jsxImportSource octane');
+					await rewindPane(1);
+					// Clicking a source token reveals the mapped token in Types code…
+					await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+					await mappedIn(1, 'useState');
+					// …and hovering the output maps back into the source too.
+					await hoverToken(1, 'setCount', 1);
+					await mappedIn(0, 'setCount');
+					await mappedIn(1, 'setCount');
+					// Clicking keeps that bidirectional mapping and scrolls it into view.
+					await clickToken(1, 'setCount', 1);
+					await mappedIn(0, 'setCount');
 
-	it.concurrent(
-		'playground keeps both panel heads the same height in every mode',
-		async () => {
-			// The compiled pane's head carries a select and a segmented control; the
-			// source pane's carries text. Letting the taller one size the row makes
-			// the layout jump on every Preview↔Compiled switch, so both reserve that
-			// height from the start.
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				const heights = () =>
-					page.evaluate(() =>
-						Array.from(document.querySelectorAll('.pg-panel-head')).map((head) =>
-							Math.round(head.getBoundingClientRect().height),
-						),
+					await outputFormat.locator('button', { hasText: 'AST' }).click();
+					await page.locator('.pg-ast-tree').waitFor();
+					expect(await outputSelector.locator('option').allTextContents()).toEqual([
+						'Client',
+						'Server',
+						'Types',
+						'Parsed',
+					]);
+					// The Types AST reveals the deepest node containing the cursor.
+					await clickToken(0, 'useState', 2);
+					await page.waitForFunction(
+						() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
-				const inPreview = await heights();
-				expect(inPreview.length).toBe(2);
-				expect(inPreview[0], `preview heads differ: ${JSON.stringify(inPreview)}`).toBe(
-					inPreview[1],
-				);
-
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-				await page.locator('[aria-label="Compiler output"]').waitFor();
-				const inCompiled = await heights();
-				expect(inCompiled[0], `compiled heads differ: ${JSON.stringify(inCompiled)}`).toBe(
-					inCompiled[1],
-				);
-				// And switching modes must not resize the row at all.
-				expect(inCompiled).toEqual(inPreview);
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		45_000,
-	);
-
-	it.concurrent(
-		'playground highlights every control-flow keyword in the compiled code',
-		async () => {
-			await assertControlFlowKeywordMapping(PREVIEW_ORIGIN);
-		},
-		45_000,
-	);
-
-	// A hover highlight has to survive the compile that finishes AFTER it.
-	// `.pg-grid.ready` goes up while compileAndRun is still awaiting its module
-	// graph, so the compile's showOutput() lands a few hundred milliseconds into
-	// an interactive pane — with a pointer possibly already resting on a mapped
-	// keyword. showOutput() used to clear the mark pair unconditionally, before
-	// deciding the artifact was unchanged and returning without touching a
-	// document; since only mousemove restores marks and the pointer never moved,
-	// the highlight stayed gone until the reader jiggled the mouse. Hold the
-	// pointer still across that window and require the mark to still be there.
-	it.concurrent(
-		'playground keeps a hover highlight through the compile that follows it',
-		async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-
-				const marked = () =>
-					page.evaluate(() =>
-						Array.from(
-							document
-								.querySelectorAll('.pg-editor .cm-content')[0]
-								?.querySelectorAll('.cm-mapped') ?? [],
-						).map((mark) => mark.textContent),
+					expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
+					expect(await page.locator('.cm-mapped').count()).toBe(1);
+					await page.waitForFunction(
+						() =>
+							getComputedStyle(document.querySelector('.pg-editor .cm-mapped')!).backgroundColor ===
+							'rgba(255, 234, 0, 0.42)',
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
-				const point = await page.evaluate(async () => {
-					const find = () => {
-						const content = document.querySelectorAll('.pg-editor .cm-content')[0];
-						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-						while (walker.nextNode()) {
-							const at = walker.currentNode.textContent!.indexOf('@if');
-							if (at !== -1) return { node: walker.currentNode, at };
-						}
-						return null;
-					};
-					if (!find()) return null;
-					(find()!.node.parentElement as HTMLElement)?.scrollIntoView({
-						block: 'center',
-						behavior: 'instant',
+					// Client AST exposes the final Program plus template IR. Template
+					// origins keep the selected static tag in authored-source coordinates.
+					await outputSelector.selectOption('client');
+					await hoverToken(0, 'button', 1);
+					await mappedIn(0, 'button');
+					// Switching output re-renders the tree, which resets the status to the
+					// node-less `label · filename` form. The source highlight and the AST
+					// selection are separate effects of the same hover, so waiting on the
+					// editor mark alone can observe the status before the node resolves.
+					// The leaf marker is written by the same call that writes the range.
+					await page.waitForFunction(
+						() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
+					await outputSelector.selectOption('server');
+					await page
+						.getByText('The final server-rendering Program. Tap a node to pin its highlight.')
+						.waitFor();
+					await outputSelector.selectOption('source');
+					await page
+						.getByText('The parser tree for the authored source. Tap a node to pin its highlight.')
+						.waitFor();
+					// Parsed has no code form, so switching to Code falls back to the
+					// most common output: Client.
+					await outputFormat.locator('button', { hasText: 'Code' }).click();
+					expect(await outputSelector.inputValue()).toBe('client');
+					expect(await outputSelector.locator('option', { hasText: 'Parsed' }).count()).toBe(0);
+					await outputIncludes("from 'octane'");
+					// A cached Types document must not retain an AST source highlight.
+					await outputSelector.selectOption('types');
+					await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+						timeout: 5_000,
 					});
-					await new Promise((resolve) =>
-						requestAnimationFrame(() => requestAnimationFrame(resolve)),
+					// Switching to Preview clears every mark; Compiled returns clean.
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
+					await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+						timeout: 5_000,
+					});
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+					await outputIncludes('@jsxImportSource octane');
+					// A broken edit clears both marks and replaces the typed document
+					// with the current parser error instead of leaving stale output.
+					await clickToken(0, 'useState', 2);
+					await mappedIn(1, 'useState');
+					await page.keyboard.type('{');
+					await page.locator('.pg-error').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.waitForFunction(
+						() => {
+							const out = document.querySelectorAll('.pg-editor .cm-content')[1];
+							return (
+								!!out &&
+								!out.querySelector('.cm-mapped') &&
+								(out.textContent ?? '').includes('// Types generation failed:')
+							);
+						},
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
-					const hit = find();
-					if (!hit) return null;
-					const range = document.createRange();
-					range.setStart(hit.node, hit.at + 1);
-					range.setEnd(hit.node, hit.at + 2);
-					const rect = range.getBoundingClientRect();
-					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+					// A failed AST generation replaces the prior tree and cannot map
+					// source hover through its stale ranges.
+					await outputFormat.locator('button', { hasText: 'AST' }).click();
+					await page
+						.getByText('AST generation failed. Fix the source to generate a new tree.')
+						.waitFor();
+					expect(await page.locator('.pg-ast-tree').count()).toBe(0);
+					await hoverToken(0, 'import', 1);
+					await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+						timeout: 5_000,
+					});
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
+
+		it.concurrent(
+			'playground keeps both panel heads the same height in every mode',
+			async () => {
+				// The compiled pane's head carries a select and a segmented control; the
+				// source pane's carries text. Letting the taller one size the row makes
+				// the layout jump on every Preview↔Compiled switch, so both reserve that
+				// height from the start.
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					const heights = () =>
+						page.evaluate(() =>
+							Array.from(document.querySelectorAll('.pg-panel-head')).map((head) =>
+								Math.round(head.getBoundingClientRect().height),
+							),
+						);
+					const inPreview = await heights();
+					expect(inPreview.length).toBe(2);
+					expect(inPreview[0], `preview heads differ: ${JSON.stringify(inPreview)}`).toBe(
+						inPreview[1],
+					);
+
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+					await page.locator('[aria-label="Compiler output"]').waitFor();
+					const inCompiled = await heights();
+					expect(inCompiled[0], `compiled heads differ: ${JSON.stringify(inCompiled)}`).toBe(
+						inCompiled[1],
+					);
+					// And switching modes must not resize the row at all.
+					expect(inCompiled).toEqual(inPreview);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
+
+		it.concurrent(
+			'playground highlights every control-flow keyword in the compiled code',
+			async () => {
+				await assertControlFlowKeywordMapping(PREVIEW_ORIGIN);
+			},
+			45_000,
+		);
+
+		// A hover highlight has to survive the compile that finishes AFTER it.
+		// `.pg-grid.ready` goes up while compileAndRun is still awaiting its module
+		// graph, so the compile's showOutput() lands a few hundred milliseconds into
+		// an interactive pane — with a pointer possibly already resting on a mapped
+		// keyword. showOutput() used to clear the mark pair unconditionally, before
+		// deciding the artifact was unchanged and returning without touching a
+		// document; since only mousemove restores marks and the pointer never moved,
+		// the highlight stayed gone until the reader jiggled the mouse. Hold the
+		// pointer still across that window and require the mark to still be there.
+		it.concurrent(
+			'playground keeps a hover highlight through the compile that follows it',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+
+					const marked = () =>
+						page.evaluate(() =>
+							Array.from(
+								document
+									.querySelectorAll('.pg-editor .cm-content')[0]
+									?.querySelectorAll('.cm-mapped') ?? [],
+							).map((mark) => mark.textContent),
+						);
+					const point = await page.evaluate(async () => {
+						const find = () => {
+							const content = document.querySelectorAll('.pg-editor .cm-content')[0];
+							const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+							while (walker.nextNode()) {
+								const at = walker.currentNode.textContent!.indexOf('@if');
+								if (at !== -1) return { node: walker.currentNode, at };
+							}
+							return null;
+						};
+						if (!find()) return null;
+						(find()!.node.parentElement as HTMLElement)?.scrollIntoView({
+							block: 'center',
+							behavior: 'instant',
+						});
+						await new Promise((resolve) =>
+							requestAnimationFrame(() => requestAnimationFrame(resolve)),
+						);
+						const hit = find();
+						if (!hit) return null;
+						const range = document.createRange();
+						range.setStart(hit.node, hit.at + 1);
+						range.setEnd(hit.node, hit.at + 2);
+						const rect = range.getBoundingClientRect();
+						return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+					});
+					expect(point, '@if not found in the source pane').not.toBeNull();
+
+					await page.mouse.move(0, 0);
+					await page.mouse.move(point!.x, point!.y);
+					await page.waitForFunction(
+						() =>
+							Array.from(
+								document
+									.querySelectorAll('.pg-editor .cm-content')[0]
+									?.querySelectorAll('.cm-mapped') ?? [],
+							).some((mark) => mark.textContent === '@if'),
+						null,
+						{ timeout: 5_000 },
+					);
+
+					// Comfortably past the observed clear window (~150-750ms after hover),
+					// with the pointer untouched.
+					await page.waitForTimeout(1_500);
+					expect(
+						await marked(),
+						'the hover highlight was cleared while the pointer never moved',
+					).toContain('@if');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			30_000,
+		);
+
+		it.concurrent(
+			'playground refreshes the active AST when another workspace file fails',
+			async () => {
+				const appSource =
+					"import { value } from './Value';\nexport default function App() @{ <p>{'Value: ' + value}</p> }";
+				const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+				const hash = encodePlaygroundHash({
+					lang: 'tsrx',
+					entry: 'App.tsrx',
+					files: [
+						{
+							name: 'App.tsrx',
+							source: appSource,
+						},
+						{ name: 'Value.tsrx', source: 'export const value = 1;' },
+					],
 				});
-				expect(point, '@if not found in the source pane').not.toBeNull();
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+					await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
+					await page.locator('.pg-ast-tree').waitFor();
 
-				await page.mouse.move(0, 0);
-				await page.mouse.move(point!.x, point!.y);
-				await page.waitForFunction(
-					() =>
-						Array.from(
+					// Break an inactive dependency so the runnable module graph fails.
+					await page.locator('.pg-tab', { hasText: 'Value.tsrx' }).click();
+					await page.locator('.pg-editor .cm-content').first().click();
+					await page.keyboard.press(selectAll);
+					await page.keyboard.type('export const value = ;');
+					await page.locator('.pg-error').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+
+					// The active App source still has a valid compiler AST. Editing it
+					// briefly invalidates the tree, then must restore it even though the
+					// dependency keeps the module graph in its failed state.
+					await page.locator('.pg-tab', { hasText: 'App.tsrx' }).click();
+					await page.locator('.pg-ast-tree').waitFor();
+					await page.locator('.pg-editor .cm-content').first().click();
+					await page.keyboard.press(selectAll);
+					await page.keyboard.type(appSource + '\n');
+					await page
+						.getByText('Waiting for the next successful compile…')
+						.waitFor({ timeout: 5_000 });
+					await page.locator('.pg-ast-tree').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					expect(await page.locator('.pg-error').count()).toBe(1);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			30_000,
+		);
+
+		it.concurrent(
+			'playground shows compiler warnings without treating runnable code as an error',
+			async () => {
+				const source = `export function App() @{ <input onChange={() => {}} /> }`;
+				const hash = encodePlaygroundHash({
+					lang: 'tsrx',
+					entry: 'App.tsrx',
+					files: [{ name: 'App.tsrx', source }],
+				});
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					const warnings = page.getByRole('region', { name: 'Compiler warnings' });
+					await warnings.waitFor();
+					expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+					expect(await warnings.textContent()).toContain('App.tsrx:1:');
+					expect(await page.locator('.pg-error').count()).toBe(0);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			30_000,
+		);
+
+		it.concurrent(
+			'playground runs a multi-file example selected from the dropdown',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					// The tab strip is absent for the single-file default…
+					expect(await page.locator('.pg-tabs').count()).toBe(0);
+					await page.selectOption('.pg-select', 'parallel-use');
+					// …and appears with one tab per virtual file for the example.
+					await page
+						.locator('.pg-tab', { hasText: 'Data.tsrx' })
+						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					// Both fake fetches resolve through the sibling module (no network).
+					await preview
+						.locator('body')
+						.getByText('City: Reykjavík (1)')
+						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					// Switching tabs swaps the editor buffer to the sibling file.
+					await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).click();
+					await page.waitForFunction(
+						() =>
 							document
-								.querySelectorAll('.pg-editor .cm-content')[0]
-								?.querySelectorAll('.cm-mapped') ?? [],
-						).some((mark) => mark.textContent === '@if'),
-					null,
-					{ timeout: 5_000 },
-				);
+								.querySelector('.pg-editor .cm-content')
+								?.textContent?.includes('fetchForecast') ?? false,
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
 
-				// Comfortably past the observed clear window (~150-750ms after hover),
-				// with the pointer untouched.
-				await page.waitForTimeout(1_500);
-				expect(
-					await marked(),
-					'the hover highlight was cleared while the pointer never moved',
-				).toContain('@if');
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		30_000,
-	);
+		it.concurrent(
+			'playground Format button reprints the active file with Prettier',
+			async () => {
+				const source = `export default function App() @{ <button onClick={()=>{}}>go</button> }`;
+				const hash = encodePlaygroundHash({
+					lang: 'tsrx',
+					entry: 'App.tsrx',
+					files: [{ name: 'App.tsrx', source }],
+				});
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.click('.pg-format');
+					// Prettier normalizes the squashed arrow — formatting works even while
+					// the shared payload is still consent-gated (it never executes code).
+					await page.waitForFunction(
+						() =>
+							document
+								.querySelector('.pg-editor .cm-content')
+								?.textContent?.includes('onClick={() => {}}') ?? false,
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					expect(await page.locator('.pg-error').count()).toBe(0);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
 
-	it.concurrent(
-		'playground refreshes the active AST when another workspace file fails',
-		async () => {
-			const appSource =
-				"import { value } from './Value';\nexport default function App() @{ <p>{'Value: ' + value}</p> }";
-			const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-			const hash = encodePlaygroundHash({
-				lang: 'tsrx',
-				entry: 'App.tsrx',
-				files: [
-					{
-						name: 'App.tsrx',
-						source: appSource,
-					},
-					{ name: 'Value.tsrx', source: 'export const value = 1;' },
-				],
-			});
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-				await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
-				await page.locator('.pg-ast-tree').waitFor();
+		it.concurrent(
+			'playground gates a shared multi-file link behind consent, then runs it',
+			async () => {
+				const hash = encodePlaygroundHash({
+					lang: 'tsrx',
+					entry: 'App.tsrx',
+					files: [
+						{
+							name: 'App.tsrx',
+							source:
+								"import { label } from './Shared.tsrx';\n\nexport default function App() @{\n\t<h2>{'Shared: ' + label}</h2>\n}",
+						},
+						{ name: 'Shared.tsrx', source: "export const label = 'from-a-link';" },
+					],
+				});
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					// Untrusted payload: visible and compiled, but not executed.
+					await page.locator('.pg-consent').waitFor();
+					await page.click('.pg-consent-run');
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					const heading = preview.locator('h2');
+					await waitForLocatorText(heading, 'Shared: from-a-link');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
 
-				// Break an inactive dependency so the runnable module graph fails.
-				await page.locator('.pg-tab', { hasText: 'Value.tsrx' }).click();
-				await page.locator('.pg-editor .cm-content').first().click();
-				await page.keyboard.press(selectAll);
-				await page.keyboard.type('export const value = ;');
-				await page.locator('.pg-error').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-
-				// The active App source still has a valid compiler AST. Editing it
-				// briefly invalidates the tree, then must restore it even though the
-				// dependency keeps the module graph in its failed state.
-				await page.locator('.pg-tab', { hasText: 'App.tsrx' }).click();
-				await page.locator('.pg-ast-tree').waitFor();
-				await page.locator('.pg-editor .cm-content').first().click();
-				await page.keyboard.press(selectAll);
-				await page.keyboard.type(appSource + '\n');
-				await page
-					.getByText('Waiting for the next successful compile…')
-					.waitFor({ timeout: 5_000 });
-				await page.locator('.pg-ast-tree').waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				expect(await page.locator('.pg-error').count()).toBe(1);
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		30_000,
-	);
-
-	it.concurrent(
-		'playground shows compiler warnings without treating runnable code as an error',
-		async () => {
-			const source = `export function App() @{ <input onChange={() => {}} /> }`;
-			const hash = encodePlaygroundHash({
-				lang: 'tsrx',
-				entry: 'App.tsrx',
-				files: [{ name: 'App.tsrx', source }],
-			});
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				const warnings = page.getByRole('region', { name: 'Compiler warnings' });
-				await warnings.waitFor();
-				expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
-				expect(await warnings.textContent()).toContain('App.tsrx:1:');
-				expect(await page.locator('.pg-error').count()).toBe(0);
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		30_000,
-	);
-
-	it.concurrent(
-		'playground runs a multi-file example selected from the dropdown',
-		async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				// The tab strip is absent for the single-file default…
-				expect(await page.locator('.pg-tabs').count()).toBe(0);
-				await page.selectOption('.pg-select', 'parallel-use');
-				// …and appears with one tab per virtual file for the example.
-				await page
-					.locator('.pg-tab', { hasText: 'Data.tsrx' })
-					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				const preview = page.frameLocator('iframe[title="Playground preview"]');
-				// Both fake fetches resolve through the sibling module (no network).
-				await preview
-					.locator('body')
-					.getByText('City: Reykjavík (1)')
-					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				// Switching tabs swaps the editor buffer to the sibling file.
-				await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).click();
-				await page.waitForFunction(
-					() =>
-						document
-							.querySelector('.pg-editor .cm-content')
-							?.textContent?.includes('fetchForecast') ?? false,
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		45_000,
-	);
-
-	it.concurrent(
-		'playground Format button reprints the active file with Prettier',
-		async () => {
-			const source = `export default function App() @{ <button onClick={()=>{}}>go</button> }`;
-			const hash = encodePlaygroundHash({
-				lang: 'tsrx',
-				entry: 'App.tsrx',
-				files: [{ name: 'App.tsrx', source }],
-			});
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await page.click('.pg-format');
-				// Prettier normalizes the squashed arrow — formatting works even while
-				// the shared payload is still consent-gated (it never executes code).
-				await page.waitForFunction(
-					() =>
-						document
-							.querySelector('.pg-editor .cm-content')
-							?.textContent?.includes('onClick={() => {}}') ?? false,
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				expect(await page.locator('.pg-error').count()).toBe(0);
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		45_000,
-	);
-
-	it.concurrent(
-		'playground gates a shared multi-file link behind consent, then runs it',
-		async () => {
-			const hash = encodePlaygroundHash({
-				lang: 'tsrx',
-				entry: 'App.tsrx',
-				files: [
-					{
-						name: 'App.tsrx',
-						source:
-							"import { label } from './Shared.tsrx';\n\nexport default function App() @{\n\t<h2>{'Shared: ' + label}</h2>\n}",
-					},
-					{ name: 'Shared.tsrx', source: "export const label = 'from-a-link';" },
-				],
-			});
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				// Untrusted payload: visible and compiled, but not executed.
-				await page.locator('.pg-consent').waitFor();
-				await page.click('.pg-consent-run');
-				const preview = page.frameLocator('iframe[title="Playground preview"]');
-				const heading = preview.locator('h2');
-				await waitForLocatorText(heading, 'Shared: from-a-link');
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		45_000,
-	);
-
-	it.concurrent(
-		'playground runs the OctaneCompat React-host example end to end',
-		async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
-				beforeNavigation: installReactCdnMirror,
-			});
-			try {
-				await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await page.selectOption('.pg-select', 'octane-compat');
-				await page
-					.locator('.pg-tab', { hasText: 'Island.tsrx' })
-					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-				await page.locator('[aria-label="Compiler output"]').selectOption('types');
-				await page.waitForFunction(
-					() =>
-						(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
-							'OctaneCompat',
-						),
-					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
-				);
-				await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
-				const preview = page.frameLocator('iframe[title="Playground preview"]');
-				// Real react-dom mounts the host; the compiled Octane island renders
-				// inside it and resolves its own @try/@pending fetch.
-				await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
-				await preview
-					.locator('body')
-					.getByText('island data #1')
-					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				// Native events keep working across the boundary.
-				await preview.getByRole('button', { name: 'clicks: 3' }).click();
-				await preview
-					.getByRole('button', { name: 'clicks: 4' })
-					.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		},
-		90_000,
-	);
-});
+		it.concurrent(
+			'playground runs the OctaneCompat React-host example end to end',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
+					beforeNavigation: installReactCdnMirror,
+				});
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.selectOption('.pg-select', 'octane-compat');
+					await page
+						.locator('.pg-tab', { hasText: 'Island.tsrx' })
+						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+					await page.locator('[aria-label="Compiler output"]').selectOption('types');
+					await page.waitForFunction(
+						() =>
+							(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+								'OctaneCompat',
+							),
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					// Real react-dom mounts the host; the compiled Octane island renders
+					// inside it and resolves its own @try/@pending fetch.
+					await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
+					await preview
+						.locator('body')
+						.getByText('island data #1')
+						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					// Native events keep working across the boundary.
+					await preview.getByRole('button', { name: 'clicks: 3' }).click();
+					await preview
+						.getByRole('button', { name: 'clicks: 4' })
+						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			90_000,
+		);
+	},
+);
