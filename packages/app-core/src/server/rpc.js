@@ -12,6 +12,7 @@ import { derive_origin } from '@ripple-ts/adapter/rpc';
 
 import { DEFAULT_RPC_MAX_BODY_BYTES } from '../constants.js';
 import { createContext, runMiddlewareChain } from './middleware.js';
+import { setRequestContextSource } from './request-context.js';
 
 const RPC_PATH_PREFIX = '/_$_ripple_rpc_$_/';
 
@@ -213,8 +214,14 @@ export async function handleRpcRequest(request, options) {
 	const corsOrigin = browserOrigin === origin ? null : browserOrigin;
 
 	const context = createContext(request, {}, options.platform);
+	// `context` rides the request store so a server function can read what the
+	// middleware chain established (auth, tenant) instead of trusting arguments
+	// the browser sent. The body is already consumed by the time it runs.
 	const store =
-		options.platform === undefined ? { origin } : { origin, platform: options.platform };
+		options.platform === undefined
+			? { origin, context }
+			: { origin, platform: options.platform, context };
+	setRequestContextSource(options.asyncContext);
 
 	try {
 		const response = await options.asyncContext.run(store, async () =>
