@@ -7114,11 +7114,13 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> =
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
+	resetRef?: { current: (() => void) | null };
 	// Renderable, not ComponentBody — same reasoning as Suspense above.
 	children: unknown;
 }> = /* @__PURE__ */ markComponentFlags<
 	ComponentBody<{
 		fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
+		resetRef?: { current: (() => void) | null };
 		children: unknown;
 	}>
 >(
@@ -7134,7 +7136,7 @@ export const ErrorBoundary: ComponentBody<{
 					: props.fallback;
 			childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
 		};
-		tryBlock(
+		const reset = tryBlock(
 			scope,
 			0,
 			block.parentNode,
@@ -7145,6 +7147,12 @@ export const ErrorBoundary: ComponentBody<{
 			undefined,
 			true,
 		);
+		const previousResetRef = scope.slots[1] as { current: (() => void) | null } | undefined;
+		if (previousResetRef !== props.resetRef) {
+			if (previousResetRef?.current === reset) previousResetRef.current = null;
+			scope.slots[1] = props.resetRef;
+		}
+		if (props.resetRef) props.resetRef.current = reset;
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'ErrorBoundary',
@@ -18511,6 +18519,8 @@ interface TrySlot {
 	idState: RootIdState;
 	/** Logical boundary above a selected hydration-container owner. */
 	passthrough: boolean;
+	/** Stable boundary reset dispatcher; remains safe after unmount. */
+	reset: () => void;
 }
 
 // Single mutation point for `TrySlot.branch`. The bare assignment is the hot
@@ -18554,7 +18564,7 @@ function mountPassthroughCatch(state: TrySlot, error: unknown): void {
 		null,
 		null,
 		state.catchBody,
-		{ err: error, reset: () => requestReset(state) },
+		{ err: error, reset: state.reset },
 		state.env,
 	);
 	state.block = block;
@@ -18591,7 +18601,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 function renderPassthroughTry(state: TrySlot): void {
 	if (state.branch === 0 && state.block !== null) {
 		state.block.body = state.catchBody!;
-		state.block.props = { err: state.err, reset: () => requestReset(state) };
+		state.block.props = { err: state.err, reset: state.reset };
 		state.block.extra = state.env;
 		renderBlock(state.block);
 		return;
@@ -18663,7 +18673,7 @@ export function tryBlock(
 	env?: any[],
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
-): void {
+): () => void {
 	// A committed Suspense primary needs the same off-screen swap capability for
 	// urgent branch replacements as transitions use: probe the replacement before
 	// disposing browser-owned state, then either commit it or show @pending while
@@ -18699,7 +18709,8 @@ export function tryBlock(
 			domParent.insertBefore(start, anchor ?? null);
 			domParent.insertBefore(end, anchor ?? null);
 		}
-		const newState: TrySlot = {
+		let newState: TrySlot;
+		newState = {
 			__kind: 'trySlotSlot',
 			start,
 			end,
@@ -18724,6 +18735,7 @@ export function tryBlock(
 			parentBlock,
 			idState: parentBlock.idState,
 			passthrough,
+			reset: () => requestReset(newState),
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -18738,12 +18750,12 @@ export function tryBlock(
 	const s = state;
 	if (s.passthrough) {
 		renderPassthroughTry(s);
-		return;
+		return s.reset;
 	}
 	if (s.branch === 0) {
 		// Already showing catch — re-render with current err (props identity unchanged).
 		s.block!.body = s.catchBody!;
-		s.block!.props = { err: s.err, reset: () => requestReset(s) };
+		s.block!.props = { err: s.err, reset: s.reset };
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
 	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.hiddenDom) {
@@ -18794,6 +18806,7 @@ export function tryBlock(
 	} else {
 		mountTry(s);
 	}
+	return s.reset;
 }
 
 function mountTry(state: TrySlot): void {
@@ -20576,6 +20589,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 }
 
 function requestReset(state: TrySlot): void {
+	if (state.parentBlock.disposed || state.branch !== 0) return;
 	// React parity for catch reset(): don't synchronously re-run the try body.
 	// Rewind slot state and schedule the parent — sibling setState calls in
 	// the SAME event handler then batch into one commit, so when mountTry
