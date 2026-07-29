@@ -444,3 +444,31 @@ export function TransitionResumeAtomicity(props) @{
 		}
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// A namespaced attribute inside a boundary. The write goes through
+// setAttributeNS, while the undo puts the old value back by qualified name —
+// which has to land on the same namespaced attribute rather than adding a plain
+// one beside it.
+// ---------------------------------------------------------------------------
+function NamespacedValue(props) @{
+	const value = use(props.load(props.step));
+	<span id="value">{value as string}</span>
+}
+
+export function TransitionNamespacedAttr(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<svg>
+					<use id="use-el" xlink:href={'#icon-' + step} />
+				</svg>
+				<NamespacedValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}

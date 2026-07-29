@@ -18,6 +18,7 @@ import {
 	AsyncTransitionKeepsDom,
 	TransitionAtomicity,
 	TransitionResumeAtomicity,
+	TransitionNamespacedAttr,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -640,6 +641,45 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(r.find('#a').textContent).toBe('a1');
 		expect(r.find('#b').textContent).toBe('b1');
 		expect(r.find('#pending').textContent).toBe('idle');
+		r.unmount();
+	});
+
+	it('restores a namespaced attribute onto the same attribute, not a plain copy', async () => {
+		const XLINK = 'http://www.w3.org/1999/xlink';
+		const entries = new Map<number, Deferred<string>>();
+		const load = (step: number) => {
+			let entry = entries.get(step);
+			if (entry === undefined) {
+				entry = deferred<string>();
+				entries.set(step, entry);
+			}
+			return entry.promise;
+		};
+		load(0);
+		entries.get(0)!.resolve('zero');
+
+		const r = mount(TransitionNamespacedAttr, { load });
+		await act(() => {});
+		const use = r.find('#use-el');
+		expect(use.getAttributeNS(XLINK, 'href')).toBe('#icon-0');
+
+		// The transition patches the attribute and then the sibling suspends, so
+		// the undo has to put '#icon-0' back on the namespaced attribute itself.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(use.getAttributeNS(XLINK, 'href')).toBe('#icon-0');
+		expect(use.getAttribute('xlink:href')).toBe('#icon-0');
+		// A plain restore alongside the namespaced one would show up as a second
+		// attribute with a null namespace.
+		expect(use.attributes.length).toBe(2);
+		expect(use.getAttributeNode('xlink:href')!.namespaceURI).toBe(XLINK);
+
+		await act(() => {
+			entries.get(1)!.resolve('one');
+		});
+		expect(use.getAttributeNS(XLINK, 'href')).toBe('#icon-1');
+		expect(use.getAttributeNode('xlink:href')!.namespaceURI).toBe(XLINK);
+		expect(r.find('#value').textContent).toBe('one');
 		r.unmount();
 	});
 });
