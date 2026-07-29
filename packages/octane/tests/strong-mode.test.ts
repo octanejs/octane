@@ -160,6 +160,114 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
+	it.each([
+		['const assertions', '1 as const'],
+		['satisfies expressions', '1 satisfies number'],
+		['non-null assertions', '(1)!'],
+		['nested transparent wrappers', '((1 as const)!) satisfies number'],
+	])('rejects state tuple updates through computed keys with %s', (_label, key) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const tuple = useState(0);
+  tuple[${key}](1);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		['const assertions', "'current' as const", '= 1'],
+		['satisfies expressions', "'current' satisfies string", '++'],
+		['non-null assertions', "'current'!", '= 1'],
+		['nested transparent wrappers', "(('current' as const)!) satisfies string", '++'],
+	])('rejects render-phase ref writes through computed keys with %s', (_label, key, operation) => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  ref[${key}] ${operation};
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
+	it.each([
+		[
+			'state hook names',
+			`const tuple = Octane['useState' as const](0); tuple[1](1);`,
+			RENDER_STATE_UPDATE,
+		],
+		[
+			'effect hook names',
+			`const [, update] = Octane.useState(0); Octane['useEffect'!](() => update(1));`,
+			EFFECT_STATE_UPDATE,
+		],
+		[
+			'memo hook names',
+			`const [, update] = Octane.useState(0); Octane[('useMemo' satisfies string)](() => update(1));`,
+			RENDER_STATE_UPDATE,
+		],
+		[
+			'ref hook names',
+			`const ref = Octane['useRef' as const](0); ref.current = 1;`,
+			RENDER_REF_WRITE,
+		],
+	])('recognizes namespace hooks behind wrapped computed %s', (_label, setup, code) => {
+		const source = `"use strong";
+import * as Octane from 'octane';
+export function App() @{
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(code);
+	});
+
+	it('does not mistake genuinely dynamic computed keys for known hooks, setters, or refs', () => {
+		const source = `"use strong";
+import * as Octane from 'octane';
+export function App() @{
+  const tuple = Octane.useState(0);
+  const index = 0;
+  const ref = Octane.useRef({});
+  const property = 'value';
+  tuple[index];
+  ref[property] = 1;
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('reports wrapped computed-key violations in plain TypeScript and editor diagnostics', () => {
+		const source = `"use strong";
+import * as Octane from 'octane';
+export function useCounter() {
+  const tuple = Octane['useState' as const](0);
+  tuple[1 as const](1);
+  return tuple[0];
+}`;
+		const editorSource = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  ref['current'!] = 1;
+  <div />
+}`;
+		const diagnostics = compileToVolarMappings(editorSource, '/src/App.tsrx');
+
+		expect(() => slotHooks(source, '/src/useCounter.ts')).toThrow(RENDER_STATE_UPDATE);
+		expect(diagnostics.diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, severity: 'error' }),
+		);
+		expect(diagnostics.errors).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, type: 'usage' }),
+		);
+	});
+
 	it('follows immutable aliases of state setters and ref objects', () => {
 		const setter = `"use strong";\n${stateComponent('const update = setCount; update(1);')}`;
 		const ref = `"use strong";
@@ -457,6 +565,42 @@ export function App() @{
 			'while (await Promise.resolve(false)) {} setCount(count + 1);',
 		],
 		[
+			'statements after an awaited false do-while test',
+			'do {} while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'labeled do-while loops with awaited tests',
+			'outer: do {} while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'do-while tests after an awaited loop body',
+			'do { await Promise.resolve(); } while (false); setCount(count + 1);',
+		],
+		[
+			'continue paths that still reach the awaited do-while test',
+			'do { if (count > 0) continue; } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'do-while test updates after yielding paths while other paths break',
+			'do { if (count > 0) break; await Promise.resolve(); } while ((setCount(count + 1), false));',
+		],
+		[
+			'breaks belonging to a nested while loop',
+			'do { while (true) { break; } } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'breaks belonging to a nested for loop',
+			'do { for (;;) { break; } } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'breaks belonging to a nested switch',
+			'do { switch (count) { case 0: break; default: break; } } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'breaks after an unavoidable await in the do-while body',
+			'do { await Promise.resolve(); break; } while (false); setCount(count + 1);',
+		],
+		[
 			'nested yielding loop heads',
 			'for (const values of [[count]]) { for (const value of await Promise.resolve(values)) { setCount(value); } }',
 		],
@@ -544,6 +688,34 @@ export function App() @{
 		[
 			'breaks that bypass an awaited do-while test',
 			'do { if (count > 0) break; } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'direct breaks that bypass an awaited do-while test',
+			'do { break; } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'labeled breaks that bypass an awaited do-while test',
+			'outer: do { break outer; } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'conditionally awaited do-while tests',
+			'do {} while (count > 0 && await Promise.resolve(false)); setCount(count + 1);',
+		],
+		[
+			'conditionally awaited do-while bodies with synchronous tests',
+			'do { if (count > 0) await Promise.resolve(); } while (false); setCount(count + 1);',
+		],
+		[
+			'unreachable awaits after escaping do-while breaks',
+			'do { break; await Promise.resolve(); } while (false); setCount(count + 1);',
+		],
+		[
+			'unreachable awaits after do-while continues',
+			'do { continue; await Promise.resolve(); } while (false); setCount(count + 1);',
+		],
+		[
+			'do-while test updates before their awaited condition',
+			'do {} while ((setCount(count + 1), await Promise.resolve(false)));',
 		],
 	])('still rejects updates in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;

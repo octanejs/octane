@@ -149,8 +149,11 @@ function importedHook(callee, scope) {
 	if (object?.type !== 'Identifier' || resolve(scope, object.name)?.kind !== 'namespace') {
 		return null;
 	}
-	if (!value.computed && value.property?.type === 'Identifier') return value.property.name;
-	return value.computed && value.property?.type === 'Literal' ? value.property.value : null;
+	if (!value.computed) {
+		return value.property?.type === 'Identifier' ? value.property.name : null;
+	}
+	const property = unwrap(value.property);
+	return property?.type === 'Literal' ? property.value : null;
 }
 
 function currentRef(member, scope) {
@@ -158,9 +161,11 @@ function currentRef(member, scope) {
 	if (value?.type !== 'MemberExpression' || value.optional === true) return false;
 	const object = unwrap(value.object);
 	if (object?.type !== 'Identifier' || resolve(scope, object.name)?.kind !== 'ref') return false;
-	return value.computed
-		? value.property?.type === 'Literal' && value.property.value === 'current'
-		: value.property?.type === 'Identifier' && value.property.name === 'current';
+	if (!value.computed) {
+		return value.property?.type === 'Identifier' && value.property.name === 'current';
+	}
+	const property = unwrap(value.property);
+	return property?.type === 'Literal' && property.value === 'current';
 }
 
 function sourcePosition(node, boundary) {
@@ -321,6 +326,81 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
+	// Bit 1 exits this loop before an await; bit 2 reaches its test synchronously.
+	function doWhileSynchronousControl(statement, nestedBreaks = 0, nestedLoops = 0, labels = null) {
+		switch (statement?.type) {
+			case 'BreakStatement': {
+				if (statement.label == null) return nestedBreaks === 0 ? 1 : 0;
+				for (let label = labels; label; label = label.parent) {
+					if (label.name === statement.label.name) return 0;
+				}
+				return 1;
+			}
+			case 'ContinueStatement': {
+				if (statement.label == null) return nestedLoops === 0 ? 2 : 0;
+				for (let label = labels; label; label = label.parent) {
+					if (label.name === statement.label.name) return 0;
+				}
+				return 2;
+			}
+			case 'BlockStatement':
+			case 'JSXCodeBlock': {
+				let control = 0;
+				for (const child of statement.body ?? []) {
+					control |= doWhileSynchronousControl(child, nestedBreaks, nestedLoops, labels);
+					if (
+						statementAlwaysAwaits(child) ||
+						child.type === 'BreakStatement' ||
+						child.type === 'ContinueStatement' ||
+						child.type === 'ReturnStatement' ||
+						child.type === 'ThrowStatement'
+					) {
+						return control;
+					}
+				}
+				return control;
+			}
+			case 'IfStatement':
+				return alwaysAwaits(statement.test)
+					? 0
+					: doWhileSynchronousControl(statement.consequent, nestedBreaks, nestedLoops, labels) |
+							doWhileSynchronousControl(statement.alternate, nestedBreaks, nestedLoops, labels);
+			case 'LabeledStatement':
+				return doWhileSynchronousControl(statement.body, nestedBreaks, nestedLoops, {
+					name: statement.label.name,
+					parent: labels,
+				});
+			case 'SwitchStatement': {
+				if (alwaysAwaits(statement.discriminant)) return 0;
+				let control = 0;
+				for (const branch of statement.cases ?? []) {
+					for (const child of branch.consequent ?? []) {
+						control |= doWhileSynchronousControl(child, nestedBreaks + 1, nestedLoops, labels);
+						if (statementAlwaysAwaits(child) || child.type === 'BreakStatement') break;
+					}
+				}
+				return control;
+			}
+			case 'ForStatement':
+			case 'ForInStatement':
+			case 'ForOfStatement':
+			case 'WhileStatement':
+			case 'DoWhileStatement':
+				return statementAlwaysAwaits(statement)
+					? 0
+					: doWhileSynchronousControl(statement.body, nestedBreaks + 1, nestedLoops + 1, labels);
+			case 'TryStatement':
+				if (statement.finalizer != null && statementAlwaysAwaits(statement.finalizer)) return 0;
+				return (
+					doWhileSynchronousControl(statement.block, nestedBreaks, nestedLoops, labels) |
+					doWhileSynchronousControl(statement.handler?.body, nestedBreaks, nestedLoops, labels) |
+					doWhileSynchronousControl(statement.finalizer, nestedBreaks, nestedLoops, labels)
+				);
+			default:
+				return 0;
+		}
+	}
+
 	function statementAlwaysAwaits(statement) {
 		switch (statement?.type) {
 			case 'ExpressionStatement':
@@ -355,6 +435,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return statement.await === true || alwaysAwaits(statement.right);
 			case 'WhileStatement':
 				return alwaysAwaits(statement.test);
+			case 'LabeledStatement':
+				return statement.body?.type === 'DoWhileStatement' && statementAlwaysAwaits(statement.body);
+			case 'DoWhileStatement': {
+				const control = doWhileSynchronousControl(statement.body);
+				const bodyAwaits = statementAlwaysAwaits(statement.body) && control === 0;
+				return (control & 1) === 0 && (bodyAwaits || alwaysAwaits(statement.test));
+			}
 			case 'TryStatement':
 				return (
 					(statement.finalizer != null && statementAlwaysAwaits(statement.finalizer)) ||
@@ -528,11 +615,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const hook = importedHook(node.callee, scope);
 				const callee = unwrap(node.callee);
 				const calleeBinding = callee?.type === 'Identifier' ? resolve(scope, callee.name) : null;
+				const tupleProperty =
+					callee?.type === 'MemberExpression' && callee.computed === true
+						? unwrap(callee.property)
+						: null;
 				const tupleUpdater =
-					callee?.type === 'MemberExpression' &&
-					callee.computed === true &&
-					callee.property?.type === 'Literal' &&
-					(callee.property.value === 1 || callee.property.value === '1') &&
+					tupleProperty?.type === 'Literal' &&
+					(tupleProperty.value === 1 || tupleProperty.value === '1') &&
 					unwrap(callee.object)?.type === 'Identifier' &&
 					resolve(scope, unwrap(callee.object).name)?.kind === 'state-tuple';
 				if (
@@ -642,6 +731,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? 'deferred'
 						: phase;
 				visit(node.body, scope, executionPhase);
+				return;
+			}
+			case 'DoWhileStatement': {
+				visit(node.body, scope, phase);
+				const executionPhase =
+					currentFunctionIsAsync &&
+					phase !== 'deferred' &&
+					statementAlwaysAwaits(node.body) &&
+					(doWhileSynchronousControl(node.body) & 2) === 0
+						? 'deferred'
+						: phase;
+				visit(node.test, scope, executionPhase);
 				return;
 			}
 		}
