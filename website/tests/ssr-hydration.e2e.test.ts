@@ -743,6 +743,32 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			'--strictPort',
 		]);
 		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
+
+		// Finish the cold playground graph before the concurrent pages start.
+		// Its dynamic editor/compiler imports are the heaviest optimizeDeps
+		// boundary in the site; discovering them under four simultaneous pages
+		// can invalidate already-served chunks and leave Vite's error overlay
+		// blocking otherwise unrelated interactions.
+		const warmed = await loadRoute(`http://localhost:${DEV_PORT}`, '/playground', {
+			waitForNetworkIdle: true,
+		});
+		try {
+			await warmed.page.waitForFunction(
+				() =>
+					document.querySelector('.pg-grid.ready') !== null ||
+					document.querySelector('vite-error-overlay') !== null,
+				null,
+				{ timeout: 30_000 },
+			);
+			const overlay = warmed.page.locator('vite-error-overlay');
+			if ((await overlay.count()) !== 0) {
+				throw new Error(`Vite cold-start error: ${(await overlay.textContent())?.trim()}`);
+			}
+			const real = warmed.errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await warmed.page.close();
+		}
 	}, 120_000);
 
 	afterAll(async () => {

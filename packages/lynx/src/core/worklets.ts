@@ -4,6 +4,8 @@
  * worklet envelope, while lifetime ownership remains Octane-controlled.
  */
 
+import { hasOwnSymbolFields } from './own-symbols.js';
+
 export type LynxThreadFunctionKind = 'main-thread' | 'background';
 
 export interface LynxThreadFunctionSource {
@@ -143,7 +145,7 @@ function assertSource(source: LynxThreadFunctionSourceLike | undefined, label: s
 }
 
 function ownEnumerableDataKeys(value: object, label: string): readonly string[] {
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	if (hasOwnSymbolFields(value)) {
 		fail(label, 'contains symbol fields.');
 	}
 	const keys = Object.getOwnPropertyNames(value);

@@ -200,6 +200,20 @@
       "verified": "2026-07-17"
     },
     {
+      "name": "@octanejs/mobx",
+      "version": "0.1.0",
+      "category": "Shared state",
+      "upstream": { "package": "mobx-react-lite", "version": "4.1.1", "core": "mobx@6.16.1" },
+      "surface": "The framework-independent MobX core is re-exported verbatim. The function-component binding includes observer, Observer, useObserver, useLocalObservable, enableStaticRendering, isUsingStaticRendering, and the deprecated useStaticRendering alias.",
+      "divergences": [
+        "React class components and the legacy mobx-react Provider/inject APIs are not included.",
+        "forwardRef compatibility options are omitted because Octane uses refs as props.",
+        "React-specific batching, prop-types validation, React DevTools integration, and useDebugValue output are omitted."
+      ],
+      "ssr": "enableStaticRendering(true) renders observed components without creating a Reaction or retaining observable subscriptions.",
+      "verified": "2026-07-28"
+    },
+    {
       "name": "@octanejs/motion",
       "version": "0.1.18",
       "category": "UI and interaction",
@@ -698,6 +712,8 @@
     "framer-motion": "@octanejs/motion",
     "jotai": "@octanejs/jotai",
     "lucide-react": "@octanejs/lucide",
+    "mobx-react": "@octanejs/mobx",
+    "mobx-react-lite": "@octanejs/mobx",
     "motion": "@octanejs/motion",
     "nuqs": "@octanejs/nuqs",
     "radix-ui": "@octanejs/radix",

@@ -1,3 +1,4 @@
+import { hasOwnSymbolFields } from './own-symbols.js';
 import type { UniversalSerializableValue } from 'octane/universal/native';
 import type { Lynx, LynxGlobalEventEmitter } from '../platform.js';
 import {
@@ -101,7 +102,7 @@ function ownEnumerableDataNames(
 	label: string,
 	allowArrayLength = false,
 ): readonly string[] {
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	if (hasOwnSymbolFields(value)) {
 		throw lifecycleDataError(label, 'contains symbol fields.');
 	}
 	const names = Object.getOwnPropertyNames(value);

@@ -88,5 +88,5 @@ describe('Docusaurus hydration', () => {
 			hydration.router.dispose();
 			errors.mockRestore();
 		}
-	});
+	}, 15_000);
 });

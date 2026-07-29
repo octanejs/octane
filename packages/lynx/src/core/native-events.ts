@@ -1,3 +1,4 @@
+import { hasOwnSymbolFields } from './own-symbols.js';
 import type { UniversalEventPriority } from 'octane/universal/native';
 
 export type LynxNativeEventPrefix =
@@ -110,7 +111,7 @@ function validateTokenIdentity(value: unknown): asserts value is LynxNativeEvent
 		keys.length !== TOKEN_IDENTITY_KEYS.length ||
 		TOKEN_IDENTITY_KEYS.some((key) => !Object.prototype.hasOwnProperty.call(record, key)) ||
 		keys.some((key) => !(TOKEN_IDENTITY_KEYS as readonly string[]).includes(key)) ||
-		Object.getOwnPropertySymbols(record).length !== 0
+		hasOwnSymbolFields(record)
 	) {
 		throw tokenError('identity must contain only root, id, generation, listener, and priority.');
 	}
