@@ -95,8 +95,10 @@ function resolvedHref(item: { href?: string; to?: string }): string | null {
 }
 
 function withBaseUrl(baseUrl: string, href: string): string {
-	if (isExternal(href) || href.startsWith('/') || href.startsWith('#')) return href;
-	return `${baseUrl}${href.replace(/^\.\//, '')}`;
+	if (href === '' || isExternal(href) || href.startsWith('#')) return href;
+	if (href === baseUrl.replace(/\/$/, '')) return baseUrl;
+	if (href.startsWith(baseUrl)) return href;
+	return `${baseUrl}${href.replace(/^(?:\.\/|\/)/, '')}`;
 }
 
 function absoluteUrl(siteUrl: string, href: string): string {
@@ -175,7 +177,7 @@ function ThemeLink(props: {
 function Navbar(props: { config?: NavbarConfig }) @{
 	const manifest = useDocusaurusManifest();
 	const title = props.config?.title ?? manifest.site.title;
-	const brandHref = props.config?.logo?.href ?? manifest.baseUrl;
+	const brandHref = withBaseUrl(manifest.baseUrl, props.config?.logo?.href ?? manifest.baseUrl);
 	const items = props.config?.items ?? [];
 
 	<header class="octane-docs-navbar">
@@ -194,7 +196,9 @@ function Navbar(props: { config?: NavbarConfig }) @{
 					@for (const item of items; key navigationKey(item)) {
 						@if (resolvedHref(item) !== null) {
 							<li>
-								<ThemeLink href={resolvedHref(item)!}>{item.label}</ThemeLink>
+								<ThemeLink
+									href={withBaseUrl(manifest.baseUrl, resolvedHref(item)!)}
+								>{item.label}</ThemeLink>
 							</li>
 						}
 					}
@@ -204,8 +208,9 @@ function Navbar(props: { config?: NavbarConfig }) @{
 	</header>
 }
 
-function Footer(props: { config?: FooterConfig }) @{
+function Footer(props: { baseUrl: string; config?: FooterConfig }) @{
 	const groups = props.config?.links ?? [];
+	// Docusaurus treats the developer-provided copyright as trusted site HTML.
 	const copyright = props.config?.copyright;
 
 	@if (groups.length > 0 || copyright !== undefined) {
@@ -219,7 +224,9 @@ function Footer(props: { config?: FooterConfig }) @{
 								@for (const item of group.items; key navigationKey(item)) {
 									@if (resolvedHref(item) !== null) {
 										<li>
-											<ThemeLink href={resolvedHref(item)!}>{item.label}</ThemeLink>
+											<ThemeLink
+												href={withBaseUrl(props.baseUrl, resolvedHref(item)!)}
+											>{item.label}</ThemeLink>
 										</li>
 									}
 								}
@@ -229,7 +236,10 @@ function Footer(props: { config?: FooterConfig }) @{
 				</ul>
 			}
 			@if (copyright !== undefined) {
-				<p class="octane-docs-footer__copyright">{copyright}</p>
+				<div
+					class="octane-docs-footer__copyright"
+					dangerouslySetInnerHTML={{ __html: copyright }}
+				/>
 			}
 		</footer>
 	}
@@ -333,7 +343,7 @@ export function DocsRoot(props: { children?: OctaneNode }) @{
 	<div class="octane-docusaurus">
 		<Navbar config={themeConfig.navbar} />
 		{props.children}
-		<Footer config={themeConfig.footer} />
+		<Footer baseUrl={manifest.baseUrl} config={themeConfig.footer} />
 	</div>
 }
 
