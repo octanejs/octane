@@ -555,17 +555,29 @@ and remains sequential.
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
 
-Known gaps are regression-pinned in `benchmarks/async-composition`:
+Composition is regression-pinned in `benchmarks/async-composition`, whose
+dashboard fixture reads eight resources — seven independent, one truly dependent
+— through an imported custom hook and three sibling panels:
 
 | Shape | Current behavior |
 | --- | --- |
-| Independent `use()` calls inside an imported custom hook | Serialize because independence analysis stops at the module boundary |
-| Adjacent async children under a parent with no `use()` | Are discovered serially because the parent never triggers its warm plan |
-| A transition-wrapped update | Reveals resolved content progressively instead of holding the whole previous screen |
+| Independent `use()` calls inside an imported custom hook | Start together: plain TypeScript custom hooks get the same memoize-and-batch treatment as component-local `use()` |
+| Adjacent async children under a parent with no `use()` | Start together: child warm plans register with active ancestors, so the first suspending descendant starts its siblings |
+| A transition-wrapped update | Can expose one mixed old/new state instead of holding the whole previous screen |
 
-The transition result is monotonic: it never rolls back, and a dependent value
-never renders against stale input. The benchmark sets one-way ceilings so all
-three gaps can only improve.
+The first two shapes reach the workload's true dependency floor — 2 waves and 8
+requests for both cold mount and transition update, against React's 6/3 waves and
+35/25 requests — so only `owner` waits, on `project.ownerId`.
+
+The remaining gap is transition atomicity, not fetch scheduling. Octane renders
+and mutates in one eager walk with no global work-in-progress tree, so a
+same-identity parent can patch its own bindings before a descendant suspends,
+leaving updated parent markup beside a held boundary's prior content. React
+renders the whole tree off-screen and commits atomically, so it holds the entire
+previous screen. The transition result is still monotonic: it never rolls back,
+never exposes invalid intermediate structure, and a dependent value never renders
+against stale input. The benchmark pins the exposed-state count at a one-way
+ceiling of one so the gap can only close.
 
 ## Root component entry points and container ownership
 
