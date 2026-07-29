@@ -1,3 +1,4 @@
+import { hasOwnSymbolFields } from './own-symbols.js';
 import type {
 	UNIVERSAL_TRANSPORT_PROTOCOL_VERSION,
 	UniversalHostBatch,
@@ -291,7 +292,7 @@ function record(
 	if (prototype !== Object.prototype && prototype !== null) {
 		return fail(label, 'must be a plain object.', index, field);
 	}
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	if (hasOwnSymbolFields(value)) {
 		return fail(label, 'contains symbol fields.', index, field);
 	}
 	// Enumerability and accessor freedom are what make a later read of this
@@ -409,7 +410,7 @@ function assertWireValue(value: unknown, label: string, seen: Set<object> | null
 		fail(label, 'contains a non-serializable value.');
 	}
 	const composite: object = value;
-	if (Object.getOwnPropertySymbols(composite).length !== 0) {
+	if (hasOwnSymbolFields(composite)) {
 		fail(label, 'contains symbol fields.');
 	}
 	// Allocated on the first descent into an object, not once per validated

@@ -1,3 +1,4 @@
+import { hasOwnSymbolFields } from './core/own-symbols.js';
 import type {
 	UniversalComponent,
 	UniversalHostBatch,
@@ -205,7 +206,7 @@ function lifecycleRecord(value: unknown, label: string): Record<string, unknown>
 	if (prototype !== Object.prototype && prototype !== null) {
 		throw new TypeError(`Octane Lynx ${label} must be a plain object.`);
 	}
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	if (hasOwnSymbolFields(value)) {
 		throw new TypeError(`Octane Lynx ${label} contains symbol fields.`);
 	}
 	return value as Record<string, unknown>;
@@ -225,7 +226,7 @@ function lifecycleTuple(
 		throw new TypeError(`Octane Lynx ${expectedType} data must be an exact ${length}-item tuple.`);
 	}
 	const names = Object.getOwnPropertyNames(event.data);
-	if (names.length !== length + 1 || Object.getOwnPropertySymbols(event.data).length !== 0) {
+	if (names.length !== length + 1 || hasOwnSymbolFields(event.data)) {
 		throw new TypeError(
 			`Octane Lynx ${expectedType} data must be a dense tuple without extra fields.`,
 		);

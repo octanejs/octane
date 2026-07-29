@@ -1,4 +1,5 @@
 import type { UniversalSerializableValue } from 'octane/universal/native';
+import { hasOwnSymbolFields } from './own-symbols.js';
 
 /** Compiler-inaccessible native attribute used by the public selector-query API. */
 export const LYNX_NODES_REF_ATTRIBUTE = 'octane-ref';
@@ -215,7 +216,7 @@ function cloneSerializable(
 	if (typeof value !== 'object') {
 		throw new TypeError(`Octane Lynx NodesRef ${label} contains a non-serializable value.`);
 	}
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	if (hasOwnSymbolFields(value)) {
 		throw new TypeError(`Octane Lynx NodesRef ${label} contains symbol fields.`);
 	}
 	if (seen.has(value)) {

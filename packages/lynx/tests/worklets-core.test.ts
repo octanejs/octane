@@ -58,6 +58,32 @@ describe('Lynx main-thread worklets', () => {
 		);
 	});
 
+	it('accepts array captures when getOwnPropertySymbols reports index keys', () => {
+		// PrimJS (the Lynx engine) returns an array's integer index keys — as
+		// strings — from Object.getOwnPropertySymbols, so the symbol-field guard
+		// must count only real symbols or every array capture is rejected.
+		const spy = vi
+			.spyOn(Object, 'getOwnPropertySymbols')
+			.mockImplementation((target: unknown): symbol[] => {
+				if (Array.isArray(target)) {
+					return Object.keys(target) as unknown as symbol[];
+				}
+				return [];
+			});
+		try {
+			const isolated = isolateLynxWorkletValue([{ _wvid: 'test:ref' }, 'value']);
+			expect(isolated).toEqual([{ _wvid: 'test:ref' }, 'value']);
+			const marked = [1, 2] as unknown as Record<symbol, unknown>;
+			marked[Symbol('poison')] = true;
+			spy.mockImplementation((target: unknown): symbol[] =>
+				target === marked ? [Symbol('poison')] : [],
+			);
+			expect(() => isolateLynxWorkletValue(marked as never)).toThrow(/symbol fields/);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	it('preserves own prototype-named capture fields at every isolation boundary', () => {
 		const payload = JSON.parse('{"__proto__":{"polluted":true},"ok":1}') as LynxWorkletRecord;
 		const isolated = isolateLynxWorkletValue(payload);
