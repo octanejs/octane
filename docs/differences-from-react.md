@@ -563,21 +563,28 @@ dashboard fixture reads eight resources — seven independent, one truly depende
 | --- | --- |
 | Independent `use()` calls inside an imported custom hook | Start together: plain TypeScript custom hooks get the same memoize-and-batch treatment as component-local `use()` |
 | Adjacent async children under a parent with no `use()` | Start together: child warm plans register with active ancestors, so the first suspending descendant starts its siblings |
-| A transition-wrapped update | Can expose one mixed old/new state instead of holding the whole previous screen |
+| A transition-wrapped update | Holds the boundary whole: no mixed old/new state, matching React |
 
-The first two shapes reach the workload's true dependency floor — 2 waves and 8
-requests for both cold mount and transition update, against React's 6/3 waves and
-35/25 requests — so only `owner` waits, on `project.ownerId`.
+All three reach the workload's true dependency floor — 2 waves and 8 requests for
+both cold mount and transition update, against React's 6/3 waves and 35/25
+requests — so only `owner` waits, on `project.ownerId`, and the update exposes
+zero intermediate states, the same as React.
 
-The remaining gap is transition atomicity, not fetch scheduling. Octane renders
-and mutates in one eager walk with no global work-in-progress tree, so a
-same-identity parent can patch its own bindings before a descendant suspends,
-leaving updated parent markup beside a held boundary's prior content. React
-renders the whole tree off-screen and commits atomically, so it holds the entire
-previous screen. The transition result is still monotonic: it never rolls back,
-never exposes invalid intermediate structure, and a dependent value never renders
-against stale input. The benchmark pins the exposed-state count at a one-way
-ceiling of one so the gap can only close.
+A held boundary holds all of its own content. Octane renders and mutates in one
+walk, so a transition patches a boundary's bindings on the way down and only then
+finds that a descendant suspends; the same happens when a held boundary replays
+its body and part of the data has arrived. Both cases record what each binding
+replaced and put it back if the attempt suspends, inside the flush that made the
+change — nothing reaches the screen in between. Transitions stay monotonic: no
+visible rollback, no invalid intermediate structure, and a dependent value never
+renders against stale input.
+
+Content the same transition patched OUTSIDE a suspended boundary still updates
+early, and so does a structural change (a keyed list reordering above the
+boundary) rather than a binding. Holding those needs the global work-in-progress
+tree Octane deliberately does not have; see
+[Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
+benchmark pins the exposed-state count at zero.
 
 ## Root component entry points and container ownership
 

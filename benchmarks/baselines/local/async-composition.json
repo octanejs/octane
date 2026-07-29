@@ -78,11 +78,11 @@
           "samples": 10
         },
         "update_mixed_states": {
-          "score": 1,
-          "median": 1,
-          "min": 1,
-          "mean": 1,
-          "p95": 1,
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
           "sd": 0,
           "rme": 0,
           "scoreRme": 0,
@@ -147,10 +147,8 @@
           "wavePatterns": [
             "project+viewer+badge+activity+activity-summary+insights+insights-chart -> owner"
           ],
-          "mixedStateCounts": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          "mixedStateSignatures": [
-            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v0:owner-0|activity=activity:v0|activity-summary=activity-summary:v0|insights=insights:v0|insights-chart=insights-chart:v0"
-          ]
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
         }
       }
     },

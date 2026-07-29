@@ -127,3 +127,20 @@ Every independent request starts before the first 50ms network wave settles;
 `owner` alone waits for `project.ownerId`. The remaining single mixed update
 signature is transition atomicity work rather than an async-discovery waterfall,
 and stays visible under its tightened one-state ceiling.
+
+## Atomic transitions (2026-07-29)
+
+The last mixed signature is gone. It was the held boundary replaying its body:
+`project`, `viewer`, and `badge` had arrived and patched their nodes, then
+`owner` suspended again behind its data dependency, leaving three v1 values
+beside five v0 ones.
+
+A suspended attempt now undoes its own binding writes, so the boundary holds
+whole. Both the waves and the exposed states are level with React:
+
+| target | update | waves (init / update) | calls (init / update) | observed mixed update states |
+| --- | ---: | ---: | ---: | ---: |
+| octane-tsrx | 2 waves | 2 / 2 | 8 / 8 | 0 |
+| React | 3 waves | 6 / 3 | 35 / 25 | 0 |
+
+The update ceiling is now zero, so any reintroduced tear fails the suite.
