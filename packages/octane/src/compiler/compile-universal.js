@@ -657,7 +657,7 @@ function createLexicalAnalysis(ast) {
 			return;
 		}
 		if (node.type === 'TSModuleDeclaration') {
-			if (node.declare === true || node.global === true) {
+			if (node.declare === true || node.kind === 'global') {
 				if (node.id) declarePattern(node.id, null);
 				return;
 			}

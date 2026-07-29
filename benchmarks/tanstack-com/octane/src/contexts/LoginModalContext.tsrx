@@ -17,7 +17,7 @@ interface LoginModalContextValue {
 	closeLoginModal: () => void;
 }
 
-declare module global {
+declare global {
 	var __tanstackLoginModalContext: Context<LoginModalContextValue | null> | undefined;
 }
 

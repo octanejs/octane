@@ -57,6 +57,33 @@ describe('compile — nested type-only statements', () => {
 	});
 });
 
+// Ambient declarations exist only for TypeScript's checker. Neither runtime
+// target may leak them into JavaScript, while references to the augmented
+// global remain ordinary runtime expressions.
+describe('compile — ambient module declarations', () => {
+	const src = `
+    export {};
+    declare global {
+      var __octaneAmbientValue: string | undefined;
+    }
+    export const ambientValue = globalThis.__octaneAmbientValue;
+  `;
+
+	for (const mode of ['client', 'server'] as const) {
+		it(`${mode} emit drops declare global syntax`, () => {
+			const { code } = compile(
+				src,
+				'ambient-global.test.tsrx',
+				mode === 'server' ? { mode: 'server' } : undefined,
+			);
+			expect(code).not.toContain('declare global');
+			expect(code).not.toContain('declare module global');
+			expect(code).not.toContain('__octaneAmbientValue:');
+			expect(code).toContain('globalThis.__octaneAmbientValue');
+		});
+	}
+});
+
 // Inline `type` specifiers (`import { a, type B }`, `export { type C, d }`)
 // must be elided exactly like tsc elides them: the emitted JS neither carries
 // the invalid `type` keyword nor imports/re-exports a binding that only exists

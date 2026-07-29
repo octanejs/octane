@@ -3,4 +3,4 @@ const Object = null;
 
 export default () => [
 	<div key="default-arrow" id="default-arrow-root">default arrow root</div>,
-]
+];

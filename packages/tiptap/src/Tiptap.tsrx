@@ -106,4 +106,4 @@ export const Tiptap = Object.assign(TiptapWrapper, {
 	Content: TiptapContent,
 });
 
-export default Tiptap
+export default Tiptap;

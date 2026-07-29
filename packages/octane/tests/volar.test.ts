@@ -330,6 +330,41 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		expect(result.code).toContain('x.label');
 	});
 
+	it('preserves declare global as a type-checkable global augmentation', () => {
+		const src =
+			'export {};\n' +
+			'declare global {\n' +
+			'\tvar __octaneAmbientValue: string | undefined;\n' +
+			'}\n' +
+			'export const ambientValue = globalThis.__octaneAmbientValue;\n';
+		const result = compileToVolarMappings(src, '/src/ambient-global.tsrx');
+
+		expect(result.errors).toEqual([]);
+		expect(result.code).toContain('declare global');
+		expect(result.code).not.toContain('declare module global');
+
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-ambient-global-'));
+		try {
+			const virtualFile = join(root, 'ambient-global.tsx');
+			writeFileSync(virtualFile, result.code);
+			const program = ts.createProgram({
+				rootNames: [virtualFile],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			expect(ts.getPreEmitDiagnostics(program)).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('lowers `module server` blocks to checkable TS with types flowing across the boundary', () => {
 		// The documented dialect (docs/ssr.md) puts a static import INSIDE the
 		// server block. Verbatim that can never typecheck (TS1147 for the

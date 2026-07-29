@@ -4572,11 +4572,7 @@ function dropTypeOnlyStatements(body) {
 // ---------------------------------------------------------------------------
 
 function isServerModuleDeclaration(node) {
-	return (
-		node?.type === 'TSModuleDeclaration' &&
-		node.declare !== true &&
-		node.metadata?.module_keyword === 'module'
-	);
+	return node?.type === 'TSModuleDeclaration' && node.declare !== true && node.kind === 'module';
 }
 
 function identifierName(node) {
