@@ -15,9 +15,11 @@
     "debug-tsx": "pnpm run debug-volar"
   },
   "dependencies": {
+    "@octanejs/aria": "workspace:*",
     "@octanejs/cmdk": "workspace:*",
     "@octanejs/lucide": "workspace:*",
     "@octanejs/radix": "workspace:*",
+    "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",
     "class-variance-authority": "catalog:default",
     "clsx": "catalog:default",

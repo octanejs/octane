@@ -10,7 +10,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 	DialogTrigger,
-} from '../../src/ui/dialog.tsrx';
+} from '../../src/bases/radix/ui/dialog.tsrx';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,7 +22,7 @@ import {
 	AlertDialogMedia,
 	AlertDialogTitle,
 	AlertDialogTrigger,
-} from '../../src/ui/alert-dialog.tsrx';
+} from '../../src/bases/radix/ui/alert-dialog.tsrx';
 import {
 	Sheet,
 	SheetClose,
@@ -32,13 +32,13 @@ import {
 	SheetHeader,
 	SheetTitle,
 	SheetTrigger,
-} from '../../src/ui/sheet.tsrx';
+} from '../../src/bases/radix/ui/sheet.tsrx';
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
-} from '../../src/ui/tooltip.tsrx';
+} from '../../src/bases/radix/ui/tooltip.tsrx';
 import {
 	Popover,
 	PopoverAnchor,
@@ -47,8 +47,12 @@ import {
 	PopoverHeader,
 	PopoverTitle,
 	PopoverTrigger,
-} from '../../src/ui/popover.tsrx';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '../../src/ui/hover-card.tsrx';
+} from '../../src/bases/radix/ui/popover.tsrx';
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from '../../src/bases/radix/ui/hover-card.tsrx';
 
 export function DialogFixture() @{
 	<div>

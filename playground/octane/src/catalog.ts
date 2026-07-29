@@ -10,7 +10,7 @@ import { Counter } from './demos/Counter.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
-import { ShadcnDemo } from './demos/Shadcn.tsrx';
+import { ShadcnBasesDemo } from './demos/ShadcnBases.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
 
 import commandMenuSource from './demos/CommandMenu.tsrx?raw';
@@ -19,7 +19,7 @@ import counterSource from './demos/Counter.tsrx?raw';
 import dynamicSource from './demos/Dynamic.tsrx?raw';
 import inputsSource from './demos/Inputs.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
-import shadcnSource from './demos/Shadcn.tsrx?raw';
+import shadcnSource from './demos/ShadcnBases.tsrx?raw';
 import suspenseSource from './demos/Suspense.tsrx?raw';
 
 export interface Demo {
@@ -91,8 +91,8 @@ export const GROUPS: readonly DemoGroup[] = [
 			},
 			{
 				id: 'shadcn',
-				title: 'shadcn/ui',
-				Component: ShadcnDemo,
+				title: 'shadcn/ui (all bases)',
+				Component: ShadcnBasesDemo,
 				source: shadcnSource,
 			},
 		],
