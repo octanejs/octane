@@ -4,15 +4,21 @@
 // via @octanejs/vite-plugin) and drives the built dist/server handler: the
 // same export the Vercel adapter's function wraps and `octane-preview` boots.
 // This proves the DEPLOYED artifact speaks MCP and serves the REST surface —
-// including that the build-time content snapshot survived bundling.
-import { describe, it, expect, beforeAll } from 'vitest';
+// including that the build-time content snapshot survived bundling. The build
+// runs from an OS-temporary mirror so Vite's output/cache churn never touches
+// the checkout; source and dependency directories remain the real ones.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
-const mcpRoot = fileURLToPath(new URL('..', import.meta.url));
-const serverEntry = path.join(mcpRoot, 'dist/server/entry.js');
+const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
+const projectFiles = ['index.html', 'package.json', 'vite.config.ts', 'octane.config.ts'];
+
+let mcpRoot = '';
+let serverEntry = '';
 
 let handler: (request: Request) => Promise<Response>;
 
@@ -34,10 +40,49 @@ async function rpc(method: string, params: unknown, id: number) {
 	return response.json();
 }
 
+function stageProject(): string {
+	// realpath avoids macOS's /var → /private/var alias: Rolldown requires HTML
+	// inputs to be inside the exact normalized root when choosing output names.
+	const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'octane-website-mcp-')));
+	const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+
+	for (const directory of ['src', 'public']) {
+		fs.symlinkSync(path.join(sourceRoot, directory), path.join(root, directory), linkType);
+	}
+
+	// Keep node_modules itself real so Vite's .vite/.vite-temp directories stay
+	// in the temporary root. Its package entries can point at the installed
+	// dependency graph without copying it.
+	const sourceModules = path.join(sourceRoot, 'node_modules');
+	const stagedModules = path.join(root, 'node_modules');
+	fs.mkdirSync(stagedModules);
+	for (const entry of fs.readdirSync(sourceModules, { withFileTypes: true })) {
+		if (entry.name.startsWith('.')) continue;
+		const source = path.join(sourceModules, entry.name);
+		const target = path.join(stagedModules, entry.name);
+		if (fs.statSync(source).isDirectory()) {
+			fs.symlinkSync(source, target, linkType);
+		} else {
+			fs.copyFileSync(source, target);
+		}
+	}
+
+	for (const file of projectFiles) {
+		fs.copyFileSync(path.join(sourceRoot, file), path.join(root, file));
+	}
+	return root;
+}
+
 beforeAll(async () => {
+	mcpRoot = stageProject();
+	serverEntry = path.join(mcpRoot, 'dist/server/entry.js');
 	await build({ root: mcpRoot, logLevel: 'silent' });
 	({ handler } = await import(pathToFileURL(serverEntry).href));
 }, 240_000);
+
+afterAll(() => {
+	if (mcpRoot) fs.rmSync(mcpRoot, { recursive: true, force: true });
+});
 
 describe('built MCP handler', () => {
 	it('produced the deployable layout and ran the Vercel adapter', () => {

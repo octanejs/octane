@@ -2531,6 +2531,7 @@ export default defineConfig({
 					include: ['website/tests/**/*.test.ts'],
 					exclude: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
 					environment: 'jsdom',
+					setupFiles: ['website/tests/setup/unit.ts'],
 					globals: false,
 					// The Core APIs route test renders the whole documentation graph, so
 					// it runs longer than the five-second default even though it needs
@@ -2588,8 +2589,8 @@ export default defineConfig({
 					include: ['website-mcp/tests/built-handler.e2e.test.ts'],
 					environment: 'node',
 					globals: false,
-					// This spec writes website-mcp/dist and .vercel/output before
-					// importing the emitted server entry.
+					// The spec builds an OS-temporary mirror before importing the
+					// emitted server entry; keep that one build/test file serial.
 					fileParallelism: false,
 				},
 			},

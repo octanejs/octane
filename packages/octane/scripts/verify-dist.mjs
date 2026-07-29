@@ -315,6 +315,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'withSlot',
 	],
 	'./static': ['prerender'],
+	'./testing': ['clampJsdomScrollTop'],
 	'./constants': [
 		'ATTRIBUTE_ALIASES',
 		'BLOCK_CLOSE',
