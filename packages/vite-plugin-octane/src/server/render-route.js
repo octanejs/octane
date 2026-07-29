@@ -1,6 +1,7 @@
 // @ts-check
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createRpcRegistry } from '@octanejs/app-core';
 import { composeHtmlStream } from './html-stream.js';
 import {
 	getContextNonce,
@@ -61,7 +62,7 @@ export async function handleRenderRoute(route, context, vite, octaneConfig) {
 		// declarations during SSR module loading (renderer-agnostic; harmless when
 		// the app uses no RPC).
 		if (!(/** @type {any} */ (globalThis).rpc_modules)) {
-			/** @type {any} */ (globalThis).rpc_modules = new Map();
+			/** @type {any} */ (globalThis).rpc_modules = createRpcRegistry();
 		}
 
 		// Load the octane streaming renderer. The wrappers call components

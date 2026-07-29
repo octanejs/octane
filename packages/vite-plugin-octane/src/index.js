@@ -976,6 +976,13 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 				if (!server || !server[funcName]) return null;
 				return server[funcName];
 			},
+			describeFunction(hash) {
+				const rpcModules = /** @type {any} */ (globalThis).rpc_modules;
+				const moduleInfo = rpcModules?.get(hash);
+				if (!moduleInfo) return null;
+				const [filePath, funcName] = moduleInfo;
+				return { module: filePath, export: funcName };
+			},
 			async executeServerFunction(fn, body) {
 				const { executeServerFunction } = await vite.ssrLoadModule('octane/server');
 				return executeServerFunction(fn, body);
