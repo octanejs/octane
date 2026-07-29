@@ -47,6 +47,16 @@
       "import": "./src/client.js",
       "default": "./src/client.js"
     },
+    "./hydrate": {
+      "types": "./types/hydrate.d.ts",
+      "import": "./src/hydrate.js",
+      "default": "./src/hydrate.js"
+    },
+    "./server": {
+      "types": "./types/server.d.ts",
+      "import": "./src/server.js",
+      "default": "./src/server.js"
+    },
     "./vite": {
       "types": "./types/vite.d.ts",
       "import": "./src/vite.js",

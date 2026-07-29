@@ -100,6 +100,61 @@ receive loaded `modules`, static `props`, `route`, `location`, `params`, and
 and merged route data. Use `Link` from `@octanejs/remix-router` for client-side
 navigation.
 
+## Static rendering and hydration
+
+The server entry resolves the requested lazy route branch through Remix's
+static handler, then prerenders fully resolved Octane markup. Hoisted metadata
+is returned separately in `head` so a static-site host can place it in the real
+document head:
+
+```ts
+import { prerenderDocusaurusRoute } from '@octanejs/docusaurus/server';
+import {
+	manifest,
+	routeModules,
+} from 'virtual:octane-docusaurus-routes';
+
+const rendered = await prerenderDocusaurusRoute(
+	new Request('https://docs.example.com/guide/intro'),
+	manifest,
+	routeModules,
+);
+
+if (rendered instanceof Response) {
+	return rendered;
+}
+
+const { html, head, css, context } = rendered;
+```
+
+`context.statusCode`, `loaderHeaders`, and `actionHeaders` preserve the static
+router result for the surrounding build or request handler. Generate a site by
+calling this function for the paths in `manifest.routesPaths`; each render
+imports only its matched route branch.
+
+Hydrate the same root after the browser receives that markup:
+
+```ts
+import { hydrateDocusaurusRoot } from '@octanejs/docusaurus/hydrate';
+import {
+	manifest,
+	routeModules,
+} from 'virtual:octane-docusaurus-routes';
+
+const container = document.getElementById('root');
+if (container === null) throw new Error('Missing Docusaurus root.');
+
+const { root, router } = await hydrateDocusaurusRoot(
+	container,
+	manifest,
+	routeModules,
+);
+```
+
+Hydration capture starts before lazy imports, waits for the initial matched
+branch, and then adopts the prerendered nodes. Dispose both returned owners when
+the application is torn down with `root.unmount()` and `router.dispose()`.
+
 ## Docusaurus-aware MDX
 
 ```js
@@ -128,7 +183,8 @@ remain composable.
 
 ## Current scope
 
-Phases 1–4 are implemented here: headless loading, manifest/Vite integration,
-MDX compilation, and lazy client routing. Static generation, hydration, and an
-Octane classic theme remain renderer/theme phases; the CLI therefore does not
-present `start` or `build` as working commands yet.
+Phases 1–5 are implemented here: headless loading, manifest/Vite integration,
+MDX compilation, lazy client routing, static route rendering, and hydration.
+Document/asset orchestration and an Octane classic theme remain the next theme
+phase; the CLI therefore does not present `start` or `build` as working commands
+yet.
