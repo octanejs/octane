@@ -3,11 +3,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Context, Middleware } from '@octanejs/app-core';
 import { createHandler } from '../src/server/production.js';
+import { getRequestContext, tryGetRequestContext } from '../src/server/request-context.js';
 
 const TEMPLATE = `<!doctype html>
 <html><head><!--ssr-head--></head><body><div id="root"><!--ssr-body--></div>
 <script type="module" data-octane-hydrate src="/assets/hydrate.js"></script></body></html>`;
 const FETCH_COORDINATOR_KEY = Symbol.for('octane.app-core.fetch-coordinator');
+const REQUEST_CONTEXT_KEY = Symbol.for('octane.app-core.request-context');
 const originalFetch = globalThis.fetch;
 
 interface RpcTestOptions {
@@ -95,6 +97,7 @@ function rpcPreflight(origin: string, options: { method?: string; requestHeaders
 afterEach(() => {
 	globalThis.fetch = originalFetch;
 	delete (globalThis as typeof globalThis & Record<symbol, unknown>)[FETCH_COORDINATOR_KEY];
+	delete (globalThis as typeof globalThis & Record<symbol, unknown>)[REQUEST_CONTEXT_KEY];
 	vi.restoreAllMocks();
 });
 
@@ -423,6 +426,59 @@ describe('server-function HTTP security', () => {
 		expect(observedState).toBe(platform);
 		expect(action).toHaveBeenCalledOnce();
 		await expect(response.json()).resolves.toEqual({ value: platform });
+	});
+
+	it('gives a server action the same context instance its middleware saw', async () => {
+		let contextFromMiddleware: Context | undefined;
+		let contextFromAction: Context | undefined;
+		const middleware: Middleware = async (context, next) => {
+			context.state.set('user', { id: 'u1' });
+			contextFromMiddleware = context;
+			return next();
+		};
+		const { action, handler } = createRpcHandler({
+			middlewares: [middleware],
+			action: () => {
+				contextFromAction = getRequestContext();
+				return contextFromAction.state.get('user');
+			},
+		});
+		const response = await handler(rpcRequest());
+
+		expect(response.status).toBe(200);
+		expect(action).toHaveBeenCalledOnce();
+		await expect(response.json()).resolves.toEqual({ value: { id: 'u1' } });
+		expect(contextFromAction).toBe(contextFromMiddleware);
+	});
+
+	it('exposes the request headers but a consumed body to a server action', async () => {
+		let cookie: string | null = null;
+		let bodyUsed: boolean | undefined;
+		const { handler } = createRpcHandler({
+			action: () => {
+				const { request } = getRequestContext();
+				cookie = request.headers.get('cookie');
+				bodyUsed = request.bodyUsed;
+				return 'ok';
+			},
+		});
+		const response = await handler(rpcRequest({ headers: { Cookie: 'session=abc' } }));
+
+		expect(response.status).toBe(200);
+		expect(cookie).toBe('session=abc');
+		expect(bodyUsed).toBe(true);
+	});
+
+	it('reports no request context outside of a request', () => {
+		expect(tryGetRequestContext()).toBeNull();
+		expect(() => getRequestContext()).toThrow(/outside of a request/);
+	});
+
+	it('does not leak a request context after the response settles', async () => {
+		const { handler } = createRpcHandler();
+		await handler(rpcRequest());
+
+		expect(tryGetRequestContext()).toBeNull();
 	});
 
 	it('does not disclose server-action exception messages', async () => {

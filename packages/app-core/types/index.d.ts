@@ -143,7 +143,7 @@ export function is_rpc_request(pathname: string): boolean;
 export interface RpcRequestOptions {
 	resolveFunction: (hash: string) => Function | null | Promise<Function | null>;
 	executeServerFunction: (fn: Function, body: string) => Promise<string>;
-	asyncContext: AsyncContext<{ origin?: string; platform?: unknown }>;
+	asyncContext: AsyncContext<{ origin?: string; platform?: unknown; context?: Context }>;
 	trustProxy?: boolean;
 	middlewares?: Middleware[];
 	allowedOrigins?: readonly string[];
@@ -153,6 +153,26 @@ export interface RpcRequestOptions {
 
 /** Apply Octane's security policy and global middleware to a server function. */
 export function handleRpcRequest(request: Request, options: RpcRequestOptions): Promise<Response>;
+
+/**
+ * The `Context` for the in-flight request.
+ *
+ * Available inside a `module server` function and inside the middleware chain
+ * that runs it, so a server function can read the identity its middleware
+ * established rather than trusting an argument the browser supplied. It is the
+ * same `Context` instance the middleware saw, including `state` mutations.
+ *
+ * `context.request.body` is already consumed on the RPC path (the boundary
+ * reads it under the configured size limit before dispatching), so
+ * `bodyUsed` is `true`; headers, cookies, and `url` are unaffected.
+ *
+ * Throws outside a request. Use {@link tryGetRequestContext} in code that must
+ * also run outside one.
+ */
+export function getRequestContext(): Context;
+
+/** {@link getRequestContext}, returning `null` outside a request instead of throwing. */
+export function tryGetRequestContext(): Context | null;
 
 // ============================================================================
 // Configuration
