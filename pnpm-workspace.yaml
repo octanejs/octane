@@ -261,6 +261,7 @@ catalogs:
     i18next: 26.3.6
     jsdom: ^30.0.1
     jotai: ^2.20.2
+    mobx: 6.16.1
     lexical: 0.46.0
     lighthouse: 13.4.1
     lucide-react: 1.24.0
