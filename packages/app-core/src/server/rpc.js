@@ -214,6 +214,15 @@ export async function handleRpcRequest(request, options) {
 	const corsOrigin = browserOrigin === origin ? null : browserOrigin;
 
 	const context = createContext(request, {}, options.platform);
+	// Name the target before middleware so a policy can authorize per function.
+	// The id alone is a compiler artifact, so a policy written against it would
+	// break on any rename.
+	const described = options.describeFunction?.(hash);
+	context.rpc = {
+		id: hash,
+		module: described?.module ?? null,
+		export: described?.export ?? null,
+	};
 	// `context` rides the request store so a server function can read what the
 	// middleware chain established (auth, tenant) instead of trusting arguments
 	// the browser sent. The body is already consumed by the time it runs.

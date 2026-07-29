@@ -7,6 +7,7 @@ import {
 	useNavigate,
 	useParams,
 } from '@octanejs/remix-router';
+import { Head, Meta, Seo } from '@octanejs/seo';
 
 type DocusaurusPluginIdentifier = {
 	name: string;
@@ -20,6 +21,13 @@ type DocusaurusRouteContextValue = {
 
 type DocusaurusManifestValue = {
 	baseUrl: string;
+	site: {
+		title: string;
+		url: string;
+		favicon?: string;
+		noIndex: boolean;
+		themeConfig: Record<string, unknown>;
+	};
 };
 
 type DocusaurusRoute = {
@@ -31,6 +39,18 @@ type DocusaurusRoute = {
 
 const ManifestContext = createContext<DocusaurusManifestValue | null>(null);
 const RouteContext = createContext<DocusaurusRouteContextValue | null>(null);
+
+function DocusaurusSiteMetadata(props: { manifest: DocusaurusManifestValue }) @{
+	const site = props.manifest.site;
+	<>
+		<Seo
+			title={site.title}
+			openGraph={{ title: site.title }}
+			robots={site.noIndex ? { index: false, follow: false } : undefined}
+		/>
+		<Meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	</>
+}
 
 function mergeRouteContext(
 	parent: DocusaurusRouteContextValue | null,
@@ -62,7 +82,10 @@ export function DocusaurusRouterProvider(props: {
 	router: DataRouter;
 }) @{
 	<ManifestContext.Provider value={props.manifest}>
-		<RouterProvider router={props.router} />
+		<Head>
+			<DocusaurusSiteMetadata manifest={props.manifest} />
+			<RouterProvider router={props.router} />
+		</Head>
 	</ManifestContext.Provider>
 }
 

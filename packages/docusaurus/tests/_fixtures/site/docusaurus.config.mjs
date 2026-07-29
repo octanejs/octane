@@ -30,6 +30,33 @@ function fixtureContentPlugin(context) {
 		getPathsToWatch() {
 			return [path.join(context.siteDir, 'watched.txt')];
 		},
+		getClientModules() {
+			return [path.join(context.siteDir, 'src/client-module.css')];
+		},
+		injectHtmlTags() {
+			return {
+				headTags: [
+					{
+						tagName: 'meta',
+						attributes: { name: 'fixture-plugin', content: 'head' },
+					},
+				],
+				preBodyTags: [
+					{
+						tagName: 'div',
+						attributes: { id: 'fixture-before' },
+						innerHTML: 'before',
+					},
+				],
+				postBodyTags: [
+					{
+						tagName: 'div',
+						attributes: { id: 'fixture-after' },
+						innerHTML: 'after',
+					},
+				],
+			};
+		},
 	};
 }
 
@@ -53,8 +80,19 @@ function fixtureInitialThemePlugin(context) {
 
 export default {
 	title: 'Octane Docusaurus fixture',
+	tagline: 'A renderer-neutral fixture',
 	url: 'https://example.test',
 	baseUrl: '/docs/',
+	favicon: 'img/favicon.svg',
+	themeConfig: {
+		navbar: {
+			title: 'Fixture docs',
+			items: [{ label: 'Guide', to: '/docs/guide/intro' }],
+		},
+		footer: {
+			copyright: 'Fixture project',
+		},
+	},
 	onBrokenLinks: 'throw',
 	plugins: [
 		[

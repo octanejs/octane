@@ -26,7 +26,7 @@ const expectedSignature = (version) =>
 const OBSERVATION_CEILINGS = {
 	'octane-tsrx': {
 		init: { waves: 2, calls: 8, mixedStates: 0 },
-		update: { waves: 2, calls: 8, mixedStates: 1 },
+		update: { waves: 2, calls: 8, mixedStates: 0 },
 	},
 	react: {
 		init: { mixedStates: 0 },

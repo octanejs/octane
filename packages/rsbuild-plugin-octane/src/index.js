@@ -132,8 +132,11 @@ function hasRoutes(config) {
 	return (config?.router.routes.length ?? 0) > 0;
 }
 
-/** @param {import('@octanejs/app-core').ResolvedOctaneConfig} config */
-function configSignature(config) {
+/**
+ * @param {import('@octanejs/app-core').ResolvedOctaneConfig} config
+ * @param {boolean | undefined} strongOverride
+ */
+function configSignature(config, strongOverride) {
 	return JSON.stringify({
 		build: config.build,
 		routes: config.router.routes.map((route) =>
@@ -150,7 +153,10 @@ function configSignature(config) {
 		preHydrate: config.router.preHydrate,
 		rootBoundary: config.rootBoundary,
 		server: config.server,
-		compiler: { renderers: config.compiler.renderers.signature },
+		compiler: {
+			renderers: config.compiler.renderers.signature,
+			strong: strongOverride ?? config.compiler.strong,
+		},
 	});
 }
 
@@ -228,6 +234,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  * @param {{
  *   hmr?: boolean,
  *   profile?: boolean,
+ *   strong?: boolean,
  *   exclude?: string[],
  *   requireDirective?: boolean,
  *   clientEnvironment?: string,
@@ -236,6 +243,9 @@ function assertRootPublicPaths(config, clientEnvironment) {
  * @returns {import('@rsbuild/core').RsbuildPlugin}
  */
 export function pluginOctane(inlineOptions = {}) {
+	if (inlineOptions.strong !== undefined && typeof inlineOptions.strong !== 'boolean') {
+		throw new TypeError('[@octanejs/rsbuild-plugin] `strong` must be a boolean.');
+	}
 	return {
 		name: PLUGIN_NAME,
 		enforce: 'pre',
@@ -253,14 +263,19 @@ export function pluginOctane(inlineOptions = {}) {
 					})
 				: null;
 			const initialConfig = initialLoaded?.config ?? null;
+			const strong = inlineOptions.strong ?? initialConfig?.compiler.strong;
 			const appEnabled = hasRoutes(initialConfig);
 			const buildTargetPlan =
 				initialConfig?.build.target === undefined
 					? null
 					: createBuildTargetPlan(initialConfig.build.target);
-			const neutralCompiler = appEnabled ? createOctaneCompiler({ root }) : null;
+			const neutralCompiler = appEnabled
+				? createOctaneCompiler({ root, ...(strong === undefined ? null : { strong }) })
+				: null;
 			let currentConfig = initialConfig;
-			let lastConfigSignature = initialLoaded ? configSignature(initialLoaded.config) : '';
+			let lastConfigSignature = initialLoaded
+				? configSignature(initialLoaded.config, inlineOptions.strong)
+				: '';
 			let configNeedsReload = false;
 			/** @type {import('@rsbuild/core').RsbuildDevServer | null} */
 			let devServer = null;
@@ -307,7 +322,7 @@ export function pluginOctane(inlineOptions = {}) {
 					throw error;
 				}
 				registerConfigDependencies(context, loaded);
-				const signature = configSignature(loaded.config);
+				const signature = configSignature(loaded.config, inlineOptions.strong);
 				if (lastConfigSignature && signature !== lastConfigSignature) configNeedsReload = true;
 				lastConfigSignature = signature;
 				currentConfig = loaded.config;
@@ -531,6 +546,7 @@ export function pluginOctane(inlineOptions = {}) {
 						root,
 						environment,
 						transpile: false,
+						...(strong === undefined ? null : { strong }),
 						...(inlineOptions.hmr === undefined ? null : { hmr: inlineOptions.hmr }),
 						...(inlineOptions.profile === undefined
 							? null

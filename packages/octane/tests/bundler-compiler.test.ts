@@ -26,6 +26,14 @@ const COMPONENT =
 const HOOK =
 	"import { useState } from 'octane';\n" + 'export function useCount() { return useState(0); }\n';
 
+const RENDER_STATE_UPDATE =
+	"import { useState } from 'octane';\n" +
+	'export function App(props) @{\n' +
+	'  const [value, setValue] = useState(props.value);\n' +
+	'  if (value !== props.value) setValue(props.value);\n' +
+	'  <p>{value as string}</p>\n' +
+	'}\n';
+
 function profileFiles(code: string | undefined): Set<string> {
 	if (code === undefined) return new Set();
 	const output = inspectProfileOutput(code);
@@ -37,6 +45,134 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it('enforces project-wide Strong mode on both client and server without claiming dependencies', () => {
+		const compiler = createOctaneCompiler({ root: '/project', strong: true });
+
+		for (const environment of ['client', 'server'] as const) {
+			expect(() =>
+				compiler.transform(RENDER_STATE_UPDATE, '/project/src/App.tsrx', { environment }),
+			).toThrow(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/);
+			expect(() =>
+				compiler.transform(RENDER_STATE_UPDATE, '/project/node_modules/example/App.tsrx', {
+					environment,
+				}),
+			).not.toThrow();
+			expect(() =>
+				compiler.transform(RENDER_STATE_UPDATE, '/linked/example/App.tsrx', { environment }),
+			).not.toThrow();
+		}
+	});
+
+	it('does not apply application Strong mode to a separate package inside the project root', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-strong-package-boundary-'));
+		try {
+			writeFileSync(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'application', private: true }),
+			);
+			const appDirectory = join(root, 'src');
+			const dependencyDirectory = join(root, 'packages', 'compatibility-binding');
+			mkdirSync(appDirectory, { recursive: true });
+			mkdirSync(dependencyDirectory, { recursive: true });
+			writeFileSync(
+				join(dependencyDirectory, 'package.json'),
+				JSON.stringify({ name: '@example/compatibility-binding', dependencies: { octane: '*' } }),
+			);
+			const compiler = createOctaneCompiler({ root, strong: true });
+
+			expect(() => compiler.transform(RENDER_STATE_UPDATE, join(appDirectory, 'App.tsrx'))).toThrow(
+				/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+			);
+			expect(() =>
+				compiler.transform(RENDER_STATE_UPDATE, join(dependencyDirectory, 'Binding.tsrx')),
+			).not.toThrow();
+			expect(() =>
+				compiler.transform(
+					`'use strong';\n${RENDER_STATE_UPDATE}`,
+					join(dependencyDirectory, 'Strong.tsrx'),
+				),
+			).toThrow(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('honors Strong directives in dependency modules that manage their own hook slots', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-strong-manual-hook-slots-'));
+		try {
+			writeFileSync(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'application', private: true }),
+			);
+			const packageDirectory = join(root, 'packages', 'manual-binding');
+			const sourceDirectory = join(packageDirectory, 'src');
+			mkdirSync(sourceDirectory, { recursive: true });
+			writeFileSync(
+				join(packageDirectory, 'package.json'),
+				JSON.stringify({
+					name: '@example/manual-binding',
+					dependencies: { octane: '*' },
+					octane: { hookSlots: { manual: ['src'] } },
+				}),
+			);
+			const source =
+				"import { useState } from 'octane';\n" +
+				'export function useBroken() { const [value, update] = useState(0); update(value); }';
+			const compiler = createOctaneCompiler({ root, strong: true });
+			const filename = join(sourceDirectory, 'use-broken.ts');
+
+			expect(() => compiler.transform(source, filename)).not.toThrow();
+			expect(() => compiler.transform(`'use strong';\n${source}`, filename)).toThrow(
+				/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('lets each module opt into Strong mode independently of the project setting', () => {
+		const compiler = createOctaneCompiler({ root: '/project', strong: false });
+		const optedIn = `'use strong';\n${RENDER_STATE_UPDATE}`;
+
+		expect(() => compiler.transform(RENDER_STATE_UPDATE, '/project/src/Legacy.tsrx')).not.toThrow();
+		expect(() => compiler.transform(optedIn, '/project/src/Strong.tsrx')).toThrow(
+			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+		);
+		expect(() => compiler.transform(optedIn, '/project/node_modules/example/Strong.tsrx')).toThrow(
+			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+		);
+	});
+
+	it('applies Strong mode to project-owned custom hooks without restricting deferred callbacks', () => {
+		const compiler = createOctaneCompiler({ root: '/project', strong: true });
+		const eagerHook =
+			"import { useState } from 'octane';\n" +
+			'export function useCount(value) { const [current, update] = useState(value); update(value); return current; }';
+		const deferredHook =
+			"import { useState } from 'octane';\n" +
+			'export function useCount(value) { const [current, update] = useState(value); return () => update(value); }';
+
+		expect(() => compiler.transform(eagerHook, '/project/src/use-count.ts')).toThrow(
+			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+		);
+		expect(() => compiler.transform(deferredHook, '/project/src/use-count.js')).not.toThrow();
+	});
+
+	it('keeps Strong directives subordinate to mixed-toolchain ownership', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			strong: true,
+			requireDirective: true,
+		});
+		const unowned = `'use strong';\n${RENDER_STATE_UPDATE}`;
+		const owned = `/** @jsxImportSource octane */\n${unowned}`;
+
+		expect(() => compiler.transform(unowned, '/project/src/Host.tsx')).not.toThrow();
+		expect(() => compiler.transform(owned, '/project/src/Island.tsx')).toThrow(
+			/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
+		);
+	});
+
 	it('normalizes the canonical cross-adapter client-reference manifest', () => {
 		const first = {
 			id: 'octane-client-reference-v1:object:/src/First.object.tsrx',

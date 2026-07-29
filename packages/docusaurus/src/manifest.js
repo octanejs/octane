@@ -162,6 +162,68 @@ async function createThemeAliases(plugins, siteDir) {
 	return { theme, themeOriginal, themeInit };
 }
 
+async function clientModules(plugins) {
+	const modules = [];
+	const seen = new Set();
+	for (const plugin of plugins) {
+		if (typeof plugin.getClientModules !== 'function') continue;
+		for (const supplied of (await plugin.getClientModules()) ?? []) {
+			if (typeof supplied !== 'string') {
+				throw new TypeError(
+					`Docusaurus plugin ${JSON.stringify(plugin.name)} returned a non-string client module.`,
+				);
+			}
+			const resolved = path.isAbsolute(supplied) ? supplied : path.resolve(plugin.path, supplied);
+			if (seen.has(resolved)) continue;
+			seen.add(resolved);
+			modules.push(resolved);
+		}
+	}
+	return modules;
+}
+
+function siteManifest(siteConfig) {
+	return toJsonValue(
+		{
+			title: siteConfig.title,
+			tagline: siteConfig.tagline,
+			url: siteConfig.url,
+			baseUrl: siteConfig.baseUrl,
+			favicon: siteConfig.favicon,
+			noIndex: siteConfig.noIndex,
+			trailingSlash: siteConfig.trailingSlash,
+			themeConfig: siteConfig.themeConfig,
+			customFields: siteConfig.customFields,
+		},
+		'$.site',
+	);
+}
+
+function i18nManifest(i18n) {
+	return toJsonValue(
+		{
+			defaultLocale: i18n.defaultLocale,
+			locales: i18n.locales,
+			currentLocale: i18n.currentLocale,
+			localeConfigs: i18n.localeConfigs,
+		},
+		'$.i18n',
+	);
+}
+
+function documentManifest(props) {
+	const locale = props.i18n.localeConfigs[props.i18n.currentLocale];
+	return {
+		htmlAttributes: {
+			lang: String(locale.htmlLang),
+			dir: String(locale.direction),
+		},
+		headTags: String(props.headTags ?? ''),
+		preBodyTags: String(props.preBodyTags ?? ''),
+		postBodyTags: String(props.postBodyTags ?? ''),
+	};
+}
+
 function readJsonIfPresent(filename, fallback) {
 	if (!existsSync(filename)) return fallback;
 	return JSON.parse(readFileSync(filename, 'utf8'));
@@ -193,7 +255,11 @@ function contentMetadata(generatedFilesDir) {
 export async function createDocusaurusManifest(loaded) {
 	const { props } = loaded.site;
 	const { siteDir, generatedFilesDir } = props;
-	const themeAliases = await createThemeAliases(props.plugins ?? [], siteDir);
+	const plugins = props.plugins ?? [];
+	const [themeAliases, discoveredClientModules] = await Promise.all([
+		createThemeAliases(plugins, siteDir),
+		clientModules(plugins),
+	]);
 	return {
 		schemaVersion: 1,
 		docusaurusVersion: loaded.docusaurusVersion,
@@ -201,6 +267,13 @@ export async function createDocusaurusManifest(loaded) {
 		generatedFilesDir,
 		outDir: props.outDir,
 		baseUrl: props.baseUrl,
+		site: siteManifest(props.siteConfig),
+		i18n: i18nManifest(props.i18n),
+		siteMetadata: toJsonValue(props.siteMetadata, '$.siteMetadata'),
+		document: documentManifest(props),
+		assets: {
+			clientModules: discoveredClientModules,
+		},
 		routesPaths: [...props.routesPaths],
 		routes: props.routes.map((route, index) => normalizeRoute(route, index)),
 		globalData: readJsonIfPresent(path.join(generatedFilesDir, 'globalData.json'), {}),

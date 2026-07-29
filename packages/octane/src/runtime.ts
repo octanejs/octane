@@ -1051,6 +1051,427 @@ let flushingStagedReveals = false;
 let deferringStagedRevealEffects = false;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Transition binding journal.
+//
+// Rendering and mutating happen in one walk, so a transition render patches a
+// boundary's own bindings on the way down and only afterwards discovers that a
+// descendant suspends. The boundary then holds its prior content, but those
+// earlier patches have already landed — the boundary shows part of the new
+// screen next to the old one. React renders the whole tree off the current one
+// and commits in a single step, so its boundary stays whole.
+//
+// While a VISIBLE try body re-renders and a hold is possible, each binding write
+// records what it replaced. If the body suspends and the boundary holds, the log
+// is replayed backwards to the checkpoint taken when that body started, leaving
+// the boundary exactly as it was. This all happens inside the flush that made
+// the change, so nothing reached the screen in between: there is no visible
+// rollback, only a boundary that never split.
+//
+// The log is scoped to the boundary, not the flush, so anything the same render
+// patched OUTSIDE the boundary keeps its new value. That is what lets the
+// `isPending` cue turn on while the content it describes stays put — React gets
+// the same result from a separate urgent render. Content outside a boundary that
+// belongs to the transition itself does still update early; holding that too
+// needs the global work-in-progress tree octane deliberately does not have
+// (SUSPENSE_DIVERGENCE.md #4).
+//
+// Compiled bindings guard on a cached copy of the last value (`if (_b.d !== _v)`)
+// and never read the DOM, so restoring a node without restoring that cache would
+// leave the guard convinced the node is already current and the value would
+// never reappear. The first write into a bag therefore snapshots the whole bag
+// next to the DOM entry.
+//
+// Controlled `value`/`checked`/`selected` are covered too, but need more than the
+// node: each carries a `default*` mirror and a per-element record of what was
+// last projected. All three go back together — restoring the node alone would
+// leave the record believing it had already projected the new value, so
+// re-projecting it on resume would be skipped as unchanged.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const JOURNAL_TEXT = 0;
+const JOURNAL_ATTR = 1;
+const JOURNAL_BAG = 2;
+const JOURNAL_PROP = 3;
+const JOURNAL_FOR = 4;
+/** Flat undo log, four slots per entry: kind, target, a, b. */
+let TRANSITION_JOURNAL: any[] | null = null;
+/** Bags already captured in the open window, so each is snapshotted once. */
+let TRANSITION_JOURNAL_BAGS: Set<object> | null = null;
+/** Open windows. Boundaries nest, and only the outermost may drop the log. */
+let TRANSITION_JOURNAL_DEPTH = 0;
+
+/**
+ * Snapshot the rendering scope's binding bag the first time it is written in the
+ * open window. Called from the binding helpers, which the compiler always emits
+ * BEFORE the matching `_b.x = _v`, so the captured values are the pre-render
+ * ones.
+ *
+ * Slot 0 only holds a bag when the body has a template root; a body made purely
+ * of control flow puts its first block slot there instead (`tryBlock(__s, 0, …)`).
+ * Every runtime slot is tagged with `__kind` and no compiler bag is, so that tag
+ * is the discriminator — restoring a boundary's own `branch`/`transitionHeld`
+ * from a "bag" snapshot would corrupt the very state driving the hold.
+ */
+function journalBag(): void {
+	const scope = CURRENT_SCOPE;
+	if (scope === null) return;
+	const bag = scope.slots[0];
+	if (bag === null || typeof bag !== 'object' || (bag as any).__kind !== undefined) return;
+	journalObjectOnce(bag);
+}
+
+/** Record every own value of `obj`, once per window, so it can be put back. */
+function journalObjectOnce(obj: object): void {
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	if (seen.has(obj)) return;
+	seen.add(obj);
+	const keys = Object.keys(obj);
+	const values: any[] = [];
+	for (let i = 0; i < keys.length; i++) values.push((obj as any)[keys[i]]);
+	TRANSITION_JOURNAL!.push(JOURNAL_BAG, obj, keys, values);
+}
+
+/**
+ * A controlled input keeps three things in step: the live DOM property, the
+ * `default*` mirror that form.reset() and SSR compare against, and the
+ * per-element record of what was last projected. Undoing one without the others
+ * would leave the record and the node disagreeing about what the user last
+ * typed, so all three go into the log together.
+ *
+ * Called once the element is armed (so the record exists) and before the write
+ * touches any of them.
+ */
+function journalControlled(el: Element, prop: string, defaultProp: string): void {
+	const log = TRANSITION_JOURNAL!;
+	log.push(JOURNAL_PROP, el, prop, (el as any)[prop]);
+	log.push(JOURNAL_PROP, el, defaultProp, (el as any)[defaultProp]);
+	const ctrl = (el as any).$$ctrl;
+	if (ctrl !== undefined) journalObjectOnce(ctrl);
+	const input = el as HTMLInputElement;
+	if (prop === 'checked' && input.type === 'radio' && input.name !== '') journalRadioCousins(input);
+	journalBag();
+}
+
+/**
+ * Record the cousin a radio write is about to clear.
+ *
+ * Checking a radio makes the platform uncheck its same-name siblings as a side
+ * effect, so a cousin cannot record its own prior state: by the time its binding
+ * runs it has already been cleared, and an uncontrolled cousin never records at
+ * all. Only a currently-checked cousin can be cleared, and a well-formed group
+ * has at most one, so this scans the group but adds at most one entry.
+ *
+ * Group scope mirrors restoreRadioCousins: same non-empty name, same form owner
+ * when there is one. Re-recording a cousin across several writes in one window
+ * is harmless — the replay runs newest-first, so the earliest value is the one
+ * left standing.
+ */
+function journalRadioCousins(input: HTMLInputElement): void {
+	const name = input.name;
+	const group: ArrayLike<Node> =
+		input.form !== null
+			? input.form.elements
+			: typeof document !== 'undefined'
+				? document.getElementsByName(name)
+				: [];
+	for (let i = 0; i < group.length; i++) {
+		const other = group[i] as HTMLInputElement;
+		if (
+			other === input ||
+			!other.checked ||
+			other.localName !== 'input' ||
+			other.type !== 'radio' ||
+			other.name !== name
+		) {
+			continue;
+		}
+		TRANSITION_JOURNAL!.push(JOURNAL_PROP, other, 'checked', true);
+	}
+}
+
+function journalControlledOption(option: HTMLOptionElement, withDefault: boolean): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'selected', option.selected);
+	if (withDefault)
+		TRANSITION_JOURNAL!.push(JOURNAL_PROP, option, 'defaultSelected', option.defaultSelected);
+}
+
+/**
+ * Item blocks a keyed list dropped while a hold was still possible.
+ *
+ * A removal cannot wait for the hold decision: the reconciler needs the nodes
+ * out of the way to finish, and whether the boundary holds is only known once
+ * the render is further along. So the DOM detach happens immediately and is
+ * undoable, while the part that CANNOT be undone — the scope teardown, the user
+ * cleanups, the `disposed` stamp — is what waits here. If the attempt survives,
+ * these tear down for real; if it unwinds, the rows go back with their state and
+ * their cleanups never having run.
+ */
+interface ParkedItem {
+	block: Block;
+	nodes: Node[];
+}
+let PARKED_ITEMS: ParkedItem[] | null = null;
+
+/** Detach an item's node range without touching its scope, keeping the nodes. */
+function parkItemForHold(block: Block): void {
+	const nodes: Node[] = [];
+	const start = block.startMarker;
+	const end = block.endMarker;
+	if (start && end) {
+		const parent = start.parentNode;
+		if (parent !== null) {
+			const exclusive = block.exclusiveMarkers;
+			let n: Node | null = exclusive ? start.nextSibling : start;
+			const stop = exclusive ? end : end.nextSibling;
+			while (n !== null && n !== stop) {
+				const next: Node | null = getNextSibling(n);
+				parent.removeChild(n);
+				nodes.push(n);
+				n = next;
+			}
+		}
+	}
+	(PARKED_ITEMS ??= []).push({ block, nodes });
+}
+
+/** True while a keyed removal must be undoable rather than final. */
+function itemRemovalDefers(): boolean {
+	return TRANSITION_JOURNAL !== null;
+}
+
+/**
+ * Record a keyed list's shape before a reconcile that may have to be undone.
+ *
+ * The list is restored as a whole rather than per operation: the chain, the key
+ * map and the counts all move together, and rebuilding the DOM from the restored
+ * chain puts moved survivors back as well as dropped rows. Once per list per
+ * window — the first record is the pre-render one, which is the one to go back
+ * to.
+ */
+function journalForSlot(state: ForSlot): void {
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	if (seen.has(state)) return;
+	seen.add(state);
+	const chain: Array<[Block, Block | null, Block | null]> = [];
+	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+		chain.push([b, b.nextSibling, b.prevSibling]);
+	}
+	TRANSITION_JOURNAL!.push(
+		JOURNAL_FOR,
+		state,
+		{
+			head: state.head,
+			tail: state.tail,
+			size: state.size,
+			empty: state.emptyBlock,
+			entries: [...state.items],
+		},
+		chain,
+	);
+}
+
+/** Put a keyed list back the way it was, rows and order together. */
+function restoreForSlot(
+	state: ForSlot,
+	snapshot: any,
+	chain: Array<[Block, Block | null, Block | null]>,
+): void {
+	// Rows the aborted attempt freshly mounted are not in the snapshot, so
+	// restoring the old chain would simply forget them. Their DOM goes with the
+	// range clear below, but the scope has to go NOW, before the overwrite makes
+	// them unreachable: the disposed stamp is what keeps their queued mount
+	// effects and ref attaches from firing for a row that never reached the
+	// screen, and it runs the render-time cleanups they registered. Parked rows
+	// are never on the chain, so this reaches exactly the fresh mounts.
+	const kept = new Set<Block>();
+	for (let i = 0; i < chain.length; i++) kept.add(chain[i][0]);
+	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+		if (!kept.has(b)) unmountBlock(b, false);
+	}
+	state.head = snapshot.head;
+	state.tail = snapshot.tail;
+	state.size = snapshot.size;
+	state.items.clear();
+	for (let i = 0; i < snapshot.entries.length; i++) {
+		state.items.set(snapshot.entries[i][0], snapshot.entries[i][1]);
+	}
+	for (let i = 0; i < chain.length; i++) {
+		chain[i][0].nextSibling = chain[i][1];
+		chain[i][0].prevSibling = chain[i][2];
+	}
+	// Collect each row's nodes BEFORE touching the DOM: a dropped row has them
+	// parked, a surviving one still has them in place, and clearing first would
+	// throw the survivors away.
+	const parent = state.end.parentNode!;
+	const ranges: Node[][] = [];
+	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+		ranges.push(takeParkedItem(b) ?? collectBlockRange(b));
+	}
+	// Anything the aborted render left between the markers goes, including rows
+	// it created that the list no longer contains.
+	let n: Node | null = state.start.nextSibling;
+	while (n !== null && n !== state.end) {
+		const next: Node | null = n.nextSibling;
+		parent.removeChild(n);
+		n = next;
+	}
+	// One walk in chain order restores membership and order together, so moved
+	// survivors come back to where they were as well as dropped rows.
+	for (let i = 0; i < ranges.length; i++) {
+		const nodes = ranges[i];
+		for (let k = 0; k < nodes.length; k++) parent.insertBefore(nodes[k], state.end);
+	}
+	// The @empty branch swaps with the rows, so it rolls back with them. A
+	// branch the aborted render mounted is scope-only torn down (its DOM went
+	// with the range clear above); one it parked comes back like a row.
+	if (state.emptyBlock !== snapshot.empty) {
+		if (state.emptyBlock !== null) unmountBlock(state.emptyBlock, false);
+		state.emptyBlock = snapshot.empty;
+	}
+	if (snapshot.empty !== null) {
+		const parkedEmpty = takeParkedItem(snapshot.empty);
+		const nodes = parkedEmpty ?? collectBlockRange(snapshot.empty);
+		for (let k = 0; k < nodes.length; k++) parent.insertBefore(nodes[k], state.end);
+	}
+}
+
+/** Remove and return a block's parked nodes, or null if it is not parked. */
+function takeParkedItem(block: Block): Node[] | null {
+	const parked = PARKED_ITEMS;
+	if (parked === null) return null;
+	for (let i = 0; i < parked.length; i++) {
+		if (parked[i].block === block) {
+			const nodes = parked[i].nodes;
+			parked.splice(i, 1);
+			return nodes;
+		}
+	}
+	return null;
+}
+
+/** The nodes a still-attached block currently owns, in order. */
+function collectBlockRange(block: Block): Node[] {
+	const nodes: Node[] = [];
+	const start = block.startMarker;
+	const end = block.endMarker;
+	if (!start || !end || start.parentNode === null) return nodes;
+	const exclusive = block.exclusiveMarkers;
+	let n: Node | null = exclusive ? start.nextSibling : start;
+	const stop = exclusive ? end : end.nextSibling;
+	while (n !== null && n !== stop) {
+		nodes.push(n);
+		n = getNextSibling(n);
+	}
+	return nodes;
+}
+
+function journalText(node: Text): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, node.nodeValue, null);
+	journalBag();
+}
+
+function journalAttr(el: Element, name: string): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, el.getAttribute(name));
+	journalBag();
+}
+
+/**
+ * Open a journal window for a visible try body that is about to re-render, and
+ * return the checkpoint to roll back to. `-1` means "not journaling": either the
+ * boundary cannot hold (nothing committed to keep) or no transition is in play,
+ * which is the overwhelmingly common case and costs one comparison.
+ *
+ * The arming test mirrors handleSuspense's hold conditions. The body inherits
+ * its mode from the block currently rendering it (renderBlockInner walks
+ * `pendingMode ?? parent's mode`), so the ambient block answers "is this a
+ * transition" before the body runs. `transitionHeld` covers the boundary that is
+ * already holding and re-suspends at urgent priority — the useSuspenseQuery
+ * shape, where the observer notifies a macrotask after the transition window
+ * closed and handleSuspense continues the hold regardless of priority.
+ */
+function armTransitionJournal(state: TrySlot): number {
+	if (
+		!state.hasResolved ||
+		state.hiddenDom !== null ||
+		!(
+			state.transitionHeld ||
+			(state.tryBlock?.pendingMode ?? CURRENT_BLOCK?.currentRenderMode) === 'transition'
+		)
+	)
+		return -1;
+	TRANSITION_JOURNAL ??= [];
+	TRANSITION_JOURNAL_BAGS ??= new Set();
+	TRANSITION_JOURNAL_DEPTH++;
+	return TRANSITION_JOURNAL.length;
+}
+
+/**
+ * Close the window opened by `armTransitionJournal`.
+ *
+ * A committed inner boundary deliberately LEAVES its entries in the log: an
+ * enclosing boundary that suspends later still has to undo them, because its
+ * content includes everything the inner boundary just wrote. Only the outermost
+ * window drops the log — before that there is always someone left who might need
+ * to replay it.
+ */
+function disarmTransitionJournal(checkpoint: number): void {
+	if (checkpoint < 0) return;
+	if (--TRANSITION_JOURNAL_DEPTH === 0) {
+		TRANSITION_JOURNAL = null;
+		TRANSITION_JOURNAL_BAGS = null;
+		flushParkedItems();
+	}
+}
+
+/**
+ * Tear down the rows still parked when the last window closes. Anything a
+ * rollback put back has already been taken off this list, so what is left is
+ * genuinely gone and its cleanups are due. The DOM is already detached, so the
+ * teardown is scope-only.
+ */
+function flushParkedItems(): void {
+	const parked = PARKED_ITEMS;
+	if (parked === null) return;
+	PARKED_ITEMS = null;
+	for (let i = 0; i < parked.length; i++) unmountBlock(parked[i].block, false);
+}
+
+/** Undo every binding write recorded since `checkpoint`, newest first. */
+function rollbackTransitionJournal(checkpoint: number): void {
+	if (checkpoint < 0) return;
+	const log = TRANSITION_JOURNAL;
+	if (log === null) return;
+	for (let i = log.length - 4; i >= checkpoint; i -= 4) {
+		const target = log[i + 1];
+		const a = log[i + 2];
+		const b = log[i + 3];
+		switch (log[i]) {
+			case JOURNAL_TEXT:
+				(target as Text).nodeValue = a;
+				break;
+			case JOURNAL_ATTR:
+				if (b === null) (target as Element).removeAttribute(a);
+				else (target as Element).setAttribute(a, b);
+				break;
+			case JOURNAL_PROP:
+				(target as any)[a] = b;
+				break;
+			case JOURNAL_FOR:
+				restoreForSlot(target as ForSlot, a, b);
+				TRANSITION_JOURNAL_BAGS!.delete(target);
+				break;
+			default:
+				for (let k = 0; k < a.length; k++) target[a[k]] = b[k];
+				// This bag is back to its pre-window values, so a later write in an
+				// enclosing window has to snapshot it again rather than trust the
+				// entry that just got replayed.
+				TRANSITION_JOURNAL_BAGS!.delete(target);
+		}
+	}
+	log.length = checkpoint;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // View Transitions (docs/view-transitions-plan.md, Phase 1).
 //
 // Octane renders AND mutates in one eager walk (flush → drainQueue) — there is
@@ -9152,6 +9573,7 @@ export function setText(node: Text, value: any): void {
 	// mutation choke point AND is prev-guarded (only ACTUAL changes reach it).
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	VIEW_TRANSITION_DRIVER?.markDirty();
+	if (TRANSITION_JOURNAL !== null) journalText(node);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -10165,6 +10587,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
@@ -10240,6 +10663,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 	}
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -10256,6 +10680,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -10270,6 +10695,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 	const next = value == null ? null : String(value);
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -10443,6 +10869,7 @@ export function setClassName(el: Element, value: unknown): void {
 	// an empty STRING still writes `class=""` — the differential rig pins that
 	// distinction against React). Same raw-value rule as setClassAttr: composition
 	// erases the null-vs-'' difference, so the check must be on `value`.
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (value == null || value === false) el.removeAttribute('class');
 	else (el as any).className = cls;
 }
@@ -10460,6 +10887,7 @@ export function setClassAttr(el: Element, value: unknown): void {
 		hydration.queueClass(el, cls, false, true, cls === null);
 		return;
 	}
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
 }
@@ -10494,6 +10922,9 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// `suppressHydrationWarning` keeps the complete server style unchanged.
 	const hydration = activeHydration();
 	if (hydration !== null && hydration.applyStyle(el, value, prev)) return;
+	// The whole style attribute, not the individual declarations applyStyleValue
+	// is about to touch: restoring the attribute text restores every one of them.
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
 	applyStyleValue(style, value, prev);
 }
 
@@ -12498,6 +12929,7 @@ function setNativeChangeDiagnosticMetadata(el: Element, value: unknown): void {
 export function setValue(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const ctrl = armControlled(el);
+	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
 	const first = !ctrl.sawV;
 	ctrl.sawV = true;
 	if (value == null) {
@@ -12606,7 +13038,9 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 }
 
 export function setChecked(el: Element, value: unknown): void {
-	setCheckedState(el as HTMLInputElement, value, armControlled(el));
+	const ctrl = armControlled(el);
+	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
+	setCheckedState(el as HTMLInputElement, value, ctrl);
 }
 
 /**
@@ -12615,7 +13049,9 @@ export function setChecked(el: Element, value: unknown): void {
  * and event restoration contract, but cannot need text-composition listeners.
  */
 export function setCheckedCheckable(el: Element, value: unknown): void {
-	setCheckedState(el as HTMLInputElement, value, armControlledBase(el));
+	const ctrl = armControlledBase(el);
+	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'checked', 'defaultChecked');
+	setCheckedState(el as HTMLInputElement, value, ctrl);
 }
 
 /**
@@ -12628,6 +13064,10 @@ export function setCheckedCheckable(el: Element, value: unknown): void {
 export function setSelectValue(el: Element, value: unknown): void {
 	const sel = el as HTMLSelectElement;
 	const ctrl = armControlled(el);
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(ctrl);
+		journalBag();
+	}
 	const first = !ctrl.sawV;
 	ctrl.sawV = true;
 	if (value == null) {
@@ -12689,6 +13129,13 @@ function projectSelectValue(
 	setDefaultSelected: boolean,
 ): void {
 	const options = sel.options;
+	// The selection lives on the options, not the select, so each one that can
+	// move has to be recorded before the projection walks over it.
+	if (TRANSITION_JOURNAL !== null) {
+		for (let i = 0; i < options.length; i++) {
+			journalControlledOption(options[i], setDefaultSelected);
+		}
+	}
 	if (typeof sv !== 'string') {
 		for (let i = 0; i < options.length; i++) {
 			const selected = sv.has(options[i].value);
@@ -18298,6 +18745,9 @@ export function tryBlock(
 		// whether to preserve the DOM (keep) or swap to pending (default).
 		s.tryBlock.body = s.tryBody;
 		s.tryBlock.extra = s.env;
+		// Everything this body patches is undoable until it either commits or
+		// suspends into a hold, so the boundary can never be left half-updated.
+		const journalCheckpoint = armTransitionJournal(s);
 		try {
 			renderBlock(s.tryBlock);
 			// Successful commit — this supersedes any in-flight transition
@@ -18314,8 +18764,10 @@ export function tryBlock(
 			if (isHostContextRequest(err)) throw err;
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
-				handleSuspense(s, err.thenable, s.tryBlock);
+				handleSuspense(s, err.thenable, s.tryBlock, journalCheckpoint);
 			} else switchToCatch(s, err);
+		} finally {
+			disarmTransitionJournal(journalCheckpoint);
 		}
 	} else {
 		mountTry(s);
@@ -18601,7 +19053,15 @@ function releaseHeldTransition(state: TrySlot): void {
 	}
 }
 
-function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBlock: Block): void {
+function handleSuspense(
+	state: TrySlot,
+	thenable: TrackedThenable<any>,
+	sourceBlock: Block,
+	// Journal position to restore if this suspend turns into a hold. `-1` from
+	// every caller that renders outside an armed window (a fresh mount or a
+	// retry, neither of which has committed content to keep whole).
+	journalCheckpoint = -1,
+): void {
 	// Transition-priority suspends on an ALREADY-committed try block keep the
 	// prior DOM visible — matches React's `useTransition` contract that the
 	// previous screen stays mounted until the new tree is fully ready. We also
@@ -18659,6 +19119,11 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		state.branch === 1 &&
 		state.hiddenDom === null
 	) {
+		// The body got part of the way through patching this boundary before the
+		// suspend, so put back what it changed. Nothing has been painted since —
+		// the render and this undo are the same synchronous flush — so the
+		// boundary simply never shows half of the new screen.
+		rollbackTransitionJournal(journalCheckpoint);
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -18969,6 +19434,12 @@ function commitResumeInner(state: TrySlot): void {
 				// Mark the replay window: useThenable's fresh-thenable reuse leniency
 				// and the waterfall diagnostic apply only while a resolved suspension
 				// is being replayed (ordinary updates must keep replacing thenables).
+				// A held boundary replaying its body is the other way it can end up
+				// half-updated: the resources that just resolved patch their nodes,
+				// and then a still-pending one behind a data dependency suspends
+				// again. The effects and refs of that attempt are already discarded
+				// below; its DOM writes need the same treatment.
+				const journalCheckpoint = armTransitionJournal(state);
 				const resumeCapture = createOffscreenCapture();
 				const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 				const previousCapture = WIP_CAPTURE;
@@ -18990,6 +19461,10 @@ function commitResumeInner(state: TrySlot): void {
 				} finally {
 					WIP_CAPTURE = previousCapture;
 					RESUME_REPLAY = prevReplay;
+					// A completed replay has nothing to undo, so close its window here
+					// where the unwind is already guaranteed. A suspended one keeps it
+					// open: handleSuspense below is what replays it.
+					if (!didThrow) disarmTransitionJournal(journalCheckpoint);
 				}
 				if (!didThrow) {
 					if (state.detachedRefs !== null) {
@@ -18999,13 +19474,21 @@ function commitResumeInner(state: TrySlot): void {
 					spliceOffscreenCapture(resumeCapture);
 					state.hasResolved = true;
 				} else {
-					refDetachQueue.splice(refDetachCheckpoint);
-					restoreSubtreeEffectDeps(tryBlock, effectDeps);
-					discardOffscreenCapture(resumeCapture);
-					if (isSuspenseException(renderError)) {
-						handleSuspense(state, renderError.thenable, tryBlock);
-					} else {
-						switchToCatch(state, renderError);
+					// The journal has to outlive handleSuspense, which is what replays it,
+					// so it is closed here rather than around the render — in a finally, or
+					// a throw out of switchToCatch would strand the window open and let the
+					// next boundary undo more than its own writes.
+					try {
+						refDetachQueue.splice(refDetachCheckpoint);
+						restoreSubtreeEffectDeps(tryBlock, effectDeps);
+						discardOffscreenCapture(resumeCapture);
+						if (isSuspenseException(renderError)) {
+							handleSuspense(state, renderError.thenable, tryBlock, journalCheckpoint);
+						} else {
+							switchToCatch(state, renderError);
+						}
+					} finally {
+						disarmTransitionJournal(journalCheckpoint);
 					}
 					if (state.parentBlock.disposed) return;
 				}
@@ -21189,10 +21672,12 @@ function detachDeoptTreeRefs(
  * slots so the setups re-fire on reactivation. Used by activityBlock on hide
  * AND by the tryBlock suspense-hide path (hideTryContentAndMountPending):
  * Activity disconnects layout + passive effects. Suspense passes
- * `disconnectPassive=false`: layout effects disconnect, while passive effects
- * remain subscribed until actual deletion, matching React's hidden-primary
- * lifetime. State, DOM, and blocks stay alive in either case. Refs remain
- * attached for Activity; Suspense cycles them separately via detachSubtreeRefs.
+ * `disconnectPassive=false`: layout effects disconnect, while CONNECTED passive
+ * effects remain subscribed until actual deletion, matching React's
+ * hidden-primary lifetime. A passive effect that never connected is not part of
+ * that hidden primary and resets like a layout one (see below). State, DOM, and
+ * blocks stay alive in either case. Refs remain attached for Activity; Suspense
+ * cycles them separately via detachSubtreeRefs.
  */
 function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void {
 	const hooks = scope.hooks;
@@ -21205,7 +21690,24 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 				// reveal re-render doesn't re-fire them. They own injected styles
 				// that must persist while a tree is merely hidden; only a real
 				// unmount (unmountScope's effect-slot walk) tears them down.
-				if (e.phase === INSERTION || (!disconnectPassive && e.phase === PASSIVE)) continue;
+				//
+				// Suspense's `disconnectPassive=false` spares passive effects for the
+				// same reason — but only ones that ACTUALLY connected. `connectedFn` is
+				// set exclusively by runEffectBody, so a null one has never run: it
+				// belongs to a subtree the boundary rendered but never committed —
+				// siblings ahead of the call that suspended, or children introduced by a
+				// later attempt. There is no subscription to preserve, and its deps are
+				// already stamped from that aborted attempt, so sparing it would let the
+				// reveal re-render compare equal deps and skip the enqueue, stranding the
+				// mount effect — and its cleanup — forever. React fires every mount effect
+				// in the subtree when a suspended mount finally commits, so an
+				// unconnected passive slot resets exactly like a layout one.
+				if (
+					e.phase === INSERTION ||
+					(!disconnectPassive && e.phase === PASSIVE && e.connectedFn !== null)
+				) {
+					continue;
+				}
 				if (typeof e.cleanup === 'function') {
 					const cleanup = e.cleanup;
 					// Clear it BEFORE firing so unmountScope's effect-slot walk sees
@@ -21499,7 +22001,12 @@ export function forBlock<T>(
 	// mounted, tear it down before reconciling so its DOM doesn't sit alongside
 	// the freshly-mounted items.
 	if (state.emptyBlock) {
-		unmountBlock(state.emptyBlock);
+		// While a hold is possible the swap has to be reversible, exactly like a
+		// row removal: keep the branch's nodes and defer its teardown.
+		if (itemRemovalDefers()) {
+			journalForSlot(state);
+			parkItemForHold(state.emptyBlock);
+		} else unmountBlock(state.emptyBlock);
 		state.emptyBlock = null;
 	}
 	// Hydrating + the SERVER rendered the @empty body (the node right after `start` is NOT an
@@ -21718,6 +22225,12 @@ function mountItemsLinear<T>(
 ): void {
 	const newLen = items.length;
 	if (newLen === 0) return;
+	// Every 0 -> N fill funnels through here (forBlock, the value-position array
+	// path, and reconcileKeyed's own empty branch). An empty list is still a
+	// shape to go back to: a fill during a render that may yet hold must come
+	// back out — rows, scopes and queued effects together — or the held boundary
+	// shows fresh rows with their bindings half rolled back underneath them.
+	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
 	const oldItems = state.items;
 	const parentNode = state.end.parentNode!;
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
@@ -21802,6 +22315,11 @@ function reconcileKeyed<T>(
 	const oldSize = state.size;
 	const newLen = items.length;
 	const parentNode = state.end.parentNode!;
+	// Record the list's shape while a hold is still possible, so a boundary that
+	// suspends later in this render can put it back whole. The 0 -> N fast path
+	// journals inside mountItemsLinear, which also covers the callers that
+	// dispatch to it directly.
+	if (oldSize > 0 && TRANSITION_JOURNAL !== null) journalForSlot(state);
 
 	// Fast path: empty → fill — the linear first-fill pass (callers on the
 	// first-mount path dispatch to it directly and skip this function entirely).
@@ -21909,7 +22427,8 @@ function reconcileKeyed<T>(
 		let removed = 0;
 		while (cur !== afterMiddle) {
 			const next: Block | null = cur!.nextSibling!;
-			unmountBlock(cur!);
+			if (itemRemovalDefers()) parkItemForHold(cur!);
+			else unmountBlock(cur!);
 			oldItems.delete(cur!.key);
 			cur = next;
 			removed++;
@@ -21996,7 +22515,8 @@ function reconcileKeyed<T>(
 		const next: Block | null = cur!.nextSibling!;
 		const newRelIdx = newKeysToIdx.get(cur!.key);
 		if (newRelIdx === undefined) {
-			unmountBlock(cur!);
+			if (itemRemovalDefers()) parkItemForHold(cur!);
+			else unmountBlock(cur!);
 			oldItems.delete(cur!.key);
 			state.size--;
 		} else {
@@ -22277,6 +22797,18 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  * template rows (the common bulk-clear case) hit only the three-field guard.
  */
 function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
+	// The bulk paths below drop the nodes wholesale, which cannot be undone.
+	// While a hold is still possible, take each row individually so its nodes
+	// are kept and its teardown waits for the outcome.
+	if (itemRemovalDefers()) {
+		let next: Block | null;
+		for (let b: Block | null = state.head; b !== null; b = next) {
+			next = b.nextSibling;
+			parkItemForHold(b);
+		}
+		oldItems.clear();
+		return;
+	}
 	const p = state.start.parentNode!;
 	if (state.start.previousSibling === null && state.end.nextSibling === null) {
 		// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.

@@ -58,6 +58,32 @@ describe('Lynx main-thread worklets', () => {
 		);
 	});
 
+	it('accepts array captures when getOwnPropertySymbols reports index keys', () => {
+		// PrimJS (the Lynx engine) returns an array's integer index keys — as
+		// strings — from Object.getOwnPropertySymbols, so the symbol-field guard
+		// must count only real symbols or every array capture is rejected.
+		const spy = vi
+			.spyOn(Object, 'getOwnPropertySymbols')
+			.mockImplementation((target: unknown): symbol[] => {
+				if (Array.isArray(target)) {
+					return Object.keys(target) as unknown as symbol[];
+				}
+				return [];
+			});
+		try {
+			const isolated = isolateLynxWorkletValue([{ _wvid: 'test:ref' }, 'value']);
+			expect(isolated).toEqual([{ _wvid: 'test:ref' }, 'value']);
+			const marked = [1, 2] as unknown as Record<symbol, unknown>;
+			marked[Symbol('poison')] = true;
+			spy.mockImplementation((target: unknown): symbol[] =>
+				target === marked ? [Symbol('poison')] : [],
+			);
+			expect(() => isolateLynxWorkletValue(marked as never)).toThrow(/symbol fields/);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	it('preserves own prototype-named capture fields at every isolation boundary', () => {
 		const payload = JSON.parse('{"__proto__":{"polluted":true},"ok":1}') as LynxWorkletRecord;
 		const isolated = isolateLynxWorkletValue(payload);
@@ -120,6 +146,46 @@ describe('Lynx main-thread worklets', () => {
 
 		main.close();
 		background.close();
+	});
+
+	it('unwraps native event element references in worklet arguments', () => {
+		// The pinned Lynx event envelope marks `target`/`currentTarget` with an
+		// `{ elementRefptr }` wrapper holding a raw main-thread element. That
+		// element must reach the worklet by identity while sibling event data is
+		// still isolated by copy.
+		const nativeNode = Object.freeze({ native: 'element' });
+		const seen: unknown[] = [];
+		const descriptor = registerMainThreadWorklet(
+			'test:event-envelope',
+			undefined,
+			function (event) {
+				seen.push(event);
+				return true;
+			},
+			{ file: 'worklets.test.ts', line: 1, column: 0 },
+		);
+		const registry = createLynxMainThreadWorkletRegistry();
+		const active = registry.activate(descriptor);
+		const detail = { scrollTop: 12, scrollHeight: 340 };
+		const event = {
+			type: 'scroll',
+			detail,
+			target: { elementRefptr: nativeNode },
+			currentTarget: { elementRefptr: nativeNode },
+		};
+
+		expect(registry.runWorklet(active, [event])).toBe(true);
+		const received = seen[0] as {
+			detail: typeof detail;
+			target: unknown;
+			currentTarget: unknown;
+		};
+		expect(received.target).toBe(nativeNode);
+		expect(received.currentTarget).toBe(nativeNode);
+		expect(received.detail).toEqual(detail);
+		expect(received.detail).not.toBe(detail);
+		registry.release(active);
+		registry.close();
 	});
 
 	it('keeps ref cells live only for an explicit worklet activation', () => {

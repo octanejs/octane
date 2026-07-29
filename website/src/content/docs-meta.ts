@@ -47,6 +47,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'vite', title: 'Vite' },
 			{ id: 'rspack', title: 'Rspack' },
 			{ id: 'rsbuild', title: 'Rsbuild' },
+			{ id: 'strong-mode', title: 'Strong mode' },
 			{ id: 'full-app-configuration', title: 'Full app configuration' },
 			{ id: 'production-and-preview', title: 'Production and preview' },
 			{ id: 'renderer-targets', title: 'Renderer targets' },
@@ -92,6 +93,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'components-and-props', title: 'Components and props' },
 			{ id: 'state-and-events', title: 'State and events' },
 			{ id: 'use-linked-state', title: 'useLinkedState', level: 3 },
+			{ id: 'strong-mode', title: 'Strong mode', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
 			{ id: 'context', title: 'Sharing data' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
@@ -129,6 +131,7 @@ export const docsMeta: DocMeta[] = [
 		group: 'Explore',
 		sections: [
 			{ id: 'hooks', title: 'Hooks' },
+			{ id: 'strong-mode', title: 'Strong mode' },
 			{ id: 'events-and-dom', title: 'Events and the DOM' },
 			{ id: 'async-work', title: 'Async work' },
 			{ id: 'errors-and-server', title: 'Errors and server rendering' },

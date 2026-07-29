@@ -188,6 +188,16 @@ describe('OctaneRspackPlugin', () => {
 		);
 	});
 
+	it.each([true, false])('forwards strong: %s to discovery and module compilation', (strong) => {
+		const compiler = createCompiler('web');
+		new OctaneRspackPlugin({ strong }).apply(compiler as any);
+
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({ root: '/project', strong }),
+		);
+		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({ strong });
+	});
+
 	it('specializes compiler and runtime resolution by Rspack layer', () => {
 		const compiler = createCompiler('web');
 		const plugin = new OctaneRspackPlugin({
@@ -378,6 +388,15 @@ describe('OctaneRspackPlugin', () => {
 		new OctaneRspackPlugin({ requireDirective: true }).apply(directive as any);
 		expect((directive.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((directive.options as any).cache.version).not.toBe((dom.options as any).cache.version);
+
+		const strong = createCachedCompiler();
+		const explicitCompatibility = createCachedCompiler();
+		new OctaneRspackPlugin({ strong: true }).apply(strong as any);
+		new OctaneRspackPlugin({ strong: false }).apply(explicitCompatibility as any);
+		expect((strong.options as any).cache.version).not.toBe((dom.options as any).cache.version);
+		expect((explicitCompatibility.options as any).cache.version).toBe(
+			(dom.options as any).cache.version,
+		);
 	});
 
 	it('resolves a relative root from the Rspack context', () => {
@@ -390,6 +409,9 @@ describe('OctaneRspackPlugin', () => {
 
 	it('rejects invalid options at the public constructor', () => {
 		expect(() => new OctaneRspackPlugin({ profile: 'yes' } as any)).toThrow(/profile/);
+		expect(() => new OctaneRspackPlugin({ strong: 'yes' } as any)).toThrow(
+			/`strong` must be a boolean/,
+		);
 		expect(() => new OctaneRspackPlugin({ parallelUse: false } as any)).toThrow(
 			/unknown option `parallelUse`/,
 		);

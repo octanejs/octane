@@ -33,6 +33,34 @@ describe('headless Docusaurus site loading', () => {
 
 		expect(manifest.docusaurusVersion).toBe(SUPPORTED_DOCUSARUS_VERSION);
 		expect(manifest.baseUrl).toBe('/docs/');
+		expect(manifest.site).toEqual(
+			expect.objectContaining({
+				title: 'Octane Docusaurus fixture',
+				tagline: 'A renderer-neutral fixture',
+				url: 'https://example.test',
+				baseUrl: '/docs/',
+				favicon: 'img/favicon.svg',
+				themeConfig: expect.objectContaining({
+					navbar: expect.objectContaining({ title: 'Fixture docs' }),
+				}),
+			}),
+		);
+		expect(manifest.i18n).toEqual(
+			expect.objectContaining({
+				defaultLocale: 'en',
+				currentLocale: 'en',
+				locales: ['en'],
+			}),
+		);
+		expect(manifest.document).toEqual({
+			htmlAttributes: { lang: 'en', dir: 'ltr' },
+			headTags: expect.stringContaining('name="fixture-plugin"'),
+			preBodyTags: expect.stringContaining('id="fixture-before"'),
+			postBodyTags: expect.stringContaining('id="fixture-after"'),
+		});
+		expect(manifest.assets.clientModules).toEqual([
+			path.join(fixture.siteDir, 'src/client-module.css'),
+		]);
 		expect(manifest.routesPaths).toEqual(expect.arrayContaining(['/custom', '/docs/guide/intro']));
 		expect(routes).toEqual(
 			expect.arrayContaining([

@@ -1,5 +1,6 @@
 import {
 	use,
+	useEffect,
 	useReducer,
 	useState,
 	useTransition,
@@ -367,6 +368,271 @@ export function AsyncTransitionKeepsDom(props) @{
 		@try {
 			const value = use(promise);
 			<span id="value">{value as string}</span>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// The panel is the same component before and after the transition, so it
+// updates its own attribute and heading straight away, and only then does the
+// child under it start loading. React keeps the whole old screen up until the
+// new one is ready, so nothing here should change early.
+// ---------------------------------------------------------------------------
+function AtomicityValue(props) @{
+	const value = use(props.load(props.version));
+	<span id="value">{value as string}</span>
+}
+
+function AtomicityPanel(props) @{
+	<section id="panel" data-version={props.version as string}>
+		<h2 id="heading">{'v' + props.version}</h2>
+		<AtomicityValue version={props.version} load={props.load} />
+	</section>
+}
+
+export function TransitionAtomicity(props) @{
+	const [version, setVersion] = useState(0);
+	const [isPending, start] = useTransition();
+	<div>
+		<span id="pending">
+			{isPending ? 'pending' : 'idle'}
+		</span>
+		<button
+			id="bump"
+			onClick={() => start(() => setVersion((value: number) => value + 1))}
+		>{'bump'}</button>
+		@try {
+			<AtomicityPanel version={version} load={props.load} />
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// Two leaves under one boundary. A transition moves both to the next step and
+// then only the first one's data arrives, so replaying the body commits that
+// leaf while the other suspends again. The boundary has to stay on the old step
+// until both are ready.
+// ---------------------------------------------------------------------------
+function ResumeLeafA(props) @{
+	const value = use(props.load('a', props.step));
+	<span id="a">{value as string}</span>
+}
+
+function ResumeLeafB(props) @{
+	const value = use(props.load('b', props.step));
+	<span id="b">{value as string}</span>
+}
+
+export function TransitionResumeAtomicity(props) @{
+	const [step, setStep] = useState(0);
+	const [isPending, start] = useTransition();
+	<div>
+		<span id="pending">
+			{isPending ? 'pending' : 'idle'}
+		</span>
+		<button id="bump" onClick={() => start(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ResumeLeafA load={props.load} step={step} />
+				<ResumeLeafB load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// A namespaced attribute inside a boundary. The write goes through
+// setAttributeNS, while the undo puts the old value back by qualified name —
+// which has to land on the same namespaced attribute rather than adding a plain
+// one beside it.
+// ---------------------------------------------------------------------------
+function NamespacedValue(props) @{
+	const value = use(props.load(props.step));
+	<span id="value">{value as string}</span>
+}
+
+export function TransitionNamespacedAttr(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<svg>
+					<use id="use-el" xlink:href={'#icon-' + step} />
+				</svg>
+				<NamespacedValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// A controlled input and checkbox inside a boundary. Their values live on the
+// DOM properties AND in a per-element record, so a suspended transition has to
+// put both back or the two disagree about what was last projected.
+// ---------------------------------------------------------------------------
+function ControlledValue(props) @{
+	const value = use(props.load(props.step));
+	<span id="value">{value as string}</span>
+}
+
+export function TransitionControlledInput(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<input id="text" value={'step-' + step} onInput={() => {}} />
+				<input id="box" type="checkbox" checked={step === 1} onChange={() => {}} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// A radio group inside a boundary. Checking one radio makes the platform clear
+// its same-name cousins, so by the time a cousin's own binding runs it has
+// already been cleared — recording it there would capture the wrong state and
+// the group would come back with nothing selected.
+// ---------------------------------------------------------------------------
+export function TransitionRadioGroup(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<input id="r-a" type="radio" name="pick-group" checked={step === 1} onChange={() => {}} />
+				<input id="r-b" type="radio" name="pick-group" checked={step === 0} onChange={() => {}} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// A keyed list inside a boundary, with a suspending sibling after it. The
+// transition drops a row and then the sibling suspends, so the list reconciles
+// first and the boundary decides to hold second. The dropped row has to come
+// back — DOM, its own state, and without having run its cleanup.
+// ---------------------------------------------------------------------------
+function RemovalRow(props) @{
+	const [seen] = useState(props.id + '!');
+	useEffect(() => {
+		props.log('mount:' + props.id);
+		return () => props.log('cleanup:' + props.id);
+	}, []);
+	<li id={'row-' + props.id}>{seen as string}</li>
+}
+
+export function TransitionKeyedRemoval(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a', 'b', 'c'] : ['a', 'c'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<RemovalRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+export function TransitionListToEmpty(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a', 'b'] : [];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<RemovalRow id={id} log={props.log} />
+					} @empty {
+						<li id="empty">{'nothing'}</li>
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------------
+// The transition ADDS a row and then a later sibling suspends. The fresh row
+// completed its mount before the hold was decided, so putting the list back is
+// not enough: the row's scope has to go too, or its queued mount effect fires
+// for a row that is not on screen and nothing can ever clean it up.
+// ---------------------------------------------------------------------------
+function AddedRow(props) @{
+	useEffect(() => {
+		props.log('mount:' + props.id);
+		return () => props.log('cleanup:' + props.id);
+	}, []);
+	<li id={'row-' + props.id}>{props.id as string}</li>
+}
+
+export function TransitionKeyedAddition(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? ['a'] : ['a', 'd'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<AddedRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// The same shape from an EMPTY list: 0 -> N has no rows to put back, but the
+// freshly-filled rows still have to come out and their scopes go with them.
+export function TransitionKeyedEmptyFill(props) @{
+	const [step, setStep] = useState(0);
+	const items =
+		step === 0 ? [] : ['d'];
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<ul id="list">
+					@for (const id of items; key id) {
+						<AddedRow id={id} log={props.log} />
+					}
+				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}

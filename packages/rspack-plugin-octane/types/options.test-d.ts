@@ -1,6 +1,7 @@
 import type { OctaneRspackLoaderOptions, OctaneRspackPluginOptions } from './index.js';
 
 const loaderOptions: OctaneRspackLoaderOptions = {
+	strong: true,
 	layerSpecializations: {
 		'native:main': {
 			renderers: {
@@ -19,6 +20,7 @@ const loaderOptions: OctaneRspackLoaderOptions = {
 };
 
 const pluginOptions: OctaneRspackPluginOptions = {
+	strong: false,
 	layerSpecializations: {
 		'native:main': {
 			runtime: '@fixture/native-main-runtime',

@@ -2474,6 +2474,47 @@ export function Scene() @{
 		);
 	});
 
+	it('evaluates a webpack-HMR universal module before any dispose data exists', () => {
+		const source = `
+			export function Scene() @{ <scene /> }
+		`;
+		let output = compile(source, '/src/HotData.object.tsrx', { renderer, hmr: 'webpack' }).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replaceAll('import.meta.webpackHot', '__hot');
+		output = output.replace('export let Scene =', 'let Scene =');
+		interface WebpackHot {
+			data: object | undefined;
+			dispose(callback: (data: object) => void): void;
+			accept(): void;
+		}
+		const evaluate = (hot: WebpackHot) =>
+			new Function('__universal', '__hot', `${output}\nreturn Scene;`)(
+				UniversalRuntime,
+				hot,
+			) as object;
+
+		// Webpack and rspack leave `hot.data` undefined until a previous instance
+		// of the module has disposed, so the first evaluation must not read it.
+		const disposals: Array<(data: object) => void> = [];
+		const first = evaluate({
+			data: undefined,
+			dispose: (callback) => disposals.push(callback),
+			accept: () => {},
+		});
+		expect(first).toBeTruthy();
+		expect(disposals).toHaveLength(1);
+
+		// A hot update hands the retained canonical component to the new module.
+		const bag = {};
+		disposals[0]!(bag);
+		const second = evaluate({ data: bag, dispose: () => {}, accept: () => {} });
+		expect(second).toBe(first);
+	});
+
 	it('warms adjacent universal component trees from a parent with no use()', async () => {
 		const source = `
 			import { use } from 'octane';

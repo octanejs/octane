@@ -2405,12 +2405,44 @@ export default defineConfig({
 				plugins: [octane()],
 				test: {
 					name: 'docusaurus',
-					include: ['packages/docusaurus/tests/**/*.test.ts'],
+					include: [
+						'packages/docusaurus/tests/**/*.test.ts',
+						'!packages/docusaurus/tests/ssr/**/*.test.ts',
+					],
 					environment: 'node',
 					globals: false,
 				},
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/mdx\/compile$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
+						},
+						{
+							find: /^@octanejs\/remix-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/remix-router/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				plugins: [octane({ ssr: true })],
+				test: {
+					name: 'docusaurus-ssr',
+					include: ['packages/docusaurus/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/docusaurus\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/docusaurus/src/server.js'),
+						},
 						{
 							find: /^@octanejs\/mdx\/compile$/,
 							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
@@ -2605,6 +2637,44 @@ export default defineConfig({
 					fileParallelism: false,
 				},
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
+			},
+			{
+				test: {
+					name: 'mobx',
+					include: ['packages/mobx/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mobx$/,
+							replacement: resolve(import.meta.dirname, 'packages/mobx/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'mobx-ssr',
+					include: ['packages/mobx/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/mobx$/,
+							replacement: resolve(import.meta.dirname, 'packages/mobx/src/index.ts'),
+						},
+					],
+				},
 			},
 			{
 				test: {

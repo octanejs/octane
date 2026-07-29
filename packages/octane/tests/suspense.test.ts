@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mount, act } from './_helpers';
+import { mount, act, nextPaint } from './_helpers';
 import {
 	BasicSuspense,
 	CatchRejection,
@@ -18,6 +18,8 @@ import {
 	WaterfallBody,
 	ReplayChurnBody,
 	PendingPropSwap,
+	PreSuspendSiblingEffects,
+	CommittedThenNewSibling,
 } from './_fixtures/suspense.tsrx';
 
 interface Deferred<T> {
@@ -515,6 +517,82 @@ describe('Suspense — useDeferredValue (React 18 stale-data pattern)', () => {
 		});
 		expect(r.find('.data').textContent).toBe('second-data');
 		expect(r.find('.data').className).toBe('data fresh');
+		r.unmount();
+	});
+});
+
+describe('Suspense — effects of siblings rendered before the suspend', () => {
+	it('fires mount effects for pre-suspend siblings once the first mount reveals', async () => {
+		const d = deferred<string>();
+		const log: string[] = [];
+		const r = mount(PreSuspendSiblingEffects, {
+			ids: ['a', 'b'],
+			log: (m: string) => log.push(m),
+			promise: d.promise,
+		});
+		// Nothing committed: the boundary suspended before any of it landed.
+		expect(r.find('.fallback').textContent).toBe('loading');
+		expect(log).toEqual([]);
+
+		await act(() => {
+			d.resolve('R');
+		});
+		expect(r.find('.resolved').textContent).toBe('R');
+		expect(r.findAll('.item').map((n) => n.textContent)).toEqual(['a', 'b', 'plain']);
+		// React parity: a suspended initial mount fires every mount effect in the
+		// subtree when it finally commits.
+		expect(log).toEqual([
+			'layout mount a',
+			'layout mount b',
+			'layout mount plain',
+			'passive mount a',
+			'passive mount b',
+			'passive mount plain',
+		]);
+
+		// The mount effects really connected, so unmount tears them down: layout
+		// cleanups synchronously, passive ones deferred (see effect-timing).
+		log.length = 0;
+		r.unmount();
+		expect(log).toEqual(['layout cleanup a', 'layout cleanup b', 'layout cleanup plain']);
+		await nextPaint();
+		expect(log).toEqual([
+			'layout cleanup a',
+			'layout cleanup b',
+			'layout cleanup plain',
+			'passive cleanup a',
+			'passive cleanup b',
+			'passive cleanup plain',
+		]);
+	});
+
+	it('spares committed passive subscriptions but still mounts a new sibling', async () => {
+		const log: string[] = [];
+		const push = (m: string) => log.push(m);
+		const r = mount(CommittedThenNewSibling, { ids: ['a'], log: push, suspend: false });
+		await nextPaint();
+		expect(log).toEqual(['layout mount a', 'passive mount a']);
+
+		// Second attempt adds child 'b' AND suspends. 'a' is already committed.
+		const d = deferred<string>();
+		log.length = 0;
+		r.update(CommittedThenNewSibling, {
+			ids: ['a', 'b'],
+			log: push,
+			suspend: true,
+			promise: d.promise,
+		});
+		expect(r.find('.fallback').textContent).toBe('loading');
+		expect(log).toEqual(['layout cleanup a']);
+
+		log.length = 0;
+		await act(() => {
+			d.resolve('R');
+		});
+		expect(r.find('.resolved').textContent).toBe('R');
+		// 'a' kept its passive subscription across the hide, so only its layout
+		// effect recycles. 'b' never committed, so both of its mounts still owe a run.
+		expect(log).toEqual(['layout mount a', 'layout mount b', 'passive mount b']);
 		r.unmount();
 	});
 });

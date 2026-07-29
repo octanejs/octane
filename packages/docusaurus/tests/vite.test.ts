@@ -45,6 +45,9 @@ describe('Docusaurus Vite bridge', () => {
 		expect(virtualModule).toContain(
 			'import { createDocusaurusRoutes } from "@octanejs/docusaurus/client";',
 		);
+		expect(virtualModule).toContain(
+			`import ${JSON.stringify(path.join(fixture.siteDir, 'src/client-module.css'))};`,
+		);
 		expect(virtualModule).toContain('import("@site/src/pages/custom.js")');
 		expect(virtualModule).toContain('import("@theme/DocItem")');
 		expect(virtualModule).toContain('import("@site/docs/intro.md")');
@@ -89,6 +92,7 @@ describe('Docusaurus Vite bridge', () => {
 
 		expect(addWatchFile).toHaveBeenCalledWith(path.join(fixture.siteDir, 'docusaurus.config.mjs'));
 		expect(addWatchFile).toHaveBeenCalledWith(path.join(fixture.siteDir, 'watched.txt'));
+		expect(addWatchFile).toHaveBeenCalledWith(path.join(fixture.siteDir, 'src/client-module.css'));
 		expect(
 			addWatchFile.mock.calls.some(
 				([value]) => value === path.join(fixture.siteDir, 'docs/intro.md'),

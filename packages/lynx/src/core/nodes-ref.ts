@@ -1,4 +1,5 @@
 import type { UniversalSerializableValue } from 'octane/universal/native';
+import { hasOwnSymbolFields } from './own-symbols.js';
 
 /** Compiler-inaccessible native attribute used by the public selector-query API. */
 export const LYNX_NODES_REF_ATTRIBUTE = 'octane-ref';
@@ -8,7 +9,10 @@ export function createLynxNodesRefSelector(root: number, id: number, generation:
 	positiveSafeInteger(root, 'selector root');
 	positiveSafeInteger(id, 'selector id');
 	positiveSafeInteger(generation, 'selector generation');
-	return `[${LYNX_NODES_REF_ATTRIBUTE}="r${root}-h${id}-g${generation}"]`;
+	// Native Lynx attribute-selector matching compares the text after `=`
+	// verbatim without stripping quotes, so the value must stay unquoted; the
+	// token is a plain CSS identifier, so DOM `querySelector` accepts it too.
+	return `[${LYNX_NODES_REF_ATTRIBUTE}=r${root}-h${id}-g${generation}]`;
 }
 
 /** Immutable native identity captured by one background query handle. */
@@ -212,7 +216,7 @@ function cloneSerializable(
 	if (typeof value !== 'object') {
 		throw new TypeError(`Octane Lynx NodesRef ${label} contains a non-serializable value.`);
 	}
-	if (Object.getOwnPropertySymbols(value).length !== 0) {
+	if (hasOwnSymbolFields(value)) {
 		throw new TypeError(`Octane Lynx NodesRef ${label} contains symbol fields.`);
 	}
 	if (seen.has(value)) {

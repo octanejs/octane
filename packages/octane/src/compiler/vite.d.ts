@@ -66,6 +66,13 @@ export interface OctaneVitePluginOptions {
 	 */
 	profile?: boolean | 'auto';
 	/**
+	 * Reject state updates during render, synchronous effect state updates, and
+	 * render-time ref writes in application-owned modules. Individual modules
+	 * can opt in with a top-level `"use strong"` directive.
+	 * @default false
+	 */
+	strong?: boolean;
+	/**
 	 * Path fragments excluded from Octane's plain `.ts`/`.js` hook-slot pass.
 	 * Prefer package manifest `octane.hookSlots.manual` declarations for bindings.
 	 */

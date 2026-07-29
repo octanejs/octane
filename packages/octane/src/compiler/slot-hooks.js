@@ -17,6 +17,7 @@
 import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { annotateHookCalls } from './hook-deps.js';
+import { assertStrongMode } from './strong-mode.js';
 
 // Build a cheap import-presence gate. Precise call identity is annotated by the
 // lexical scope analysis in analyzeHookDependencies below; this gate only avoids
@@ -990,7 +991,7 @@ function walk(node, owner, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ environment?: 'client' | 'server', hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ environment?: 'client' | 'server', strong?: boolean, hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (ordinary prod builds and SSR) emits
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
@@ -1010,6 +1011,7 @@ export function slotHooks(source, id, options) {
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
+	assertStrongMode(ast, source, id, options);
 	const importInfo = octaneHookLocals(ast);
 	const canSpecializeRoot =
 		!options?.hmr &&

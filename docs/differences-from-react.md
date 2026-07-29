@@ -268,6 +268,27 @@ so it can preserve useful parts of the old value. `sourceEqual` and `valueEqual`
 default to `Object.is`; pass custom comparators as an optional third argument.
 The tuple also supports the same optional latest-value getter as `useState`.
 
+## Optional Strong mode
+
+Strong mode adds compile-time checks for patterns that make rendering harder to
+reason about. Opt into one module with a directive before its imports:
+
+```tsx
+"use strong";
+
+import { useLinkedState } from 'octane';
+```
+
+Alternatively, enable it across application-owned modules with
+`compiler: { strong: true }` in `octane.config.ts`. Installed dependencies stay
+in compatibility mode unless their own source opts in.
+
+A Strong module cannot call a state updater during render or directly while
+setting up an effect, and it cannot assign to `ref.current` during render.
+Event handlers, effects that synchronize an external system, and normal DOM or
+timer refs remain supported. Replace prop-driven state resets with
+`useLinkedState` instead of calling a setter during render.
+
 ## JSX values follow the represented render scope
 
 Moving compiler-authored JSX into a variable, prop, array, or other value
@@ -563,21 +584,35 @@ dashboard fixture reads eight resources — seven independent, one truly depende
 | --- | --- |
 | Independent `use()` calls inside an imported custom hook | Start together: plain TypeScript custom hooks get the same memoize-and-batch treatment as component-local `use()` |
 | Adjacent async children under a parent with no `use()` | Start together: child warm plans register with active ancestors, so the first suspending descendant starts its siblings |
-| A transition-wrapped update | Can expose one mixed old/new state instead of holding the whole previous screen |
+| A transition-wrapped update | Holds the boundary whole: no mixed old/new state, matching React |
 
-The first two shapes reach the workload's true dependency floor — 2 waves and 8
-requests for both cold mount and transition update, against React's 6/3 waves and
-35/25 requests — so only `owner` waits, on `project.ownerId`.
+All three reach the workload's true dependency floor — 2 waves and 8 requests for
+both cold mount and transition update, against React's 6/3 waves and 35/25
+requests — so only `owner` waits, on `project.ownerId`, and the update exposes
+zero intermediate states, the same as React.
 
-The remaining gap is transition atomicity, not fetch scheduling. Octane renders
-and mutates in one eager walk with no global work-in-progress tree, so a
-same-identity parent can patch its own bindings before a descendant suspends,
-leaving updated parent markup beside a held boundary's prior content. React
-renders the whole tree off-screen and commits atomically, so it holds the entire
-previous screen. The transition result is still monotonic: it never rolls back,
-never exposes invalid intermediate structure, and a dependent value never renders
-against stale input. The benchmark pins the exposed-state count at a one-way
-ceiling of one so the gap can only close.
+A held boundary holds all of its own content. Octane renders and mutates in one
+walk, so a transition patches a boundary's bindings on the way down and only then
+finds that a descendant suspends; the same happens when a held boundary replays
+its body and part of the data has arrived. Both cases record what each binding
+replaced and put it back if the attempt suspends, inside the flush that made the
+change — nothing reaches the screen in between. Transitions stay monotonic: no
+visible rollback, no invalid intermediate structure, and a dependent value never
+renders against stale input.
+
+Controlled `value`, `checked` and `selected` are held too. Each carries a
+`default*` mirror and a record of what was last projected, and all of it goes
+back together — restoring the node alone would leave the record believing the new
+value had already landed, so re-projecting it on resume would be skipped.
+
+Two things a transition can still change early: content it patched OUTSIDE a
+suspended boundary, and a structural change above one, such as a keyed list
+reordering. Both need the transition to become a deferred commit — a keyed
+removal disposes blocks and runs their cleanups, which cannot be undone, and
+reverting content outside a boundary needs the reveal to re-render where the
+transition began rather than just the boundary. See
+[Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
+benchmark pins the exposed-state count at zero.
 
 ## Root component entry points and container ownership
 
