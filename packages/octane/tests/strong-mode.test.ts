@@ -403,6 +403,256 @@ export function App() @{
 	});
 
 	it.each([
+		['async iterator bodies', 'for await (const value of [count]) { setCount(value); }'],
+		[
+			'statements after empty async iterations',
+			'for await (const value of []) {} setCount(count + 1);',
+		],
+		[
+			'async iterator destructuring defaults',
+			'for await (const { value = setCount(count + 1) } of [{}]) {}',
+		],
+		[
+			'ordinary iterator bodies after an awaited iterable',
+			'for (const value of await Promise.resolve([count])) { setCount(value); }',
+		],
+		[
+			'statements after empty awaited iterables',
+			'for (const value of await Promise.resolve([])) {} setCount(count + 1);',
+		],
+		[
+			'ordinary iterator destructuring defaults after an awaited iterable',
+			'for (const { value = setCount(count + 1) } of await Promise.resolve([{}])) {}',
+		],
+		[
+			'for-in bodies after an awaited object',
+			'for (const key in await Promise.resolve({ count })) { setCount(count + 1); }',
+		],
+		[
+			'statements after empty awaited for-in objects',
+			'for (const key in await Promise.resolve({})) {} setCount(count + 1);',
+		],
+		[
+			'for-loop bodies after an awaited initializer',
+			'for (let index = await Promise.resolve(count); index < 1; index++) { setCount(index); }',
+		],
+		[
+			'statements after skipped loops with an awaited initializer',
+			'for (let index = await Promise.resolve(count); index < 0; index++) {} setCount(count + 1);',
+		],
+		[
+			'for-loop bodies after an awaited test',
+			'for (let index = 0; await Promise.resolve(index < 1); index++) { setCount(index); }',
+		],
+		[
+			'statements after an awaited false for-loop test',
+			'for (let index = 0; await Promise.resolve(index < 0); index++) {} setCount(count + 1);',
+		],
+		[
+			'while-loop bodies after an awaited test',
+			'while (await Promise.resolve(count > -1)) { setCount(count); break; }',
+		],
+		[
+			'statements after an awaited false while-loop test',
+			'while (await Promise.resolve(false)) {} setCount(count + 1);',
+		],
+		[
+			'nested yielding loop heads',
+			'for (const values of [[count]]) { for (const value of await Promise.resolve(values)) { setCount(value); } }',
+		],
+		[
+			'awaited setter arguments in loop updates',
+			'for (let index = 0; index < 1; setCount(await Promise.resolve(++index))) {}',
+		],
+	])('allows updates after guaranteed yields in %s', (_label, body) => {
+		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+		const effect = `"use strong";\n${stateComponent(
+			`useEffect(() => { (async () => { ${body} })(); }, [count]);`,
+			'useState, useEffect',
+		)}`;
+		const asyncEffect = `"use strong";\n${stateComponent(
+			`useEffect(async () => { ${body} }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		for (const source of [render, effect, asyncEffect]) {
+			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
+		}
+	});
+
+	it.each([
+		[
+			'async iterable expressions before the iterator yields',
+			'for await (const value of (setCount(count + 1), [count])) {}',
+		],
+		[
+			'ordinary iterable expressions before their awaited values',
+			'for (const value of (setCount(count + 1), await Promise.resolve([count]))) {}',
+		],
+		[
+			'ordinary iterator destructuring defaults before any await',
+			'for (const { value = setCount(count + 1) } of [{}]) {}',
+		],
+		[
+			'for-in sources before their awaited values',
+			'for (const key in (setCount(count + 1), await Promise.resolve({ count }))) {}',
+		],
+		[
+			'for-loop initializers before their awaited values',
+			'for (let index = (setCount(count + 1), await Promise.resolve(count)); index < 0; index++) {}',
+		],
+		[
+			'for-loop tests before their awaited values',
+			'for (; (setCount(count + 1), await Promise.resolve(false));) {}',
+		],
+		[
+			'first loop bodies before an awaited update',
+			'for (let index = 0; index < 1; await Promise.resolve(index++)) { setCount(index); }',
+		],
+		[
+			'statements after skipped loops with only an awaited update',
+			'for (let index = 0; index < 0; await Promise.resolve(index++)) {} setCount(count + 1);',
+		],
+		[
+			'statements after skipped loops whose only await is in the body',
+			'for (const value of []) { await Promise.resolve(); } setCount(count + 1);',
+		],
+		[
+			'conditionally awaited ordinary iterable expressions',
+			'for (const value of count > 0 ? await Promise.resolve([count]) : []) {} setCount(count + 1);',
+		],
+		[
+			'conditionally awaited for-in sources',
+			'for (const key in count > 0 ? await Promise.resolve({ count }) : {}) {} setCount(count + 1);',
+		],
+		[
+			'conditionally awaited for-loop initializers',
+			'for (let index = count > 0 ? await Promise.resolve(count) : 0; index < 0; index++) {} setCount(count + 1);',
+		],
+		[
+			'conditionally awaited for-loop tests',
+			'for (let index = 0; count > 0 && await Promise.resolve(index < 0); index++) {} setCount(count + 1);',
+		],
+		[
+			'conditionally awaited while-loop tests',
+			'while (count > 0 && await Promise.resolve(false)) {} setCount(count + 1);',
+		],
+		[
+			'do-while bodies before the first awaited test',
+			'do { setCount(count + 1); } while (await Promise.resolve(false));',
+		],
+		[
+			'breaks that bypass an awaited do-while test',
+			'do { if (count > 0) break; } while (await Promise.resolve(false)); setCount(count + 1);',
+		],
+	])('still rejects updates in %s', (_label, body) => {
+		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+		const effect = `"use strong";\n${stateComponent(
+			`useEffect(async () => { ${body} }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		expect(() => compile(render, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+		expect(() => compile(effect, '/src/Counter.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it.each([
+		[
+			'classic loop initializers',
+			'for (let setCount = () => {}, index = 0; index < 1; index++) { setCount(); }',
+		],
+		['ordinary iteration bindings', 'for (const setCount of [() => {}]) { setCount(); }'],
+		['async iteration bindings', 'for await (const setCount of [() => {}]) { setCount(); }'],
+	])('does not mistake state updaters shadowed by %s', (_label, body) => {
+		const source = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
+	});
+
+	it('does not mistake ref objects shadowed by iteration bindings', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  for (const ref of [{ current: 0 }]) {
+    ref.current = 1;
+  }
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])('preserves yielding loop heads during $mode compilation with dev=$dev', (options) => {
+		const source = `"use strong";\n${stateComponent(
+			`useEffect(async () => {
+      for await (const value of [count]) {
+        setCount(value);
+      }
+      for (const value of await Promise.resolve([])) {}
+      setCount(count + 1);
+    }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx', options)).not.toThrow();
+	});
+
+	it('applies yielding loop rules to plain TypeScript custom hooks', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function useCounter() {
+  const [count, setCount] = useState(0);
+  useEffect(async () => {
+    for await (const value of [count]) {
+      setCount(value);
+    }
+    for (const value of await Promise.resolve([])) {}
+    setCount(count + 1);
+  }, [count]);
+  return count;
+}`;
+		const synchronous = source.replace(
+			'for await (const value of [count])',
+			'for await (const value of (setCount(count + 1), [count]))',
+		);
+
+		expect(() => slotHooks(source, '/src/useCounter.ts')).not.toThrow();
+		expect(() => slotHooks(synchronous, '/src/useCounter.ts')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it('publishes editor errors only for synchronous updates in yielding loops', () => {
+		const source = `"use strong";\n${stateComponent(
+			`useEffect(async () => {
+      for await (const value of [count]) {
+        setCount(value);
+      }
+    }, [count]);`,
+			'useState, useEffect',
+		)}`;
+		const synchronous = source.replace(
+			'for await (const value of [count])',
+			'for await (const value of (setCount(count + 1), [count]))',
+		);
+		const valid = compileToVolarMappings(source, '/src/Counter.tsrx');
+		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
+
+		expect(valid.diagnostics).toEqual([]);
+		expect(valid.errors).toEqual([]);
+		expect(rejected.diagnostics).toContainEqual(
+			expect.objectContaining({ code: EFFECT_STATE_UPDATE, severity: 'error' }),
+		);
+		expect(rejected.errors).toContainEqual(
+			expect.objectContaining({ code: EFFECT_STATE_UPDATE, type: 'usage' }),
+		);
+	});
+
+	it.each([
 		{ mode: 'client', dev: true },
 		{ mode: 'client', dev: false },
 		{ mode: 'server', dev: true },

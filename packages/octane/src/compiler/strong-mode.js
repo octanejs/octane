@@ -343,6 +343,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						statementAlwaysAwaits(statement.consequent) &&
 						statementAlwaysAwaits(statement.alternate))
 				);
+			case 'ForStatement':
+				return (
+					(statement.init?.type === 'VariableDeclaration'
+						? statementAlwaysAwaits(statement.init)
+						: alwaysAwaits(statement.init)) || alwaysAwaits(statement.test)
+				);
+			case 'ForInStatement':
+				return alwaysAwaits(statement.right);
+			case 'ForOfStatement':
+				return statement.await === true || alwaysAwaits(statement.right);
+			case 'WhileStatement':
+				return alwaysAwaits(statement.test);
 			case 'TryStatement':
 				return (
 					(statement.finalizer != null && statementAlwaysAwaits(statement.finalizer)) ||
@@ -574,13 +586,62 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				visit(node.body, catchScope, phase);
 				return;
 			}
-			case 'ForStatement':
+			case 'ForStatement': {
+				const loop = createScope(scope, 'block');
+				if (node.init?.type === 'VariableDeclaration') {
+					const target = declarationScope(loop, node.init.kind);
+					const binding = { kind: 'other' };
+					for (const declaration of node.init.declarations ?? []) {
+						addPatternNames(declaration.id, target.bindings, binding);
+					}
+				}
+				let executionPhase = phase;
+				visit(node.init, loop, executionPhase);
+				if (
+					currentFunctionIsAsync &&
+					executionPhase !== 'deferred' &&
+					(node.init?.type === 'VariableDeclaration'
+						? statementAlwaysAwaits(node.init)
+						: alwaysAwaits(node.init))
+				) {
+					executionPhase = 'deferred';
+				}
+				visit(node.test, loop, executionPhase);
+				if (currentFunctionIsAsync && executionPhase !== 'deferred' && alwaysAwaits(node.test)) {
+					executionPhase = 'deferred';
+				}
+				visit(node.body, loop, executionPhase);
+				visit(node.update, loop, executionPhase);
+				return;
+			}
 			case 'ForInStatement':
 			case 'ForOfStatement': {
 				const loop = createScope(scope, 'block');
-				for (const key of ['init', 'left', 'right', 'test', 'update', 'body']) {
-					visit(node[key], loop, phase);
+				if (node.left?.type === 'VariableDeclaration') {
+					const target = declarationScope(loop, node.left.kind);
+					const binding = { kind: 'other' };
+					for (const declaration of node.left.declarations ?? []) {
+						addPatternNames(declaration.id, target.bindings, binding);
+					}
 				}
+				visit(node.right, loop, phase);
+				const executionPhase =
+					currentFunctionIsAsync &&
+					phase !== 'deferred' &&
+					(alwaysAwaits(node.right) || (node.type === 'ForOfStatement' && node.await === true))
+						? 'deferred'
+						: phase;
+				visit(node.left, loop, executionPhase);
+				visit(node.body, loop, executionPhase);
+				return;
+			}
+			case 'WhileStatement': {
+				visit(node.test, scope, phase);
+				const executionPhase =
+					currentFunctionIsAsync && phase !== 'deferred' && alwaysAwaits(node.test)
+						? 'deferred'
+						: phase;
+				visit(node.body, scope, executionPhase);
 				return;
 			}
 		}
