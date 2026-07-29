@@ -19,6 +19,7 @@ import {
 	TransitionAtomicity,
 	TransitionResumeAtomicity,
 	TransitionNamespacedAttr,
+	TransitionControlledInput,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -679,6 +680,47 @@ describe('useTransition — the old screen stays whole', () => {
 		});
 		expect(use.getAttributeNS(XLINK, 'href')).toBe('#icon-1');
 		expect(use.getAttributeNode('xlink:href')!.namespaceURI).toBe(XLINK);
+		expect(r.find('#value').textContent).toBe('one');
+		r.unmount();
+	});
+
+	it('holds a controlled input and checkbox, records included', async () => {
+		const entries = new Map<number, Deferred<string>>();
+		const load = (step: number) => {
+			let entry = entries.get(step);
+			if (entry === undefined) {
+				entry = deferred<string>();
+				entries.set(step, entry);
+			}
+			return entry.promise;
+		};
+		load(0);
+		entries.get(0)!.resolve('zero');
+
+		const r = mount(TransitionControlledInput, { load });
+		await act(() => {});
+		const text = r.find('#text') as HTMLInputElement;
+		const box = r.find('#box') as HTMLInputElement;
+		expect(text.value).toBe('step-0');
+		expect(box.checked).toBe(false);
+
+		// The transition projects step 1 onto both controls and then the sibling
+		// suspends, so both have to go back to step 0.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(text.value).toBe('step-0');
+		expect(text.defaultValue).toBe('step-0');
+		expect(box.checked).toBe(false);
+		expect(box.defaultChecked).toBe(false);
+
+		// The per-element record has to come back too. If it still believed it had
+		// projected 'step-1', re-projecting that same value would be skipped as
+		// unchanged and the input would stay on step-0 forever.
+		await act(() => {
+			entries.get(1)!.resolve('one');
+		});
+		expect(text.value).toBe('step-1');
+		expect(box.checked).toBe(true);
 		expect(r.find('#value').textContent).toBe('one');
 		r.unmount();
 	});

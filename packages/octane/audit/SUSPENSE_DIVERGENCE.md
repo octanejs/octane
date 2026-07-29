@@ -103,15 +103,32 @@ happens in the flush that made the change, so no intermediate state is ever pain
 `benchmarks/async-composition` pins the update at zero exposed states, level with React;
 `transitions.test.ts` covers the in-place and replay shapes.
 
-**Remaining limitation:** this is still not a global WIP, so the journal is scoped to the
-boundary. Content the same transition patched OUTSIDE a suspended boundary keeps its new
-value — which is what lets the `isPending` cue turn on while its content holds, but also
-means unrelated shell markup updates early where React would hold the whole prior screen.
-Structural mutations (a keyed list reordering above the boundary) are not journaled either:
-the reconciler navigates live DOM, so undoing writes it has already read back is not sound
-without the absent global WIP. The async Action batching in #6 prevents the shell tear while
-an Action is in flight, but does not close the synchronous case. Fallback-visible retries
-are capture-safe and never had this limitation.
+Controlled `value`/`checked`/`selected` are covered as of 2026-07-29 as well. Each needs
+more than the node: the `default*` mirror and the per-element record of what was last
+projected go back with it, or the record would believe the new value had already landed and
+skip re-projecting it on resume.
+
+**Remaining limitation — one project, not two.** Content the same transition patched OUTSIDE
+a suspended boundary still keeps its new value, and so does a structural change above the
+boundary. These were previously filed as separate gaps; they are not. Both need the
+transition render to become a deferred commit unit, for two reasons found while attempting
+the first:
+
+1. *Reveal scope.* Reverting content outside the boundary strands it. The reveal path
+   re-renders the try block only, so a restored bag outside it is never re-patched and the
+   content stays on the old value permanently. The hold would have to record the block the
+   transition originated from and re-render that instead.
+2. *Destruction is not undoable.* A keyed removal disposes blocks, running user cleanups and
+   discarding hook state. Moves and inserts journal fine (`node`, `parent`, `nextSibling`),
+   but removals need disposals collected during the render and executed only on commit.
+
+Effects are the third piece: a rolled-back region outside a boundary would otherwise run
+effects against DOM that was reverted underneath them, so that region needs the same
+capture-and-splice treatment the resume path already uses.
+
+The async Action batching in #6 prevents the shell tear while an Action is in flight, but
+does not close the synchronous case. Fallback-visible retries are capture-safe and never had
+this limitation.
 Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---

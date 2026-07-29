@@ -472,3 +472,29 @@ export function TransitionNamespacedAttr(props) @{
 		}
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// A controlled input and checkbox inside a boundary. Their values live on the
+// DOM properties AND in a per-element record, so a suspended transition has to
+// put both back or the two disagree about what was last projected.
+// ---------------------------------------------------------------------------
+function ControlledValue(props) @{
+	const value = use(props.load(props.step));
+	<span id="value">{value as string}</span>
+}
+
+export function TransitionControlledInput(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<input id="text" value={'step-' + step} onInput={() => {}} />
+				<input id="box" type="checkbox" checked={step === 1} onChange={() => {}} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
