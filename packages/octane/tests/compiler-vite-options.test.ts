@@ -13,6 +13,14 @@ const STATEFUL_SOURCE =
 	'\t<main>{count as string}</main>\n' +
 	'}\n';
 
+const RENDER_STATE_UPDATE =
+	"import { useState } from 'octane';\n" +
+	'export function App(props) @{\n' +
+	'\tconst [count, setCount] = useState(props.count);\n' +
+	'\tif (count !== props.count) setCount(props.count);\n' +
+	'\t<main>{count as string}</main>\n' +
+	'}\n';
+
 function configure(plugin: Plugin, command: 'serve' | 'build', build: { ssr?: boolean } = {}) {
 	(plugin.config as (config: { root: string }) => unknown)({ root: ROOT });
 	(plugin.configResolved as (config: unknown) => void)({
@@ -35,6 +43,27 @@ async function transform(
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('enforces the public Strong option for both client and server transforms', async () => {
+		for (const ssr of [false, true]) {
+			const plugin = octane({ hmr: false, strong: true });
+			configure(plugin, 'build', { ssr });
+
+			await expect(
+				Promise.resolve(transform(plugin, RENDER_STATE_UPDATE, `${ROOT}/src/App.tsrx`, { ssr })),
+			).rejects.toThrow(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/);
+		}
+	});
+
+	it('keeps Strong mode opt-in when its public option is disabled', async () => {
+		const plugin = octane({ hmr: false, strong: false });
+		configure(plugin, 'build');
+
+		expect(await transform(plugin, RENDER_STATE_UPDATE)).not.toBeNull();
+		await expect(
+			Promise.resolve(transform(plugin, `'use strong';\n${RENDER_STATE_UPDATE}`)),
+		).rejects.toThrow(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/);
+	});
+
 	it('changes emitted hot-update support for both hmr values', async () => {
 		const enabled = octane({ hmr: true });
 		const disabled = octane({ hmr: false });

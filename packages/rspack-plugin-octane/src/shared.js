@@ -40,6 +40,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'hmr',
 	'dev',
 	'profile',
+	'strong',
 	'exclude',
 	'renderers',
 	'requireDirective',
@@ -177,6 +178,7 @@ function normalizeOptions(value, plugin) {
 	assertBooleanOption(options, 'hmr');
 	assertBooleanOption(options, 'dev');
 	assertBooleanOption(options, 'profile');
+	assertBooleanOption(options, 'strong');
 	assertBooleanOption(options, 'requireDirective');
 	if (
 		options.exclude !== undefined &&
@@ -196,6 +198,7 @@ function normalizeOptions(value, plugin) {
 		...(options.hmr === undefined ? null : { hmr: options.hmr }),
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
+		...(options.strong === undefined ? null : { strong: options.strong }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),

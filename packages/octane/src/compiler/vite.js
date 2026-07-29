@@ -150,6 +150,9 @@ function assertProfilingDefineAvailable(definitions, enabled) {
 }
 
 export function octane(options = {}) {
+	if (options.strong !== undefined && typeof options.strong !== 'boolean') {
+		throw new TypeError('octane/compiler/vite: `strong` must be a boolean when provided.');
+	}
 	if (options.parallelUse !== undefined) {
 		// Removed 2026-07-16: the parallel-use() pipeline is unconditional compiled
 		// semantics (docs/suspense-parallel-use-plan.md). Warn instead of throwing
@@ -194,6 +197,7 @@ export function octane(options = {}) {
 		root: projectRoot,
 		exclude: options.exclude,
 		profile: profileEnabled,
+		strong: options.strong,
 		renderers: options.renderers,
 		requireDirective,
 		warn,
@@ -207,6 +211,7 @@ export function octane(options = {}) {
 			root: projectRoot,
 			exclude: options.exclude,
 			profile: profileEnabled,
+			strong: options.strong,
 			renderers: options.renderers,
 			requireDirective,
 			warn,

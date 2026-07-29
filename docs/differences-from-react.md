@@ -268,6 +268,27 @@ so it can preserve useful parts of the old value. `sourceEqual` and `valueEqual`
 default to `Object.is`; pass custom comparators as an optional third argument.
 The tuple also supports the same optional latest-value getter as `useState`.
 
+## Optional Strong mode
+
+Strong mode adds compile-time checks for patterns that make rendering harder to
+reason about. Opt into one module with a directive before its imports:
+
+```tsx
+"use strong";
+
+import { useLinkedState } from 'octane';
+```
+
+Alternatively, enable it across application-owned modules with
+`compiler: { strong: true }` in `octane.config.ts`. Installed dependencies stay
+in compatibility mode unless their own source opts in.
+
+A Strong module cannot call a state updater during render or directly while
+setting up an effect, and it cannot assign to `ref.current` during render.
+Event handlers, effects that synchronize an external system, and normal DOM or
+timer refs remain supported. Replace prop-driven state resets with
+`useLinkedState` instead of calling a setter during render.
+
 ## JSX values follow the represented render scope
 
 Moving compiler-authored JSX into a variable, prop, array, or other value

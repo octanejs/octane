@@ -66,6 +66,7 @@ describe('Core APIs documentation', () => {
 		}
 		for (const id of [
 			'use-linked-state',
+			'strong-mode',
 			'use-sync-external-store',
 			'hydrate-when',
 			'hydrate-split',
@@ -101,6 +102,7 @@ describe('Core APIs documentation', () => {
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
 		for (const sourceMarker of [
 			'useLinkedState(props.user.id, () => props.user.name)',
+			"'use strong';",
 			'nextItems.find((item) => item.id === previous?.value?.id)',
 			'export function NetworkStatus()',
 			'<Hydrate when={visible({ rootMargin:',

@@ -294,6 +294,30 @@ On the first render, `previous` is `undefined`. When the source changes, it is
 Like `useState`, the hook also offers an optional third tuple item, `getValue`, for
 reading the latest value inside an async or delayed callback.
 
+<h3 id="strong-mode">Catch state mistakes with Strong mode</h3>
+
+Strong mode is an optional compiler check. Add `"use strong"` before a module's
+imports to try it one file at a time, or set `compiler: { strong: true }` in
+`octane.config.ts` to cover your application.
+
+```tsx
+'use strong';
+
+import { useLinkedState } from 'octane';
+
+export function ProfileEditor({ user }) {
+	const [name, setName] = useLinkedState(user.id, () => user.name);
+	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+}
+```
+
+A Strong module cannot update state while rendering, update state directly while
+setting up an effect, or write `ref.current` while rendering. Event handlers can
+still update state. Effects that synchronize external systems and refs for DOM
+nodes or timers are still valid. Use `useLinkedState` when editable state should
+follow an input; it returns the right value immediately without an effect or a
+render-time setter.
+
 <details className="deep-dive">
 	<summary>Octane deep dive: state getters and conditional hooks</summary>
 	<div>

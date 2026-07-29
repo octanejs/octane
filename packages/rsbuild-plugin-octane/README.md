@@ -75,8 +75,21 @@ Options are declarative and cache-stable:
 
 - `hmr` controls browser component handoff;
 - `profile` enables component profiling in the browser environment;
+- `strong` overrides the app's `compiler.strong` setting;
 - `exclude` skips path fragments in the plain `.ts`/`.js` hook-slot pass; and
 - `clientEnvironment` / `serverEnvironment` rename the generated environments.
+
+Enable Strong mode for the whole app in `octane.config.ts`:
+
+```ts
+export default defineConfig({
+	compiler: { strong: true },
+});
+```
+
+You can also pass `pluginOctane({ strong: true })`. The plugin option takes
+priority over the app config. Dependencies are unaffected unless they begin a
+module with `"use strong"`.
 
 App mode currently serves from the root path and uses Rsbuild's default asset
 prefix. Keep `server.base` at `/` and `output.assetPrefix` at `auto` or `/`; for

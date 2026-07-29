@@ -207,6 +207,111 @@ describe('octane() plugin factory', () => {
 		}
 	});
 
+	it.each([true, false])('forwards strong=%s to the bundled compiler', async (strong) => {
+		const [compiler] = octane({ hmr: false, strong });
+		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		const transform = compiler.transform as (source: string, id: string) => { code: string };
+		const source =
+			"import { useState } from 'octane';\n" +
+			'export function App() @{\n' +
+			'  const [count, setCount] = useState(0);\n' +
+			'  setCount(count + 1);\n' +
+			'  <main />\n' +
+			'}\n';
+
+		if (strong) {
+			expect(() => transform.call({}, source, '/repo/src/App.tsrx')).toThrow(/useLinkedState/);
+		} else {
+			expect(transform.call({}, source, '/repo/src/App.tsrx').code).toContain('count');
+		}
+	});
+
+	it('rejects a non-boolean inline Strong-mode setting', () => {
+		expect(() =>
+			octane({
+				// @ts-expect-error JavaScript configuration still receives runtime validation.
+				strong: 'true',
+			}),
+		).toThrow('`strong` must be a boolean when provided.');
+	});
+
+	it('reads Strong mode from app config, honors inline overrides, and restarts for changes', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-strong-mode-'));
+		const configPath = join(root, 'octane.config.ts');
+		const policyPath = join(root, 'strong.config.ts');
+		const source =
+			"import { useState } from 'octane';\n" +
+			'export function App() @{\n' +
+			'  const [count, setCount] = useState(0);\n' +
+			'  setCount(count + 1);\n' +
+			'  <main />\n' +
+			'}\n';
+		try {
+			await writeFile(policyPath, 'export const strong = true;\n');
+			await writeFile(
+				configPath,
+				"import { strong } from './strong.config.ts';\nexport default { compiler: { strong } };\n",
+			);
+
+			const [compiler, meta] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const transform = compiler.transform as (source: string, id: string) => { code: string };
+			expect(() => transform.call({}, source, join(root, 'src/App.tsrx'))).toThrow(
+				/useLinkedState/,
+			);
+
+			const [override] = octane({ hmr: false, strong: false });
+			await (override.config as (config: { root: string }) => unknown)({ root });
+			expect(
+				(override.transform as (source: string, id: string) => { code: string }).call(
+					{},
+					source,
+					join(root, 'src/App.tsrx'),
+				).code,
+			).toContain('count');
+			expect(() =>
+				(override.transform as (source: string, id: string) => { code: string }).call(
+					{},
+					'"use strong";\n' + source,
+					join(root, 'src/OptedIn.tsrx'),
+				),
+			).toThrow(/useLinkedState/);
+
+			const [inlineRenderers] = octane({
+				hmr: false,
+				renderers: { registry: { alternate: 'octane/universal' } },
+			});
+			await (inlineRenderers.config as (config: { root: string }) => unknown)({ root });
+			expect(() =>
+				(inlineRenderers.transform as (source: string, id: string) => { code: string }).call(
+					{},
+					source,
+					join(root, 'src/InlineRenderer.tsrx'),
+				),
+			).toThrow(/useLinkedState/);
+
+			const add = vi.fn();
+			(meta.configureServer as (server: unknown) => void)({
+				watcher: { add },
+				middlewares: { use: vi.fn() },
+			});
+			const watchedPolicyPath = await realpath(policyPath);
+			expect(add).toHaveBeenCalledWith(expect.arrayContaining([configPath, watchedPolicyPath]));
+
+			const restart = vi.fn(async () => undefined);
+			const hotUpdate = meta.hotUpdate as {
+				handler(context: unknown): Promise<unknown>;
+			};
+			await hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: watchedPolicyPath, modules: [], server: { restart } },
+			);
+			expect(restart).toHaveBeenCalledOnce();
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
 	it.each([true, false])(
 		'preserves build.minify=%s and build.target=false in resolved Vite config',
 		async (minify) => {

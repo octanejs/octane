@@ -134,6 +134,70 @@ Rspack's generated runtime. Rsbuild accepts one ES level, `modules`, `false`, or
 esbuild-style browser targets such as `['chrome100', 'firefox100']`; do not mix
 ES levels and browser targets in the same array.
 
+<h2 id="strong-mode">Strong mode</h2>
+
+Strong mode asks the compiler to reject a few state and ref patterns that make a
+component harder to follow. It is off by default, so you can try it in one file:
+
+```tsx
+'use strong';
+
+import { useLinkedState } from 'octane';
+
+export function ProfileEditor({ user }) {
+	const [name, setName] = useLinkedState(user.id, () => user.name);
+	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+}
+```
+
+The directive applies only to its own module. Put it at the top of the file,
+before imports or other code; comments and other directives may come first. When
+a file needs an `@jsxImportSource octane` ownership pragma, put that comment
+first:
+
+```tsx
+/** @jsxImportSource octane */
+'use strong';
+
+import { useState } from 'octane';
+```
+
+When the whole application is ready, switch it on in the shared app config used
+by the Vite and Rsbuild integrations:
+
+```ts
+// octane.config.ts
+export default {
+	compiler: {
+		strong: true,
+	},
+};
+```
+
+Each bundler plugin also accepts the same option directly. A standalone Rspack
+setup uses its plugin option because it does not load `octane.config.ts`:
+
+```ts
+octane({ strong: true }); // Vite
+new OctaneRspackPlugin({ strong: true }); // Rspack
+pluginOctane({ strong: true }); // Rsbuild
+```
+
+An explicit plugin option wins over `octane.config.ts`. Application-wide mode
+does not change installed dependencies; a dependency can opt in with its own
+`"use strong"` directive.
+
+A Strong module cannot:
+
+- Call a state setter or reducer dispatcher while rendering.
+- Call one directly while an effect is being set up.
+- Assign to a ref's `current` value while rendering.
+
+Use `useLinkedState` when state should reset or adjust after an input changes.
+Event handlers may update state normally. Effects that connect to external
+systems and refs for DOM nodes, timers, or event callbacks are still useful and
+remain allowed. Values such as `Date.now()` and `Math.random()` are not banned.
+
 <h2 id="mixed-toolchains">Mixed toolchains and file ownership</h2>
 
 By default the Octane compiler owns every project `.tsrx` and `.tsx` module. In

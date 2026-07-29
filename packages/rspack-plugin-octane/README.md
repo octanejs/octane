@@ -46,6 +46,17 @@ Set `transpile: false` when an existing rule already strips TypeScript. Set
 `hmr: false` to disable Octane HMR codegen even when Rspack HMR is active.
 Set `profile: true` to produce a client profiling build; server compilations
 always keep profiling disabled.
+
+Set `strong: true` to reject state updates during rendering, state updates from
+effects, and ref writes during rendering in your application code:
+
+```js
+new OctaneRspackPlugin({ strong: true });
+```
+
+Dependencies keep their existing behavior. Any module can opt in on its own by
+putting `"use strong"` before its imports.
+
 The experimental `renderers` option accepts the same declarative registry,
 filename rules, and module/export boundary metadata as `compiler.renderers` in
 Octane app config:

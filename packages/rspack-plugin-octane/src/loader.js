@@ -110,6 +110,7 @@ export default function octaneLoader(source, inputSourceMap) {
 		const compiler = createOctaneCompiler({
 			root,
 			profile,
+			...(options.strong === undefined ? null : { strong: options.strong }),
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(compilerOptions.renderers === undefined
 				? null

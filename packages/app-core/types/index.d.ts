@@ -346,6 +346,8 @@ export interface OctaneConfigOptions {
 	adapter?: OctaneAdapter;
 	/** @experimental Compiler-owned configuration shared by all bundler integrations. */
 	compiler?: {
+		/** Reject unsafe state updates and ref writes in application-owned modules. @default false */
+		strong?: boolean;
 		renderers?: ExperimentalRendererConfigOptions;
 	};
 	router?: {
@@ -405,6 +407,8 @@ export interface ResolvedOctaneConfig {
 	};
 	adapter?: OctaneAdapter;
 	compiler: {
+		/** @default false */
+		strong: boolean;
 		renderers: ExperimentalResolvedRendererConfig;
 	};
 	router: {

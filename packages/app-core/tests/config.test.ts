@@ -2,6 +2,29 @@
 import { describe, expect, it } from 'vitest';
 import { resolveOctaneConfig } from '../src/config.js';
 
+describe('Strong mode configuration', () => {
+	it('keeps Strong mode opt-in by default', () => {
+		expect(resolveOctaneConfig({}).compiler.strong).toBe(false);
+	});
+
+	it.each([true, false])('preserves compiler.strong=%s', (strong) => {
+		const config = resolveOctaneConfig({ compiler: { strong } });
+		expect(config.compiler.strong).toBe(strong);
+		expect(resolveOctaneConfig(config).compiler.strong).toBe(strong);
+	});
+
+	it.each(['true', 1, null, {}])('rejects non-boolean compiler.strong=%j', (strong) => {
+		expect(() =>
+			resolveOctaneConfig({
+				compiler: {
+					// @ts-expect-error JavaScript configuration still receives runtime validation.
+					strong,
+				},
+			}),
+		).toThrow('[octane] compiler.strong must be a boolean when provided.');
+	});
+});
+
 describe('adapter server targets', () => {
 	it('accepts the node server target without custom runtime primitives', () => {
 		const adapter = { serverTarget: 'node' as const };

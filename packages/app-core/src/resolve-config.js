@@ -174,6 +174,9 @@ export function resolveOctaneConfig(raw, options = {}) {
 	) {
 		throw new Error('[octane] compiler must be an object when provided.');
 	}
+	if (raw.compiler?.strong !== undefined && typeof raw.compiler.strong !== 'boolean') {
+		throw new Error('[octane] compiler.strong must be a boolean when provided.');
+	}
 
 	if (raw.router?.routes !== undefined && !Array.isArray(raw.router.routes)) {
 		throw new Error('[octane] router.routes must be an array.');
@@ -232,6 +235,7 @@ export function resolveOctaneConfig(raw, options = {}) {
 		},
 		adapter: raw.adapter,
 		compiler: {
+			strong: raw.compiler?.strong ?? false,
 			renderers: normalizeRendererConfig(raw.compiler?.renderers),
 		},
 		router: {

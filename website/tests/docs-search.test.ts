@@ -89,6 +89,15 @@ describe('docs search ranking', () => {
 		expect(top.id).toBe('deferred-hydration');
 	});
 
+	it('deep links Strong-mode searches to the build configuration guide', async () => {
+		const index = await loadSearchIndex();
+		const [top] = searchDocs(index, 'strong mode');
+
+		expect(top).toBeDefined();
+		expect(top.slug).toBe('build-tools');
+		expect(top.id).toBe('strong-mode');
+	});
+
 	it('ranks a heading match above an incidental prose mention', async () => {
 		const index = await loadSearchIndex();
 		const [top] = searchDocs(index, 'install');

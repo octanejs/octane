@@ -56,6 +56,7 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { assertStrongMode } from './strong-mode.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -5653,7 +5654,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -5705,6 +5706,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const analyzedAst = parseModule(source, cleanFilename);
 	analyzeTsrx(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
+	assertStrongMode(analyzedAst, source, cleanFilename, options);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
 	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
 }

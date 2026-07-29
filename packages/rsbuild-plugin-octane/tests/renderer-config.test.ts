@@ -38,7 +38,7 @@ function writeRendererConfig(root: string, module = '/src/object-renderer.js', p
 	);
 }
 
-function writeProject(root: string, withRoute: boolean) {
+function writeProject(root: string, withRoute: boolean, strong?: boolean) {
 	write(root, 'package.json', JSON.stringify({ private: true, type: 'module' }) + '\n');
 	write(root, 'index.html', '<body><div id="root"><!--ssr-body--></div></body>\n');
 	write(root, 'src/Page.tsrx', 'export function Page() @{ <main>ready</main> }\n');
@@ -50,7 +50,7 @@ function writeProject(root: string, withRoute: boolean) {
 import { renderers } from './renderer.config.ts';
 
 export default defineConfig({
-	compiler: { renderers },
+	compiler: { renderers${strong === undefined ? '' : `, strong: ${strong}`} },
 	router: { routes: ${withRoute ? "[new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })]" : '[]'} },
 });
 `,
@@ -73,9 +73,9 @@ describe('Rsbuild renderer configuration', () => {
 	it('preserves asymmetric public compiler booleans through custom client/server environments', async () => {
 		writeProject(root, true);
 		for (const compilerOptions of [
-			{ hmr: true, profile: false, requireDirective: false },
-			{ hmr: false, profile: true, requireDirective: false },
-			{ hmr: false, profile: false, requireDirective: true },
+			{ hmr: true, profile: false, requireDirective: false, strong: false },
+			{ hmr: false, profile: true, requireDirective: false, strong: true },
+			{ hmr: false, profile: false, requireDirective: true, strong: false },
 		]) {
 			const instance = await createRsbuild({
 				cwd: root,
@@ -110,9 +110,55 @@ describe('Rsbuild renderer configuration', () => {
 				hmr: compilerOptions.hmr,
 				profile: false,
 				requireDirective: compilerOptions.requireDirective,
+				strong: compilerOptions.strong,
 				transpile: false,
 			});
 		}
+	});
+
+	it.each([
+		['application configuration', true, undefined, true],
+		['explicit compatibility override', true, false, false],
+		['explicit Strong override', false, true, true],
+		['default compatibility', undefined, undefined, false],
+	] as const)(
+		'uses %s for both client and server compilers',
+		async (_label, configStrong, inlineStrong, expectedStrong) => {
+			writeProject(root, true, configStrong);
+			const instance = await createRsbuild({
+				cwd: root,
+				rsbuildConfig: {
+					plugins: [pluginOctane(inlineStrong === undefined ? {} : { strong: inlineStrong })],
+				},
+			});
+			const configs = await instance.initConfigs({ action: 'build' });
+			const plugins = configs
+				.flatMap((config) => config.plugins ?? [])
+				.filter((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+
+			expect(plugins).toHaveLength(2);
+			for (const plugin of plugins) expect(plugin.options.strong).toBe(expectedStrong);
+		},
+	);
+
+	it('rejects a non-boolean inline Strong-mode option', () => {
+		expect(() => pluginOctane({ strong: 'yes' } as any)).toThrow(/`strong` must be a boolean/);
+	});
+
+	it('enables Strong mode for compiler-only projects without an app config', async () => {
+		writeProject(root, false);
+		rmSync(join(root, 'octane.config.ts'));
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ strong: true })] },
+		});
+		const configs = await instance.initConfigs({ action: 'build' });
+		const plugins = configs
+			.flatMap((config) => config.plugins ?? [])
+			.filter((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].options.strong).toBe(true);
 	});
 
 	it.each([
@@ -200,5 +246,33 @@ describe('Rsbuild renderer configuration', () => {
 			},
 		});
 		expect(restartedPlugin.options.renderers).not.toEqual(initialPlugin.options.renderers);
+	});
+
+	it('applies Strong-mode config changes after Rsbuild restarts', async () => {
+		writeProject(root, false, false);
+		const createCompilerPlugin = async () => {
+			const instance = await createRsbuild({
+				cwd: root,
+				rsbuildConfig: { plugins: [pluginOctane()] },
+			});
+			return (await instance.initConfigs({ action: 'dev' }))
+				.flatMap((config) => config.plugins ?? [])
+				.find((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+		};
+
+		const initialPlugin = await createCompilerPlugin();
+		write(
+			root,
+			'octane.config.ts',
+			`import { defineConfig } from '@octanejs/rsbuild-plugin';
+import { renderers } from './renderer.config.ts';
+
+export default defineConfig({ compiler: { renderers, strong: true } });
+`,
+		);
+		const restartedPlugin = await createCompilerPlugin();
+
+		expect(initialPlugin?.options.strong).toBe(false);
+		expect(restartedPlugin?.options.strong).toBe(true);
 	});
 });

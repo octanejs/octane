@@ -28,10 +28,12 @@ import {
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
+	error as collectCompileError,
 	parseModule,
 } from '@tsrx/core';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { analyzeStrongMode } from './strong-mode.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import {
 	DOM_RENDERER_MODULE,
@@ -194,7 +196,7 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
  * @returns {import('@tsrx/core/types').VolarMappingsResult & {
  *   diagnostics: readonly unknown[],
  *   generatedAst: import('estree').Program,
@@ -228,6 +230,11 @@ export function compileToVolarMappings(source, filename, options) {
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	}).diagnostics;
+	const strongDiagnostics =
+		options?.strong === true || source.includes('use strong')
+			? analyzeStrongMode(ast, source, filename, options).diagnostics
+			: null;
+	if (strongDiagnostics !== null) diagnostics.push(...strongDiagnostics);
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
@@ -251,6 +258,25 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments: printComments,
 	});
+	if (strongDiagnostics !== null) {
+		for (const diagnostic of strongDiagnostics) {
+			collectCompileError(
+				diagnostic.message,
+				diagnostic.filename ?? null,
+				{
+					start: diagnostic.start.offset,
+					end: diagnostic.end.offset,
+					loc: {
+						start: { line: diagnostic.start.line, column: diagnostic.start.column },
+						end: { line: diagnostic.end.line, column: diagnostic.end.column },
+					},
+				},
+				errors,
+				undefined,
+				diagnostic.code,
+			);
+		}
+	}
 	// After the transform: the copy-on-write lowering must not observe the
 	// marker mid-flight, and `ast` is what ships below as `sourceAst`.
 	markNativeTemplateBodies(ast);

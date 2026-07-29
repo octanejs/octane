@@ -221,7 +221,7 @@ function collect_hydrate_module_paths(config) {
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -238,12 +238,12 @@ export function octane(inlineOptions = {}) {
 	/** @type {boolean} Is this the SSR sub-build closeBundle launches? */
 	let isSSRBuild = false;
 	/**
-	 * Config dependencies that select compiler renderers. A change requires a
-	 * server restart because the neutral compiler snapshots normalized renderer
-	 * metadata before the first module transform.
+	 * Config dependencies that select Strong mode or compiler renderers. A
+	 * change requires a server restart because the neutral compiler snapshots
+	 * its configuration before the first module transform.
 	 * @type {Set<string>}
 	 */
-	const rendererConfigWatchFiles = new Set();
+	const compilerConfigWatchFiles = new Set();
 	/** @type {Map<string, Promise<LoadedOctaneConfig | null>>} */
 	const startupConfigLoads = new Map();
 	/** @type {ResolvedOctaneConfig | null} Config loaded for the build (config hook, reused in closeBundle) */
@@ -494,8 +494,8 @@ export function octane(inlineOptions = {}) {
 		 * @param {ViteDevServer} vite
 		 */
 		configureServer(vite) {
-			if (rendererConfigWatchFiles.size > 0) {
-				vite.watcher.add([...rendererConfigWatchFiles]);
+			if (compilerConfigWatchFiles.size > 0) {
+				vite.watcher.add([...compilerConfigWatchFiles]);
 			}
 			/** @type {Promise<void> | null} */
 			let initPromise = null;
@@ -669,10 +669,9 @@ export function octane(inlineOptions = {}) {
 			order: 'pre',
 			async handler({ file, modules, server }) {
 				if (this.environment.name !== 'client') return;
-				if (rendererConfigWatchFiles.has(path.resolve(file))) {
-					// Renderer rules and boundary metadata are immutable inputs to every
-					// compiler environment. Rebuild the plugin/compiler snapshot instead
-					// of letting later transforms observe a mixture of old and new config.
+				if (compilerConfigWatchFiles.has(path.resolve(file))) {
+					// Strong mode and renderer metadata are immutable compiler inputs.
+					// Restart so later transforms cannot mix old and new configuration.
 					await server.restart();
 					return [];
 				}
@@ -881,6 +880,7 @@ export function octane(inlineOptions = {}) {
 	 * @type {{
 	 *   hmr?: boolean,
 	 *   profile?: boolean | 'auto',
+	 *   strong?: boolean,
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -892,6 +892,7 @@ export function octane(inlineOptions = {}) {
 	// command-aware `'auto'` signal the compiler resolves to DEV-only profiling.
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
 	else if (inlineOptions.devtools === true) compilerOptions.profile = 'auto';
+	if (inlineOptions.strong !== undefined) compilerOptions.strong = inlineOptions.strong;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {
 		compilerOptions.requireDirective = inlineOptions.requireDirective;
@@ -900,31 +901,36 @@ export function octane(inlineOptions = {}) {
 	const compilerPlugin = /** @type {Plugin} */ (octaneCompiler(compilerOptions));
 	const compilerConfigHook = compilerPlugin.config;
 	if (typeof compilerConfigHook === 'function') {
-		compilerPlugin.config = function compilerConfigWithAppRenderers(userConfig, env) {
+		compilerPlugin.config = function compilerConfigWithAppOptions(userConfig, env) {
 			const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
-			// Inline renderer metadata is an explicit full override. Preserve the
-			// synchronous no-config/inline path used by compiler-only SPA projects.
-			if (inlineOptions.renderers !== undefined) {
-				rendererConfigWatchFiles.clear();
+			// Both inline compiler options override app config independently. Preserve
+			// the synchronous path when neither needs to read octane.config.ts.
+			if (inlineOptions.renderers !== undefined && inlineOptions.strong !== undefined) {
+				compilerConfigWatchFiles.clear();
 				return compilerConfigHook.call(this, userConfig, env);
 			}
 
 			const configPath = getOctaneConfigPath(projectRoot);
 			if (!octaneConfigExists(projectRoot)) {
-				delete compilerOptions.renderers;
-				rendererConfigWatchFiles.clear();
-				// A newly-created octane.config.ts can introduce renderer rules. Watch
-				// the missing path so dev restarts into the configured compiler.
-				rendererConfigWatchFiles.add(path.resolve(configPath));
+				if (inlineOptions.renderers === undefined) delete compilerOptions.renderers;
+				if (inlineOptions.strong === undefined) delete compilerOptions.strong;
+				compilerConfigWatchFiles.clear();
+				// A new app config can introduce Strong mode or renderer rules.
+				compilerConfigWatchFiles.add(path.resolve(configPath));
 				return compilerConfigHook.call(this, userConfig, env);
 			}
 
 			return loadStartupConfig(projectRoot).then((loaded) => {
 				const config = /** @type {LoadedOctaneConfig} */ (loaded);
-				compilerOptions.renderers = config.config.compiler.renderers;
-				rendererConfigWatchFiles.clear();
+				if (inlineOptions.renderers === undefined) {
+					compilerOptions.renderers = config.config.compiler.renderers;
+				}
+				if (inlineOptions.strong === undefined) {
+					compilerOptions.strong = config.config.compiler.strong;
+				}
+				compilerConfigWatchFiles.clear();
 				for (const file of [...config.dependencies, ...config.missingDependencies]) {
-					rendererConfigWatchFiles.add(path.resolve(file));
+					compilerConfigWatchFiles.add(path.resolve(file));
 				}
 				return compilerConfigHook.call(this, userConfig, env);
 			});

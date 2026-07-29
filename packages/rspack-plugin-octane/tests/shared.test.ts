@@ -78,6 +78,11 @@ describe('declarative options', () => {
 		);
 	});
 
+	it('preserves explicit Strong-mode choices for the plugin and standalone loader', () => {
+		expect(normalizePluginOptions({ strong: true })).toEqual({ strong: true });
+		expect(normalizeLoaderOptions({ strong: false })).toEqual({ strong: false });
+	});
+
 	it('normalizes compile-runtime metadata and a plugin-only runtime request', () => {
 		const universalRuntime = { runtime: 'lynx', thread: 'background' as const };
 		const options = normalizePluginOptions({
@@ -143,6 +148,7 @@ describe('declarative options', () => {
 	it.each([
 		[{ environment: 'worker' }, /environment/],
 		[{ hmr: 'webpack' }, /hmr/],
+		[{ strong: 'yes' }, /`strong` must be a boolean/],
 		[{ exclude: 'vendor' }, /exclude/],
 		[{ renderers: { default: 'missing' } }, /default references unknown renderer/],
 		[{ universalRuntime: { runtime: 'lynx', thread: 'worker' } }, /thread/],

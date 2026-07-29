@@ -14,6 +14,11 @@ export interface OctaneRsbuildPluginOptions {
 	/** Enable component profiling in the browser environment. */
 	profile?: boolean;
 	/**
+	 * Override `compiler.strong` for this integration. Strong mode applies to
+	 * project-owned modules; dependencies can opt in with `"use strong"`.
+	 */
+	strong?: boolean;
+	/**
 	 * Ad-hoc path fragments skipped by the plain TypeScript/JavaScript
 	 * hook-slot pass. With `requireDirective`, excluded paths are exempt from
 	 * Octane ownership entirely — including `.tsrx`/`.tsx` — for projects

@@ -14,6 +14,8 @@ export interface OctanePluginOptions {
 	hmr?: boolean;
 	/** Enable component profiling in client transforms. */
 	profile?: boolean;
+	/** Enable Strong mode for app code, overriding `compiler.strong` in `octane.config.ts`. */
+	strong?: boolean;
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.

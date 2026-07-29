@@ -527,6 +527,63 @@ receive `{ source, value }`. Sources and values use `Object.is` by default. Pass
 comparisons. Like `useState`, `useLinkedState` also supports an optional third
 tuple item, `getValue`, for reading the latest value from a delayed callback.
 
+### Strong mode
+
+Strong mode is an optional compiler check for state and refs. Start with one
+module by placing `"use strong"` before its imports:
+
+```tsx
+"use strong";
+
+import { useLinkedState } from 'octane';
+
+export function ProfileEditor({ user }) {
+  const [name, setName] = useLinkedState(user.id, () => user.name);
+
+  return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+}
+```
+
+When the project is ready, enable it for all application-owned modules:
+
+```ts
+// octane.config.ts
+export default {
+  compiler: {
+    strong: true,
+  },
+};
+```
+
+The Vite and Rsbuild app integrations read this setting from `octane.config.ts`.
+Vite, Rspack, and Rsbuild also accept `strong: true` directly in their Octane
+plugin options; use the plugin option for a standalone Rspack setup. An
+explicit plugin setting takes precedence over `octane.config.ts`. Dependencies
+keep their existing behavior unless one of their own modules opts in with
+`"use strong"`.
+
+Strong mode reports three patterns as compile errors:
+
+- Calling a `useState`, `useReducer`, or `useLinkedState` updater during render.
+- Calling one of those updaters directly while an effect is being set up.
+- Assigning to a `useRef` object's `current` value during render.
+
+Update state in event handlers instead. When state should reset or adjust after
+an input changes, use `useLinkedState`. Effects that connect to external systems
+and refs used for DOM elements, timers, or event callbacks remain valid. Strong
+mode does not restrict `Date.now()`, `Math.random()`, or similar values.
+
+`"use strong"` only affects the current module. Put it at the top of the file,
+before imports or other code; comments and other directives may come first. In
+files that also use an Octane JSX ownership pragma, keep the pragma first:
+
+```tsx
+/** @jsxImportSource octane */
+"use strong";
+
+import { useState } from 'octane';
+```
+
 ### Conditional hooks
 
 Unlike React, a hook can sit behind a guard or after an early `return`:
