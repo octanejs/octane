@@ -59,24 +59,26 @@ function LinkedSuspense<S, T>(props: LinkedProps<S, T>) {
 
 interface IndependentControls {
 	setSource: (source: string) => void;
-	setResource: (resource: Promise<unknown>) => void;
+	setResource: (resource: Promise<unknown> | null) => void;
+	setValue: (next: string | ((previous: string) => string)) => void;
 	getValue: () => string;
 }
 
 function IndependentLinkedSource(props: {
 	observe: (controls: Partial<IndependentControls>) => void;
+	optionsForSource?: (source: string) => LinkedOptions<string, string>;
 }) {
 	const [source, setSource] = (useState as any)('A', INDEPENDENT_SOURCE_SLOT) as [
 		string,
 		(source: string) => void,
 	];
-	const [value, , getValue] = (__useLinkedStateWithGetter as any)(
+	const [value, setValue, getValue] = (__useLinkedStateWithGetter as any)(
 		source,
 		(next: string) => next,
-		undefined,
+		props.optionsForSource?.(source),
 		LINKED_SLOT,
-	) as [string, unknown, () => string];
-	props.observe({ setSource, getValue });
+	) as [string, IndependentControls['setValue'], () => string];
+	props.observe({ setSource, setValue, getValue });
 	return createElement('span', { id: 'independent-linked-value' }, value);
 }
 
@@ -85,14 +87,17 @@ function IndependentSuspendingSibling(props: {
 }) {
 	const [resource, setResource] = (useState as any)(null, INDEPENDENT_RESOURCE_SLOT) as [
 		Promise<unknown> | null,
-		(resource: Promise<unknown>) => void,
+		(resource: Promise<unknown> | null) => void,
 	];
 	props.observe({ setResource });
 	if (resource !== null) use(resource);
 	return createElement('span', { id: 'independent-ready' }, 'ready');
 }
 
-function IndependentSuspense(props: { observe: (controls: Partial<IndependentControls>) => void }) {
+function IndependentSuspense(props: {
+	observe: (controls: Partial<IndependentControls>) => void;
+	optionsForSource?: (source: string) => LinkedOptions<string, string>;
+}) {
 	return createElement(
 		Suspense,
 		{ fallback: createElement('span', { id: 'independent-pending' }, 'loading') },
@@ -512,6 +517,105 @@ describe('useLinkedState', () => {
 		expect(root.find('#independent-linked-value').textContent).toBe('B');
 		expect(controls.getValue()).toBe('B');
 		root.unmount();
+	});
+
+	it('preserves concurrent functional edits to a source waiting for Suspense to reveal', async () => {
+		const gate = deferred();
+		const controls = {} as IndependentControls;
+		const root = mount(IndependentSuspense, {
+			observe: (next: Partial<IndependentControls>) => Object.assign(controls, next),
+		});
+
+		flushSync(() => {
+			controls.setSource('B');
+			controls.setResource(gate.promise);
+		});
+		expect(root.find('#independent-pending').textContent).toBe('loading');
+		expect(controls.getValue()).toBe('A');
+
+		flushSync(() => {
+			controls.setValue((value) => `${value}: first`);
+			controls.setValue((value) => `${value}: second`);
+		});
+		expect(controls.getValue()).toBe('A');
+
+		await act(() => gate.resolve());
+		expect(root.find('#independent-linked-value').textContent).toBe('B: first: second');
+		expect(controls.getValue()).toBe('B: first: second');
+		root.unmount();
+	});
+
+	it('uses the parked value comparator while keeping committed getter reads isolated', async () => {
+		const gate = deferred();
+		const controls = {} as IndependentControls;
+		const committedEqual = (left: string, right: string) => left === right;
+		const parkedEqual = (left: string, right: string) => left.toLowerCase() === right.toLowerCase();
+		const root = mount(IndependentSuspense, {
+			observe: (next: Partial<IndependentControls>) => Object.assign(controls, next),
+			optionsForSource: (source: string) => ({
+				valueEqual: source === 'A' ? committedEqual : parkedEqual,
+			}),
+		});
+
+		flushSync(() => {
+			controls.setSource('B');
+			controls.setResource(gate.promise);
+		});
+		flushSync(() => {
+			controls.setValue('b');
+			controls.setValue((value) => `${value}!`);
+		});
+		expect(controls.getValue()).toBe('A');
+
+		await act(() => gate.resolve());
+		expect(root.find('#independent-linked-value').textContent).toBe('B!');
+		expect(controls.getValue()).toBe('B!');
+		root.unmount();
+	});
+
+	it('discards parked local edits when a newer source replaces the hidden draft', async () => {
+		const gate = deferred();
+		const controls = {} as IndependentControls;
+		const root = mount(IndependentSuspense, {
+			observe: (next: Partial<IndependentControls>) => Object.assign(controls, next),
+		});
+
+		flushSync(() => {
+			controls.setSource('B');
+			controls.setResource(gate.promise);
+		});
+		flushSync(() => controls.setValue((value) => `${value}: stale`));
+		expect(controls.getValue()).toBe('A');
+
+		flushSync(() => {
+			controls.setSource('C');
+			controls.setResource(null);
+		});
+		expect(root.find('#independent-linked-value').textContent).toBe('C');
+		expect(controls.getValue()).toBe('C');
+
+		await act(() => gate.resolve());
+		expect(root.find('#independent-linked-value').textContent).toBe('C');
+		expect(controls.getValue()).toBe('C');
+		root.unmount();
+	});
+
+	it('never publishes parked local edits after their Suspense boundary unmounts', async () => {
+		const gate = deferred();
+		const controls = {} as IndependentControls;
+		const root = mount(IndependentSuspense, {
+			observe: (next: Partial<IndependentControls>) => Object.assign(controls, next),
+		});
+
+		flushSync(() => {
+			controls.setSource('B');
+			controls.setResource(gate.promise);
+		});
+		flushSync(() => controls.setValue((value) => `${value}: stale`));
+		root.unmount();
+
+		await act(() => gate.resolve());
+		expect(controls.getValue()).toBe('A');
 	});
 
 	it('never publishes a parked source draft after its Suspense boundary unmounts', async () => {

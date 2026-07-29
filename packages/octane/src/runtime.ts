@@ -4321,6 +4321,11 @@ interface LinkedStateSlot<Source, Value> {
 	renderSourceChanged?: boolean;
 	/** Preserve only drafts explicitly edited by their rendering owner. */
 	renderUpdated?: boolean;
+	/** A completed draft is parked only after its hidden boundary defers publication. */
+	renderParked?: boolean;
+	/** Refresh the revealed owner after an outside update changed its parked draft. */
+	renderNeedsRefresh?: boolean;
+	renderPublish?: () => void;
 	renderVersion?: number;
 }
 
@@ -4384,18 +4389,37 @@ export function useLinkedState<Source, Value>(
 			valueEqual: equalValue,
 			setter: (next) => {
 				const renderingDraft = CURRENT_BLOCK === block && state!.renderPending === true;
-				const previous = renderingDraft
+				let updatingParkedDraft = false;
+				if (
+					!renderingDraft &&
+					state!.renderPending === true &&
+					transitionActionBatchForUpdate() === null
+				) {
+					updatingParkedDraft = state!.renderParked === true;
+					if (!updatingParkedDraft && (block as any).__thenableDone === true) {
+						const hiddenBoundary = findSuspenseHiddenTry(block);
+						const publish = state!.renderPublish;
+						if (hiddenBoundary !== null && publish !== undefined) {
+							state!.renderParked = true;
+							deferLinkedStateReveal(hiddenBoundary, publish);
+							updatingParkedDraft = true;
+						}
+					}
+				}
+				const updatingDraft = renderingDraft || updatingParkedDraft;
+				const previous = updatingDraft
 					? (state!.renderValue as Value)
 					: stagedTransitionValue(state!);
 				const operation =
 					typeof next === 'function' ? (next as (value: Value) => Value) : () => next;
 				const computed = operation(previous);
-				const equal = renderingDraft ? state!.renderValueEqual : state!.valueEqual;
+				const equal = updatingDraft ? state!.renderValueEqual : state!.valueEqual;
 				if ((equal ?? Object.is)(previous, computed)) return;
-				if (renderingDraft) {
+				if (updatingDraft) {
 					state!.renderValue = computed;
 					state!.renderUpdated = true;
-					scheduleRender(block);
+					if (updatingParkedDraft) state!.renderNeedsRefresh = true;
+					else scheduleRender(block);
 					return;
 				}
 				if (stageTransitionValue(state!, block, operation, computed)) {
@@ -4437,9 +4461,13 @@ export function useLinkedState<Source, Value>(
 		state.renderPending = false;
 		state.renderUpdated = false;
 		state.renderSourceChanged = false;
+		state.renderParked = false;
+		state.renderNeedsRefresh = false;
+		state.renderPublish = undefined;
 		return [state.value, state.setter] as unknown as LinkedStateTuple<Value>;
 	}
 
+	const reuseParkedDraft = reuseUpdatedDraft && state.renderParked === true;
 	let value = reuseUpdatedDraft ? (state.renderValue as Value) : state.value;
 	if (sourceChanged && !reuseUpdatedDraft) {
 		const previous = { source: state.source, value: state.value };
@@ -4456,13 +4484,20 @@ export function useLinkedState<Source, Value>(
 	state.renderValueEqual = equalValue;
 	state.renderSourceChanged = sourceChanged;
 	state.renderUpdated = reuseUpdatedDraft;
-	const version = (state.renderVersion = (state.renderVersion ?? 0) + 1);
+	state.renderParked = reuseParkedDraft;
+	if (!reuseParkedDraft) state.renderNeedsRefresh = false;
+	// A hidden retry can suspend and discard its fresh commit action. Keep the
+	// original parked reveal action valid until this source draft is replaced.
+	const version = reuseParkedDraft
+		? (state.renderVersion as number)
+		: (state.renderVersion = (state.renderVersion ?? 0) + 1);
 	const current = state;
 	const publish = () => {
 		if (current.renderPending !== true || current.renderVersion !== version || block.disposed)
 			return;
 		const hiddenBoundary = findSuspenseHiddenTry(block);
 		if (hiddenBoundary !== null) {
+			current.renderParked = true;
 			deferLinkedStateReveal(hiddenBoundary, publish);
 			return;
 		}
@@ -4479,10 +4514,16 @@ export function useLinkedState<Source, Value>(
 		current.source = current.renderSource as Source;
 		current.value = current.renderValue as Value;
 		current.valueEqual = current.renderValueEqual;
+		const refresh = current.renderNeedsRefresh === true;
 		current.renderPending = false;
 		current.renderSourceChanged = false;
 		current.renderUpdated = false;
+		current.renderParked = false;
+		current.renderNeedsRefresh = false;
+		current.renderPublish = undefined;
+		if (refresh) scheduleRender(block);
 	};
+	state.renderPublish = publish;
 	enqueueEffectEventCommitAction(publish);
 	return [value, state.setter] as unknown as LinkedStateTuple<Value>;
 }

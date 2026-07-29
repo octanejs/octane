@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { act, flushSync, hydrateRoot } from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
 import * as UniversalRuntime from '../src/universal.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
@@ -95,6 +95,30 @@ export function NestedLinkedSuspense(props) @{
 		</section>
 	</Suspense>
 }
+
+function ParkedLinkedValue(props) @{
+	const [value, setValue, getValue] = useLinkedState(
+		props.source,
+		(source) => 'draft:' + source,
+	);
+	props.capture?.({ value, setValue, getValue });
+	<span id="hydrated-parked-value">{value as string}</span>
+}
+
+function ParkedLinkedResource(props) @{
+	if (props.promise != null) use(props.promise);
+	<span id="hydrated-parked-ready">{'ready'}</span>
+}
+
+export function HydratedParkedLinked(props) @{
+	<section>
+		<button id="hydrated-parked-edit" onClick={() => props.onEdit?.()}>{'edit'}</button>
+		<Suspense fallback={<p id="hydrated-parked-pending">{'loading'}</p>}>
+			<ParkedLinkedValue {...props} />
+			<ParkedLinkedResource promise={props.promise} />
+		</Suspense>
+	</section>
+}
 `;
 
 type FixtureModule = {
@@ -104,6 +128,7 @@ type FixtureModule = {
 	HydratedRenderPhaseEdit: any;
 	ConditionalLinked: any;
 	NestedLinkedSuspense: any;
+	HydratedParkedLinked: any;
 };
 
 let serverFixture: FixtureModule | undefined;
@@ -307,6 +332,52 @@ describe('useLinkedState hydration', () => {
 			);
 			expect(container.querySelector('#hydrated-linked-edit')).toBe(serverNode);
 			expect(serverNode.textContent).toBe('draft:B!');
+			expect(captured?.getValue()).toBe('draft:B!');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('retains an event edit made while a hydrated source draft is parked by Suspense', async () => {
+		const server = serverComponents();
+		const client = clientComponents();
+		container.innerHTML = ServerRuntime.renderToString(server.HydratedParkedLinked, {
+			source: 'A',
+		}).html;
+		const sourceNode = container.querySelector('#hydrated-parked-value') as HTMLSpanElement;
+		let captured: CapturedLinked<string> | undefined;
+		const capture = (value: CapturedLinked<string>) => (captured = value);
+		const onEdit = () => captured!.setValue((previous) => previous + '!');
+		const root = hydrateRoot(container, client.HydratedParkedLinked, {
+			source: 'A',
+			capture,
+			onEdit,
+		});
+		const resource = deferred<string>();
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#hydrated-parked-value')).toBe(sourceNode);
+			expect(captured?.getValue()).toBe('draft:A');
+
+			flushSync(() =>
+				root.render(client.HydratedParkedLinked, {
+					source: 'B',
+					promise: resource.promise,
+					capture,
+					onEdit,
+				}),
+			);
+			expect(container.querySelector('#hydrated-parked-pending')?.textContent).toBe('loading');
+
+			flushSync(() =>
+				(container.querySelector('#hydrated-parked-edit') as HTMLButtonElement).click(),
+			);
+			expect(container.querySelector('#hydrated-parked-pending')?.textContent).toBe('loading');
+			expect(captured?.getValue()).toBe('draft:A');
+			await act(() => resource.resolve('ready'));
+
+			expect(container.querySelector('#hydrated-parked-value')).toBe(sourceNode);
+			expect(sourceNode.textContent).toBe('draft:B!');
 			expect(captured?.getValue()).toBe('draft:B!');
 		} finally {
 			root.unmount();
@@ -641,6 +712,13 @@ describe('universal useLinkedState', () => {
 				'linked-pending': 'loading',
 			});
 			expect(linked.getValue()).toBe('edited first');
+			linked.setValue((previous) => `${previous}!`);
+			UniversalRuntime.flushUniversalSync(() => {});
+			expect(universalValues(objectContainer)).toEqual({
+				'linked-state': 'edited first',
+				'linked-pending': 'loading',
+			});
+			expect(linked.getValue()).toBe('edited first');
 
 			root.render(Scene, { source: 'accepted' });
 			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'accepted' });
@@ -650,6 +728,59 @@ describe('universal useLinkedState', () => {
 			blocker.resolve('late');
 			await flushUniversalWork();
 			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'accepted' });
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('retains universal event edits applied while a replacement source waits behind Suspense', async () => {
+		const objectContainer = UniversalRuntime.createObjectContainer();
+		const root = UniversalRuntime.createUniversalRoot(
+			objectContainer,
+			UniversalRuntime.createObjectDriver(),
+		);
+		const blocker = deferred<string>();
+		let linked!: CapturedLinked<string>;
+		const fallbackPlan = UniversalRuntime.universalPlan('object', {
+			kind: 'host',
+			type: 'linked-pending',
+			props: { value: 'loading' },
+		});
+		const Scene = UniversalRuntime.defineUniversalComponent(
+			'object',
+			(props: { source: string; suspend?: boolean }) =>
+				UniversalRuntime.universalTry(
+					() => {
+						const [value, setValue, getValue] = universalLinkedRuntime.__useLinkedStateWithGetter!(
+							props.source,
+							(source) => `draft:${source}`,
+							'linked',
+						);
+						linked = { value, setValue, getValue: getValue! };
+						if (props.suspend) UniversalRuntime.use(blocker.promise);
+						return UniversalRuntime.universalValue(universalLinkedPlan, [value]);
+					},
+					() => UniversalRuntime.universalValue(fallbackPlan),
+				),
+		);
+
+		try {
+			root.render(Scene, { source: 'A' });
+			root.render(Scene, { source: 'B', suspend: true });
+			expect(linked.getValue()).toBe('draft:A');
+			linked.setValue((previous) => `${previous}!`);
+			linked.setValue((previous) => `${previous}?`);
+			expect(linked.getValue()).toBe('draft:A');
+			UniversalRuntime.flushUniversalSync(() => {});
+			expect(universalValues(objectContainer)).toEqual({
+				'linked-state': 'draft:A',
+				'linked-pending': 'loading',
+			});
+			blocker.resolve('ready');
+			await flushUniversalWork();
+
+			expect(universalValues(objectContainer)).toEqual({ 'linked-state': 'draft:B!?' });
+			expect(linked.getValue()).toBe('draft:B!?');
 		} finally {
 			root.unmount();
 		}

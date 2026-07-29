@@ -782,6 +782,20 @@ interface LinkedStateHook<Source = unknown, Value = unknown> {
 	get?: () => Value;
 }
 
+interface ParkedUniversalLinkedDraft<Source = unknown, Value = unknown> {
+	source: Source;
+	value: Value;
+	valueEqual: (previous: Value, next: Value) => boolean;
+	generation: number;
+	updated: boolean;
+}
+
+// Retained Suspense commits the old primary owner while discarding its speculative
+// replacement owner. Preserve only linked-state source drafts here; ordinary
+// state hooks never allocate, consult, or change this optional side table.
+let PARKED_UNIVERSAL_LINKED_DRAFTS: WeakMap<object, ParkedUniversalLinkedDraft<any, any>> | null =
+	null;
+
 interface ReducerHook<S = unknown, A = unknown> {
 	kind: 'reducer';
 	value: S;
@@ -3706,6 +3720,24 @@ function universalLinkedStateHook<Source, Value>(
 				const committed = record.hooks.get(resolved) as LinkedStateHook<Source, Value> | undefined;
 				if (committed?.linked !== true) return;
 				const transition = universalTransitionBatchForUpdate();
+				const parked = PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed) as
+					ParkedUniversalLinkedDraft<Source, Value> | undefined;
+				if (
+					transition === null &&
+					record.visibility === 'suspense-hidden' &&
+					parked !== undefined &&
+					parked.generation === committed.generation
+				) {
+					const next =
+						typeof update === 'function'
+							? (update as (previous: Value) => Value)(parked.value)
+							: update;
+					if (parked.valueEqual(parked.value, next)) return;
+					parked.value = next;
+					parked.updated = true;
+					scheduleOwner(record, resolved);
+					return;
+				}
 				const previous =
 					transition === null
 						? visibleStateValue(record, resolved, committed.value)
@@ -3760,10 +3792,48 @@ function universalLinkedStateHook<Source, Value>(
 			);
 		}
 		hook.valueEqual = valueEqual;
-		if (!sourceEqual(hook.source, source)) {
+		const committed = owner.record.hooks.get(resolved) as
+			LinkedStateHook<Source, Value> | undefined;
+		let parked =
+			committed === undefined
+				? undefined
+				: (PARKED_UNIVERSAL_LINKED_DRAFTS?.get(committed) as
+						ParkedUniversalLinkedDraft<Source, Value> | undefined);
+		if (
+			parked !== undefined &&
+			(committed?.generation !== parked.generation ||
+				!sourceEqual(parked.source, source) ||
+				parked.valueEqual !== valueEqual)
+		) {
+			PARKED_UNIVERSAL_LINKED_DRAFTS!.delete(committed!);
+			parked = undefined;
+		}
+		const sourceChanged = !sourceEqual(hook.source, source);
+		if (sourceChanged) {
 			const previous = { source: hook.source, value: hook.value };
 			const next = reconcile(source, previous);
-			hook.value = valueEqual(hook.value, next) ? hook.value : next;
+			const reconciled = valueEqual(hook.value, next) ? hook.value : next;
+			const reuseParked =
+				parked !== undefined &&
+				owner.record.visibility === 'suspense-hidden' &&
+				parked.updated &&
+				parked.generation === committed?.generation;
+			hook.value = reuseParked && parked !== undefined ? parked.value : reconciled;
+			if (!reuseParked && committed !== undefined) {
+				let boundary: DraftOwner | null = owner.parent;
+				while (boundary !== null && !(boundary.isBoundary && boundary.canHandleSuspense)) {
+					boundary = boundary.parent;
+				}
+				if (boundary !== null) {
+					(PARKED_UNIVERSAL_LINKED_DRAFTS ??= new WeakMap()).set(committed, {
+						source,
+						value: hook.value,
+						valueEqual,
+						generation: committed.generation,
+						updated: false,
+					});
+				}
+			}
 			hook.source = source;
 			hook.generation++;
 			hook.generationBase = hook.value;
