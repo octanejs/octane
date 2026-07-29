@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "valtio",
+    "version": "2.3.2"
+  },
+  "surface": "The framework-agnostic `valtio/vanilla` core and `valtio/vanilla/utils` are re-exported verbatim; `useSnapshot` and the `useProxy` utility are ported to Octane.",
+  "divergences": [
+    "React DevTools affected-path debug labels are omitted because Octane's `useDebugValue` is currently a no-op."
+  ],
+  "ssr": "The server snapshot path uses `snapshot(proxyObject)`; no dedicated SSR rendering test is included yet.",
+  "verified": "2026-07-27",
+  "notes": []
+}

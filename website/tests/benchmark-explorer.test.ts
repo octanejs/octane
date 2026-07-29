@@ -30,11 +30,13 @@ async function mountExplorer() {
 }
 
 describe('benchmark explorer — bar chart', () => {
-	it('sorts bars fastest-first, so Octane (1×) leads the default suite', async () => {
+	it('sorts bars fastest-first for the default suite', async () => {
 		const { barLabels } = await mountExplorer();
-		// js-framework (the first suite) has every framework present; Octane is 1×,
-		// the lowest, so it sorts to the top.
-		expect(barLabels()[0]).toBe('Octane (.tsrx)');
+		const defaultRow = HOME_SUMMARY.rows[0];
+		const expectedFastest = HOME_SUMMARY.series
+			.filter((series) => typeof defaultRow[series.key] === 'number')
+			.toSorted((a, b) => (defaultRow[a.key] as number) - (defaultRow[b.key] as number))[0]!.label;
+		expect(barLabels()[0]).toBe(expectedFastest);
 		expect(barLabels()).toContain('React 19');
 	});
 

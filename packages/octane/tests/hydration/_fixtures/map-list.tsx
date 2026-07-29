@@ -1,4 +1,5 @@
-import { useState } from 'octane';
+/** @jsxImportSource octane */
+import { Fragment, useState } from 'octane';
 
 // React-style `.tsx` `{items.map(x => <li key/>)}` keyed list. It lowers to the
 // SAME forBlock fast path as `@for` on the client AND the equivalent ssrBlock
@@ -25,6 +26,22 @@ export function MapList() {
 				<li className="row" data-id={x.id as number} key={x.id as number}>
 					{x.label as string}
 				</li>
+			))}
+		</ul>
+	);
+}
+
+export function IndexKeyedFragmentHydrationMap(props: {
+	items: Array<{ id: number; label: string }>;
+}) {
+	return (
+		<ul className="indexed-list">
+			{props.items.map((item, index) => (
+				<Fragment key={index}>
+					<li className="indexed-row" data-id={item.id} data-index={index}>
+						{item.label}
+					</li>
+				</Fragment>
 			))}
 		</ul>
 	);

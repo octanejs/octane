@@ -28,6 +28,7 @@ import type {
 	SwipeDirection,
 	ToasterProps,
 	ToastClassnames,
+	ToastContent,
 	ToastIcons,
 	ToastProps,
 	ToastT,
@@ -45,6 +46,25 @@ const TIME_BEFORE_UNMOUNT = 200;
 
 function cn(...classes: (string | undefined)[]): string {
 	return classes.filter(Boolean).join(' ');
+}
+
+function getToastIcon(icons: ToastIcons | undefined, type: ToastTypes | undefined): ToastContent {
+	if (!icons || !type || !(type in icons)) {
+		return undefined;
+	}
+
+	return icons[type as keyof ToastIcons];
+}
+
+function getToastClassName(
+	classNames: ToastClassnames | undefined,
+	type: ToastTypes | undefined,
+): string | undefined {
+	if (!classNames || !type || !(type in classNames)) {
+		return undefined;
+	}
+
+	return classNames[type as keyof ToastClassnames];
 }
 
 function getDefaultSwipeDirections(position: string): SwipeDirection[] {
@@ -257,10 +277,19 @@ function Toast(props: ToastProps) {
 		}
 	}, [deleteToast, toastItem.delete]);
 
-	const icon =
-		toastItem.icon || (toastType ? icons?.[toastType] : undefined) || getAsset(toastType);
-	const toasterTypeClass = toastType ? classNames?.[toastType] : undefined;
-	const toastTypeClass = toastType ? toastItem.classNames?.[toastType] : undefined;
+	const configuredIcon = getToastIcon(icons, toastType);
+	const icon = toastItem.icon || configuredIcon || getAsset(toastType);
+	const toasterTypeClass = getToastClassName(classNames, toastType);
+	const toastTypeClass = getToastClassName(toastItem.classNames, toastType);
+	const toastStyle: CSSProperties = {
+		'--index': index,
+		'--toasts-before': index,
+		'--z-index': toasts.length - index,
+		'--offset': `${removed ? offsetBeforeRemove : offset.current}px`,
+		'--initial-height': expandByDefault ? 'auto' : `${initialHeight}px`,
+		...style,
+		...toastItem.style,
+	};
 
 	return <li
 		tabIndex={0}
@@ -294,15 +323,7 @@ function Toast(props: ToastProps) {
 		data-swipe-direction={swipeOutDirection}
 		data-expanded={Boolean(expanded || expandByDefault && mounted)}
 		data-testid={toastItem.testId}
-		style={{
-			'--index': index,
-			'--toasts-before': index,
-			'--z-index': toasts.length - index,
-			'--offset': `${removed ? offsetBeforeRemove : offset.current}px`,
-			'--initial-height': expandByDefault ? 'auto' : `${initialHeight}px`,
-			...style,
-			...toastItem.style,
-		}}
+		style={toastStyle}
 		onDragEnd={() => {
 			setSwiping(false);
 			setSwipeDirection(null);
@@ -417,7 +438,7 @@ function Toast(props: ToastProps) {
 				</button>
 			: null}
 		{(toastType || toastItem.icon || toastItem.promise) && toastItem.icon !== null &&
-		((toastType ? icons?.[toastType] : undefined) !== null || toastItem.icon)
+		(configuredIcon !== null || toastItem.icon)
 			? <div data-icon="" className={cn(classNames?.icon, toastItem.classNames?.icon)}>
 					{toastItem.promise || toastItem.type === 'loading' && !toastItem.icon
 						? toastItem.icon ||
@@ -626,6 +647,13 @@ export function Toaster(props: ToasterProps) {
 		);
 		return heights.find((height) => height.toastId === frontToast?.id)?.height ?? 0;
 	};
+	const getToasterStyle = (currentPosition: Position, positionIndex: number): CSSProperties => ({
+		'--front-toast-height': `${getFrontToastHeight(currentPosition, positionIndex)}px`,
+		'--width': `${TOAST_WIDTH}px`,
+		'--gap': `${gap}px`,
+		...style,
+		...assignOffset(viewportOffset, mobileOffset),
+	});
 
 	const removeToast = useCallback((toastToRemove: ToastT) => {
 		setToasts((current) => {
@@ -745,13 +773,7 @@ export function Toaster(props: ToasterProps) {
 					data-sonner-theme={actualTheme}
 					data-y-position={currentPosition.split('-')[0]}
 					data-x-position={currentPosition.split('-')[1]}
-					style={{
-						'--front-toast-height': `${getFrontToastHeight(currentPosition, positionIndex)}px`,
-						'--width': `${TOAST_WIDTH}px`,
-						'--gap': `${gap}px`,
-						...style,
-						...assignOffset(viewportOffset, mobileOffset),
-					}}
+					style={getToasterStyle(currentPosition, positionIndex)}
 					onBlur={(event: FocusEvent) => {
 						const currentTarget = event.currentTarget as HTMLOListElement;
 						if (

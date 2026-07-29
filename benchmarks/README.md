@@ -12,9 +12,10 @@ result contract**.
 
 The comparative suites include native Preact and Svelte 5 fixtures alongside
 the existing React, Solid, Ripple, and Vue Vapor references. Preact fixtures use
-`preact`/`preact/hooks` directly (with `preact/compat` only for APIs such as
-portals, Suspense, and `flushSync`); Svelte fixtures use runes, keyed `#each`,
-modern event attributes, and the public imperative APIs. Framework-specific
+`preact`/`preact/hooks` directly, including native scheduler timing, with
+`preact/compat` only for React-shaped APIs that core does not expose, such as
+portals, Suspense, `memo`, and `useSyncExternalStore`; Svelte fixtures use runes,
+keyed `#each`, modern event attributes, and the public imperative APIs. Framework-specific
 capability gaps stay explicit: Svelte's public server renderer is buffered, so
 `streaming-ssr` reports no Svelte target rather than wrapping buffered HTML in a
 fake stream. `codegen-size`, `dbmon-deopt`, and `js-framework-deopt` remain
@@ -42,7 +43,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, **lynx-list**, and
+**ssr-throughput**, **streaming-ssr**, **lynx-list**, **lynx-render**, and
 **lynx-bundle-size** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
@@ -180,12 +181,14 @@ internally, get their own baseline and guard namespace.
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, snapshots, notifications, renders, and exact subscription cleanup |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and six-framework cleanup gates |
+| `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
 | `scheduler-responsiveness` | scheduler-responsiveness | none (builds) | real controlled typing during eight 512-subscriber store updates at 6× CPU throttling, with focus, caret, frame, and notification gates |
 | `suspense-recovery` | suspense-recovery | none (builds) | six-framework visible async pending, rejection, retry, cancellation, and stale-response correctness |
 | `event-delegation` | event-delegation | none (builds) | 128 real native input events, 512 event-bearing hosts, capture/bubble accounting, and every controlled output |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
+| `list-clear` | list-clear | Octane-only | keyed-list bulk clear by parent shape — the only coverage of the shared-parent path |
 | `memo-wall` | memo-wall | Octane + reference frameworks | memo bail + context walk |
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR + Octane-only stress fixtures |
@@ -199,6 +202,7 @@ internally, get their own baseline and guard namespace.
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
+| `lynx-render` | lynx-render | none (Node-only) | dual-thread Lynx render CPU: empty startup, create 1,000 and 10,000 keyed rows through the real background root, transport, and main receiver over a cheap fake Element PAPI, plus a gate that a native tap reaches its background handler via the engine `publishEvent` receiver |
 | `lynx-bundle-size` | lynx-bundle-size | none (builds) | semantic-checksummed production Rspeedy artifact bytes for background preview and dual-thread IFR modes; source/build evidence only |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | six real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |

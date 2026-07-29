@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.9
+
+### Patch Changes
+
+- 1b3f441: Correct the React component migration guidance to use the supported TSRX switch case and default clause grammar.
+
 ## 0.2.8
 
 ### Patch Changes

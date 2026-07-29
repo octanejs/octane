@@ -5,12 +5,86 @@
  * mounts both, and asserts byte-identical innerHTML after each step. This is the
  * gold-standard proof that the port behaves like Base UI — not just "passes my tests".
  */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import { mountDifferential, normaliseHtml } from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/base-ui-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+/**
+ * The rig mounts BOTH runtimes into one jsdom document, so they share a single
+ * `document.activeElement`. A `Menu.Popup` takes focus on open (unlike Dialog/Popover, whose
+ * differential fixtures either run a MODAL focus manager or never focus), and it does so on both
+ * sides — so whichever popup is focused last makes the OTHER runtime's still-focused portal fire a
+ * `focusout` whose `relatedTarget` sits outside it. `FloatingPortal`'s non-modal tab-management
+ * answers that by running `disableFocusInside(portalNode)`, which stamps
+ * `tabindex="-1" data-tabindex="<prev>"` on every tabbable in that portal — including the focus
+ * manager's own inside guards.
+ *
+ * Both runtimes run that identical code; the asymmetry is one document for two apps, not a port
+ * divergence (probed: the side holding focus keeps its original `tabindex`, the side that lost it
+ * gets `-1`, and which side that is flips with whatever the previous test left focused).
+ *
+ * Rather than delete the attributes, this UNDOES the disable — `disableFocusInside` stashes the
+ * previous value in `data-tabindex`, so restoring it is exactly what `enableFocusInside` does when
+ * focus comes back. Both sides therefore normalise to their pre-disable DOM and the `tabindex`
+ * values are still compared, which matters once menu ITEMS are in the popup: their tabindex is
+ * roving state (`open && highlighted ? 0 : -1`), not a constant, so blanket-stripping it would hide
+ * a real roving-focus divergence. Everything else is byte-compared untouched.
+ */
+function undoFocusInsideDisable(html: string): string {
+	return html.replace(/<[a-z]+ [^>]*data-tabindex="[^"]*"[^>]*>/g, (tag) => {
+		const stashed = / data-tabindex="([^"]*)"/.exec(tag)?.[1] ?? '';
+		const withoutStash = tag.replace(/ data-tabindex="[^"]*"/, '');
+		return stashed === ''
+			? withoutStash.replace(/ tabindex="[^"]*"/, '')
+			: withoutStash.replace(/ tabindex="[^"]*"/, ` tabindex="${stashed}"`);
+	});
+}
+
+/**
+ * `d.step` for open menus: drives the step on both runtimes, then byte-compares after undoing the
+ * shared-document focus artifact above on both sides.
+ */
+async function stepUndoingFocusDisable(
+	d: any,
+	name: string,
+	fn: (i: any, r: any) => void | Promise<void> = () => {},
+): Promise<void> {
+	await d.observe(name, fn);
+	const octane = undoFocusInsideDisable(normaliseHtml(d.octane.container.innerHTML));
+	const react = undoFocusInsideDisable(normaliseHtml(d.react.container.innerHTML));
+	expect(octane, `divergence at step "${name}"`).toBe(react);
+}
+
+/**
+ * Byte-compare ONE subtree instead of the whole container.
+ *
+ * Needed for an open SUBMENU. The submenu trigger is the only tabbable child of the parent popup
+ * while its submenu is open (`tabIndex: open || highlighted ? 0 : -1`), so the parent focus
+ * manager's initial focus lands on it, and the trigger's `onFocus` sets the PARENT menu's
+ * `activeIndex` — which surfaces as `data-highlighted`. With both runtimes in one document only one
+ * can win that focus, so only one gets the derived state. Unlike the focus-guard `tabindex`, this is
+ * store state, not a DOM attribute the rig can reconstruct.
+ *
+ * Verified it is the rig and not the port: mounted octane ALONE (no React competing for focus) and
+ * the trigger *is* highlighted and *is* `document.activeElement`, matching React exactly. Rather
+ * than normalise `data-highlighted` away — which would blind the roving-focus comparison the stage-2
+ * helper deliberately preserves — this compares the submenu's OWN portal subtree, where the whole
+ * stage-3 payload lives: nested placement, `data-nested`, the popup's aria wiring back to the
+ * trigger, and the nested items. The trigger's own highlighted state is covered by an octane-only
+ * assertion in `tests/menu.test.ts`.
+ */
+async function stepComparingSubtree(d: any, name: string, selector: string): Promise<void> {
+	await d.observe(name, () => {});
+	const pick = (root: HTMLElement) => {
+		const el = root.querySelector(selector);
+		expect(el, `no element matching ${selector}`).not.toBe(null);
+		return undoFocusInsideDisable(normaliseHtml((el as HTMLElement).outerHTML));
+	};
+	expect(pick(d.octane.container), `divergence at step "${name}"`).toBe(pick(d.react.container));
+}
 
 describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Separator: default (horizontal), byte-identical', async () => {
@@ -527,6 +601,139 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it("AlertDialog.Viewport: open (Dialog's viewport reached through the AlertDialog namespace)", async () => {
 		const d = await mountDifferential(FIXTURE, 'AlertDialogViewportOpen', undefined, CACHE);
 		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Menu: closed Root+Trigger renders the trigger byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuClosed', undefined, CACHE);
+		await d.step('mount (closed)', () => {});
+		d.unmount();
+	});
+
+	it('Menu: open modal dropdown (Portal/backdrop/Positioner/Popup) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpen', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open non-modal dropdown (no internal backdrop) renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenNonModal', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with explicit side/align/sideOffset renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenPlacement', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a disabled root renders byte-identically', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenDisabled', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with items, a disabled item, Separator and Group/GroupLabel', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenWithItems', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with checkbox items (checked/unchecked + transition-mounted indicator)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenCheckboxItems', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	// Base UI's MENU indicators gate on `item.checked`, not on the `mounted` flag that
+	// `Checkbox.Indicator`/`Radio.Indicator` use — so unchecking drops the node immediately and the
+	// exit transition never runs. That reads as a bug against the rest of Base UI, and it was raised
+	// as one in review, but it is upstream's own inconsistency (`MenuCheckboxItemIndicator.tsx` L26
+	// does not even destructure `mounted`). Porting the "fix" would diverge from the real
+	// `@base-ui/react`; this step is the proof that both runtimes drop it on the same commit, and
+	// the guard against a future well-meant repair.
+	it('Menu: toggling a checkbox item matches Base UI, including the immediate indicator unmount', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenCheckboxItems', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open, first item checked)');
+		await stepUndoingFocusDisable(d, 'uncheck the first item', async (i, r) => {
+			await i.click('.menu-check');
+			await r.click('.menu-check');
+		});
+		await stepUndoingFocusDisable(d, 're-check the first item', async (i, r) => {
+			await i.click('.menu-check');
+			await r.click('.menu-check');
+		});
+		d.unmount();
+	});
+
+	it('Menu: selecting a different radio item matches Base UI (indicator moves)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenRadioGroup', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open, second item selected)');
+		await stepUndoingFocusDisable(d, 'select the first item', async (i, r) => {
+			await i.click('.menu-radio');
+			await r.click('.menu-radio');
+		});
+		d.unmount();
+	});
+
+	it('Menu: open with a radio group (group label wiring + selected indicator)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenRadioGroup', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with LinkItem, Arrow and Backdrop', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenLinkArrowBackdrop', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a Viewport wrapping the items', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenViewport', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: open with a closed submenu (SubmenuTrigger is both a parent item and a trigger)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenWithSubmenu', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open, submenu closed)');
+		d.unmount();
+	});
+
+	it('Menubar: closed (composite root of menuitem triggers)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarClosed', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Menubar: vertical, non-modal, disabled (state attributes + orientation)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarVerticalDisabled', undefined, CACHE);
+		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('Menubar: with one menu open (bar-cutout backdrop, orientation-driven side)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenubarOpenMenu', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('ContextMenu: closed Root+Trigger', async () => {
+		const d = await mountDifferential(FIXTURE, 'ContextMenuClosed', undefined, CACHE);
+		await d.step('mount (closed)', () => {});
+		d.unmount();
+	});
+
+	it('ContextMenu: open (modal focus manager, fixed positioning, Menu parts via the namespace)', async () => {
+		const d = await mountDifferential(FIXTURE, 'ContextMenuOpen', undefined, CACHE);
+		await stepUndoingFocusDisable(d, 'mount (open)');
+		d.unmount();
+	});
+
+	it('Menu: OPEN submenu subtree (nested placement, data-nested, aria wiring, nested items)', async () => {
+		const d = await mountDifferential(FIXTURE, 'MenuOpenWithSubmenuOpen', undefined, CACHE);
+		await stepComparingSubtree(d, 'mount (both open)', '.submenu-positioner');
 		d.unmount();
 	});
 });

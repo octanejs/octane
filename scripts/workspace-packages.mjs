@@ -9,6 +9,9 @@ export const INVENTORY_PATH = path.join(REPO_ROOT, 'docs/packages.md');
 const SPECIAL_ROLES = new Map([
 	['octane', 'core runtime + compiler'],
 	['@octanejs/app-core', 'metaframework core'],
+	// Docusaurus owns application routing/content orchestration. This package
+	// adopts that metaframework boundary rather than binding a React library API.
+	['@octanejs/docusaurus', 'metaframework'],
 	['@octanejs/rspack-plugin', 'compiler integration'],
 	['@octanejs/rspeedy-plugin', 'native compiler integration'],
 	['@octanejs/rsbuild-plugin', 'metaframework'],
@@ -17,6 +20,11 @@ const SPECIAL_ROLES = new Map([
 	// binding, so it stays outside the binding status/catalog contract.
 	['@octanejs/tanstack-start', 'metaframework'],
 	['@octanejs/mcp-server', 'agent tooling'],
+	// The CLI inspects and configures other people's projects, including ones
+	// that have no Octane installed yet, which is exactly what `octane init`
+	// exists to fix. Coupling it to the runtime singleton would make it
+	// uninstallable in the case it is meant to solve.
+	['@octanejs/cli', 'developer tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
 	// Original Octane API rather than a port of an upstream library, so it has no
 	// binding status.json / parity contract to satisfy.
@@ -25,6 +33,7 @@ const SPECIAL_ROLES = new Map([
 
 const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/app-core',
+	'@octanejs/docusaurus',
 	'@octanejs/rspack-plugin',
 	'@octanejs/rspeedy-plugin',
 	'@octanejs/rsbuild-plugin',

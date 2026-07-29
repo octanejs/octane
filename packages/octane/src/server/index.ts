@@ -107,6 +107,8 @@ export {
 	// Compiler-emitted codegen helpers (private ABI — see module doc)
 	markChildrenBlock,
 	createElement,
+	createScopedValue,
+	createScopedElement,
 	positionalChildren,
 	escapeHtml,
 	escapeAttr,
@@ -144,6 +146,7 @@ export {
 	ssrBlock,
 	ssrActivity,
 	ssrForBlock,
+	mapSlot,
 	ssrControl,
 	ssrArm,
 	ssrTry,

@@ -1,5 +1,4 @@
 import { createElement, render } from 'preact';
-import { flushSync } from 'preact/compat';
 import App, {
 	bumpAt1,
 	bumpAt11,
@@ -15,20 +14,24 @@ import App, {
 
 const target = document.getElementById('main');
 let mounted = false;
+const update = (run) => {
+	run();
+	return Promise.resolve();
+};
 
 window.__mount = () => {
-	flushSync(() => render(createElement(App), target));
+	render(createElement(App), target);
 	mounted = true;
 };
 window.__unmount = () => {
 	if (mounted) {
-		flushSync(() => render(null, target));
+		render(null, target);
 		mounted = false;
 	}
 };
 window.__reset = () => {
 	if (mounted) {
-		flushSync(() => render(null, target));
+		render(null, target);
 		mounted = false;
 	}
 	while (target.firstChild) target.removeChild(target.firstChild);
@@ -58,14 +61,14 @@ for (const [index, bump] of [
 	[81, bumpAt81],
 	[91, bumpAt91],
 ]) {
-	window['__bumpAt' + index] = () => flushSync(bump);
+	window['__bumpAt' + index] = () => update(bump);
 }
 window.__sweepBatched = () =>
-	flushSync(() => {
+	update(() => {
 		for (const bump of bumps) bump();
 	});
 window.__sweepBatchedReverse = () =>
-	flushSync(() => {
+	update(() => {
 		for (let i = bumps.length - 1; i >= 0; i--) bumps[i]();
 	});
 window.__ready = true;

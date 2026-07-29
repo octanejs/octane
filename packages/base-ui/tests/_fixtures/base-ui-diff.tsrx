@@ -20,6 +20,9 @@ import { Slider } from '@octanejs/base-ui/slider';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Menu } from '@octanejs/base-ui/menu';
+import { Menubar } from '@octanejs/base-ui/menubar';
+import { ContextMenu } from '@octanejs/base-ui/context-menu';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
 import { PreviewCard } from '@octanejs/base-ui/preview-card';
 import { Button } from '@octanejs/base-ui/button';
@@ -970,5 +973,510 @@ export function AlertDialogViewportOpen() @{
 				</AlertDialog.Viewport>
 			</AlertDialog.Portal>
 		</AlertDialog.Root>
+	</div>
+}
+
+// Menu (CLOSED) — Root (wraps a FloatingTree) + Trigger only. Proves the Menu store, the parent
+// resolution, and the closed-trigger path (useClick/useFocus/hover, the list-navigation + typeahead
+// reference props Menu.Root merges into `inactiveTriggerProps`, and the trigger focus guards)
+// render byte-identically to real Base UI while closed.
+export function MenuClosed() @{
+	<Menu.Root>
+		<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+	</Menu.Root>
+}
+
+// Menu (OPEN) — the full anchored-dropdown path portaled into an in-fixture host div (so the rig's
+// `container.innerHTML` sees it). jsdom has zero-size rects, so `useAnchorPositioning` computes
+// deterministic default styles in BOTH octane and React — proving the Positioner (useFloating +
+// @floating-ui/dom middleware, with Menu's DROPDOWN_COLLISION_AVOIDANCE), the modal InternalBackdrop
+// and the Popup (role="menu", `data-rootownerid`, FloatingFocusManager) render byte-for-byte
+// identically to real Base UI, including the @floating-ui positioner styles.
+//
+// Controlled-open WITHOUT a trigger keeps the anchor stable: with a trigger, its
+// `element` ↔ `[guard, element, guard]` shape-flip on open remounts the button, which the
+// positioner observes as a transient "trigger change" (sets `data-instant`) — a mount-timing
+// artifact the rig can't see. The trigger's open/dismiss flow is covered by the behavior test on
+// `MenuInteractive` instead.
+export function MenuOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, non-modal) — `modal={false}` drops the InternalBackdrop and the scroll lock, so the
+// positioner/popup pair must still match Base UI exactly on the non-modal path.
+export function MenuOpenNonModal() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, explicit side/align) — the positioner's placement props flow through to the
+// @floating-ui computation and the `data-side`/`data-align` state attributes.
+export function MenuOpenPlacement() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner" side="right" align="start" sideOffset={8}>
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, disabled root) — `disabled` gates useDismiss/useListNavigation/useTypeahead off; the
+// rendered popup must still match.
+export function MenuOpenDisabled() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false} disabled>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (interactive) — a real trigger → open → dismiss flow, for behavior tests (focus management,
+// keyboard open/close and the store's roving-focus plumbing aren't visible in innerHTML, so they
+// can't be differential-tested).
+export function MenuInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Root modal={false}>
+			<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (DETACHED trigger via a handle) — the trigger sits OUTSIDE `Menu.Root` and is associated
+// with it only through the shared `Menu.Handle`. This is the path where `MenuStore.setOpen` must
+// reach `Menu.Root`'s `setOpen`: the store routes it through the floating root context's event bus
+// rather than applying it directly, precisely so a holder of the store alone (a detached trigger,
+// or `handle.open()`/`handle.close()`) drives the one Root that owns the open-change sequence.
+export function MenuWithHandle({ handle }: { handle: any }) @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Trigger handle={handle} id="detached-menu-trigger" className="menu-trigger">
+			Open menu
+		</Menu.Trigger>
+		<Menu.Root handle={handle} modal={false}>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">Menu body</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, with items) — the stage-2 payload. Items register with the positioner's CompositeList,
+// which is what gives `useListNavigation`/`useTypeahead` (Phase 3e) something to navigate. Covers
+// the item roles/tabindex, the disabled item, Group + GroupLabel's `aria-labelledby` wiring, and
+// `Menu.Separator` (the shared Separator reached through the Menu namespace).
+export function MenuOpenWithItems() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.Item className="menu-item">Copy</Menu.Item>
+						<Menu.Item className="menu-item" disabled>Paste</Menu.Item>
+						<Menu.Separator className="menu-sep" />
+						<Menu.Group className="menu-group">
+							<Menu.GroupLabel className="menu-group-label">More</Menu.GroupLabel>
+							<Menu.Item className="menu-item">Duplicate</Menu.Item>
+						</Menu.Group>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, checkbox items) — `role="menuitemcheckbox"`, `aria-checked`, and `itemMapping`'s
+// present/absent `data-checked`/`data-unchecked` pair. The indicator is transition-mounted, so the
+// unchecked item has no indicator element at all while the checked one does.
+export function MenuOpenCheckboxItems() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.CheckboxItem className="menu-check" defaultChecked>
+							<Menu.CheckboxItemIndicator className="menu-check-ind">x</Menu.CheckboxItemIndicator>
+							Bold
+						</Menu.CheckboxItem>
+						<Menu.CheckboxItem className="menu-check">
+							<Menu.CheckboxItemIndicator className="menu-check-ind">x</Menu.CheckboxItemIndicator>
+							Italic
+						</Menu.CheckboxItem>
+						<Menu.CheckboxItem className="menu-check">
+							<Menu.CheckboxItemIndicator className="menu-check-ind" keepMounted>
+								x
+							</Menu.CheckboxItemIndicator>
+							Underline
+						</Menu.CheckboxItem>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, radio group) — `role="group"` + the GroupLabel `aria-labelledby` wiring RadioGroup
+// shares with Group, plus `role="menuitemradio"`/`aria-checked` and the selected item's indicator.
+export function MenuOpenRadioGroup() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.RadioGroup className="menu-radio-group" defaultValue="md">
+							<Menu.GroupLabel className="menu-group-label">Size</Menu.GroupLabel>
+							<Menu.RadioItem className="menu-radio" value="sm">
+								<Menu.RadioItemIndicator className="menu-radio-ind">o</Menu.RadioItemIndicator>
+								Small
+							</Menu.RadioItem>
+							<Menu.RadioItem className="menu-radio" value="md">
+								<Menu.RadioItemIndicator className="menu-radio-ind">o</Menu.RadioItemIndicator>
+								Medium
+							</Menu.RadioItem>
+						</Menu.RadioGroup>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, link item + arrow + backdrop) — the remaining stage-2 parts. LinkItem renders an
+// `<a>` that still carries the menuitem role and the composite tabindex; Arrow picks up the
+// positioner's arrow styles; Backdrop is the user-facing overlay (distinct from the modal
+// InternalBackdrop the positioner renders on its own).
+export function MenuOpenLinkArrowBackdrop() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Backdrop className="menu-backdrop" />
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Arrow className="menu-arrow">^</Menu.Arrow>
+						<Menu.LinkItem className="menu-link" href="https://example.com">Docs</Menu.LinkItem>
+						<Menu.Item className="menu-item">Close</Menu.Item>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, viewport) — the content-transition container between the popup and its children.
+export function MenuOpenViewport() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Viewport className="menu-viewport">
+							<Menu.Item className="menu-item">Cut</Menu.Item>
+							<Menu.Item className="menu-item">Copy</Menu.Item>
+						</Menu.Viewport>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (interactive, with items) — for behavior tests: roving focus, typeahead, item activation,
+// and checkbox/radio toggling, none of which are visible in a mount-time innerHTML snapshot.
+export function MenuItemsInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Root modal={false}>
+			<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Apple</Menu.Item>
+						<Menu.Item className="menu-item">Banana</Menu.Item>
+						<Menu.Item className="menu-item">Cherry</Menu.Item>
+						<Menu.CheckboxItem className="menu-check">
+							<Menu.CheckboxItemIndicator className="menu-check-ind">x</Menu.CheckboxItemIndicator>
+							Damson
+						</Menu.CheckboxItem>
+						<Menu.RadioGroup className="menu-radio-group" defaultValue="e1">
+							<Menu.RadioItem className="menu-radio" value="e1">Elderberry</Menu.RadioItem>
+							<Menu.RadioItem className="menu-radio" value="e2">Fig</Menu.RadioItem>
+						</Menu.RadioGroup>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, with a closed submenu) — the stage-3 skeleton. `SubmenuTrigger` is simultaneously an
+// item of the parent menu and the trigger of its own, so it carries the parent's `itemProps` and
+// roving tabindex alongside `aria-haspopup`/`aria-expanded` and the trigger open-state attributes.
+// The submenu itself is closed here, so only the trigger renders.
+export function MenuOpenWithSubmenu() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.SubmenuRoot>
+							<Menu.SubmenuTrigger className="menu-subtrigger">Share</Menu.SubmenuTrigger>
+							<Menu.Portal container={containerRef}>
+								<Menu.Positioner className="submenu-positioner">
+									<Menu.Popup className="submenu-popup">
+										<Menu.Item className="submenu-item">Email</Menu.Item>
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.SubmenuRoot>
+						<Menu.Item className="menu-item">Paste</Menu.Item>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (OPEN, with an OPEN submenu) — both levels mounted. The nested `Menu.Root` resolves its
+// parent to `{ type: 'menu' }` through `SubmenuRoot`'s context, which flips the submenu positioner
+// to `inline-end`/`start` placement, marks the popup `data-nested`, and suppresses the modal
+// backdrop for the nested level.
+export function MenuOpenWithSubmenuOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menu.Root open modal={false}>
+			<Menu.Portal container={containerRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.SubmenuRoot open>
+							<Menu.SubmenuTrigger className="menu-subtrigger">Share</Menu.SubmenuTrigger>
+							<Menu.Portal container={containerRef}>
+								<Menu.Positioner className="submenu-positioner">
+									<Menu.Popup className="submenu-popup">
+										<Menu.Item className="submenu-item">Email</Menu.Item>
+										<Menu.Item className="submenu-item">Message</Menu.Item>
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.SubmenuRoot>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menu (interactive submenu) — for behavior tests: opening a submenu from its trigger, the
+// parent/sibling close relays, and Escape closing only the child.
+export function MenuSubmenuInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menu.Root modal={false}>
+			<Menu.Trigger className="menu-trigger">Open menu</Menu.Trigger>
+			<Menu.Portal container={hostRef}>
+				<Menu.Positioner className="menu-positioner">
+					<Menu.Popup className="menu-popup">
+						<Menu.Item className="menu-item">Cut</Menu.Item>
+						<Menu.SubmenuRoot>
+							<Menu.SubmenuTrigger className="menu-subtrigger" openOnHover={false}>
+								Share
+							</Menu.SubmenuTrigger>
+							<Menu.Portal container={hostRef}>
+								<Menu.Positioner className="submenu-positioner">
+									<Menu.Popup className="submenu-popup">
+										<Menu.Item className="submenu-item">Email</Menu.Item>
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.SubmenuRoot>
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
+	</div>
+}
+
+// Menubar (CLOSED) — a CompositeRoot of Menu.Triggers sharing one FloatingTree. The `menubar` arm
+// of Menu's parent union, transcribed in stage 1 and inert until now, makes each trigger render as
+// a CompositeItem with `role="menuitem"` instead of a standalone button.
+export function MenubarClosed() @{
+	<Menubar className="menubar">
+		<Menu.Root>
+			<Menu.Trigger className="menubar-trigger">File</Menu.Trigger>
+		</Menu.Root>
+		<Menu.Root>
+			<Menu.Trigger className="menubar-trigger">Edit</Menu.Trigger>
+		</Menu.Root>
+	</Menubar>
+}
+
+// Menubar (vertical, non-modal, disabled) — the state attributes and the orientation that flows
+// into both the composite roving focus and the menus' positioner defaults.
+export function MenubarVerticalDisabled() @{
+	<Menubar className="menubar" orientation="vertical" modal={false} disabled>
+		<Menu.Root>
+			<Menu.Trigger className="menubar-trigger">File</Menu.Trigger>
+		</Menu.Root>
+	</Menubar>
+}
+
+// Menubar with one menu OPEN — proves the menubar parent branch end to end: the open menu's
+// positioner takes its side from the bar's orientation, the backdrop cutout is the BAR (not the
+// trigger) so the whole menubar stays clickable, and the trigger keeps `role="menuitem"`.
+export function MenubarOpenMenu() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<Menubar className="menubar">
+			<Menu.Root open>
+				<Menu.Trigger className="menubar-trigger">File</Menu.Trigger>
+				<Menu.Portal container={containerRef}>
+					<Menu.Positioner className="menu-positioner">
+						<Menu.Popup className="menu-popup">
+							<Menu.Item className="menu-item">New</Menu.Item>
+							<Menu.Item className="menu-item">Open</Menu.Item>
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+			<Menu.Root>
+				<Menu.Trigger className="menubar-trigger">Edit</Menu.Trigger>
+			</Menu.Root>
+		</Menubar>
+	</div>
+}
+
+// ContextMenu (CLOSED) — Root + Trigger only. The trigger is a plain region that listens for
+// contextmenu/long-press; nothing is portaled until it opens.
+export function ContextMenuClosed() @{
+	<ContextMenu.Root>
+		<ContextMenu.Trigger className="ctx-trigger">Right click me</ContextMenu.Trigger>
+	</ContextMenu.Root>
+}
+
+// ContextMenu (OPEN) — the `context-menu` arm of Menu's parent union: a MODAL focus manager, fixed
+// positioning, `start` alignment with the cursor-anchored offsets, and Menu's parts reached through
+// the ContextMenu namespace.
+export function ContextMenuOpen() @{
+	const containerRef = useRef(null);
+	<div>
+		<div ref={containerRef} class="portal-host" />
+		<ContextMenu.Root open>
+			<ContextMenu.Trigger className="ctx-trigger">Right click me</ContextMenu.Trigger>
+			<ContextMenu.Portal container={containerRef}>
+				<ContextMenu.Positioner className="ctx-positioner">
+					<ContextMenu.Popup className="ctx-popup">
+						<ContextMenu.Item className="ctx-item">Cut</ContextMenu.Item>
+						<ContextMenu.Separator className="ctx-sep" />
+						<ContextMenu.Item className="ctx-item">Copy</ContextMenu.Item>
+					</ContextMenu.Popup>
+				</ContextMenu.Positioner>
+			</ContextMenu.Portal>
+		</ContextMenu.Root>
+	</div>
+}
+
+// ContextMenu (interactive) — for behavior tests: a real `contextmenu` event opens it at the cursor.
+export function ContextMenuInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="ctx-host" />
+		<ContextMenu.Root>
+			<ContextMenu.Trigger className="ctx-trigger">Right click me</ContextMenu.Trigger>
+			<ContextMenu.Portal container={hostRef}>
+				<ContextMenu.Positioner className="ctx-positioner">
+					<ContextMenu.Popup className="ctx-popup">
+						<ContextMenu.Item className="ctx-item">Cut</ContextMenu.Item>
+					</ContextMenu.Popup>
+				</ContextMenu.Positioner>
+			</ContextMenu.Portal>
+		</ContextMenu.Root>
+	</div>
+}
+
+// Menubar (interactive) — for behavior tests: pressing a trigger opens its menu, and the sibling
+// trigger opens on hover once one menu is open.
+export function MenubarInteractive() @{
+	const hostRef = useRef(null);
+	<div>
+		<div ref={hostRef} class="menu-host" />
+		<Menubar className="menubar">
+			<Menu.Root>
+				<Menu.Trigger className="menubar-file">File</Menu.Trigger>
+				<Menu.Portal container={hostRef}>
+					<Menu.Positioner className="menu-positioner">
+						<Menu.Popup className="file-popup">
+							<Menu.Item className="menu-item">New</Menu.Item>
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+			<Menu.Root>
+				<Menu.Trigger className="menubar-edit">Edit</Menu.Trigger>
+				<Menu.Portal container={hostRef}>
+					<Menu.Positioner className="menu-positioner">
+						<Menu.Popup className="edit-popup">
+							<Menu.Item className="menu-item">Undo</Menu.Item>
+						</Menu.Popup>
+					</Menu.Positioner>
+				</Menu.Portal>
+			</Menu.Root>
+		</Menubar>
 	</div>
 }

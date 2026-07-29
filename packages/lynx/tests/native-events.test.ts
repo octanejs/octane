@@ -62,7 +62,13 @@ describe('Lynx native event boundary', () => {
 	});
 
 	it('round-trips one versionless root, host generation, and listener identity', () => {
-		const identity = { root: 7, id: 11, generation: 3, listener: 29 };
+		const identity = {
+			root: 7,
+			id: 11,
+			generation: 3,
+			listener: 29,
+			priority: 'discrete',
+		} as const;
 		const token = encodeLynxNativeEventToken(identity);
 
 		expect(decodeLynxNativeEventToken(token)).toEqual(identity);
@@ -73,20 +79,30 @@ describe('Lynx native event boundary', () => {
 
 	it('rejects non-canonical, unsafe, and version-bearing listener identities', () => {
 		for (const identity of [
-			{ root: 0, id: 1, generation: 1, listener: 1 },
-			{ root: 1, id: -1, generation: 1, listener: 1 },
-			{ root: 1, id: 1, generation: Number.MAX_SAFE_INTEGER + 1, listener: 1 },
-			{ root: 1, id: 1, generation: 1, listener: 1, version: 4 },
+			{ root: 0, id: 1, generation: 1, listener: 1, priority: 'discrete' },
+			{ root: 1, id: -1, generation: 1, listener: 1, priority: 'discrete' },
+			{
+				root: 1,
+				id: 1,
+				generation: Number.MAX_SAFE_INTEGER + 1,
+				listener: 1,
+				priority: 'discrete',
+			},
+			{ root: 1, id: 1, generation: 1, listener: 1, priority: 'discrete', version: 4 },
+			{ root: 1, id: 1, generation: 1, listener: 1 },
+			{ root: 1, id: 1, generation: 1, listener: 1, priority: 'urgent' },
 		]) {
 			expect(() => encodeLynxNativeEventToken(identity as never)).toThrow(/native event token/);
 		}
 		for (const token of [
 			null,
 			'',
-			'octane-lynx:event:01:1:1:1',
-			'octane-lynx:event:1:1:1:0',
+			'octane-lynx:event:01:1:1:1:discrete',
+			'octane-lynx:event:1:1:1:0:discrete',
 			'octane-lynx:event:1:1:1:1:2',
-			'octane-lynx:event:1:1:1:9007199254740992',
+			'octane-lynx:event:1:1:1:1',
+			'octane-lynx:event:1:1:1:1:urgent',
+			'octane-lynx:event:1:1:1:9007199254740992:discrete',
 		]) {
 			expect(() => decodeLynxNativeEventToken(token)).toThrow(/native event token/);
 		}

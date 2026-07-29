@@ -20,7 +20,7 @@ comparison: the `bundle-size` suite builds these apps too (ops prefixed
 | `solid`       | 5242 | Solid 2.0-beta; `flush()` per handler; class STRINGS (beta `classList` is inert) |
 | `ripple`      | 5243 | deriveds are FUNCTIONS called in template expressions (fine-grained: the body runs once — a setup-time `const` freezes) |
 | `vue-vapor`   | 5244 | Vapor SFC; `window.__benchFlush = () => nextTick()` (no public sync flush) |
-| `preact`      | 5261 | Preact core/hooks; `flushSync` commits each handler inside the timed window |
+| `preact`      | 5261 | Preact core/hooks; native microtask commits are awaited inside the timed window |
 | `svelte`      | 5272 | Svelte 5 runes; `flushSync` commits each handler inside the timed window |
 
 ## DOM contract (shared by every app)

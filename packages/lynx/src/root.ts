@@ -14,6 +14,7 @@ import {
 	type LynxPublicHandle,
 } from './core/client-driver.js';
 import { prepareLynxBackgroundLifecycleReceiver } from './core/background-lifecycle.js';
+import { installLynxNativeEventReceiver } from './core/native-event-receiver.js';
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
 import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
@@ -267,10 +268,13 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 		}
 	})();
 	let uninstallCallBridge: (() => void) | null = null;
+	let uninstallNativeEvents: (() => void) | null = null;
 	let workletsClosed = false;
 	const closeWorklets = (): void => {
 		if (workletsClosed) return;
 		workletsClosed = true;
+		uninstallNativeEvents?.();
+		uninstallNativeEvents = null;
 		uninstallCallBridge?.();
 		uninstallCallBridge = null;
 		acceptedWorklets.clear();
@@ -289,6 +293,33 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 				);
 				return { promise: call.promise as Promise<Result>, cancel: call.cancel };
 			},
+		});
+	} catch (error) {
+		lifecycleInstallation.rollback();
+		transport.close(error);
+		closeWorklets();
+		throw error;
+	}
+
+	// A native `bind*` handler is delivered by the engine straight to this
+	// thread, so the root that owns the listener table must be the thing
+	// listening for it. Installing this is what makes taps reach handlers at all.
+	try {
+		uninstallNativeEvents = installLynxNativeEventReceiver(target as object, {
+			claims(root) {
+				// The transport knows its root from its first commit, which is
+				// necessarily earlier than main installing a token for it. Claiming on
+				// the accepted identity instead would drop every tap that lands before
+				// this thread processes the first acknowledgement.
+				return transport.ownedRoot() === root;
+			},
+			deliver(deliveries) {
+				transport.dispatchNativeEventBatch(deliveries);
+			},
+			report(error) {
+				options.onDiagnostic?.(error);
+			},
+			scheduleMicrotask,
 		});
 	} catch (error) {
 		lifecycleInstallation.rollback();

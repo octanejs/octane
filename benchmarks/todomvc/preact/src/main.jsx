@@ -1,10 +1,9 @@
 import { render } from 'preact';
 import { useCallback, useState } from 'preact/hooks';
-import { flushSync } from 'preact/compat';
 
-// Native Preact TodoMVC fixture. State and hooks come from Preact directly;
-// compat is used only for its public synchronous flush so the timed event
-// window includes the DOM commit, matching the sibling adapters.
+// Preact queues hook updates in a microtask. The harness awaits this after each
+// interaction so native scheduling and the DOM commit stay timed.
+window.__benchFlush = () => Promise.resolve();
 
 let nextId = 1;
 
@@ -18,44 +17,37 @@ function TodoApp() {
 		const input = e.currentTarget;
 		const title = input.value.trim();
 		if (title === '') return;
-		flushSync(() => setTodos((items) => [...items, { id: nextId++, title, completed: false }]));
+		setTodos((items) => [...items, { id: nextId++, title, completed: false }]);
 		input.value = '';
 	}, []);
 	const toggle = (id) =>
-		flushSync(() =>
-			setTodos((items) =>
-				items.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)),
-			),
+		setTodos((items) =>
+			items.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)),
 		);
-	const destroy = (id) =>
-		flushSync(() => setTodos((items) => items.filter((item) => item.id !== id)));
+	const destroy = (id) => setTodos((items) => items.filter((item) => item.id !== id));
 	const toggleAll = (e) => {
 		const completed = e.currentTarget.checked;
-		flushSync(() =>
-			setTodos((items) =>
-				items.map((item) => (item.completed === completed ? item : { ...item, completed })),
-			),
+		setTodos((items) =>
+			items.map((item) => (item.completed === completed ? item : { ...item, completed })),
 		);
 	};
 	const clearCompleted = useCallback(
-		() => flushSync(() => setTodos((items) => items.filter((item) => !item.completed))),
+		() => setTodos((items) => items.filter((item) => !item.completed)),
 		[],
 	);
-	const startEdit = (id) => flushSync(() => setEditing(id));
+	const startEdit = (id) => setEditing(id);
 	const commitEdit = (id, e) => {
 		const title = e.currentTarget.value.trim();
-		flushSync(() => {
-			setTodos((items) =>
-				title === ''
-					? items.filter((item) => item.id !== id)
-					: items.map((item) => (item.id === id ? { ...item, title } : item)),
-			);
-			setEditing(null);
-		});
+		setTodos((items) =>
+			title === ''
+				? items.filter((item) => item.id !== id)
+				: items.map((item) => (item.id === id ? { ...item, title } : item)),
+		);
+		setEditing(null);
 	};
 	const editKeyDown = (id, e) => {
 		if (e.key === 'Enter') commitEdit(id, e);
-		else if (e.key === 'Escape') flushSync(() => setEditing(null));
+		else if (e.key === 'Escape') setEditing(null);
 	};
 
 	const visible =
@@ -124,7 +116,7 @@ function TodoApp() {
 									<a
 										class={filter === name ? 'selected' : ''}
 										data-filter={name}
-										onClick={() => flushSync(() => setFilter(name))}
+										onClick={() => setFilter(name)}
 									>
 										{name[0].toUpperCase() + name.slice(1)}
 									</a>

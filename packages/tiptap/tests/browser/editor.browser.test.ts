@@ -126,6 +126,33 @@ async function readMenuGeometry(kind: 'bubble' | 'floating') {
 }
 
 describe('@octanejs/tiptap real-browser behavior', () => {
+	it('switches EditorContent and a lazy Suspense source editor without detached anchors', async () => {
+		await page.goto(`${origin}/editor-switch.html`, { waitUntil: 'networkidle' });
+
+		const modeSwitch = page.locator('[data-editor-switch="true"]');
+		const toggle = modeSwitch.getByRole('button', { name: 'Toggle source editor' });
+		const richEditor = modeSwitch.locator('[data-branch-rich-editor="true"] .ProseMirror');
+		const sourceEditor = modeSwitch.locator('[data-branch-source-editor="true"]');
+
+		await richEditor.waitFor();
+		expect(await richEditor.textContent()).toBe('Switchable editor');
+
+		await toggle.click();
+		await sourceEditor.waitFor();
+		expect(await sourceEditor.textContent()).toBe('source editor');
+		expect(await richEditor.count()).toBe(0);
+
+		await toggle.click();
+		await richEditor.waitFor();
+		expect(await richEditor.textContent()).toBe('Switchable editor');
+		expect(await sourceEditor.count()).toBe(0);
+
+		await toggle.click();
+		await sourceEditor.waitFor();
+		expect(await richEditor.count()).toBe(0);
+		expect(pageErrors).toEqual([]);
+	});
+
 	it('keeps a live caret while typing updates editor content', async () => {
 		const paragraph = page.locator('.ProseMirror > p').first();
 		await paragraph.click();

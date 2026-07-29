@@ -89,11 +89,11 @@ describe('context Provider — children dialect changes', () => {
 		try {
 			m.click('.toggle');
 
-			// The control: an `@if` swap deleting the identical component. It reaches the boundary
-			// too, so the Provider flip is not inventing its own routing. This arm asserts only
-			// that the boundary engages — `@if` currently surfaces a follow-on DOM error rather
-			// than the cleanup's own, a separate pre-existing gap that is not this PR's to close.
-			expect(m.container.querySelector('.caught')).not.toBe(null);
+			// The control: an `@if` swap deleting the identical component. The
+			// cleanup disposes the old branch through its enclosing boundary, so
+			// the swap must stop before mounting into that disposed catch range.
+			expect(m.container.querySelector('.caught')?.textContent).toBe('cleanup-boom');
+			expect(m.container.querySelector('.other')).toBe(null);
 			expect(error.mock.calls.filter((c) => String(c[0]).includes('cleanup-boom'))).toHaveLength(0);
 		} finally {
 			error.mockRestore();

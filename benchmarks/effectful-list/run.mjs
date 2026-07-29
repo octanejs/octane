@@ -13,10 +13,9 @@
 // AND its effect dispatch inside the adapter call — synchronously where the
 // framework allows it (octane: flushSync + drainPassiveEffects; react:
 // flushSync — React 19 flushes passives synchronously at the tail of a
-// sync-lane commit; solid: flush(); ripple: flushSync); an adapter with no
-// public sync flush (vue-vapor) returns a thenable and the timed window
-// extends until it settles (nextTick resolves after Vue's flushJobs — DOM
-// mutated and post-flush watchers drained). Either way we time ONLY the
+// sync-lane commit; solid: flush(); ripple: flushSync). Native async adapters
+// (Preact and vue-vapor) return a thenable and the timed window extends until it
+// settles after the DOM mutation. Either way we time ONLY the
 // framework's JS work, with a forced GC before each timed sample.
 // Sub-millisecond ops (update_nodeps / update_deps on the fine-grained
 // targets) loop N times inside the timed window and divide, to beat timer
@@ -196,7 +195,7 @@ async function gateCheck(page, op) {
 // Timed loop, entirely in-page: (optional per-sample pre) → gc() → inner×op →
 // divide. Yields a macrotask between samples so the page stays responsive and
 // deferred work can't bleed into the next sample. An op that returns a
-// thenable (vue-vapor — no public sync flush; see the methodology note) is
+// thenable (Preact/vue-vapor; see the methodology note) is
 // awaited BETWEEN inner iterations, so each iteration commits — the inner
 // state changes would otherwise coalesce into one commit and the sample
 // would time a single net update instead of `inner` full ones.

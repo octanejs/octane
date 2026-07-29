@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
+	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',
 	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
@@ -27,6 +28,7 @@ export const KNOWN_BINDINGS = {
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	nuqs: '@octanejs/nuqs',
+	cmdk: '@octanejs/cmdk',
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
@@ -102,7 +104,7 @@ export const KNOWN_BINDINGS = {
 // Octane-specific ecosystem packages that have no React import to rewrite.
 // Keep these out of KNOWN_BINDINGS so the React bridge never invents a source
 // package mapping for native tooling.
-export const KNOWN_NATIVE_BINDINGS = new Set(['@octanejs/devtools']);
+export const KNOWN_NATIVE_BINDINGS = new Set(['@octanejs/devtools', '@octanejs/tauri']);
 
 // Workspace directory names for the maintained bindings. Keep this derived
 // from both catalogs so repository path routing cannot drift from the public

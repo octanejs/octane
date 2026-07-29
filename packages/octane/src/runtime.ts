@@ -656,6 +656,14 @@ export interface Block extends Scope {
 interface EffectSlot {
 	deps: any[] | undefined;
 	cleanup: Cleanup | undefined;
+	/** Render token of the latest completed attempt that reached this call site. */
+	renderVersion: number;
+	/** Invalidates queued work superseded by a later render or presence transition. */
+	revision: number;
+	/** Whether the latest completed render reached this registered call site. */
+	active: boolean;
+	/** Stable first-enqueue order within the owning scope. */
+	order: number;
 	/** Hook key retained so a bailed Suspense descendant can reconnect at commit. */
 	slot: HookSlot;
 	/** Last effect body and args that actually reached commit. */
@@ -675,12 +683,23 @@ interface EffectSlot {
 	phase: Phase;
 }
 
-type EffectDepsSnapshot = Map<EffectSlot, any[] | undefined>;
+interface EffectStateSnapshot {
+	deps: any[] | undefined;
+	revision: number;
+	active: boolean;
+}
+
+type EffectDepsSnapshot = Map<EffectSlot, EffectStateSnapshot>;
 
 interface PendingEffect {
 	scope: Scope;
 	slot: HookSlot;
-	fn: EffectFn;
+	/** Null for a conditional call site that disappeared and only needs teardown. */
+	fn: EffectFn | null;
+	/** Stable first-enqueue order of the owning slot within its scope. */
+	order: number;
+	/** Slot revision this entry belongs to; stale entries are ignored at drain. */
+	revision: number;
 	/**
 	 * The effect's deps array, spread as positional arguments to the body when it
 	 * runs (`fn.apply(null, args)`). This is a deliberate superset of React: a
@@ -718,6 +737,13 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
+// Conditional effects need to distinguish "deps unchanged" from "the call site
+// was not reached". Effect-less components keep this at zero and pay no counter
+// increment; a render of an existing effect-owning scope allocates its token up
+// front, while the first effect call lazily allocates one below.
+let CURRENT_EFFECT_RENDER_VERSION = 0;
+let CURRENT_EFFECT_REACHED = 0;
+let NEXT_EFFECT_RENDER_VERSION = 1;
 interface ActiveWarmPlan {
 	block: Block;
 	fn: () => void;
@@ -2852,14 +2878,25 @@ function comparePostOrder(
 	return aSeq - bSeq;
 }
 function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
+	if (a.scope === b.scope) return a.order - b.order || a.seq - b.seq;
 	return comparePostOrder(a.scope.block, a.seq, b.scope.block, b.seq);
 }
 
 /** Fire (and clear) the CURRENT cleanup of the slot behind a queued effect. */
 function fireEffectCleanup(e: PendingEffect): void {
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
-	if (slot && slot.cleanup) {
-		const cleanup = slot.cleanup;
+	if (slot === undefined || slot.revision !== e.revision) return;
+	const disconnect = e.fn === null;
+	const cleanup = slot.cleanup;
+	if (disconnect) {
+		// Publish the absence before user cleanup runs. A cleanup may schedule a
+		// render; that render must see this call site as disconnected and must not
+		// queue a duplicate teardown while the current one is still unwinding.
+		slot.connectedFn = null;
+		slot.connectedArgs = undefined;
+		slot.disconnected = false;
+	}
+	if (cleanup) {
 		slot.cleanup = undefined;
 		try {
 			runEffectCleanupCallback(cleanup);
@@ -2874,13 +2911,13 @@ function fireEffectCleanup(e: PendingEffect): void {
 
 /** Run a queued effect's body and stash its returned cleanup on the slot. */
 function runEffectBody(e: PendingEffect): void {
+	if (e.fn === null) return;
 	let cleanup: void | Cleanup;
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
-	if (slot) {
-		slot.connectedFn = e.fn;
-		slot.connectedArgs = e.args;
-		slot.disconnected = false;
-	}
+	if (slot === undefined || slot.revision !== e.revision) return;
+	slot.connectedFn = e.fn;
+	slot.connectedArgs = e.args;
+	slot.disconnected = false;
 	try {
 		EFFECT_BODY_DEPTH++;
 		try {
@@ -2903,7 +2940,7 @@ function runEffectBody(e: PendingEffect): void {
 		// The slot owns its LATEST cleanup: unmountScope's effect-slot walk (and
 		// deactivateScope's hide walk) read + clear it, so a dep-changed effect's
 		// stale cleanup can never replay at teardown.
-		if (slot) slot.cleanup = cleanup;
+		slot.cleanup = cleanup;
 	}
 }
 
@@ -2970,7 +3007,11 @@ function drainMutationEffects(): PendingEffect[] | null {
 		}
 		for (let k = i; k < end; k++) {
 			const e = q[k];
-			if (e.phase === LAYOUT && !e.scope.block.disposed && !inInactiveSubtree(e.scope.block))
+			if (
+				e.phase === LAYOUT &&
+				!e.scope.block.disposed &&
+				(e.fn === null || !inInactiveSubtree(e.scope.block))
+			)
 				fireEffectCleanup(e);
 		}
 		i = end;
@@ -3008,7 +3049,7 @@ function drainPassivePhase(): void {
 	q.sort(compareEffectPostOrder);
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
+		if (e.scope.block.disposed || (e.fn !== null && inInactiveSubtree(e.scope.block))) continue;
 		fireEffectCleanup(e);
 	}
 	for (let i = 0; i < q.length; i++) {
@@ -3374,6 +3415,8 @@ function enqueueEffectEventCommitAction(action: () => void): void {
 function renderBlockInner(block: Block): void {
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
+	const prevEffectRenderVersion = CURRENT_EFFECT_RENDER_VERSION;
+	const prevEffectReached = CURRENT_EFFECT_REACHED;
 	const prevWarmEpisode = CURRENT_WARM_EPISODE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	const prevEffectEventTarget = EFFECT_EVENT_RENDER_TARGET;
@@ -3384,6 +3427,8 @@ function renderBlockInner(block: Block): void {
 	const effectEventActionCheckpoint = effectEventActionTarget.length;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
+	CURRENT_EFFECT_REACHED = 0;
 	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
 	if (!continuesParentTree) {
 		// A true Suspense retry enters from no ambient block and resumes its saved
@@ -3468,6 +3513,7 @@ function renderBlockInner(block: Block): void {
 			block.extra,
 		);
 		if (out !== undefined && block.outputHandler !== null) block.outputHandler(block, out);
+		finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
 		if (block.effectEventRenderVersion !== 0) {
 			block.effectEventCompletedVersion = block.effectEventRenderVersion;
@@ -3495,6 +3541,8 @@ function renderBlockInner(block: Block): void {
 		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
 		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_WARM_EPISODE = prevWarmEpisode;
+		CURRENT_EFFECT_RENDER_VERSION = prevEffectRenderVersion;
+		CURRENT_EFFECT_REACHED = prevEffectReached;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 	}
@@ -4737,23 +4785,102 @@ function inInactiveSubtree(block: Block | null): boolean {
 	return false;
 }
 
+function ensureEffectRenderVersion(): number {
+	if (CURRENT_EFFECT_RENDER_VERSION === 0) {
+		CURRENT_EFFECT_RENDER_VERSION = NEXT_EFFECT_RENDER_VERSION++;
+	}
+	return CURRENT_EFFECT_RENDER_VERSION;
+}
+
+/**
+ * A completed render disconnects any previously-live effect call site it did
+ * not reach. The teardown rides the ordinary phase queue, so insertion/layout
+ * stay synchronous and passive stays post-paint. Suspended/thrown renders never
+ * call this function; captured renders redirect the entries into WIP_CAPTURE.
+ */
+function finishEffectRender(scope: Scope): void {
+	const effects = scope.effectSlots;
+	if (effects === null || CURRENT_EFFECT_RENDER_VERSION === 0) return;
+	// enqueueEffect counts each registered slot at most once per render. Reaching
+	// the registered slot count therefore proves there is no conditional
+	// omission, even when custom-hook composition invokes one effective slot more
+	// than once. This common path avoids scanning the slot list.
+	if (CURRENT_EFFECT_REACHED === effects.length) return;
+	for (let i = 0; i < effects.length; i++) {
+		const effect = effects[i];
+		if (effect.renderVersion === CURRENT_EFFECT_RENDER_VERSION) continue;
+		if (!effect.active) continue;
+		// Reaching this call site again must recreate even when its authored deps
+		// are unchanged.
+		effect.deps = undefined;
+		effect.active = false;
+		const revision = ++effect.revision;
+		const target =
+			WIP_CAPTURE !== null ? WIP_CAPTURE.effects[effect.phase] : effectQueues[effect.phase];
+		target.push({
+			scope,
+			slot: effect.slot,
+			fn: null,
+			order: effect.order,
+			revision,
+			args: undefined,
+			phase: effect.phase,
+			seq: commitSeq++,
+		});
+	}
+}
+
 function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, phase: Phase): void {
 	const scope = CURRENT_SCOPE!;
-	// Hidden <Activity> subtree: render (state + DOM) but DON'T run effects. Skip
-	// BEFORE touching the slot so the effect is treated as fresh and re-fires when
-	// the Activity becomes visible (deactivateScope also clears prior deps). Walk
-	// ancestors so a visible inner block inside a hidden outer Activity is skipped
-	// too. Effects are rare on the hot path, so this extra walk is cheap.
+	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
+	const renderVersion = ensureEffectRenderVersion();
+	const firstReach = prev !== undefined && prev.renderVersion !== renderVersion;
+	if (firstReach) {
+		CURRENT_EFFECT_REACHED++;
+		prev!.renderVersion = renderVersion;
+	}
+	// Hidden <Activity> subtree: render (state + DOM) but DON'T run effects. Record
+	// that this call site was reached, then skip lifecycle state so the effect is
+	// treated as fresh and re-fires when the Activity becomes visible
+	// (deactivateScope also clears prior deps). Walk ancestors so a visible inner
+	// block inside a hidden outer Activity is skipped too. Effects are rare on the
+	// hot path, so this extra walk is cheap.
 	// INSERTION effects are exempt (React: they stay connected while hidden and an
 	// update in a hidden-but-rendered subtree still fires them — Activity-test.js:1428).
-	if (phase !== INSERTION && inInactiveSubtree(scope.block)) return;
-	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
-	if (prev && !depsChanged(prev.deps, deps)) return;
+	if (phase !== INSERTION && inInactiveSubtree(scope.block)) {
+		if (prev && !prev.active) {
+			// A hidden re-reach supersedes teardown from an earlier completed
+			// hidden render. Advance the presence revision so its fn:null entry
+			// cannot clear the retained body needed by a bailed reveal.
+			prev.active = true;
+			prev.revision++;
+		}
+		return;
+	}
+	if (prev) {
+		let reactivated = false;
+		if (!prev.active) {
+			prev.active = true;
+			prev.revision++;
+			reactivated = true;
+		}
+		if (!depsChanged(prev.deps, deps)) return;
+		// Multiple calls may legitimately compose onto one effective slot through
+		// plain-TypeScript custom-hook paths. Advance once for a later render, not
+		// once per enqueue, so every call from this render remains observable.
+		if (firstReach && !reactivated) prev.revision++;
+	}
 	let effect: EffectSlot;
 	if (!prev) {
+		CURRENT_EFFECT_REACHED++;
+		const order = scope.effectSlots === null ? 0 : scope.effectSlots.length;
 		const slotObj: EffectSlot = {
 			deps,
 			cleanup: undefined,
+			renderVersion,
+			revision: 0,
+			active: true,
+			order,
 			effect: true,
 			phase,
 			slot,
@@ -4773,7 +4900,16 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 	}
 	// Tag with the enqueue sequence (DFS pre-order). The commit drains turn this +
 	// the parentBlock chain into React's post-order commit order — see PendingEffect.seq.
-	const entry = { scope, slot, fn, args: deps, phase, seq: commitSeq++ };
+	const entry = {
+		scope,
+		slot,
+		fn,
+		order: effect.order,
+		revision: effect.revision,
+		args: deps,
+		phase,
+		seq: commitSeq++,
+	};
 	const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase];
 	target.push(entry);
 	markEffectReconnectQueued(effect, phase, target);
@@ -5362,6 +5498,15 @@ function childrenAsBody(children: unknown): ComponentBody {
 	return (_p, s) => {
 		childSlot(s, 0, s.block.parentNode, children, s.block.endMarker);
 	};
+}
+
+// Descriptor children remain inspectable values, but a scoped JSX descriptor
+// resolves them only after its represented boundary enters its try body. Reading
+// the accessor while constructing that body would move throws and suspension
+// outside the boundary, recreating the eager-JSX ownership bug.
+function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
+	if (!SCOPED_ELEMENT_PROPS.has(props)) return childrenAsBody(props.children);
+	return (_props, scope, extra) => childrenAsBody(props.children)(undefined, scope, extra);
 }
 
 /**
@@ -6483,7 +6628,7 @@ export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> 
 				scope,
 				0,
 				block.parentNode,
-				childrenAsBody(props.children),
+				scopedChildrenAsBody(props),
 				null,
 				pendingBody,
 				block.endMarker,
@@ -6550,7 +6695,7 @@ export const ErrorBoundary: ComponentBody<{
 			scope,
 			0,
 			block.parentNode,
-			childrenAsBody(props.children),
+			scopedChildrenAsBody(props),
 			catchBody,
 			null,
 			block.endMarker,
@@ -8647,7 +8792,43 @@ function parseSeedJson(raw: string): unknown[] | null {
 	}
 }
 
+// A mapped-list fallback owns its host through the descriptor reconciler. On
+// the first transition to the compiled item body, let that body's existing
+// clone() mount adopt the same host and initialize its ordinary binding bag.
+// Armed only around that one mapped survivor render; all other clones see null.
+let MAPPED_ITEM_ADOPTION: { node: Node | null } | null = null;
+
 export function clone<T extends Node>(node: T, loc?: string): T {
+	if (MAPPED_ITEM_ADOPTION !== null && MAPPED_ITEM_ADOPTION.node !== null) {
+		const adopted = MAPPED_ITEM_ADOPTION.node;
+		MAPPED_ITEM_ADOPTION.node = null;
+		const lazy =
+			(node as any).nodeType === undefined
+				? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
+				: undefined;
+		const expected = lazy === undefined ? node : resolveLazyTemplate(lazy);
+		if (
+			(adopted as Element).localName === (expected as Element).localName &&
+			(adopted as Element).namespaceURI === (expected as Element).namespaceURI
+		) {
+			for (let child = adopted.firstChild; child !== null; child = child.nextSibling) {
+				detachDeoptTreeRefs(child, null);
+			}
+			(adopted as Element).replaceChildren();
+			for (let child = expected.firstChild; child !== null; child = child.nextSibling) {
+				adopted.appendChild(child.cloneNode(true));
+			}
+			return adopted as T;
+		}
+		const replacement = expected.cloneNode(true);
+		const block = CURRENT_SCOPE!.block;
+		detachDeoptTreeRefs(adopted, null);
+		adopted.parentNode!.replaceChild(replacement, adopted);
+		if (block.startMarker === adopted) block.startMarker = replacement;
+		if (block.endMarker === adopted) block.endMarker = replacement;
+		block.deoptNode = null;
+		return replacement as T;
+	}
 	// Compiler templates are inert module-scope tokens. Parse each concrete
 	// namespace on its first real mount, then clone the cached node thereafter.
 	// Non-compiler callers can still hand clone() an ordinary DOM Node directly.
@@ -13275,6 +13456,10 @@ function elementKeyWasProvided(descriptor: ElementDescriptor): boolean {
 // missing-key validation state out of band so rebasing an unkeyed element from
 // a dynamic collection does not accidentally silence the renderer warning.
 const ELEMENTS_MISSING_LIST_KEY = new WeakSet<object>();
+// Only compiler-authored descriptors with a deferred child body enter this
+// collection. Ordinary createElement calls retain their exact public shape and
+// allocation path.
+const SCOPED_ELEMENT_PROPS = new WeakSet<object>();
 export interface ElementDescriptor<P = any> {
 	$$kind: typeof ELEMENT_TAG;
 	// A compiled ComponentBody (the fast/common case, e.g. `root.render(<App/>)`)
@@ -13342,6 +13527,138 @@ function finalizeElementDescriptor<P>(descriptor: ElementDescriptor<P>): Element
 	}
 	return descriptor;
 }
+
+const SCOPED_VALUE_RECORD: unique symbol = Symbol('octane.scopedValue');
+
+type ScopedValueDescriptor<P> = ElementDescriptor<P> & {
+	readonly [SCOPED_VALUE_RECORD]?: () => ElementDescriptor<P>;
+};
+
+/**
+ * Preserve an inspectable JSX descriptor while deferring its complete record.
+ *
+ * The marker stays eagerly available to public element checks, while inspecting
+ * any actual field resolves type, props, key, ref, and children together in the
+ * current render scope. A shared value is rebuilt when its provider scope or
+ * context epoch changes, just like a scoped element's deferred children.
+ *
+ * @internal
+ */
+export function createScopedValue<P>(
+	readElement: () => ElementDescriptor<P>,
+): ElementDescriptor<P> {
+	let resolved: ElementDescriptor<P> | undefined;
+	let resolvedScope: Scope | null = null;
+	let resolvedEpoch = 0;
+
+	const resolve = (): ElementDescriptor<P> => {
+		const scope = CURRENT_SCOPE;
+		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
+		if (resolved === undefined || resolvedScope !== scope || resolvedEpoch !== epoch) {
+			const next = readElement();
+			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
+				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+			}
+			resolvedScope = scope;
+			resolvedEpoch = epoch;
+			resolved = next;
+		}
+		return resolved;
+	};
+
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		get type() {
+			return resolve().type;
+		},
+		get props() {
+			return resolve().props;
+		},
+		get key() {
+			return resolve().key;
+		},
+		get ref() {
+			return resolve().ref;
+		},
+		get children() {
+			return resolve().children;
+		},
+	};
+	Object.defineProperty(descriptor, SCOPED_VALUE_RECORD, { value: resolve });
+	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
+	return descriptor;
+}
+
+/**
+ * Compiler-only JSX descriptor whose child tree resolves in its rendered scope.
+ *
+ * Matching accessors preserve the ordinary descriptor type, props, key, ref, and
+ * synchronously inspectable children without introducing component boundaries or
+ * hydration markers. Scope/context-aware memoization prevents one module-level
+ * element from retaining another provider's children or stale context values.
+ *
+ * @internal
+ */
+export function createScopedElement<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props: P | undefined,
+	readChildren: () => unknown,
+): ElementDescriptor<P> {
+	const src = (props ?? null) as any;
+	const hasKey = hasElementConfigKey(src);
+	const key = hasKey ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+
+	let resolved = false;
+	let resolvedScope: Scope | null = null;
+	let resolvedEpoch = 0;
+	let resolvedChildren: unknown;
+	const children = (): unknown => {
+		const scope = CURRENT_SCOPE;
+		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
+		const sameScope =
+			resolvedScope === scope ||
+			(resolvedScope !== null && scope !== null && scope.block.parentBlock === resolvedScope.block);
+		if (!resolved || !sameScope || resolvedEpoch !== epoch) {
+			const nextChildren = readChildren();
+			resolvedScope = scope;
+			resolvedEpoch = epoch;
+			resolvedChildren = nextChildren;
+			resolved = true;
+		} else if (resolvedScope !== scope) {
+			// Host classification previews scoped children in the parent block before
+			// hostElementBody immediately renders them in its direct child block.
+			// Reuse that same-context preview once, then move ownership to the child
+			// so sibling/provider scopes cannot inherit another subtree's values.
+			resolvedScope = scope;
+		}
+		return resolvedChildren;
+	};
+	const childProperty = { configurable: true, enumerable: true, get: children };
+	Object.defineProperty(copiedProps, 'children', childProperty);
+	SCOPED_ELEMENT_PROPS.add(copiedProps);
+
+	const descriptor: ElementDescriptor<P> = {
+		$$kind: ELEMENT_TAG,
+		type,
+		props: copiedProps as P,
+		key,
+		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
+		children: null,
+	};
+	Object.defineProperty(descriptor, 'children', childProperty);
+	if (
+		key === null &&
+		src != null &&
+		(typeof src === 'object' || typeof src === 'function') &&
+		'key' in src
+	) {
+		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+	}
+	return finalizeElementDescriptor(descriptor);
+}
+
 // React-shape `createElement(type, props, ...children)`. Two-arg calls
 // (`createElement(Comp, props)`) stay the component-value form the compiler emits
 // for `{<Comp/>}`. With a string `type` and/or explicit children it produces a
@@ -13440,9 +13757,23 @@ export function cloneElement<P>(
 	if (!isElementDescriptor(element)) {
 		throw new Error(formatClientError(4));
 	}
-	const props = copyElementConfig(element.props);
+	let scopedChildren: (() => unknown) | undefined;
+	let props: any;
+	if (SCOPED_ELEMENT_PROPS.has(element.props as object)) {
+		// Copy a scoped descriptor's child accessor without evaluating it in the caller's scope.
+		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		props = {};
+		for (const name in element.props) {
+			if (name !== 'key' && name !== 'children' && hasOwnProp.call(element.props, name)) {
+				props[name] = (element.props as any)[name];
+			}
+		}
+	} else {
+		props = copyElementConfig(element.props);
+	}
 	let key = element.key;
 	let hasKeyOverride = false;
+	let replacedChildren = false;
 	if (config != null) {
 		hasKeyOverride = hasElementConfigKey(config);
 		if (hasKeyOverride) key = '' + config.key;
@@ -13451,16 +13782,25 @@ export function cloneElement<P>(
 			// React 19 keeps refs as props, but cloneElement treats an explicitly
 			// undefined ref as absent for backwards compatibility.
 			if (name === 'ref' && config.ref === undefined) continue;
-			if (hasOwnProp.call(config, name)) props[name] = config[name];
+			if (hasOwnProp.call(config, name)) {
+				props[name] = config[name];
+				if (name === 'children') replacedChildren = true;
+			}
 		}
 	}
 	const n = children.length;
 	let kids: any;
+	let childProperty: PropertyDescriptor | undefined;
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
 		POSITIONAL_CHILDREN.add(children);
 		kids = children;
+	} else if (scopedChildren !== undefined && !replacedChildren) {
+		childProperty = { configurable: true, enumerable: true, get: scopedChildren };
+		Object.defineProperty(props, 'children', childProperty);
+		SCOPED_ELEMENT_PROPS.add(props);
+		kids = null;
 	} else {
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
@@ -13474,6 +13814,7 @@ export function cloneElement<P>(
 		ref: props.ref !== undefined ? props.ref : null,
 		children: kids ?? null,
 	};
+	if (childProperty !== undefined) Object.defineProperty(descriptor, 'children', childProperty);
 	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
 		key === null &&
@@ -13492,14 +13833,22 @@ export function cloneElement<P>(
 }
 
 function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
+	const scoped = SCOPED_ELEMENT_PROPS.has(element.props);
 	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type: element.type,
 		props: element.props,
 		key,
 		ref: element.ref,
-		children: element.children,
+		children: scoped ? null : element.children,
 	};
+	if (scoped) {
+		Object.defineProperty(descriptor, 'children', {
+			configurable: true,
+			enumerable: true,
+			get: Object.getOwnPropertyDescriptor(element, 'children')!.get!,
+		});
+	}
 	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
 	return finalizeElementDescriptor(descriptor);
@@ -14813,7 +15162,10 @@ export function hostComponent(
 	slot: number,
 	tag: string,
 	props: Record<string, any> | null,
-	childrenBody?: ComponentBody | null,
+	// A compiled TSRX call site passes its children render-body; a TSX/createElement
+	// value position passes a descriptor. `OctaneNode` is the alias for "whatever a
+	// hole may render", and covers both — see the branch below.
+	childrenBody?: ComponentBody | OctaneNode,
 	anchor?: Node | null,
 ): Element {
 	const block = scope.block;
@@ -14834,17 +15186,30 @@ export function hostComponent(
 	}
 	const el = state.el;
 	applyHostProps(el, props, scope, state);
-	if (childrenBody != null) {
+	if (typeof childrenBody === 'function') {
 		// The compiled children render-body is a FRESH closure every parent render, but
 		// it is the SAME positional children slot. childSlot keys block-reuse on body
 		// identity, so handing it the raw closure would re-mount (and DOM-duplicate) the
 		// children — a `@for`/`@if` block especially — on every re-render. Pass a STABLE
 		// delegating body whose target we update each render, so childSlot reconciles.
-		state.latest = childrenBody;
+		state.latest = childrenBody as ComponentBody;
 		if (state.body === undefined) {
 			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
 		}
 		childSlot(state.childScope!, 0, el, state.body, null, false, el);
+	} else if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
+		// createElement/descriptor callers already supply a renderable value. Let
+		// childSlot reconcile it directly instead of assuming every child is callable.
+		//
+		// A TSX value position can go null between renders (`{cond ? <x/> : null}`),
+		// unlike the compiled TSRX body which is statically present or absent. Once
+		// the slot exists it must keep receiving the value — including null — or the
+		// previous Block and its DOM stay stranded inside the host (hostElementBody
+		// reconciles unconditionally for the same reason). A host that never had
+		// children stays out of childSlot: under hydration `ownsHost` is ignored, so
+		// an unconditional call would mint a stray end marker inside every childless
+		// host component.
+		childSlot(state.childScope!, 0, el, childrenBody ?? null, null, false, el);
 	}
 	return el;
 }
@@ -14955,7 +15320,13 @@ function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 	return (n as Node & DeoptStamped)[DEOPT_DESC];
 }
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
-	(el as Element & DeoptStamped)[DEOPT_DESC] = d;
+	// Preserve the record committed to this DOM node. A deferred JSX shell can
+	// resolve differently after a Provider update; stamping the shell itself
+	// would make both sides of the next prop diff observe the new record and
+	// would run user code outside render while Suspense detaches subtree refs.
+	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
+	(el as Element & DeoptStamped)[DEOPT_DESC] =
+		resolveScopedRecord === undefined ? d : resolveScopedRecord();
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';
@@ -15246,12 +15617,16 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	if (next.length === 0 && activeHydration() === null && !hasDeoptOwnedChild(el)) {
 		return;
 	}
-	// Collect the children we OWN, skipping foreign `<!--portal-->…<!--/portal-->`
-	// ranges: a portal rendered elsewhere may target this element, and its nodes are
-	// not ours to reuse, remove, or reorder (React parity — portal content coexists
-	// with the container's rendered children). Range starts carry $$portalEnd.
+	// Collect only children this reconciler owns. Portal ranges and unstamped
+	// imperatively streamed nodes may coexist with our children; neither belongs
+	// to the descriptor and neither may be removed or positionally adopted.
+	// Hydration is the sole exception: its unstamped server nodes are ours to
+	// adopt. Check hydration lazily so already-stamped updates pay no extra cost.
 	const owned: Node[] = [];
 	let hasForeign = false;
+	let hydrationOwnsUnstamped: boolean | undefined;
+	let byKey: Map<any, Node> | null = null;
+	const unstamped: Node[] = [];
 	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
@@ -15260,26 +15635,29 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			scan = nodeAfterPortalRange(scan, rangeEnd);
 			continue;
 		}
+		const stampedKey = (scan as any).$$deoptKey;
+		const descriptor = stampedKey === undefined ? getDeoptDesc(scan) : undefined;
+		if (
+			stampedKey === undefined &&
+			descriptor === undefined &&
+			!(hydrationOwnsUnstamped ??= activeHydration() !== null)
+		) {
+			hasForeign = true;
+			scan = getNextSibling(scan);
+			continue;
+		}
 		owned.push(scan);
-		scan = getNextSibling(scan);
-	}
-	// Partition current children by their stamped SLOT KEY (position-scoped —
-	// see flattenDeoptChildrenKeyed; explicit keys ride the same scheme). Nodes
-	// without a stamp (server-adopted on the first post-hydration reconcile)
-	// fall back to document-order reuse, and get stamped below for next time.
-	let byKey: Map<any, Node> | null = null;
-	const unstamped: Node[] = [];
-	for (let i = 0; i < owned.length; i++) {
-		const n = owned[i];
-		const k = (n as any).$$deoptKey ?? getDeoptDesc(n)?.key;
-		if (k != null) {
+		const key = stampedKey ?? descriptor?.key;
+		if (key != null) {
 			if (byKey === null) byKey = new Map();
-			if (!byKey.has(k)) {
-				byKey.set(k, n);
+			if (!byKey.has(key)) {
+				byKey.set(key, scan);
+				scan = getNextSibling(scan);
 				continue;
 			}
 		}
-		unstamped.push(n);
+		unstamped.push(scan);
+		scan = getNextSibling(scan);
 	}
 	let up = 0;
 	const result: Node[] = [];
@@ -15312,7 +15690,9 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// like a React portal whose container children reorder around it).
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
-		const at = hasForeign ? liveOwnedChildAt(el, i) : (existing[i] ?? null);
+		const at = hasForeign
+			? liveOwnedChildAt(el, i, hydrationOwnsUnstamped === true)
+			: (existing[i] ?? null);
 		if (at !== want) el.insertBefore(want, at);
 	}
 }
@@ -15330,13 +15710,21 @@ function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 // The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
 // `<!--portal-->…<!--/portal-->` ranges (see reconcileDeoptChildren). Live walk —
 // called per reorder step, only when a foreign range exists.
-function liveOwnedChildAt(el: Element, index: number): Node | null {
+function liveOwnedChildAt(el: Element, index: number, adoptHydrationChildren = false): Node | null {
 	let i = 0;
 	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
 			scan = nodeAfterPortalRange(scan, rangeEnd);
+			continue;
+		}
+		if (
+			!adoptHydrationChildren &&
+			(scan as any).$$deoptKey === undefined &&
+			getDeoptDesc(scan) === undefined
+		) {
+			scan = getNextSibling(scan);
 			continue;
 		}
 		if (i === index) return scan;
@@ -15501,7 +15889,11 @@ function deoptItemBody(item: any, scope: Scope): void {
 	}
 	// Switching Blocks → pure: unmount the childSlot content the Blocks path mounted
 	// (effect cleanups + DOM) by reconciling it to null. Idempotent once cleared.
-	if (scope.slots[0] !== undefined && scope.slots[0] !== null) {
+	if (
+		scope.slots[0] !== undefined &&
+		scope.slots[0] !== null &&
+		(scope.slots[0] as any).__kind === 'childSlot'
+	) {
 		childSlot(scope, 0, block.parentNode, null, block.endMarker);
 	}
 	// Pure host/text item → reconcile in place, REUSING the item's existing node so
@@ -15538,6 +15930,58 @@ function deoptItemBody(item: any, scope: Scope): void {
 		}
 	}
 	block.deoptNode = node;
+}
+
+// Guarded native maps invoke componentSlot directly from their compiled item
+// body. Keep that same slot ownership when a custom map returns the matching
+// component descriptors, so switching dispatch modes preserves the component
+// Block, its hooks/effects, and its DOM without aliasing it as a ChildSlot.
+function mappedDeoptItemBody(item: any, scope: Scope): void {
+	const state = scope.slots[0] as CompSlot | ChildSlot | undefined;
+	const block = scope.block;
+	if (isElementDescriptor(item) && typeof item.type === 'function') {
+		if (state === undefined || state.__kind === 'componentSlotSlot') {
+			const stale = block.deoptNode;
+			if (stale !== null) {
+				detachDeoptTreeRefs(stale, null);
+				if (stale.parentNode === block.parentNode) block.parentNode.removeChild(stale);
+				block.deoptNode = null;
+			}
+			componentSlot(
+				scope,
+				0,
+				block.parentNode,
+				item.type,
+				item.props,
+				block.endMarker,
+				undefined,
+				true,
+				true,
+			);
+			return;
+		}
+	} else if (state?.__kind === 'componentSlotSlot') {
+		// An exotic map may replace a keyed component with a host or empty value.
+		// Preserve the item's boundaries before disposing its self-marked child;
+		// the ordinary descriptor reconciler can then fill that same keyed range.
+		const root = block.startMarker;
+		if (
+			root !== null &&
+			root === block.endMarker &&
+			root.nodeType !== 8 &&
+			root.parentNode !== null
+		) {
+			const start = document.createComment('it');
+			const end = document.createComment('/it');
+			root.parentNode.insertBefore(start, root);
+			root.parentNode.insertBefore(end, root.nextSibling);
+			block.startMarker = start;
+			block.endMarker = end;
+		}
+		disposeReturnSlot(block, state);
+		block.deoptNode = null;
+	}
+	deoptItemBody(item, scope);
 }
 
 // True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
@@ -15899,6 +16343,164 @@ function isPortalTarget(block: Block, domParent: Node): boolean {
 	return false;
 }
 
+const NATIVE_ARRAY_MAP = Array.prototype.map;
+const NATIVE_REFLECT_APPLY = Reflect.apply;
+const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+// Components hand the reconciler immutable array snapshots. Memoizing indexed
+// accessor classification by snapshot identity avoids a descriptor allocation
+// per row on every unchanged parent render; holes and intrinsic overrides are
+// still rechecked each time. Mutating an existing data index into an accessor
+// without changing the snapshot identity/length is outside that contract.
+const NATIVE_ARRAY_ACCESSORS = new WeakMap<object, { length: number; accessor: boolean }>();
+
+/** Shared compiler ABI: native-array eligibility query plus stable keyed map dispatch. */
+export function mapSlot(
+	scopeOrItems: any,
+	slotOrMethod: any,
+	domParent?: Node,
+	items?: any,
+	method?: any,
+	native?: boolean | ((...args: any[]) => any),
+	callback?: (...args: any[]) => any,
+	getKey?: (item: any, index: number) => any,
+	itemBody?: (item: any, scope: Scope) => void,
+	flags?: number,
+	deps?: any[],
+	anchor?: Node | null,
+	ownEnd?: boolean | 1,
+): boolean | void {
+	if (arguments.length === 2) {
+		const receiver = scopeOrItems;
+		if (
+			!Array.isArray(receiver) ||
+			Object.getPrototypeOf(receiver) !== Array.prototype ||
+			slotOrMethod !== NATIVE_ARRAY_MAP ||
+			Object.prototype.hasOwnProperty.call(receiver, 'constructor') ||
+			Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
+			Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
+		) {
+			return false;
+		}
+		const length = receiver.length;
+		let accessor = NATIVE_ARRAY_ACCESSORS.get(receiver);
+		if (accessor === undefined || accessor.length !== length) {
+			let found = false;
+			for (let index = 0; index < length; index++) {
+				const descriptor = Object.getOwnPropertyDescriptor(receiver, index);
+				if (descriptor === undefined || descriptor.get !== undefined) {
+					found = true;
+					break;
+				}
+			}
+			accessor = { length, accessor: found };
+			NATIVE_ARRAY_ACCESSORS.set(receiver, accessor);
+		}
+		if (accessor.accessor) return false;
+		for (let index = 0; index < length; index++) {
+			if (!(index in receiver)) return false;
+		}
+		return true;
+	}
+	// Unmemoized mapped regions do not need the eligibility answer separately.
+	// Accept their compact one-call ABI and run the same guard exactly once.
+	if (typeof native === 'function') {
+		ownEnd = anchor as boolean | 1 | undefined;
+		anchor = deps as Node | null | undefined;
+		deps = flags as any[] | undefined;
+		flags = itemBody as unknown as number | undefined;
+		itemBody = getKey as unknown as (item: any, scope: Scope) => void;
+		getKey = callback as (item: any, index: number) => any;
+		callback = native;
+		native = mapSlot(items, method) as boolean;
+	}
+	if (ownEnd === 1) ownEnd = true;
+	if (native === true) {
+		const previous = ((scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined)
+			?.forSlot;
+		if (
+			previous?.mappedNative === false &&
+			previous.head !== null &&
+			(previous.head.slots[0] as CompSlot | undefined)?.__kind === 'componentSlotSlot'
+		) {
+			// A custom receiver may have reordered keyed component survivors. Its
+			// first native successor must still execute the authored map callback in
+			// ascending source order, before the reconciler walks the prior order.
+			const mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
+			childSlot(
+				scopeOrItems,
+				slotOrMethod,
+				domParent!,
+				mapped,
+				anchor,
+				ownEnd,
+				undefined,
+				false,
+				true,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				true,
+			);
+			const next = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot;
+			if (next.forSlot !== null) next.forSlot.mappedNative = true;
+			return;
+		}
+		childSlot(
+			scopeOrItems,
+			slotOrMethod,
+			domParent!,
+			items,
+			anchor,
+			ownEnd,
+			undefined,
+			false,
+			true,
+			itemBody,
+			getKey,
+			flags,
+			deps,
+		);
+	} else {
+		let mapped = NATIVE_REFLECT_APPLY(method, items, [callback]);
+		if (Array.isArray(mapped)) {
+			let packed: any[] | null = null;
+			for (let index = 0; index < mapped.length; index++) {
+				if (!(index in mapped)) {
+					packed = [];
+					break;
+				}
+			}
+			if (packed !== null) {
+				for (let index = 0; index < mapped.length; index++) {
+					if (index in mapped) packed.push(mapped[index]);
+				}
+				mapped = packed;
+			}
+		}
+		childSlot(
+			scopeOrItems,
+			slotOrMethod,
+			domParent!,
+			mapped,
+			anchor,
+			ownEnd,
+			undefined,
+			false,
+			true,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true,
+		);
+		const state = (scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined;
+		if (state?.forSlot !== null && state?.forSlot !== undefined) {
+			state.forSlot.mappedNative = false;
+		}
+	}
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -15922,6 +16524,11 @@ export function childSlot(
 	// nested child slot must render the descriptor directly rather than wrap it
 	// in another one-item list.
 	includeKeyedSingle: boolean = true,
+	compiledMapBody?: (item: any, scope: Scope) => void,
+	compiledMapKey?: (item: any, index: number) => any,
+	compiledMapFlags?: number,
+	compiledMapDeps?: any[],
+	mappedFallback?: boolean,
 ): void {
 	// Reading the host's tag costs two DOM accessors and this runs for every
 	// renderable hole on every render, so lead with the cheap facts. A de-opt list
@@ -15959,6 +16566,11 @@ export function childSlot(
 				ownsHost,
 				compactable,
 				includeKeyedSingle,
+				compiledMapBody,
+				compiledMapKey,
+				compiledMapFlags,
+				compiledMapDeps,
+				mappedFallback,
 			),
 		);
 		return;
@@ -15995,7 +16607,10 @@ export function childSlot(
 		)?.[HYDRATION_RANGE_BOUNDARY] !== 'owner';
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
-	const preparedList = prepareDeoptList(value, false, includeKeyedSingle);
+	const preparedList =
+		compiledMapBody !== undefined
+			? { items: value as any[], keys: null }
+			: prepareDeoptList(value, false, includeKeyedSingle);
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
 	// portals, no render functions). Computed once per call: the slot init below
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
@@ -16045,6 +16660,11 @@ export function childSlot(
 				ownsHost,
 				compactable,
 				includeKeyedSingle,
+				compiledMapBody,
+				compiledMapKey,
+				compiledMapFlags,
+				compiledMapDeps,
+				mappedFallback,
 			);
 			return;
 		}
@@ -16244,16 +16864,140 @@ export function childSlot(
 			}
 		}
 		const { items, keys } = preparedList;
-		const getKey = (_item: any, i: number) => keys[i];
+		const markerlessMappedFallback =
+			mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
+		const getKey = compiledMapKey
+			? (item: any, index: number) => 'k' + String(compiledMapKey(item, index))
+			: (_item: any, i: number) => keys![i];
+		const wasMappedNative = state.forSlot.mappedNative === true;
+		let body =
+			compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
+		if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
+			for (let index = 0; index < items.length; index++) {
+				const item = items[index];
+				if (!isHostDescriptor(item)) continue;
+				const block = state.forSlot.items.get(getKey(item, index));
+				if (
+					block !== undefined &&
+					block.startMarker !== null &&
+					block.startMarker === block.endMarker &&
+					block.startMarker.nodeType === 1 &&
+					(block.startMarker as Element).localName === item.type
+				) {
+					const root = block.startMarker as Element;
+					const text = root.firstChild;
+					if (text?.nodeType === 3 && text.nextSibling === null) {
+						const children = Object.getOwnPropertyDescriptor(item, 'children');
+						const primitive =
+							children !== undefined &&
+							'value' in children &&
+							(typeof children.value === 'string' ||
+								typeof children.value === 'number' ||
+								typeof children.value === 'bigint');
+						if (primitive) {
+							(text as any).$$deoptKey = 0;
+						} else if (children?.get !== undefined) {
+							// Scoped JSX descriptors defer children until their represented
+							// render scope. Prove this node came from the compiled binding bag
+							// without invoking that scope-sensitive accessor in the parent.
+							const bag = block.slots[0];
+							if (bag !== null && bag !== undefined) {
+								for (const field in bag) {
+									if (bag[field] === text) {
+										(text as any).$$deoptKey = 0;
+										break;
+									}
+								}
+							}
+						}
+					}
+					block.deoptNode = block.startMarker;
+				}
+			}
+		}
+		if (compiledMapBody !== undefined) {
+			if (state.forSlot.mappedNative === false) {
+				body = (item: any, scope: Scope, extra?: any[]): void => {
+					const adopted = scope.slots[0] === undefined ? scope.block.deoptNode : null;
+					if (adopted === null || adopted.nodeType !== 1) {
+						(compiledMapBody as any)(item, scope, extra);
+						return;
+					}
+					const previous = MAPPED_ITEM_ADOPTION;
+					const adoption = { node: adopted };
+					MAPPED_ITEM_ADOPTION = adoption;
+					try {
+						(compiledMapBody as any)(item, scope, extra);
+						if (adoption.node === null) scope.block.deoptNode = null;
+					} finally {
+						MAPPED_ITEM_ADOPTION = previous;
+					}
+				};
+			}
+			state.forSlot.mappedNative = true;
+		}
+		if (markerlessMappedFallback) {
+			const descriptorBody = body;
+			body = (item: any, scope: Scope): void => {
+				const root = scope.block.startMarker;
+				if (
+					root !== null &&
+					root === scope.block.endMarker &&
+					root.nodeType === 1 &&
+					scope.block.deoptNode === null
+				) {
+					scope.block.deoptNode = root;
+				}
+				descriptorBody(item, scope);
+			};
+		}
+		const fastFlags = compiledMapFlags || 0;
+		const ssrMarkerless =
+			compiledMapBody === undefined ? markerlessMappedFallback : (fastFlags & 16) !== 0;
+		let pure = (fastFlags & 1) !== 0;
+		let lite = false;
+		if (compiledMapBody !== undefined) {
+			state.forSlot.env = compiledMapDeps;
+			if ((fastFlags & 4) !== 0 && compiledMapDeps !== undefined) {
+				if (
+					state.forSlot.cachedDeps !== null &&
+					depsEqual(state.forSlot.cachedDeps, compiledMapDeps)
+				) {
+					pure = true;
+				} else {
+					lite = true;
+				}
+				state.forSlot.cachedDeps = compiledMapDeps;
+			}
+		}
 		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 		// no `it` pair per item — resolved per item value in mountItem; shape
 		// flips promote to a minted pair in place (deoptItemBody).
 		// First fill dispatches to the linear pass directly (see mountItemsLinear)
 		// so a de-opt list's hydration adopt skips the full reconciler too.
 		if (state.forSlot.size === 0) {
-			mountItemsLinear(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, 2, false);
+			mountItemsLinear(
+				parentBlock,
+				state.forSlot,
+				items,
+				getKey,
+				body,
+				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+				ssrMarkerless,
+			);
 		} else {
-			reconcileKeyed(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, false, 2);
+			reconcileKeyed(
+				parentBlock,
+				state.forSlot,
+				items,
+				getKey,
+				body,
+				pure,
+				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+				lite,
+				(fastFlags & 8) !== 0,
+				ssrMarkerless,
+			);
 		}
 		// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 		// children whose keys have no new item) are orphans inside the range —
@@ -18326,7 +19070,11 @@ function snapshotSubtreeEffectDeps(scope: Scope): EffectDepsSnapshot {
 			for (const slot of hooks.values()) {
 				const effect = slot as EffectSlot | undefined;
 				if (effect?.effect === true) {
-					snapshot.set(effect, effect.deps);
+					snapshot.set(effect, {
+						deps: effect.deps,
+						revision: effect.revision,
+						active: effect.active,
+					});
 				}
 			}
 		}
@@ -18344,7 +19092,18 @@ function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot): v
 			for (const slot of hooks.values()) {
 				const effect = slot as EffectSlot | undefined;
 				if (effect?.effect !== true) continue;
-				effect.deps = snapshot.has(effect) ? snapshot.get(effect) : undefined;
+				const previous = snapshot.get(effect);
+				if (previous === undefined) {
+					// A slot created only by the discarded attempt remains reusable,
+					// but none of that attempt's commit work is still pending.
+					effect.deps = undefined;
+					effect.revision = 0;
+					effect.active = false;
+				} else {
+					effect.deps = previous.deps;
+					effect.revision = previous.revision;
+					effect.active = previous.active;
+				}
 			}
 		}
 		forEachSubtreeChild(current, visit);
@@ -18390,6 +19149,7 @@ function reconnectBailedEffects(block: Block): void {
 			for (let i = 0; i < effects.length; i++) {
 				const effect = effects[i];
 				if (
+					effect.active &&
 					effect.disconnected &&
 					effect.connectedFn !== null &&
 					!context.queuedSlots.has(effect)
@@ -18411,6 +19171,8 @@ function reconnectBailedEffects(block: Block): void {
 			scope,
 			slot: effect.slot,
 			fn: effect.connectedFn!,
+			order: effect.order,
+			revision: effect.revision,
 			args: effect.connectedArgs,
 			phase: effect.phase,
 			seq: commitSeq++,
@@ -19832,9 +20594,23 @@ function renderBranchSlot(
 		const oldBoundaryShared = sharesBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd);
 		if (state.block) {
 			unmountBlock(state.block);
+			if (parentBlock.disposed) return;
 			state.block = null;
 		}
 		state.branch = next;
+		if (state.start === null && body !== null && oldBoundaryShared) {
+			// A sole-root ancestor can borrow the outgoing branch's host as its
+			// own boundary. Publish a durable replacement before rendering the
+			// incoming arm: a nested Suspense may otherwise observe that removed
+			// host and pass a detached insertion anchor to its try block.
+			const s = document.createComment(marker);
+			const e = document.createComment('/' + marker);
+			domParent.insertBefore(s, after);
+			domParent.insertBefore(e, after);
+			state.start = s;
+			state.end = e;
+			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
+		}
 		if (state.start !== null) {
 			// MARKER path — hydration-adopted, or already markered (multi-node / post-
 			// swap). The branch borrows the slot's start/end (exclusiveMarkers teardown
@@ -20564,6 +21340,9 @@ interface ForSlot {
 	// focus, input state survive — React parity) instead of rebuilding.
 	// Consumed and nulled within the same render.
 	adopt: Array<{ key: any; node: Node }> | null;
+	// Present only on a childSlot owned by the compiler's guarded map ABI.
+	// Keeps descriptor↔compiled adoption off every ordinary descriptor list.
+	mappedNative?: boolean;
 }
 
 export function forBlock<T>(
@@ -21459,10 +22238,35 @@ function reconcileKeyed<T>(
 }
 
 /**
+ * How many items a SHARED-parent clear needs before the scoped Range beats
+ * walking the marker span. Measured in Chromium (Playwright, 101 trials per
+ * point, alternating order, batched above the 100us clock clamp), clearing
+ * 4-node items out of a 3000-node document:
+ *
+ *   items      10     25     50    100-600    1000    2000
+ *   range/walk 2.21x  1.58x  1.34x  ~1.0x     0.88x   0.92x
+ *
+ * The walk wins outright while Range's fixed setup dominates, the two are
+ * within run-to-run noise across the middle band (the ratio flips between
+ * runs there; Range's absolute times are stable, the walk's are not), and
+ * Range pulls reproducibly ahead by ~8-12% once the per-node call overhead
+ * dominates. The boundary sits at the TOP of the noise band rather than the
+ * bottom: nothing measurable is given up in a browser either way, while the
+ * walk is worth far more everywhere else — jsdom's `deleteContents` decides
+ * containment with a boundary-point comparison per candidate node, each of
+ * which can walk the whole document, so the Range path costs
+ * O(items x document) there (266x the walk at 100 items in a 3400-node
+ * document, and it grows with PAGE size, not list size).
+ */
+const RANGE_CLEAR_MIN_ITEMS = 512;
+
+/**
  * Bulk-clear a forBlock's items. When the forBlock owns its parent (markers
  * bracket the entire content), uses `textContent = ''` — the fastest DOM clear
- * on Chromium per Ripple's measured advantage on the `clear` op. Otherwise
- * falls back to a scoped Range deletion.
+ * on Chromium per Ripple's measured advantage on the `clear` op. A shared
+ * parent keeps neighbours intact by clearing only the marker span: a sibling
+ * walk, or a scoped Range once the list is large enough to pay for it
+ * (RANGE_CLEAR_MIN_ITEMS).
  *
  * Every item still gets a disposal pass: items whose scope carries cleanups,
  * child scopes, or slot-stashed Blocks (a cross-module `<Row/>` lives on the
@@ -21479,8 +22283,13 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 		(p as Element).textContent = '';
 		p.appendChild(state.start);
 		p.appendChild(state.end);
+	} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
+		// Shared parent (other JSX interleaved) — detach the marker span directly.
+		// Each removal takes a whole item subtree, so this is one call per ITEM,
+		// not per node.
+		removeRange(state.start.nextSibling, state.end);
 	} else {
-		// Shared parent (other JSX interleaved) — scoped Range delete keeps neighbors intact.
+		// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
 		const range = document.createRange();
 		range.setStartAfter(state.start);
 		range.setEndBefore(state.end);

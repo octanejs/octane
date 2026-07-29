@@ -33,7 +33,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
+import { censusDomNodes } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -58,8 +58,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // All ops mutate the DOM inside the adapter call — synchronously where the
 // framework allows it (ripple / octane / react via flushSync, solid via
-// flush()); an adapter with no public sync flush (vue-vapor) returns a
-// thenable (nextTick(), settling after Vue's flushJobs) and the timed window
+// flush()); native async adapters (Preact and vue-vapor) return a thenable after
+// their queued DOM update, and the timed window
 // extends until it settles — awaited BETWEEN reps so bumps can't coalesce
 // into one commit. Either way we time ONLY the framework's work and force a
 // GC right before each timed sample. This isolates framework JS work from
@@ -286,7 +286,7 @@ async function measureSweep(browser, url, batchFn) {
 						for (const idx of indices) {
 							const fn = window['__bumpAt' + idx];
 							if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
-							// An async-commit bump (vue-vapor) is awaited per change —
+							// An async-commit bump (Preact/vue-vapor) is awaited per change —
 							// that IS the "flush on every change" mode for a microtask
 							// scheduler (each await lets flushJobs run before the next).
 							const r = fn();
@@ -376,7 +376,6 @@ async function runTarget(t, { verify = true } = {}) {
 			unmount,
 		};
 		if (dom !== null) {
-			for (const [op, field] of DOM_OPS) results[op] = deterministicCount(dom[field]);
 			results.__dom = dom;
 		}
 		return {
@@ -397,15 +396,6 @@ const OPS = [
 	'bump_sweep_batched',
 	'bump_sweep_reverse',
 	'unmount',
-];
-
-const DOM_OPS = [
-	['nodes_mounted', 'total'],
-	['elements_mounted', 'elements'],
-	['text_mounted', 'text'],
-	['comments_mounted', 'comments'],
-	['empty_text_mounted', 'emptyText'],
-	['whitespace_text_mounted', 'whitespaceText'],
 ];
 
 const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
@@ -491,11 +481,6 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			const r = all[c][op];
 			row.push(`${fmt(r.median)} (min ${fmt(r.min)}, sd ${fmt(r.stddev)})`.padEnd(W));
 		}
-		console.log(row.join('| '));
-	}
-	for (const [op] of DOM_OPS) {
-		const row = [op.padEnd(14)];
-		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -585,12 +570,7 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 				...TARGETS.map((t) => ({
 					name: t.name,
 					ops: all[t.name]
-						? {
-								...Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])])),
-								...Object.fromEntries(
-									DOM_OPS.map(([op]) => [op, deterministicStatForJson(all[t.name][op])]),
-								),
-							}
+						? Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])]))
 						: {},
 					meta: {
 						gates: failedTargets.has(t.name) ? 'fail' : 'pass',

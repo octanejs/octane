@@ -1,4 +1,5 @@
 // Deterministic, untimed work gate for Octane's production TSRX target.
+// Set WORK_DIALECT=jsx to check the equivalent return-JSX production target.
 //
 // This deliberately uses Chromium precise call coverage after compilation,
 // rather than source-level counters inside RowsA/@for. Observable mutations in
@@ -13,7 +14,11 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-const URL = process.env.TARGET_URL || 'http://localhost:5206/';
+const DIALECT = process.env.WORK_DIALECT || 'tsrx';
+if (DIALECT !== 'tsrx' && DIALECT !== 'jsx') {
+	throw new Error(`Unsupported WORK_DIALECT ${JSON.stringify(DIALECT)}; expected "tsrx" or "jsx".`);
+}
+const URL = process.env.TARGET_URL || `http://localhost:${DIALECT === 'jsx' ? 5207 : 5206}/`;
 const ROWS = 1000;
 const METRICS = [
 	'RowsA',
@@ -103,10 +108,9 @@ const OPS = [
 			Leaf: 1,
 		},
 	},
-	// Wall B renders through an imported helper's returned descriptors, which
-	// autoMemo deliberately does not cache (per-key descriptor reuse is a later
-	// phase). Every parent update therefore rebuilds all 1000 descriptors and
-	// must be absorbed by value-comparing memo bails — zero row bodies.
+	// Wall B's imported helper is cached against its `items` argument by
+	// production auto-calculation. Equal/context-only TSRX parent updates reuse
+	// that descriptor array; changed items still rebuild it in one_change_B.
 	{
 		name: 'context_B',
 		hook: '__ctxB',
@@ -114,8 +118,8 @@ const OPS = [
 			RowsA: 0,
 			updateSurvivor: ROWS,
 			itemBody: 0,
-			buildValueRows: 1,
-			createElement: ROWS,
+			buildValueRows: 0,
+			createElement: 0,
 			shallowEqualProps: ROWS,
 			RowImpl: 0,
 			InnerImpl: 0,
@@ -129,8 +133,8 @@ const OPS = [
 			RowsA: 0,
 			updateSurvivor: ROWS,
 			itemBody: 0,
-			buildValueRows: 1,
-			createElement: ROWS,
+			buildValueRows: 0,
+			createElement: 0,
 			shallowEqualProps: ROWS,
 			RowImpl: 0,
 			InnerImpl: 0,
@@ -138,6 +142,21 @@ const OPS = [
 		},
 	},
 ];
+
+// Return-JSX components keep their public descriptor ABI, so their wrapper
+// allocations differ from TSRX even when both dialects do the same keyed-list
+// work. Keep the consumer-visible bodies and the optimized list work exact:
+// an unchanged wall must visit no keyed survivors, while a changed item must
+// visit the survivors but run exactly one item/row/inner/leaf body.
+const JSX_EXPECTATIONS = {
+	mount: { createElement: 11007 },
+	equal_A: { RowsA: 1, createElement: 3 },
+	one_change_A: { createElement: 8 },
+	context_A: { RowsA: 1, createElement: ROWS + 3 },
+	one_change_B: { createElement: ROWS + 6 },
+	context_B: { buildValueRows: 1, createElement: ROWS * 2 + 1 },
+	equal_B_control: { buildValueRows: 1, createElement: ROWS + 1 },
+};
 
 function callCounts(coverage) {
 	const counts = Object.fromEntries(METRICS.map((name) => [name, 0]));
@@ -200,9 +219,10 @@ try {
 	for (const op of OPS) {
 		const counts = await measure(browser, op);
 		results[op.name] = counts;
+		const expected = DIALECT === 'jsx' ? { ...op.expect, ...JSX_EXPECTATIONS[op.name] } : op.expect;
 		for (const metric of METRICS) {
-			if (counts[metric] !== op.expect[metric]) {
-				failures.push(`${op.name}.${metric}: ${counts[metric]} !== expected ${op.expect[metric]}`);
+			if (counts[metric] !== expected[metric]) {
+				failures.push(`${op.name}.${metric}: ${counts[metric]} !== expected ${expected[metric]}`);
 			}
 		}
 	}

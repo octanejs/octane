@@ -4,6 +4,7 @@
     "description": "Small stores, atoms, Redux, RTK Query, and TanStack Store.",
     "packages": [
       "@octanejs/zustand",
+      "@octanejs/valtio",
       "@octanejs/jotai",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",
@@ -26,7 +27,7 @@
   },
   {
     "title": "UI and interaction",
-    "description": "Primitives, positioning, motion, drag and drop, toasts, icons, keyboard shortcuts, and event pacing.",
+    "description": "Primitives, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
     "packages": [
       "@octanejs/radix",
       "@octanejs/base-ui",
@@ -35,6 +36,7 @@
       "@octanejs/motion",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
+      "@octanejs/cmdk",
       "@octanejs/shadcn",
       "@octanejs/lucide",
       "@octanejs/tanstack-hotkeys",
@@ -67,6 +69,11 @@
     "title": "Web 3D",
     "description": "Technical-preview, React Three Fiber-style scene graphs on Octane's universal renderer.",
     "packages": ["@octanejs/three"]
+  },
+  {
+    "title": "Desktop",
+    "description": "Tauri v2 commands and events for desktop applications.",
+    "packages": ["@octanejs/tauri"]
   },
   {
     "title": "Styling, tests, and devtools",

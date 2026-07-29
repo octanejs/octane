@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "package": "@tauri-apps/api",
+    "version": "2.11.1"
+  },
+  "surface": "Octane hooks over the framework-neutral Tauri IPC surface: useInvoke (suspending command), useInvokeState (pending/success/error with refetch), and useTauriEvent (event subscription with lifecycle-safe teardown). The rest of @tauri-apps/api — window, webview, menu, tray, path, dpi, image, and the plugin packages — is already framework-neutral and is imported directly rather than re-exported here.",
+  "divergences": [
+    "There is no React binding upstream; @tauri-apps/api ships promise and callback APIs, so this package is a new hook layer rather than a port.",
+    "Hook call-site slots are forwarded through Octane's compiler binding ABI.",
+    "useInvoke integrates with Octane's use() rather than React's use() or a thrown-promise implementation detail.",
+    "Command arguments given as a plain record are compared by value for the default refetch key; array and binary payloads are compared by identity. The command name is always part of the key, so explicit deps extend it rather than replacing it.",
+    "useInvokeState returns to pending on refetch and does not implement stale-while-revalidate; a caching query layer belongs to @octanejs/tanstack-query.",
+    "A failed useTauriEvent subscription throws by default so a missing capability is loud, and is then recovered by the enclosing boundary's reset(); passing onError reports it instead, keeping the component mounted so a changed event or enabled flag retries.",
+    "Channel-based streaming has no hook yet: construct Channel directly and keep it stable with useMemo."
+  ],
+  "ssr": "Server rendering performs no IPC. useInvokeState renders its pending state and issues the command on the client after hydration; useTauriEvent subscribes only on the client. useInvoke is client-oriented: without a Tauri host it rejects with TauriUnavailableError so the boundary reports rather than hangs.",
+  "verified": "2026-07-27"
+}

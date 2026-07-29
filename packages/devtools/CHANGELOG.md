@@ -1,5 +1,40 @@
 # @octanejs/devtools
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [c3ba5e0]
+- Updated dependencies [430061e]
+- Updated dependencies [a21ff46]
+- Updated dependencies [1821f63]
+- Updated dependencies [3db74e9]
+- Updated dependencies [0d4ed9e]
+- Updated dependencies [7bdf1fa]
+- Updated dependencies [e1927d8]
+- Updated dependencies [dac0e66]
+- Updated dependencies [54c60fa]
+- Updated dependencies [59a95d6]
+- Updated dependencies [138fbd9]
+- Updated dependencies [50c1ab5]
+- Updated dependencies [e0c5490]
+- Updated dependencies [e6a158e]
+  - octane@0.1.18
+
+## 0.0.5
+
+### Patch Changes
+
+- Updated dependencies [bd31a2d]
+- Updated dependencies [9e0ef45]
+- Updated dependencies [dea219b]
+- Updated dependencies [2374980]
+- Updated dependencies [2374980]
+- Updated dependencies [ac687f8]
+- Updated dependencies [7997d39]
+- Updated dependencies [eb69cb6]
+  - octane@0.1.17
+
 ## 0.0.4
 
 ### Patch Changes

@@ -141,14 +141,9 @@ export function useCompositeRoot(...args: any[]): {
 
 			if (activeIndex !== -1) {
 				onHighlightedIndexChange(activeIndex);
-			} else if (
-				isListIndexDisabled({ current: sortedElements }, highlightedIndex, disabledIndices)
-			) {
-				const firstEnabledIndex = findNonDisabledListIndex(
-					{ current: sortedElements },
-					{ disabledIndices },
-				);
-				if (!isIndexOutOfListBounds({ current: sortedElements }, firstEnabledIndex)) {
+			} else if (isListIndexDisabled(sortedElements, highlightedIndex, disabledIndices)) {
+				const firstEnabledIndex = findNonDisabledListIndex(sortedElements, { disabledIndices });
+				if (!isIndexOutOfListBounds(sortedElements, firstEnabledIndex)) {
 					onHighlightedIndexChange(firstEnabledIndex);
 				}
 			}
@@ -168,9 +163,9 @@ export function useCompositeRoot(...args: any[]): {
 				return;
 			}
 			const elements = elementsRef.current;
-			if (isListIndexDisabled(elementsRef, highlightedIndex, disabledIndices)) {
-				const firstEnabledIndex = findNonDisabledListIndex(elementsRef, { disabledIndices });
-				if (!isIndexOutOfListBounds({ current: elements }, firstEnabledIndex)) {
+			if (isListIndexDisabled(elements, highlightedIndex, disabledIndices)) {
+				const firstEnabledIndex = findNonDisabledListIndex(elements, { disabledIndices });
+				if (!isIndexOutOfListBounds(elements, firstEnabledIndex)) {
 					onHighlightedIndexChange(firstEnabledIndex);
 				}
 			}
@@ -294,7 +289,7 @@ export function useCompositeRoot(...args: any[]): {
 						nextIndex = onLoop(event, highlightedIndex, nextIndex, elementsRef);
 					}
 				} else {
-					nextIndex = findNonDisabledListIndex(elementsRef, {
+					nextIndex = findNonDisabledListIndex(elementsRef.current, {
 						startingIndex: nextIndex,
 						decrement: backwardKeys.includes(event.key),
 						disabledIndices,
@@ -302,7 +297,10 @@ export function useCompositeRoot(...args: any[]): {
 				}
 			}
 
-			if (nextIndex !== highlightedIndex && !isIndexOutOfListBounds(elementsRef, nextIndex)) {
+			if (
+				nextIndex !== highlightedIndex &&
+				!isIndexOutOfListBounds(elementsRef.current, nextIndex)
+			) {
 				if (stopEventPropagation) {
 					event.stopPropagation();
 				}

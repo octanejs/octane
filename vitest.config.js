@@ -231,6 +231,10 @@ function userAppEvalSubmission() {
 export default defineConfig({
 	test: {
 		...configDefaults,
+		// This root-only option applies to every project below. For local
+		// diagnostics, a CLI value such as `--silent=false` or
+		// `--silent=passed-only` overrides this default.
+		silent: true,
 		projects: [
 			{
 				test: {
@@ -437,6 +441,39 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'valtio',
+					include: ['packages/valtio/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/valtio$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/react\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/react/utils.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/react.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/vanilla\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/vanilla/utils.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/vanilla$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/vanilla.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'dexie',
 					include: ['packages/dexie/tests/**/*.test.ts'],
 					exclude: [
@@ -484,6 +521,44 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/dexie$/,
 							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tauri',
+					include: ['packages/tauri/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tauri$/,
+							replacement: resolve(import.meta.dirname, 'packages/tauri/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tauri-ssr',
+					include: ['packages/tauri/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tauri$/,
+							replacement: resolve(import.meta.dirname, 'packages/tauri/src/index.ts'),
 						},
 					],
 				},
@@ -1094,6 +1169,11 @@ export default defineConfig({
 						'!packages/apollo-client/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
+					// inside the test body (same helper as base-ui/aria); keep the same 30s
+					// headroom so a loaded CI shard doesn't overrun the 5s vitest default.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -2038,6 +2118,11 @@ export default defineConfig({
 						'!packages/base-ui/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
+					// inside the test body; on a loaded CI shard that overran the 5s vitest
+					// default. Match the other differential-bearing projects at 30s.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// Differential precompile for base-ui fixtures: rewrites `@octanejs/base-ui/<sub>`
 					// → `@base-ui-components/react/<sub>` so the React side runs real Base UI.
 					globalSetup: ['packages/base-ui/tests/differential/_setup.ts'],
@@ -2138,6 +2223,51 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/sonner$/,
 							replacement: resolve(import.meta.dirname, 'packages/sonner/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'cmdk',
+					include: ['packages/cmdk/tests/**/*.test.ts', '!packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					// Fails any test that logs a console.error (octane reports effect
+					// exceptions there without failing the run).
+					setupFiles: ['packages/cmdk/tests/_setup.ts'],
+					// Differential precompile for cmdk fixtures: rewrites
+					// `@octanejs/cmdk` → the real published `cmdk@1.1.1`.
+					globalSetup: ['packages/cmdk/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'cmdk-ssr',
+					include: ['packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					setupFiles: ['packages/cmdk/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
 						},
 					],
 				},
@@ -2255,8 +2385,32 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'docusaurus',
+					include: ['packages/docusaurus/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mdx\/compile$/,
+							replacement: resolve(import.meta.dirname, 'packages/mdx/src/compile.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'cli',
+					include: ['packages/cli/tests/**/*.test.js'],
 					environment: 'node',
 					globals: false,
 				},
@@ -2370,13 +2524,13 @@ export default defineConfig({
 				test: {
 					name: 'website-unit',
 					include: ['website/tests/**/*.test.ts'],
-					exclude: [
-						'website/tests/core-apis-docs.test.ts',
-						'website/tests/ssr-smoke.test.ts',
-						'website/tests/ssr-hydration.e2e.test.ts',
-					],
+					exclude: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
 					environment: 'jsdom',
 					globals: false,
+					// The Core APIs route test renders the whole documentation graph, so
+					// it runs longer than the five-second default even though it needs
+					// nothing but jsdom.
+					testTimeout: 15_000,
 				},
 				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
 				// routing, and deployment are owned by @octanejs/tanstack-start; the
@@ -2386,11 +2540,10 @@ export default defineConfig({
 			{
 				test: {
 					name: 'website-integration',
-					include: [
-						'website/tests/core-apis-docs.test.ts',
-						'website/tests/ssr-smoke.test.ts',
-						'website/tests/ssr-hydration.e2e.test.ts',
-					],
+					include: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
+					// One production build and one preview server for both specs; see
+					// the file header for why they no longer build for themselves.
+					globalSetup: ['./website/tests/setup/production-server.ts'],
 					environment: 'jsdom',
 					globals: false,
 					// Vitest defaults ordinary tests to five seconds. This project
@@ -2398,9 +2551,16 @@ export default defineConfig({
 					// coverage, so give unannotated integration cases the same
 					// budget as the SSR smoke test.
 					testTimeout: 15_000,
-					// The SSR and browser specs write website/.output, while the
-					// route-level docs test renders the full application. Keep this
-					// integration boundary serial while ordinary tests stay parallel.
+					// Browser cases inside the e2e spec run concurrently (page-per-case
+					// against a shared server). Four keeps the Vite dev server's on-demand
+					// transform queue from becoming the bottleneck and leaves headroom, so
+					// timing-sensitive hover and layout cases are not measured on a
+					// saturated machine.
+					maxConcurrency: 4,
+					// Both specs drive the shared preview server and the e2e spec also
+					// owns a Vite dev server, a browser, and source edits for its HMR
+					// case. Keep the FILE boundary serial even though cases within a file
+					// are concurrent.
 					fileParallelism: false,
 				},
 				plugins: [octaneMdx(websiteMdxOptions), octane()],

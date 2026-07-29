@@ -7,7 +7,7 @@
 // drives animation/gesture/layout/drag from layout effects — exactly the refs +
 // effects + rendering path this is meant to exercise.
 import { animate, hover, press, inView } from 'motion';
-import { hostComponent, useLayoutEffect, useState, provideContext } from 'octane';
+import { childSlot, hostComponent, useLayoutEffect, useState, provideContext } from 'octane';
 import {
 	MotionConfigContext,
 	VariantContext,
@@ -494,7 +494,7 @@ export const motion: any = new Proxy(
 // self-animates its own removal (see the exit cleanup above), so this is a thin
 // passthrough that exists for drop-in compatibility with Framer Motion's API.
 export function AnimatePresence(props: any, scope: any): void {
-	if (typeof props.children === 'function') props.children(undefined, scope);
+	renderTransparentChildren(props.children, scope);
 }
 
 // MotionConfig — provides global defaults (transition, reduced motion) to every
@@ -505,7 +505,11 @@ export function MotionConfig(props: any, scope: any): void {
 		transition: props.transition,
 		reducedMotion: props.reducedMotion,
 	});
-	if (typeof props.children === 'function') props.children(undefined, scope);
+	renderTransparentChildren(props.children, scope);
+}
+
+function renderTransparentChildren(children: unknown, scope: any): void {
+	childSlot(scope, 0, scope.block.parentNode, children, scope.block.endMarker);
 }
 
 export { useAnimate } from './useAnimate';

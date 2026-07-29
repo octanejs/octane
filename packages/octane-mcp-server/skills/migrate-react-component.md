@@ -38,7 +38,7 @@ locals, early returns) stays above it.
 | `items.map(x => <li key={x.id}>...` | `@for (const x of items; key x.id) { <li>... }` with optional `@empty { }` |
 | `cond ? <A/> : <B/>` in JSX | `@if (cond) { <A/> } @else { <B/> }` |
 | `{cond && <A/>}` | `@if (cond) { <A/> }` |
-| switch on a value | `@switch (v) { @case (a) { } @default { } }` |
+| switch on a value | `@switch (v) { @case a: { } @default: { } }` |
 | `<Suspense fallback={...}>` | `<Suspense>` or `@try { } @pending { }` |
 | Error boundary class | `<ErrorBoundary>` or `@try { } @catch (e) { }` |
 | `forwardRef((props, ref) => ...)` | plain function; `ref` arrives as a prop |

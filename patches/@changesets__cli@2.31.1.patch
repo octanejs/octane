@@ -1,0 +1,96 @@
+diff --git a/dist/changesets-cli.cjs.js b/dist/changesets-cli.cjs.js
+index 56cd7bd47e22feb4f64f12a096958e33c8373888..243edba6aec9862a6b72170d4d3b7a4e3f01c5c2 100644
+--- a/dist/changesets-cli.cjs.js
++++ b/dist/changesets-cli.cjs.js
+@@ -877,7 +877,14 @@ async function infoAllow404(packageJson) {
+ // we check `npm info` before publishing but `npm info` can return stale data at times
+ // so we need to gracefully handle this situation
+ function isAlreadyPublishedError(output) {
+-  return output.includes("cannot publish over the previously published version");
++  return typeof output === "string" && output.includes("cannot publish over the previously published version");
++}
++function formatPublishError(publishTool, error) {
++  const message = (publishTool === "pnpm" ? error.message ?? error.summary : error.summary ?? error.message) ?? "Unknown error";
++  return {
++    code: error.code ?? (isAlreadyPublishedError(message) ? "E403" : "EUNKNOWN"),
++    message: `${message}${error.detail ? `\n${error.detail}` : ""}`
++  };
+ }
+ // we have this so that we can do try a publish again after a publish without
+ // the call being wrapped in the npm request limit and causing the publishes to potentially never run
+@@ -960,15 +967,15 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+     // Note that the `--json` output is always printed at the end so this should work
+     let json = getLastJsonObjectFromString(stderr.toString()) || getLastJsonObjectFromString(stdout.toString());
+     if (json !== null && json !== void 0 && json.error) {
+-      var _json$error$detail;
+-      if (json.error.code === "E403" && isAlreadyPublishedError(json.error.summary)) {
++      const publishError = formatPublishError(publishTool.name, json.error);
++      if (publishError.code === "E403" && isAlreadyPublishedError(publishError.message)) {
+         // we don't need to log anything here, it just turned out the version was already published so we gracefully exit the publish process
+         return {
+           result: "skipped"
+         };
+       }
+       // The first case is no 2fa provided, the second is when the 2fa is wrong (timeout or wrong words)
+-      if ((json.error.code === "EOTP" || json.error.code === "E401" && (_json$error$detail = json.error.detail) !== null && _json$error$detail !== void 0 && _json$error$detail.includes("--otp=<code>")) && process.stdin.isTTY) {
++      if ((publishError.code === "EOTP" || publishError.code === "E401" && publishError.message.includes("--otp=<code>")) && process.stdin.isTTY) {
+         // the current otp code must be invalid since it errored
+         twoFactorState.token = undefined;
+         // just in case this isn't already true
+@@ -983,7 +990,7 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+           allowRetry: true
+         };
+       }
+-      logger.error(`an error occurred while publishing ${packageJson.name}: ${json.error.code}`, json.error.summary, json.error.detail ? "\n" + json.error.detail : "");
++      logger.error(`an error occurred while publishing ${packageJson.name}: ${publishError.code}`, publishError.message);
+     }
+     logger.error(stderr.toString() || stdout.toString());
+     return {
+diff --git a/dist/changesets-cli.esm.js b/dist/changesets-cli.esm.js
+index 87493a35c6324e77efa85fc96a287149aa021276..b8cbabd480327a2925e917408619e2478abc32c2 100644
+--- a/dist/changesets-cli.esm.js
++++ b/dist/changesets-cli.esm.js
+@@ -840,7 +840,14 @@ async function infoAllow404(packageJson) {
+ // we check `npm info` before publishing but `npm info` can return stale data at times
+ // so we need to gracefully handle this situation
+ function isAlreadyPublishedError(output) {
+-  return output.includes("cannot publish over the previously published version");
++  return typeof output === "string" && output.includes("cannot publish over the previously published version");
++}
++function formatPublishError(publishTool, error) {
++  const message = (publishTool === "pnpm" ? error.message ?? error.summary : error.summary ?? error.message) ?? "Unknown error";
++  return {
++    code: error.code ?? (isAlreadyPublishedError(message) ? "E403" : "EUNKNOWN"),
++    message: `${message}${error.detail ? `\n${error.detail}` : ""}`
++  };
+ }
+ // we have this so that we can do try a publish again after a publish without
+ // the call being wrapped in the npm request limit and causing the publishes to potentially never run
+@@ -923,15 +930,15 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+     // Note that the `--json` output is always printed at the end so this should work
+     let json = getLastJsonObjectFromString(stderr.toString()) || getLastJsonObjectFromString(stdout.toString());
+     if (json !== null && json !== void 0 && json.error) {
+-      var _json$error$detail;
+-      if (json.error.code === "E403" && isAlreadyPublishedError(json.error.summary)) {
++      const publishError = formatPublishError(publishTool.name, json.error);
++      if (publishError.code === "E403" && isAlreadyPublishedError(publishError.message)) {
+         // we don't need to log anything here, it just turned out the version was already published so we gracefully exit the publish process
+         return {
+           result: "skipped"
+         };
+       }
+       // The first case is no 2fa provided, the second is when the 2fa is wrong (timeout or wrong words)
+-      if ((json.error.code === "EOTP" || json.error.code === "E401" && (_json$error$detail = json.error.detail) !== null && _json$error$detail !== void 0 && _json$error$detail.includes("--otp=<code>")) && process.stdin.isTTY) {
++      if ((publishError.code === "EOTP" || publishError.code === "E401" && publishError.message.includes("--otp=<code>")) && process.stdin.isTTY) {
+         // the current otp code must be invalid since it errored
+         twoFactorState.token = undefined;
+         // just in case this isn't already true
+@@ -946,7 +953,7 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+           allowRetry: true
+         };
+       }
+-      error(`an error occurred while publishing ${packageJson.name}: ${json.error.code}`, json.error.summary, json.error.detail ? "\n" + json.error.detail : "");
++      error(`an error occurred while publishing ${packageJson.name}: ${publishError.code}`, publishError.message);
+     }
+     error(stderr.toString() || stdout.toString());
+     return {

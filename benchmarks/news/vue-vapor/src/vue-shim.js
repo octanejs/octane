@@ -8,6 +8,7 @@
 // any overlapping names in the star export, per ES module semantics.
 export * from '@vue/runtime-vapor';
 export {
+	computed,
 	ref,
 	shallowRef,
 	unref,

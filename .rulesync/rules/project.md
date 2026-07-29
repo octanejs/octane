@@ -123,6 +123,16 @@ pnpm typecheck
 pnpm format:check  # repo-wide: generated baselines share the gate
 ```
 
+`pnpm test` performs its explicit package prechecks and then starts one root
+Vitest invocation for all projects declared in `vitest.config.js`; it does not
+fan out through the packages' own `test` scripts. The root config sets
+`silent: true`, so console output from both passing and failing tests is hidden
+by default across every project. While diagnosing a test, use
+`pnpm test -- --silent=false` to show all test console output, or
+`pnpm test -- --silent=passed-only` to show output only from failing tests.
+Vitest CLI options override the config value; no conditional config logic is
+needed.
+
 Add a changeset for user-facing package changes; stay on the `patch` track while
 Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build
 pipeline changes follow `.rulesync/rules/core-engineering.md`.

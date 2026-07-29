@@ -8,7 +8,11 @@
 import { describe, it, expect } from 'vitest';
 import { compileRuntime, compileTypes } from '../src/lib/playground.ts';
 import { collectAuthoredRanges } from '../src/lib/playground-ast.ts';
-import { DEFAULT_WORKSPACES } from '../src/lib/playground-examples.ts';
+import {
+	DEFAULT_WORKSPACES,
+	exampleWorkspace,
+	getExample,
+} from '../src/lib/playground-examples.ts';
 import {
 	identityMapping,
 	mappingFromInspection,
@@ -793,5 +797,148 @@ describe('Counter example — per-node mapping coverage', () => {
 				}
 			}
 		}
+	});
+});
+
+// ── The Form actions example — attributes that never bake into HTML ──────────
+// A static attribute is baked into template markup, and the template's origins
+// carry it. `action`, `defaultValue` and every other dynamic attribute have no
+// markup at all: they survive as a runtime call whose every token but the ones
+// NAMING it maps to the value expression. Reported as hovering either name
+// lighting up nothing in the Compiled pane, in client and server mode alike.
+describe('Form actions example — attributes with no baked HTML', () => {
+	const SOURCE = exampleWorkspace(getExample('form-actions')!, 'tsrx')!.files[0].source;
+
+	// [label, authored name, the fragment locating it, distinct generated tokens]
+	type Row = [string, string, string, Record<'client' | 'server', string[]>];
+	const ROWS: Row[] = [
+		[
+			'a function form action',
+			'action',
+			'<form action={submit}',
+			{ client: ['_$setFormAction', "'action'"], server: ['_$ssrAttr', '"action"'] },
+		],
+		[
+			// No name token at all on the client: the helper IS the name.
+			'an uncontrolled default value',
+			'defaultValue',
+			'defaultValue="Ada"',
+			{ client: ['_$setDefaultValueUncontrolled'], server: ['"defaultValue"'] },
+		],
+		[
+			'a boolean prop bound from a hook',
+			'disabled',
+			'disabled={status.pending}',
+			{ client: ['_$setBooleanAttribute', "'disabled'"], server: ['_$ssrAttr', '"disabled"'] },
+		],
+	];
+
+	describe.each([
+		['client', 'client' as const],
+		['server', 'server' as const],
+	])('%s output', (_label, mode) => {
+		const { code, mapping } = runtimeArtifact(SOURCE, mode);
+
+		it.each(ROWS)('resolves %s in both directions', (_name, attr, anchor, expected) => {
+			const anchorAt = SOURCE.indexOf(anchor);
+			expect(anchorAt, `${anchor} missing from the example`).toBeGreaterThanOrEqual(0);
+			const at = anchorAt + anchor.indexOf(attr);
+			const pair = mapping.pairFromSource(at + 1);
+			expect(pair, `${attr} resolved to nothing`).not.toBeNull();
+			// The authored NAME — never the value, never the whole attribute.
+			expect(pair!.source.map((range) => textAt(SOURCE, range))).toEqual([attr]);
+			// Which tokens, not how many: one attribute legitimately writes on both
+			// the mount and the update path.
+			expect([...new Set(pair!.output.map((range) => textAt(code, range)))].sort()).toEqual(
+				[...expected[mode]].sort(),
+			);
+			for (const range of pair!.output) {
+				expect(mapsBack(mapping, SOURCE, range.from + 1, attr)).toBe(true);
+			}
+		});
+	});
+});
+
+// ── Props resolved as a GROUP rather than one call per attribute ─────────────
+// Two lowerings drop the authored name on the way out. A host with a spread, a
+// duplicate prop, or a value/defaultValue cascade routes every prop through one
+// commit-phase collector, `setHostPropSources(el, [[false, 'defaultValue', …]])`
+// — the per-source name literal is all that names each attribute. Server-side,
+// `<textarea>`/`<select>` value/defaultValue never serialize as attributes at
+// all: they become the content/projection call, which takes its writers
+// POSITIONALLY, so the helper alias is the only token there is. Reported as
+// hovering common controlled-form names lighting up nothing in the Compiled
+// pane.
+describe('grouped prop lowerings — commit sources and content positions', () => {
+	const SOURCE = `export default function App(props: {
+	rest: Record<string, unknown>;
+	name: string;
+	bio: string;
+	fallback: string;
+	tone: string;
+}) @{
+	<form>
+		<input {...props.rest} defaultValue={props.name} />
+		<textarea value={props.bio} defaultValue={props.fallback} />
+		<select value={props.tone}><option value="a">A</option></select>
+	</form>
+}
+`;
+
+	// [label, authored name, the fragment locating it, distinct generated tokens]
+	type Row = [string, string, string, Record<'client' | 'server', string[]>];
+	const ROWS: Row[] = [
+		[
+			// The spread makes every prop of this input a commit source.
+			'a spread-resolved input default',
+			'defaultValue',
+			'{...props.rest} defaultValue={',
+			{ client: ["'defaultValue'"], server: ['"defaultValue"'] },
+		],
+		[
+			'the value writer of a textarea cascade',
+			'value',
+			'<textarea value={',
+			{ client: ["'value'"], server: ['_$ssrTextareaValue'] },
+		],
+		[
+			// Both writers feed ONE positional call on the server, so this name
+			// resolves through an alias onto the writer that anchors it.
+			'the default writer of a textarea cascade',
+			'defaultValue',
+			'{props.bio} defaultValue={',
+			{ client: ["'defaultValue'"], server: ['_$ssrTextareaValue'] },
+		],
+		[
+			'a select value driving option projection',
+			'value',
+			'<select value={',
+			{ client: ['_$setSelectValue'], server: ['_$ssrSelectScope'] },
+		],
+	];
+
+	describe.each([
+		['client', 'client' as const],
+		['server', 'server' as const],
+	])('%s output', (_label, mode) => {
+		const { code, mapping } = runtimeArtifact(SOURCE, mode);
+
+		it.each(ROWS)('resolves %s in both directions', (_name, attr, anchor, expected) => {
+			const anchorAt = SOURCE.indexOf(anchor);
+			expect(anchorAt, `${anchor} missing from the fixture`).toBeGreaterThanOrEqual(0);
+			const at = anchorAt + anchor.indexOf(attr);
+			const pair = mapping.pairFromSource(at + 1);
+			expect(pair, `${attr} resolved to nothing`).not.toBeNull();
+			// The authored NAME — never the value, never the whole attribute.
+			expect(pair!.source.map((range) => textAt(SOURCE, range))).toEqual([attr]);
+			// Which tokens, not how many: one attribute legitimately writes on both
+			// the mount and the update path.
+			expect([...new Set(pair!.output.map((range) => textAt(code, range)))].sort()).toEqual(
+				[...expected[mode]].sort(),
+			);
+			for (const range of pair!.output) {
+				expect(mapsBack(mapping, SOURCE, range.from + 1, attr)).toBe(true);
+			}
+		});
 	});
 });

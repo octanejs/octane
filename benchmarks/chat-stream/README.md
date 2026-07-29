@@ -30,7 +30,8 @@ counter per pump; segment text derives via the shared `segText(seg, done)`
 (settled segments cache their joined text). Frameworks differ only in their
 idiomatic reactivity around that model. Ripple's deriveds are functions called
 in template expressions, Solid and Svelte update fine-grained bindings, and the
-React and Preact handlers use public `flushSync` to bound each timed commit.
+React handlers use public `flushSync`; Preact uses its native microtask scheduler
+and the harness awaits each queued commit inside the timed window.
 
 Known variance: solid's `switchConv` is bimodal PER BROWSER SESSION (~3.6ms
 or ~6ms median, stable within a session) — its recorded baseline is pinned at

@@ -746,7 +746,13 @@ function installNativeEvent<Node extends LynxElementRef>(
 ): void {
 	const binding = parseLynxNativeEventProp(type);
 	if (binding === null) throw hostError(`event ${JSON.stringify(type)} is not a Lynx event prop.`);
-	const token = encodeLynxNativeEventToken({ root, id, generation, listener: listener.id });
+	const token = encodeLynxNativeEventToken({
+		root,
+		id,
+		generation,
+		listener: listener.id,
+		priority: listener.priority,
+	});
 	const events = nativeEventMap(state, node);
 	const current = events.get(type);
 	if (current?.source === 'background' && current.listener === token) return;

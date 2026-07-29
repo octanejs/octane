@@ -1,5 +1,59 @@
 # @octanejs/app-core
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [c3ba5e0]
+- Updated dependencies [430061e]
+- Updated dependencies [a21ff46]
+- Updated dependencies [1821f63]
+- Updated dependencies [3db74e9]
+- Updated dependencies [0d4ed9e]
+- Updated dependencies [7bdf1fa]
+- Updated dependencies [e1927d8]
+- Updated dependencies [dac0e66]
+- Updated dependencies [54c60fa]
+- Updated dependencies [59a95d6]
+- Updated dependencies [138fbd9]
+- Updated dependencies [50c1ab5]
+- Updated dependencies [e0c5490]
+- Updated dependencies [e6a158e]
+  - octane@0.1.18
+
+## 0.0.13
+
+### Patch Changes
+
+- eb69cb6: Authored `<title>`/`<meta>`/`<link>` now reach the real `<head>` in file-routed
+  SSR apps. The route renders into the template's `<div id="root">`, not a
+  document, so core's head fold had no `</head>` to target and prepended the
+  metadata inside `#root` instead: the template's `<title>` won by document order,
+  `link rel="canonical"` and `meta name="description"` were ignored where they
+  landed, and hydration could not find the ownership markers in `document.head` so
+  it appended duplicates.
+
+  New opt-in `RenderOptions.headChannel: 'separate'` withholds hoisted metadata
+  from `html`/the streamed shell and hands it over on its own, through
+  `RenderResult.head` for the buffered renderers and the new
+  `StreamOptions.onHeadReady(head)` for the streaming ones (called before the shell
+  is written, so a host can still place it in the template prefix). Both the dev
+  server and the production handler use it and splice at `<!--ssr-head-->`.
+
+  The default stays `'fold'` and is unchanged: same bytes, same result shape, no
+  `head` field. Core does not dedupe metadata, so a `<title>` in `index.html` and
+  one in a component both still ship.
+
+- Updated dependencies [bd31a2d]
+- Updated dependencies [9e0ef45]
+- Updated dependencies [dea219b]
+- Updated dependencies [2374980]
+- Updated dependencies [2374980]
+- Updated dependencies [ac687f8]
+- Updated dependencies [7997d39]
+- Updated dependencies [eb69cb6]
+  - octane@0.1.17
+
 ## 0.0.12
 
 ### Patch Changes

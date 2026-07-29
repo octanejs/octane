@@ -48,6 +48,20 @@ function expectedBarCount(card: BenchCard): number {
 	).length;
 }
 
+function atStableChartPrecision(card: BenchCard) {
+	return {
+		...card,
+		rows: card.rows.map((row) =>
+			Object.fromEntries(
+				Object.entries(row).map(([key, value]) => [
+					key,
+					typeof value === 'number' ? Number(value.toPrecision(15)) : value,
+				]),
+			),
+		),
+	};
+}
+
 // Build a fresh router at `url` so tests do not share jsdom location state.
 // The client store commits matches inside a transition, so wait for the root
 // layout before making route assertions.
@@ -63,7 +77,11 @@ async function renderRoute(url: string) {
 
 describe('website routes', () => {
 	it('publishes each framework only where the checked benchmark has measurements', () => {
-		expect(HOME_SUMMARY).toEqual(createHomeSummary(FRAMEWORK_CARDS));
+		// Math.log/exp may differ by one ULP between libc implementations. Keep
+		// this snapshot check exact at a stable precision beyond the chart's display.
+		expect(atStableChartPrecision(HOME_SUMMARY)).toEqual(
+			atStableChartPrecision(createHomeSummary(FRAMEWORK_CARDS)),
+		);
 
 		for (const card of FRAMEWORK_CARDS) {
 			const keys = card.series.map((series) => series.key);
@@ -157,8 +175,8 @@ describe('website routes', () => {
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// compat, spin, explorer. (Each section carries a compiler-added scoped class
-		// after its semantic one.)
+		// cli, compat, spin, explorer. (Each section carries a compiler-added scoped
+		// class after its semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
 		);
@@ -167,6 +185,7 @@ describe('website routes', () => {
 			'features',
 			'proven',
 			'why',
+			'cli',
 			'compat',
 			'spin',
 			'explorer',

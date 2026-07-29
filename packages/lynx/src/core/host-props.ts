@@ -400,18 +400,31 @@ function sameStructuredValue(first: unknown, second: unknown): boolean {
 	});
 }
 
+const NO_MAIN_THREAD_EVENT_PROPS: readonly string[] = Object.freeze([]);
+const MAIN_THREAD_PREFIX = 'main-thread:';
+
+function collectMainThreadEventPropNames(
+	props: Readonly<Record<string, unknown>>,
+	names: Set<string> | null,
+): Set<string> | null {
+	for (const name of Object.keys(props)) {
+		// Cheap prefix test before the regex: this runs for every prop of every
+		// node, and a main-thread event prop is rare.
+		if (!name.startsWith(MAIN_THREAD_PREFIX)) continue;
+		if (parseLynxMainThreadEventProp(name) !== null) (names ??= new Set()).add(name);
+	}
+	return names;
+}
+
 function mainThreadEventPropNames(
 	previous: Readonly<Record<string, unknown>>,
 	next: Readonly<Record<string, unknown>>,
 ): readonly string[] {
-	const names = new Set<string>();
-	for (const name of Object.keys(previous)) {
-		if (parseLynxMainThreadEventProp(name) !== null) names.add(name);
-	}
-	for (const name of Object.keys(next)) {
-		if (parseLynxMainThreadEventProp(name) !== null) names.add(name);
-	}
-	return [...names].sort();
+	const names = collectMainThreadEventPropNames(
+		next,
+		collectMainThreadEventPropNames(previous, null),
+	);
+	return names === null ? NO_MAIN_THREAD_EVENT_PROPS : [...names].sort();
 }
 
 function classProp(value: Readonly<Record<string, unknown>>): unknown {
@@ -421,10 +434,14 @@ function classProp(value: Readonly<Record<string, unknown>>): unknown {
 	return value.class;
 }
 
+// Shared so a node without `data-*` props allocates nothing, and so two such
+// nodes compare equal by identity in `sameDataset`.
+const EMPTY_DATASET: Readonly<Record<string, unknown>> = Object.freeze(Object.create(null));
+
 export function normalizeLynxDataset(
 	props: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
-	const dataset = Object.create(null) as Record<string, unknown>;
+	let dataset: Record<string, unknown> | null = null;
 	for (const name of Object.keys(props)) {
 		if (!name.startsWith('data-')) continue;
 		const key = name.slice(5);
@@ -432,15 +449,17 @@ export function normalizeLynxDataset(
 		const value = props[name];
 		// Pinned ReactLynx preserves an explicit null dataset value. Undefined
 		// (or omission) removes the key from the complete replacement bag.
-		if (value !== undefined) dataset[key] = value;
+		if (value !== undefined)
+			(dataset ??= Object.create(null) as Record<string, unknown>)[key] = value;
 	}
-	return Object.freeze(dataset);
+	return dataset === null ? EMPTY_DATASET : Object.freeze(dataset);
 }
 
 function sameDataset(
 	previous: Readonly<Record<string, unknown>>,
 	next: Readonly<Record<string, unknown>>,
 ): boolean {
+	if (previous === next) return true;
 	const previousNames = Object.keys(previous);
 	const nextNames = Object.keys(next);
 	if (previousNames.length !== nextNames.length) return false;

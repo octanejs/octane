@@ -24,6 +24,14 @@
     "note": "Same-run 512-subscriber useSyncExternalStore fan-out, gated on complete visible updates, rapid-write consistency, and exact listener teardown. A verified quick run measured about 1.01x; 2x leaves real-browser scheduling headroom."
   },
   {
+    "suite": "store-selector-fanout",
+    "op": "parent_rerenders",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.95,
+    "note": "Twenty unrelated parent re-renders across 512 selector-based subscribers with the store untouched, gated on every subscriber still showing the correct total and the new generation. Octane keeps one identity for a capture-free selector, so the selection is reused: verified full and quick runs measured 0.59x (0.586-0.597 across three quick runs), against 1.20x when that identity churns per render. 0.95x leaves roughly 60% headroom over the observed ratio while still failing if the selection is recomputed per render. The deterministic companion signal is meta.selectorCallsDuringRerenders, which is 0 rather than 10,240 while meta.subscriberRendersDuringRerenders stays at 10,240."
+  },
+  {
     "suite": "hydration-interactivity",
     "op": "uncontrolled_6x_hydration",
     "target": "octane-tsrx",
@@ -140,24 +148,24 @@
     "op": "parent_rerender_equal_A",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 600,
-    "note": "Known return-JSX autoMemo gap: the calibrated 8ms batches measured 469-491x through 2026-07-19. This intentionally loose ceiling catches added work until descriptor-output reuse closes the gap; deterministic work gates remain the primary oracle."
+    "maxRatio": 6,
+    "note": "Guarded native-array JSX lists reuse unchanged keyed work; the 20-sample production pairing measured 3.86x TSRX after preserving the ordinary return-descriptor boundary (previously 497x). Six leaves browser-noise headroom while preventing a return to 1000 survivor visits."
   },
   {
     "suite": "memo-wall",
     "op": "one_change_A",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 32,
-    "note": "Known return-JSX one-change gap measured 21.2-25.9x through 2026-07-19. The 32x ceiling allows normal paired variation while preventing more row/list work from landing."
+    "maxRatio": 10,
+    "note": "Guarded returned-JSX keyed lists enter only the changed row helper. Conservatively checking each fresh array snapshot for observable indexed accessors measured 7.41x TSRX, improving the prior 26.62x gap while preserving ordinary Array.map getter semantics. Ten leaves browser-noise headroom without allowing the old descriptor-rebuild path."
   },
   {
     "suite": "memo-wall",
     "op": "ctx_through_wall_A",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 3,
-    "note": "Context-through-wall TSX/TSRX ratio remained 2.24-2.37x through 2026-07-19. The ceiling protects leaf-only refresh behavior while the return-JSX wrapper work is optimized."
+    "maxRatio": 2.25,
+    "note": "Context-aware returned-JSX list caching keeps all 1000 leaf consumers reactive without revisiting keyed survivors; the 20-sample production pairing measured 1.94x TSRX. The ceiling allows browser variance while protecting the context invalidation path."
   },
   {
     "suite": "recursive-context",
@@ -508,108 +516,6 @@
     "note": "Cross-framework transition topology guard: Octane reaches the honest 2-wave dependency floor vs React's 3 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
-    "suite": "recursive-context",
-    "op": "nodes_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 3.66,
-    "note": "Deterministic mounted-tree scaffolding ceiling: TSX 11263 / TSRX 3081 nodes on 2026-07-19. Visible element/text controls below prevent dropped output from looking like an improvement."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "comments_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 820,
-    "note": "Return-JSX boundary-marker tripwire: TSX 8192 / TSRX 10 comments at mount. This is a max-only gap ceiling so direct-return lowering can reduce it without rebaselining."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "elements_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "minRatio": 1,
-    "maxRatio": 1,
-    "note": "Semantic control for the recursive mounted census: both dialects render exactly 2047 visible elements."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "text_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "minRatio": 1,
-    "maxRatio": 1,
-    "note": "Semantic control for the recursive mounted census: both dialects render exactly 1024 text nodes."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "nodes_partial_unmounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 3.66,
-    "note": "Deterministic partial-teardown scaffolding ceiling: TSX 10920 / TSRX 2984 nodes after removing the 32-leaf subtree."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "comments_partial_unmounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 993,
-    "note": "Partial-teardown marker tripwire: TSX 7944 / TSRX 8 comments. Max-only so intended marker removal passes."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "elements_partial_unmounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "minRatio": 1,
-    "maxRatio": 1,
-    "note": "Semantic control after partial teardown: both dialects retain exactly 1984 visible elements."
-  },
-  {
-    "suite": "recursive-context",
-    "op": "text_partial_unmounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "minRatio": 1,
-    "maxRatio": 1,
-    "note": "Semantic control after partial teardown: both dialects retain exactly 992 text nodes."
-  },
-  {
-    "suite": "signal-favoring",
-    "op": "nodes_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 1.32,
-    "note": "Deterministic 100-component-chain scaffolding ceiling: TSX 418 / TSRX 319 mounted nodes on 2026-07-19."
-  },
-  {
-    "suite": "signal-favoring",
-    "op": "comments_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 1.91,
-    "note": "Return-JSX chain marker tripwire: TSX 208 / TSRX 109 comments. Max-only so direct component lowering can reduce it."
-  },
-  {
-    "suite": "signal-favoring",
-    "op": "elements_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "minRatio": 1,
-    "maxRatio": 1,
-    "note": "Semantic control for the signal-chain census: both dialects render exactly 100 visible elements."
-  },
-  {
-    "suite": "signal-favoring",
-    "op": "text_mounted",
-    "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "minRatio": 1,
-    "maxRatio": 1,
-    "note": "Semantic control for the signal-chain census: both dialects render exactly 110 text nodes."
-  },
-  {
     "suite": "js-framework",
     "op": "nodes_1k",
     "target": "octane-tsrx",
@@ -728,58 +634,6 @@
     "minRatio": 1.0,
     "maxRatio": 1.0,
     "note": "Semantic control: equivalent chat states render exactly 25 text nodes."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "nodes_closed_main",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "maxRatio": 1.33,
-    "note": "Closed portal swarm #main census: Octane 2622 vs React 2014 nodes after component-item and dormant-if elision (1.302x, 2026-07-13)."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "elements_closed_main",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: closed portal fixtures render exactly 1411 elements under #main."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "text_closed_main",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: closed portal fixtures render exactly 603 text nodes under #main."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "nodes_open_body",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "maxRatio": 1.38,
-    "note": "Open portal swarm whole-body census retains load-bearing foreign target pairs: Octane 7025 vs React 5217 nodes (1.347x, 2026-07-13)."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "elements_open_body",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: open portal fixtures render exactly 3412 elements across main and foreign targets."
-  },
-  {
-    "suite": "portal-swarm",
-    "op": "text_open_body",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control: open portal fixtures render exactly 1805 text nodes across main and foreign targets."
   },
   {
     "suite": "three-renderer",

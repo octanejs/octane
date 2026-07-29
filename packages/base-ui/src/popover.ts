@@ -58,7 +58,7 @@ import { InternalBackdrop } from './utils/InternalBackdrop';
 import { useAnimationsFinished } from './utils/useAnimationsFinished';
 import { useOpenChangeComplete } from './utils/useOpenChangeComplete';
 import { getDisabledMountTransitionStyles } from './utils/getDisabledMountTransitionStyles';
-import { POPUP_COLLISION_AVOIDANCE } from './utils/constants';
+import { POPUP_COLLISION_AVOIDANCE, PATIENT_CLICK_THRESHOLD } from './utils/constants';
 import { ClosePartProvider, useClosePartCount, useClosePartRegistration } from './utils/closePart';
 import { popupStateMapping } from './utils/popupStateMapping';
 import { transitionStatusMapping } from './utils/useTransitionStatus';
@@ -98,7 +98,6 @@ import { PopupTriggerMap } from './utils/popups/popupTriggerMap';
 import type { InteractionType } from './utils/useEnhancedClickHandler';
 
 const OPEN_DELAY = 300;
-const PATIENT_CLICK_THRESHOLD = 500;
 const CLICK_TRIGGER_IDENTIFIER = 'data-base-ui-click-trigger';
 
 // --- Store -------------------------------------------------------------------
@@ -533,7 +532,12 @@ function PopoverRootComponent<Payload>(props: any): any {
 	});
 }
 
-function PopoverRoot<Payload = unknown>(props: any): any {
+interface PopoverRootProps<Payload> {
+	handle?: PopoverHandle<Payload>;
+	[key: string]: unknown;
+}
+
+function PopoverRoot<Payload = unknown>(props: PopoverRootProps<Payload>): any {
 	const slot = S('PopoverRootWrapper');
 	// Top-level popovers establish a FloatingTree; nested ones reuse the parent's.
 	if (usePopoverRootContext(true)) {

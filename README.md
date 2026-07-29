@@ -44,9 +44,11 @@ Octane is the day-to-day feel:
   effect events. It is the no-bookkeeping dependency DX associated with signal
   frameworks, while keeping the hooks model you already know. Explicit arrays
   remain authoritative; pass `null` when you intentionally want every render.
-  Locally declared custom hooks in a full-compiled `.tsrx`/`.tsx` module get
-  the same inference when they transparently forward a callback and final
-  dependency parameter to one of these hooks.
+  Built-in hook calls retain this inference inside custom hooks, including
+  compiler-processed plain `.ts`/`.js` modules. A separate, narrower rule also
+  infers omitted dependency arguments at calls to locally declared custom
+  wrappers in fully compiled `.tsrx`/`.tsx` modules when they transparently
+  forward a callback and final dependency parameter to one of these hooks.
 - **No rules of hooks.** Hooks are tracked by call site, not call order, so a
   hook can live inside an `if` or after an early return — the usual React
   footguns simply aren't there. The one rule that remains is enforced for you:
@@ -146,6 +148,12 @@ Octane's published packages require Node.js 22 or newer.
 
 ```bash
 pnpm add octane @octanejs/vite-plugin
+```
+
+Or let the CLI wire it up, including the TypeScript settings `.tsrx` needs:
+
+```bash
+pnpm dlx @octanejs/cli init
 ```
 
 For any Vite app, add Octane's Vite integration:
@@ -405,6 +413,27 @@ setters, reducer dispatchers, refs, and state getters. It also omits
 `useEffectEvent` results because Effect Events are non-reactive captures, even
 though React-compatible wrappers have a fresh identity on each render.
 
+This applies to built-in hook calls inside compiler-processed custom hooks,
+including custom hooks written in plain `.ts` or `.js` modules:
+
+```ts
+import { useEffect, useMemo } from 'octane';
+
+export function useLoggedValue(value: string, log: (value: string) => void) {
+  const formatted = useMemo(() => value.toUpperCase());
+
+  useEffect(() => {
+    log(formatted);
+  });
+
+  return formatted;
+}
+```
+
+The memo's inferred dependency is `value`; the effect's inferred dependencies
+are `formatted` and `log`. Changes propagate through the custom hook without
+requiring its caller to pass a dependency array.
+
 Explicit arrays keep their React meaning and are never rewritten. Pass `null`
 for the uncommon every-render form:
 
@@ -415,9 +444,10 @@ useEffect(() => sync(room.id), [room.id]); // explicit dependencies
 useEffect(() => measure(), null); // explicitly after every commit
 ```
 
-The same inference applies to a locally declared custom hook in a full-compiled
-`.tsrx`/`.tsx` module when its implementation transparently forwards a callback
-and final dependency parameter:
+Inferring a missing dependency argument at a **call to a custom wrapper** is a
+separate case. In a fully compiled `.tsrx`/`.tsx` module, a locally declared
+wrapper qualifies when it transparently forwards a callback and its final
+dependency parameter:
 
 ```jsx
 function useTrackedEffect(callback, dependencies) {
@@ -427,9 +457,11 @@ function useTrackedEffect(callback, dependencies) {
 useTrackedEffect(() => sync(room.id)); // inferred from the closure
 ```
 
-This proof is deliberately local and conservative. Plain `.ts`/`.js` modules,
-imported custom hooks, and wrappers that transform or otherwise inspect those
-parameters still require an explicit dependency argument.
+This proof is deliberately local and conservative. The surgical pass for plain
+`.ts`/`.js` modules still infers direct built-in hook calls, but it does not
+infer dependency arguments at calls to custom wrappers. Imported or method-style
+wrappers and wrappers that transform or inspect their callback or dependency
+parameter also require an explicit dependency argument.
 
 `useState` and `useReducer` also expose an optional third tuple member: a stable getter for
 the hook's latest state. It is useful in async callbacks and other long-lived
@@ -634,7 +666,7 @@ Octane itself. Good places to start:
 ## Packages
 
 This is a pnpm monorepo containing the core runtime+compiler, the metaframework
-plugin (and its Vercel and Cloudflare adapters), an MCP server, private evaluation tooling, and
+plugin (and its Vercel and Cloudflare adapters), the CLI, an MCP server, private evaluation tooling, and
 the framework bindings. The current workspace package inventory and counts are
 generated from the workspace manifests in
 [`docs/packages.md`](./docs/packages.md):
@@ -661,6 +693,11 @@ generated from the workspace manifests in
   file-route generation, server-function compilation, streaming SSR, hydration,
   and Vite development and production integration, using
   [`@octanejs/tanstack-router`](./packages/tanstack-router) as its router binding.
+- [`@octanejs/cli`](./packages/cli) is the `octane` command line: `init` wires
+  Octane into an existing project, `doctor` finds and repairs the
+  misconfigurations that break Octane quietly, `add` installs a binding and
+  reports its divergences, `explain` decodes a runtime error code, and `mcp add`
+  registers the MCP server with Claude Code, Codex, Cursor, or VS Code.
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
   compile tooling to AI agents over MCP.
 - [`@octanejs/evals`](./packages/octane-evals) is the private workspace package
@@ -703,6 +740,19 @@ pnpm test         # run the test suite
 pnpm typecheck    # type-check packages, website, and examples
 pnpm format       # format with Prettier
 ```
+
+`pnpm test` runs the projects declared in the root `vitest.config.js` through a
+single Vitest invocation rather than calling each package's `test` script. Test
+console output is silent by default for every project, including failures. Pass
+`--silent=false` through the root script when debugging, or use
+`--silent=passed-only` to print output only for failing tests:
+
+```bash
+pnpm test -- --silent=false
+pnpm test -- --silent=passed-only
+```
+
+Command-line options override the root Vitest config.
 
 ### Playground
 

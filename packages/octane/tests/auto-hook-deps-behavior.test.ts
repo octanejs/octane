@@ -8,6 +8,7 @@ import {
 	EffectFromCleanupOnly,
 	EffectFromDeferredWork,
 	EffectFromDestructuring,
+	EffectFromModuleScopeHelpers,
 	EffectFromProps,
 	EffectFromReferencedCallback,
 	EffectFromState,
@@ -306,6 +307,58 @@ describe('inferred useEffect dependencies — behavior', () => {
 		});
 		flushEffects();
 		expect(log).toHaveBeenLastCalledWith('fallback');
+		expect(log).toHaveBeenCalledTimes(2);
+		r.unmount();
+		flushEffects();
+	});
+
+	it('reruns when only the computed destructuring key changes', () => {
+		const log = vi.fn();
+		// One record and one fallback for the whole test, so the computed key is
+		// the ONLY thing that can drive a rerun. The neighbouring case varies the
+		// key and the fallback together, which a dropped key would survive.
+		const record = { primary: 'first', secondary: 'second' };
+		const r = mount(EffectFromDestructuring, {
+			field: 'primary',
+			fallback: 'missing',
+			record,
+			noise: 0,
+			log,
+		});
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('first');
+
+		r.update(EffectFromDestructuring, {
+			field: 'secondary',
+			fallback: 'missing',
+			record,
+			noise: 0,
+			log,
+		});
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('second');
+		expect(log).toHaveBeenCalledTimes(2);
+		r.unmount();
+		flushEffects();
+	});
+
+	it('reads module-scope helpers correctly without treating them as reactive', () => {
+		const log = vi.fn();
+		const r = mount(EffectFromModuleScopeHelpers, { value: 1, noise: 0, log });
+		flushEffects();
+		// The omitted captures still resolve — dropping them from the array must
+		// not change what the callback computes.
+		expect(log).toHaveBeenLastCalledWith('cfg:fmt:10');
+
+		// An unrelated prop change must not rerun an effect whose only other
+		// captures are module-scope constants.
+		r.update(EffectFromModuleScopeHelpers, { value: 1, noise: 1, log });
+		flushEffects();
+		expect(log).toHaveBeenCalledTimes(1);
+
+		r.update(EffectFromModuleScopeHelpers, { value: 2, noise: 1, log });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('cfg:fmt:20');
 		expect(log).toHaveBeenCalledTimes(2);
 		r.unmount();
 		flushEffects();

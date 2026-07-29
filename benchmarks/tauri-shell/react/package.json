@@ -1,0 +1,21 @@
+{
+  "name": "react-tauri-shell",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "React 19 column of the Tauri desktop-shell benchmark - the same cold start, IPC-streamed log tail, and synchronous keyed churn.",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@benchmarks/tauri-shell-harness": "workspace:*",
+    "@tauri-apps/api": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "terser": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

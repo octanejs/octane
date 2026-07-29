@@ -283,6 +283,21 @@ const SUITES = [
 		})),
 	})),
 	{
+		// Selector-based fan-out: 512 subscribers read one store through a
+		// selector, then the parent re-renders 20 times with the store untouched.
+		// Reuses the news per-target toolchains with its own page, so the shared
+		// runtime-stress fixture's 512 form fields stay out of the measurement.
+		name: 'store-selector-fanout',
+		cwd: 'store-selector-fanout',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
+			label: target,
+			script: 'run.mjs',
+			args: (n) => [target, String(n)],
+		})),
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
@@ -296,6 +311,16 @@ const SUITES = [
 			{ filter: 'svelte-effectful-list-bench', port: 5277 },
 		],
 		iter: { normal: 30, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// The only suite that reaches the shared-parent bulk clear: every other
+		// fixture's `@for` is the sole child of its parent. The two shared sizes
+		// straddle the strategy boundary, so moving it moves one of them.
+		name: 'list-clear',
+		cwd: 'list-clear',
+		servers: [{ filter: 'octane-tsrx-list-clear-bench', port: 5298 }],
+		iter: { normal: 20, quick: 4 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
@@ -504,6 +529,18 @@ const SUITES = [
 		cwd: 'lynx-list',
 		servers: [],
 		iter: { normal: 3, quick: 1 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Native Lynx dual-thread render cost (Node-only): drives the real
+		// background root, async transport, main receiver, and host driver through
+		// a cheap fake Element PAPI, so the milliseconds are Octane's own per-node
+		// CPU cost. It also gates that a native tap reaches its background handler
+		// through the engine's own `publishEvent` receiver. No device timing claim.
+		name: 'lynx-render',
+		cwd: 'lynx-render',
+		servers: [],
+		iter: { normal: 5, quick: 1 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

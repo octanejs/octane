@@ -28,8 +28,11 @@ export const REASONS = {
 	outsidePress: 'outside-press',
 	closePress: 'close-press',
 	focusOut: 'focus-out',
+	listNavigation: 'list-navigation',
 	escapeKey: 'escape-key',
 	imperativeAction: 'imperative-action',
+	cancelOpen: 'cancel-open',
+	siblingOpen: 'sibling-open',
 } as const;
 
 export type BaseUIEventReason = (typeof REASONS)[keyof typeof REASONS];

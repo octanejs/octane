@@ -12,7 +12,11 @@ packages/shadcn/tests/differential/upstream/
 # Vendored pinned upstream shadcn style sheet (byte-exact below its header)
 playground/octane/src/styles/style-nova.css
 **/dist/
+**/dist-active/
 **/build/
+# Cargo build artifacts and Tauri's generated ACL schemas
+**/src-tauri/target/
+**/src-tauri/gen/
 **/.netlify/
 **/.nitro/
 **/.output/
@@ -52,11 +56,13 @@ packages/tanstack-form/tests/_fixtures/upstream/*.tsrx
 
 # Dependencies
 **/node_modules/
+.pnpm-store/
 
-# Claude Code session worktrees (gitignored working copies — never in CI's
-# checkout; sweeping them makes local format:check disagree with CI while a
-# background session is active)
+# Agent session worktrees (gitignored working copies — never in CI's checkout;
+# sweeping them makes local format:check disagree with CI while a background
+# session is active)
 .claude/worktrees/
+.codex/worktrees/
 
 # Editor/IDE generated files
 **/.cache/

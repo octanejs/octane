@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
+import { Menu } from '@octanejs/base-ui/menu';
+import { ContextMenu } from '@octanejs/base-ui/context-menu';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
 import { PreviewCard } from '@octanejs/base-ui/preview-card';
 
@@ -89,6 +91,61 @@ const EXPECTED: Record<string, [Record<string, unknown>, string[]]> = {
 			'Viewport',
 			'createHandle',
 			'Handle',
+		],
+	],
+	// The COMPLETE upstream `menu/index.parts.ts` surface (Phase 3f stages 1-3). Menubar and
+	// ContextMenu are separate namespaces and land in stage 4.
+	Menu: [
+		Menu,
+		[
+			'Root',
+			'Trigger',
+			'Portal',
+			'Positioner',
+			'Popup',
+			'Arrow',
+			'Backdrop',
+			'Viewport',
+			'Item',
+			'LinkItem',
+			'CheckboxItem',
+			'CheckboxItemIndicator',
+			'RadioGroup',
+			'RadioItem',
+			'RadioItemIndicator',
+			'Group',
+			'GroupLabel',
+			'Separator',
+			'SubmenuRoot',
+			'SubmenuTrigger',
+			'createHandle',
+			'Handle',
+		],
+	],
+	// Mirrors upstream's `context-menu/index.parts.ts`: Root and Trigger are ContextMenu's own,
+	// every other part is Menu's, re-exported through this namespace.
+	ContextMenu: [
+		ContextMenu,
+		[
+			'Root',
+			'Trigger',
+			'Backdrop',
+			'Portal',
+			'Positioner',
+			'Popup',
+			'Arrow',
+			'Group',
+			'GroupLabel',
+			'Item',
+			'CheckboxItem',
+			'CheckboxItemIndicator',
+			'LinkItem',
+			'RadioGroup',
+			'RadioItem',
+			'RadioItemIndicator',
+			'SubmenuRoot',
+			'SubmenuTrigger',
+			'Separator',
 		],
 	],
 };

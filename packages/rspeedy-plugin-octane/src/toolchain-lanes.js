@@ -1,4 +1,6 @@
 const SHARED_PACKAGES = Object.freeze({
+	'@emnapi/core': '1.11.2',
+	'@emnapi/runtime': '1.11.2',
 	'@lynx-js/cache-events-webpack-plugin': '0.2.0',
 	'@lynx-js/chunk-loading-webpack-plugin': '0.4.1',
 	'@lynx-js/css-extract-webpack-plugin': '0.9.0',
@@ -15,6 +17,7 @@ const SHARED_PACKAGES = Object.freeze({
 	'@lynx-js/webpack-dev-transport': '0.3.0',
 	'@lynx-js/webpack-runtime-globals': '0.0.7',
 	'@lynx-js/websocket': '0.0.4',
+	'@napi-rs/wasm-runtime': '1.1.6',
 	'@rsbuild/core': '2.1.4',
 	'@rsbuild/plugin-css-minimizer': '2.0.0',
 	'@rsdoctor/rspack-plugin': '1.5.18',
