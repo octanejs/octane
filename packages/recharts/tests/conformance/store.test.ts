@@ -8,7 +8,14 @@
 import { describe, it, expect } from 'vitest';
 import { configureStore, createSlice } from '@reduxjs/toolkit';
 import { mount, nextPaint } from '../_helpers';
-import { LayoutApp, LayoutView, PanoramaApp, PanoramaProbe } from '../_fixtures/store-probe.tsrx';
+import { referenceElementsReducer } from '../../src/state/referenceElementsSlice';
+import {
+	LayoutApp,
+	LayoutView,
+	PanoramaApp,
+	PanoramaProbe,
+	ReferenceLineReporterApp,
+} from '../_fixtures/store-probe.tsrx';
 
 const layoutSlice = createSlice({
 	name: 'layout',
@@ -32,6 +39,61 @@ async function flush() {
 }
 
 describe('recharts redux plumbing', () => {
+	it('keeps an equivalent ReferenceLine registration stable across parent rerenders', async () => {
+		const actions: string[] = [];
+		const store = configureStore({
+			reducer: { referenceElements: referenceElementsReducer },
+			middleware: (getDefaultMiddleware) =>
+				getDefaultMiddleware().concat(() => (next) => (action: { type: string }) => {
+					actions.push(action.type);
+					return next(action);
+				}),
+		});
+		const settings = {
+			xAxisId: 0,
+			yAxisId: 0,
+			ifOverflow: 'discard',
+			segment: [
+				{ x: 1, y: 2 },
+				{ x: 3, y: 4 },
+			],
+		};
+		const result = mount(ReferenceLineReporterApp, { store, settings });
+		await flush();
+		result.update(ReferenceLineReporterApp, {
+			store,
+			settings: {
+				...settings,
+				segment: [
+					{ x: 1, y: 2 },
+					{ x: 3, y: 4 },
+				],
+			},
+		});
+		await flush();
+		expect(actions).toEqual(['referenceElements/addLine']);
+		expect(store.getState().referenceElements.lines).toHaveLength(1);
+
+		result.update(ReferenceLineReporterApp, {
+			store,
+			settings: {
+				...settings,
+				segment: [
+					{ x: 1, y: 2 },
+					{ x: 5, y: 6 },
+				],
+			},
+		});
+		await flush();
+		expect(actions).toEqual([
+			'referenceElements/addLine',
+			'referenceElements/removeLine',
+			'referenceElements/addLine',
+		]);
+		expect(store.getState().referenceElements.lines).toHaveLength(1);
+		result.unmount();
+	});
+
 	it('useChartLayout reads the store through RechartsReduxContext and tracks dispatches', async () => {
 		const store = makeChartStore();
 		const r = mount(LayoutApp, { store });

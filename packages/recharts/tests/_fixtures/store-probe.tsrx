@@ -3,6 +3,7 @@ import { RechartsReduxContext } from '@octanejs/recharts/state/RechartsReduxCont
 import { useAppDispatch } from '@octanejs/recharts/state/hooks';
 import { useChartLayout } from '@octanejs/recharts/context/chartLayoutContext';
 import { PanoramaContext, useIsPanorama } from '@octanejs/recharts/context/PanoramaContext';
+import { ReportReferenceLine } from '../../src/cartesian/ReferenceLine.tsrx';
 
 // Conformance fixture for the recharts redux plumbing: a chart-shaped store
 // provided through RechartsReduxContext (the isolated per-chart store pattern),
@@ -31,4 +32,10 @@ export function PanoramaApp() @{
 	<PanoramaContext.Provider value={true}>
 		<PanoramaProbe />
 	</PanoramaContext.Provider>
+}
+
+export function ReferenceLineReporterApp(props) @{
+	<Provider store={props.store} context={RechartsReduxContext}>
+		<ReportReferenceLine {...props.settings} />
+	</Provider>
 }

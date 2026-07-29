@@ -8,6 +8,7 @@
 // effects run in order), so indexes line up with data indexes exactly like the
 // upstream element order did.
 import { createContext, useContext, useMemo, useState } from 'octane';
+import { shallowEqual } from '@octanejs/redux';
 import { splitSlot, subSlot } from '../internal';
 
 export interface CellRegistry {
@@ -58,6 +59,17 @@ export function useCellRegistry(...rest: any[]): [RegisteredCell[] | undefined, 
 			};
 			return {
 				register(token: object, props: unknown) {
+					const previousProps = entries.get(token);
+					if (
+						entries.has(token) &&
+						previousProps != null &&
+						props != null &&
+						typeof previousProps === 'object' &&
+						typeof props === 'object' &&
+						shallowEqual(previousProps, props)
+					) {
+						return;
+					}
 					entries.set(token, props);
 					publish();
 				},
