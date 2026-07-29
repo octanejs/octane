@@ -40,6 +40,22 @@ function unwrap(node) {
 	return value;
 }
 
+function optionalChainCanSkip(node) {
+	let current = node;
+	while (current != null) {
+		// Grouping ends a chain before an outer call or property access evaluates.
+		if (current.type === 'ChainExpression') return false;
+		if (TRANSPARENT_EXPRESSIONS.has(current.type)) {
+			current = current.expression;
+			continue;
+		}
+		if (current.type !== 'CallExpression' && current.type !== 'MemberExpression') return false;
+		if (current.optional === true) return true;
+		current = current.type === 'CallExpression' ? current.callee : current.object;
+	}
+	return false;
+}
+
 function addPatternNames(pattern, bindings, value) {
 	if (pattern == null) return;
 	switch (pattern.type) {
@@ -259,8 +275,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'CallExpression':
 			case 'NewExpression':
 				return (
-					node.optional !== true &&
-					(alwaysAwaits(node.callee) || (node.arguments ?? []).some(alwaysAwaits))
+					alwaysAwaits(node.callee) ||
+					(node.optional !== true &&
+						(node.arguments ?? []).some(alwaysAwaits) &&
+						!optionalChainCanSkip(node.callee))
 				);
 			case 'AssignmentExpression':
 				return alwaysAwaits(node.left) || alwaysAwaits(node.right);
@@ -269,14 +287,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'LogicalExpression':
 				return alwaysAwaits(node.left);
 			case 'ConditionalExpression':
-				return alwaysAwaits(node.test);
+				return (
+					alwaysAwaits(node.test) || (alwaysAwaits(node.consequent) && alwaysAwaits(node.alternate))
+				);
 			case 'UnaryExpression':
 			case 'UpdateExpression':
 				return alwaysAwaits(node.argument);
 			case 'MemberExpression':
 				return (
-					node.optional !== true &&
-					(alwaysAwaits(node.object) || (node.computed === true && alwaysAwaits(node.property)))
+					alwaysAwaits(node.object) ||
+					(node.optional !== true &&
+						node.computed === true &&
+						alwaysAwaits(node.property) &&
+						!optionalChainCanSkip(node.object))
 				);
 			case 'ArrayExpression':
 				return (node.elements ?? []).some(alwaysAwaits);
@@ -299,13 +322,51 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function statementAlwaysAwaits(statement) {
-		if (statement?.type === 'ExpressionStatement') return alwaysAwaits(statement.expression);
-		if (statement?.type === 'VariableDeclaration') {
-			return (statement.declarations ?? []).some((declaration) => alwaysAwaits(declaration.init));
+		switch (statement?.type) {
+			case 'ExpressionStatement':
+				return alwaysAwaits(statement.expression);
+			case 'VariableDeclaration':
+				return (statement.declarations ?? []).some((declaration) => alwaysAwaits(declaration.init));
+			case 'ReturnStatement':
+			case 'ThrowStatement':
+				return alwaysAwaits(statement.argument);
+			case 'BlockStatement':
+			case 'JSXCodeBlock':
+				for (const child of statement.body ?? []) {
+					if (statementAlwaysAwaits(child)) return true;
+				}
+				return false;
+			case 'IfStatement':
+				return (
+					alwaysAwaits(statement.test) ||
+					(statement.alternate != null &&
+						statementAlwaysAwaits(statement.consequent) &&
+						statementAlwaysAwaits(statement.alternate))
+				);
+			case 'TryStatement':
+				return (
+					(statement.finalizer != null && statementAlwaysAwaits(statement.finalizer)) ||
+					(statementAlwaysAwaits(statement.block) &&
+						(statement.handler == null || statementAlwaysAwaits(statement.handler.body)))
+				);
+			default:
+				return false;
 		}
-		return statement?.type === 'ReturnStatement' || statement?.type === 'ThrowStatement'
-			? alwaysAwaits(statement.argument)
-			: false;
+	}
+
+	function visitStatements(statements, scope, phase) {
+		let executionPhase = phase;
+		for (const statement of statements ?? []) {
+			visit(statement, scope, executionPhase);
+			if (
+				currentFunctionIsAsync &&
+				executionPhase !== 'deferred' &&
+				statementAlwaysAwaits(statement)
+			) {
+				executionPhase = 'deferred';
+			}
+		}
+		return executionPhase;
 	}
 
 	function visitFunction(node, parentScope, phase) {
@@ -321,17 +382,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				visitPatternExpressions(parameter, functionScope, phase);
 			}
 			if (body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock') {
-				let executionPhase = phase;
-				for (const statement of body.body ?? []) {
-					visit(statement, functionScope, executionPhase);
-					if (
-						currentFunctionIsAsync &&
-						executionPhase !== 'deferred' &&
-						statementAlwaysAwaits(statement)
-					) {
-						executionPhase = 'deferred';
-					}
-				}
+				const executionPhase = visitStatements(body.body, functionScope, phase);
 				if (body.render) visit(body.render, functionScope, executionPhase);
 			} else {
 				visit(body, functionScope, phase);
@@ -442,8 +493,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'BlockStatement':
 			case 'JSXCodeBlock': {
 				const block = createScope(scope, 'block', node.body ?? []);
-				for (const statement of node.body ?? []) visit(statement, block, phase);
-				if (node.render) visit(node.render, block, phase);
+				const executionPhase = visitStatements(node.body, block, phase);
+				if (node.render) visit(node.render, block, executionPhase);
+				return;
+			}
+			case 'IfStatement': {
+				visit(node.test, scope, phase);
+				const branchPhase =
+					currentFunctionIsAsync && phase !== 'deferred' && alwaysAwaits(node.test)
+						? 'deferred'
+						: phase;
+				visit(node.consequent, scope, branchPhase);
+				visit(node.alternate, scope, branchPhase);
 				return;
 			}
 			case 'VariableDeclaration':

@@ -306,6 +306,183 @@ export function App() @{
 		expect(() => compile(conditionalObject, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
+	it.each([
+		['standalone blocks', '{ await Promise.resolve(); setCount(1); }'],
+		['statements after standalone blocks', '{ await Promise.resolve(); } setCount(1);'],
+		[
+			'deeply nested blocks',
+			'{ { const next = await Promise.resolve(count + 1); setCount(next); } }',
+		],
+		['conditional branches', 'if (count > -1) { await Promise.resolve(); setCount(1); }'],
+		[
+			'branches that both yield',
+			'if (count > 0) { await Promise.resolve(); } else { await Promise.resolve(); } setCount(1);',
+		],
+		['awaited conditional tests', 'if (await Promise.resolve(count > -1)) setCount(1);'],
+		[
+			'awaited optional-chain receivers',
+			'const target = { update: () => {} }; (await Promise.resolve(target))?.update(); setCount(1);',
+		],
+		[
+			'try blocks',
+			'try { const next = await Promise.resolve(count + 1); setCount(next); } catch {}',
+		],
+		[
+			'catch blocks',
+			'try { throw new Error("retry"); } catch { const next = await Promise.resolve(1); setCount(next); }',
+		],
+		[
+			'try and catch branches that both yield',
+			'try { await Promise.resolve(); } catch { await Promise.resolve(); } setCount(1);',
+		],
+		['finally blocks', 'try {} finally { await Promise.resolve(); setCount(1); }'],
+		[
+			'statements after awaited finally blocks',
+			'try {} finally { await Promise.resolve(); } setCount(1);',
+		],
+	])('allows updates after guaranteed awaits in nested %s', (_label, body) => {
+		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+		const effect = `"use strong";\n${stateComponent(
+			`useEffect(() => { (async () => { ${body} })(); }, [count]);`,
+			'useState, useEffect',
+		)}`;
+		const asyncEffect = `"use strong";\n${stateComponent(
+			`useEffect(async () => { ${body} }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		for (const source of [render, effect, asyncEffect]) {
+			expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
+		}
+	});
+
+	it.each([
+		['updates before a nested await', '{ setCount(1); await Promise.resolve(); }'],
+		[
+			'conditionally executed nested awaits',
+			'{ if (count > 0) await Promise.resolve(); setCount(1); }',
+		],
+		[
+			'conditional branches without an alternative',
+			'if (count > 0) { await Promise.resolve(); } setCount(1);',
+		],
+		[
+			'branches where only one arm yields',
+			'if (count > 0) { await Promise.resolve(); } else {} setCount(1);',
+		],
+		['short-circuited awaits', 'count > 0 && await Promise.resolve(); setCount(1);'],
+		[
+			'optional chains that can skip awaited arguments',
+			'const target = count > 0 ? { update: () => {} } : null; target?.update(await Promise.resolve()); setCount(1);',
+		],
+		[
+			'updates before awaits in try blocks',
+			'try { setCount(1); await Promise.resolve(); } catch {}',
+		],
+		[
+			'updates before awaits in catch blocks',
+			'try { throw new Error("retry"); } catch { setCount(1); await Promise.resolve(); }',
+		],
+		[
+			'catch branches that can continue without yielding',
+			'try { await Promise.resolve(); } catch {} setCount(1);',
+		],
+		[
+			'finally blocks that can run synchronously',
+			'try { await Promise.resolve(); } finally { setCount(1); }',
+		],
+	])('still rejects %s', (_label, body) => {
+		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
+		const effect = `"use strong";\n${stateComponent(
+			`useEffect(async () => { ${body} }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		expect(() => compile(render, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+		expect(() => compile(effect, '/src/Counter.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])('preserves nested async effect updates during $mode compilation with dev=$dev', (options) => {
+		const source = `"use strong";\n${stateComponent(
+			`useEffect(() => {
+      (async () => {
+        try {
+          const next = await Promise.resolve(count + 1);
+          setCount(next);
+        } catch {
+          await Promise.resolve();
+          setCount(0);
+        }
+      })();
+    }, [count]);`,
+			'useState, useEffect',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx', options)).not.toThrow();
+	});
+
+	it('accepts nested async effect updates in plain TypeScript custom hooks', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function useCounter() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    (async () => {
+      try {
+        const next = await Promise.resolve(count + 1);
+        setCount(next);
+      } catch {
+        await Promise.resolve();
+        setCount(0);
+      }
+    })();
+  }, [count]);
+  return count;
+}`;
+		const synchronous = source.replace(
+			'const next = await Promise.resolve(count + 1);\n        setCount(next);',
+			'setCount(count + 1);\n        await Promise.resolve();',
+		);
+
+		expect(() => slotHooks(source, '/src/useCounter.ts')).not.toThrow();
+		expect(() => slotHooks(synchronous, '/src/useCounter.ts')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it('does not publish editor errors for legitimately deferred nested async updates', () => {
+		const source = `"use strong";\n${stateComponent(
+			`useEffect(async () => {
+      try {
+        const next = await Promise.resolve(count + 1);
+        setCount(next);
+      } catch {
+        await Promise.resolve();
+        setCount(0);
+      }
+    }, [count]);`,
+			'useState, useEffect',
+		)}`;
+		const result = compileToVolarMappings(source, '/src/Counter.tsrx');
+		const synchronous = source.replace(
+			'const next = await Promise.resolve(count + 1);\n        setCount(next);',
+			'setCount(count + 1);\n        await Promise.resolve();',
+		);
+		const rejected = compileToVolarMappings(synchronous, '/src/Counter.tsrx');
+
+		expect(result.diagnostics).toEqual([]);
+		expect(result.errors).toEqual([]);
+		expect(rejected.diagnostics).toContainEqual(
+			expect.objectContaining({ code: EFFECT_STATE_UPDATE, severity: 'error' }),
+		);
+		expect(rejected.errors).toContainEqual(
+			expect.objectContaining({ code: EFFECT_STATE_UPDATE, type: 'usage' }),
+		);
+	});
+
 	it.each(['ref.current = 1;', 'ref.current++;', "ref['current'] = 1;"])(
 		'rejects render-phase useRef writes: %s',
 		(write) => {
