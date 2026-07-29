@@ -634,6 +634,39 @@ describe('useLinkedState', () => {
 		expect(controls.getValue()).toBe('A');
 	});
 
+	it('discards an old transition before parking a new source behind Suspense', async () => {
+		const transitionGate = deferred();
+		const suspenseGate = deferred();
+		const controls = {} as IndependentControls;
+		const root = mount(IndependentSuspense, {
+			observe: (next: Partial<IndependentControls>) => Object.assign(controls, next),
+		});
+
+		flushSync(() => {
+			startTransition(async () => {
+				controls.setValue('stale A');
+				await transitionGate.promise;
+			});
+		});
+		expect(controls.getValue()).toBe('stale A');
+
+		flushSync(() => {
+			controls.setSource('B');
+			controls.setResource(suspenseGate.promise);
+		});
+		expect(root.find('#independent-pending').textContent).toBe('loading');
+		expect(controls.getValue()).toBe('A');
+
+		await act(() => transitionGate.resolve());
+		expect(root.find('#independent-pending').textContent).toBe('loading');
+		expect(controls.getValue()).toBe('A');
+
+		await act(() => suspenseGate.resolve());
+		expect(root.find('#independent-linked-value').textContent).toBe('B');
+		expect(controls.getValue()).toBe('B');
+		root.unmount();
+	});
+
 	it('discards an unfinished transition update when its source changes urgently', async () => {
 		const gate = deferred();
 		let controls!: LinkedControls<number>;

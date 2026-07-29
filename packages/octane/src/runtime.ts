@@ -4543,14 +4543,9 @@ export function useLinkedState<Source, Value>(
 	const publish = () => {
 		if (current.renderPending !== true || current.renderVersion !== version || block.disposed)
 			return;
-		const hiddenBoundary = findSuspenseHiddenTry(block);
-		if (hiddenBoundary !== null) {
-			current.renderParked = true;
-			deferLinkedStateReveal(hiddenBoundary, publish);
-			return;
-		}
 		// A setter staged for the old source belongs to its previous generation.
-		// Publishing it after this reset would overwrite the newly linked value.
+		// Discard it before parking too: otherwise it can flush into the committed
+		// value while Suspense still hides the replacement source.
 		if (sourceChanged) {
 			const pendingBatch = current.pendingActionBatch;
 			if (pendingBatch !== undefined) {
@@ -4558,6 +4553,12 @@ export function useLinkedState<Source, Value>(
 				current.pendingActionBatch = undefined;
 				current.pendingActionValue = undefined;
 			}
+		}
+		const hiddenBoundary = findSuspenseHiddenTry(block);
+		if (hiddenBoundary !== null) {
+			current.renderParked = true;
+			deferLinkedStateReveal(hiddenBoundary, publish);
+			return;
 		}
 		current.source = current.renderSource as Source;
 		current.value = current.renderValue as Value;

@@ -131,9 +131,11 @@ function compiledFirstScreenHookImports(observeGetter: boolean): Set<string> {
 		[
 			'--input-type=module',
 			'-e',
-			`import { parseModule } from '@tsrx/core';
+			`import { createRequire } from 'node:module';
 import { compile } from './packages/octane/src/compiler/compile.js';
 import { lynxMainThreadRenderer } from './packages/lynx/src/config.runtime.js';
+const compilerRequire = createRequire(new URL('./packages/octane/package.json', import.meta.url));
+const { parseModule } = await import(compilerRequire.resolve('@tsrx/core'));
 let source = '';
 for await (const chunk of process.stdin) source += chunk;
 const { code } = compile(source, '/src/linked-first-screen.lynx.tsrx', {
