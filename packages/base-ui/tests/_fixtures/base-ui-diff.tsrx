@@ -21,6 +21,7 @@ import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
 import { Menu } from '@octanejs/base-ui/menu';
+import { Toast } from '@octanejs/base-ui/toast';
 import { Menubar } from '@octanejs/base-ui/menubar';
 import { ContextMenu } from '@octanejs/base-ui/context-menu';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
@@ -1479,4 +1480,83 @@ export function MenubarInteractive() @{
 			</Menu.Root>
 		</Menubar>
 	</div>
+}
+
+// Toast (EMPTY) — Provider + Viewport with nothing in it. The viewport is a live region that is
+// always present; toasts are added imperatively, so this is the resting state.
+export function ToastEmpty() @{
+	<Toast.Provider>
+		<Toast.Viewport className="toast-viewport" />
+	</Toast.Provider>
+}
+
+// Toast (one toast) — an "add" button plus the viewport rendering the toast list. The rig clicks
+// the button on both runtimes, so this covers the whole imperative path: `useToastManager().add()`
+// → the store's list + metadata → `Toast.Root` with its index/offset CSS vars, roles and the
+// title/description id wiring.
+function ToastAddButton(props) @{
+	const manager = Toast.useToastManager();
+	<button
+		className="toast-add"
+		type="button"
+		onClick={() => manager.add({ title: 'Saved', description: 'Your changes were saved.' })}
+	>
+		Add
+	</button>
+}
+
+function ToastList() @{
+	const manager = Toast.useToastManager();
+	<Toast.Viewport className="toast-viewport">
+		@for (const toast of manager.toasts; key toast.id) {
+			<Toast.Root toast={toast} className="toast-root">
+				<Toast.Content className="toast-content">
+					<Toast.Title className="toast-title" />
+					<Toast.Description className="toast-description" />
+				</Toast.Content>
+				<Toast.Action className="toast-action" />
+				<Toast.Close className="toast-close" aria-label="Close">x</Toast.Close>
+			</Toast.Root>
+		}
+	</Toast.Viewport>
+}
+
+export function ToastBasic() @{
+	<Toast.Provider>
+		<ToastAddButton />
+		<ToastList />
+	</Toast.Provider>
+}
+
+// Toast (limit) — `limit={1}` marks everything past the newest as `limited`, which renders as
+// `data-limited` + `inert` rather than removing it, so it can still animate out.
+export function ToastLimited() @{
+	<Toast.Provider limit={1}>
+		<ToastAddButton />
+		<ToastList />
+	</Toast.Provider>
+}
+
+// Toast (high priority) — `priority: 'high'` switches the root to `role="alertdialog"` and mirrors
+// the toast into the viewport's visually-hidden `role="alert"` live region.
+function ToastAddHighPriority() @{
+	const manager = Toast.useToastManager();
+	<button
+		className="toast-add-high"
+		type="button"
+		onClick={() => manager.add({
+			title: 'Error',
+			description: 'Something failed.',
+			priority: 'high',
+		})}
+	>
+		Add urgent
+	</button>
+}
+
+export function ToastHighPriority() @{
+	<Toast.Provider>
+		<ToastAddHighPriority />
+		<ToastList />
+	</Toast.Provider>
 }

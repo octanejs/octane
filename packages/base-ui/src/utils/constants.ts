@@ -29,3 +29,13 @@ export const TYPEAHEAD_RESET_MS = 500;
  * immediately close the popup it just opened).
  */
 export const PATIENT_CLICK_THRESHOLD = 500;
+
+/**
+ * Opt-out attributes a consumer puts on an element inside a swipeable surface (Toast, Drawer) so a
+ * drag starting there does not begin a swipe — e.g. a slider or a scrollable region.
+ */
+export const BASE_UI_SWIPE_IGNORE_ATTRIBUTE = 'data-base-ui-swipe-ignore';
+export const LEGACY_SWIPE_IGNORE_ATTRIBUTE = 'data-swipe-ignore';
+
+export const BASE_UI_SWIPE_IGNORE_SELECTOR = `[${BASE_UI_SWIPE_IGNORE_ATTRIBUTE}]`;
+export const LEGACY_SWIPE_IGNORE_SELECTOR = `[${LEGACY_SWIPE_IGNORE_ATTRIBUTE}]`;

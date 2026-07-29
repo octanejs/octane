@@ -4,6 +4,7 @@ import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
 import { Popover } from '@octanejs/base-ui/popover';
 import { Menu } from '@octanejs/base-ui/menu';
 import { ContextMenu } from '@octanejs/base-ui/context-menu';
+import { Toast } from '@octanejs/base-ui/toast';
 import { Tooltip } from '@octanejs/base-ui/tooltip';
 import { PreviewCard } from '@octanejs/base-ui/preview-card';
 
@@ -146,6 +147,26 @@ const EXPECTED: Record<string, [Record<string, unknown>, string[]]> = {
 			'SubmenuRoot',
 			'SubmenuTrigger',
 			'Separator',
+		],
+	],
+	// Mirrors upstream's `toast/index.parts.ts`, which also exports the two manager entry points
+	// through the namespace.
+	Toast: [
+		Toast,
+		[
+			'Provider',
+			'Viewport',
+			'Root',
+			'Content',
+			'Description',
+			'Title',
+			'Close',
+			'Action',
+			'Portal',
+			'Positioner',
+			'Arrow',
+			'useToastManager',
+			'createToastManager',
 		],
 	],
 };

@@ -30,6 +30,7 @@ export { PreviewCard } from './preview-card';
 export { Tooltip } from './tooltip';
 export { Slider } from './slider';
 export { Switch } from './switch';
+export { Toast } from './toast';
 export { Toggle } from './toggle';
 export { ToggleGroup } from './toggle-group';
 export { useRender } from './use-render';
