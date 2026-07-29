@@ -26,6 +26,7 @@ import {
 	getFreePort,
 	spawnServer as spawnServerIn,
 	stopServer,
+	waitForReadyState,
 	waitForServer,
 } from './support/server-process.ts';
 
@@ -729,6 +730,14 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 
 	beforeAll(async () => {
 		if (!browser) return;
+		// The production build is no longer awaited in globalSetup (it blocked the
+		// whole run), so it can still be compiling right now. This boot deliberately
+		// starts from a cold optimize-deps cache and is the most load-sensitive step
+		// in the file — the same reason the two suites are sequential rather than
+		// concurrent. Letting it race a full production build times it out. Waiting
+		// restores the ordering globalSetup used to guarantee, without putting the
+		// other ~90 projects back behind the build.
+		await waitForReadyState(inject('productionReadyFile'), 300_000);
 		DEV_PORT = await getFreePort();
 		// Fresh optimize-deps cache → prove the declared dependency graph handles
 		// a deterministic cold start without an "Outdated Optimize Dep" reload.
@@ -743,7 +752,8 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			'--strictPort',
 		]);
 		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
-	}, 120_000);
+		// Covers the production-build wait above plus the cold dev boot.
+	}, 420_000);
 
 	afterAll(async () => {
 		await stopServer(server);
@@ -1390,6 +1400,12 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
 	const PREVIEW_ORIGIN = inject('productionOrigin');
 	const outputDir = inject('productionOutputDir');
+
+	// The setup starts the build in the background so the rest of the suite does
+	// not queue behind it; the origin is reserved but not yet answering when this
+	// module loads, and `outputDir` is not populated either. Both the browser
+	// cases and the Build Output assertions need it finished.
+	beforeAll(() => waitForReadyState(inject('productionReadyFile'), 300_000));
 
 	it.concurrent('emits the Vercel Build Output API contract', () => {
 		const config = JSON.parse(readFileSync(join(outputDir, 'config.json'), 'utf8')) as {

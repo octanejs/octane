@@ -239,6 +239,12 @@ export default defineConfig({
 			{
 				test: {
 					name: 'octane',
+					// The individual cases here run in milliseconds; the 5s default was
+					// being tripped by machine contention, not by the code under test
+					// (control-flow, hmr, and differential files each failed this way in
+					// a full run while passing alone). A 20s ceiling absorbs a saturated
+					// machine and still catches a genuine hang.
+					testTimeout: 20_000,
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
@@ -318,6 +324,10 @@ export default defineConfig({
 				// are unaffected — they control their own options).
 				test: {
 					name: 'octane-prod',
+					// Same contention budget as the `octane` project above: this one runs
+					// the identical file set a second time, so it is on the machine at the
+					// same moment and fails the same way.
+					testTimeout: 20_000,
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
@@ -2233,6 +2243,13 @@ export default defineConfig({
 					name: 'cmdk',
 					include: ['packages/cmdk/tests/**/*.test.ts', '!packages/cmdk/tests/ssr/**/*.test.ts'],
 					environment: 'jsdom',
+					// The differential oracle mounts real cmdk beside the Octane build.
+					// In isolation the whole project finishes in ~5.6s, but inside a full
+					// run those two cases overran the 5s default purely from machine
+					// contention — a green suite reporting itself broken. Same budget as
+					// the other differential-bearing projects.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// Fails any test that logs a console.error (octane reports effect
 					// exceptions there without failing the run).
 					setupFiles: ['packages/cmdk/tests/_setup.ts'],
@@ -2530,7 +2547,23 @@ export default defineConfig({
 				test: {
 					name: 'website-unit',
 					include: ['website/tests/**/*.test.ts'],
-					exclude: ['website/tests/ssr-smoke.test.ts', 'website/tests/ssr-hydration.e2e.test.ts'],
+					// A project that declares `exclude` makes Vitest ignore the CLI
+					// `--exclude` flag entirely. CI's sharded suite therefore CANNOT drop
+					// a spec in this project by name the way it does for every other
+					// quarantined path, and its `--exclude "$WEBSITE_DOCS_SPEC"` was
+					// silently a no-op — core-apis-docs ran in a shard AND in the
+					// website_e2e job that owns it. The shard sets the variable below to
+					// ask for the exclusion; website_e2e does not, so it still runs there,
+					// serially, on an unloaded runner. That matters: the spec renders the
+					// whole documentation graph (see testTimeout) and is exactly the kind
+					// of case a saturated shard turns into a spurious timeout.
+					exclude: [
+						'website/tests/ssr-smoke.test.ts',
+						'website/tests/ssr-hydration.e2e.test.ts',
+						...(process.env.OCTANE_EXCLUDE_WEBSITE_DOCS === '1'
+							? ['website/tests/core-apis-docs.test.ts']
+							: []),
+					],
 					environment: 'jsdom',
 					setupFiles: ['website/tests/setup/unit.ts'],
 					globals: false,
@@ -2558,6 +2591,11 @@ export default defineConfig({
 					// coverage, so give unannotated integration cases the same
 					// budget as the SSR smoke test.
 					testTimeout: 15_000,
+					// The production build no longer blocks globalSetup (see
+					// tests/setup/production-server.ts); both specs wait for it in a
+					// `beforeAll` instead. That hook is therefore as long as a cold
+					// website build, which the 10s hook default cannot cover.
+					hookTimeout: 320_000,
 					// Browser cases inside the e2e spec run concurrently (page-per-case
 					// against a shared server). Four keeps the Vite dev server's on-demand
 					// transform queue from becoming the bottleneck and leaves headroom, so
