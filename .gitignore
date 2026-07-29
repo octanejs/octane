@@ -18,6 +18,13 @@ examples/**/*.d.tsrx.ts
 # Vercel Build Output (@octanejs/adapter-vercel writes {root}/.vercel/output on build)
 .vercel/
 
+# Throwaway test project directories staged inside the workspace instead of
+# os.tmpdir() — `createTempProject(prefix, { insideWorkspace: true })`. Only the
+# workerd suites need this: workerd resolves module paths against the process
+# working directory and refuses to climb out of it, so a /tmp root cannot boot.
+# See packages/octane/tests/_temp-project.ts.
+.test-scratch/
+
 # Unified bench runner scratch: per-suite collected results + server logs, and the
 # non-authoritative ratio-guard suggestions file. (benchmarks/baselines/local/ and
 # benchmarks/baselines/ratios.json ARE committed — see benchmarks/baselines/README.md.)

@@ -208,7 +208,7 @@
       "octaneReferences": [
         {
           "kind": "test",
-          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "file": "packages/octane/tests/compiler/compiler-vite-options.test.ts",
           "testName": "changes emitted hot-update support for both hmr values",
           "note": "Direct Vite integration coverage for explicit HMR, SSR-mode, and ownership booleans."
         },
@@ -233,25 +233,25 @@
       ],
       "evidence": [
         {
-          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "file": "packages/octane/tests/compiler/compiler-vite-options.test.ts",
           "testName": "changes emitted hot-update support for both hmr values",
           "modes": ["vite-client"],
           "observables": ["emitted-code"]
         },
         {
-          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "file": "packages/octane/tests/compiler/compiler-vite-options.test.ts",
           "testName": "forces server output despite a client transform signal",
           "modes": ["production-compile", "vite-client", "vite-ssr"],
           "observables": ["emitted-code"]
         },
         {
-          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "file": "packages/octane/tests/compiler/compiler-vite-options.test.ts",
           "testName": "forces client output despite a server transform signal",
           "modes": ["production-compile", "vite-client", "vite-ssr"],
           "observables": ["emitted-code"]
         },
         {
-          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "file": "packages/octane/tests/compiler/compiler-vite-options.test.ts",
           "testName": "changes ownership of an unmarked project TSX module for both directive values",
           "modes": ["vite-client", "vite-ssr"],
           "observables": ["emitted-code"]
@@ -330,7 +330,7 @@
         },
         {
           "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
-          "testName": "executes the profiled runtime",
+          "testName": "executes one profiled runtime and deduplicates profiling imports from raw dependencies",
           "modes": ["rspack", "production-compile"],
           "observables": ["bundle-contents"]
         },
@@ -360,7 +360,7 @@
         },
         {
           "file": "packages/rsbuild-plugin-octane/tests/target.test.ts",
-          "testName": "emits profiling only in the client production bundle",
+          "testName": "builds targeted client/server runtimes with generated import.meta and client-only profiling",
           "modes": ["rsbuild", "production-compile"],
           "observables": ["bundle-contents"]
         },
@@ -378,7 +378,7 @@
         },
         {
           "file": "packages/rspeedy-plugin-octane/tests/build.test.ts",
-          "testName": "assembles a normal Octane application and generated receiver into a native bundle",
+          "testName": "assembles self-contained native bundles for every authored application entry",
           "modes": ["rspeedy"],
           "observables": ["bundle-contents", "package-resolution"]
         }
@@ -1468,7 +1468,7 @@
       ],
       "evidence": [
         {
-          "file": "packages/octane/tests/vite-integration.test.ts",
+          "file": "packages/octane/tests/compiler/vite-integration.test.ts",
           "testName": "discovers a parent package and routes raw dependency imports to the SSR runtime",
           "modes": ["vite-ssr", "production-compile"],
           "observables": ["package-resolution", "markup"]

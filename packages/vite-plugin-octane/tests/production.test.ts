@@ -8,6 +8,11 @@
 // The fixture has no installed node_modules (it is not a workspace package);
 // the setup symlinks the workspace's octane / @octanejs/vite-plugin / vite in,
 // which is exactly what a pnpm install would produce.
+//
+// The build runs against a throwaway copy of the fixture, never the tracked
+// sources: `vite build` and the symlinked node_modules would otherwise leave
+// debris under `tests/_fixtures/app` whenever a run is interrupted, and two
+// concurrent runs would build into the same directory.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,11 +21,14 @@ import { EventEmitter, once } from 'node:events';
 import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
+import { createTempProject } from '../../octane/tests/_temp-project.js';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
 
-const fixtureRoot = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
+const fixtureSource = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
 const repoRoot = path.resolve(packageRoot, '../..');
+const project = createTempProject('octane-vite-prod');
+const fixtureRoot = project.root;
 const distDir = path.join(fixtureRoot, 'dist');
 const sceneFile = path.join(fixtureRoot, 'src/Scene.object.tsrx');
 const clientReferenceId = 'octane-client-reference-v1:object:/src/Scene.object.tsrx';
@@ -89,6 +97,7 @@ let hostileBrowserOrigin = '';
 const previousTrustedRpcOrigin = process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN;
 
 beforeAll(async () => {
+	fs.cpSync(fixtureSource, fixtureRoot, { recursive: true });
 	linkPackage('octane', path.join(repoRoot, 'packages/octane'));
 	linkPackage('@octanejs/vite-plugin', packageRoot);
 	linkPackage('vite', path.join(packageRoot, 'node_modules/vite'));
@@ -100,8 +109,6 @@ beforeAll(async () => {
 	hostileBrowserOriginServer = hostileProbe.server;
 	hostileBrowserOrigin = hostileProbe.origin;
 	process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN = trustedBrowserOrigin;
-
-	fs.rmSync(distDir, { recursive: true, force: true });
 
 	// The production build: client bundle, then (closeBundle) the server bundle.
 	await build({ root: fixtureRoot, logLevel: 'silent' });
@@ -139,8 +146,7 @@ afterAll(async () => {
 	} else {
 		process.env.OCTANE_TEST_TRUSTED_RPC_ORIGIN = previousTrustedRpcOrigin;
 	}
-	fs.rmSync(distDir, { recursive: true, force: true });
-	fs.rmSync(path.join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
+	project.dispose();
 });
 
 // Dynamic-importing freshly built output legitimately exceeds vitest's 5s

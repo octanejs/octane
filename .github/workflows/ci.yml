@@ -301,10 +301,15 @@ jobs:
       # ordinary suite without making time-sensitive integration work compete
       # with hundreds of unrelated files.
       - name: Run tests
+        # WEBSITE_DOCS_SPEC is excluded through the environment, not `--exclude`:
+        # it lives in the `website-unit` project, and a project that declares its
+        # own `exclude` makes Vitest ignore the CLI flag. The flag was here and
+        # did nothing. See the `website-unit` project in vitest.config.js.
+        env:
+          OCTANE_EXCLUDE_WEBSITE_DOCS: "1"
         run: >-
           pnpm test
           --shard=${{ matrix.shard }}
-          --exclude "$WEBSITE_DOCS_SPEC"
           --exclude "$WEBSITE_E2E_SPEC"
           --exclude "$WEBSITE_SSR_SPEC"
           --exclude "website-mcp/tests/built-handler.e2e.test.ts"

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as Octane from '../src/index';
 import {
 	__profileBeginRender,
 	__profileComponent,
@@ -49,6 +50,17 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
+});
+
+describe('profiling public surface', () => {
+	// The compiler emits calls to these helpers, but they are internal: a
+	// consumer importing `octane` must not be able to reach them. Asserted here
+	// rather than beside the profile-codegen tests in tests/compiler/, because it
+	// observes the runtime namespace, not compiler output.
+	it('keeps compiler-only helpers out of the public runtime namespace', () => {
+		expect(Octane).not.toHaveProperty('__profileComponent');
+		expect(Octane).not.toHaveProperty('__profileHook');
+	});
 });
 
 describe('profiler event buffer', () => {

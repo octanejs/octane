@@ -7958,7 +7958,7 @@
       "rationale": "Omitted Octane dependency arrays are compiler-inferred; React treats omitted useMemo inputs as recompute-every-render. Octane authors use an explicit null dependency argument for that behavior.",
       "evidence": [
         {
-          "file": "packages/octane/tests/auto-hook-deps.test.ts",
+          "file": "packages/octane/tests/compiler/auto-hook-deps.test.ts",
           "testName": "covers the complete dependency-hook family",
           "modes": ["client", "server-string", "production-compile"]
         },

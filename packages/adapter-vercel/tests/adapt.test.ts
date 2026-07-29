@@ -10,12 +10,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
+import { createTempProject } from '../../octane/tests/_temp-project.js';
 import { adapt } from '../src/index.js';
 
-// The tests dir doubles as the fake project root: the fake build goes in
-// `dist/` and adapt() writes `.vercel/output/` next to it — both gitignored.
-const root = fileURLToPath(new URL('.', import.meta.url));
+// A throwaway directory doubles as the fake project root: the fake build goes
+// in `dist/` and adapt() writes `.vercel/output/` next to it.
+const project = createTempProject('octane-vercel-adapt');
+const root = project.root;
 const clientDir = path.join(root, 'dist/client');
 const serverDir = path.join(root, 'dist/server');
 const outputDir = path.join(root, '.vercel/output');
@@ -35,9 +37,6 @@ function write(file: string, data: string) {
 }
 
 beforeAll(async () => {
-	fs.rmSync(path.join(root, 'dist'), { recursive: true, force: true });
-	fs.rmSync(path.join(root, '.vercel'), { recursive: true, force: true });
-
 	write(path.join(clientDir, 'assets/app-abc.js'), 'console.log("app");\n');
 	write(path.join(serverDir, 'entry.js'), FAKE_ENTRY);
 	write(path.join(serverDir, 'index.html'), '<!doctype html><html><!--ssr-body--></html>\n');
@@ -49,8 +48,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-	fs.rmSync(path.join(root, 'dist'), { recursive: true, force: true });
-	fs.rmSync(path.join(root, '.vercel'), { recursive: true, force: true });
+	project.dispose();
 });
 
 describe('adapt()', () => {

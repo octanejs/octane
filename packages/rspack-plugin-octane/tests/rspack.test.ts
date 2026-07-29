@@ -568,24 +568,19 @@ export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canva
 		);
 	}, 30_000);
 
-	it('executes the profiled runtime', async () => {
-		const profiled = await buildRealRuntime(true);
+	it('executes one profiled runtime and deduplicates profiling imports from raw dependencies', async () => {
+		const profiled = await buildRealRuntime(true, 'web', true);
+		expect(profiled.code).toContain('raw-binding-output');
 		expect(profiled.code).toContain('__OCTANE_PROFILER__');
 		expect(profiled.code).toContain('octane.component');
 		expect(profiled.code).toContain('/src/ProfileBundleProbe.tsrx#ProfileBundleProbe');
+		expect(profiled.code).not.toContain('__octane_nested_profiling_runtime__');
 
 		await import(`${pathToFileURL(profiled.file).href}?profile`);
 		expect((globalThis as any)[runGlobal]).toBe(1);
 		const profiler = (globalThis as any)[profilerGlobal];
 		expect(profiler.getEvents()).toEqual([]);
 		expect(profiler.exportTrace()).toMatchObject({ displayTimeUnit: 'ms', traceEvents: [] });
-	}, 30_000);
-
-	it('deduplicates profiling imports from raw dependencies', async () => {
-		const profiled = await buildRealRuntime(true, 'web', true);
-		expect(profiled.code).toContain('raw-binding-output');
-		expect(profiled.code).toContain('__OCTANE_PROFILER__');
-		expect(profiled.code).not.toContain('__octane_nested_profiling_runtime__');
 	}, 30_000);
 
 	it('ignores profile mode in server bundles', async () => {

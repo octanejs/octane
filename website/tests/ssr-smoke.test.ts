@@ -10,13 +10,20 @@
 // of its own purely to obtain an HTTP origin; the assertions below are all
 // markup- and asset-level, so they hold against either preset's output. See the
 // setup file for the coverage that consolidating on `vercel` gave up.
-import { describe, it, expect, inject } from 'vitest';
+import { beforeAll, describe, it, expect, inject } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { waitForReadyState } from './support/server-process.ts';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 const origin = inject('productionOrigin');
 const outputDir = inject('productionOutputDir');
+
+// The setup starts the build in the background so the rest of the suite does
+// not queue behind it, so the origin is reserved but not yet answering when this
+// module loads. Everything below — HTTP and build-output alike — needs the build
+// finished, so wait once here rather than per case.
+beforeAll(() => waitForReadyState(inject('productionReadyFile'), 300_000));
 const staticRoot = path.join(outputDir, 'static');
 const serverEntry = path.join(outputDir, 'functions/__server.func/index.mjs');
 

@@ -102,11 +102,11 @@ describe('Rsbuild build.target mapping', () => {
 		rmSync(root, { recursive: true, force: true });
 	});
 
-	it('applies an ES target to both client/server Rspack runtimes and only preserves generated import.meta', async () => {
+	it('builds targeted client/server runtimes with generated import.meta and client-only profiling', async () => {
 		writeApp(root, JSON.stringify('es5'));
 		const instance = await createRsbuild({
 			cwd: root,
-			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false, profile: true })] },
 		});
 		const configs = await instance.initConfigs({ action: 'build' });
 
@@ -124,7 +124,13 @@ describe('Rsbuild build.target mapping', () => {
 			expect.arrayContaining([expect.objectContaining({ parser: { importMeta: false } })]),
 		);
 		await instance.build();
-	});
+		const client = readJavaScript(join(root, 'dist/client'));
+		const server = readJavaScript(join(root, 'dist/server'));
+		for (const marker of ['__OCTANE_PROFILER__', 'octane.component', '/src/Page.tsrx#Page']) {
+			expect(client).toContain(marker);
+			expect(server).not.toContain(marker);
+		}
+	}, 30_000);
 
 	it('converts esbuild-style browser targets for SWC and Rspack runtime generation', async () => {
 		writeApp(root, JSON.stringify(['chrome100', 'firefox100']));
@@ -221,22 +227,6 @@ describe('Rsbuild build.target mapping', () => {
 				: config.target === 'webworker',
 		)!;
 		expect(workerConfig.optimization?.minimize).toBe(minify);
-	});
-
-	it('emits profiling only in the client production bundle', async () => {
-		writeApp(root, JSON.stringify('es2022'));
-		const instance = await createRsbuild({
-			cwd: root,
-			rsbuildConfig: { plugins: [pluginOctane({ hmr: false, profile: true })] },
-		});
-		await instance.build();
-
-		const client = readJavaScript(join(root, 'dist/client'));
-		const server = readJavaScript(join(root, 'dist/server'));
-		for (const marker of ['__OCTANE_PROFILER__', 'octane.component', '/src/Page.tsrx#Page']) {
-			expect(client).toContain(marker);
-			expect(server).not.toContain(marker);
-		}
 	});
 
 	it.each([

@@ -1,12 +1,14 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createTempProject, type TempProject } from '../../octane/tests/_temp-project.js';
 import { loadOctaneConfig, loadOctaneConfigWithMetadata } from '../src/config-loader.js';
 
-const packageRoot = fileURLToPath(new URL('../', import.meta.url));
-const fixtureRoot = path.join(packageRoot, '.test-config-loader');
+// The loader resolves, caches, and watches real paths, so each case gets its
+// own throwaway project rather than a mocked filesystem.
+let project: TempProject;
+let fixtureRoot: string;
 
 function write(relative: string, source: string) {
 	const filename = path.join(fixtureRoot, relative);
@@ -14,8 +16,13 @@ function write(relative: string, source: string) {
 	fs.writeFileSync(filename, source);
 }
 
+beforeEach(() => {
+	project = createTempProject('octane-app-config');
+	fixtureRoot = project.root;
+});
+
 afterEach(() => {
-	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+	project.dispose();
 });
 
 describe('loadOctaneConfig', () => {

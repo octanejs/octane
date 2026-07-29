@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
-import { octane } from '../src/compiler/vite.js';
+import { octane } from '../../src/compiler/vite.js';
 
-const OCTANE_PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const OCTANE_PACKAGE_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 describe('octane/compiler/vite integration', () => {
 	let server: ViteDevServer | null = null;

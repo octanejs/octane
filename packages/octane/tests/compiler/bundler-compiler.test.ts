@@ -12,9 +12,9 @@ import {
 	createOctaneCompiler,
 	findVoidComponentImports,
 	resolveOctaneRuntimeRequest,
-} from '../src/compiler/bundler.js';
-import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
-import { decodeMappings } from './_source-map.js';
+} from '../../src/compiler/bundler.js';
+import { inspectProfileOutput, uniqueMetadata } from '../_profile-output';
+import { decodeMappings } from '../_source-map.js';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +

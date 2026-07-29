@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { compile } from '../src/compiler/compile.js';
-import { createOctaneCompiler } from '../src/compiler/bundler.js';
-import { octane } from '../src/compiler/vite.js';
-import { compileToVolarMappings } from '../src/compiler/volar.js';
-import { normalizeRendererConfig } from '../src/compiler/renderers.js';
+import { compile } from '../../src/compiler/compile.js';
+import { createOctaneCompiler } from '../../src/compiler/bundler.js';
+import { octane } from '../../src/compiler/vite.js';
+import { compileToVolarMappings } from '../../src/compiler/volar.js';
+import { normalizeRendererConfig } from '../../src/compiler/renderers.js';
 
 const CODE = 'OCTANE_NATIVE_TEXT_ONCHANGE';
 

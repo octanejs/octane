@@ -26,12 +26,37 @@
 //
 // Project-scoped, so unrelated vitest projects never pay for it: `globalSetup`
 // declared on a project runs only when that project is part of the run.
+//
+// It does NOT follow that only this project waits for it. Vitest awaits every
+// participating project's globalSetup, one after another, before it collects a
+// single test file:
+//
+//   await this.initializeGlobalSetup(specifications)   // before pool.collectTests
+//   for (const project of projects) await project._initializeGlobalSetup()
+//
+// So awaiting the build here stalled the entire run — all ~90 projects — for as
+// long as the build took, measured locally at ~65s of a 73s dead window before
+// the first test result appeared. CI never noticed because its shards exclude
+// this project's specs, which drops the project from that loop entirely.
+//
+// The build therefore runs in the BACKGROUND: setup() reserves the port, hands
+// the specs their origin, starts build→serve, and returns immediately. The two
+// server-backed specs wait for readiness in their own beforeAll, so the other
+// projects' tests run during the build instead of behind it.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TestProject } from 'vitest/node';
-import { getFreePort, spawnServer, stopServer, waitForServer } from '../support/server-process.ts';
+import {
+	reserveFreePort,
+	spawnServer,
+	stopServer,
+	waitForServer,
+	writeReadyState,
+} from '../support/server-process.ts';
 
 declare module 'vitest' {
 	interface ProvidedContext {
@@ -39,6 +64,11 @@ declare module 'vitest' {
 		productionOrigin: string;
 		/** Absolute path to the Vercel Build Output directory the run was served from. */
 		productionOutputDir: string;
+		/**
+		 * File the background build/serve chain writes its terminal state to.
+		 * Specs await it via `awaitProductionServer()` before their first request.
+		 */
+		productionReadyFile: string;
 	}
 }
 
@@ -47,12 +77,19 @@ const OUTPUT_DIR = join(WEBSITE, '.vercel/output');
 const PRODUCTION_ENV = { NODE_ENV: 'production', NITRO_PRESET: 'vercel' };
 
 let server: ChildProcess | undefined;
+let build: ChildProcess | undefined;
+let ready: Promise<void> | undefined;
+let readyFile: string | undefined;
+let tearingDown = false;
 
 function buildWebsite(): Promise<void> {
 	return new Promise((resolve, reject) => {
-		const build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
+		// Captured module-side so teardown can kill a build still in flight — the
+		// run can be cancelled while this is the only thing still working.
+		build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
 			cwd: WEBSITE,
 			stdio: 'ignore',
+			detached: true,
 			env: { ...process.env, ...PRODUCTION_ENV },
 		});
 		build.once('error', reject);
@@ -67,22 +104,63 @@ export async function setup(project: TestProject): Promise<void> {
 	// is opt-in and never set in CI, so the default stays "the artifact under
 	// test was built from the current tree".
 	const reuse = process.env.OCTANE_WEBSITE_REUSE_BUILD === '1' && existsSync(OUTPUT_DIR);
-	if (!reuse) await buildWebsite();
 
-	const port = await getFreePort();
-	server = spawnServer(
-		WEBSITE,
-		['exec', 'vite', 'preview', '--configLoader', 'runner', '--port', String(port), '--strictPort'],
-		PRODUCTION_ENV,
-	);
-	const origin = `http://localhost:${port}`;
-	await waitForServer(server, `${origin}/`, 30_000);
+	// Held for the duration of the build, not just probed — see reserveFreePort.
+	const reservation = await reserveFreePort();
+	const origin = `http://localhost:${reservation.port}`;
+	readyFile = join(tmpdir(), `octane-website-ready-${process.pid}-${reservation.port}.json`);
 
+	// Provided BEFORE the work completes. These are static facts (a port we hold,
+	// a path we control), so the specs can be handed them immediately; what they
+	// must not assume is that the server is answering yet.
 	project.provide('productionOrigin', origin);
 	project.provide('productionOutputDir', OUTPUT_DIR);
+	project.provide('productionReadyFile', readyFile);
+
+	// Deliberately NOT awaited: returning here releases the rest of the run.
+	// Every terminal state is recorded in the ready file, so a failure surfaces
+	// as a real error in the waiting spec rather than as an unexplained timeout.
+	ready = (async () => {
+		try {
+			if (!reuse) await buildWebsite();
+			build = undefined;
+			await reservation.release();
+			if (tearingDown) return;
+			server = spawnServer(
+				WEBSITE,
+				[
+					'exec',
+					'vite',
+					'preview',
+					'--configLoader',
+					'runner',
+					'--port',
+					String(reservation.port),
+					'--strictPort',
+				],
+				PRODUCTION_ENV,
+			);
+			await waitForServer(server, `${origin}/`, 30_000);
+			await writeReadyState(readyFile!, { ok: true });
+		} catch (error) {
+			await reservation.release().catch(() => {});
+			await writeReadyState(readyFile!, {
+				ok: false,
+				error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+			});
+		}
+	})();
 }
 
 export async function teardown(): Promise<void> {
-	await stopServer(server);
+	// Stop either in-flight process before settling the chain; the flag closes
+	// the gap where the build has exited but the preview has not spawned yet.
+	tearingDown = true;
+	await Promise.all([stopServer(build), stopServer(server)]);
+	await ready?.catch(() => {});
 	server = undefined;
+	build = undefined;
+	ready = undefined;
+	if (readyFile) await rm(readyFile, { force: true }).catch(() => {});
+	readyFile = undefined;
 }
