@@ -84,7 +84,25 @@ const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbo
 
 /** Server twin of the compiler's guarded native-array map ABI. */
 export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) => any): any {
-	if (arguments.length === 3) return NATIVE_REFLECT_APPLY(method, receiver, [callback]);
+	if (arguments.length === 3) {
+		let mapped = NATIVE_REFLECT_APPLY(method, receiver, [callback]);
+		if (Array.isArray(mapped)) {
+			let packed: any[] | null = null;
+			for (let index = 0; index < mapped.length; index++) {
+				if (!(index in mapped)) {
+					packed = [];
+					break;
+				}
+			}
+			if (packed !== null) {
+				for (let index = 0; index < mapped.length; index++) {
+					if (index in mapped) packed.push(mapped[index]);
+				}
+				mapped = packed;
+			}
+		}
+		return mapped;
+	}
 	if (
 		!Array.isArray(receiver) ||
 		Object.getPrototypeOf(receiver) !== Array.prototype ||

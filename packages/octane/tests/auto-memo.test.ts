@@ -701,6 +701,86 @@ describe('compiler-owned component-region memoization', () => {
 		container.remove();
 	});
 
+	it.each(['native', 'custom', 'inherited'] as const)(
+		'hydrates packed rows from a %s sparse map without replacing server-rendered nodes',
+		(receiver) => {
+			const { server, client } = loadMappedHydrationComponents();
+			const items = [
+				{ id: 1, label: 'first' },
+				{ id: 2, label: 'second' },
+				{ id: 3, label: 'third' },
+			];
+			const events: string[] = [];
+			let rows: unknown;
+			let expectedEvents: string[];
+			let expectedText: string[];
+
+			if (receiver === 'native') {
+				const sparse: (typeof items)[number][] = [];
+				sparse[1] = items[0]!;
+				sparse[3] = items[1]!;
+				rows = sparse;
+				expectedEvents = ['callback:1:1', 'callback:2:3'];
+				expectedText = ['hydrated:1:first', 'hydrated:3:second'];
+			} else if (receiver === 'custom') {
+				const customRows = {
+					map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+						if (this !== customRows) throw new Error('sparse map lost its receiver');
+						events.push('custom:start');
+						const sparse: T[] = [];
+						sparse[1] = callback(items[1]!, 7);
+						sparse[3] = callback(items[0]!, 3);
+						events.push('custom:end');
+						return sparse;
+					},
+				};
+				rows = customRows;
+				expectedEvents = ['custom:start', 'callback:2:7', 'callback:1:3', 'custom:end'];
+				expectedText = ['hydrated:7:second', 'hydrated:3:first'];
+			} else {
+				const inherited = Object.create(Array.prototype) as object;
+				Object.defineProperty(inherited, '1', {
+					configurable: true,
+					get() {
+						events.push('get:inherited');
+						return items[1]!;
+					},
+				});
+				const sparse: (typeof items)[number][] = [];
+				sparse[0] = items[0]!;
+				sparse[3] = items[2]!;
+				Object.setPrototypeOf(sparse, inherited);
+				rows = sparse;
+				expectedEvents = ['callback:1:0', 'get:inherited', 'callback:2:1', 'callback:3:3'];
+				expectedText = ['hydrated:0:first', 'hydrated:1:second', 'hydrated:3:third'];
+			}
+
+			const onItem = (itemId: number, index: number): string => {
+				events.push(`callback:${itemId}:${index}`);
+				return `${itemId}:${index}`;
+			};
+			const props = { rows, prefix: 'hydrated', onItem };
+			const { html } = ServerRuntime.renderToString(server.App, props);
+			expect(events).toEqual(expectedEvents);
+
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = html;
+			const list = container.querySelector('ul')!;
+			const originalRows = Array.from(list.querySelectorAll('li'));
+			expect(originalRows.map((row) => row.textContent)).toEqual(expectedText);
+
+			events.length = 0;
+			const root = hydrateRoot(container, client.App as any, props);
+			flushSync(() => {});
+			expect(events).toEqual(expectedEvents);
+			expect(Array.from(list.querySelectorAll('li'))).toEqual(originalRows);
+			expect(originalRows.map((row) => row.textContent)).toEqual(expectedText);
+			root.unmount();
+			container.remove();
+		},
+	);
+
 	it('serializes native mapped host rows without per-item hydration comments', () => {
 		const { server } = loadMappedHydrationComponents();
 		const rows = [
