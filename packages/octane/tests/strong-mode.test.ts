@@ -147,6 +147,82 @@ export function App() @{
 		expect(() => compile(callback, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
+	it.each([
+		[
+			'named function declarations',
+			'function apply() { setCount(count + 1); } useMemo(apply, [count]);',
+		],
+		[
+			'named function expressions',
+			'const apply = () => setCount(count + 1); useMemo(apply, [count]);',
+		],
+		[
+			'aliased named callbacks',
+			'const apply = () => setCount(count + 1); const calculate = apply; useMemo(calculate, [count]);',
+		],
+		['state updaters', 'useMemo(setCount, [count]);'],
+		['aliased state updaters', 'const update = setCount; useMemo(update, [count]);'],
+		[
+			'TypeScript-wrapped named callbacks',
+			'const apply = () => setCount(count + 1); useMemo((apply as () => void), [count]);',
+		],
+	])('rejects render updates through useMemo %s', (_label, setup) => {
+		const source = `"use strong";\n${stateComponent(setup, 'useState, useMemo')}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		[
+			'aliased imports',
+			`import { useMemo as memo, useState } from 'octane';
+export function App() @{ const [, update] = useState(0); memo(update, []); <div /> }`,
+		],
+		[
+			'namespace imports',
+			`import * as Octane from 'octane';
+export function App() @{ const [, update] = Octane.useState(0); Octane.useMemo(update, []); <div /> }`,
+		],
+		[
+			'wrapped namespace properties',
+			`import * as Octane from 'octane';
+export function App() @{ const [, update] = Octane.useState(0); Octane['useMemo' as const](update, []); <div /> }`,
+		],
+	])('tracks named memo callbacks through %s', (_label, source) => {
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it('keeps deferred, unknown, and shadowed named memo callbacks legal', () => {
+		const source = `"use strong";
+import { useMemo, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const apply = () => setTimeout(() => setCount(count + 1), 0);
+  const external = props.calculate;
+  useMemo(apply, [count]);
+  useMemo(external, [count]);
+  useMemo(() => () => setCount(count + 1), [count]);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('publishes named memo state updates as editor errors', () => {
+		const source = `"use strong";\n${stateComponent(
+			'const apply = () => setCount(count + 1); useMemo(apply, [count]);',
+			'useState, useMemo',
+		)}`;
+		const result = compileToVolarMappings(source, '/src/Counter.tsrx');
+
+		expect(result.diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_STATE_UPDATE, severity: 'error' }),
+		);
+		expect(result.errors).toContainEqual(
+			expect.objectContaining({ code: RENDER_STATE_UPDATE, type: 'usage' }),
+		);
+	});
+
 	it('recognizes state updater access through immutable state tuple aliases', () => {
 		const source = `"use strong";
 import { useState } from 'octane';
@@ -572,6 +648,51 @@ export function App() @{
 			'labeled do-while loops with awaited tests',
 			'outer: do {} while (await Promise.resolve(false)); setCount(count + 1);',
 		],
+		['labeled await expressions', 'completed: await Promise.resolve(); setCount(count + 1);'],
+		[
+			'labeled blocks with unavoidable awaits',
+			'completed: { await Promise.resolve(); } setCount(count + 1);',
+		],
+		[
+			'nested labeled blocks with unavoidable awaits',
+			'outer: { inner: { await Promise.resolve(); } } setCount(count + 1);',
+		],
+		[
+			'labeled while loops with awaited tests',
+			'outer: while (await Promise.resolve(false)) {} setCount(count + 1);',
+		],
+		[
+			'switch cases after an awaited discriminant',
+			'switch (await Promise.resolve(count)) { case 0: setCount(count + 1); break; }',
+		],
+		[
+			'statements after awaited switch discriminants',
+			'switch (await Promise.resolve(count)) {} setCount(count + 1);',
+		],
+		[
+			'switch case updates after an awaited case label',
+			'switch (count) { case await Promise.resolve(0): setCount(count + 1); break; }',
+		],
+		[
+			'statements after an unavoidable awaited first case label',
+			'switch (count) { case await Promise.resolve(0): break; } setCount(count + 1);',
+		],
+		[
+			'switch case updates after their own awaits',
+			'switch (count) { case 0: await Promise.resolve(); setCount(count + 1); break; }',
+		],
+		[
+			'statements after switches where every branch awaits',
+			'switch (count) { case 0: await Promise.resolve(); break; default: await Promise.resolve(); } setCount(count + 1);',
+		],
+		[
+			'fall-through switch branches with a shared unavoidable await',
+			'switch (count) { case 0: case 1: await Promise.resolve(); setCount(count + 1); break; default: await Promise.resolve(); }',
+		],
+		[
+			'labeled switches with an awaited discriminant',
+			'outer: switch (await Promise.resolve(count)) { case 0: break outer; } setCount(count + 1);',
+		],
 		[
 			'do-while tests after an awaited loop body',
 			'do { await Promise.resolve(); } while (false); setCount(count + 1);',
@@ -698,6 +819,30 @@ export function App() @{
 			'outer: do { break outer; } while (await Promise.resolve(false)); setCount(count + 1);',
 		],
 		[
+			'labeled block exits before their awaited statements',
+			'outer: { if (count > 0) break outer; await Promise.resolve(); } setCount(count + 1);',
+		],
+		[
+			'switches without a default when no awaited case matches',
+			'switch (count) { case 0: await Promise.resolve(); break; } setCount(count + 1);',
+		],
+		[
+			'switch cases that can break before their await',
+			'switch (count) { case 0: break; default: await Promise.resolve(); } setCount(count + 1);',
+		],
+		[
+			'direct switch-case entries that skip an earlier awaited fall-through',
+			'switch (count) { case 0: await Promise.resolve(); case 1: setCount(count + 1); break; }',
+		],
+		[
+			'conditionally awaited switch discriminants',
+			'switch (count > 0 ? await Promise.resolve(count) : count) {} setCount(count + 1);',
+		],
+		[
+			'labeled switch breaks before their awaited statements',
+			'outer: switch (count) { case 0: break outer; default: await Promise.resolve(); } setCount(count + 1);',
+		],
+		[
 			'conditionally awaited do-while tests',
 			'do {} while (count > 0 && await Promise.resolve(false)); setCount(count + 1);',
 		],
@@ -753,6 +898,14 @@ export function App() @{
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('does not mistake state updaters shadowed by switch-scope declarations', () => {
+		const source = `"use strong";\n${stateComponent(
+			'switch (count) { case 0: { const setCount = () => {}; setCount(); break; } }',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
 	});
 
 	it.each([

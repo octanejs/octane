@@ -401,6 +401,24 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
+	function switchCaseAlwaysAwaits(cases, start) {
+		for (let index = start; index < cases.length; index++) {
+			for (const statement of cases[index].consequent ?? []) {
+				if (doWhileSynchronousControl(statement) !== 0) return false;
+				if (statementAlwaysAwaits(statement)) return true;
+				if (
+					statement.type === 'BreakStatement' ||
+					statement.type === 'ContinueStatement' ||
+					statement.type === 'ReturnStatement' ||
+					statement.type === 'ThrowStatement'
+				) {
+					return false;
+				}
+			}
+		}
+		return false;
+	}
+
 	function statementAlwaysAwaits(statement) {
 		switch (statement?.type) {
 			case 'ExpressionStatement':
@@ -436,7 +454,31 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'WhileStatement':
 				return alwaysAwaits(statement.test);
 			case 'LabeledStatement':
-				return statement.body?.type === 'DoWhileStatement' && statementAlwaysAwaits(statement.body);
+				return (
+					statementAlwaysAwaits(statement.body) &&
+					(statement.body?.type === 'DoWhileStatement' ||
+						doWhileSynchronousControl(statement.body) === 0)
+				);
+			case 'SwitchStatement': {
+				if (alwaysAwaits(statement.discriminant)) return true;
+				const cases = statement.cases ?? [];
+				if (!cases.some((branch) => branch.test == null)) {
+					return alwaysAwaits(cases[0]?.test);
+				}
+				let searchAwaits = false;
+				const fallbackAwaits = cases.some((branch) => alwaysAwaits(branch.test));
+				for (let index = 0; index < cases.length; index++) {
+					const branch = cases[index];
+					if (branch.test != null && alwaysAwaits(branch.test)) searchAwaits = true;
+					if (
+						!(branch.test == null ? fallbackAwaits : searchAwaits) &&
+						!switchCaseAlwaysAwaits(cases, index)
+					) {
+						return false;
+					}
+				}
+				return true;
+			}
 			case 'DoWhileStatement': {
 				const control = doWhileSynchronousControl(statement.body);
 				const bodyAwaits = statementAlwaysAwaits(statement.body) && control === 0;
@@ -549,15 +591,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function visitEffectCallback(value, scope) {
+	function visitSynchronousHookCallback(value, scope, phase) {
 		const callback = unwrap(value);
 		if (FUNCTION_TYPES.has(callback?.type)) {
-			visitCallback(callback, scope, 'effect');
+			visitCallback(callback, scope, phase);
+			return true;
 		} else if (callback?.type === 'Identifier') {
 			const binding = resolve(scope, callback.name);
-			if (binding?.kind === 'callback') visitCallback(binding.node, binding.scope, 'effect');
-			else if (binding?.kind === 'setter') reportSetter(callback, 'effect');
+			if (binding?.kind === 'callback') visitCallback(binding.node, binding.scope, phase);
+			else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
+				reportSetter(callback, phase);
+			}
+			return true;
 		}
+		return false;
 	}
 
 	function visit(node, scope, phase) {
@@ -606,6 +653,52 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				visit(node.alternate, scope, branchPhase);
 				return;
 			}
+			case 'LabeledStatement':
+				visit(node.body, scope, phase);
+				return;
+			case 'SwitchStatement': {
+				visit(node.discriminant, scope, phase);
+				const initialPhase =
+					currentFunctionIsAsync && phase !== 'deferred' && alwaysAwaits(node.discriminant)
+						? 'deferred'
+						: phase;
+				const branches = node.cases ?? [];
+				const switchScope = createScope(scope, 'block');
+				for (const branch of branches) predeclareStatements(branch.consequent, switchScope);
+
+				let searchPhase = initialPhase;
+				for (const branch of branches) {
+					visit(branch.test, switchScope, searchPhase);
+					if (currentFunctionIsAsync && searchPhase !== 'deferred' && alwaysAwaits(branch.test)) {
+						searchPhase = 'deferred';
+					}
+				}
+
+				const fallbackPhase = searchPhase;
+				searchPhase = initialPhase;
+				let fallthroughPhase = null;
+				for (const branch of branches) {
+					if (currentFunctionIsAsync && searchPhase !== 'deferred' && alwaysAwaits(branch.test)) {
+						searchPhase = 'deferred';
+					}
+					const matchingPhase = branch.test == null ? fallbackPhase : searchPhase;
+					const branchPhase =
+						matchingPhase === 'deferred' &&
+						(fallthroughPhase == null || fallthroughPhase === 'deferred')
+							? 'deferred'
+							: phase;
+					const executionPhase = visitStatements(branch.consequent, switchScope, branchPhase);
+					const last = branch.consequent?.[branch.consequent.length - 1];
+					fallthroughPhase =
+						last?.type === 'BreakStatement' ||
+						last?.type === 'ContinueStatement' ||
+						last?.type === 'ReturnStatement' ||
+						last?.type === 'ThrowStatement'
+							? null
+							: executionPhase;
+				}
+				return;
+			}
 			case 'VariableDeclaration':
 				for (const declaration of node.declarations ?? []) {
 					bindDeclaration(declaration, node.kind, scope, phase);
@@ -633,15 +726,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				if (EFFECT_HOOKS.has(hook)) {
 					visit(node.callee, scope, phase);
-					visitEffectCallback(node.arguments?.[0], scope);
+					visitSynchronousHookCallback(node.arguments?.[0], scope, 'effect');
 					for (let index = 1; index < (node.arguments?.length ?? 0); index++) {
 						visit(node.arguments[index], scope, phase);
 					}
 					return;
 				}
-				if (hook === 'useMemo' && FUNCTION_TYPES.has(unwrap(node.arguments?.[0])?.type)) {
+				if (hook === 'useMemo') {
 					visit(node.callee, scope, phase);
-					visitFunction(unwrap(node.arguments[0]), scope, phase);
+					if (!visitSynchronousHookCallback(node.arguments?.[0], scope, phase)) {
+						visit(node.arguments?.[0], scope, phase);
+					}
 					for (let index = 1; index < node.arguments.length; index++) {
 						visit(node.arguments[index], scope, phase);
 					}
