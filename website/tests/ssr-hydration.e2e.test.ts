@@ -1719,6 +1719,16 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				await outputSelector.selectOption('client');
 				await hoverToken(0, 'button', 1);
 				await mappedIn(0, 'button');
+				// Switching output re-renders the tree, which resets the status to the
+				// node-less `label · filename` form. The source highlight and the AST
+				// selection are separate effects of the same hover, so waiting on the
+				// editor mark alone can observe the status before the node resolves.
+				// The leaf marker is written by the same call that writes the range.
+				await page.waitForFunction(
+					() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
+					null,
+					{ timeout: 10_000 },
+				);
 				expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
 				await outputSelector.selectOption('server');
 				await page
