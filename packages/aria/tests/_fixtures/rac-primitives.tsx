@@ -1,4 +1,7 @@
-import { useContext, useState } from 'octane';
+import { createElement, useContext, useState } from 'octane';
+// Deliberately the BARREL, not the module path: this fixture pins what the
+// components entry publishes.
+import { Focusable as RACFocusable } from '../../src/components/index';
 import { Provider } from '../../src/components/utils';
 import { Button } from '../../src/components/Button';
 import { FieldError, FieldErrorContext } from '../../src/components/FieldError';
@@ -197,5 +200,17 @@ export function FormScenario() {
 				<ErrorsProbe />
 			</Form>
 		</div>
+	);
+}
+
+// Focusable reached through the COMPONENTS entry (not the hooks path). RAC
+// publishes it from both, so the components surface must too — shadcn's aria
+// base imports it from 'react-aria-components' to make Tooltip's trigger
+// focusable.
+export function FocusableFromComponentsEntry() {
+	return createElement(
+		RACFocusable as any,
+		{},
+		createElement('span', { id: 'rac-focusable', role: 'button' }, 'trigger'),
 	);
 }

@@ -20,7 +20,15 @@ import type {
 	Orientation,
 	PressEvents,
 } from '@react-types/shared';
-import { createContext, createElement, useContext, useMemo, useRef, useState } from 'octane';
+import {
+	createContext,
+	createElement,
+	isChildrenBlock,
+	useContext,
+	useMemo,
+	useRef,
+	useState,
+} from 'octane';
 
 import { CollectionNode } from '../collections/BaseCollection';
 import { CollectionBuilder, createLeafComponent } from '../collections/CollectionBuilder';
@@ -250,7 +258,12 @@ export function Tabs(props: TabsProps): any {
 	let { children, orientation = 'horizontal' } = props;
 	children = useMemo(
 		() =>
-			typeof children === 'function' ? children({ orientation, defaultChildren: null }) : children,
+			// A `.tsrx` `@{ … }` body compiles children to a tagged BLOCK function,
+			// which is not the render prop upstream expects here — calling it with
+			// render values instead of a scope throws.
+			typeof children === 'function' && !isChildrenBlock(children)
+				? children({ orientation, defaultChildren: null })
+				: children,
 		[children, orientation],
 		subSlot(slot, 'children'),
 	);

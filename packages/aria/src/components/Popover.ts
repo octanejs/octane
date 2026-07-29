@@ -15,6 +15,7 @@ import {
 	useEffect,
 	useMemo,
 	useRef,
+	isChildrenBlock,
 	useState,
 } from 'octane';
 
@@ -164,7 +165,9 @@ export function Popover(props: PopoverProps): any {
 	// If we are in a hidden tree, we still need to preserve our children.
 	if (isHidden) {
 		let children = props.children;
-		if (typeof children === 'function') {
+		// A `.tsrx` `@{ … }` body compiles children to a tagged BLOCK function,
+		// which is not a render prop; calling it here would throw.
+		if (typeof children === 'function' && !isChildrenBlock(children)) {
 			children = children({
 				trigger: props.trigger || null,
 				placement: 'bottom',

@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount, nextPaint } from '../../octane/tests/_helpers';
 import {
+	BlockChildrenButton,
+	ComposedBlockChildren,
+	RenderPropButton,
+	ValueChildrenButton,
+} from './_fixtures/rac-block-children.tsrx';
+import {
 	ButtonScenario,
 	FieldErrorScenario,
+	FocusableFromComponentsEntry,
 	FormScenario,
 	LabeledField,
 	LayoutScenario,
@@ -277,6 +284,60 @@ describe('@octanejs/aria/components — Form', () => {
 		input.value = 'bob';
 		form.reset();
 		expect(input.value).toBe('alice');
+		r.unmount();
+	});
+});
+
+// RAC publishes `Focusable` from BOTH its hooks entry and its components entry.
+// shadcn's React Aria base imports it from 'react-aria-components' to make a
+// Tooltip trigger focusable, so an @octanejs/aria that only exposed it on the
+// hooks surface would fail that consumer at import time.
+describe('@octanejs/aria — components entry parity', () => {
+	it('publishes Focusable, which makes its child focusable', async () => {
+		const r = mount(FocusableFromComponentsEntry);
+		const span = r.find('#rac-focusable') as HTMLElement;
+		expect(span.getAttribute('tabindex')).toBe('0');
+
+		await act(() => {
+			span.focus();
+		});
+		expect(document.activeElement).toBe(span);
+		r.unmount();
+	});
+});
+
+// Every RAC component funnels children through useRenderProps, which upstream
+// may call as a render prop. Octane's `@{ … }` authoring form compiles children
+// to a tagged block function, so an unguarded `typeof children === 'function'`
+// invokes the block with render values and throws — breaking the idiomatic way
+// to author any RAC component in .tsrx.
+describe('@octanejs/aria — RAC children authored as a .tsrx block', () => {
+	it('renders block children identically to value children', () => {
+		const block = mount(BlockChildrenButton);
+		const value = mount(ValueChildrenButton);
+		expect((block.find('#block-btn') as HTMLElement).textContent).toBe('Save');
+		expect((value.find('#value-btn') as HTMLElement).textContent).toBe('Save');
+		block.unmount();
+		value.unmount();
+	});
+
+	it('forwards block children through composeRenderProps', () => {
+		// composeRenderProps is how a wrapper wraps its own markup around the
+		// caller's children — the shape shadcn's React Aria base uses in almost
+		// every component. It has the same typeof-function hazard as
+		// useRenderProps, on a path useRenderProps never sees.
+		const r = mount(ComposedBlockChildren);
+		const box = r.find('#composed') as HTMLElement;
+		expect(box.textContent).toContain('Accept terms');
+		expect(box.querySelector('[data-slot="indicator"]')).not.toBeNull();
+		r.unmount();
+	});
+
+	it('still calls a real render prop with its render values', () => {
+		// The guard must not disable render props wholesale: a caller-authored
+		// function child is still invoked, and still sees selection state.
+		const r = mount(RenderPropButton);
+		expect((r.find('#render-prop') as HTMLElement).textContent).toBe('on');
 		r.unmount();
 	});
 });

@@ -13,7 +13,15 @@
 // RAC component needs the package dictionary). Hooks are hoisted out of argument object
 // literals per the binding convention; explicit dependency arrays are preserved verbatim.
 import type { Collection as ICollection, Node } from '@react-types/shared';
-import { Fragment, createContext, createElement, useContext, useMemo, useRef } from 'octane';
+import {
+	Fragment,
+	createContext,
+	createElement,
+	useContext,
+	useMemo,
+	useRef,
+	isChildrenBlock,
+} from 'octane';
 
 import { CollectionBuilder } from '../collections/CollectionBuilder';
 import { createHideableComponent } from '../collections/Hidden';
@@ -187,7 +195,7 @@ export const Select: <T, M extends SelectionMode = 'single'>(
 	let { children, isDisabled = false, isInvalid = false, isRequired = false } = props;
 	let content = useMemo(
 		() =>
-			typeof children === 'function'
+			typeof children === 'function' && !isChildrenBlock(children)
 				? children({
 						isOpen: false,
 						isDisabled,
