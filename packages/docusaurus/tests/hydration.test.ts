@@ -14,6 +14,7 @@ const originalUrl = window.location.href;
 
 afterEach(() => {
 	window.history.replaceState(null, '', originalUrl);
+	document.head.replaceChildren();
 	document.body.replaceChildren();
 });
 
@@ -50,10 +51,12 @@ describe('Docusaurus hydration', () => {
 			url,
 		);
 		window.history.replaceState(null, '', url);
+		document.head.innerHTML = serverResult.head ?? '';
 
 		const container = document.createElement('div');
 		container.innerHTML = serverResult.html;
 		document.body.appendChild(container);
+		const serverTitle = document.head.querySelector('title');
 		const serverSection = container.querySelector('section');
 		const serverArticle = container.querySelector('article');
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -68,6 +71,8 @@ describe('Docusaurus hydration', () => {
 			expect(errors).not.toHaveBeenCalled();
 			expect(container.querySelector('section')).toBe(serverSection);
 			expect(container.querySelector('article')).toBe(serverArticle);
+			expect(document.head.querySelector('title')).toBe(serverTitle);
+			expect(document.head.querySelectorAll('title')).toHaveLength(1);
 			expect(container.querySelector('h1')?.textContent).toBe('Introduction');
 			expect(loads).not.toContain('advanced');
 

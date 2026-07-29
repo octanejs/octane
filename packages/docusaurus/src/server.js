@@ -1,7 +1,10 @@
 import { prerender } from 'octane/static';
 import { createStaticHandler, createStaticRouter } from '@octanejs/remix-router';
 import { DocusaurusRouterProvider } from './client-components.tsrx';
+import { renderDocusaurusDocument } from './document.js';
 import { createDocusaurusRoutes } from './routes.js';
+
+export { renderDocusaurusDocument };
 
 function toRequest(value) {
 	if (value instanceof Request) return value;
@@ -42,5 +45,20 @@ export async function prerenderDocusaurusRoute(request, manifest, registry, opti
 	return {
 		...result,
 		context,
+	};
+}
+
+export async function prerenderDocusaurusDocument(request, manifest, registry, options = {}) {
+	const { document: documentOptions = {}, ...renderOptions } = options;
+	const result = await prerenderDocusaurusRoute(request, manifest, registry, renderOptions);
+	if (result instanceof Response) return result;
+	const bodyHtml = result.html;
+	return {
+		...result,
+		bodyHtml,
+		html: renderDocusaurusDocument(result, manifest, {
+			...documentOptions,
+			nonce: documentOptions.nonce ?? renderOptions.nonce,
+		}),
 	};
 }

@@ -10,6 +10,46 @@ export function createDocusaurusTestManifest(): DocusaurusManifest {
 		generatedFilesDir: '/site/.docusaurus',
 		outDir: '/site/build',
 		baseUrl: '/docs/',
+		site: {
+			title: 'Octane Docs',
+			tagline: 'Compiler-first documentation',
+			url: 'https://octane.example',
+			baseUrl: '/docs/',
+			favicon: 'img/favicon.svg',
+			noIndex: false,
+			themeConfig: {},
+			customFields: {},
+		},
+		i18n: {
+			defaultLocale: 'en',
+			locales: ['en'],
+			currentLocale: 'en',
+			localeConfigs: {
+				en: {
+					label: 'English',
+					direction: 'ltr',
+					htmlLang: 'en',
+					calendar: 'gregory',
+					path: 'en',
+					translate: false,
+					url: 'https://octane.example',
+					baseUrl: '/docs/',
+				},
+			},
+		},
+		siteMetadata: {
+			docusaurusVersion: '3.10.1',
+			pluginVersions: {},
+		},
+		document: {
+			htmlAttributes: { lang: 'en', dir: 'ltr' },
+			headTags: '',
+			preBodyTags: '',
+			postBodyTags: '',
+		},
+		assets: {
+			clientModules: [],
+		},
 		routesPaths: ['/docs/guide/intro', '/docs/guide/advanced'],
 		routes: [
 			{

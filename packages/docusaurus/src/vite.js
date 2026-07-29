@@ -31,13 +31,16 @@ function serializableManifest(manifest) {
 }
 
 function clientRoutesModule(manifest) {
+	const clientModules = manifest.assets.clientModules
+		.map((specifier) => `import ${JSON.stringify(specifier)};\n`)
+		.join('');
 	const importers = [...collectDocusaurusRouteModuleReferences(manifest.routes)]
 		.sort(([left], [right]) => left.localeCompare(right))
 		.map(
 			([key, specifier]) => `\t${JSON.stringify(key)}: () => import(${JSON.stringify(specifier)}),`,
 		)
 		.join('\n');
-	return `import { createDocusaurusRoutes } from "@octanejs/docusaurus/client";
+	return `${clientModules}import { createDocusaurusRoutes } from "@octanejs/docusaurus/client";
 import manifest from ${JSON.stringify(DOCUSAURUS_MANIFEST_ID)};
 
 export { manifest };
@@ -136,6 +139,9 @@ export function docusaurusBridge(options = {}, shared = createSharedState(option
 			for (const source of Object.keys(manifest.content)) {
 				const resolved = path.isAbsolute(source) ? source : resolveDocusaurusId(source, manifest);
 				if (resolved !== null) this.addWatchFile?.(cleanId(resolved));
+			}
+			for (const clientModule of manifest.assets.clientModules) {
+				this.addWatchFile?.(cleanId(clientModule));
 			}
 		},
 		async watchChange() {

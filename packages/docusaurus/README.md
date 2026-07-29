@@ -39,6 +39,8 @@ The manifest contains:
 
 - nested routes with `component`, `modules`, `props`, and plugin context;
 - generated global data and per-document metadata;
+- serializable site config, locale/document attributes, and plugin HTML tags;
+- client modules discovered through the Docusaurus plugin lifecycle;
 - `@site`, `@generated`, `~docs`, `@theme`, `@theme-original`, and
   `@theme-init` resolution;
 - the exact Docusaurus version and route-path inventory.
@@ -64,7 +66,32 @@ export default defineConfig({
 
 The bridge publishes `virtual:octane-docusaurus-manifest` and resolves
 Docusaurus aliases. Its MDX plugin chooses Octane client/server compilation per
-Vite environment and injects metadata discovered by the content plugins.
+Vite environment and injects metadata discovered by the content plugins. The
+route virtual module also imports plugin client modules, so theme CSS and other
+side-effect assets participate in the client and SSR build graphs.
+
+## Octane classic theme
+
+Add the first-party Octane theme beside the content plugins in
+`docusaurus.config.mjs`:
+
+```js
+import octaneClassicTheme from '@octanejs/docusaurus/theme';
+
+export default {
+	title: 'My documentation',
+	url: 'https://docs.example.com',
+	baseUrl: '/',
+	themes: [octaneClassicTheme],
+	plugins: ['@docusaurus/plugin-content-docs'],
+};
+```
+
+The theme supplies Octane-native `DocsRoot`, `DocVersionRoot`, `DocRoot`,
+`DocItem`, category-index, and tag-page route modules. Its initial classic shell
+renders configured navbar/footer links, recursive documentation sidebars,
+document metadata, canonical links, previous/next navigation, and responsive
+CSS. React-authored theme modules and swizzles still need Octane equivalents.
 
 ## Client routing
 
@@ -103,30 +130,50 @@ navigation.
 ## Static rendering and hydration
 
 The server entry resolves the requested lazy route branch through Remix's
-static handler, then prerenders fully resolved Octane markup. Hoisted metadata
-is returned separately in `head` so a static-site host can place it in the real
-document head:
+static handler, then prerenders fully resolved Octane markup. Use the route API
+when a host owns the outer HTML, or the document API to compose Docusaurus
+plugin tags, metadata, scoped CSS, build assets, and the hydration entry into a
+complete page:
 
 ```ts
-import { prerenderDocusaurusRoute } from '@octanejs/docusaurus/server';
+import { prerenderDocusaurusDocument } from '@octanejs/docusaurus/server';
 import {
 	manifest,
 	routeModules,
 } from 'virtual:octane-docusaurus-routes';
 
-const rendered = await prerenderDocusaurusRoute(
+const rendered = await prerenderDocusaurusDocument(
 	new Request('https://docs.example.com/guide/intro'),
 	manifest,
 	routeModules,
+	{
+		document: {
+			assets: {
+				stylesheets: ['assets/site.css'],
+				modulePreloads: ['assets/intro.js'],
+			},
+			hydrate: 'assets/hydrate.js',
+		},
+	},
 );
 
 if (rendered instanceof Response) {
 	return rendered;
 }
 
-const { html, head, css, context } = rendered;
+const { html, bodyHtml, head, css, context } = rendered;
 ```
 
+`html` is the complete `<!DOCTYPE html>` document. `bodyHtml` remains the
+prerendered router root for integrations that need both forms. Relative asset
+paths resolve against `manifest.baseUrl`; URL attributes are escaped, duplicate
+asset entries are removed without reordering, and `nonce` from the render
+options is carried onto module scripts. Docusaurus `injectHtmlTags` output is
+trusted site configuration and retains upstream ordering around the
+`#__docusaurus` root.
+
+`prerenderDocusaurusRoute()` remains available and returns hoisted metadata in
+`head` so an existing static-site host can place it in its own document head.
 `context.statusCode`, `loaderHeaders`, and `actionHeaders` preserve the static
 router result for the surrounding build or request handler. Generate a site by
 calling this function for the paths in `manifest.routesPaths`; each render
@@ -141,7 +188,7 @@ import {
 	routeModules,
 } from 'virtual:octane-docusaurus-routes';
 
-const container = document.getElementById('root');
+const container = document.getElementById('__docusaurus');
 if (container === null) throw new Error('Missing Docusaurus root.');
 
 const { root, router } = await hydrateDocusaurusRoot(
@@ -183,8 +230,9 @@ remain composable.
 
 ## Current scope
 
-Phases 1–5 are implemented here: headless loading, manifest/Vite integration,
-MDX compilation, lazy client routing, static route rendering, and hydration.
-Document/asset orchestration and an Octane classic theme remain the next theme
-phase; the CLI therefore does not present `start` or `build` as working commands
-yet.
+Phases 1–6 are implemented here: headless loading, manifest/Vite integration,
+MDX compilation, lazy client routing, static route rendering, hydration,
+document/asset orchestration, and the initial Octane classic documentation
+theme. A complete `start`/`build` CLI workflow and broader classic-theme feature
+parity remain later phases, so the CLI does not present those commands as
+working yet.

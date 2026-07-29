@@ -1,0 +1,183 @@
+.octane-docusaurus {
+	--octane-docs-accent: #5a45ff;
+	--octane-docs-border: #d9dce5;
+	--octane-docs-muted: #5f6574;
+	--octane-docs-surface: #f7f7fa;
+	color: #1d2029;
+	font-family:
+		Inter,
+		ui-sans-serif,
+		system-ui,
+		-apple-system,
+		BlinkMacSystemFont,
+		'Segoe UI',
+		sans-serif;
+	line-height: 1.6;
+}
+
+.octane-docusaurus a {
+	color: var(--octane-docs-accent);
+	text-decoration-thickness: 0.08em;
+	text-underline-offset: 0.16em;
+}
+
+.octane-docs-navbar {
+	align-items: center;
+	border-bottom: 1px solid var(--octane-docs-border);
+	display: flex;
+	gap: 1.5rem;
+	min-height: 3.75rem;
+	padding: 0 1.5rem;
+}
+
+.octane-docs-navbar__brand {
+	color: inherit;
+	font-size: 1.05rem;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.octane-docs-navbar__items {
+	align-items: center;
+	display: flex;
+	gap: 1rem;
+	list-style: none;
+	margin: 0 0 0 auto;
+	padding: 0;
+}
+
+.octane-docs-layout {
+	display: grid;
+	grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+	margin: 0 auto;
+	max-width: 90rem;
+	min-height: calc(100vh - 7.5rem);
+}
+
+.octane-docs-sidebar {
+	border-right: 1px solid var(--octane-docs-border);
+	padding: 1.5rem;
+}
+
+.octane-docs-sidebar ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.octane-docs-sidebar ul ul {
+	border-left: 1px solid var(--octane-docs-border);
+	margin: 0.35rem 0 0.75rem 0.45rem;
+	padding-left: 0.85rem;
+}
+
+.octane-docs-sidebar a {
+	border-radius: 0.35rem;
+	color: inherit;
+	display: block;
+	padding: 0.35rem 0.5rem;
+	text-decoration: none;
+}
+
+.octane-docs-sidebar a[aria-current='page'] {
+	background: color-mix(in srgb, var(--octane-docs-accent) 12%, transparent);
+	color: var(--octane-docs-accent);
+	font-weight: 650;
+}
+
+.octane-docs-sidebar__category {
+	color: var(--octane-docs-muted);
+	display: block;
+	font-size: 0.8rem;
+	font-weight: 700;
+	letter-spacing: 0.045em;
+	margin: 0.75rem 0 0.25rem;
+	text-transform: uppercase;
+}
+
+.octane-docs-main {
+	min-width: 0;
+	padding: clamp(1.5rem, 4vw, 4rem);
+}
+
+.octane-docs-article,
+.octane-docs-list-page {
+	margin: 0 auto;
+	max-width: 52rem;
+}
+
+.octane-docs-paginator {
+	border-top: 1px solid var(--octane-docs-border);
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	margin-top: 3rem;
+	padding-top: 1.5rem;
+}
+
+.octane-docs-paginator__next {
+	text-align: right;
+}
+
+.octane-docs-card-list {
+	display: grid;
+	gap: 1rem;
+	list-style: none;
+	padding: 0;
+}
+
+.octane-docs-card {
+	border: 1px solid var(--octane-docs-border);
+	border-radius: 0.6rem;
+	padding: 1rem 1.15rem;
+}
+
+.octane-docs-footer {
+	background: var(--octane-docs-surface);
+	border-top: 1px solid var(--octane-docs-border);
+	padding: 2rem 1.5rem;
+}
+
+.octane-docs-footer__links {
+	display: grid;
+	gap: 2rem;
+	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+	list-style: none;
+	margin: 0 auto 1.5rem;
+	max-width: 70rem;
+	padding: 0;
+}
+
+.octane-docs-footer__items {
+	list-style: none;
+	padding: 0;
+}
+
+.octane-docs-footer__copyright {
+	color: var(--octane-docs-muted);
+	margin: 0 auto;
+	max-width: 70rem;
+}
+
+@media (max-width: 48rem) {
+	.octane-docs-navbar {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding-block: 0.85rem;
+	}
+
+	.octane-docs-navbar__items {
+		flex-wrap: wrap;
+		margin-left: 0;
+	}
+
+	.octane-docs-layout {
+		display: block;
+	}
+
+	.octane-docs-sidebar {
+		border-bottom: 1px solid var(--octane-docs-border);
+		border-right: 0;
+	}
+}

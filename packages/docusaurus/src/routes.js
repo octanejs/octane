@@ -66,15 +66,25 @@ async function loadRouteModules(value, registry, cache) {
 	return value;
 }
 
-function routePath(route) {
+function routePath(route, parentPath) {
+	let pathname = route.path;
+	if (parentPath !== undefined && pathname.startsWith('/')) {
+		if (pathname === parentPath) {
+			pathname = '';
+		} else {
+			const prefix = parentPath.endsWith('/') ? parentPath : `${parentPath}/`;
+			if (pathname.startsWith(prefix)) pathname = pathname.slice(prefix.length);
+		}
+	}
 	if (
-		route.path === '*' ||
+		pathname === '' ||
+		pathname === '*' ||
 		route.exact === true ||
 		(route.children !== undefined && route.children.length > 0)
 	) {
-		return route.path;
+		return pathname;
 	}
-	return route.path.endsWith('/') ? `${route.path}*` : `${route.path}/*`;
+	return pathname.endsWith('/') ? `${pathname}*` : `${pathname}/*`;
 }
 
 function createRouteComponent(route, Component, modules, context) {
@@ -88,10 +98,10 @@ function createRouteComponent(route, Component, modules, context) {
 	};
 }
 
-function createRoute(route, registry, cache) {
+function createRoute(route, registry, cache, parentPath) {
 	return {
 		id: route.id,
-		path: routePath(route),
+		path: routePath(route, parentPath),
 		handle: {
 			docusaurus: route,
 		},
@@ -111,7 +121,9 @@ function createRoute(route, registry, cache) {
 				Component: createRouteComponent(route, Component, modules, context),
 			};
 		},
-		children: (route.children ?? []).map((child) => createRoute(child, registry, cache)),
+		children: (route.children ?? []).map((child) =>
+			createRoute(child, registry, cache, route.path),
+		),
 	};
 }
 

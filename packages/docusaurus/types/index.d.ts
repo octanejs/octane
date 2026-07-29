@@ -77,6 +77,46 @@ export interface DocusaurusManifestAliases {
 	themeInit: Record<string, string>;
 }
 
+export interface DocusaurusManifestSite {
+	title: string;
+	tagline: string;
+	url: string;
+	baseUrl: string;
+	favicon?: string;
+	noIndex: boolean;
+	trailingSlash?: boolean;
+	themeConfig: Record<string, any>;
+	customFields: Record<string, any>;
+}
+
+export interface DocusaurusLocaleConfig {
+	label: string;
+	direction: 'ltr' | 'rtl';
+	htmlLang: string;
+	calendar: string;
+	path: string;
+	translate: boolean;
+	url: string;
+	baseUrl: string;
+}
+
+export interface DocusaurusManifestI18n {
+	defaultLocale: string;
+	locales: string[];
+	currentLocale: string;
+	localeConfigs: Record<string, DocusaurusLocaleConfig>;
+}
+
+export interface DocusaurusManifestDocument {
+	htmlAttributes: {
+		lang: string;
+		dir: string;
+	};
+	headTags: string;
+	preBodyTags: string;
+	postBodyTags: string;
+}
+
 export interface DocusaurusManifest {
 	schemaVersion: 1;
 	docusaurusVersion: string;
@@ -84,6 +124,13 @@ export interface DocusaurusManifest {
 	generatedFilesDir: string;
 	outDir: string;
 	baseUrl: string;
+	site: DocusaurusManifestSite;
+	i18n: DocusaurusManifestI18n;
+	siteMetadata: Record<string, any>;
+	document: DocusaurusManifestDocument;
+	assets: {
+		clientModules: string[];
+	};
 	routesPaths: string[];
 	routes: DocusaurusManifestRoute[];
 	globalData: Record<string, unknown>;
