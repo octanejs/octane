@@ -105,6 +105,7 @@ export function docusaurusBridge(options = {}, shared = createSharedState(option
 			const module = server.moduleGraph.getModuleById(id);
 			if (module !== undefined) server.moduleGraph.invalidateModule(module);
 		}
+		server.ws.send({ type: 'full-reload' });
 	}
 
 	return {

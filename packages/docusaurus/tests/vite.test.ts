@@ -124,6 +124,7 @@ describe('Docusaurus Vite bridge', () => {
 		const manifestModule = {};
 		const routesModule = {};
 		const invalidateModule = vi.fn();
+		const wsSend = vi.fn();
 		plugin.configureServer({
 			moduleGraph: {
 				getModuleById(id: string) {
@@ -132,12 +133,14 @@ describe('Docusaurus Vite bridge', () => {
 				},
 				invalidateModule,
 			},
+			ws: { send: wsSend },
 		});
 
 		await plugin.watchChange(path.join(fixture.siteDir, 'watched.txt'));
 
 		expect(invalidateModule).toHaveBeenCalledWith(manifestModule);
 		expect(invalidateModule).toHaveBeenCalledWith(routesModule);
+		expect(wsSend).toHaveBeenCalledWith({ type: 'full-reload' });
 	});
 
 	it('waits for an in-flight reload before serving manifest data', async () => {

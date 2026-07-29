@@ -36,6 +36,9 @@ export interface DocusaurusBridgePlugin {
 			getModuleById(id: string): unknown;
 			invalidateModule(module: unknown): void;
 		};
+		ws: {
+			send(payload: { type: 'full-reload' }): void;
+		};
 	}): void;
 	configResolved(config: { root?: string; command: string }): Promise<void>;
 	buildStart(this: { addWatchFile?(id: string): void }): Promise<void>;
