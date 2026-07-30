@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
-import { MapArm, StringArm, ChildrenArm } from '../_fixtures/ternary-mixed-arms.tsrx';
+import {
+	MapArm,
+	StringArm,
+	ChildrenArm,
+	NestedTernary,
+	RootFragArm,
+} from '../_fixtures/ternary-mixed-arms.tsrx';
 
 // The server has always rendered BOTH arms of `{cond ? A : B}` correctly; the
 // client regression dropped the non-JSX arm's value, so SSR markup showed
@@ -62,6 +68,53 @@ describe('hydrateRoot — ternary child hole with one JSX arm', () => {
 
 		flushSync(() => (container.querySelector('.flip') as HTMLButtonElement).click());
 		expect(host.textContent).toBe('nope');
+		root.unmount();
+	});
+
+	it('adopts a nested ternary: the inner ternary is a value hole on both sides', async () => {
+		// The outer ternary claims branch ranges; the INNER one sits at the
+		// branch's fragment root, which renders as a value hole. Server and
+		// client must agree on that split or the adopted ranges misalign.
+		const { html } = await ServerRT.renderToString(server.NestedTernary, {});
+		expect(html).toContain('0'); // n=2 → the nested else tail
+
+		container.innerHTML = html;
+		const host = container.querySelector('.host') as HTMLElement;
+		const root = hydrateRoot(container, NestedTernary);
+		flushSync(() => {});
+
+		expect(container.querySelector('.host')).toBe(host); // adopted
+		expect(host.textContent).toBe('0');
+
+		// Walk every level through the live handler.
+		flushSync(() => (container.querySelector('.next') as HTMLButtonElement).click());
+		expect(host.querySelector('b')?.textContent).toBe('a'); // n=3 → outer then
+
+		flushSync(() => (container.querySelector('.next') as HTMLButtonElement).click());
+		expect(host.querySelector('i')?.textContent).toBe('b'); // n=4 → nested then
+
+		flushSync(() => (container.querySelector('.next') as HTMLButtonElement).click());
+		expect(host.textContent).toBe('0'); // n=5 → nested else again
+		root.unmount();
+	});
+
+	it('adopts a fragment-root ternary as a value hole', async () => {
+		const { html } = await ServerRT.renderToString(server.RootFragArm, {});
+		expect(html).toContain('nope');
+
+		container.innerHTML = html;
+		const btn = container.querySelector('.flip') as HTMLButtonElement;
+		const root = hydrateRoot(container, RootFragArm);
+		flushSync(() => {});
+
+		expect(container.querySelector('.flip')).toBe(btn); // adopted
+		expect(container.textContent).toBe('flipnope');
+
+		flushSync(() => btn.click());
+		expect(container.querySelector('b')?.textContent).toBe('yes');
+
+		flushSync(() => btn.click());
+		expect(container.textContent).toBe('flipnope');
 		root.unmount();
 	});
 

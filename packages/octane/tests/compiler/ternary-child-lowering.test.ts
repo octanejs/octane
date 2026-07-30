@@ -66,19 +66,20 @@ describe('ternary child holes with one JSX arm — lowering contract', () => {
 		expect(imports).toContain('ssrArm');
 	});
 
-	it('folded positions keep the value lowering on BOTH sides', () => {
-		// Component children and returned `.tsx` trees fold expression holes into
-		// descriptor value holes on the client — the ternary is never an ifBlock
-		// there, and the server must keep ssrChild for the same holes or the
-		// hydration shapes diverge.
-		const childrenSrc = `
+	it('value positions keep the value lowering on BOTH sides', () => {
+		// The claim exists only where the client claims: a hole that is the
+		// direct child of a host element in a template walk. Everywhere else —
+		// children-as-props roots, returned `.tsx` trees, body/fragment roots —
+		// the hole is a value, and the server must keep ssrChild for the same
+		// holes or the hydration shapes diverge.
+		const childrenRootSrc = `
 			function Box(props) @{ <section>{props.children}</section> }
 			export function T(props) @{
 				<div><Box>{props.on ? <b>{'yes'}</b> : 'nope'}</Box></div>
 			}
 		`;
-		expect(octaneImports(childrenSrc)).not.toContain('ifBlock');
-		expect(importsOf(childrenSrc, 'server')).not.toContain('ssrControl');
+		expect(octaneImports(childrenRootSrc)).not.toContain('ifBlock');
+		expect(importsOf(childrenRootSrc, 'server')).not.toContain('ssrControl');
 
 		const returnedSrc = `
 			export function T(props) {
@@ -87,5 +88,30 @@ describe('ternary child holes with one JSX arm — lowering contract', () => {
 		`;
 		expect(octaneImports(returnedSrc)).not.toContain('ifBlock');
 		expect(importsOf(returnedSrc, 'server')).not.toContain('ssrControl');
+
+		const rootFragmentSrc = `
+			export function T(props) @{
+				<>
+					<button>{'flip'}</button>
+					{props.on ? <b>{'yes'}</b> : 'nope'}
+				</>
+			}
+		`;
+		expect(octaneImports(rootFragmentSrc)).not.toContain('ifBlock');
+		expect(importsOf(rootFragmentSrc, 'server')).not.toContain('ssrControl');
+	});
+
+	it('a host-wrapped hole inside component children claims on BOTH sides', () => {
+		// Only the children ROOT is the children-as-props value; template
+		// content nested in a host element inside children claims like any
+		// other template child.
+		const src = `
+			function Box(props) @{ <section>{props.children}</section> }
+			export function T(props) @{
+				<div><Box><p>{props.on ? <b>{'yes'}</b> : 'nope'}</p></Box></div>
+			}
+		`;
+		expect(octaneImports(src)).toContain('ifBlock');
+		expect(importsOf(src, 'server')).toContain('ssrControl');
 	});
 });

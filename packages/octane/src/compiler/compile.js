@@ -4005,8 +4005,10 @@ function wrapAsBlockStmt(node) {
 		// holding an element, a nested ternary) is the branch's render VALUE. As
 		// a bare statement the branch body would evaluate-and-discard it, so wrap
 		// it as the authored-equivalent `<>{expr}</>` — the branch renders the
-		// value through the fragment's child hole (a nested ternary re-enters
-		// this lowering there and becomes a nested ifBlock).
+		// value through the fragment's child hole. The hole sits at the
+		// fragment's ROOT, a value position on both compilers: a nested ternary
+		// stays a value hole here (it is NOT re-claimed into a nested ifBlock),
+		// which is why the server claim requires host-child position too.
 		node = inheritOriginLoc(b.jsx_fragment([b.jsx_expression_container(node, node)]), node);
 	}
 	return b.block([node]);
@@ -7491,7 +7493,15 @@ function ssrCompileBodyWithMapTemps(
 		((!!(node.body && node.body.type === 'JSXCodeBlock') && !returnedOutput) ||
 			returnedFragmentRoot) &&
 		inheritSoleCompRoot(bodyNodes, ctx);
+	// Body/sub ROOTS (including fragment-root children) are not host-element
+	// children: the client routes rich holes there through the de-opt value
+	// path (a portal has no host to stamp — see the emitNodeHtml root branch),
+	// so the ternary claim must stay off until an element's own children walk
+	// (ssrEmitElement) turns the flag on.
+	const prevHostChildPos = ctx._ssrHostChildPos;
+	ctx._ssrHostChildPos = false;
 	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
+	ctx._ssrHostChildPos = prevHostChildPos;
 	ctx._ssrInheritRoot = prevInheritRoot;
 	ctx._returnedFragmentTemplate = prevReturnedFragmentTemplate;
 	ctx._tsxValuePos = prevValuePos;
@@ -8596,6 +8606,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
 		// the first text part must protect a leading newline (see ssrEmitNodes).
 		const nlGuardFirst = tag === 'pre' || tag === 'textarea' || tag === 'listing';
+		// These children sit directly under a host element — the one position
+		// where the client claims `{cond ? A : B}` holes (emitElementHtml). Root
+		// positions reset this in ssrCompileBody.
+		const prevHostChildPos = ctx._ssrHostChildPos;
+		ctx._ssrHostChildPos = true;
 		childrenExpr = ssrEmitNodes(
 			normChildren,
 			ctx,
@@ -8606,6 +8621,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			childComponentNs,
 			nlGuardFirst,
 		);
+		ctx._ssrHostChildPos = prevHostChildPos;
 	}
 	// `children=` and spread-held children are content props, not attributes.
 	// With no nested JSX children, the last present writer renders as the host's
@@ -8934,16 +8950,18 @@ function ssrCompileSub(
 ) {
 	const fnName = `${baseName}$${ctx.nextHelperId++}`;
 	const synth = { params: paramNodes || [], body: bodyStmts };
-	// Extracted-fragment subs — component template children (`__schildren`) and
-	// returned-tree mirrors (`__sfragment`) — fold expression holes into
-	// descriptor VALUE holes on the client (`props.hN` + childTextHole); only
-	// directive ARMS keep the template walk there. Mark them so
-	// ssrEmitTsrxExpression keeps `{cond ? A : B}` on ssrChild inside them,
-	// mirroring the client's fold instead of claiming an @if. Directive-arm
-	// subs reset the flag through this same save/restore, so an @if INSIDE
-	// children/mirrors claims again, exactly like the client.
+	// Returned-tree mirror subs (`__sfragment`): extractFragment folds EVERY
+	// expression hole in the mirrored tree into a descriptor value hole on the
+	// client (`props.hN` + childTextHole), even holes sitting inside host
+	// elements. Mark them so ssrEmitTsrxExpression keeps `{cond ? A : B}` on
+	// ssrChild throughout the mirror, matching that fold. Directive-arm subs
+	// reset the flag through this same save/restore, so an @if INSIDE a mirror
+	// claims again, exactly like the client. (Component `__schildren` subs are
+	// NOT folded wholesale — only their ROOT holes are the children-as-props
+	// value, which `_ssrHostChildPos` already leaves unclaimed — while a hole
+	// inside a host element within children claims like any template child.)
 	const prevFoldedExprHoles = ctx._ssrFoldedExprHoles;
-	ctx._ssrFoldedExprHoles = baseName === '__schildren' || baseName === '__sfragment';
+	ctx._ssrFoldedExprHoles = baseName === '__sfragment';
 	let fn;
 	try {
 		fn = ssrCompileBody(
@@ -9485,18 +9503,20 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		node.returnedJsxValue !== true &&
 		ctx._tsxValuePos !== true &&
 		ctx._ssrFoldedExprHoles !== true &&
+		ctx._ssrHostChildPos === true &&
 		isConditionalJsx(expr)
 	) {
-		// Mirror the client's child-position lowering (emitElementHtml): in a
-		// TEMPLATE-form body a `{cond ? A : B}` hole with a JSX arm becomes an
-		// @if on BOTH sides, so each arm compiles as an ordinary arm body and
-		// the hydration shapes (control key, arm ranges, a keyed `.map` claimed
-		// inside a value arm) agree by construction. VALUE-form positions stay
-		// on ssrChild: the client folds returned `.tsx` trees' holes and
-		// extracted-fragment holes (component children, returned-tree mirrors)
-		// into descriptor value holes (`props.hN` + childTextHole), never
-		// ifBlock — `_tsxValuePos` and `_ssrFoldedExprHoles` are the server's
-		// mirrors of those two folds.
+		// Mirror the client's claim EXACTLY: only emitElementHtml's children
+		// walk lowers `{cond ? A : B}` with a JSX arm to an @if, so both sides
+		// compile each arm as an ordinary arm body and the hydration shapes
+		// (control key, arm ranges, a keyed `.map` claimed inside a value arm)
+		// agree by construction. Everywhere else the hole is a VALUE on the
+		// client and must stay on ssrChild here: returned `.tsx` trees
+		// (`_tsxValuePos`), returned-tree mirrors whose holes extractFragment
+		// folds to `props.hN` (`_ssrFoldedExprHoles`), and every non-host-child
+		// position — body/arm/fragment roots and component-children roots,
+		// where a rich hole rides the de-opt value path because a portal there
+		// has no host to stamp (`_ssrHostChildPos`).
 		const asIf = {
 			...b.if(expr.test, wrapAsBlockStmt(expr.consequent), wrapAsBlockStmt(expr.alternate)),
 			loc: expr.loc, // same devLoc/control-key position as the client's claim

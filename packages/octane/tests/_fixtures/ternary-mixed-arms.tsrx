@@ -120,6 +120,18 @@ export function ChildrenArm() @{
 	</div>
 }
 
+// The hole sits at a FRAGMENT-ROOT position (no enclosing host element). The
+// client deliberately routes root-position rich holes through the value path
+// (a portal there has no host to stamp), so this ternary renders as a VALUE on
+// both sides — it must never be claimed into branch ranges.
+export function RootFragArm() @{
+	const [on, setOn] = useState(false);
+	<>
+		<button class="flip" onClick={() => setOn(!on)}>{'flip'}</button>
+		{on ? <b>{'yes'}</b> : 'nope'}
+	</>
+}
+
 // A logical `&&` arm: `false` renders nothing, an element renders.
 export function AndArm() @{
 	const [n, setN] = useState(0);
