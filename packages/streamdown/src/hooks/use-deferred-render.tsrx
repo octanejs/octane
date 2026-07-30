@@ -39,6 +39,10 @@ export interface UseDeferredRenderOptions {
 	rootMargin?: string;
 }
 
+function withoutSlot<T>(value: T | symbol | undefined): T | undefined {
+	return typeof value === 'symbol' ? undefined : value;
+}
+
 /**
  * Hook for deferred rendering components when they enter the viewport.
  * Uses Intersection Observer + debounce + requestIdleCallback for optimal performance.
@@ -63,7 +67,7 @@ export function useDeferredRender(options: UseDeferredRenderOptions = {}) {
 		debounceDelay = DEFERRED_RENDER_DEBOUNCE_DELAY,
 		rootMargin = DEFERRED_RENDER_ROOT_MARGIN,
 		idleTimeout = DEFERRED_RENDER_IDLE_TIMEOUT,
-	} = options;
+	} = withoutSlot(options) ?? {};
 
 	const [shouldRender, setShouldRender] = useState(false);
 	const containerRef = useRef<HTMLDivElement | null>(null);
