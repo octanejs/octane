@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.15",
-    "@octanejs/radix@0.1.19",
+    "@octanejs/lucide@0.1.16",
+    "@octanejs/radix@0.1.20",
     "class-variance-authority"
   ],
   "registryDependencies": [
