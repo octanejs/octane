@@ -14388,7 +14388,10 @@ export function createScopedValue<P>(
 		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
 		const sameScope =
 			resolvedScope === scope ||
-			(resolvedScope !== null && scope !== null && scope.block.parentBlock === resolvedScope.block);
+			(resolvedScope !== null &&
+				scope !== null &&
+				scope.block.parentBlock === resolvedScope.block &&
+				scope.$$ctxValues === null);
 		if (resolved === undefined || !sameScope || resolvedEpoch !== epoch) {
 			const next = readElement();
 			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
@@ -14460,7 +14463,10 @@ export function createScopedElement<P>(
 		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
 		const sameScope =
 			resolvedScope === scope ||
-			(resolvedScope !== null && scope !== null && scope.block.parentBlock === resolvedScope.block);
+			(resolvedScope !== null &&
+				scope !== null &&
+				scope.block.parentBlock === resolvedScope.block &&
+				scope.$$ctxValues === null);
 		if (!resolved || !sameScope || resolvedEpoch !== epoch) {
 			const nextChildren = readChildren();
 			resolvedScope = scope;
