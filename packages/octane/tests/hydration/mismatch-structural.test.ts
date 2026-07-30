@@ -22,6 +22,7 @@ const NESTEDSWAP = join(
 	process.cwd(),
 	'packages/octane/tests/hydration/_fixtures/nested-swap.tsrx',
 );
+const TERNARY = join(process.cwd(), 'packages/octane/tests/_fixtures/ternary-mixed-arms.tsrx');
 
 function serverModule(fixture: string, file: string): Record<string, any> {
 	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'server' });
@@ -582,6 +583,103 @@ describe.each([
 			expect(recoveredAction.textContent?.trim()).toBe('inside:1');
 			flushSync(() => outsideAction.click());
 			expect(outsideAction.textContent?.trim()).toBe('outside:1');
+			expectDiagnostics();
+		} finally {
+			root.unmount();
+		}
+	});
+});
+
+// The server HTML below is a LEGACY shape for a sole-child mixed-arm-ternary hole:
+// an outer value pair wrapping one pair per keyed item. Today's client claims that
+// hole as an @if-lowered block whose branch hosts the keyed list, so every adopted
+// pair sits one nesting level off from where the client expects it. Recovery from
+// that misalignment must rebuild the subtree and never throw — stale server HTML
+// (an older octane version, a cached edge response) is exactly what the prod
+// recovery safety net exists for.
+describe.each([
+	{
+		name: 'development compile',
+		client: devClientModule(TERNARY, 'ternary-mixed-arms.tsrx'),
+		warns: true,
+	},
+	{
+		name: 'production compile',
+		client: prodClientModule(TERNARY, 'ternary-mixed-arms.tsrx'),
+		warns: false,
+	},
+])('hydrateRoot — recovery inside a misadopted range ($name)', ({ client, warns: shouldWarn }) => {
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	function expectDiagnostics(): void {
+		const messages = errSpy.mock.calls
+			.map((call) => String(call[0]))
+			.filter((message) => message.includes('hydration mismatch'));
+		if (shouldWarn) expect(messages.length).toBeGreaterThanOrEqual(1);
+		else expect(messages).toEqual([]);
+	}
+
+	const LEGACY_HTML =
+		'<div><button class="next">next</button><div class="host">' +
+		'<!--[--><!--[--><i>x</i><!--]--><!--[--><i>y</i><!--]--><!--]-->' +
+		'</div></div>';
+
+	it('legacy nested-pair list shape: rebuilds the keyed list and stays interactive', () => {
+		container.innerHTML = LEGACY_HTML;
+		const root = hydrateRoot(container, client.ForArm);
+		flushSync(() => {});
+
+		try {
+			const itemTexts = () =>
+				Array.from(container.querySelectorAll('.host i'), (n) => n.textContent);
+			expect(itemTexts()).toEqual(['x', 'y']);
+
+			// The rebuilt block must leave a coherent slot boundary behind: flip to the
+			// component arm and back to the keyed list through the live click handler.
+			const next = container.querySelector<HTMLButtonElement>('.next')!;
+			flushSync(() => next.click());
+			expect(container.querySelector('.host i')).toBeNull();
+			expect(container.querySelector('.host em')?.textContent).toBe('chip');
+			flushSync(() => next.click());
+			expect(itemTexts()).toEqual(['x', 'y']);
+			expect(container.querySelector('.host em')).toBeNull();
+			expectDiagnostics();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// The inline-ternary form of the same shape. Its keyed-array arm currently
+	// renders empty on a pure client mount (a compiler lowering gap, owned by the
+	// compiler's ternary tests), so this case pins only what RECOVERY owns: no
+	// throw, the stale server list fully discarded (never leaked into later
+	// arms), and a slot boundary the swaps can keep using.
+	it('legacy nested-pair list shape under the inline ternary: discards, never throws or leaks', () => {
+		container.innerHTML = LEGACY_HTML;
+		const root = hydrateRoot(container, client.MapArm);
+		flushSync(() => {});
+
+		try {
+			const next = container.querySelector<HTMLButtonElement>('.next')!;
+			flushSync(() => next.click());
+			// Component arm on screen; no stale server <i> may survive alongside it.
+			expect(container.querySelector('.host i')).toBeNull();
+			expect(container.querySelector('.host em')?.textContent).toBe('chip');
+			flushSync(() => next.click());
+			// Back on the array arm: the chip must be gone through the same boundary.
+			expect(container.querySelector('.host em')).toBeNull();
 			expectDiagnostics();
 		} finally {
 			root.unmount();

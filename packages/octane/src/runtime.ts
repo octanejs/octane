@@ -21549,10 +21549,39 @@ function renderBranchSlot(
 				let bStart: Node;
 				let bEnd: Node;
 				let borrowed = false;
+				let rebuild = false;
+				let inner: Comment | null = null;
+				let innerEnd: Comment | null = null;
 				if (hydration !== null && hydration.isOpen(state.start.nextSibling)) {
-					bStart = state.start.nextSibling as Comment;
-					bEnd = hydration.close(bStart);
-					hydration.node = bStart.nextSibling;
+					inner = state.start.nextSibling as Comment;
+					innerEnd = hydration.close(inner);
+					if (innerEnd !== state.end && innerEnd.nextSibling !== state.end) {
+						// The first nested pair does not SPAN the slot's adopted range, so it
+						// cannot be this branch's own range — the server encoded this slot
+						// differently (e.g. a legacy value-hole list: an outer pair plus one
+						// pair per item). Adopting the prefix pair would strand the rest of
+						// the server content outside the branch: the next swap leaves it on
+						// screen and later re-entries insert against detached anchors.
+						// STRUCTURAL mismatch — discard the server range and client-build the
+						// branch fresh into the borrowed slot markers below.
+						if (process.env.NODE_ENV !== 'production') {
+							const mmLoc = siteLoc(parentScope, slotKey);
+							if (mmLoc)
+								hydration.warnStructural(
+									mmLoc,
+									'a single branch range',
+									hydration.describe(innerEnd.nextSibling),
+								);
+						}
+						removeRange(state.start.nextSibling, state.end);
+						inner = null;
+						rebuild = true;
+					}
+				}
+				if (inner !== null) {
+					bStart = inner;
+					bEnd = innerEnd as Comment;
+					hydration!.node = inner.nextSibling;
 				} else {
 					bStart = state.start;
 					bEnd = state.end as Node;
@@ -21576,7 +21605,17 @@ function renderBranchSlot(
 				);
 				if (borrowed) b.exclusiveMarkers = true;
 				state.block = b;
-				renderBlock(b);
+				if (rebuild) {
+					// The discarded range left nothing to adopt, but the cursor still sits
+					// inside the live document. Suspend hydration for the whole branch
+					// subtree so cursor-greedy adoption (e.g. a keyed list's markerless item
+					// path) client-builds instead of claiming the slot's own close marker,
+					// then park the cursor after the slot for the next sibling.
+					hydration!.suspend(() => renderBlock(b));
+					hydration!.node = (state.end as Node).nextSibling;
+				} else {
+					renderBlock(b);
+				}
 			} else if (hydration !== null && state.start.nextSibling !== state.end) {
 				// EMPTY client branch, but the server rendered content in this slot (e.g. an
 				// `@else` with content on the server, empty `@if` on the client). Discard the
