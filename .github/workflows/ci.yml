@@ -31,6 +31,7 @@ jobs:
       is_release: ${{ steps.classify.outputs.is_release }}
       is_release_pr: ${{ steps.classify.outputs.is_release_pr }}
       is_release_merge: ${{ steps.classify.outputs.is_release_merge }}
+      full_ci: ${{ steps.verify_scope.outputs.full_ci }}
 
     steps:
       # Authenticate both a generated release PR event and the eventual main
@@ -262,6 +263,128 @@ jobs:
               );
             }
 
+      - name: Checkout change history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      # Keep the cheap lint/static gate universal. Expensive matrices can be
+      # omitted only when the committed classifier proves that every changed
+      # file is documentation, metadata, or an isolated developer helper.
+      - name: Classify the CI scope
+        id: change_scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          node scripts/classify-ci-change.mjs
+          --base "$BASE_SHA"
+          --head "$HEAD_SHA"
+          --github-output "$GITHUB_OUTPUT"
+
+      # A lightweight diff can inherit coverage only from a base commit that
+      # actually completed every expensive lane. This prevents a quick metadata
+      # push from cancelling an untested source push and then going green.
+      - name: Verify full-suite provenance
+        id: verify_scope
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CANDIDATE_FULL_CI: ${{ steps.change_scope.outputs.full_ci }}
+        with:
+          script: |
+            core.setOutput("full_ci", "true");
+            if (process.env.CANDIDATE_FULL_CI !== "false") {
+              return;
+            }
+
+            try {
+              const { owner, repo } = context.repo;
+              const baseSha = process.env.BASE_SHA;
+              if (!baseSha || /^0+$/.test(baseSha)) {
+                core.warning(
+                  "The lightweight change has no comparable base commit. Running full CI.",
+                );
+                return;
+              }
+
+              const requiredFullJobs = [
+                "website integration suite",
+                "typecheck",
+                "validate publishable packages",
+                ...["package-builds", "eval-corpus", "browser"].map(
+                  (lane) => `heavy integration (${lane})`,
+                ),
+                ...["1/3", "2/3", "3/3"].map(
+                  (shard) => `example apps (${shard})`,
+                ),
+                ...["minimum r156", "current"].map(
+                  (lane) => `Three compatibility (${lane})`,
+                ),
+                ...["minimum", "current"].map(
+                  (lane) => `Lynx compatibility (${lane})`,
+                ),
+                ...[22, 24].flatMap((node) =>
+                  ["1/4", "2/4", "3/4", "4/4"].map(
+                    (shard) => `test shard (Node ${node}, ${shard})`,
+                  ),
+                ),
+              ];
+              const { data: baseRuns } =
+                await github.rest.actions.listWorkflowRuns({
+                  owner,
+                  repo,
+                  workflow_id: "ci.yml",
+                  branch: "main",
+                  event: "push",
+                  status: "completed",
+                  head_sha: baseSha,
+                  per_page: 10,
+                });
+
+              for (const run of baseRuns.workflow_runs) {
+                if (
+                  run.head_sha !== baseSha ||
+                  run.head_branch !== "main" ||
+                  run.head_repository?.full_name !== `${owner}/${repo}` ||
+                  run.event !== "push" ||
+                  run.conclusion !== "success"
+                ) {
+                  continue;
+                }
+
+                const jobs = await github.paginate(
+                  github.rest.actions.listJobsForWorkflowRun,
+                  { owner, repo, run_id: run.id, per_page: 100 },
+                );
+                const successfulJobs = new Set(
+                  jobs
+                    .filter((job) => job.conclusion === "success")
+                    .map((job) => job.name),
+                );
+                const hasReusableProvenance =
+                  successfulJobs.has("CI provenance");
+                const completedFullSuite = requiredFullJobs.every((job) =>
+                  successfulJobs.has(job),
+                );
+                if (hasReusableProvenance || completedFullSuite) {
+                  core.setOutput("full_ci", "false");
+                  core.notice(
+                    `Skipping expensive CI for a lightweight change based on tested ${baseSha}.`,
+                  );
+                  return;
+                }
+              }
+
+              core.notice(
+                `Base ${baseSha} has no completed run with every expensive lane passing. Running full CI.`,
+              );
+            } catch (error) {
+              core.warning(
+                `Could not verify full-suite provenance: ${error.message}. Running full CI.`,
+              );
+            }
+
   test_shard:
     name: test shard (Node ${{ matrix.node-version }}, ${{ matrix.shard }})
     needs: release_change
@@ -269,7 +392,7 @@ jobs:
     # generates its metadata-only release commit. Keep the post-merge CI run
     # (publishing waits for it), but do not repeat the full suite once the merge
     # has been authenticated above.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -326,13 +449,14 @@ jobs:
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
   # folds the dedicated integration suites into the same merge and publishing
-  # gates. An authenticated release skip must satisfy every prerequisite.
+  # gates. An authenticated release or lightweight-change skip must satisfy
+  # every prerequisite.
   test:
     name: test (${{ matrix.required-context }})
     needs: [release_change, test_shard, website_e2e, heavy_integration]
     # The release PR does not need test contexts. The post-merge release run does:
     # publish.yml verifies these stable aggregate names before publishing.
-    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -343,12 +467,13 @@ jobs:
     steps:
       - name: Verify all test suites passed
         env:
+          FULL_CI: ${{ needs.release_change.outputs.full_ci }}
           IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_change.outputs.is_release_merge }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
           WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
           HEAVY_INTEGRATION_RESULT: ${{ needs.heavy_integration.result }}
         run: |
-          if [ "$IS_CHANGESET_RELEASE_MERGE" = true ]; then
+          if [ "$IS_CHANGESET_RELEASE_MERGE" = true ] || [ "$FULL_CI" = false ]; then
             test "$SHARD_RESULT" = skipped
             test "$WEBSITE_E2E_RESULT" = skipped
             test "$HEAVY_INTEGRATION_RESULT" = skipped
@@ -363,7 +488,7 @@ jobs:
     needs: release_change
     # Same authenticated-release skip as the shards above: a metadata-only
     # Changesets merge has already passed this on its parent commit.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -406,7 +531,7 @@ jobs:
     needs: release_change
     # Run build and browser coverage once on the newest supported Node. The
     # ordinary suite still runs on both Node 22 and 24 above.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -458,7 +583,7 @@ jobs:
     needs: release_change
     # A skipped job reports success, including when it is a required check. The
     # classifier only takes this path for the exact bot-owned metadata commit.
-    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -505,6 +630,9 @@ jobs:
       # bump at review time instead of at release time.
       - name: Disallow major and minor bumps in changesets
         run: pnpm changeset:check
+
+      - name: Validate CI workflow behavior
+        run: pnpm ci:workflow:test
 
       # A committed test must execute and pass. Intentional framework
       # divergences are ordinary assertions; missing environment prerequisites
@@ -598,7 +726,7 @@ jobs:
   typecheck:
     name: typecheck
     needs: release_change
-    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -626,7 +754,7 @@ jobs:
   example_shard:
     name: example apps (${{ matrix.shard }})
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -665,19 +793,25 @@ jobs:
   examples:
     name: examples
     needs: [release_change, example_shard]
-    if: ${{ always() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Verify all example shards passed
         env:
+          FULL_CI: ${{ needs.release_change.outputs.full_ci }}
           EXAMPLE_SHARD_RESULT: ${{ needs.example_shard.result }}
-        run: test "$EXAMPLE_SHARD_RESULT" = success
+        run: |
+          if [ "$FULL_CI" = false ]; then
+            test "$EXAMPLE_SHARD_RESULT" = skipped
+          else
+            test "$EXAMPLE_SHARD_RESULT" = success
+          fi
 
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
     # This matrix intentionally rewrites one importer without changing the
     # repository lockfile after the frozen base install.
@@ -739,7 +873,7 @@ jobs:
   lynx_compat:
     name: Lynx compatibility (${{ matrix.lane }})
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -779,7 +913,7 @@ jobs:
   package:
     name: validate publishable packages
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -810,3 +944,42 @@ jobs:
       # to prove singleton resolution and client/server raw-source compilation.
       - name: Pack and validate every publishable package
         run: pnpm packages:pack:check
+
+  # This stable marker lets consecutive lightweight commits inherit the last
+  # full suite transitively. A lightweight run reaches it only after the scope
+  # classifier verifies that its base already had equivalent provenance.
+  provenance:
+    name: CI provenance
+    needs: [release_change, test, lint, typecheck, examples, three_compat, lynx_compat, package]
+    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify reusable CI coverage
+        env:
+          FULL_CI: ${{ needs.release_change.outputs.full_ci }}
+          RELEASE_CHANGE_RESULT: ${{ needs.release_change.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          EXAMPLES_RESULT: ${{ needs.examples.result }}
+          THREE_COMPAT_RESULT: ${{ needs.three_compat.result }}
+          LYNX_COMPAT_RESULT: ${{ needs.lynx_compat.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+        run: |
+          test "$RELEASE_CHANGE_RESULT" = success
+          test "$TEST_RESULT" = success
+          test "$LINT_RESULT" = success
+          test "$EXAMPLES_RESULT" = success
+
+          if [ "$FULL_CI" = false ]; then
+            test "$TYPECHECK_RESULT" = skipped
+            test "$THREE_COMPAT_RESULT" = skipped
+            test "$LYNX_COMPAT_RESULT" = skipped
+            test "$PACKAGE_RESULT" = skipped
+          else
+            test "$TYPECHECK_RESULT" = success
+            test "$THREE_COMPAT_RESULT" = success
+            test "$LYNX_COMPAT_RESULT" = success
+            test "$PACKAGE_RESULT" = success
+          fi

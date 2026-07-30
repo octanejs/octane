@@ -795,8 +795,20 @@ Octane uses [pnpm](https://pnpm.io) for package management and workspace scripts
 pnpm install      # install workspace dependencies
 pnpm test         # run the test suite
 pnpm typecheck    # type-check packages, website, and examples
-pnpm format       # format with Prettier
+pnpm format       # format the whole repository with Prettier
+pnpm format:check # check the whole repository with Prettier
 ```
+
+During iteration, limit Prettier to one or more files or directories:
+
+```bash
+pnpm format:files README.md packages/octane/src
+pnpm format:files:check README.md packages/octane/src
+```
+
+`format:files` writes changes; `format:files:check` is read-only. Both accept any
+mix of file and directory paths. Use the repo-wide `pnpm format:check` for the
+final formatting gate.
 
 `pnpm test` runs the projects declared in the root `vitest.config.js` through a
 single Vitest invocation rather than calling each package's `test` script. Test
