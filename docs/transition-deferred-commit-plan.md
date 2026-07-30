@@ -159,6 +159,23 @@ attempt end. A pre-existing sole-child hole array→text→array crash blocks th
 cue re-render's kind round-trips and is spun out separately with a ready
 failing test.
 
+## P1 landed (2026-07-30, Design A + harvest)
+
+Design A shipped in this PR: whole-drain attempt, cell revert, urgent cue
+re-render, `heldSyncCellsIntact` release gate, promotion at the staged-reveal
+barrier, promote-at-timeout, sync urgent-supersede discard, pu-entry swaps
+(`useMemo`/`puPub`/`puAdopt`), and the episode-agnostic warm harvest collected
+from the origin subtree's block caches at unwind. Continuing rounds (a promoted
+render suspending on a later dependency) skip the pu undo and the cue
+re-render — the screen and cue were re-established in round one — so entries
+move monotonically forward. The flip-away case now re-asserts the whole held
+screen instead of tearing to the flipped text.
+
+Residual, pinned one-way in the benchmark (update calls ceiling 13): the round
+after the dependent `owner` resolves re-creates the five warm-started panel
+fetches instead of dep-hitting them — app-cache-served, zero mixed states,
+no network duplication. P2 owns walking that back to the 8-call floor.
+
 ## Phases
 
 - **P0 (this PR)**: plan + correct the divergence audit's "decouple the cue"
