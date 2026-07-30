@@ -37,6 +37,7 @@ export const KNOWN_BINDINGS = {
 	cmdk: '@octanejs/cmdk',
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
+	'@monaco-editor/react': '@octanejs/monaco-editor',
 	'lucide-react': '@octanejs/lucide',
 	'@phosphor-icons/react': '@octanejs/phosphor-icons',
 	'@floating-ui/react': '@octanejs/floating-ui',
@@ -151,6 +152,7 @@ export const KNOWN_VANILLA_CORES = {
 	jotai: 'jotai/vanilla',
 	'@lexical/react': 'lexical',
 	'@tiptap/react': '@tiptap/core',
+	'@monaco-editor/react': 'monaco-editor',
 };
 
 export const REACT_API_MAP = {
