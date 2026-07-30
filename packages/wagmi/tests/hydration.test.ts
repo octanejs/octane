@@ -66,7 +66,7 @@ describe('WagmiProvider SSR initial state', () => {
 		expect(hydrationCalls).toBe(1);
 		expect(mountCalls).toBe(1);
 		flushEffects();
-		mounted.update(HydrationApp, props);
+		mounted.update(HydrationApp, { ...props, initialState: { ...initialState } });
 		flushEffects();
 
 		expect(hydrationCalls).toBe(1);

@@ -33,6 +33,14 @@ export default defineConfig({
 		// octane plugin has to compile, so they must not be pre-bundled either. That
 		// covers both the cmdk demo and the registry-installed shadcn components,
 		// which build on the raw-source radix and lucide bindings.
-		exclude: ['octane', '@octanejs/cmdk', '@octanejs/radix', '@octanejs/lucide'],
+		exclude: [
+			'octane',
+			'@octanejs/cmdk',
+			'@octanejs/radix',
+			'@octanejs/lucide',
+			'@octanejs/rainbowkit',
+			'@octanejs/tanstack-query',
+			'@octanejs/wagmi',
+		],
 	},
 });

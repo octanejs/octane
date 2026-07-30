@@ -19,6 +19,7 @@ export const KNOWN_BINDINGS = {
 	'@tanstack/react-form': '@octanejs/tanstack-form',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	wagmi: '@octanejs/wagmi',
+	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-store': '@octanejs/tanstack-store',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',

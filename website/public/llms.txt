@@ -171,7 +171,7 @@ Bindings — reach for these when asked about the React equivalent:
 - **Forms and content** — `@octanejs/hook-form`, `@octanejs/tanstack-form`, `@octanejs/lexical`, `@octanejs/tiptap`, `@octanejs/mdx`, and `@octanejs/i18next` cover forms, rich-text editing, MDX, and internationalization.
 - **Data-heavy screens** — `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/recharts`, and `@octanejs/visx` cover tables, virtualized lists, charts, and visualization primitives.
 - **Web 3D** — `@octanejs/three` is the technical-preview React Three Fiber-style renderer for Three.js scenes.
-- **Web3** — `@octanejs/wagmi` provides Octane-native EVM account, chain, connector, action, and query bindings for Wagmi v3.
+- **Web3** — `@octanejs/wagmi` provides Octane-native EVM account, chain, connector, action, and query bindings for Wagmi v3; `@octanejs/rainbowkit` adds wallet discovery and accessible connect UI.
 - **Desktop** — `@octanejs/tauri` covers Tauri v2 IPC: suspending and stateful commands plus event subscriptions that survive an async unlisten. Octane needs no adapter to run in a Tauri webview; the rest of `@tauri-apps/api` is framework-neutral and imported directly.
 - **Styling, tests, and devtools** — `@octanejs/stylex`, `@octanejs/styled-components`, `@octanejs/testing-library`, `@octanejs/tanstack-devtools`, and `@octanejs/devtools` cover compiled and runtime styling, DOM-first component tests, the TanStack Devtools panel, and Octane runtime diagnostics.
 

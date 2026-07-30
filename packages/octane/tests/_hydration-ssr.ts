@@ -4,7 +4,7 @@ import { createServer } from 'vite';
 import { octane } from '../src/compiler/vite.js';
 import type { RenderResult } from '../src/runtime.server';
 
-type HydrationBinding = 'apollo-client' | 'aria' | 'base-ui' | 'docusaurus';
+type HydrationBinding = 'apollo-client' | 'aria' | 'base-ui' | 'docusaurus' | 'rainbowkit';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
@@ -40,6 +40,23 @@ function bindingAliases(binding: HydrationBinding) {
 			{
 				find: /^@octanejs\/remix-router$/,
 				replacement: resolve(repositoryRoot, 'packages/remix-router/src/index.ts'),
+			},
+		];
+	}
+
+	if (binding === 'rainbowkit') {
+		return [
+			{
+				find: /^@octanejs\/rainbowkit$/,
+				replacement: resolve(source, 'index.ts'),
+			},
+			{
+				find: /^@octanejs\/wagmi$/,
+				replacement: resolve(repositoryRoot, 'packages/wagmi/src/index.ts'),
+			},
+			{
+				find: /^@octanejs\/tanstack-query$/,
+				replacement: resolve(repositoryRoot, 'packages/tanstack-query/src/index.ts'),
 			},
 		];
 	}

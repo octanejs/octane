@@ -283,6 +283,22 @@
       "verified": "2026-07-21"
     },
     {
+      "name": "@octanejs/rainbowkit",
+      "version": "0.0.1",
+      "category": "Web3",
+      "upstream": { "package": "@rainbow-me/rainbowkit", "version": "2.2.11" },
+      "surface": "Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.",
+      "divergences": [
+        "IMPORTANT: upstream RainbowKit 2.2.11 declares wagmi ^2.9.0. This adapter intentionally consumes @octanejs/wagmi v3 and is not drop-in dependency or peer-range parity.",
+        "The React DOM and vanilla-extract implementation is replaced by native Octane TSRX, DOM events, focus/scroll containment, and CSS custom properties.",
+        "The wallet list merges optional configured descriptors with the enclosing Wagmi v3 connector list, deduplicated by canonical connector uid with explicit id/name fallback. Unavailable configured entries remain visible with a reason. RainbowKit wallet factories, vendor SDKs, and WalletConnect project configuration remain application-owned.",
+        "Authentication, recent transactions, ENS/avatar resolution, localization, cool mode, account avatars/balances, chain icons, and pixel-identical upstream themes are unsupported and their upstream props are not accepted.",
+        "rainbowTheme is an explicitly documented Octane-only purple/rounded preset; it is not an upstream RainbowKit export."
+      ],
+      "ssr": "The provider and controls emit deterministic disconnected markup without browser wallet access. Connector discovery and live Wagmi state become authoritative after hydration; no hydrated UI state authorizes wallet actions.",
+      "verified": "2026-07-29"
+    },
+    {
       "name": "@octanejs/react-error-boundary",
       "version": "0.1.2",
       "category": "UI and interaction",
@@ -720,6 +736,7 @@
     "@mantine/hooks": "@octanejs/mantine-hooks",
     "@mdx-js/react": "@octanejs/mdx",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
+    "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",
     "@stylexjs/stylex": "@octanejs/stylex",

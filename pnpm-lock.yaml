@@ -849,7 +849,7 @@ importers:
         version: 0.3.118(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.118(@tsrx/react@0.2.56(react@19.2.7))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.19(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.118(@tsrx/react@0.2.56(react@19.2.7))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.21(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -2614,7 +2614,7 @@ importers:
         version: 25.9.5
       nitro:
         specifier: ^3.0.260311-beta
-        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       tailwindcss:
         specifier: ^4.2.2
         version: 4.3.3
@@ -2904,7 +2904,7 @@ importers:
         version: 24.13.3
       nitro:
         specifier: ^3.0.260311-beta
-        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       typescript:
         specifier: catalog:default
         version: 5.9.3
@@ -4545,6 +4545,43 @@ importers:
         specifier: catalog:default
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
+  packages/rainbowkit:
+    dependencies:
+      '@octanejs/wagmi':
+        specifier: workspace:*
+        version: link:../wagmi
+      '@wagmi/core':
+        specifier: catalog:default
+        version: 3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@4.4.3))
+    devDependencies:
+      '@octanejs/tanstack-query':
+        specifier: workspace:*
+        version: link:../tanstack-query
+      '@testing-library/jest-dom':
+        specifier: catalog:default
+        version: 6.9.1
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.56(react@19.2.7)
+      '@wagmi/connectors':
+        specifier: catalog:default
+        version: 8.0.25(@wagmi/core@3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)(viem@2.55.10(typescript@5.9.3)(zod@4.4.3))
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      viem:
+        specifier: catalog:default
+        version: 2.55.10(typescript@5.9.3)(zod@4.4.3)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/react-error-boundary:
     devDependencies:
       '@tsrx/react':
@@ -5853,6 +5890,9 @@ importers:
       '@octanejs/radix':
         specifier: workspace:*
         version: link:../../packages/radix
+      '@octanejs/rainbowkit':
+        specifier: workspace:*
+        version: link:../../packages/rainbowkit
       '@octanejs/react-error-boundary':
         specifier: workspace:*
         version: link:../../packages/react-error-boundary
@@ -5868,6 +5908,9 @@ importers:
       '@octanejs/wagmi':
         specifier: workspace:*
         version: link:../../packages/wagmi
+      '@wagmi/connectors':
+        specifier: catalog:default
+        version: 8.0.25(@wagmi/core@3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@3.25.76)))(typescript@5.9.3)(viem@2.55.10(typescript@5.9.3)(zod@3.25.76))
       class-variance-authority:
         specifier: catalog:default
         version: 0.7.1
@@ -5965,7 +6008,7 @@ importers:
         version: 2.3.0
       nitro:
         specifier: ^3.0.260311-beta
-        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       playwright:
         specifier: catalog:default
         version: 1.61.1
@@ -16292,8 +16335,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.1.19:
-    resolution: {integrity: sha512-rn3fuQIMVpXZVExtJWy8c0Bg37w9oZMIvmqJ1m4vNYysf1G9hMv4Nox0jrpML/1Sk4RdSmRTOVRS+hbz7mmUGQ==}
+  octane@0.1.21:
+    resolution: {integrity: sha512-cfemarQcdslN3WG9f/e1EzcwO2JvbJQLliLp3fF6ECiel28vT5ncaigSbgGQZgMWYX/1CWM5ChlB5xoqOVn72Q==}
     engines: {node: '>=22'}
     peerDependencies:
       react: ^19.0.0
@@ -24423,7 +24466,7 @@ snapshots:
 
   '@rsbuild/core@2.1.4(core-js@3.49.0)':
     dependencies:
-      '@rspack/core': 2.1.3(@swc/helpers@0.5.23)
+      '@rspack/core': 2.1.4(@swc/helpers@0.5.23)
       '@swc/helpers': 0.5.23
     optionalDependencies:
       core-js: 3.49.0
@@ -26162,7 +26205,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/typescript-plugin@0.3.118(@tsrx/react@0.2.56(react@19.2.7))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.19(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.118(@tsrx/react@0.2.56(react@19.2.7))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.21(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -26171,7 +26214,7 @@ snapshots:
       '@tsrx/react': 0.2.56(react@19.2.7)
       '@tsrx/ripple': 0.1.57
       '@tsrx/solid': 0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
-      octane: 0.1.19(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.1.21(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/typescript-plugin@0.3.118(@tsrx/react@0.2.56(react@19.2.7))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
@@ -26319,7 +26362,7 @@ snapshots:
 
   '@types/d3-interpolate@3.0.1':
     dependencies:
-      '@types/d3-color': 3.1.0
+      '@types/d3-color': 3.1.3
 
   '@types/d3-interpolate@3.0.4':
     dependencies:
@@ -26345,7 +26388,7 @@ snapshots:
 
   '@types/d3-scale@4.0.2':
     dependencies:
-      '@types/d3-time': 3.0.0
+      '@types/d3-time': 3.0.4
 
   '@types/d3-scale@4.0.9':
     dependencies:
@@ -27276,6 +27319,13 @@ snapshots:
 
   '@vue/shared@3.6.0-rc.1': {}
 
+  '@wagmi/connectors@8.0.25(@wagmi/core@3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@3.25.76)))(typescript@5.9.3)(viem@2.55.10(typescript@5.9.3)(zod@3.25.76))':
+    dependencies:
+      '@wagmi/core': 3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@3.25.76))
+      viem: 2.55.10(typescript@5.9.3)(zod@3.25.76)
+    optionalDependencies:
+      typescript: 5.9.3
+
   '@wagmi/connectors@8.0.25(@wagmi/core@3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)(viem@2.55.10(typescript@5.9.3)(zod@4.4.3))':
     dependencies:
       '@wagmi/core': 3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@4.4.3))
@@ -27289,6 +27339,21 @@ snapshots:
       mipd: 0.0.7(typescript@5.9.3)
       viem: 2.55.10(typescript@5.9.3)(zod@4.4.3)
       zustand: 5.0.0(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7))
+    optionalDependencies:
+      '@tanstack/query-core': 5.101.3
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - '@types/react'
+      - immer
+      - react
+      - use-sync-external-store
+
+  '@wagmi/core@3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@3.25.76))':
+    dependencies:
+      eventemitter3: 5.0.1
+      mipd: 0.0.7(typescript@5.9.3)
+      viem: 2.55.10(typescript@5.9.3)(zod@3.25.76)
+      zustand: 5.0.0(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     optionalDependencies:
       '@tanstack/query-core': 5.101.3
       typescript: 5.9.3
@@ -27420,6 +27485,11 @@ snapshots:
   '@xtuc/ieee754@1.2.0': {}
 
   '@xtuc/long@4.2.2': {}
+
+  abitype@1.2.3(typescript@5.9.3)(zod@3.25.76):
+    optionalDependencies:
+      typescript: 5.9.3
+      zod: 3.25.76
 
   abitype@1.2.3(typescript@5.9.3)(zod@4.4.3):
     optionalDependencies:
@@ -28598,7 +28668,7 @@ snapshots:
 
   d3-geo@3.1.0:
     dependencies:
-      d3-array: 3.2.1
+      d3-array: 3.2.4
 
   d3-geo@3.1.1:
     dependencies:
@@ -28638,8 +28708,8 @@ snapshots:
 
   d3-scale@4.0.2:
     dependencies:
-      d3-array: 3.2.1
-      d3-format: 3.1.0
+      d3-array: 3.2.4
+      d3-format: 3.1.2
       d3-interpolate: 3.0.1
       d3-time: 3.1.0
       d3-time-format: 4.1.0
@@ -28660,7 +28730,7 @@ snapshots:
 
   d3-time@3.1.0:
     dependencies:
-      d3-array: 3.2.1
+      d3-array: 3.2.4
 
   d3-timer@3.0.1: {}
 
@@ -31832,7 +31902,7 @@ snapshots:
 
   nf3@0.3.22: {}
 
-  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.10(srvx@0.11.22)
@@ -31849,7 +31919,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4)(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
-      dotenv: 8.6.0
+      dotenv: 17.4.2
       jiti: 2.7.0
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
@@ -31885,7 +31955,7 @@ snapshots:
       - uploadthing
       - wrangler
 
-  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.10(srvx@0.11.22)
@@ -31902,7 +31972,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4)(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
-      dotenv: 8.6.0
+      dotenv: 17.4.2
       jiti: 2.7.0
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
@@ -31938,7 +32008,7 @@ snapshots:
       - uploadthing
       - wrangler
 
-  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.10(srvx@0.11.22)
@@ -31955,7 +32025,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4)(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
-      dotenv: 8.6.0
+      dotenv: 17.4.2
       jiti: 2.7.0
       vite: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
@@ -32079,7 +32149,7 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.1.19(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.1.21(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@tsrx/core': 0.1.56
       '@types/react': 19.2.17
@@ -32180,6 +32250,21 @@ snapshots:
       get-intrinsic: 1.3.0
       object-keys: 1.1.1
       safe-push-apply: 1.0.0
+
+  ox@0.14.33(typescript@5.9.3)(zod@3.25.76):
+    dependencies:
+      '@adraffy/ens-normalize': 1.11.1
+      '@noble/ciphers': 1.3.0
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
+      eventemitter3: 5.0.1
+    optionalDependencies:
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - zod
 
   ox@0.14.33(typescript@5.9.3)(zod@4.4.3):
     dependencies:
@@ -35310,6 +35395,23 @@ snapshots:
       d3-shape: 3.2.0
       d3-time: 3.1.0
       d3-timer: 3.0.1
+
+  viem@2.55.10(typescript@5.9.3)(zod@3.25.76):
+    dependencies:
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
+      isows: 1.0.7(ws@8.21.0)
+      ox: 0.14.33(typescript@5.9.3)(zod@3.25.76)
+      ws: 8.21.0
+    optionalDependencies:
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+      - zod
 
   viem@2.55.10(typescript@5.9.3)(zod@4.4.3):
     dependencies:

@@ -665,6 +665,7 @@ describe('manifest-declared manual hook slots', () => {
 			'motion',
 			'phosphor-icons',
 			'radix',
+			'rainbowkit',
 			'react-error-boundary',
 			'remix-router',
 			'styled-components',

@@ -1214,6 +1214,63 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'rainbowkit',
+					include: [
+						'packages/rainbowkit/tests/**/*.test.ts',
+						'!packages/rainbowkit/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/rainbowkit$/,
+							replacement: resolve(import.meta.dirname, 'packages/rainbowkit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/rainbowkit\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/rainbowkit/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/wagmi$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wagmi\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'rainbowkit-ssr',
+					include: ['packages/rainbowkit/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/rainbowkit$/,
+							replacement: resolve(import.meta.dirname, 'packages/rainbowkit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wagmi$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-query',
 					include: ['packages/tanstack-query/tests/**/*.test.ts'],
 					environment: 'jsdom',
