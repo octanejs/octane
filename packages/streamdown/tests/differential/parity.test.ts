@@ -1,10 +1,23 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import { mountDifferential, normaliseHtml } from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(import.meta.dirname, '../_fixtures/markdown-parity.tsrx');
 const featureFixture = resolve(import.meta.dirname, '../_fixtures/feature-parity.tsrx');
 const cache = resolve(import.meta.dirname, '.react-cache');
+
+function normaliseUpstreamCodeBlockBackgrounds(html: string): string {
+	return normaliseHtml(html)
+		.replaceAll('bg-[var(--sdm-bg,inherit]', 'bg-[var(--sdm-bg,inherit)]')
+		.replaceAll(
+			'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit)]',
+			'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit))]',
+		);
+}
+
+function expectUpstreamCodeBlockParity(octaneHtml: string, reactHtml: string): void {
+	expect(normaliseHtml(octaneHtml)).toBe(normaliseUpstreamCodeBlockBackgrounds(reactHtml));
+}
 
 const STATIC_MARKDOWN = [
 	'# Streamdown',
@@ -139,7 +152,7 @@ describe('@octanejs/streamdown differential parity', () => {
 			cache,
 		);
 
-		await differential.step('control surface', (octane, react) => {
+		await differential.observe('control surface', (octane, react) => {
 			for (const runtime of [octane, react]) {
 				expect(runtime.findAll('[data-streamdown="code-block"]')).toHaveLength(1);
 				expect(runtime.findAll('[data-streamdown="code-block-copy-button"]')).toHaveLength(1);
@@ -147,6 +160,17 @@ describe('@octanejs/streamdown differential parity', () => {
 				expect(runtime.findAll('[data-streamdown="table-wrapper"]')).toHaveLength(1);
 				expect(runtime.find('table').textContent).toContain('answer42');
 			}
+
+			const octanePre = octane.find('[data-streamdown="code-block-body"] pre');
+			expect(octanePre.classList.contains('bg-[var(--sdm-bg,inherit)]')).toBe(true);
+			expect(
+				octanePre.classList.contains('dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit))]'),
+			).toBe(true);
+
+			// Streamdown 2.5.0 ships unbalanced arbitrary-value classes. Keep the
+			// rest of this scenario byte-identical while normalising only that
+			// upstream typo on the React side.
+			expectUpstreamCodeBlockParity(octane.container.innerHTML, react.container.innerHTML);
 		});
 
 		differential.unmount();
@@ -160,7 +184,11 @@ describe('@octanejs/streamdown differential parity', () => {
 			cache,
 		);
 
-		await differential.step('initial incomplete stream', () => {});
+		await differential.observe('initial incomplete stream', () => {});
+		expectUpstreamCodeBlockParity(
+			differential.octane.container.innerHTML,
+			differential.react.container.innerHTML,
+		);
 		await differential.step('stream to static', async (octane, react) => {
 			await octane.click('#to-static');
 			await react.click('#to-static');
