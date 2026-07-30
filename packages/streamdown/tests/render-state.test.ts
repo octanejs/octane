@@ -55,6 +55,27 @@ describe('@octanejs/streamdown render state', () => {
 		}
 	});
 
+	it('keeps code rows block-level when line numbers are hidden', () => {
+		const mounted = mount(StreamdownHarness, {
+			children: '```ts\nconst first = 1;\nconst second = 2;\n```',
+			controls: false,
+			lineNumbers: false,
+			mode: 'static',
+		});
+
+		try {
+			const rows = mounted.container.querySelectorAll(
+				'[data-streamdown="code-block-body"] code > span',
+			);
+			expect(rows).toHaveLength(2);
+			for (const row of rows) {
+				expect(row.classList.contains('block')).toBe(true);
+			}
+		} finally {
+			mounted.unmount();
+		}
+	});
+
 	it('tracks animated text independently for sibling streaming blocks', () => {
 		const props = {
 			animated: { duration: 150, sep: 'word', stagger: 0 },

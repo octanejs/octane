@@ -13,9 +13,8 @@ type CodeBlockBodyProps =
 		lineNumbers?: boolean;
 	};
 
-// Base line numbers class string (merged without prefix for memoization)
+// Line-number pseudo-element classes (merged without prefix for memoization).
 const LINE_NUMBER_CLASSES_BASE = baseCn(
-	'block',
 	'before:content-[counter(line)]',
 	'before:inline-block',
 	'before:[counter-increment:line]',
@@ -59,8 +58,11 @@ export const CodeBlockBody = memo(
 	}: CodeBlockBodyProps) => {
 		const cn = useCn();
 
-		// Prefix the pre-computed line number classes
-		const lineNumberClasses = useMemo(() => cn(LINE_NUMBER_CLASSES_BASE), [cn]);
+		// Code rows are always block-level; line-number pseudo-elements are optional.
+		const lineClasses = useMemo(() => cn('block', lineNumbers && LINE_NUMBER_CLASSES_BASE), [
+			cn,
+			lineNumbers,
+		]);
 
 		// Use CSS custom properties instead of direct inline styles so that
 		// dark-mode Tailwind classes can override without !important.
@@ -109,7 +111,7 @@ export const CodeBlockBody = memo(
 						: undefined}
 				>{result.tokens.map(
 					(row, index) => <span
-						className={lineNumbers ? lineNumberClasses : undefined}
+						className={lineClasses}
 						// biome-ignore lint/suspicious/noArrayIndexKey: "This is a stable key."
 						key={index}
 					>
