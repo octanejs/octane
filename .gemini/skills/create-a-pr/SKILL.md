@@ -28,7 +28,15 @@ Use this when asked to prepare a branch and pull request for an Octane change.
 
 ## Validation checklist
 
-Run the smallest meaningful set and record results:
+During iteration, format or check one or more changed files/directories without
+scanning the repository:
+
+```bash
+pnpm format:files <path...>
+pnpm format:files:check <path...>
+```
+
+Then run the smallest meaningful final set and record results:
 
 ```bash
 pnpm format:check
