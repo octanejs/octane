@@ -485,6 +485,13 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			'Octane Lynx main-thread receiver requires ContextProxy dispatchEvent/addEventListener/removeEventListener.',
 		);
 	}
+	// The native main thread exposes SystemInfo only as `lynx.SystemInfo`, but
+	// authored `'main thread'` functions read the documented bare global; expose
+	// it exactly as ReactLynx's worklet environment setup does.
+	const environmentTarget = target as { SystemInfo?: unknown; lynx?: { SystemInfo?: unknown } };
+	if (environmentTarget.SystemInfo === undefined) {
+		environmentTarget.SystemInfo = environmentTarget.lynx?.SystemInfo ?? {};
+	}
 	const papi: LynxElementPAPI<Node> = createLynxElementPAPI<Node>(rawTarget);
 	const componentId = options.componentId ?? '0';
 	if (typeof componentId !== 'string' || componentId.length === 0) {
