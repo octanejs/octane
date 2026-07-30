@@ -118,6 +118,8 @@ catalogs:
     '@apollo/client': 4.2.6
     dexie: 4.4.4
     fake-indexeddb: 6.2.5
+    viem: 2.55.10
+    wagmi: 3.7.4
     '@graphql-typed-document-node/core': ^3.2.0
     '@lucide/icons': 1.24.0
     '@babel/core': 7.29.7
@@ -193,6 +195,8 @@ catalogs:
     '@tanstack/store': ^0.9.3
     '@tanstack/table-core': 8.21.3
     '@tanstack/virtual-core': 3.17.3
+    '@wagmi/connectors': 8.0.25
+    '@wagmi/core': 3.6.4
     '@tauri-apps/api': 2.11.1
     '@tauri-apps/cli': 2.11.4
     '@testing-library/dom': ^10.4.1

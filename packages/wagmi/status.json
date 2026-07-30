@@ -1,0 +1,46 @@
+{
+  "upstream": {
+    "package": "wagmi",
+    "version": "3.7.4"
+  },
+  "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
+  "divergences": [
+    "The binding targets Wagmi v3 names. Deprecated v2 useAccount/useSwitchAccount aliases and hooks outside the documented representative inventory are not exported.",
+    "Privileged mutation hooks force retry:false, require a current live connector, cancel before dispatch when the displayed wallet context changed, and quarantine a late success as ActionContextChangedError when account, chain, or connector changed after dispatch.",
+    "RainbowKit 2.2.x declares Wagmi v2 peers. Its defining provider/custom-button/modal contracts can be implemented over this v3 surface, proven by the deterministic disconnected-to-connecting-to-connected gate, but the downstream binding must document that peer-range divergence.",
+    "The connectors subpath exposes the dependency-free injected and deterministic mock connectors. Vendor connectors and their optional SDKs remain direct application dependencies.",
+    "EIP-1193 event validation, duplicate coalescing, and connector-generation invalidation are delegated unchanged to @wagmi/core 3.6.4. This binding does not add a second provider-event layer or claim independent normalization behavior."
+  ],
+  "ssr": "WagmiProvider supports ssr:true and initialState through @wagmi/core hydrate. parseHydratedState accepts only a versioned, 16 KiB-bounded public-state hint and rejects malformed or privileged material; a hydrated connection is never authority for signing or submission.",
+  "verified": "2026-07-29",
+  "provenance": {
+    "source": "https://github.com/wevm/wagmi",
+    "license": "MIT"
+  },
+  "supportedExports": [
+    "createConfig",
+    "WagmiProvider",
+    "useConfig",
+    "useConnection",
+    "useConnect",
+    "useDisconnect",
+    "useSwitchConnection",
+    "useSwitchChain",
+    "useConnectors",
+    "useConnections",
+    "useChains",
+    "useBalance",
+    "useReadContract",
+    "useSimulateContract",
+    "useWriteContract",
+    "useSendTransaction",
+    "useWaitForTransactionReceipt",
+    "useSignMessage"
+  ],
+  "unsupported": [
+    "deprecated Wagmi v2 aliases",
+    "connector-specific React UI",
+    "all Wagmi hooks not named in supportedExports",
+    "automatic signing or submission retry"
+  ]
+}

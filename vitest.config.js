@@ -1193,6 +1193,27 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'wagmi',
+					include: ['packages/wagmi/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/wagmi$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wagmi\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-query',
 					include: ['packages/tanstack-query/tests/**/*.test.ts'],
 					environment: 'jsdom',

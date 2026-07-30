@@ -176,6 +176,37 @@ pre.boom {
 	font-family: ui-monospace, Menlo, monospace;
 	font-size: 12px;
 }
+.metrics-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 8px;
+	margin: 0 0 16px;
+}
+.metrics-grid > div {
+	min-width: 0;
+	padding: 10px;
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.6);
+	background: var(--background);
+}
+.metrics-grid dt {
+	color: var(--muted-foreground);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.metrics-grid dd {
+	margin: 4px 0 0;
+	font-weight: 600;
+}
+.metric-address {
+	overflow: hidden;
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .panel + .panel {
 	margin-top: 12px;
 }
