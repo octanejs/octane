@@ -15,7 +15,8 @@ const LIGHTWEIGHT_PATHS = [
 	/^\.gemini\//,
 	/^\.rulesync\//,
 	/^\.vscode\//,
-	/^\.github\/(?!workflows\/ci\.yml$)/,
+	/^\.github\//,
+	/^scripts\/(?:classify-ci-change(?:\.test)?|ci-workflow\.test)\.mjs$/,
 	/^(?:AGENTS|CLAUDE|GEMINI)\.md$/,
 	/^(?:CODE_OF_CONDUCT|CONTRIBUTING|LICENSE|README|SECURITY)(?:\.md)?$/,
 ];
@@ -44,9 +45,10 @@ function rootPackageChangeIsLightweight(before, after) {
 	for (const script of changedScripts) {
 		if (beforeScripts[script] === afterScripts[script]) continue;
 
-		// A newly added, explicitly-invoked formatter helper cannot affect an
-		// install, build, typecheck, or test. Existing commands remain
-		// conservative because changing one may alter a CI entry point.
+		// These commands are exercised by the universal lint job and cannot
+		// affect shipped code. Other existing commands remain conservative
+		// because changing one may alter a product CI entry point.
+		if (script === 'ci:workflow:test') continue;
 		const isNewFormatterHelper =
 			!own(beforeScripts, script) && own(afterScripts, script) && script.startsWith('format:');
 		if (!isNewFormatterHelper) return false;

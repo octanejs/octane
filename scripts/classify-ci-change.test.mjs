@@ -25,10 +25,34 @@ describe('classifyCiChange', () => {
 		assert.equal(classify(['benchmarks/baselines/local/dbmon.json']), false);
 	});
 
-	test('runs full CI when any executable or workflow-owned file changes', () => {
+	test('runs full CI when any executable file changes', () => {
 		assert.equal(classify(['docs/ssr.md', 'packages/octane/src/runtime.ts']), true);
-		assert.equal(classify(['.github/workflows/ci.yml']), true);
 		assert.equal(classify([]), true);
+	});
+
+	test('keeps the CI control-plane bundle on the lightweight path', () => {
+		const after = structuredClone(rootPackage);
+		after.scripts['ci:workflow:test'] =
+			'node --test scripts/classify-ci-change.test.mjs scripts/ci-workflow.test.mjs';
+
+		assert.equal(
+			classify(
+				[
+					'.github/workflows/ci.yml',
+					'.github/workflows/publish.yml',
+					'scripts/classify-ci-change.mjs',
+					'scripts/classify-ci-change.test.mjs',
+					'scripts/ci-workflow.test.mjs',
+					'README.md',
+					'.rulesync/rules/project.md',
+					'AGENTS.md',
+					'package.json',
+				],
+				rootPackage,
+				after,
+			),
+			false,
+		);
 	});
 
 	test('treats a newly added formatter helper as isolated developer tooling', () => {
@@ -46,5 +70,9 @@ describe('classifyCiChange', () => {
 		const changedDependency = structuredClone(rootPackage);
 		changedDependency.devDependencies.vitest = 'next';
 		assert.equal(classify(['package.json'], rootPackage, changedDependency), true);
+
+		const unknownScript = structuredClone(rootPackage);
+		unknownScript.scripts['ci:other'] = 'node scripts/other.mjs';
+		assert.equal(classify(['package.json'], rootPackage, unknownScript), true);
 	});
 });
