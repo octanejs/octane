@@ -14,6 +14,7 @@ import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
 import { MobxDemo } from './demos/Mobx.tsrx';
 import { PhosphorIconsDemo } from './demos/PhosphorIcons.tsrx';
+import { RxJSDemo } from './demos/RxJS.tsrx';
 import { RainbowKitDemo } from './demos/RainbowKit.tsrx';
 import { ShadcnDemo } from './demos/Shadcn.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
@@ -30,6 +31,7 @@ import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
 import mobxSource from './demos/Mobx.tsrx?raw';
 import phosphorIconsSource from './demos/PhosphorIcons.tsrx?raw';
+import rxjsSource from './demos/RxJS.tsrx?raw';
 import rainbowKitSource from './demos/RainbowKit.tsrx?raw';
 import shadcnSource from './demos/Shadcn.tsrx?raw';
 import suspenseSource from './demos/Suspense.tsrx?raw';
@@ -114,6 +116,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Phosphor Icons',
 				Component: PhosphorIconsDemo,
 				source: phosphorIconsSource,
+			},
+			{
+				id: 'rxjs',
+				title: 'RxJS',
+				Component: RxJSDemo,
+				source: rxjsSource,
 			},
 			{
 				id: 'wagmi',

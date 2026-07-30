@@ -367,6 +367,22 @@
       "verified": "2026-07-13"
     },
     {
+      "name": "@octanejs/rxjs",
+      "version": "0.1.0",
+      "category": "Shared state",
+      "upstream": {
+        "package": "@react-rxjs/core + @react-rxjs/utils",
+        "version": "0.10.8 / 0.9.7"
+      },
+      "surface": "Core bind/state/Subscribe APIs and the complete @react-rxjs/utils surface.",
+      "divergences": [
+        "StateObservable values are not JSX nodes; render them through useStateObservable or bind.",
+        "@react-rxjs/dom is omitted because octane batches updates without ReactDOM.unstable_batchedUpdates."
+      ],
+      "ssr": "useSyncExternalStore supplies the state snapshot during server rendering; browser-only ReactDOM batching helpers are intentionally absent.",
+      "verified": "2026-07-30"
+    },
+    {
       "name": "@octanejs/shadcn",
       "version": "0.0.6",
       "category": "UI and interaction",
@@ -737,6 +753,8 @@
     "@mdx-js/react": "@octanejs/mdx",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
     "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
+    "@react-rxjs/core": "@octanejs/rxjs",
+    "@react-rxjs/utils": "@octanejs/rxjs",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",
     "@stylexjs/stylex": "@octanejs/stylex",

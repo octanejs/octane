@@ -456,6 +456,27 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'rxjs',
+					include: ['packages/rxjs/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/rxjs$/,
+							replacement: resolve(import.meta.dirname, 'packages/rxjs/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/rxjs\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/rxjs/src/utils/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'valtio',
 					include: ['packages/valtio/tests/**/*.test.ts'],
 					environment: 'jsdom',

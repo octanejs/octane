@@ -165,6 +165,12 @@ catalogs:
     '@preact/preset-vite':
       specifier: ^2.10.6
       version: 2.10.6
+    '@react-rxjs/core':
+      specifier: 0.10.8
+      version: 0.10.8
+    '@react-rxjs/utils':
+      specifier: 0.9.7
+      version: 0.9.7
     '@react-spring/web':
       specifier: ^10.1.2
       version: 10.1.2
@@ -189,6 +195,9 @@ catalogs:
     '@rspack/core':
       specifier: ^2.1.4
       version: 2.1.4
+    '@rx-state/core':
+      specifier: 0.1.4
+      version: 0.1.4
     '@shikijs/rehype':
       specifier: ^3.23.0
       version: 3.23.0
@@ -4876,6 +4885,40 @@ importers:
         specifier: catalog:default
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
+  packages/rxjs:
+    dependencies:
+      '@rx-state/core':
+        specifier: catalog:default
+        version: 0.1.4(rxjs@7.8.2)
+    devDependencies:
+      '@react-rxjs/core':
+        specifier: catalog:default
+        version: 0.10.8(react@19.2.7)(rxjs@7.8.2)
+      '@react-rxjs/utils':
+        specifier: catalog:default
+        version: 0.9.7(@react-rxjs/core@0.10.8(react@19.2.7)(rxjs@7.8.2))(react@19.2.7)(rxjs@7.8.2)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.56(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      rxjs:
+        specifier: catalog:default
+        version: 7.8.2
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/seo:
     devDependencies:
       octane:
@@ -5914,6 +5957,9 @@ importers:
       '@octanejs/react-error-boundary':
         specifier: workspace:*
         version: link:../../packages/react-error-boundary
+      '@octanejs/rxjs':
+        specifier: workspace:*
+        version: link:../../packages/rxjs
       '@octanejs/sonner':
         specifier: workspace:*
         version: link:../../packages/sonner
@@ -5938,6 +5984,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
+      rxjs:
+        specifier: catalog:default
+        version: 7.8.2
       tailwind-merge:
         specifier: catalog:default
         version: 3.6.0
@@ -9585,6 +9634,19 @@ packages:
   '@radix-ui/rect@1.1.2':
     resolution: {integrity: sha512-xnXE7wG13PI+cxieVssYXlQJuYVRhH9NBoxt3KNwzghDIA69GMm7d4wXRouHIYjE+KvS6U/MsMO73NdS2MH9ZA==}
 
+  '@react-rxjs/core@0.10.8':
+    resolution: {integrity: sha512-vCA7dDpJ7whvBJCerCqY5wvrPnIo4EvxYihQNuDy0u0OhN4kYafs2H755sMLeUXBwSihiskd9Z3v8SHpmcEdzQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      rxjs: '>=7'
+
+  '@react-rxjs/utils@0.9.7':
+    resolution: {integrity: sha512-m9CUTdRsglObvUAlYfB24QvN+QH4XqCGEKnCdSILIeOx7mMqSi9TTFp2zrj5XqtMiLnj4ReAdDxrXegLPB73bQ==}
+    peerDependencies:
+      '@react-rxjs/core': '>=0.1.0'
+      react: '>=16.8.0'
+      rxjs: '>=6'
+
   '@react-spring/animated@10.1.2':
     resolution: {integrity: sha512-yAsQ/bbp6+vko7WNCI1M00c6KLE9XKTGCrgRhQqS4JcK3oF5qBV4rHYrQEprvEvYXxt+1H5FsLS2eVValEPfFw==}
     peerDependencies:
@@ -10183,6 +10245,11 @@ packages:
 
   '@rspack/resolver@0.2.8':
     resolution: {integrity: sha512-FBWqdHhzS8mcf/WN4Ktzr7EaeaN+hsxbN98EweegX3924beZuY6H70CSFWCv1fIHAieCUv/9XCjKggHvhCsLwA==}
+
+  '@rx-state/core@0.1.4':
+    resolution: {integrity: sha512-Z+3hjU2xh1HisLxt+W5hlYX/eGSDaXXP+ns82gq/PLZpkXLu0uwcNUh9RLY3Clq4zT+hSsA3vcpIGt6+UAb8rQ==}
+    peerDependencies:
+      rxjs: '>=7'
 
   '@scure/base@1.2.6':
     resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
@@ -24207,6 +24274,19 @@ snapshots:
 
   '@radix-ui/rect@1.1.2': {}
 
+  '@react-rxjs/core@0.10.8(react@19.2.7)(rxjs@7.8.2)':
+    dependencies:
+      '@rx-state/core': 0.1.4(rxjs@7.8.2)
+      react: 19.2.7
+      rxjs: 7.8.2
+      use-sync-external-store: 1.6.0(react@19.2.7)
+
+  '@react-rxjs/utils@0.9.7(@react-rxjs/core@0.10.8(react@19.2.7)(rxjs@7.8.2))(react@19.2.7)(rxjs@7.8.2)':
+    dependencies:
+      '@react-rxjs/core': 0.10.8(react@19.2.7)(rxjs@7.8.2)
+      react: 19.2.7
+      rxjs: 7.8.2
+
   '@react-spring/animated@10.1.2(react@19.2.7)':
     dependencies:
       '@react-spring/shared': 10.1.2(react@19.2.7)
@@ -24802,6 +24882,10 @@ snapshots:
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
+
+  '@rx-state/core@0.1.4(rxjs@7.8.2)':
+    dependencies:
+      rxjs: 7.8.2
 
   '@scure/base@1.2.6': {}
 
