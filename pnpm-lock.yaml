@@ -5841,24 +5841,33 @@ importers:
       '@octanejs/lucide':
         specifier: workspace:*
         version: link:../../packages/lucide
+      '@octanejs/mantine-hooks':
+        specifier: workspace:*
+        version: link:../../packages/mantine-hooks
+      '@octanejs/mobx':
+        specifier: workspace:*
+        version: link:../../packages/mobx
       '@octanejs/phosphor-icons':
         specifier: workspace:*
         version: link:../../packages/phosphor-icons
       '@octanejs/radix':
         specifier: workspace:*
         version: link:../../packages/radix
+      '@octanejs/react-error-boundary':
+        specifier: workspace:*
+        version: link:../../packages/react-error-boundary
       '@octanejs/sonner':
         specifier: workspace:*
         version: link:../../packages/sonner
       '@octanejs/tanstack-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-query
-      '@octanejs/wagmi':
-        specifier: workspace:*
-        version: link:../../packages/wagmi
       '@octanejs/usehooks-ts':
         specifier: workspace:*
         version: link:../../packages/usehooks-ts
+      '@octanejs/wagmi':
+        specifier: workspace:*
+        version: link:../../packages/wagmi
       class-variance-authority:
         specifier: catalog:default
         version: 0.7.1

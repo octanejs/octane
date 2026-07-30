@@ -17,8 +17,11 @@
   "dependencies": {
     "@octanejs/cmdk": "workspace:*",
     "@octanejs/lucide": "workspace:*",
+    "@octanejs/mantine-hooks": "workspace:*",
+    "@octanejs/mobx": "workspace:*",
     "@octanejs/phosphor-icons": "workspace:*",
     "@octanejs/radix": "workspace:*",
+    "@octanejs/react-error-boundary": "workspace:*",
     "@octanejs/sonner": "workspace:*",
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/wagmi": "workspace:*",
