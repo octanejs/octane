@@ -27,11 +27,22 @@ export function IconBase(props: IconBaseProps) {
 		...contextRest,
 		...rest,
 		ref,
+		// Everything below shares ONE array child, so each entry needs a key or
+		// octane reconciles it by position and warns. Upstream never hits this:
+		// its `weights` map holds a single ReactElement per weight, while this
+		// port stores `[tag, attributes]` tuples so the generated icons stay
+		// tree-shakeable — which makes the keys this package's job.
+		//
+		// The primitives of a weight are a fixed, never-reordered sequence, so the
+		// index is their stable identity. Pairing it with the tag means switching
+		// weight reuses a node when the element type matches at that position and
+		// replaces it when it does not, instead of patching a <path> into a
+		// <circle>.
 		children: [
-			...(alt ? [createElement('title', { children: alt })] : []),
+			...(alt ? [createElement('title', { key: 'title', children: alt })] : []),
 			...(Array.isArray(children) ? children : children == null ? [] : [children]),
-			...weights[weight ?? contextWeight].map(([tag, attributes]) =>
-				createElement(tag, attributes),
+			...weights[weight ?? contextWeight].map(([tag, attributes], index) =>
+				createElement(tag, { key: `${tag}-${index}`, ...attributes }),
 			),
 		],
 	});

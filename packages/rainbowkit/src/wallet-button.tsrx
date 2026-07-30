@@ -35,10 +35,16 @@ export function WalletButton(props: WalletButtonProps) {
 			? props.children({ ready, connect, error: mutation.error })
 			: props.children;
 	}
+	// Returning an ARRAY makes these a keyed list to octane's reconciler, so both
+	// slots need keys or it matches them by position and warns. They are two fixed
+	// roles — the control, and an error that comes and goes beneath it — so the
+	// role name IS the stable identity: the button keeps its DOM node (and focus)
+	// when the error appears or clears, instead of being matched against the <p>.
 	return [
 		createElement(
 			'button',
 			{
+				key: 'wallet-button',
 				type: 'button',
 				className: 'rk-wallet-button',
 				disabled: !ready || context?.connecting || mutation.isPending,
@@ -49,7 +55,7 @@ export function WalletButton(props: WalletButtonProps) {
 		mutation.error
 			? createElement(
 					'p',
-					{ role: 'alert', className: 'rk-wallet-error' },
+					{ key: 'wallet-error', role: 'alert', className: 'rk-wallet-error' },
 					mutation.error instanceof Error ? mutation.error.message : 'The wallet request failed.',
 				)
 			: null,

@@ -1131,3 +1131,26 @@ describe('RainbowKit Wagmi v3 compatibility gate', () => {
 		expect(document.querySelector('[role="dialog"]')).toBeNull();
 	});
 });
+
+// WalletButton returns an ARRAY (the control plus an optional error), which
+// octane reconciles as a keyed list. Unkeyed, it warns on every render and
+// matches the button against the error node by position — so the control can
+// lose its DOM identity, and its focus, the moment an error appears.
+describe('@octanejs/rainbowkit — WalletButton array children', () => {
+	it('renders without octane key warnings', () => {
+		const seen: string[] = [];
+		const original = console.warn;
+		console.warn = (...args: unknown[]) => {
+			seen.push(args.map(String).join(' '));
+		};
+		try {
+			setup([{ id: 'mock', name: 'Playground wallet' }]);
+			mounted!.click('#custom-connect');
+			flushEffects();
+			flushSync(() => {});
+		} finally {
+			console.warn = original;
+		}
+		expect(seen.filter((w) => w.includes('unique "key"'))).toEqual([]);
+	});
+});
