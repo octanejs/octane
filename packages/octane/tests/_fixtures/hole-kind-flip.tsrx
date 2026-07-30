@@ -14,3 +14,18 @@ export function HoleKindRoundTrip() @{
 		</div>
 	</div>
 }
+
+function Replacement() @{
+	<strong id="replacement">{'component'}</strong>
+}
+
+export function ArrayToComponentHole() @{
+	const [showComponent, setShowComponent] = useState(false);
+	const rows = showComponent ? null : ['a', 'b'];
+	const content =
+		rows === null ? <Replacement /> : rows.map((id) => <i key={id}>{id as string}</i>);
+	<div>
+		<button id="show-component" onClick={() => setShowComponent(true)}>{'show'}</button>
+		<div id="component-host">{content}</div>
+	</div>
+}

@@ -15717,6 +15717,10 @@ function clearChildContent(state: ChildSlot): void {
 			host.removeChild(n);
 			n = next;
 		}
+		// The owned sweep also removed any lazily minted ForSlot markers. Drop
+		// their detached refs before another content kind uses them as anchors.
+		state.start = null;
+		state.end = null;
 	} else if (state.start !== null) {
 		// Component (or hydrated) range: sweep everything between the markers —
 		// covers a multi-node component body as well as any leftover text node.
