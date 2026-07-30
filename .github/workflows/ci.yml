@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
 
 concurrency:
   # Only the newest state of a pull request or main can still ship.
@@ -22,6 +23,9 @@ env:
 jobs:
   release_change:
     name: classify changeset release
+    # GitHub still emits workflow events while a pull request is a draft. Keep
+    # every job behind this guard so those events consume no runner time.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -392,7 +396,7 @@ jobs:
     # generates its metadata-only release commit. Keep the post-merge CI run
     # (publishing waits for it), but do not repeat the full suite once the merge
     # has been authenticated above.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -456,7 +460,7 @@ jobs:
     needs: [release_change, test_shard, website_e2e, heavy_integration]
     # The release PR does not need test contexts. The post-merge release run does:
     # publish.yml verifies these stable aggregate names before publishing.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -488,7 +492,7 @@ jobs:
     needs: release_change
     # Same authenticated-release skip as the shards above: a metadata-only
     # Changesets merge has already passed this on its parent commit.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -531,7 +535,7 @@ jobs:
     needs: release_change
     # Run build and browser coverage once on the newest supported Node. The
     # ordinary suite still runs on both Node 22 and 24 above.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -583,7 +587,7 @@ jobs:
     needs: release_change
     # A skipped job reports success, including when it is a required check. The
     # classifier only takes this path for the exact bot-owned metadata commit.
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -729,7 +733,7 @@ jobs:
   typecheck:
     name: typecheck
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -757,7 +761,7 @@ jobs:
   example_shard:
     name: example apps (${{ matrix.shard }})
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -796,7 +800,7 @@ jobs:
   examples:
     name: examples
     needs: [release_change, example_shard]
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -814,7 +818,7 @@ jobs:
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
     # This matrix intentionally rewrites one importer without changing the
     # repository lockfile after the frozen base install.
@@ -876,7 +880,7 @@ jobs:
   lynx_compat:
     name: Lynx compatibility (${{ matrix.lane }})
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -916,7 +920,7 @@ jobs:
   package:
     name: validate publishable packages
     needs: release_change
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -954,7 +958,7 @@ jobs:
   provenance:
     name: CI provenance
     needs: [release_change, test, lint, typecheck, examples, three_compat, lynx_compat, package]
-    if: ${{ always() && !cancelled() && needs.release_change.outputs.is_release_pr != 'true' }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
     steps:

@@ -89,10 +89,11 @@ Open every PR as a draft and stop there. Nothing has run against the pushed diff
 yet, and the draft state is what says so. Marking it ready for review is the
 maintainer's job, and so is merging. Report the PR URL and end the task.
 
-Do not sit on `gh pr checks --watch` either. CI registers from the `pull_request`
-event a moment after the PR exists, so a watch started right away often finds an
-empty Checks API and exits non-zero, which reads as a failed suite when nothing
-has started yet. The maintainer reads the run on the PR.
+Do not sit on `gh pr checks --watch` either. Repository CI intentionally skips
+every job while the pull request is a draft and starts on the
+`ready_for_review` event. Cursor Bugbot still reviews every pull request,
+including drafts, outside Actions, so people can watch and respond to its issue
+comments before making a draft ready. Vercel may also report separately.
 
 `.github/workflows/draft-agent-prs.yml` converts an `agent-authored` PR that was
 opened outside draft back into a draft, so a forgotten `--draft` costs a round
