@@ -75,10 +75,34 @@ git add <files>
 git commit -m "<type>: <summary>"
 git push -u origin <branch>
 gh pr create --fill
+gh pr edit <number> --add-label <type> --add-label agent-authored
 ```
 
 If using `gh pr create --body-file`, write the PR body to a temp file and pass it explicitly.
 
+Label after the PR exists rather than with `gh pr create --label`, so a rejected
+label cannot cost you the PR. An outside contributor's token has no rights to
+label at all; when the edit fails, leave the PR open and name the intended labels
+in the final response.
+
+## Labels
+
+Every PR carries exactly one type label. Every PR whose diff an agent produced
+also carries `agent-authored`.
+
+- Type: the conventional-commit type already in the PR title, one of `feat`,
+  `fix`, `docs`, `test`, `perf`, `refactor`, `chore`, `ci`. A `feat(lynx): …`
+  title takes `feat`. Never apply two.
+- `agent-authored`: apply whenever an agent wrote the change, no matter which
+  account pushes it. The author field cannot show this, because an agent commits
+  under the human's credentials, so the label is the only signal that separates
+  human PRs from agent PRs. Absence of the label asserts a human wrote the diff:
+  never drop it to make a PR read as hand-written. Humans add nothing, and
+  `-label:agent-authored` is the human-authored filter.
+- `bug` and `enhancement` belong to issues. Do not put them on a PR.
+- Do not invent labels. `gh label list` is the full set; adding a type means
+  creating the label in the repo first.
+
 ## Final response
 
-Return PR URL, branch, commit summary, and validation evidence.
+Return PR URL, branch, commit summary, labels applied, and validation evidence.

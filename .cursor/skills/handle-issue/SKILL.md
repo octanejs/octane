@@ -70,3 +70,8 @@ Notes:
 8. **Labels/comments**
    - Use `gh issue edit`/`gh issue comment` only when asked or when operating autonomously with permission.
    - Do not close issues without maintainer instruction unless explicitly authorized.
+   - Classify issues with the existing `bug`/`enhancement`/`documentation`/`question` set. The
+     `feat`/`fix`/`docs`/`test`/`perf`/`refactor`/`chore`/`ci` type labels are for PRs.
+   - Add `agent-authored` to an issue an agent filed. When an agent only comments on someone
+     else's issue, say so in the comment rather than relabelling their issue.
+   - A PR that closes the issue is labelled by `create-a-pr`, not here.
