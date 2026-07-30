@@ -17,6 +17,7 @@
   "dependencies": {
     "@octanejs/cmdk": "workspace:*",
     "@octanejs/lucide": "workspace:*",
+    "@octanejs/phosphor-icons": "workspace:*",
     "@octanejs/radix": "workspace:*",
     "@octanejs/sonner": "workspace:*",
     "@octanejs/tanstack-query": "workspace:*",

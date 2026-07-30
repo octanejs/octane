@@ -708,6 +708,9 @@ jobs:
       - name: Check Lucide generated sources are current
         run: pnpm lucide:generate:check
 
+      - name: Check Phosphor Icons generated sources are current
+        run: pnpm phosphor-icons:generate:check
+
       # The shadcn registry is what the upstream CLI installs from, and it
       # embeds the sibling versions its components need. Regenerating happens at
       # `changeset:version` too, so this catches a source edit that never ran

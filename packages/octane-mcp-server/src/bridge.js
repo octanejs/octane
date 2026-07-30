@@ -37,6 +37,7 @@ export const KNOWN_BINDINGS = {
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
+	'@phosphor-icons/react': '@octanejs/phosphor-icons',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'react-aria': '@octanejs/aria',
 	'react-aria-components': '@octanejs/aria',

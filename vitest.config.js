@@ -1699,6 +1699,55 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'phosphor-icons',
+					include: [
+						'packages/phosphor-icons/tests/**/*.test.ts',
+						'!packages/phosphor-icons/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/phosphor-icons$/,
+							replacement: resolve(import.meta.dirname, 'packages/phosphor-icons/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/phosphor-icons\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/phosphor-icons/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'phosphor-icons-ssr',
+					include: ['packages/phosphor-icons/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/phosphor-icons$/,
+							replacement: resolve(import.meta.dirname, 'packages/phosphor-icons/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/phosphor-icons\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/phosphor-icons/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-router',
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
 					environment: 'jsdom',
