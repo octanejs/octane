@@ -32,6 +32,12 @@ jobs:
       - name: Convert an agent-authored pull request back to draft
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
+          # Draft state is not repository content, so the job stays off
+          # `contents`. GITHUB_TOKEN has been reported to answer draft mutations
+          # with "Resource not accessible by integration" (actions/toolkit#1165)
+          # and GraphQL publishes no permission table to check that against, so
+          # an app or PAT secret takes over wherever the repository defines one.
+          github-token: ${{ secrets.DRAFT_PR_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const number = context.payload.pull_request.number;

@@ -202,5 +202,12 @@ describe('Agent pull request draft policy', () => {
 		assert.match(draftWorkflow, /^ {6}issues: read$/m);
 		assert.match(draftWorkflow, /contains\(github\.event\.pull_request\.labels\.\*\.name/);
 		assert.doesNotMatch(draftWorkflow, /actions\/checkout/);
+		// Converting to draft changes no repository content, and the fallback
+		// secret is the answer to a token that cannot run the mutation.
+		assert.doesNotMatch(draftWorkflow, /contents: write/);
+		assert.match(
+			draftWorkflow,
+			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
+		);
 	});
 });
