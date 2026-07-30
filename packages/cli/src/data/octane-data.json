@@ -623,6 +623,24 @@
       "verified": "2026-07-17"
     },
     {
+      "name": "@octanejs/usehooks-ts",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "usehooks-ts",
+        "version": "3.1.1",
+        "source": "https://github.com/juliencrn/usehooks-ts/tree/v3.1.1",
+        "license": "MIT"
+      },
+      "surface": "First host-safe cohort: useBoolean, useCounter, useToggle, useMap, useStep, useDebounceCallback, useDebounceValue, useInterval, useTimeout, useIsMounted, and useUnmount.",
+      "divergences": [
+        "Only the listed pure, timing, and lifecycle hooks are exported; browser storage/media hooks and DOM observer/direct-element hooks are deliberately absent.",
+        "Public setter types are structurally equivalent to React Dispatch/SetStateAction without importing React types."
+      ],
+      "ssr": "Supported for the listed cohort. Effects and timers do not run during server rendering; hydration activates lifecycle and timing work without requiring browser reads during render.",
+      "verified": "2026-07-29"
+    },
+    {
       "name": "@octanejs/valtio",
       "version": "0.1.3",
       "category": "Shared state",
@@ -759,6 +777,7 @@
     "shadcn": "@octanejs/shadcn",
     "sonner": "@octanejs/sonner",
     "styled-components": "@octanejs/styled-components",
+    "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",
     "zustand": "@octanejs/zustand"
   },

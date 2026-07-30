@@ -12,6 +12,7 @@ import { Inputs } from './demos/Inputs.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
 import { ShadcnDemo } from './demos/Shadcn.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
+import { UseHooksTsDemo } from './demos/UseHooksTs.tsrx';
 
 import commandMenuSource from './demos/CommandMenu.tsrx?raw';
 import conditionalSource from './demos/Conditional.tsrx?raw';
@@ -21,6 +22,7 @@ import inputsSource from './demos/Inputs.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
 import shadcnSource from './demos/Shadcn.tsrx?raw';
 import suspenseSource from './demos/Suspense.tsrx?raw';
+import useHooksTsSource from './demos/UseHooksTs.tsrx?raw';
 
 export interface Demo {
 	/** Stable id — also the URL route, so renaming one breaks shared links. */
@@ -94,6 +96,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'shadcn/ui',
 				Component: ShadcnDemo,
 				source: shadcnSource,
+			},
+			{
+				id: 'usehooks-ts',
+				title: 'usehooks-ts',
+				Component: UseHooksTsDemo,
+				source: useHooksTsSource,
 			},
 		],
 	},

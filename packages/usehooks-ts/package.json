@@ -1,0 +1,56 @@
+{
+  "name": "@octanejs/usehooks-ts",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Evidence-scoped usehooks-ts bindings for Octane.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/usehooks-ts"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project usehooks-ts --project usehooks-ts-ssr",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "dependencies": {
+    "lodash.debounce": "4.0.8"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/lodash.debounce": "4.0.9",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "usehooks-ts": "3.1.1",
+    "vitest": "catalog:default"
+  }
+}

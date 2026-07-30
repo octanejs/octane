@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 // expected union from the workspace manifests, so publishing a new binding
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
+	'usehooks-ts': '@octanejs/usehooks-ts',
 	zustand: '@octanejs/zustand',
 	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',

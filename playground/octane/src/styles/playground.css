@@ -176,6 +176,9 @@ pre.boom {
 	font-family: ui-monospace, Menlo, monospace;
 	font-size: 12px;
 }
+.panel + .panel {
+	margin-top: 12px;
+}
 
 /* @octanejs/cmdk ships unstyled — it exposes a DOM contract of `cmdk-*`
  * attributes to style against. Ported here from the playground's old inline

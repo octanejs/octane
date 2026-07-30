@@ -695,6 +695,45 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'usehooks-ts',
+					include: ['packages/usehooks-ts/tests/**/*.test.ts'],
+					exclude: ['packages/usehooks-ts/tests/ssr.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/usehooks-ts$/,
+							replacement: resolve(import.meta.dirname, 'packages/usehooks-ts/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'usehooks-ts-ssr',
+					include: ['packages/usehooks-ts/tests/ssr.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/usehooks-ts$/,
+							replacement: resolve(import.meta.dirname, 'packages/usehooks-ts/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-hotkeys',
 					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
 					environment: 'jsdom',

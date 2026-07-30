@@ -42,6 +42,7 @@
       "@octanejs/cmdk",
       "@octanejs/shadcn",
       "@octanejs/lucide",
+      "@octanejs/usehooks-ts",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer"
     ]
