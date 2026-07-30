@@ -83,6 +83,26 @@ function InspectContextAttribute(props: { child: OctaneNode }) {
 	);
 }
 
+function InspectChildrenThenProvide(props: { child: OctaneNode }) {
+	const child = Children.only(props.child) as ElementDescriptor;
+	const inspected = String(child.props.children);
+	return (
+		<ValueContext.Provider value={inspected === 'outer' ? 'inner' : 'unexpected'}>
+			{child}
+		</ValueContext.Provider>
+	);
+}
+
+function InspectRecordThenProvide(props: { child: OctaneNode }) {
+	const child = Children.only(props.child) as ElementDescriptor;
+	const inspected = String(child.props['data-value']);
+	return (
+		<ValueContext.Provider value={inspected === 'outer' ? 'inner' : 'unexpected'}>
+			{child}
+		</ValueContext.Provider>
+	);
+}
+
 function InnerFragmentComponent() {
 	return <strong data-context="fragment-component-tag">inner</strong>;
 }
@@ -194,6 +214,20 @@ export function RootInspectedAttributeContext() {
 			<InspectContextAttribute child={content} />
 		</ValueContext.Provider>
 	);
+}
+
+export function InspectedChildrenProviderContext() {
+	const content = <span data-context="inspected-provider-children">{getterValue.current}</span>;
+	return <InspectChildrenThenProvide child={content} />;
+}
+
+export function InspectedRecordProviderContext() {
+	const content = (
+		<span data-context="inspected-provider-record" data-value={getterValue.current}>
+			attribute
+		</span>
+	);
+	return <InspectRecordThenProvide child={content} />;
 }
 
 export function VariableContext() {
