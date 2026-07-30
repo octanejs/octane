@@ -75,7 +75,7 @@ git checkout -b <branch>
 git add <files>
 git commit -m "<type>: <summary>"
 git push -u origin <branch>
-gh pr create --fill
+gh pr create --draft --fill
 gh pr edit <number> --add-label <type> --add-label agent-authored
 ```
 
@@ -85,6 +85,22 @@ Label after the PR exists rather than with `gh pr create --label`, so a rejected
 label cannot cost you the PR. An outside contributor's token has no rights to
 label at all; when the edit fails, leave the PR open and name the intended labels
 in the final response.
+
+## Leave the PR as a draft
+
+Open every PR as a draft and stop there. Nothing has run against the pushed diff
+yet, and the draft state is what says so. Marking it ready for review is the
+maintainer's job, and so is merging. Report the PR URL and end the task.
+
+Do not sit on `gh pr checks --watch` either. CI registers from the `pull_request`
+event a moment after the PR exists, so a watch started right away often finds an
+empty Checks API and exits non-zero, which reads as a failed suite when nothing
+has started yet. The maintainer reads the run on the PR.
+
+`.github/workflows/draft-agent-prs.yml` converts an `agent-authored` PR that was
+opened outside draft back into a draft, so a forgotten `--draft` costs a round
+trip instead of passing unnoticed. It leaves the PR alone once anyone has marked
+it ready for review, so it never undoes `gh pr ready`.
 
 ## Labels
 
@@ -107,3 +123,4 @@ also carries `agent-authored`.
 ## Final response
 
 Return PR URL, branch, commit summary, labels applied, and validation evidence.
+The PR stays a draft.

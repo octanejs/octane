@@ -7,6 +7,10 @@ import { describe, test } from 'node:test';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
 const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
+const draftWorkflow = readFileSync(
+	path.join(REPO, '.github/workflows/draft-agent-prs.yml'),
+	'utf8',
+);
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function jobSource(job) {
@@ -118,5 +122,92 @@ describe('Publish workflow validation', () => {
 		assert.equal(outputs.get('sha'), run.head_sha);
 		assert.match(publishWorkflow, /successfulJobs\.has\("CI provenance"\)/);
 		assert.match(publishWorkflow, /legacyRequiredJobs/);
+	});
+});
+
+describe('Agent pull request draft policy', () => {
+	function runConversion({ pull, timeline = [] }) {
+		const converted = [];
+		const notices = [];
+		const failures = [];
+		const github = {
+			rest: {
+				pulls: { get: async () => ({ data: pull }) },
+				issues: { listEventsForTimeline: async () => undefined },
+			},
+			paginate: async () => timeline,
+			graphql: async (_query, variables) => {
+				converted.push(variables.id);
+				return {};
+			},
+		};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			stepScript(draftWorkflow, 'Convert an agent-authored pull request back to draft'),
+		);
+
+		return execute(
+			github,
+			{
+				repo: { owner: 'octanejs', repo: 'octane' },
+				payload: { pull_request: { number: pull.number } },
+			},
+			{
+				notice: (message) => notices.push(message),
+				setFailed: (message) => failures.push(message),
+			},
+		).then(() => ({ converted, notices, failures }));
+	}
+
+	const agentPull = {
+		number: 423,
+		node_id: 'PR_node',
+		draft: false,
+		state: 'open',
+		labels: [{ name: 'feat' }, { name: 'agent-authored' }],
+	};
+
+	test('drafts an agent-authored pull request that was opened for review', async () => {
+		const { converted, failures } = await runConversion({ pull: agentPull });
+
+		assert.deepEqual(converted, ['PR_node']);
+		assert.deepEqual(failures, []);
+	});
+
+	test('leaves a pull request alone once it has been marked ready for review', async () => {
+		const { converted, notices } = await runConversion({
+			pull: agentPull,
+			timeline: [{ event: 'labeled' }, { event: 'ready_for_review' }],
+		});
+
+		assert.deepEqual(converted, []);
+		assert.match(notices.join('\n'), /already marked ready for review/);
+	});
+
+	test('ignores a pull request that is already a draft or carries no agent label', async () => {
+		const alreadyDraft = await runConversion({ pull: { ...agentPull, draft: true } });
+		const humanAuthored = await runConversion({
+			pull: { ...agentPull, labels: [{ name: 'feat' }] },
+		});
+
+		assert.deepEqual(alreadyDraft.converted, []);
+		assert.deepEqual(humanAuthored.converted, []);
+	});
+
+	test('runs with a writable token without checking out pull request code', () => {
+		assert.match(draftWorkflow, /on:\n {2}pull_request_target:\n {4}types: \[opened, labeled\]/);
+		assert.match(draftWorkflow, /^ {6}pull-requests: write$/m);
+		assert.match(draftWorkflow, /^ {6}issues: read$/m);
+		assert.match(draftWorkflow, /contains\(github\.event\.pull_request\.labels\.\*\.name/);
+		assert.doesNotMatch(draftWorkflow, /actions\/checkout/);
+		// Converting to draft changes no repository content, and the fallback
+		// secret is the answer to a token that cannot run the mutation.
+		assert.doesNotMatch(draftWorkflow, /contents: write/);
+		assert.match(
+			draftWorkflow,
+			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
+		);
 	});
 });

@@ -1,0 +1,91 @@
+name: Draft agent PRs
+
+# An agent opens its pull request as a draft and labels it afterwards, so the
+# `labeled` event is the one that normally carries the policy. `opened` covers a
+# pull request that already arrives labelled.
+on:
+  pull_request_target:
+    types: [opened, labeled]
+
+concurrency:
+  # Serialize per pull request instead of cancelling: a dropped run would leave
+  # an agent-authored pull request presenting itself as finished work.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  convert:
+    name: convert to draft
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.state == 'open' &&
+      (github.event.action == 'opened' || github.event.label.name == 'agent-authored') &&
+      contains(github.event.pull_request.labels.*.name, 'agent-authored')
+    runs-on: ubuntu-latest
+    # `pull_request_target` is what gives a fork pull request a writable token.
+    # Nothing here checks out or executes the pull request's code.
+    permissions:
+      issues: read
+      pull-requests: write
+
+    steps:
+      - name: Convert an agent-authored pull request back to draft
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          # Draft state is not repository content, so the job stays off
+          # `contents`. GITHUB_TOKEN has been reported to answer draft mutations
+          # with "Resource not accessible by integration" (actions/toolkit#1165)
+          # and GraphQL publishes no permission table to check that against, so
+          # an app or PAT secret takes over wherever the repository defines one.
+          github-token: ${{ secrets.DRAFT_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+
+            // The event payload is a snapshot from before this run was queued.
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            if (pull.draft || pull.state !== "open") {
+              return;
+            }
+            if (!pull.labels.some((label) => label.name === "agent-authored")) {
+              return;
+            }
+
+            // Marking a pull request ready for review is a deliberate act, and
+            // ordinary label edits keep arriving afterwards. Without this the
+            // next label would drag a reviewed pull request back into draft.
+            const timeline = await github.paginate(
+              github.rest.issues.listEventsForTimeline,
+              { owner, repo, issue_number: number, per_page: 100 },
+            );
+            if (timeline.some((event) => event.event === "ready_for_review")) {
+              core.notice(
+                `#${number} was already marked ready for review; leaving it as is.`,
+              );
+              return;
+            }
+
+            try {
+              await github.graphql(
+                `mutation ($id: ID!) {
+                   convertPullRequestToDraft(input: { pullRequestId: $id }) {
+                     clientMutationId
+                   }
+                 }`,
+                { id: pull.node_id },
+              );
+            } catch (error) {
+              core.setFailed(
+                `Could not convert #${number} to a draft: ${error.message}. ` +
+                  "Convert it manually and mark it ready once its checks pass.",
+              );
+              return;
+            }
+
+            core.notice(
+              `Converted #${number} to a draft. Agent-authored pull requests open as drafts and are marked ready once their checks pass.`,
+            );
