@@ -23,6 +23,16 @@ function jobSource(job) {
 	return workflow.slice(start, nextJob === -1 ? undefined : bodyStart + nextJob);
 }
 
+function workflowJobs() {
+	const jobsMarker = '\njobs:\n';
+	const jobsStart = workflow.indexOf(jobsMarker);
+	assert.notEqual(jobsStart, -1, 'missing jobs block');
+
+	return [
+		...workflow.slice(jobsStart + jobsMarker.length).matchAll(/^  ([a-zA-Z][a-zA-Z0-9_]*):$/gm),
+	].map((match) => match[1]);
+}
+
 function stepScript(workflowSource, stepName) {
 	const stepMarker = `      - name: ${stepName}\n`;
 	const stepStart = workflowSource.indexOf(stepMarker);
@@ -42,6 +52,21 @@ function stepScript(workflowSource, stepName) {
 }
 
 describe('CI workflow aggregation', () => {
+	test('runs no jobs for draft pull requests and starts when they become ready', () => {
+		assert.match(
+			workflow,
+			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft\]$/m,
+		);
+
+		const draftGuard =
+			/github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.draft == false/;
+		const jobs = workflowJobs();
+		assert.ok(jobs.length > 0, 'expected CI workflow jobs');
+		for (const job of jobs) {
+			assert.match(jobSource(job), draftGuard, `${job} must not run on a draft pull request`);
+		}
+	});
+
 	test('does not turn a superseded run into failed aggregate checks', () => {
 		for (const job of ['test', 'examples', 'lint', 'provenance']) {
 			assert.match(jobSource(job), /if:.*always\(\).*!\s*cancelled\(\)/);

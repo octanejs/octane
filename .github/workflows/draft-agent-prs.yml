@@ -81,11 +81,11 @@ jobs:
             } catch (error) {
               core.setFailed(
                 `Could not convert #${number} to a draft: ${error.message}. ` +
-                  "Convert it manually and mark it ready once its checks pass.",
+                  "Convert it manually; repository CI starts after a maintainer marks it ready.",
               );
               return;
             }
 
             core.notice(
-              `Converted #${number} to a draft. Agent-authored pull requests open as drafts and are marked ready once their checks pass.`,
+              `Converted #${number} to a draft. Repository CI will start after a maintainer marks it ready for review.`,
             );
