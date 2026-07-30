@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 50 binding package(s).**
+**0 active pin(s) across 51 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -41,6 +41,7 @@ surface and evidence.
 | `@octanejs/redux` | 0 |
 | `@octanejs/redux-toolkit` | 0 |
 | `@octanejs/remix-router` | 0 |
+| `@octanejs/rxjs` | 0 |
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/sonner` | 0 |
 | `@octanejs/styled-components` | 0 |

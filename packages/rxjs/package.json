@@ -1,0 +1,58 @@
+{
+  "name": "@octanejs/rxjs",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "RxJS bindings for the octane renderer, based on React-RxJS.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/rxjs"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./utils": "./src/utils/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rx-state/core": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "rxjs": "catalog:default"
+  },
+  "devDependencies": {
+    "@react-rxjs/core": "catalog:default",
+    "@react-rxjs/utils": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "rxjs": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
