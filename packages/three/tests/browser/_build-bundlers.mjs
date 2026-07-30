@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
 import rspack from '@rspack/core';
@@ -8,20 +8,23 @@ import { pluginOctane } from '@octanejs/rsbuild-plugin';
 import { threeRenderers } from '@octanejs/three/config';
 import { octane } from '@octanejs/vite-plugin';
 import { build as viteBuild } from 'vite';
+import { createStagingRoot, stageFixture } from './_stage-fixture.mjs';
 
 const fixtureRoot = fileURLToPath(new URL('../_fixtures/bundler-app', import.meta.url));
 const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
-const repositoryRoot = resolve(packageRoot, '../..');
-const viteOutput = resolve(fixtureRoot, 'dist-vite');
-const rsbuildOutput = resolve(fixtureRoot, 'dist-rsbuild');
-const rspackOutput = resolve(fixtureRoot, 'dist-rspack');
 
-function linkPackage(name, target) {
-	const destination = resolve(fixtureRoot, 'node_modules', ...name.split('/'));
-	mkdirSync(dirname(destination), { recursive: true });
-	rmSync(destination, { recursive: true, force: true });
-	symlinkSync(target, destination, 'dir');
-}
+// The suite passes the staging directory in so it can remove it even when this
+// helper throws; run standalone, the helper makes its own. Either way the build
+// happens outside the checkout. `@octanejs/three` is the package under test, so
+// it is the one dependency missing from its own installed graph.
+const appRoot = stageFixture(fixtureRoot, process.argv[2] ?? createStagingRoot('three-bundler'), {
+	dependencies: packageRoot,
+	link: { '@octanejs/three': packageRoot },
+});
+
+const viteOutput = resolve(appRoot, 'dist-vite');
+const rsbuildOutput = resolve(appRoot, 'dist-rsbuild');
+const rspackOutput = resolve(appRoot, 'dist-rspack');
 
 async function compileRspack(config) {
 	const compiler = rspack(config);
@@ -47,14 +50,8 @@ async function compileRspack(config) {
 	});
 }
 
-for (const output of [viteOutput, rsbuildOutput, rspackOutput]) {
-	rmSync(output, { recursive: true, force: true });
-}
-linkPackage('@octanejs/three', packageRoot);
-linkPackage('octane', resolve(repositoryRoot, 'packages/octane'));
-
 const viteResult = await viteBuild({
-	root: fixtureRoot,
+	root: appRoot,
 	configFile: false,
 	logLevel: 'silent',
 	plugins: [octane({ hmr: false })],
@@ -77,7 +74,7 @@ const viteRenderedThreeModules = [
 ].sort();
 
 const rsbuild = await createRsbuild({
-	cwd: fixtureRoot,
+	cwd: appRoot,
 	rsbuildConfig: {
 		plugins: [pluginOctane({ hmr: false })],
 		source: { entry: { index: './src/main.ts' } },
@@ -87,7 +84,7 @@ const rsbuild = await createRsbuild({
 await rsbuild.build();
 
 const rspackStats = await compileRspack({
-	context: fixtureRoot,
+	context: appRoot,
 	mode: 'development',
 	target: 'web',
 	entry: './src/main.ts',
@@ -100,7 +97,9 @@ const rspackStats = await compileRspack({
 	],
 });
 const sceneModule = [...rspackStats.compilation.modules].find((module) =>
-	String(module.resource ?? module.nameForCondition?.() ?? '').endsWith('/src/Scene.three.tsrx'),
+	String(module.resource ?? module.nameForCondition?.() ?? '').endsWith(
+		`${sep}src${sep}Scene.three.tsrx`,
+	),
 );
 const source = String(sceneModule?.originalSource?.()?.source?.() ?? '');
 const buildInfo = getOctaneRspackBuildInfo(sceneModule);
@@ -109,6 +108,7 @@ const bundle = readFileSync(resolve(rspackOutput, 'bundle.js'), 'utf8');
 console.log(
 	'__OCTANE_THREE_BUNDLER_EVIDENCE__' +
 		JSON.stringify({
+			appRoot,
 			buildInfo,
 			hmrSelfAccept: source.includes('import.meta.webpackHot.accept()'),
 			rspackBundleHasScene: bundle.includes('bundler-proof-cube'),

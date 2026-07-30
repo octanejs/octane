@@ -39,7 +39,7 @@ describe('runCompile', () => {
 	});
 
 	it('reports an async component as a diagnostic with the maintained message', () => {
-		// Message contract pinned by packages/octane/tests/compile-errors.test.ts.
+		// Message contract pinned by packages/octane/tests/compiler/compile-errors.test.ts.
 		const result = runCompile(base(`export async function Foo() @{ <div>{'x'}</div> }`));
 		expect(result.ok).toBe(false);
 		if (result.ok) return;

@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, symlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
 import { pluginOctane } from '@octanejs/rsbuild-plugin';
 import { Miniflare } from 'miniflare';
+import { createTempProject } from '../../octane/tests/_temp-project.js';
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
 const repoRoot = resolve(packageRoot, '../..');
@@ -18,12 +19,15 @@ function linkPackage(root: string, name: string, target: string) {
 }
 
 let root: string;
+let disposeProject: () => void;
 let worker: Miniflare;
 
 beforeAll(async () => {
-	// Keep the module graph below the process working directory: workerd rejects
-	// module paths that escape its configured filesystem root.
-	root = mkdtempSync(join(packageRoot, '.tmp-rsbuild-'));
+	// `insideWorkspace`: this fixture boots in workerd, which cannot load modules
+	// from an `os.tmpdir()` root. See createTempProject.
+	({ root, dispose: disposeProject } = createTempProject('cloudflare-rsbuild', {
+		insideWorkspace: true,
+	}));
 	cpSync(fixtureRoot, root, { recursive: true });
 	linkPackage(root, 'octane', join(repoRoot, 'packages/octane'));
 	linkPackage(root, '@octanejs/rsbuild-plugin', join(repoRoot, 'packages/rsbuild-plugin-octane'));
@@ -47,7 +51,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await worker?.dispose();
-	rmSync(root, { recursive: true, force: true });
+	disposeProject?.();
 });
 
 describe('Cloudflare Rsbuild production output', { timeout: 30_000 }, () => {

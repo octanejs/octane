@@ -15717,8 +15717,12 @@ function clearChildContent(state: ChildSlot): void {
 			host.removeChild(n);
 			n = next;
 		}
-		// The owned sweep also removed any lazily minted ForSlot markers. Drop
-		// their detached refs before another content kind uses them as anchors.
+		// An owns-parent slot has no markers in any value regime EXCEPT a live
+		// array, whose lazily-minted ForSlot pair sits INSIDE the host — so the
+		// sweep above just detached it. Forget the pair: the array branch re-mints
+		// on re-entry, and every other regime expects the markerless baseline.
+		// Stale refs here would anchor the next mount (ForSlot, createBlock, or an
+		// offscreen swap) on detached comments and insert into a null parent.
 		state.start = null;
 		state.end = null;
 	} else if (state.start !== null) {

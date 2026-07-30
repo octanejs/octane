@@ -1,5 +1,26 @@
 # @octanejs/rspack-plugin
 
+## 0.1.15
+
+### Patch Changes
+
+- c151b71: Add optional Strong mode for clearer state and ref behavior. Enable it across an
+  application with `compiler: { strong: true }`, in one module with `"use strong"`,
+  or through the Vite, Rspack, and Rsbuild plugin options. Strong modules reject
+  state updates during render, direct state updates while setting up an effect, and
+  render-time writes to refs, with `useLinkedState` available for state that
+  should follow another value.
+- Updated dependencies [c6370b6]
+- Updated dependencies [dd272ad]
+- Updated dependencies [c151b71]
+- Updated dependencies [66b51d8]
+- Updated dependencies [a57c32a]
+- Updated dependencies [e38a557]
+- Updated dependencies [bd90e27]
+- Updated dependencies [ae6811d]
+- Updated dependencies [62d81b8]
+  - octane@0.1.20
+
 ## 0.1.14
 
 ### Patch Changes

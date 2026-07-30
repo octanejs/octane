@@ -1,5 +1,86 @@
 # @octanejs/vite-plugin
 
+## 0.1.20
+
+### Patch Changes
+
+- 89323b7: Fail the boot on a `module server` function id collision instead of silently
+  rerouting one function's calls to another.
+
+  An id is `strong_hash("<module>#<export>")`, a SHA-256 truncated to 8 hex
+  characters, whose own documentation calls it "fine for identification, not for
+  authentication". Both registration paths were a plain Map set, which resolves a
+  collision by overwriting: one function became unreachable and every call to it
+  executed the other one instead, under whatever authorization that other function
+  carries. Nothing reported it, and which function wins depends on module
+  evaluation order.
+
+  Dev registers through `globalThis.rpc_modules`, which is now built by
+  `createRpcRegistry()` and rejects a second declaration under an id another export
+  already took. Re-registering the same export stays a no-op, which module reloads
+  depend on. Production builds its descriptor map from the server manifest and
+  throws from `createHandler` on a duplicate id, before serving a request.
+
+  Both report the two colliding module paths and export names, and say that
+  renaming either export resolves it. This does not widen the id: 32 bits stays
+  narrow enough to collide at scale, but the failure is now loud and happens at
+  build or boot rather than in production traffic.
+
+- 89323b7: Tell middleware which server function an RPC request targets, so authorization
+  can be written per function instead of per endpoint.
+
+  `options.middlewares` is one chain for the whole RPC boundary, and the only
+  identifying thing in the request was a compiler-assigned hash in the URL. A
+  policy could authenticate the caller but could not express "the admin functions
+  require an admin role" without hard-coding hashes that change on rename.
+
+  `Context.rpc` now names the target, and is populated before the middleware chain
+  runs:
+
+  ```ts
+  const authorize: Middleware = async (context, next) => {
+  	if (context.rpc?.module === '/src/admin.ts' && !isAdmin(context)) {
+  		return new Response('Forbidden', { status: 403 });
+  	}
+  	return next();
+  };
+  ```
+
+  The mapping comes from a new optional `describeFunction(hash)` on
+  `RpcRequestOptions`, which names an export without loading its module and is
+  synchronous so the middleware chain never waits on it. The Vite plugin reads the
+  dev registration map, and the production handler builds descriptors from the
+  server manifest once per handler, because `build_rpc_lookup` keeps only the
+  namespace object and export name. An integration that omits `describeFunction`
+  gets `module` and `export` as `null`, which a per-function policy will not match,
+  so a hand-rolled boundary must supply it before relying on one.
+
+  `rpc.id` is the raw hash and is stable only within a build; authorize on
+  `module`/`export`. Unauthorized requests already never reached the target
+  function, since `resolveFunction` runs as the middleware chain's final handler;
+  this adds the identity that was missing, not a new ordering guarantee.
+
+- c151b71: Add optional Strong mode for clearer state and ref behavior. Enable it across an
+  application with `compiler: { strong: true }`, in one module with `"use strong"`,
+  or through the Vite, Rspack, and Rsbuild plugin options. Strong modules reject
+  state updates during render, direct state updates while setting up an effect, and
+  render-time writes to refs, with `useLinkedState` available for state that
+  should follow another value.
+- Updated dependencies [c6370b6]
+- Updated dependencies [89323b7]
+- Updated dependencies [89323b7]
+- Updated dependencies [0a0b813]
+- Updated dependencies [dd272ad]
+- Updated dependencies [c151b71]
+- Updated dependencies [66b51d8]
+- Updated dependencies [a57c32a]
+- Updated dependencies [e38a557]
+- Updated dependencies [bd90e27]
+- Updated dependencies [ae6811d]
+- Updated dependencies [62d81b8]
+  - octane@0.1.20
+  - @octanejs/app-core@0.0.16
+
 ## 0.1.19
 
 ### Patch Changes

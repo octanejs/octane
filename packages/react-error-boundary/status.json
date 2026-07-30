@@ -1,0 +1,14 @@
+{
+  "upstream": {
+    "package": "react-error-boundary",
+    "version": "6.1.2"
+  },
+  "surface": "Complete against the published react-error-boundary 6.1.2 function/type surface adapted to Octane: ErrorBoundary, ErrorBoundaryContext, getErrorMessage, fallback variants, onError/onReset callbacks, resetKeys, useErrorBoundary (including error), withErrorBoundary, OnErrorCallback, and UseErrorBoundaryApi.",
+  "divergences": [
+    "Component stack information is currently an empty string because Octane does not expose a public component-stack formatter.",
+    "Event-handler and asynchronous errors must be passed to useErrorBoundary().showBoundary(), matching upstream's explicit forwarding requirement.",
+    "Server rendering that must match upstream error propagation uses the explicit @octanejs/react-error-boundary/server entry."
+  ],
+  "ssr": "The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2.",
+  "verified": "2026-07-29"
+}
