@@ -1,14 +1,14 @@
 /** biome-ignore-all lint/a11y/noSvgWithoutTitle: "Streamdown icons" */
 import type { SVGProps } from './types';
 
-type IconProps = SVGProps<SVGSVGElement>;
+type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-export const CheckIcon = (props: IconProps) => <svg
+export const CheckIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -19,12 +19,12 @@ export const CheckIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const CopyIcon = (props: IconProps) => <svg
+export const CopyIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -35,12 +35,12 @@ export const CopyIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const DownloadIcon = (props: IconProps) => <svg
+export const DownloadIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -51,12 +51,12 @@ export const DownloadIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const Loader2Icon = (props: IconProps) => <svg
+export const Loader2Icon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path d="M8 0V4" stroke="currentColor" strokeWidth="1.5" />
@@ -81,12 +81,12 @@ export const Loader2Icon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const Maximize2Icon = (props: IconProps) => <svg
+export const Maximize2Icon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -97,12 +97,12 @@ export const Maximize2Icon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const RotateCcwIcon = (props: IconProps) => <svg
+export const RotateCcwIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -113,12 +113,12 @@ export const RotateCcwIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const XIcon = (props: IconProps) => <svg
+export const XIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -129,12 +129,12 @@ export const XIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const ExternalLinkIcon = (props: IconProps) => <svg
+export const ExternalLinkIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -145,12 +145,12 @@ export const ExternalLinkIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const ZoomInIcon = (props: IconProps) => <svg
+export const ZoomInIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path
@@ -161,12 +161,12 @@ export const ZoomInIcon = (props: IconProps) => <svg
 	/>
 </svg>;
 
-export const ZoomOutIcon = (props: IconProps) => <svg
+export const ZoomOutIcon = ({ size = 16, ...props }: IconProps) => <svg
 	color="currentColor"
-	height={16}
+	height={size}
 	strokeLinejoin="round"
 	viewBox="0 0 16 16"
-	width={16}
+	width={size}
 	{...props}
 >
 	<path

@@ -6,17 +6,37 @@ const fixture = resolve(import.meta.dirname, '../_fixtures/markdown-parity.tsrx'
 const featureFixture = resolve(import.meta.dirname, '../_fixtures/feature-parity.tsrx');
 const cache = resolve(import.meta.dirname, '.react-cache');
 
-function normaliseUpstreamCodeBlockBackgrounds(html: string): string {
-	return normaliseHtml(html)
+function normaliseUpstreamIconSizes(html: string): string {
+	return html.replace(/<svg\b[^>]*>/g, (svg) => {
+		if (!svg.includes('viewBox="0 0 16 16"')) {
+			return svg;
+		}
+
+		const size = svg.match(/ size="([^"]+)"/)?.[1];
+		if (!size) {
+			return svg;
+		}
+
+		return svg
+			.replace(' height="16"', ` height="${size}"`)
+			.replace(` size="${size}"`, '')
+			.replace(' width="16"', ` width="${size}"`);
+	});
+}
+
+function normaliseUpstreamKnownDefects(html: string): string {
+	const normalised = normaliseHtml(html)
 		.replaceAll('bg-[var(--sdm-bg,inherit]', 'bg-[var(--sdm-bg,inherit)]')
 		.replaceAll(
 			'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit)]',
 			'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit))]',
 		);
+
+	return normaliseUpstreamIconSizes(normalised);
 }
 
 function expectUpstreamCodeBlockParity(octaneHtml: string, reactHtml: string): void {
-	expect(normaliseHtml(octaneHtml)).toBe(normaliseUpstreamCodeBlockBackgrounds(reactHtml));
+	expect(normaliseHtml(octaneHtml)).toBe(normaliseUpstreamKnownDefects(reactHtml));
 }
 
 // Streamdown 2.5 shares animation progress across sibling blocks. Compare every
@@ -197,9 +217,9 @@ describe('@octanejs/streamdown differential parity', () => {
 				octanePre.classList.contains('dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit))]'),
 			).toBe(true);
 
-			// Streamdown 2.5.0 ships unbalanced arbitrary-value classes. Keep the
-			// rest of this scenario byte-identical while normalising only that
-			// upstream typo on the React side.
+			// Streamdown 2.5.0 ships unbalanced arbitrary-value classes and leaves
+			// icon size props inert. Keep the rest of this scenario byte-identical
+			// while normalising only those upstream defects on the React side.
 			expectUpstreamCodeBlockParity(octane.container.innerHTML, react.container.innerHTML);
 		});
 
