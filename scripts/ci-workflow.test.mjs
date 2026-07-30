@@ -6,6 +6,8 @@ import { describe, test } from 'node:test';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
+const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function jobSource(job) {
 	const marker = `  ${job}:\n`;
@@ -15,6 +17,24 @@ function jobSource(job) {
 	const bodyStart = start + marker.length;
 	const nextJob = workflow.slice(bodyStart).search(/\n  [a-zA-Z][a-zA-Z0-9_]*:\n/);
 	return workflow.slice(start, nextJob === -1 ? undefined : bodyStart + nextJob);
+}
+
+function stepScript(workflowSource, stepName) {
+	const stepMarker = `      - name: ${stepName}\n`;
+	const stepStart = workflowSource.indexOf(stepMarker);
+	assert.notEqual(stepStart, -1, `missing ${stepName} step`);
+
+	const scriptMarker = '          script: |\n';
+	const scriptStart = workflowSource.indexOf(scriptMarker, stepStart);
+	assert.notEqual(scriptStart, -1, `missing script for ${stepName}`);
+
+	const bodyStart = scriptStart + scriptMarker.length;
+	const nextStep = workflowSource.slice(bodyStart).search(/\n      - name:/);
+	const body = workflowSource.slice(bodyStart, nextStep === -1 ? undefined : bodyStart + nextStep);
+	return body
+		.split('\n')
+		.map((line) => (line.startsWith('            ') ? line.slice(12) : line))
+		.join('\n');
 }
 
 describe('CI workflow aggregation', () => {
@@ -54,5 +74,49 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('test'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('examples'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);
+	});
+});
+
+describe('Publish workflow validation', () => {
+	test('accepts a successful lightweight run through reusable CI provenance', async () => {
+		const outputs = new Map();
+		const run = {
+			event: 'push',
+			head_branch: 'main',
+			head_repository: { full_name: 'octanejs/octane' },
+			head_sha: 'a'.repeat(40),
+			path: '.github/workflows/ci.yml',
+			conclusion: 'success',
+		};
+		const github = {
+			rest: {
+				actions: {
+					getWorkflowRun: async () => ({ data: run }),
+					listJobsForWorkflowRun: async () => undefined,
+				},
+			},
+			paginate: async () => [{ name: 'CI provenance', conclusion: 'success' }],
+		};
+		const core = {
+			setOutput(name, value) {
+				outputs.set(name, value);
+			},
+			info() {},
+		};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			'process',
+			stepScript(publishWorkflow, 'Resolve validated SHA'),
+		);
+
+		await execute(github, { repo: { owner: 'octanejs', repo: 'octane' } }, core, {
+			env: { CI_RUN_ID: '123' },
+		});
+
+		assert.equal(outputs.get('sha'), run.head_sha);
+		assert.match(publishWorkflow, /successfulJobs\.has\("CI provenance"\)/);
+		assert.match(publishWorkflow, /legacyRequiredJobs/);
 	});
 });

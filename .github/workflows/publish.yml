@@ -90,28 +90,38 @@ jobs:
               github.rest.actions.listJobsForWorkflowRun,
               { owner, repo, run_id: runId, per_page: 100 },
             );
-            const requiredJobs = new Set([
-              "examples",
-              "lint",
-              "Lynx compatibility (current)",
-              "Lynx compatibility (minimum)",
-              "Three compatibility (current)",
-              "Three compatibility (minimum r156)",
-              "typecheck",
-              "validate publishable packages",
-              "test (22)",
-              "test (24)",
-            ]);
+            const successfulJobs = new Set(
+              jobs
+                .filter((job) => job.conclusion === "success")
+                .map((job) => job.name),
+            );
 
-            for (const job of jobs) {
-              if (requiredJobs.has(job.name) && job.conclusion === "success") {
-                requiredJobs.delete(job.name);
-              }
-            }
-            if (requiredJobs.size > 0) {
-              throw new Error(
-                `CI run ${runId} lacks successful jobs: ${[...requiredJobs].join(", ")}`,
+            // CI provenance verifies both accepted run shapes: either every
+            // expensive lane passed, or a lightweight diff intentionally
+            // skipped those lanes after inheriting tested base coverage.
+            // Retain the old explicit set for manual recovery from successful
+            // CI runs created before the provenance marker existed.
+            if (!successfulJobs.has("CI provenance")) {
+              const legacyRequiredJobs = [
+                "examples",
+                "lint",
+                "Lynx compatibility (current)",
+                "Lynx compatibility (minimum)",
+                "Three compatibility (current)",
+                "Three compatibility (minimum r156)",
+                "typecheck",
+                "validate publishable packages",
+                "test (22)",
+                "test (24)",
+              ];
+              const missingJobs = legacyRequiredJobs.filter(
+                (job) => !successfulJobs.has(job),
               );
+              if (missingJobs.length > 0) {
+                throw new Error(
+                  `CI run ${runId} lacks successful CI provenance or legacy jobs: ${missingJobs.join(", ")}`,
+                );
+              }
             }
 
             if (run.conclusion !== "success") {
