@@ -748,7 +748,7 @@ Object.assign(MemoCode, { displayName: 'MarkdownCode' });
 
 const MemoImg = memo<
 	DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> & ExtraProps
->(ImageComponent, (p, n) => p.className === n.className && sameNodePosition(p.node, n.node));
+>(ImageComponent);
 
 Object.assign(MemoImg, { displayName: 'MarkdownImg' });
 
@@ -792,7 +792,7 @@ const MemoParagraph = memo<ParagraphProps>(({ children, node, ...props }: Paragr
 	}
 
 	return <p {...props}>{children}</p>;
-}, (p, n) => sameClassAndNode(p, n));
+});
 Object.assign(MemoParagraph, { displayName: 'MarkdownParagraph' });
 
 export const components = {

@@ -23,35 +23,41 @@ export const ImageComponent = ({
 	const { DownloadIcon } = useIcons();
 	const cn = useCn();
 	const imgRef = useRef<HTMLImageElement | null>(null);
-	const [imageLoaded, setImageLoaded] = useState(false);
-	const [imageError, setImageError] = useState(false);
+	const [imageState, setImageState] = useState({
+		error: false,
+		loaded: false,
+		source: src,
+	});
 	const t = useTranslations();
 
+	const imageLoaded = imageState.source === src && imageState.loaded;
+	const imageError = imageState.source === src && imageState.error;
 	const hasExplicitDimensions = props.width != null || props.height != null;
 	const showDownload = (imageLoaded || hasExplicitDimensions) && !imageError;
 	const showFallback = imageError && !hasExplicitDimensions;
 
 	// Handle images already complete before Octane attaches event handlers (e.g. cached or SSR hydration)
 	useEffect(() => {
+		setImageState(
+			(state) => state.source === src ? state : { error: false, loaded: false, source: src },
+		);
+
 		const img = imgRef.current;
 		if (img?.complete) {
 			const loaded = img.naturalWidth > 0;
-			setImageLoaded(loaded);
-			setImageError(!loaded);
+			setImageState({ error: !loaded, loaded, source: src });
 		}
-	}, []);
+	}, [src]);
 
 	const handleLoad = useCallback<NativeEventHandler<HTMLImageElement>>((event) => {
-		setImageLoaded(true);
-		setImageError(false);
+		setImageState({ error: false, loaded: true, source: src });
 		onLoadProp?.(event);
-	}, [onLoadProp]);
+	}, [onLoadProp, src]);
 
 	const handleError = useCallback<NativeEventHandler<HTMLImageElement>>((event) => {
-		setImageLoaded(false);
-		setImageError(true);
+		setImageState({ error: true, loaded: false, source: src });
 		onErrorProp?.(event);
-	}, [onErrorProp]);
+	}, [onErrorProp, src]);
 
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: "Complex image download logic with multiple edge cases"
 	const downloadImage = async () => {

@@ -1,5 +1,5 @@
 import type { MermaidConfig } from 'mermaid';
-import { useContext, useEffect, useState } from 'octane';
+import { useContext, useEffect, useRef, useState } from 'octane';
 import { useDeferredRender } from '../../hooks/use-deferred-render.tsrx';
 import { StreamdownContext } from '../../index.tsrx';
 import { useMermaidPlugin } from '../plugin-context.tsrx';
@@ -27,6 +27,7 @@ export const Mermaid = ({
 	const [svgContent, setSvgContent] = useState<string>('');
 	const [lastValidSvg, setLastValidSvg] = useState<string>('');
 	const [retryCount, setRetryCount] = useState(0);
+	const activeRenderRef = useRef<object | null>(null);
 	const { mermaid: mermaidContext } = useContext(StreamdownContext);
 	const mermaidPlugin = useMermaidPlugin();
 	const ErrorComponent = mermaidContext?.errorComponent;
@@ -38,17 +39,26 @@ export const Mermaid = ({
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: "Required for Mermaid"
 	useEffect(() => {
+		const renderRequest = {};
+		activeRenderRef.current = renderRequest;
+		const cancelRender = () => {
+			if (activeRenderRef.current === renderRequest) {
+				activeRenderRef.current = null;
+			}
+		};
+
 		// Only render when shouldRender is true
 		if (!shouldRender) {
-			return;
+			return cancelRender;
 		}
 
 		// If no mermaid plugin, show error
 		if (!mermaidPlugin) {
+			setIsLoading(false);
 			setError(
 				'Mermaid plugin not available. Please add the mermaid plugin to enable diagram rendering.',
 			);
-			return;
+			return cancelRender;
 		}
 
 		const renderChart = async () => {
@@ -70,10 +80,18 @@ export const Mermaid = ({
 
 				const { svg } = await mermaid.render(uniqueId, chart);
 
+				if (activeRenderRef.current !== renderRequest) {
+					return;
+				}
+
 				// Update both current and last valid SVG
 				setSvgContent(svg);
 				setLastValidSvg(svg);
 			} catch (err) {
+				if (activeRenderRef.current !== renderRequest) {
+					return;
+				}
+
 				// Silently fail and keep the last valid SVG
 				// Don't update svgContent here - just keep what we have
 
@@ -84,11 +102,14 @@ export const Mermaid = ({
 					setError(errorMessage);
 				}
 			} finally {
-				setIsLoading(false);
+				if (activeRenderRef.current === renderRequest) {
+					setIsLoading(false);
+				}
 			}
 		};
 
 		renderChart();
+		return cancelRender;
 	}, [chart, config, retryCount, shouldRender, mermaidPlugin]);
 
 	// Show placeholder when not scheduled to render
