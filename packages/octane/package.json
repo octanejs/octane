@@ -153,11 +153,14 @@
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@wagmi/connectors": "catalog:default",
+    "@wagmi/core": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
     "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "viem": "catalog:default",
     "vite": "catalog:default",
     "vitest": "catalog:default"
   }

@@ -844,6 +844,15 @@ importers:
       '@changesets/cli':
         specifier: catalog:default
         version: 2.31.1(patch_hash=b2e3a2f8bfccf1ba042c15980245f5bc2ef7d4898e838d4cf5cab75b7b920b90)(@types/node@24.13.3)
+      '@octanejs/rainbowkit':
+        specifier: workspace:*
+        version: link:packages/rainbowkit
+      '@octanejs/tanstack-query':
+        specifier: workspace:*
+        version: link:packages/tanstack-query
+      '@octanejs/wagmi':
+        specifier: workspace:*
+        version: link:packages/wagmi
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.3.118(prettier@3.9.6)
@@ -4437,6 +4446,12 @@ importers:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.56(react@19.2.7)
+      '@wagmi/connectors':
+        specifier: catalog:default
+        version: 8.0.25(@wagmi/core@3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)(viem@2.55.10(typescript@5.9.3)(zod@4.4.3))
+      '@wagmi/core':
+        specifier: catalog:default
+        version: 3.6.4(@tanstack/query-core@5.101.3)(@types/react@19.2.17)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(typescript@5.9.3)(zod@4.4.3))
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -4452,6 +4467,9 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
+      viem:
+        specifier: catalog:default
+        version: 2.55.10(typescript@5.9.3)(zod@4.4.3)
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)

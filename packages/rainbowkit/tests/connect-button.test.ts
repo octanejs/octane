@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { connect, createConfig, http } from '@wagmi/core';
 import { mock } from '@wagmi/connectors/mock';
 import { mainnet, sepolia } from 'viem/chains';
@@ -16,7 +17,7 @@ import {
 	latestWalletConnect,
 } from './_fixtures/app.tsrx';
 
-const rainbowKitStyles = readFileSync('packages/rainbowkit/src/styles.css', 'utf8');
+const rainbowKitStyles = readFileSync(resolve(import.meta.dirname, '../src/styles.css'), 'utf8');
 
 const account = '0x0000000000000000000000000000000000000001' as const;
 let mounted: ReturnType<typeof mount> | undefined;
