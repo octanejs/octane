@@ -605,9 +605,17 @@ Controlled `value`, `checked` and `selected` are held too. Each carries a
 back together — restoring the node alone would leave the record believing the new
 value had already landed, so re-projecting it on resume would be skipped.
 
-Two things a transition can still change early: content it patched OUTSIDE a
-suspended boundary, and a structural change above one, such as a keyed list
-reordering. Both need the transition to become a deferred commit — a keyed
+A held synchronous transition now defers its whole commit: content the
+transition patched outside the suspended boundary — shell text, attributes,
+keyed structure — reverts with the hold and lands in one step on resolve, with
+`isPending` staying on throughout. `benchmarks/async-composition` pins the
+update at zero exposed intermediate states, level with React. One residual is
+pinned at its own ceiling there: after the dependent request resolves, the
+promoted round re-creates the warm-started panel fetches (13 creations against
+the 8-call floor; the app-level cache serves the same promises, so nothing
+refetches over the network) until the resume/warm work in
+[the deferred-commit plan](./transition-deferred-commit-plan.md) restores the
+floor. Both need the transition to become a deferred commit — a keyed
 removal disposes blocks and runs their cleanups, which cannot be undone, and
 reverting content outside a boundary needs the reveal to re-render where the
 transition began rather than just the boundary. See

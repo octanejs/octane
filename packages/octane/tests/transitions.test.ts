@@ -26,6 +26,7 @@ import {
 	TransitionKeyedAddition,
 	TransitionKeyedEmptyFill,
 	TransitionArrayModeExit,
+	TransitionOutsideBoundary,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -899,7 +900,7 @@ describe('useTransition — the old screen stays whole', () => {
 		r.unmount();
 	});
 
-	it('a slot leaving array mode tears its rows down inline, not deferred past the attempt', async () => {
+	it('a slot leaving array mode tears down inline, and the hold re-asserts the screen', async () => {
 		const fulfilled = {
 			status: 'fulfilled',
 			value: 'zero',
@@ -914,29 +915,86 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(r.findAll('#host li').map((li) => li.id)).toEqual(['row-a', 'row-b']);
 		expect(log.drain()).toEqual(['render:tail:0', 'mount:a', 'mount:b']);
 
-		// The flip discards the slot itself, so a hold has nothing to restore the
-		// rows into. Their teardown belongs to the attempt that removed them —
-		// layout cleanups fire before the tail's render, the pre-parking order —
-		// rather than parking them as deferred-but-unrestorable.
+		// The flip discards the slot itself, so its teardown runs inline with the
+		// attempt — layout cleanups before the tail's render. The hold then
+		// re-asserts the whole old screen: the rows come back as fresh mounts.
+		// Their state does not survive (the flip destroyed it, and a kind flip is
+		// not journaled), but the held screen is whole, which the old plain-text
+		// tear never was.
 		r.click('#bump');
 		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(log.drain()).toEqual(['cleanup:a', 'cleanup:b', 'render:tail:1']);
-		// The flipped-in text stays: a slot kind flip is not journaled (the
-		// retained per-swap limitation in SUSPENSE_DIVERGENCE.md #4), while the
-		// tail below it holds its prior value.
-		expect(r.find('#host').textContent).toBe('plain');
+		expect(log.drain()).toEqual([
+			'cleanup:a',
+			'cleanup:b',
+			'render:tail:1',
+			'render:tail:0',
+			'mount:a',
+			'mount:b',
+		]);
+		expect(r.find('#host').textContent).toBe('ab');
 		expect(r.find('#value').textContent).toBe('zero');
 
 		await act(() => {
 			d1.resolve('one');
 		});
+		// The promotion replays the flip for real: same inline teardown order.
 		expect(r.find('#host').textContent).toBe('plain');
 		expect(r.find('#value').textContent).toBe('one');
-		expect(log.drain()).toEqual(['render:tail:1']);
+		expect(log.drain()).toEqual(['cleanup:a', 'cleanup:b', 'render:tail:1']);
 
-		// Exactly-once: the rows were torn down by the flip and never again.
+		// Every mount above has exactly one matching cleanup; nothing left over.
 		r.unmount();
 		await act(() => {});
 		expect(log.drain()).toEqual([]);
+	});
+
+	it('holds the shell outside the boundary, and does not leak the aborted attempt', async () => {
+		const fulfilled = {
+			status: 'fulfilled',
+			value: 'zero',
+			then: (fn: (v: string) => void) => void fn('zero'),
+		} as unknown as Promise<string>;
+		const d1 = deferred<string>();
+		const loadCalls: number[] = [];
+		const load = (step: number) => {
+			loadCalls.push(step);
+			return step === 0 ? fulfilled : d1.promise;
+		};
+		const log = createLog();
+
+		const r = mount(TransitionOutsideBoundary, { load, log: log.push });
+		await act(() => {});
+		expect(r.find('#shell').textContent).toBe('shell-0');
+		expect(r.find('#value').textContent).toBe('zero');
+		expect(log.drain()).toEqual(['effect:0']);
+
+		// The shell is outside the boundary. The whole screen holds: shell text,
+		// held value, and no effect from the aborted attempt.
+		r.click('#bump');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(r.find('#shell').textContent).toBe('shell-0');
+		expect(r.find('#value').textContent).toBe('zero');
+		await act(() => {});
+		expect(log.drain()).toEqual([]);
+
+		// Shell and content arrive together, effect fires once for the landing step.
+		await act(() => {
+			d1.resolve('one');
+		});
+		expect(r.find('#shell').textContent).toBe('shell-1');
+		expect(r.find('#value').textContent).toBe('one');
+		expect(log.drain()).toEqual(['effect:1']);
+		// The held screen never re-fetches: in production compiles, one creation
+		// per step, ever — the cue re-render dep-hits the swapped-back step-0
+		// entry and the promotion dep-hits the swapped-forward step-1 entry. The
+		// dev compile keeps its documented safety net (repeat creations reuse the
+		// tracked thenable), so it only pins that both steps were created.
+		if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+			expect(loadCalls).toEqual([0, 1]);
+		} else {
+			expect(loadCalls[0]).toBe(0);
+			expect(loadCalls).toContain(1);
+		}
+		r.unmount();
 	});
 });

@@ -996,6 +996,17 @@ function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 			);
 		scheduleRender(block);
 	}
+	// Retain the applied updates for the drain this flush schedules: a render
+	// that suspends into a hold reverts these cells to their baseValues and
+	// promotes them when the data arrives (deferred transition commit, P1).
+	// Consumed by endTransitionAttempt; cleared when the flush completes.
+	if (batch.updates.size > 0) {
+		const retained: Array<TransitionActionUpdate<any>> = [];
+		for (const update of batch.updates.values()) {
+			if (!update.block.disposed) retained.push(update);
+		}
+		if (retained.length > 0) FLUSHED_TRANSITION_UPDATES.push(retained);
+	}
 	batch.updates.clear();
 	if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) {
 		IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
@@ -1049,6 +1060,317 @@ const HELD_TRANSITIONS = new Set<TrySlot>();
 const STAGED_REVEALS = new Set<TrySlot>();
 let flushingStagedReveals = false;
 let deferringStagedRevealEffects = false;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deferred transition commit (docs/transition-deferred-commit-plan.md, P1).
+//
+// A synchronous transition stages its setters into a TransitionActionBatch and
+// flushes it before startTransition returns, so by the time the drain renders,
+// the cells already hold the new values. If that render suspends into a hold,
+// the screen must stay whole — including everything OUTSIDE the boundary the
+// same render patched on the way past. The attempt makes the render undoable:
+// journal window over the origin's whole render, live-queue checkpoints for the
+// work it enqueued, the flushed cells reverted to the recorded baseValues, and
+// the parallel-use entries it replaced swapped back.
+//
+// The pending cue needs no special treatment: `slotRef.isPending` was flipped
+// by the listener pass and survives the unwind. Re-rendering the origin at
+// urgent priority with the reverted cells re-publishes exactly the cue-derived
+// bindings — every other binding no-ops on its restored bag guard, and old
+// cells render previously committed (cached) content, so it cannot suspend.
+//
+// On settle the hold PROMOTES: parallel-use entries swap forward, cells write
+// forward, and an ordinary transition drain commits the whole screen in one
+// flush — or suspends on a later dependency and goes around again. Warm-walk
+// creations are carried on the hold as an episode-agnostic HARVEST, because
+// each round's drain mints a fresh warm episode and could otherwise never
+// adopt the fetches the attempt already started.
+//
+// P1 scope: single-origin transitions (every flushed update targets the block
+// the attempt wrapped). A flush whose updates span several blocks — or one
+// whose transition is driven by state the batch never staged, like an external
+// store — falls back to today's per-boundary behavior untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TransitionAttempt {
+	origin: Block;
+	journalCheckpoint: number;
+	effects: [number, number, number];
+	effectEvents: number;
+	effectEventActions: number;
+	stores: number;
+	refAttach: number;
+	refDetach: number;
+	effectDeps: EffectDepsSnapshot;
+	heldSlots: Set<TrySlot> | null;
+	/** [hooksMap, slot, previousEntry, nextEntry] — undone on hold, redone on promotion. */
+	puSwaps: Array<[Map<HookSlot, unknown>, HookSlot, unknown, unknown]> | null;
+}
+
+let ACTIVE_TRANSITION_ATTEMPT: TransitionAttempt | null = null;
+
+/** Flushed sync-transition updates retained for the drain, one group per batch. */
+let FLUSHED_TRANSITION_UPDATES: Array<Array<TransitionActionUpdate<any>>> = [];
+
+interface WarmHarvestEntry {
+	slot: HookSlot;
+	deps: any[];
+	value: any;
+	taken: boolean;
+}
+
+/** The reverted state of a held transition, waiting for promotion on settle. */
+let HELD_SYNC_TRANSITION: {
+	origin: Block;
+	entries: Array<TransitionActionUpdate<any>>;
+	puSwaps: Array<[Map<HookSlot, unknown>, HookSlot, unknown, unknown]> | null;
+	/** Values the attempt's warm walk created, adoptable in ANY later round's
+	 * episode. `taken` resets on each re-revert so every round can adopt. */
+	warmHarvest: WarmHarvestEntry[] | null;
+	holders: Set<TrySlot>;
+} | null = null;
+
+/**
+ * Swaps a promotion applied forward, pending the promoted round's outcome. A
+ * held transition can take several rounds — each settle promotes, renders, and
+ * may suspend on a LATER dependency. The next round's unwind must swap back
+ * everything promoted so far, not just that round's own publishes, or the cue
+ * re-render dep-misses the earlier slots and re-creates old-version requests.
+ * Cleared when a promoted round commits or the transition is discarded.
+ */
+let PROMOTED_PU_SWAPS: Array<[Map<HookSlot, unknown>, HookSlot, unknown, unknown]> | null = null;
+/** The harvest survives promotion the same way, for the round after next. */
+let PROMOTED_WARM_HARVEST: WarmHarvestEntry[] | null = null;
+
+function beginTransitionAttempt(block: Block): TransitionAttempt | null {
+	if (block.pendingMode !== 'transition' || ACTIVE_TRANSITION_ATTEMPT !== null) return null;
+	TRANSITION_JOURNAL ??= [];
+	TRANSITION_JOURNAL_BAGS ??= new Set();
+	TRANSITION_JOURNAL_DEPTH++;
+	// Marks in the live queues rather than a capture that reroutes them: a
+	// transition that completes — the overwhelmingly common case — behaves
+	// exactly as before, effects and refs included; only one that ends up held
+	// pays anything, by rewinding the queues to these marks.
+	const attempt: TransitionAttempt = {
+		origin: block,
+		journalCheckpoint: TRANSITION_JOURNAL.length,
+		effects: [effectQueues[0].length, effectQueues[1].length, effectQueues[2].length],
+		effectEvents: effectEventQueue.length,
+		effectEventActions: effectEventCommitActions.length,
+		stores: storeSyncQueue.length,
+		refAttach: refAttachQueue.length,
+		refDetach: refDetachQueue.length,
+		effectDeps: snapshotSubtreeEffectDeps(block),
+		heldSlots: null,
+		puSwaps: null,
+	};
+	ACTIVE_TRANSITION_ATTEMPT = attempt;
+	return attempt;
+}
+
+function endTransitionAttempt(attempt: TransitionAttempt | null): void {
+	if (attempt === null) return;
+	ACTIVE_TRANSITION_ATTEMPT = null;
+	const held = attempt.heldSlots;
+	// A promoted round that ran to commit makes its forward state canon.
+	if (held === null || held.size === 0) {
+		PROMOTED_PU_SWAPS = null;
+		PROMOTED_WARM_HARVEST = null;
+	}
+	// The unwind is only sound when the driving cells can be reverted with it:
+	// single-origin groups from the flushed batch (P1). A transition driven by
+	// something the batch never staged — an external store, or updates spanning
+	// several blocks — keeps today's per-boundary behavior untouched, because
+	// unwinding the render without reverting its inputs would erase the pending
+	// cue with no way to re-publish it.
+	let entries: Array<TransitionActionUpdate<any>> | null = null;
+	if (held !== null && held.size > 0) {
+		entries = [];
+		for (let i = FLUSHED_TRANSITION_UPDATES.length - 1; i >= 0; i--) {
+			const group = FLUSHED_TRANSITION_UPDATES[i];
+			let single = true;
+			for (let k = 0; k < group.length; k++) {
+				if (group[k].block !== attempt.origin) {
+					single = false;
+					break;
+				}
+			}
+			if (!single) continue;
+			for (let k = 0; k < group.length; k++) entries.push(group[k]);
+			FLUSHED_TRANSITION_UPDATES.splice(i, 1);
+		}
+	}
+	if (held !== null && held.size > 0 && entries !== null && entries.length > 0) {
+		// Unwind everything the attempt did: bindings and structure via the
+		// journal, then the work it queued, then the effect cells it advanced.
+		rollbackTransitionJournal(attempt.journalCheckpoint);
+		for (let phase = 0; phase < 3; phase++) {
+			effectQueues[phase].length = attempt.effects[phase];
+		}
+		effectEventQueue.length = attempt.effectEvents;
+		effectEventCommitActions.length = attempt.effectEventActions;
+		for (let i = attempt.stores; i < storeSyncQueue.length; i++) {
+			storeSyncQueue[i].queued = false;
+		}
+		storeSyncQueue.length = attempt.stores;
+		refAttachQueue.length = attempt.refAttach;
+		refDetachQueue.length = attempt.refDetach;
+		restoreSubtreeEffectDeps(attempt.origin, attempt.effectDeps);
+		// FIRST hold of a transition: swap the parallel-use entries back so the
+		// cue re-render dep-hits the old creations instead of re-fetching them,
+		// and schedule that cue re-render below. A CONTINUING round (a promoted
+		// render suspending on a later dependency) needs neither: the old screen
+		// and the cue bindings were re-established in round one and the journal
+		// rollback above just restored them — so the parallel-use entries stay
+		// monotonically FORWARD, and every later round dep-hits them outright.
+		const continuing = PROMOTED_PU_SWAPS !== null || PROMOTED_WARM_HARVEST !== null;
+		let puSwaps = attempt.puSwaps;
+		if (continuing) {
+			if (PROMOTED_PU_SWAPS !== null) {
+				puSwaps = puSwaps === null ? PROMOTED_PU_SWAPS : PROMOTED_PU_SWAPS.concat(puSwaps);
+				PROMOTED_PU_SWAPS = null;
+			}
+		} else if (puSwaps !== null) {
+			for (let i = puSwaps.length - 1; i >= 0; i--) {
+				const [hooks, slot, prev] = puSwaps[i];
+				if (prev === undefined) hooks.delete(slot);
+				else hooks.set(slot, prev);
+			}
+		}
+		for (let i = 0; i < entries.length; i++) {
+			entries[i].slot.value = entries[i].baseValue;
+		}
+		// Harvest the warm walk's creations off this round's episode caches
+		// (block-attached, so they outlive the plans), carrying earlier rounds'
+		// harvest forward with availability reset: the fetches are in flight and
+		// must be adopted — never re-created — by every later round's render,
+		// whatever episode it mints.
+		let warmHarvest: WarmHarvestEntry[] | null = PROMOTED_WARM_HARVEST;
+		PROMOTED_WARM_HARVEST = null;
+		if (warmHarvest !== null) {
+			for (let i = 0; i < warmHarvest.length; i++) warmHarvest[i].taken = false;
+		}
+		const harvest = (scope: Scope): void => {
+			const cache = (scope.block as any).__warmCache as Map<HookSlot, WarmEntry[]> | undefined;
+			if (cache !== undefined) {
+				for (const [slot, list] of cache) {
+					for (let i = 0; i < list.length; i++) {
+						const entry = list[i];
+						if (entry.available) {
+							(warmHarvest ??= []).push({
+								slot,
+								deps: entry.deps,
+								value: entry.value,
+								taken: false,
+							});
+						}
+					}
+				}
+			}
+			forEachSubtreeChild(scope, harvest);
+		};
+		harvest(attempt.origin);
+		HELD_SYNC_TRANSITION = {
+			origin: attempt.origin,
+			entries,
+			puSwaps,
+			warmHarvest,
+			holders: new Set(held),
+		};
+		// Re-publish the cue on the FIRST hold: the origin re-renders at urgent
+		// priority in this same drain. Cells and bags both hold the old values,
+		// so only the isPending-derived bindings actually write. Continuing
+		// rounds re-established nothing cue-visible, so they skip it.
+		if (!continuing) scheduleRender(attempt.origin);
+	}
+	if (--TRANSITION_JOURNAL_DEPTH === 0) {
+		TRANSITION_JOURNAL = null;
+		TRANSITION_JOURNAL_BAGS = null;
+		flushParkedItems();
+	}
+}
+
+/**
+ * Record a parallel-use memo entry the attempt replaces, with both directions.
+ * The cue re-render renders the OLD inputs and must dep-hit the old entries —
+ * a miss would re-create old-version requests against data sources that have
+ * moved on. The PROMOTED render renders the NEW inputs and must dep-hit the
+ * entries the attempt already created. Publish sites replace the entry object
+ * wholesale, so swapping references swaps deps and value together.
+ * Attempt-owned: the per-boundary journal windows predate this and keep their
+ * pinned replay behavior.
+ */
+function journalPuEntry(scope: Scope, slot: HookSlot, next: unknown): void {
+	const attempt = ACTIVE_TRANSITION_ATTEMPT;
+	if (attempt === null) return;
+	const hooks = ensureHooks(scope);
+	(attempt.puSwaps ??= []).push([hooks, slot, hooks.get(slot), next]);
+}
+
+/** True while the held cells are untouched — an in-place boundary success under
+ * a held sync transition is then the cue re-render, not an urgent supersede. */
+function heldSyncCellsIntact(state: TrySlot): boolean {
+	const held = HELD_SYNC_TRANSITION;
+	if (held === null || !held.holders.has(state)) return false;
+	for (let i = 0; i < held.entries.length; i++) {
+		const entry = held.entries[i];
+		if (!Object.is(entry.slot.value, entry.baseValue)) return false;
+	}
+	return true;
+}
+
+/** Write the held transition forward and schedule its transition renders. */
+function promoteHeldSyncTransition(): boolean {
+	const held = HELD_SYNC_TRANSITION;
+	if (held === null) return false;
+	HELD_SYNC_TRANSITION = null;
+	// Swap the attempt's parallel-use creations forward BEFORE the renders run,
+	// so the promoted pass dep-hits everything the attempt already started.
+	const puSwaps = held.puSwaps;
+	if (puSwaps !== null) {
+		for (let i = 0; i < puSwaps.length; i++) {
+			const [hooks, slot, , next] = puSwaps[i];
+			hooks.set(slot, next);
+		}
+		PROMOTED_PU_SWAPS = PROMOTED_PU_SWAPS === null ? puSwaps : PROMOTED_PU_SWAPS.concat(puSwaps);
+	}
+	// The harvest stays adoptable for this round's renders and, via the
+	// carrier, for the round after a re-suspend.
+	PROMOTED_WARM_HARVEST = held.warmHarvest;
+	const promoted: Array<TransitionActionUpdate<any>> = [];
+	TRANSITION_DEPTH++;
+	try {
+		for (let i = 0; i < held.entries.length; i++) {
+			const entry = held.entries[i];
+			// A cell an urgent write superseded keeps the urgent value — the
+			// pinned synchronous discard semantics.
+			if (!Object.is(entry.slot.value, entry.baseValue)) continue;
+			entry.slot.value = entry.value;
+			if (!entry.block.disposed) {
+				promoted.push(entry);
+				scheduleRender(entry.block);
+			}
+		}
+	} finally {
+		TRANSITION_DEPTH--;
+	}
+	// The promoted round is itself an attempt: if it suspends on a LATER
+	// dependency, the hold must revert these same cells back to the
+	// still-committed old screen (baseValue is untouched) and go around again.
+	if (promoted.length > 0) FLUSHED_TRANSITION_UPDATES.push(promoted);
+	return true;
+}
+
+/** Drop a held sync transition when its last holder stops holding. */
+function discardHeldSyncTransition(state: TrySlot): void {
+	const held = HELD_SYNC_TRANSITION;
+	if (held === null || !held.holders.delete(state)) return;
+	if (held.holders.size === 0) {
+		HELD_SYNC_TRANSITION = null;
+		PROMOTED_PU_SWAPS = null;
+		PROMOTED_WARM_HARVEST = null;
+	}
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Transition binding journal.
@@ -2492,7 +2814,12 @@ function drainQueue(): { err: any } | null {
 				block.drainStamp = drainId;
 				block.drainRenders = 1;
 			}
-			renderBlock(block);
+			const attempt = beginTransitionAttempt(block);
+			try {
+				renderBlock(block);
+			} finally {
+				endTransitionAttempt(attempt);
+			}
 		} catch (err) {
 			try {
 				handleRenderError(block, err);
@@ -2549,6 +2876,9 @@ function flush(): void {
  */
 function flushWork(): void {
 	inFlush = true;
+	// Any retained sync-transition updates belong to the drain below. Whatever
+	// a hold did not consume is finished with once the flush completes.
+	const clearRetainedTransitionUpdates = FLUSHED_TRANSITION_UPDATES.length > 0;
 	// addTransitionType types belong to the transition batch this drain commits:
 	// an UNWRAPPED drain (no boundary, no startViewTransition, flushSync) that
 	// contains transition work consumes them too — they must not leak into a
@@ -2569,6 +2899,8 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
+		if (clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0)
+			FLUSHED_TRANSITION_UPDATES.length = 0;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__devtoolsNotifyFlush();
 		if (clearViewTransitionTypes) viewTransitionDriver!.clearTypes();
@@ -5420,11 +5752,13 @@ export function useMemo<T>(
 	if (WARM_EVER && d !== undefined) {
 		const adopted = adoptWarmValue(s, d);
 		if (adopted !== WARM_MISS) {
-			ensureHooks(scope).set(s, {
+			const adoptedEntry = {
 				deps: d,
-				value: adopted,
+				value: adopted as T,
 				warmEpisode: CURRENT_WARM_EPISODE,
-			});
+			};
+			if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(scope, s, adoptedEntry);
+			ensureHooks(scope).set(s, adoptedEntry);
 			return adopted as T;
 		}
 	}
@@ -5434,6 +5768,10 @@ export function useMemo<T>(
 	// eslint-disable-next-line prefer-spread
 	const value = compute.apply(null, (d ?? []) as []);
 	const entry: { deps: any[] | undefined; value: T; warmEpisode?: number } = { deps: d, value };
+	// The attempt records the replacement both ways: the cue re-render must
+	// dep-hit the old entry (never re-create old-version requests), and the
+	// promoted render must dep-hit this one (never create twice).
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(scope, s, entry);
 	ensureHooks(scope).set(s, entry);
 	if (d !== undefined && recordRealWarmMemo(s, d, entry)) {
 		entry.warmEpisode = CURRENT_WARM_EPISODE;
@@ -8057,6 +8395,20 @@ function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 		}
 		b = b.parentBlock;
 	}
+	// Held-transition fallback: the attempt's harvest is episode-agnostic, so a
+	// later round's render (whatever episode it minted) still adopts the fetch
+	// the warm walk already started instead of creating it again. Consulted for
+	// the round in flight via the promoted carrier as well as the live hold.
+	const harvestList = HELD_SYNC_TRANSITION?.warmHarvest ?? PROMOTED_WARM_HARVEST;
+	if (harvestList !== null && harvestList !== undefined) {
+		for (let i = 0; i < harvestList.length; i++) {
+			const entry = harvestList[i];
+			if (!entry.taken && entry.slot === slot && !depsChanged(entry.deps, deps)) {
+				entry.taken = true;
+				return entry.value;
+			}
+		}
+	}
 	return WARM_MISS;
 }
 
@@ -8096,11 +8448,13 @@ function puHit(slot: HookSlot, entry: PuMemoEntry): any {
 function puAdopt(slot: HookSlot, deps: any[]): any {
 	const adopted = adoptWarmValue(slot, deps);
 	if (adopted === WARM_MISS) return puMiss;
-	ensureHooks(CURRENT_SCOPE!).set(slot, {
+	const adoptedEntry: PuMemoEntry = {
 		deps,
 		value: adopted,
 		warmEpisode: CURRENT_WARM_EPISODE,
-	});
+	};
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(CURRENT_SCOPE!, slot, adoptedEntry);
+	ensureHooks(CURRENT_SCOPE!).set(slot, adoptedEntry);
 	return adopted;
 }
 
@@ -8174,6 +8528,7 @@ export function puTake4(slot: HookSlot, d0: any, d1: any, d2: any, d3: any): any
 
 export function puPub(slot: HookSlot, value: any, ...deps: any[]): any {
 	const entry: PuMemoEntry = { deps, value };
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(CURRENT_SCOPE!, slot, entry);
 	ensureHooks(CURRENT_SCOPE!).set(slot, entry);
 	if (recordRealWarmMemo(slot, deps, entry)) entry.warmEpisode = CURRENT_WARM_EPISODE;
 	return value;
@@ -17316,6 +17671,13 @@ export function childSlot(
 			// blocks upgrade adopts the SAME way (the element's raw children ARE the
 			// incoming items), so it must not sweep either.
 			if (hydration === null && !upgradeArmed) clearChildContent(state);
+			// A text-mode sole-child write wiped the host wholesale and took the
+			// minted markers with it. Anchoring the new list on those detached
+			// comments would insert into a null parent — drop them and re-mint.
+			if (state.end !== null && state.end.parentNode === null) {
+				state.end = null;
+				state.start = null;
+			}
 			if (state.end === null) {
 				// OWNS-PARENT slot entering array mode: ForSlot requires a real
 				// marker pair (reconcileKeyed anchors on it) — mint it lazily,
@@ -18797,8 +19159,14 @@ export function tryBlock(
 			// invalidate the pending retry so the eventual .then callback no-ops.
 			// Matches React's "urgent setState while transition is suspended
 			// discards the transition" semantics (ReactUse-test.js:1631).
-			releaseHeldTransition(s);
-			s.pendingThenable = null;
+			// A cue re-render under a held sync transition re-renders this body
+			// with the reverted (old) cells and succeeds — that is the held screen
+			// re-asserting itself, not an urgent supersede. Keep holding; the
+			// promotion on settle is what ends this hold.
+			if (!heldSyncCellsIntact(s)) {
+				releaseHeldTransition(s);
+				s.pendingThenable = null;
+			}
 		} catch (err) {
 			// §6.3 control signal — never an application failure: pass it through
 			// so the renderer-region owner (handleRenderError) receives it; a
@@ -19080,6 +19448,10 @@ function showTryBlock(state: TrySlot): void {
  * No-op if no hold is currently held.
  */
 function releaseHeldTransition(state: TrySlot): void {
+	// An urgent supersede (or error/unmount) ends this boundary's hold; when the
+	// last holder goes, the reverted cells stay reverted and the staged values
+	// are dropped — the pinned synchronous discard semantics.
+	discardHeldSyncTransition(state);
 	if (state.transitionHeld) {
 		state.transitionHeld = false;
 		tickTransitionCount(-1);
@@ -19167,6 +19539,11 @@ function handleSuspense(
 		// the render and this undo are the same synchronous flush — so the
 		// boundary simply never shows half of the new screen.
 		rollbackTransitionJournal(journalCheckpoint);
+		// A whole-drain attempt is in flight: this hold makes it unwind, and the
+		// boundary joins the held set so promotion and discard can find it.
+		if (ACTIVE_TRANSITION_ATTEMPT !== null) {
+			(ACTIVE_TRANSITION_ATTEMPT.heldSlots ??= new Set()).add(state);
+		}
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -19394,6 +19771,13 @@ function refreshPendingBody(state: TrySlot): void {
  */
 function swapToPendingFallback(state: TrySlot): void {
 	if (!state.pendingBody || state.branch !== 1 || !state.tryBlock) return;
+	// Once the fallback shows, the held-whole contract is over for this
+	// boundary: write the staged screen forward now so the shell commits the
+	// new values alongside the fallback (what React shows after its own
+	// timeout), and the hidden primary retries against the data in flight.
+	if (HELD_SYNC_TRANSITION !== null && HELD_SYNC_TRANSITION.holders.has(state)) {
+		promoteHeldSyncTransition();
+	}
 	hideTryContentAndMountPending(state);
 }
 
@@ -19936,6 +20320,25 @@ function rebaseOffscreenCaptureSeq(capture: OffscreenCapture): void {
 
 function flushStagedReveals(): void {
 	if (flushingStagedReveals) return; // re-entrancy guard (a reveal may abandon a sibling)
+	// Deferred commit: when the barrier is satisfied for a held sync transition
+	// whose boundaries are all still visible, the reveal IS the promotion — the
+	// staged screen writes forward and ordinary transition renders re-drive the
+	// origin and every held boundary in one flush. A boundary the timeout
+	// already hid keeps the existing hidden-retry path instead.
+	if (HELD_SYNC_TRANSITION !== null) {
+		let allVisible = true;
+		for (const holder of HELD_SYNC_TRANSITION.holders) {
+			if (holder.hiddenDom !== null) {
+				allVisible = false;
+				break;
+			}
+		}
+		if (allVisible && promoteHeldSyncTransition()) {
+			STAGED_REVEALS.clear();
+			flush();
+			return;
+		}
+	}
 	flushingStagedReveals = true;
 	try {
 		const run = (): void => {

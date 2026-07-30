@@ -680,3 +680,26 @@ export function TransitionArrayModeExit(props) @{
 		}
 	</div>
 }
+
+// ---------------------------------------------------------------------------
+// The shell sits OUTSIDE the boundary, so nothing held it: the same transition
+// patched it on the way past and it ran ahead of the content it describes.
+// With the deferred commit, the shell, its effect, and the held content all
+// move in one step. The effect tracks whether an aborted attempt leaked — it
+// must run once, for the step the screen actually lands on.
+// ---------------------------------------------------------------------------
+export function TransitionOutsideBoundary(props) @{
+	const [step, setStep] = useState(0);
+	useEffect(() => {
+		props.log('effect:' + step);
+	}, [step]);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<h1 id="shell">{'shell-' + step}</h1>
+		@try {
+			<ControlledValue load={props.load} step={step} />
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
