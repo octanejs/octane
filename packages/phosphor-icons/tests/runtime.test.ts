@@ -106,3 +106,44 @@ describe('@octanejs/phosphor-icons — runtime behavior', () => {
 		expect(localRefs.at(-1)).toBe(null);
 	});
 });
+
+// Every icon renders its weight's SVG primitives as an ARRAY child, which is a
+// keyed position in octane's reconciler. Upstream sidesteps this by storing one
+// ReactElement per weight; this port stores `[tag, attributes]` tuples so the
+// generated icons stay tree-shakeable, which means the port owns the keys.
+// Without them octane warns, and a weight switch reconciles by position with no
+// identity — the exact case the warning exists for.
+describe('@octanejs/phosphor-icons — keyed weight primitives', () => {
+	function captureWarnings(run: () => void): string[] {
+		const seen: string[] = [];
+		const original = console.warn;
+		console.warn = (...args: unknown[]) => {
+			seen.push(args.map(String).join(' '));
+		};
+		try {
+			run();
+		} finally {
+			console.warn = original;
+		}
+		return seen;
+	}
+
+	it('renders without octane key warnings', () => {
+		const warnings = captureWarnings(() => {
+			const mounted = mount(Camera, { id: 'keyed' });
+			mounted.unmount();
+		});
+		expect(warnings.filter((w) => w.includes('unique "key"'))).toEqual([]);
+	});
+
+	it('swaps every primitive when the weight changes', () => {
+		const mounted = mount(Camera, { id: 'w', weight: 'regular' });
+		const before = [...mounted.find('#w').querySelectorAll('path')].map((p) => p.getAttribute('d'));
+		expect(before).toEqual(cameraWeights.regular.map(([, attrs]) => attrs.d));
+
+		mounted.update(Camera, { id: 'w', weight: 'duotone' } as never);
+		const after = [...mounted.find('#w').querySelectorAll('path')].map((p) => p.getAttribute('d'));
+		expect(after).toEqual(cameraWeights.duotone.map(([, attrs]) => attrs.d));
+		mounted.unmount();
+	});
+});
