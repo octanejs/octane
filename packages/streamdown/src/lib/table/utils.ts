@@ -3,6 +3,14 @@ export interface TableData {
 	rows: string[][];
 }
 
+const TABLE_CONTAINER_SELECTOR =
+	'[data-streamdown="table-wrapper"], [data-streamdown="table-fullscreen"]';
+
+export const findTableForControl = (control: Element | null): HTMLTableElement | null =>
+	control
+		?.closest(TABLE_CONTAINER_SELECTOR)
+		?.querySelector<HTMLTableElement>('table[data-streamdown="table"]') ?? null;
+
 export const extractTableDataFromElement = (tableElement: HTMLElement): TableData => {
 	const headers: string[] = [];
 	const rows: string[][] = [];

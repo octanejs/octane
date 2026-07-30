@@ -6,7 +6,12 @@ import { useCn } from '../prefix-context.tsrx';
 import { useTranslations } from '../translations-context.tsrx';
 import type { NativeMouseEvent } from '../types';
 import { save } from '../utils';
-import { extractTableDataFromElement, tableDataToCSV, tableDataToMarkdown } from './utils';
+import {
+	extractTableDataFromElement,
+	findTableForControl,
+	tableDataToCSV,
+	tableDataToMarkdown,
+} from './utils';
 
 export interface TableDownloadButtonProps {
 	children?: OctaneNode;
@@ -32,10 +37,7 @@ export const TableDownloadButton = ({
 
 	const downloadTableData = (event: NativeMouseEvent<HTMLButtonElement>) => {
 		try {
-			// Find the closest table element
-			const button = event.currentTarget;
-			const tableWrapper = button.closest('[data-streamdown="table-wrapper"]');
-			const tableElement = tableWrapper?.querySelector('table') as HTMLTableElement;
+			const tableElement = findTableForControl(event.currentTarget);
 
 			if (!tableElement) {
 				onError?.(new Error('Table not found'));
@@ -108,8 +110,7 @@ export const TableDownloadDropdown = ({
 
 	const downloadTableData = (format: 'csv' | 'markdown') => {
 		try {
-			const tableWrapper = dropdownRef.current?.closest('[data-streamdown="table-wrapper"]');
-			const tableElement = tableWrapper?.querySelector('table') as HTMLTableElement;
+			const tableElement = findTableForControl(dropdownRef.current);
 
 			if (!tableElement) {
 				onError?.(new Error('Table not found'));

@@ -6,6 +6,7 @@ import { useCn } from '../prefix-context.tsrx';
 import { useTranslations } from '../translations-context.tsrx';
 import {
 	extractTableDataFromElement,
+	findTableForControl,
 	tableDataToCSV,
 	tableDataToMarkdown,
 	tableDataToTSV,
@@ -41,8 +42,7 @@ export const TableCopyDropdown = ({
 		}
 
 		try {
-			const tableWrapper = dropdownRef.current?.closest('[data-streamdown="table-wrapper"]');
-			const tableElement = tableWrapper?.querySelector('table') as HTMLTableElement;
+			const tableElement = findTableForControl(dropdownRef.current);
 
 			if (!tableElement) {
 				onError?.(new Error('Table not found'));
