@@ -41,6 +41,7 @@ surface and evidence.
 | `@octanejs/redux` | 0 |
 | `@octanejs/redux-toolkit` | 0 |
 | `@octanejs/remix-router` | 0 |
+| `@octanejs/rxjs` | 0 |
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/sonner` | 0 |
 | `@octanejs/streamdown` | 0 |

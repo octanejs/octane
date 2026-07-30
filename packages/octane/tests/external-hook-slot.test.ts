@@ -668,6 +668,7 @@ describe('manifest-declared manual hook slots', () => {
 			'rainbowkit',
 			'react-error-boundary',
 			'remix-router',
+			'rxjs',
 			'styled-components',
 			'stylex',
 			'tanstack-query',

@@ -227,6 +227,13 @@ async function loadRoute(
 					null,
 					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 				);
+				// Route preparation and a Vite recovery reload can both finish after
+				// `load`. The behavioral boundary is route-owned DOM, not an arbitrary
+				// two-frame delay. Wait for that boundary before reading the text; the
+				// callers still assert the route rendered user-visible content.
+				await page.waitForFunction(() => document.querySelector('main > *') !== null, null, {
+					timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+				});
 				const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
 				return { page, errors, main };
 			} catch (error) {
