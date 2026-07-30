@@ -4,6 +4,11 @@ import { SKIP, visitParents } from 'unist-util-visit-parents';
 
 export interface AnimatePlugin {
 	/**
+	 * Selects the isolated render state used by the next synchronous rehype run.
+	 * Streamdown calls this before rendering each block.
+	 */
+	setActiveBlock: (key: string | number) => void;
+	/**
 	 * Returns the total HAST text node character count from the last
 	 * rehype run, then resets to 0. Use this value as the argument to
 	 * setPrevContentLength on the next render.
@@ -128,6 +133,11 @@ interface AnimateRenderState {
 	prevContentLength: number;
 }
 
+const createAnimateRenderState = (): AnimateRenderState => ({
+	prevContentLength: 0,
+	lastRenderCharCount: 0,
+});
+
 const processTextNode = (
 	node: Text,
 	ancestors: Node[],
@@ -191,15 +201,23 @@ export function createAnimatePlugin(options?: AnimateOptions): AnimatePlugin {
 		stagger: options?.stagger ?? 40,
 	};
 
-	// Mutable render state — the rehype closure and the plugin API methods
-	// both reference this same object.
-	const renderState: AnimateRenderState = {
-		prevContentLength: 0,
-		lastRenderCharCount: 0,
+	// Octane renders sibling component bodies and their descendants depth-first.
+	// Keep one state per block so one block's synchronous rehype run cannot become
+	// the "previous render" observed by the next sibling.
+	const renderStates = new Map<string | number, AnimateRenderState>();
+	let activeBlock: string | number = 'static';
+	const getRenderState = () => {
+		let state = renderStates.get(activeBlock);
+		if (!state) {
+			state = createAnimateRenderState();
+			renderStates.set(activeBlock, state);
+		}
+		return state;
 	};
 
 	const id = instanceId++;
 	const rehypeAnimate = () => (tree: Root) => {
+		const renderState = getRenderState();
 		const charCounter = { count: 0, newIndex: 0 };
 		visitParents(tree, 'text', (node: Text, ancestors) =>
 			processTextNode(node, ancestors, config, renderState, charCounter),
@@ -221,10 +239,14 @@ export function createAnimatePlugin(options?: AnimateOptions): AnimatePlugin {
 		name: 'animate',
 		type: 'animate',
 		rehypePlugin: rehypeAnimate,
+		setActiveBlock(key: string | number) {
+			activeBlock = key;
+		},
 		setPrevContentLength(length: number) {
-			renderState.prevContentLength = length;
+			getRenderState().prevContentLength = length;
 		},
 		getLastRenderCharCount() {
+			const renderState = getRenderState();
 			const count = renderState.lastRenderCharCount;
 			renderState.lastRenderCharCount = 0;
 			return count;

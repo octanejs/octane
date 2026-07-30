@@ -284,91 +284,44 @@ export type BlockProps =
 		animatePlugin?: AnimatePlugin | null;
 	};
 
-export const Block = memo(
-	// Destructure internal props to prevent them from leaking to the DOM
-	({
-		content,
-		shouldParseIncompleteMarkdown: _,
-		shouldNormalizeHtmlIndentation,
-		index: __,
-		isIncomplete,
-		dir,
-		animatePlugin: animatePluginProp,
-		...props
-	}: BlockProps) => {
-		// Tell the animate plugin how many HAST characters were already rendered
-		// so it can skip their animation (duration=0ms) on this render pass.
-		//
-		// getLastRenderCharCount() returns the char count from the PREVIOUS
-		// rehype run then resets to 0. Octane evaluates descendants depth-first: this Block's
-		// body runs, then its child Markdown calls processor.runSync (which
-		// runs rehypeAnimate synchronously). So the value here is from the
-		// previous render — exactly what we need as prevContentLength.
-		if (animatePluginProp) {
-			const prevCount = animatePluginProp.getLastRenderCharCount();
-			animatePluginProp.setPrevContentLength(prevCount);
-		}
+// Destructure internal props to prevent them from leaking to the DOM.
+export const Block = memo(({
+	content,
+	shouldParseIncompleteMarkdown: _,
+	shouldNormalizeHtmlIndentation,
+	index,
+	isIncomplete,
+	dir,
+	animatePlugin: animatePluginProp,
+	...props
+}: BlockProps) => {
+	// Tell the animate plugin how many HAST characters were already rendered
+	// so it can skip their animation (duration=0ms) on this render pass.
+	//
+	// getLastRenderCharCount() returns the char count from the PREVIOUS
+	// rehype run then resets to 0. Octane evaluates descendants depth-first: this Block's
+	// body runs, then its child Markdown calls processor.runSync (which
+	// runs rehypeAnimate synchronously). So the value here is from the
+	// previous render — exactly what we need as prevContentLength.
+	if (animatePluginProp) {
+		animatePluginProp.setActiveBlock(index);
+		const prevCount = animatePluginProp.getLastRenderCharCount();
+		animatePluginProp.setPrevContentLength(prevCount);
+	}
 
-		// Note: remend is already applied to the entire markdown before parsing into blocks
-		// in the Streamdown component, so we don't need to apply it again here
-		const normalizedContent =
-			typeof content === 'string' && shouldNormalizeHtmlIndentation
-				? normalizeHtmlIndentation(content)
-				: content;
+	// Note: remend is already applied to the entire markdown before parsing into blocks
+	// in the Streamdown component, so we don't need to apply it again here
+	const normalizedContent =
+		typeof content === 'string' && shouldNormalizeHtmlIndentation
+			? normalizeHtmlIndentation(content)
+			: content;
 
-		const inner = <Markdown {...props}>{normalizedContent}</Markdown>;
+	const inner = <Markdown {...props}>{normalizedContent}</Markdown>;
 
-		return <BlockIncompleteContext.Provider value={isIncomplete}>
-			{dir ? <div dir={dir} style={{ display: 'contents' }}>{inner}</div> : (inner)}
-		</BlockIncompleteContext.Provider>;
-	},
-	(prevProps, nextProps) => {
-		// Deep comparison for better memoization
-		if (prevProps.content !== nextProps.content) {
-			return false;
-		}
-		if (prevProps.shouldNormalizeHtmlIndentation !== nextProps.shouldNormalizeHtmlIndentation) {
-			return false;
-		}
-		if (prevProps.index !== nextProps.index) {
-			return false;
-		}
-
-		if (prevProps.isIncomplete !== nextProps.isIncomplete) {
-			return false;
-		}
-
-		if (prevProps.dir !== nextProps.dir) {
-			return false;
-		}
-
-		// Check if components object changed (shallow comparison)
-		if (prevProps.components !== nextProps.components) {
-			// If references differ, check if keys are the same
-			const prevKeys = Object.keys(prevProps.components || {});
-			const nextKeys = Object.keys(nextProps.components || {});
-
-			if (prevKeys.length !== nextKeys.length) {
-				return false;
-			}
-			if (prevKeys.some((key) => prevProps.components?.[key] !== nextProps.components?.[key])) {
-				return false;
-			}
-		}
-
-		// Check if rehypePlugins changed (reference comparison)
-		if (prevProps.rehypePlugins !== nextProps.rehypePlugins) {
-			return false;
-		}
-
-		// Check if remarkPlugins changed (reference comparison)
-		if (prevProps.remarkPlugins !== nextProps.remarkPlugins) {
-			return false;
-		}
-
-		return true;
-	},
-);
+	return <BlockIncompleteContext.Provider value={isIncomplete}>
+		{dir ? <div dir={dir} style={{ display: 'contents' }}>{inner}</div> : (inner)}
+	</BlockIncompleteContext.Provider>;
+});
 
 Object.assign(Block, { displayName: 'Block' });
 
@@ -695,6 +648,7 @@ export const Streamdown = memo(({
 
 	// Static mode: simple rendering without streaming features
 	if (mode === 'static') {
+		animatePlugin?.setActiveBlock('static');
 		return <TranslationsContext.Provider value={translationsValue}>
 			<PluginContext.Provider value={plugins ?? null}>
 				<StreamdownContext.Provider value={contextValue}>
@@ -762,5 +716,5 @@ export const Streamdown = memo(({
 			</StreamdownContext.Provider>
 		</PluginContext.Provider>
 	</TranslationsContext.Provider>;
-}, (prevProps, nextProps) => prevProps.children === nextProps.children && prevProps.shikiTheme === nextProps.shikiTheme && prevProps.isAnimating === nextProps.isAnimating && prevProps.animated === nextProps.animated && prevProps.mode === nextProps.mode && prevProps.plugins === nextProps.plugins && prevProps.className === nextProps.className && prevProps.linkSafety === nextProps.linkSafety && prevProps.lineNumbers === nextProps.lineNumbers && prevProps.normalizeHtmlIndentation === nextProps.normalizeHtmlIndentation && prevProps.literalTagContent === nextProps.literalTagContent && JSON.stringify(prevProps.translations) === JSON.stringify(nextProps.translations) && prevProps.prefix === nextProps.prefix && prevProps.dir === nextProps.dir);
+});
 Object.assign(Streamdown, { displayName: 'Streamdown' });

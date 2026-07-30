@@ -19,6 +19,16 @@ function expectUpstreamCodeBlockParity(octaneHtml: string, reactHtml: string): v
 	expect(normaliseHtml(octaneHtml)).toBe(normaliseUpstreamCodeBlockBackgrounds(reactHtml));
 }
 
+// Streamdown 2.5 shares animation progress across sibling blocks. Compare every
+// other DOM detail with upstream, then assert the corrected timing separately.
+function normaliseAnimationTiming(html: string): string {
+	return normaliseHtml(html).replace(/ ?--sd-(?:duration|delay): \d+ms;/g, '');
+}
+
+function expectUpstreamAnimationParity(octaneHtml: string, reactHtml: string): void {
+	expect(normaliseAnimationTiming(octaneHtml)).toBe(normaliseAnimationTiming(reactHtml));
+}
+
 const STATIC_MARKDOWN = [
 	'# Streamdown',
 	'',
@@ -64,11 +74,31 @@ describe('@octanejs/streamdown differential parity', () => {
 		);
 
 		const firstOctaneHeading = differential.octane.find('h1');
-		await differential.step('initial stream', () => {});
-		await differential.step('append block', async (octane, react) => {
+		await differential.observe('initial stream', () => {});
+		expectUpstreamAnimationParity(
+			differential.octane.container.innerHTML,
+			differential.react.container.innerHTML,
+		);
+		for (const animatedText of differential.octane.findAll('[data-sd-animate]')) {
+			expect((animatedText as HTMLElement).style.getPropertyValue('--sd-duration')).toBe('100ms');
+		}
+		expect(
+			(differential.octane.findAll('p [data-sd-animate]')[1] as HTMLElement).style.getPropertyValue(
+				'--sd-delay',
+			),
+		).toBe('40ms');
+
+		await differential.observe('append block', async (octane, react) => {
 			await octane.click('#append-markdown');
 			await react.click('#append-markdown');
 		});
+		expectUpstreamAnimationParity(
+			differential.octane.container.innerHTML,
+			differential.react.container.innerHTML,
+		);
+		for (const animatedText of differential.octane.findAll('h2 [data-sd-animate]')) {
+			expect((animatedText as HTMLElement).style.getPropertyValue('--sd-duration')).toBe('100ms');
+		}
 
 		expect(differential.octane.find('h1')).toBe(firstOctaneHeading);
 		expect(differential.octane.findAll('h2')).toHaveLength(1);
