@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { classifyCiChange } from './classify-ci-change.mjs';
+import { classifyCiChange, parseChangedPaths } from './classify-ci-change.mjs';
 
 const rootPackage = {
 	name: 'octane-monorepo',
@@ -28,6 +28,31 @@ describe('classifyCiChange', () => {
 	test('runs full CI when any executable file changes', () => {
 		assert.equal(classify(['docs/ssr.md', 'packages/octane/src/runtime.ts']), true);
 		assert.equal(classify([]), true);
+	});
+
+	test('classifies both sides of renames and copies', () => {
+		const files = parseChangedPaths(
+			[
+				'R100',
+				'packages/octane/src/runtime.ts',
+				'docs/runtime.ts',
+				'C075',
+				'packages/octane/src/constants.ts',
+				'docs/constants.ts',
+				'M',
+				'README.md',
+				'',
+			].join('\0'),
+		);
+
+		assert.deepEqual(files, [
+			'packages/octane/src/runtime.ts',
+			'docs/runtime.ts',
+			'packages/octane/src/constants.ts',
+			'docs/constants.ts',
+			'README.md',
+		]);
+		assert.equal(classify(files), true);
 	});
 
 	test('keeps the CI control-plane bundle on the lightweight path', () => {

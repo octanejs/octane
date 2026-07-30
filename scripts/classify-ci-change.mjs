@@ -92,6 +92,29 @@ export function classifyCiChange({
 	};
 }
 
+export function parseChangedPaths(nameStatusOutput) {
+	const fields = nameStatusOutput.split('\0');
+	if (fields.at(-1) === '') fields.pop();
+
+	const files = [];
+	for (let index = 0; index < fields.length;) {
+		const status = fields[index++];
+		if (!/^[ACDMRTUXB]\d*$/.test(status)) {
+			throw new Error(`Unexpected git diff status: ${status || '<empty>'}`);
+		}
+
+		const pathCount = status[0] === 'R' || status[0] === 'C' ? 2 : 1;
+		if (index + pathCount > fields.length) {
+			throw new Error(`Incomplete git diff record for status ${status}`);
+		}
+		for (let pathIndex = 0; pathIndex < pathCount; pathIndex++) {
+			files.push(fields[index++]);
+		}
+	}
+
+	return [...new Set(files)];
+}
+
 function argument(name) {
 	const index = process.argv.indexOf(name);
 	return index === -1 ? undefined : process.argv[index + 1];
@@ -109,13 +132,21 @@ function classifyRevisions(base, head) {
 		};
 	}
 
-	const files = execFileSync(
-		'git',
-		['diff', '--name-only', '--diff-filter=ACDMRTUXB', '-z', `${base}..${head}`],
-		{ encoding: 'utf8' },
-	)
-		.split('\0')
-		.filter(Boolean);
+	const files = parseChangedPaths(
+		execFileSync(
+			'git',
+			[
+				'diff',
+				'--name-status',
+				'--find-renames',
+				'--find-copies',
+				'--diff-filter=ACDMRTUXB',
+				'-z',
+				`${base}..${head}`,
+			],
+			{ encoding: 'utf8' },
+		),
+	);
 	const packageChanged = files.includes('package.json');
 
 	return classifyCiChange({
