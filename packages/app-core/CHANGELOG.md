@@ -1,5 +1,121 @@
 # @octanejs/app-core
 
+## 0.0.16
+
+### Patch Changes
+
+- 89323b7: Fail the boot on a `module server` function id collision instead of silently
+  rerouting one function's calls to another.
+
+  An id is `strong_hash("<module>#<export>")`, a SHA-256 truncated to 8 hex
+  characters, whose own documentation calls it "fine for identification, not for
+  authentication". Both registration paths were a plain Map set, which resolves a
+  collision by overwriting: one function became unreachable and every call to it
+  executed the other one instead, under whatever authorization that other function
+  carries. Nothing reported it, and which function wins depends on module
+  evaluation order.
+
+  Dev registers through `globalThis.rpc_modules`, which is now built by
+  `createRpcRegistry()` and rejects a second declaration under an id another export
+  already took. Re-registering the same export stays a no-op, which module reloads
+  depend on. Production builds its descriptor map from the server manifest and
+  throws from `createHandler` on a duplicate id, before serving a request.
+
+  Both report the two colliding module paths and export names, and say that
+  renaming either export resolves it. This does not widen the id: 32 bits stays
+  narrow enough to collide at scale, but the failure is now loud and happens at
+  build or boot rather than in production traffic.
+
+- 89323b7: Tell middleware which server function an RPC request targets, so authorization
+  can be written per function instead of per endpoint.
+
+  `options.middlewares` is one chain for the whole RPC boundary, and the only
+  identifying thing in the request was a compiler-assigned hash in the URL. A
+  policy could authenticate the caller but could not express "the admin functions
+  require an admin role" without hard-coding hashes that change on rename.
+
+  `Context.rpc` now names the target, and is populated before the middleware chain
+  runs:
+
+  ```ts
+  const authorize: Middleware = async (context, next) => {
+  	if (context.rpc?.module === '/src/admin.ts' && !isAdmin(context)) {
+  		return new Response('Forbidden', { status: 403 });
+  	}
+  	return next();
+  };
+  ```
+
+  The mapping comes from a new optional `describeFunction(hash)` on
+  `RpcRequestOptions`, which names an export without loading its module and is
+  synchronous so the middleware chain never waits on it. The Vite plugin reads the
+  dev registration map, and the production handler builds descriptors from the
+  server manifest once per handler, because `build_rpc_lookup` keeps only the
+  namespace object and export name. An integration that omits `describeFunction`
+  gets `module` and `export` as `null`, which a per-function policy will not match,
+  so a hand-rolled boundary must supply it before relying on one.
+
+  `rpc.id` is the raw hash and is stable only within a build; authorize on
+  `module`/`export`. Unauthorized requests already never reached the target
+  function, since `resolveFunction` runs as the middleware chain's final handler;
+  this adds the identity that was missing, not a new ordering guarantee.
+
+- 0a0b813: Give `module server` functions access to the request they are serving, via
+  `getRequestContext()` and `tryGetRequestContext()`.
+
+  The RPC boundary built a full `Context` for every request and handed it to the
+  middleware chain, but the request store it ran the handler inside carried only
+  `origin` and `platform`. A server function could therefore not read the headers,
+  cookies, or middleware `state` for its own request, so the identity of the caller
+  had to arrive as an argument from the browser, which is exactly the value a
+  mutation must not trust. Render routes already received middleware state through
+  `RenderRouteProps.state`; server functions now have the equivalent.
+
+  ```tsx
+  module server {
+  	import { getRequestContext } from '@octanejs/app-core';
+
+  	export async function deletePost(id: string) {
+  		const { state } = getRequestContext();
+  		const user = state.get('user');
+  		if (!user) throw new Error('Not signed in');
+  		await db.posts.delete(id, user.id);
+  	}
+  }
+  ```
+
+  The returned `Context` is the same instance the middleware chain observed,
+  including its `state` mutations. `context.request.body` is already consumed by
+  the time a server function runs, since the boundary reads it under the configured
+  size limit before dispatching, so `bodyUsed` is `true`; headers, cookies, and
+  `url` are unaffected. `getRequestContext()` throws outside a request because that
+  is a programmer error, and `tryGetRequestContext()` returns `null` for code that
+  has to run in both places.
+
+  The active async context is published on a `Symbol.for` global, matching the
+  existing fetch coordinator, so the accessor resolves the live store even though a
+  server function is loaded through a separate module graph in dev and through the
+  server manifest in production. Dev and production share the one boundary, so both
+  behave identically. This does not yet cover SSR render routes, which never enter
+  the request async context.
+
+- c151b71: Add optional Strong mode for clearer state and ref behavior. Enable it across an
+  application with `compiler: { strong: true }`, in one module with `"use strong"`,
+  or through the Vite, Rspack, and Rsbuild plugin options. Strong modules reject
+  state updates during render, direct state updates while setting up an effect, and
+  render-time writes to refs, with `useLinkedState` available for state that
+  should follow another value.
+- Updated dependencies [c6370b6]
+- Updated dependencies [dd272ad]
+- Updated dependencies [c151b71]
+- Updated dependencies [66b51d8]
+- Updated dependencies [a57c32a]
+- Updated dependencies [e38a557]
+- Updated dependencies [bd90e27]
+- Updated dependencies [ae6811d]
+- Updated dependencies [62d81b8]
+  - octane@0.1.20
+
 ## 0.0.15
 
 ### Patch Changes

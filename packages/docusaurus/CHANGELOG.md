@@ -1,5 +1,33 @@
 # @octanejs/docusaurus
 
+## 0.0.4
+
+### Patch Changes
+
+- 3983b13: Add Docusaurus document and client-module asset orchestration, a full SSR HTML
+  composer, and the initial Octane-native classic documentation theme. Nested
+  Docusaurus layout routes that share an absolute pathname now map correctly onto
+  the Remix route hierarchy.
+- 4c896b7: Add lazy client routing over the Docusaurus manifest, including browser and
+  memory router factories, nested route rendering and context, and a Vite virtual
+  module with statically analyzable route imports.
+- d1526d9: Resolve classic theme links against the configured base URL and render footer copyright markup as Docusaurus-compatible HTML.
+- 7551059: Add static route prerendering and client hydration over the lazy Docusaurus
+  route graph, with matched-branch loading and adoptable Octane server markup.
+- Updated dependencies [c6370b6]
+- Updated dependencies [dd272ad]
+- Updated dependencies [c151b71]
+- Updated dependencies [66b51d8]
+- Updated dependencies [a57c32a]
+- Updated dependencies [e38a557]
+- Updated dependencies [bd90e27]
+- Updated dependencies [ae6811d]
+- Updated dependencies [62d81b8]
+  - octane@0.1.20
+  - @octanejs/mdx@0.1.17
+  - @octanejs/remix-router@0.1.16
+  - @octanejs/seo@0.0.5
+
 ## 0.0.3
 
 ### Patch Changes

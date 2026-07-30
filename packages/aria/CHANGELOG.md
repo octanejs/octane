@@ -1,5 +1,40 @@
 # @octanejs/aria
 
+## 0.0.14
+
+### Patch Changes
+
+- 9975620: Pass `.tsrx` block children through RAC render props instead of invoking them.
+
+  A component authored with octane's `@{ … }` body form compiles its children to a
+  tagged block function. React Aria Components treats a function child as a render
+  prop, so every unguarded `typeof children === 'function'` check invoked that
+  block with render values instead of a scope and threw
+  `Cannot read properties of undefined (reading 'block')` — breaking the idiomatic
+  way to author any RAC component in `.tsrx`.
+
+  Block children are now detected with `isChildrenBlock` and rendered as ordinary
+  children at all five sites that consume them: `useRenderProps`,
+  `composeRenderProps`, `Tabs`, `Popover`, `Select`, and `ComboBox`. A genuine
+  render prop is still called with its render values. `composeRenderProps` is the
+  one applications hit most, because it is how a component wraps its own markup
+  around the caller's children.
+
+  Also publishes `Focusable` from `@octanejs/aria/components`. Upstream RAC exports
+  it from both its hooks and its components entry; this package had it only on the
+  hooks surface.
+
+- Updated dependencies [c6370b6]
+- Updated dependencies [dd272ad]
+- Updated dependencies [c151b71]
+- Updated dependencies [66b51d8]
+- Updated dependencies [a57c32a]
+- Updated dependencies [e38a557]
+- Updated dependencies [bd90e27]
+- Updated dependencies [ae6811d]
+- Updated dependencies [62d81b8]
+  - octane@0.1.20
+
 ## 0.0.13
 
 ### Patch Changes

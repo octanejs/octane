@@ -1,5 +1,105 @@
 # octane
 
+## 0.1.20
+
+### Patch Changes
+
+- c6370b6: Add `octane/testing` with `clampJsdomScrollTop()`, an opt-in helper that clamps
+  jsdom's stored scroll position to its reported range and dispatches the
+  resulting native scroll event.
+- dd272ad: Expose a stable native error-boundary reset ref for renderer adapters.
+- c151b71: Add optional Strong mode for clearer state and ref behavior. Enable it across an
+  application with `compiler: { strong: true }`, in one module with `"use strong"`,
+  or through the Vite, Rspack, and Rsbuild plugin options. Strong modules reject
+  state updates during render, direct state updates while setting up an effect, and
+  render-time writes to refs, with `useLinkedState` available for state that
+  should follow another value.
+- 66b51d8: Run the mount effects of components a boundary rendered but never committed.
+
+  A `useEffect` could be lost outright. When a Suspense boundary suspended on
+  something rendered _after_ a sibling — a `@for` of children followed by a
+  component that calls `use()` on a pending promise, say — those earlier siblings
+  had already run their hooks before the attempt was abandoned. Their effects were
+  queued and then dropped along with the rest of the aborted attempt, but the
+  slots kept the dependency arrays that attempt had stamped. When the promise
+  resolved and the content was revealed, the re-render compared those deps, found
+  them unchanged, and enqueued nothing. The mount body never ran, and neither did
+  the cleanup it would have returned, so subscriptions, timers, and observers set
+  up in `useEffect` silently never started. `useLayoutEffect` was unaffected.
+
+  Hiding a boundary behind its fallback still leaves passive effects subscribed,
+  which is what React does for content that is on screen and merely hidden. That
+  now applies only to effects that actually ran. One that never ran has no
+  subscription to preserve, so it resets like a layout effect and fires when the
+  boundary finally commits — React fires every mount effect in the subtree when a
+  suspended mount lands.
+
+  This also covers a boundary that commits, then re-renders with a new child and
+  suspends: the new child's effects mount on reveal while its already-committed
+  siblings keep the subscriptions they had.
+
+- a57c32a: Hold a Suspense boundary whole through a transition.
+
+  A transition that suspended used to leave part of the new screen on top of the
+  old one. Rendering and mutating happen in one walk, so a component patched its
+  own attributes and text on the way down and only afterwards found that a child
+  below it was still loading — the boundary kept its old content but the markup
+  around it had already moved on. The same thing happened when a held boundary
+  replayed its body and only some of the data had arrived: the resolved parts
+  committed and the rest stayed behind.
+
+  A suspended attempt now undoes its own binding writes, so the boundary either
+  updates completely or not at all. The undo runs in the same flush as the change,
+  so nothing intermediate is ever painted and transitions stay monotonic — no
+  visible rollback, no invalid intermediate structure.
+
+  `benchmarks/async-composition` records zero exposed intermediate states for a
+  transition update, level with React, with its ceiling tightened from one to zero.
+
+  Controlled `value`, `checked` and `selected` are held too, along with their
+  `default*` mirrors and the record of what was last projected.
+
+  Two things a transition can still change early: content it patched outside a
+  suspended boundary, and a structural change above one such as a keyed list
+  reordering.
+
+- e38a557: Hold a keyed list whole through a suspended transition.
+
+  A transition that dropped a row and then suspended used to lose the row from the
+  held screen: the list reconciled first, the boundary decided to hold second, and
+  by then the row's DOM, state and cleanups were already gone. A list the boundary
+  was supposed to be holding frozen showed up with rows missing.
+
+  Removals inside a boundary now defer their teardown while a hold is still
+  possible. The nodes come out of the way so the reconcile can finish, but they
+  are kept, and the row's scope — its state, its effects, its cleanups — is left
+  untouched until the outcome is known. If the boundary holds, the rows come back
+  exactly as they were, cleanups never having run; once the transition commits,
+  the removal goes through for real and cleanups fire then.
+
+  The list restores as a whole — order, membership and the `@empty` branch
+  together — so reorders roll back alongside removals.
+
+- bd90e27: Keyed-list parking only defers what a hold can restore.
+
+  A value-position keyed list whose slot leaves array mode (the value stops
+  being an array) discards the slot itself, so rows removed by that flip have
+  nothing to be restored into. They no longer park for a possible hold — their
+  teardown runs inline with the attempt that removed them, exactly as it did
+  before rows learned to wait — instead of being deferred past the rest of the
+  render as unrestorable.
+
+  The rollback that puts a held list back also stops if a teardown cleanup
+  flips the enclosing boundary to `@catch` mid-restore, instead of writing into
+  a disposed range.
+
+- ae6811d: Add `useLinkedState` for local state that can be edited independently but should
+  reset or adjust when an input changes. The new value is available immediately,
+  without an effect or a state update during render. Calculations can inspect the
+  previous source and value, choose custom equality checks, and use the same
+  optional latest-value getter as `useState`.
+- 62d81b8: Guard `hot.data` in the universal webpack-HMR handoff: webpack and rspack leave `module.hot.data` undefined until a previous instance of the module has disposed, so the emitted `hot.data.__octaneUniversalComponents` read crashed every dev bundle on its first evaluation.
+
 ## 0.1.19
 
 ### Patch Changes
