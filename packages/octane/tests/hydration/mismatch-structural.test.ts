@@ -661,11 +661,10 @@ describe.each([
 		}
 	});
 
-	// The inline-ternary form of the same shape. Its keyed-array arm currently
-	// renders empty on a pure client mount (a compiler lowering gap, owned by the
-	// compiler's ternary tests), so this case pins only what RECOVERY owns: no
-	// throw, the stale server list fully discarded (never leaked into later
-	// arms), and a slot boundary the swaps can keep using.
+	// The inline-ternary form of the same shape (arm rendering itself is owned
+	// by the compiler's ternary suites). This case pins only what RECOVERY
+	// owns: no throw, the stale server list fully discarded (never leaked into
+	// later arms), and a slot boundary the swaps can keep using.
 	it('legacy nested-pair list shape under the inline ternary: discards, never throws or leaks', () => {
 		container.innerHTML = LEGACY_HTML;
 		const root = hydrateRoot(container, client.MapArm);

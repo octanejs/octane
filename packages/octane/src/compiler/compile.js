@@ -3995,11 +3995,20 @@ function isConditionalJsx(node) {
 	);
 }
 
-/** Wrap an expression as a BlockStatement body, so makeIfCall can consume it. */
+/** Wrap a ternary arm as a BlockStatement body, so makeIfCall can consume it. */
 function wrapAsBlockStmt(node) {
 	if (!node) return null;
 	// null / Literal(null) / Literal(false) → no branch
 	if (node.type === 'Literal' && (node.value === null || node.value === false)) return null;
+	if (!isJsxLike(node)) {
+		// A non-JSX arm (`{cond ? xs.map(…) : <Jsx/>}`, a string, a variable
+		// holding an element, a nested ternary) is the branch's render VALUE. As
+		// a bare statement the branch body would evaluate-and-discard it, so wrap
+		// it as the authored-equivalent `<>{expr}</>` — the branch renders the
+		// value through the fragment's child hole (a nested ternary re-enters
+		// this lowering there and becomes a nested ifBlock).
+		node = inheritOriginLoc(b.jsx_fragment([b.jsx_expression_container(node, node)]), node);
+	}
 	return b.block([node]);
 }
 
@@ -8925,18 +8934,33 @@ function ssrCompileSub(
 ) {
 	const fnName = `${baseName}$${ctx.nextHelperId++}`;
 	const synth = { params: paramNodes || [], body: bodyStmts };
-	const fn = ssrCompileBody(
-		synth,
-		ctx,
-		fnName,
-		cssHash,
-		[],
-		parentNs || 'html',
-		false,
-		componentNs,
-		returnedFragmentTemplate,
-		returnedFragmentRoot,
-	);
+	// Extracted-fragment subs — component template children (`__schildren`) and
+	// returned-tree mirrors (`__sfragment`) — fold expression holes into
+	// descriptor VALUE holes on the client (`props.hN` + childTextHole); only
+	// directive ARMS keep the template walk there. Mark them so
+	// ssrEmitTsrxExpression keeps `{cond ? A : B}` on ssrChild inside them,
+	// mirroring the client's fold instead of claiming an @if. Directive-arm
+	// subs reset the flag through this same save/restore, so an @if INSIDE
+	// children/mirrors claims again, exactly like the client.
+	const prevFoldedExprHoles = ctx._ssrFoldedExprHoles;
+	ctx._ssrFoldedExprHoles = baseName === '__schildren' || baseName === '__sfragment';
+	let fn;
+	try {
+		fn = ssrCompileBody(
+			synth,
+			ctx,
+			fnName,
+			cssHash,
+			[],
+			parentNs || 'html',
+			false,
+			componentNs,
+			returnedFragmentTemplate,
+			returnedFragmentRoot,
+		);
+	} finally {
+		ctx._ssrFoldedExprHoles = prevFoldedExprHoles;
+	}
 	return { fnName, fn };
 }
 
@@ -8944,10 +8968,19 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	// rewriteHookCalls: key any `use(thenable)` in the @if test (it bypasses the
 	// setup rewrite, so without a stable key it collides with sibling/body use()).
 	const testExpr = rewriteHookCalls(node.test, ctx, name);
-	const thenStmts =
-		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
-	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
-	inlinedSubs.push(thenSub.fn);
+	// A null consequent (`{cond ? null : <Jsx/>}` lowered by wrapAsBlockStmt)
+	// means "no then branch". It must emit like a MISSING @else — plain '' with
+	// no inner arm range — because the hydrating client renders that branch with
+	// a null body and adopts an empty slot range.
+	const thenStmts = node.consequent
+		? node.consequent.type === 'BlockStatement'
+			? node.consequent.body
+			: [node.consequent]
+		: null;
+	const thenSub = thenStmts
+		? ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs)
+		: null;
+	if (thenSub) inlinedSubs.push(thenSub.fn);
 	let elseCall = ssrHtmlTemplate([], node, ctx);
 	let elseFnName = null;
 	if (node.alternate) {
@@ -8968,26 +9001,33 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrControl');
 	ctx.runtimeNeeded.add('ssrArm');
-	registerDirectiveOrigin(ctx, node, ['_$ssrControl', '_$ssrArm', thenSub.fnName, elseFnName]);
+	registerDirectiveOrigin(ctx, node, [
+		'_$ssrControl',
+		'_$ssrArm',
+		thenSub ? thenSub.fnName : null,
+		elseFnName,
+	]);
 	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = ssrCall(
-		'ssrArm',
-		[
-			b.literal('then', '"then"'),
-			ssrThunk(
-				ssrCall(
-					'ssrBlock',
-					[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
-					node.consequent,
-				),
+	const thenInner = thenSub
+		? ssrCall(
+				'ssrArm',
+				[
+					b.literal('then', '"then"'),
+					ssrThunk(
+						ssrCall(
+							'ssrBlock',
+							[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
+							node.consequent,
+						),
+						node.consequent,
+					),
+				],
 				node.consequent,
-			),
-		],
-		node.consequent,
-	);
+			)
+		: ssrHtmlTemplate([], node, ctx);
 	const elseInner = node.alternate
 		? ssrCall(
 				'ssrArm',
@@ -9440,6 +9480,28 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 	) {
 		ctx.runtimeNeeded.add('ssrPortal');
 		return ssrCall('ssrPortal', [], node);
+	}
+	if (
+		node.returnedJsxValue !== true &&
+		ctx._tsxValuePos !== true &&
+		ctx._ssrFoldedExprHoles !== true &&
+		isConditionalJsx(expr)
+	) {
+		// Mirror the client's child-position lowering (emitElementHtml): in a
+		// TEMPLATE-form body a `{cond ? A : B}` hole with a JSX arm becomes an
+		// @if on BOTH sides, so each arm compiles as an ordinary arm body and
+		// the hydration shapes (control key, arm ranges, a keyed `.map` claimed
+		// inside a value arm) agree by construction. VALUE-form positions stay
+		// on ssrChild: the client folds returned `.tsx` trees' holes and
+		// extracted-fragment holes (component children, returned-tree mirrors)
+		// into descriptor value holes (`props.hN` + childTextHole), never
+		// ifBlock — `_tsxValuePos` and `_ssrFoldedExprHoles` are the server's
+		// mirrors of those two folds.
+		const asIf = {
+			...b.if(expr.test, wrapAsBlockStmt(expr.consequent), wrapAsBlockStmt(expr.alternate)),
+			loc: expr.loc, // same devLoc/control-key position as the client's claim
+		};
+		return ssrEmitIf(asIf, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 	}
 	ctx.runtimeNeeded.add('ssrChild');
 	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
@@ -20169,10 +20231,16 @@ function hoistBodyHelper(
 // ===========================================================================
 
 function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
-	// node.test, node.consequent (BlockStatement | Element), node.alternate (BlockStatement | IfStatement | null)
+	// node.test, node.consequent (BlockStatement | Element | null), node.alternate (BlockStatement | IfStatement | null)
+	// A null consequent (`{cond ? null : <Jsx/>}` lowered by wrapAsBlockStmt)
+	// means "no then branch" — same contract as the null alternate: the helper
+	// slot compiles to `null` and the runtime renders an empty branch.
 
-	const thenStmts =
-		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
+	const thenStmts = node.consequent
+		? node.consequent.type === 'BlockStatement'
+			? node.consequent.body
+			: [node.consequent]
+		: null;
 	const elseStmts = node.alternate
 		? node.alternate.type === 'BlockStatement'
 			? node.alternate.body
@@ -20180,20 +20248,22 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		: null;
 	// Phase 2: one shared env tuple for both branches (see unionEnv).
 	const envNames = unionEnv(ctx, [
-		{ stmts: thenStmts, params: [] },
+		thenStmts && { stmts: thenStmts, params: [] },
 		elseStmts && { stmts: elseStmts, params: [] },
 	]);
-	const thenHelperName = hoistBodyHelper(
-		ctx,
-		inlinedSubs,
-		'__then',
-		thenStmts,
-		[],
-		parentNs,
-		cssHash,
-		envNames,
-		directiveKeywordOrigin(ctx, node),
-	);
+	const thenHelperName = thenStmts
+		? hoistBodyHelper(
+				ctx,
+				inlinedSubs,
+				'__then',
+				thenStmts,
+				[],
+				parentNs,
+				cssHash,
+				envNames,
+				directiveKeywordOrigin(ctx, node),
+			)
+		: null;
 
 	let elseHelperName = null;
 	if (elseStmts) {
