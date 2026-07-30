@@ -34,7 +34,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.9` | 2 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.18` | 4 |
 | `@octanejs/mobx` | [`packages/mobx`](../packages/mobx) | framework binding | `0.1.2` | 1 |
-| `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.20` | 1 |
+| `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.20` | 2 |
 | `@octanejs/nuqs` | [`packages/nuqs`](../packages/nuqs) | framework binding | `0.1.10` | 7 |
 | `@octanejs/phosphor-icons` | [`packages/phosphor-icons`](../packages/phosphor-icons) | framework binding | `0.0.1` | 2 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.20` | 1 |

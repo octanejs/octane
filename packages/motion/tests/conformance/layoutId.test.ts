@@ -7,11 +7,12 @@ vi.mock('motion', () => ({
 	inView: vi.fn(() => vi.fn()),
 }));
 import { mount, nextPaint } from '../_helpers';
-import { Hero } from '../_fixtures/hero.tsrx';
+import { Hero, NamedHero } from '../_fixtures/hero.tsrx';
 
 const orig = Element.prototype.getBoundingClientRect;
 afterEach(() => {
 	Element.prototype.getBoundingClientRect = orig;
+	animateMock.mockClear();
 });
 
 describe('layoutId (shared-element crossfade)', () => {
@@ -36,5 +37,24 @@ describe('layoutId (shared-element crossfade)', () => {
 			{ duration: 0.4 },
 		);
 		b.unmount();
+	});
+
+	it('expires an unclaimed layoutId box before a later reopen', async () => {
+		let box: any = { left: 0, top: 0, width: 100, height: 100 };
+		Element.prototype.getBoundingClientRect = vi.fn(() => box);
+
+		const first = mount(NamedHero, { layoutId: 'reopened-hero' });
+		await nextPaint();
+		first.unmount();
+		await Promise.resolve();
+
+		box = { left: 200, top: 0, width: 100, height: 100 };
+		animateMock.mockClear();
+		const reopened = mount(NamedHero, { layoutId: 'reopened-hero' });
+		await nextPaint();
+
+		expect(reopened.find('#named-hero').style.transform).toBe('');
+		expect(animateMock).not.toHaveBeenCalled();
+		reopened.unmount();
 	});
 });

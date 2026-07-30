@@ -43,6 +43,12 @@ function List(props) @{
   events, …) and `style` MotionValues spread/bound onto the element.
 - `AnimatePresence` — exit animations on removal.
 - `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
+- `useReducedMotion()` — a live `prefers-reduced-motion` subscription; operating-system
+  setting changes update mounted consumers.
+- `LayoutGroup` — namespaces `layoutId` values so independent shared-layout surfaces
+  do not cross-animate.
+- `LazyMotion` + `domAnimation` / `domMax` + `m` — feature-gated hosts. The
+  `./react-m` entry exposes every HTML/SVG host as a named export.
 - `variants` — label resolution (`animate="visible"`) + parent→child propagation +
   `staggerChildren` / `delayChildren` (number or `stagger()` function) / `staggerDirection`.
 - `useMotionValue()`, `useScroll()`, `useAnimate()` — MotionValues, scroll-linked
@@ -74,13 +80,15 @@ real `<tag>` through `hostComponent`, captures the node, and drives:
   vs the previous commit (`layout`) or a same-id element that just unmounted
   (`layoutId`) — apply the inverse transform then animate it back to identity. The
   same cleanup-before-detach ordering lets a leaving `layoutId` element record its
-  box for the next one.
+  box for a same-commit replacement; unused boxes expire after that commit.
+  `layout="position"` applies only translation, `layout="size"` only scaling, and
+  layout animations use `transition.layout` when provided.
 
 ## Not yet ported
 
 The full layout **projection tree** — nested projection, child scale correction, and
 continuous shared-layout during drag (the `layout`/`layoutId` here are single-element
-FLIPs). Also drag momentum/elastic physics, reduced-motion enforcement, and
+FLIPs). Also drag momentum/elastic physics and
 `useTransform`'s output-map form (`useTransform(mv, [0, 100], { opacity: [0, 1] })`).
 
 Stagger specifics: `when: 'beforeChildren' | 'afterChildren'` parent/child sequencing

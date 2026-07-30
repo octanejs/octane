@@ -7,16 +7,37 @@
 // drives animation/gesture/layout/drag from layout effects — exactly the refs +
 // effects + rendering path this is meant to exercise.
 import { animate, hover, press, inView } from 'motion';
-import { childSlot, hostComponent, useLayoutEffect, useState, provideContext } from 'octane';
 import {
+	childSlot,
+	hostComponent,
+	useContext,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useState,
+	provideContext,
+} from 'octane';
+import {
+	LayoutGroupContext,
+	LazyMotionContext,
 	MotionConfigContext,
 	VariantContext,
 	StaggerContext,
+	type MotionFeatureBundle,
 	resolveVariant,
 	splitVariant,
 } from './context';
 import { isMotionValue, isTransformKey, applyStyleValue } from './useMotionValue';
-import { useContext } from 'octane';
+import { useReducedMotionAtSlot } from './useReducedMotion';
+import {
+	layoutAnimationMode,
+	layoutCellKey,
+	layoutTransition,
+	projectLayout,
+	recordLayoutCell,
+	takeLayoutCell,
+	type LayoutBox,
+} from './layout';
 
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
@@ -32,18 +53,12 @@ const MV = Symbol.for('octane-motion:motionvalues');
 const LAYOUT_ID = Symbol.for('octane-motion:layoutid');
 const STAGGER_ORCH = Symbol.for('octane-motion:stagger-orch');
 const STAGGER = Symbol.for('octane-motion:stagger');
+const CONFIG_REDUCED = Symbol.for('octane-motion:config-reduced');
+const LAYOUT_GROUP_STATE = Symbol.for('octane-motion:layout-group-state');
+const LAZY_STATE = Symbol.for('octane-motion:lazy-state');
+const LAZY_EFFECT = Symbol.for('octane-motion:lazy-effect');
 
-// Shared-element registry: a `layoutId` element records its box on unmount; the
-// next element to mount with the same id crossfades (FLIPs) from it. (A basic
-// shared-layout "magic move"; the full projection tree is out of scope.)
-interface Box {
-	left: number;
-	top: number;
-	width: number;
-	height: number;
-}
-const layoutCells = new Map<string, Box>();
-const boxOf = (n: HTMLElement): Box => {
+const boxOf = (n: HTMLElement): LayoutBox => {
 	const r = n.getBoundingClientRect();
 	return { left: r.left, top: r.top, width: r.width, height: r.height };
 };
@@ -110,13 +125,92 @@ function clamp(v: number, min: number, max: number): number {
 	return v < min ? min : v > max ? max : v;
 }
 
-function createMotionComponent(tag: string) {
+const POSITIONAL_KEYS = new Set([
+	'width',
+	'height',
+	'top',
+	'left',
+	'right',
+	'bottom',
+	'transform',
+	'transformPerspective',
+	'x',
+	'y',
+	'z',
+	'translateX',
+	'translateY',
+	'translateZ',
+	'scale',
+	'scaleX',
+	'scaleY',
+	'rotate',
+	'rotateX',
+	'rotateY',
+	'rotateZ',
+	'skew',
+	'skewX',
+	'skewY',
+]);
+
+function reducedTransition(values: any, transition: any, shouldReduceMotion: boolean): any {
+	if (!shouldReduceMotion || values == null || typeof values !== 'object') return transition;
+
+	let reduced: Record<string, any> | null = null;
+	for (const key in values) {
+		if (!POSITIONAL_KEYS.has(key)) continue;
+		const next = (reduced ??= { ...(transition || {}) });
+		const valueTransition =
+			transition?.[key] != null && typeof transition[key] === 'object' ? transition[key] : {};
+		next[key] = { ...valueTransition, type: false, delay: 0, duration: 0 };
+	}
+	return reduced ?? transition;
+}
+
+function animateTarget(
+	node: HTMLElement,
+	values: any,
+	transition: any,
+	shouldReduceMotion: boolean,
+): any {
+	return animate(node, values, reducedTransition(values, transition, shouldReduceMotion));
+}
+
+export type MotionComponent = (props: any, scope: any) => void;
+
+function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionComponent {
 	return function MotionComponent(props: any, scope: any): void {
 		const config = useContext(MotionConfigContext);
+		const layoutGroup = useContext(LayoutGroupContext);
+		const lazy = useContext(LazyMotionContext);
 		const inherited = useContext(VariantContext);
 		// Read the PARENT's stagger orchestration before providing our own below.
 		const parentStagger = useContext(StaggerContext);
 		const variants = props.variants;
+		const features = preloadedFeatures ? domMax : lazy.features;
+		const animationEnabled = preloadedFeatures || features?.animation === true;
+		const gesturesEnabled = preloadedFeatures || features?.gestures === true;
+		const dragEnabled = preloadedFeatures || features?.drag === true;
+		const layoutEnabled = preloadedFeatures || features?.layout === true;
+		const shouldReduceMotion = config.shouldReduceMotion === true;
+		const layoutIdKey =
+			props.layoutId === undefined
+				? undefined
+				: layoutCellKey(
+						layoutGroup.layoutIdNamespace ?? (layoutGroup.id ? [layoutGroup.id] : undefined),
+						props.layoutId,
+					);
+
+		if (
+			preloadedFeatures &&
+			lazy.provided &&
+			lazy.strict &&
+			typeof process !== 'undefined' &&
+			process.env.NODE_ENV !== 'production'
+		) {
+			throw new Error(
+				'You have rendered a `motion` component within a strict `LazyMotion` component. Import and render from `@octanejs/motion/react-m` instead.',
+			);
+		}
 
 		// Variant labels: an explicit prop wins, else inherit the parent's label.
 		const initialLabel = props.initial !== undefined ? props.initial : inherited.initial;
@@ -201,13 +295,18 @@ function createMotionComponent(tag: string) {
 		latest.onDrag = props.onDrag;
 		latest.onDragStart = props.onDragStart;
 		latest.onDragEnd = props.onDragEnd;
+		latest.shouldReduceMotion = shouldReduceMotion;
+		latest.animationEnabled = animationEnabled;
+		latest.layoutMode = layoutAnimationMode(props.layout);
 
 		// `initial`: apply instantly on mount (before the animate effect runs).
 		useLayoutEffect(
 			() => {
-				if (resolvedInitial) animate(node, resolvedInitial, { duration: 0 });
+				if (animationEnabled && resolvedInitial) {
+					animate(node, resolvedInitial, { duration: 0 });
+				}
 			},
-			[],
+			[animationEnabled],
 			ENTER,
 		);
 
@@ -216,7 +315,7 @@ function createMotionComponent(tag: string) {
 		// count are both known by now — all children registered during the parent render).
 		useLayoutEffect(
 			() => {
-				if (resolvedAnimate) {
+				if (animationEnabled && resolvedAnimate) {
 					let t = transition;
 					const o = latest.staggerParent;
 					if (o && o.active) {
@@ -232,12 +331,12 @@ function createMotionComponent(tag: string) {
 						}
 						if (delay > 0) t = { ...(t || {}), delay: (t?.delay || 0) + delay };
 					}
-					const controls = animate(node, resolvedAnimate, t);
+					const controls = animateTarget(node, resolvedAnimate, t, latest.shouldReduceMotion);
 					if (props.onAnimationComplete) whenDone(controls, () => props.onAnimationComplete());
 					return () => controls.stop();
 				}
 			},
-			[stableKey(resolvedAnimate), stableKey(transition)],
+			[animationEnabled, stableKey(resolvedAnimate), stableKey(transition), shouldReduceMotion],
 			ANIMATE,
 		);
 
@@ -284,6 +383,7 @@ function createMotionComponent(tag: string) {
 		// read from `latest`, so prop changes take effect without re-binding.
 		useLayoutEffect(
 			() => {
+				if (!gesturesEnabled) return;
 				const cleanups: Array<() => void> = [];
 				const gesture = (
 					bind: (el: Element, onStart: () => () => void) => () => void,
@@ -291,9 +391,14 @@ function createMotionComponent(tag: string) {
 					transitionKey: string,
 				) =>
 					bind(node, () => {
-						animate(node, latest[valuesKey], latest[transitionKey] ?? latest.transition);
+						animateTarget(
+							node,
+							latest[valuesKey],
+							latest[transitionKey] ?? latest.transition,
+							latest.shouldReduceMotion,
+						);
 						return () => {
-							animate(node, latest.base, latest.transition);
+							animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
 						};
 					});
 				if (props.whileHover)
@@ -301,8 +406,14 @@ function createMotionComponent(tag: string) {
 				if (props.whileTap) cleanups.push(gesture(press as any, 'whileTap', 'whileTapTransition'));
 				if (props.whileFocus) {
 					const onFocus = () =>
-						animate(node, latest.whileFocus, latest.whileFocusTransition ?? latest.transition);
-					const onBlur = () => animate(node, latest.base, latest.transition);
+						animateTarget(
+							node,
+							latest.whileFocus,
+							latest.whileFocusTransition ?? latest.transition,
+							latest.shouldReduceMotion,
+						);
+					const onBlur = () =>
+						animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
 					node.addEventListener('focus', onFocus);
 					node.addEventListener('blur', onBlur);
 					cleanups.push(() => {
@@ -312,7 +423,7 @@ function createMotionComponent(tag: string) {
 				}
 				return () => cleanups.forEach((c) => c());
 			},
-			[],
+			[gesturesEnabled],
 			GESTURE,
 		);
 
@@ -320,20 +431,27 @@ function createMotionComponent(tag: string) {
 		// when it leaves (unless `viewport.once`). Reuses motion's `inView`.
 		useLayoutEffect(
 			() => {
-				if (!props.whileInView) return;
+				if (!gesturesEnabled || !props.whileInView) return;
 				const stop = inView(
 					node,
 					() => {
-						animate(node, latest.whileInView, latest.whileInViewTransition ?? latest.transition);
+						animateTarget(
+							node,
+							latest.whileInView,
+							latest.whileInViewTransition ?? latest.transition,
+							latest.shouldReduceMotion,
+						);
 						return () => {
-							if (!props.viewport?.once) animate(node, latest.base, latest.transition);
+							if (!props.viewport?.once) {
+								animateTarget(node, latest.base, latest.transition, latest.shouldReduceMotion);
+							}
 						};
 					},
 					props.viewport,
 				);
 				return () => stop();
 			},
-			[],
+			[gesturesEnabled],
 			INVIEW,
 		);
 
@@ -341,7 +459,7 @@ function createMotionComponent(tag: string) {
 		// (`drag="x"`/`"y"`) and `dragConstraints` (a box of left/right/top/bottom px).
 		useLayoutEffect(
 			() => {
-				if (!props.drag) return;
+				if (!dragEnabled || !props.drag) return;
 				let active = false;
 				let startX = 0;
 				let startY = 0;
@@ -388,7 +506,7 @@ function createMotionComponent(tag: string) {
 					window.removeEventListener('pointerup', onUp);
 				};
 			},
-			[],
+			[dragEnabled],
 			DRAG,
 		);
 
@@ -399,7 +517,10 @@ function createMotionComponent(tag: string) {
 		// tree — nested/shared layout, scale correction — is out of scope.)
 		useLayoutEffect(
 			() => {
-				if (!props.layout) return;
+				if (!layoutEnabled || !props.layout) {
+					latest.layoutBox = undefined;
+					return;
+				}
 				const prevTransform = node.style.transform;
 				node.style.transform = '';
 				const r = node.getBoundingClientRect();
@@ -407,13 +528,14 @@ function createMotionComponent(tag: string) {
 				const prev = latest.layoutBox;
 				latest.layoutBox = box;
 				if (!prev) return;
-				const dx = prev.left - box.left;
-				const dy = prev.top - box.top;
-				const sx = box.width ? prev.width / box.width : 1;
-				const sy = box.height ? prev.height / box.height : 1;
-				if (dx || dy || sx !== 1 || sy !== 1) {
-					node.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-					animate(node, { transform: 'translate(0px, 0px) scale(1, 1)' }, transition);
+				const projection = projectLayout(prev, box, latest.layoutMode);
+				if (projection) {
+					if (latest.shouldReduceMotion) {
+						node.style.transform = prevTransform;
+					} else {
+						node.style.transform = projection.from;
+						animate(node, { transform: projection.to }, layoutTransition(latest.transition));
+					}
 				} else {
 					node.style.transform = prevTransform;
 				}
@@ -427,27 +549,26 @@ function createMotionComponent(tag: string) {
 		// the next same-id element (the cleanup runs while still in the DOM).
 		useLayoutEffect(
 			() => {
-				const id = props.layoutId;
+				if (!layoutEnabled) return;
+				const id = layoutIdKey;
 				if (!id) return;
-				const prev = layoutCells.get(id);
+				const prev = takeLayoutCell(id);
 				if (prev) {
-					layoutCells.delete(id);
-					node.style.transform = '';
-					const box = boxOf(node);
-					const dx = prev.left - box.left;
-					const dy = prev.top - box.top;
-					const sx = box.width ? prev.width / box.width : 1;
-					const sy = box.height ? prev.height / box.height : 1;
-					if (dx || dy || sx !== 1 || sy !== 1) {
-						node.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-						animate(node, { transform: 'translate(0px, 0px) scale(1, 1)' }, latest.transition);
+					if (!latest.shouldReduceMotion) {
+						node.style.transform = '';
+						const box = boxOf(node);
+						const projection = projectLayout(prev, box, latest.layoutMode);
+						if (projection) {
+							node.style.transform = projection.from;
+							animate(node, { transform: projection.to }, layoutTransition(latest.transition));
+						}
 					}
 				}
 				return () => {
-					if (node.isConnected) layoutCells.set(id, boxOf(node));
+					if (node.isConnected) recordLayoutCell(id, boxOf(node));
 				};
 			},
-			[],
+			[layoutEnabled, layoutIdKey],
 			LAYOUT_ID,
 		);
 
@@ -457,6 +578,7 @@ function createMotionComponent(tag: string) {
 		// animate the exit on the clone, and remove the clone when it finishes.
 		useLayoutEffect(
 			() => () => {
+				if (!latest.animationEnabled) return;
 				const n: HTMLElement | null = latest.node;
 				const exit = latest.exit;
 				if (!exit || !n || !n.isConnected || n.parentNode == null) return;
@@ -469,7 +591,12 @@ function createMotionComponent(tag: string) {
 				clone.style.width = `${rect.width}px`;
 				clone.style.height = `${rect.height}px`;
 				parent.appendChild(clone);
-				const controls = animate(clone, exit, latest.exitTransition ?? latest.transition);
+				const controls = animateTarget(
+					clone,
+					exit,
+					latest.exitTransition ?? latest.transition,
+					latest.shouldReduceMotion,
+				);
 				whenDone(controls, () => clone.remove());
 			},
 			[],
@@ -478,17 +605,41 @@ function createMotionComponent(tag: string) {
 	};
 }
 
+export const domAnimation: MotionFeatureBundle = Object.freeze({
+	animation: true,
+	gestures: true,
+	drag: false,
+	layout: false,
+});
+
+export const domMax: MotionFeatureBundle = Object.freeze({
+	animation: true,
+	gestures: true,
+	drag: true,
+	layout: true,
+});
+
+export type MotionProxy = Record<string, MotionComponent>;
+
+function motionProxy(preloadedFeatures: boolean): MotionProxy {
+	return new Proxy(
+		{},
+		{
+			get(cache: Record<string, MotionComponent>, tag: string | symbol) {
+				if (typeof tag !== 'string') return undefined;
+				return cache[tag] ?? (cache[tag] = createMotionComponent(tag, preloadedFeatures));
+			},
+		},
+	);
+}
+
 // `motion.div`, `motion.span`, … — a proxy that lazily builds (and caches) a
 // component per tag.
-export const motion: any = new Proxy(
-	{},
-	{
-		get(cache: any, tag: string | symbol) {
-			if (typeof tag !== 'string') return undefined;
-			return cache[tag] ?? (cache[tag] = createMotionComponent(tag));
-		},
-	},
-);
+export const motion = motionProxy(true);
+
+// `m` renders the same hosts but activates animation/gesture/layout behavior
+// only from its nearest LazyMotion feature bundle.
+export const m = motionProxy(false);
 
 // AnimatePresence — renders its children; each `motion.*` with an `exit` prop
 // self-animates its own removal (see the exit cleanup above), so this is a thin
@@ -497,13 +648,113 @@ export function AnimatePresence(props: any, scope: any): void {
 	renderTransparentChildren(props.children, scope);
 }
 
+export interface LayoutGroupProps {
+	children?: unknown;
+	id?: string;
+	inherit?: boolean | 'id';
+}
+
+export function LayoutGroup(props: LayoutGroupProps, scope: any): void {
+	const parent = useContext(LayoutGroupContext);
+	const value = useMemo(
+		() => {
+			const inherit = props.inherit ?? true;
+			const inheritId = inherit === true || inherit === 'id';
+			const id =
+				inheritId && parent.id ? (props.id ? `${parent.id}-${props.id}` : parent.id) : props.id;
+			const parentNamespace = parent.layoutIdNamespace ?? (parent.id ? [parent.id] : undefined);
+			const layoutIdNamespace =
+				inheritId && parent.id
+					? props.id
+						? [...(parentNamespace ?? [parent.id]), props.id]
+						: parentNamespace
+					: props.id
+						? [props.id]
+						: undefined;
+			return { id, layoutIdNamespace };
+		},
+		[parent.id, parent.layoutIdNamespace, props.id, props.inherit],
+		LAYOUT_GROUP_STATE,
+	);
+	provideContext(scope, LayoutGroupContext, value);
+	renderTransparentChildren(props.children, scope);
+}
+
 // MotionConfig — provides global defaults (transition, reduced motion) to every
 // motion element below it. A plain-TS component: stamps the config context, then
 // renders children.
 export function MotionConfig(props: any, scope: any): void {
+	const parent = useContext(MotionConfigContext);
+	const reducedMotion = props.reducedMotion ?? parent.reducedMotion ?? 'never';
+	// Octane slots hooks by call site, so this subscription can stay conditional.
+	// Avoid paying for matchMedia listeners when the policy never consults it.
+	const userPreference = reducedMotion === 'user' ? useReducedMotionAtSlot(CONFIG_REDUCED) : false;
 	provideContext(scope, MotionConfigContext, {
-		transition: props.transition,
-		reducedMotion: props.reducedMotion,
+		transition: props.transition ?? parent.transition,
+		reducedMotion,
+		shouldReduceMotion: reducedMotion === 'always' || (reducedMotion === 'user' && userPreference),
+	});
+	renderTransparentChildren(props.children, scope);
+}
+
+export type LazyMotionFeatures =
+	| MotionFeatureBundle
+	| (() =>
+			| Promise<MotionFeatureBundle | { default: MotionFeatureBundle }>
+			| MotionFeatureBundle
+			| { default: MotionFeatureBundle });
+
+export interface LazyMotionProps {
+	children?: unknown;
+	features: LazyMotionFeatures;
+	strict?: boolean;
+}
+
+interface LoadedLazyFeatures {
+	source: LazyMotionFeatures | null;
+	features: MotionFeatureBundle | null;
+}
+
+function normalizeFeatures(
+	value: MotionFeatureBundle | { default: MotionFeatureBundle },
+): MotionFeatureBundle {
+	return 'default' in value ? value.default : value;
+}
+
+export function LazyMotion(props: LazyMotionProps, scope: any): void {
+	const [loaded, setLoaded] = useState<LoadedLazyFeatures>(
+		() => ({ source: null, features: null }),
+		LAZY_STATE,
+	);
+	const source = props.features;
+	const isLoader = typeof source === 'function';
+	const features = isLoader
+		? loaded.source === source
+			? loaded.features
+			: null
+		: normalizeFeatures(source);
+
+	useEffect(
+		() => {
+			if (typeof source !== 'function') return;
+			let current = true;
+			Promise.resolve(source()).then((value) => {
+				if (current) {
+					setLoaded({ source, features: normalizeFeatures(value) });
+				}
+			});
+			return () => {
+				current = false;
+			};
+		},
+		[source],
+		LAZY_EFFECT,
+	);
+
+	provideContext(scope, LazyMotionContext, {
+		features,
+		strict: props.strict === true,
+		provided: true,
 	});
 	renderTransparentChildren(props.children, scope);
 }
@@ -518,7 +769,15 @@ export { useScroll } from './useScroll';
 export { useTransform } from './useTransform';
 export { useSpring } from './useSpring';
 export { useMotionValueEvent } from './useMotionValueEvent';
-export { MotionConfigContext, VariantContext, StaggerContext } from './context';
+export { useReducedMotion } from './useReducedMotion';
+export {
+	LayoutGroupContext,
+	LazyMotionContext,
+	MotionConfigContext,
+	VariantContext,
+	StaggerContext,
+} from './context';
 
 // Re-export motion's framework-agnostic helpers (animate, stagger, value types, …).
 export * from 'motion';
+export type { TargetAndTransition, Transition } from 'motion';
