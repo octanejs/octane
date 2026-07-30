@@ -253,6 +253,19 @@ describe('bridgeReportFromSource', () => {
 });
 
 describe('KNOWN_BINDINGS', () => {
+	it('maps Streamdown and every official plugin package to the consolidated binding', () => {
+		const upstreamPackages = [
+			'streamdown',
+			'@streamdown/code',
+			'@streamdown/math',
+			'@streamdown/mermaid',
+			'@streamdown/cjk',
+		];
+		expect(upstreamPackages.every((name) => KNOWN_BINDINGS[name] === '@octanejs/streamdown')).toBe(
+			true,
+		);
+	});
+
 	it('maps every public Visx entry point to the aggregate Octane port', async () => {
 		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
 		const manifest = JSON.parse(await readFile(join(packagesRoot, 'visx', 'package.json'), 'utf8'));

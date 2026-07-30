@@ -43,6 +43,7 @@ surface and evidence.
 | `@octanejs/remix-router` | 0 |
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/sonner` | 0 |
+| `@octanejs/streamdown` | 0 |
 | `@octanejs/styled-components` | 0 |
 | `@octanejs/stylex` | 0 |
 | `@octanejs/tanstack-ai` | 0 |
