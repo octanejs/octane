@@ -105,6 +105,16 @@ export interface InstallLynxMainThreadOptions {
 	 * initialization. `automatic` releases background work after `root.render()`.
 	 */
 	readonly firstScreenSync?: 'automatic' | 'manual';
+	/**
+	 * `engine` defers the one-shot first-screen render until the engine's
+	 * `__RenderPage` lifecycle arrives. Native decodes the template's PageConfig
+	 * onto the ElementManager only after main-thread script evaluation
+	 * (`TemplateAssembler::DidVMExecute`), so elements created during evaluation
+	 * see config-dependent defaults — `defaultOverflowVisible` above all — as
+	 * unset and paint clipped. `immediate` keeps the evaluation-time render used
+	 * by source and JavaScript-host tests.
+	 */
+	readonly firstScreenRender?: 'immediate' | 'engine';
 	readonly onDiagnostic?: (error: Error) => void;
 	readonly executeMainThreadWorklet?: (
 		worklet: import('./core/protocol.js').LynxMainThreadWorkletWireDescriptor,
@@ -464,6 +474,16 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	if (options.firstScreen !== true && options.firstScreenSync !== undefined) {
 		throw new TypeError('Octane Lynx firstScreenSync requires firstScreen: true.');
 	}
+	if (
+		options.firstScreenRender !== undefined &&
+		options.firstScreenRender !== 'immediate' &&
+		options.firstScreenRender !== 'engine'
+	) {
+		throw new TypeError('Octane Lynx firstScreenRender must be immediate or engine.');
+	}
+	if (options.firstScreen !== true && options.firstScreenRender !== undefined) {
+		throw new TypeError('Octane Lynx firstScreenRender requires firstScreen: true.');
+	}
 	const firstScreenEnabled = options.firstScreen === true;
 	const firstScreenSync = options.firstScreenSync ?? 'automatic';
 	const rawTarget = options.target ?? globalThis;
@@ -520,6 +540,9 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let firstScreenState: 'open' | 'painted' | 'skipped' | 'failed' | 'cleanup-pending' =
 		firstScreenEnabled ? 'open' : 'skipped';
 	let firstScreenSyncReady = !firstScreenEnabled;
+	const firstScreenRenderMode = options.firstScreenRender ?? 'immediate';
+	let pendingFirstScreenRender: (() => void) | null = null;
+	let firstScreenRenderReleased = firstScreenRenderMode !== 'engine';
 	let firstTree: LynxFirstTree<Node> | null = null;
 	let failedFirstScreenSource: LynxHostContainer<Node> | null = null;
 	let awaitingAdoption: UniversalTransportIdentity | null = null;
@@ -646,6 +669,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			);
 		} catch (error) {
 			report(error, 'Octane Lynx received malformed __RenderPage data.');
+		} finally {
+			// The engine dispatches __RenderPage after script evaluation, once the
+			// decoded PageConfig is installed; a deferred first screen renders here.
+			releaseFirstScreenRender();
 		}
 	};
 
@@ -1590,6 +1617,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const abortKey = (identity: UniversalTransportIdentity) => `${identity.root}:${identity.version}`;
 
 	const handleReady = (message: LynxMainReadyRequest): void => {
+		// A background ready request also proves script evaluation has finished;
+		// hosts without the typed __RenderPage lifecycle release the deferred
+		// first screen here.
+		releaseFirstScreenRender();
 		if (
 			dispatchingReadyRequest === message.request ||
 			completedReadyRequests.has(message.request)
@@ -1603,7 +1634,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		if (canAnnounceReady()) announceReady();
 	};
 
-	const renderFirstScreen = <Props>(
+	const renderFirstScreenNow = <Props>(
 		component: UniversalComponent<Props>,
 		props: Props,
 	): LynxFirstScreenRenderResult => {
@@ -1658,6 +1689,49 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 	};
 
+	const renderFirstScreen = <Props>(
+		component: UniversalComponent<Props>,
+		props: Props,
+	): LynxFirstScreenRenderResult | null => {
+		if (firstScreenRenderReleased) return renderFirstScreenNow(component, props);
+		if (closed) throw new Error('Octane Lynx first-screen root rendered after receiver close.');
+		if (firstScreenState !== 'open' || pendingFirstScreenRender !== null) {
+			throw new Error(
+				'Octane Lynx first-screen root is one-shot and its render window has closed.',
+			);
+		}
+		// Element creation must wait for the engine's post-evaluation lifecycle:
+		// PageConfig reaches the ElementManager only after main-thread script
+		// evaluation, and elements created earlier bake in unconfigured defaults.
+		pendingFirstScreenRender = () => {
+			renderFirstScreenNow(component, props);
+		};
+		return null;
+	};
+
+	const releaseFirstScreenRender = (): void => {
+		if (firstScreenRenderReleased) return;
+		firstScreenRenderReleased = true;
+		const pending = pendingFirstScreenRender;
+		pendingFirstScreenRender = null;
+		if (closed) return;
+		if (pending !== null && firstScreenState === 'open') {
+			try {
+				pending();
+			} catch {
+				// renderFirstScreenNow reported the failure and transitioned the
+				// first-screen state; there is no authored caller left to rethrow to.
+			}
+			return;
+		}
+		// The entry finished evaluation without rendering a first screen; settle
+		// the window exactly as an immediate-mode markFirstScreenSyncReady would.
+		if (firstScreenState === 'open' && firstScreenSyncReady) {
+			firstScreenState = 'skipped';
+			announceReady();
+		}
+	};
+
 	const markFirstScreenSyncReady = (): void => {
 		if (!firstScreenEnabled) {
 			throw new Error('Octane Lynx first-screen synchronization is not enabled.');
@@ -1665,7 +1739,13 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		if (closed) throw new Error('Octane Lynx first-screen synchronization ran after close.');
 		if (firstScreenSyncReady) return;
 		firstScreenSyncReady = true;
-		if (firstScreenState === 'open') firstScreenState = 'skipped';
+		if (
+			firstScreenState === 'open' &&
+			firstScreenRenderReleased &&
+			pendingFirstScreenRender === null
+		) {
+			firstScreenState = 'skipped';
+		}
 		announceReady();
 	};
 
@@ -2253,6 +2333,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				render: renderFirstScreen,
 				markSyncReady: markFirstScreenSyncReady,
 				unmount() {
+					pendingFirstScreenRender = null;
+					firstScreenRenderReleased = true;
 					queuedNativeEvents.length = 0;
 					awaitingAdoption = null;
 					// Unmount closes the authored synchronous window immediately. Cleanup

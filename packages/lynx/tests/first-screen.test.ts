@@ -216,6 +216,7 @@ function backgroundContext(): LynxContextProxy {
 
 function installEnvironment(
 	configurePAPI?: (target: Record<string, unknown>) => void,
+	installOptions?: Partial<Parameters<typeof installLynxMainThread>[0]>,
 ): InstalledEnvironment {
 	const dom = new JSDOM('<!doctype html><html><body></body></html>');
 	installLynxTestingEnv(globalThis, {
@@ -235,7 +236,11 @@ function installEnvironment(
 		registrations.push(Object.freeze({ listener }));
 		addEvent(node, kind, name, listener);
 	};
-	const main = installLynxMainThread({ firstScreen: true, firstScreenSync: 'manual' });
+	const main = installLynxMainThread({
+		firstScreen: true,
+		firstScreenSync: 'manual',
+		...installOptions,
+	});
 	return (installed = { dom, main, registrations });
 }
 
@@ -400,6 +405,53 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 			firstTree: { root: 1, version: 1 },
 		});
 		expect((ready[0] as { request: number }).request).toBeGreaterThan(0);
+	});
+
+	it('defers an engine-mode first screen until __RenderPage arrives', () => {
+		// Native installs the decoded PageConfig on the ElementManager only after
+		// main-thread script evaluation, so an engine-mode receiver must not
+		// create elements during evaluation; the render runs when the engine's
+		// __RenderPage lifecycle proves evaluation has finished.
+		const engineListeners = new Map<string, Set<(event: LynxContextProxyEvent) => void>>();
+		const engineContext: LynxContextProxy = {
+			dispatchEvent(event) {
+				for (const listener of [...(engineListeners.get(event.type) ?? [])]) listener(event);
+			},
+			addEventListener(type, listener) {
+				let entries = engineListeners.get(type);
+				if (entries === undefined) engineListeners.set(type, (entries = new Set()));
+				entries.add(listener);
+			},
+			removeEventListener(type, listener) {
+				engineListeners.get(type)?.delete(listener);
+			},
+		};
+		const { dom, main } = installEnvironment(
+			(target) => {
+				(target.lynx as Record<string, unknown>).getEngine = () => engineContext;
+			},
+			{ firstScreenRender: 'engine' },
+		);
+		const props: SceneProps = {
+			id: 'engine-mode',
+			items: ['a'],
+			onTap() {},
+			onEffect() {},
+		};
+
+		const deferred = firstScreenRoot.render(MainScene as UniversalComponent<SceneProps>, props);
+		expect(deferred).toBeNull();
+		expect(dom.window.document.querySelector('#engine-mode')).toBeNull();
+
+		main.markFirstScreenSyncReady();
+		expect(dom.window.document.querySelector('#engine-mode')).toBeNull();
+		expect(main.firstScreenSnapshot()).toBeNull();
+
+		engineContext.dispatchEvent({ type: '__RenderPage', data: [{}, {}] });
+		expect(dom.window.document.querySelector('#engine-mode')).not.toBeNull();
+		expect(dom.window.document.querySelector('#a')).not.toBeNull();
+		expect(main.firstScreenSnapshot()).toMatchObject({ root: 1, version: 1 });
+		expect(main.diagnostics()).toEqual([]);
 	});
 
 	it('repairs a nondeterministic first tree and reports the typed mismatch', () => {
