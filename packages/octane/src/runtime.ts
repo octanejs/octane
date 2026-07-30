@@ -14386,7 +14386,10 @@ export function createScopedValue<P>(
 	const resolve = (): ElementDescriptor<P> => {
 		const scope = CURRENT_SCOPE;
 		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
-		if (resolved === undefined || resolvedScope !== scope || resolvedEpoch !== epoch) {
+		const sameScope =
+			resolvedScope === scope ||
+			(resolvedScope !== null && scope !== null && scope.block.parentBlock === resolvedScope.block);
+		if (resolved === undefined || !sameScope || resolvedEpoch !== epoch) {
 			const next = readElement();
 			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
 				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
@@ -14394,6 +14397,12 @@ export function createScopedValue<P>(
 			resolvedScope = scope;
 			resolvedEpoch = epoch;
 			resolved = next;
+		} else if (resolvedScope !== scope) {
+			// Host classification previews a scoped value in the parent block before
+			// immediately rendering it in the host's direct child block. Reuse that
+			// same-context record once, then move ownership to the child so a later
+			// sibling or provider scope still resolves independently.
+			resolvedScope = scope;
 		}
 		return resolved;
 	};
