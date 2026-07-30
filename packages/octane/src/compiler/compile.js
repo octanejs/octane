@@ -8596,6 +8596,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
 		// the first text part must protect a leading newline (see ssrEmitNodes).
 		const nlGuardFirst = tag === 'pre' || tag === 'textarea' || tag === 'listing';
+		const prevHostChildPos = ctx._ssrHostChildPos;
+		ctx._ssrHostChildPos = true;
 		childrenExpr = ssrEmitNodes(
 			normChildren,
 			ctx,
@@ -8606,6 +8608,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			childComponentNs,
 			nlGuardFirst,
 		);
+		ctx._ssrHostChildPos = prevHostChildPos;
 	}
 	// `children=` and spread-held children are content props, not attributes.
 	// With no nested JSX children, the last present writer renders as the host's
@@ -8944,6 +8947,8 @@ function ssrCompileSub(
 	// children/mirrors claims again, exactly like the client.
 	const prevFoldedExprHoles = ctx._ssrFoldedExprHoles;
 	ctx._ssrFoldedExprHoles = baseName === '__schildren' || baseName === '__sfragment';
+	const prevHostChildPos = ctx._ssrHostChildPos;
+	ctx._ssrHostChildPos = false;
 	let fn;
 	try {
 		fn = ssrCompileBody(
@@ -8960,6 +8965,7 @@ function ssrCompileSub(
 		);
 	} finally {
 		ctx._ssrFoldedExprHoles = prevFoldedExprHoles;
+		ctx._ssrHostChildPos = prevHostChildPos;
 	}
 	return { fnName, fn };
 }
@@ -9485,6 +9491,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		node.returnedJsxValue !== true &&
 		ctx._tsxValuePos !== true &&
 		ctx._ssrFoldedExprHoles !== true &&
+		ctx._ssrHostChildPos === true &&
 		isConditionalJsx(expr)
 	) {
 		// Mirror the client's child-position lowering (emitElementHtml): in a
@@ -9496,7 +9503,10 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		// extracted-fragment holes (component children, returned-tree mirrors)
 		// into descriptor value holes (`props.hN` + childTextHole), never
 		// ifBlock — `_tsxValuePos` and `_ssrFoldedExprHoles` are the server's
-		// mirrors of those two folds.
+		// mirrors of those two folds. `_ssrHostChildPos` mirrors the client's
+		// emitElementHtml / emitNodeHtml split: the client only lowers ternaries
+		// inside a host element's children; at body or arm roots it routes
+		// TSRXExpression through makeChildCall (childSlot) instead.
 		const asIf = {
 			...b.if(expr.test, wrapAsBlockStmt(expr.consequent), wrapAsBlockStmt(expr.alternate)),
 			loc: expr.loc, // same devLoc/control-key position as the client's claim
