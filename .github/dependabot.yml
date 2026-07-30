@@ -4,10 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    groups:
-      all-dependencies:
-        patterns:
-          - "*"
+    cooldown:
+      default-days: 7
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
 
   - package-ecosystem: cargo
     directory: /examples/workbench/src-tauri
