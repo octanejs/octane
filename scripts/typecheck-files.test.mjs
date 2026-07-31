@@ -115,6 +115,41 @@ describe('typecheck-files command', () => {
 		}
 	});
 
+	test('does not discover projects above the repository root', async () => {
+		const fixture = await createFixture('octane-typecheck-project-boundary-');
+		const repository = path.join(fixture.root, 'repository');
+		const packageRoot = path.join(repository, 'packages', 'fixture');
+		const sourceDirectory = path.join(packageRoot, 'src');
+
+		try {
+			await mkdir(sourceDirectory, { recursive: true });
+			await Promise.all([
+				writeFile(path.join(sourceDirectory, 'source.ts'), 'export const source = true;\n'),
+				writeFile(
+					path.join(fixture.root, 'tsconfig.json'),
+					JSON.stringify({ files: ['./repository/packages/fixture/src/source.ts'] }),
+				),
+			]);
+			git(repository, ['init', '--quiet']);
+
+			const escaped = run(sourceDirectory, fixture.env, ['source.ts']);
+			assert.equal(escaped.status, 1);
+			assert.match(escaped.stderr, /No TypeScript project includes: "source\.ts"/);
+			await assert.rejects(access(fixture.log));
+
+			await writeFile(
+				path.join(packageRoot, 'tsconfig.json'),
+				JSON.stringify({ files: ['./src/source.ts'] }),
+			);
+			const contained = run(sourceDirectory, fixture.env, ['source.ts']);
+			assert.equal(contained.status, 0, contained.stderr);
+			const [invocation] = await invocations(fixture.log);
+			assert.equal(invocation.config.extends, path.join(packageRoot, 'tsconfig.json'));
+		} finally {
+			await rm(fixture.root, { force: true, recursive: true });
+		}
+	});
+
 	test('checks the union of staged and unstaged files from their TypeScript project', async () => {
 		const fixture = await createFixture();
 

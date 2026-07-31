@@ -34,6 +34,22 @@ function sourceFilesInDirectory(directory) {
 	return files.sort();
 }
 
+function projectSearchRoot(cwd) {
+	const result = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+		cwd,
+		encoding: 'utf8',
+	});
+	return result.status === 0 ? path.resolve(result.stdout.trimEnd()) : path.resolve(cwd);
+}
+
+function isWithin(directory, file) {
+	const relative = path.relative(directory, file);
+	return (
+		relative === '' ||
+		(!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
+	);
+}
+
 function showProject(config) {
 	const result = spawnSync('tsrx-tsc', ['--showConfig', '-p', config], {
 		encoding: 'utf8',
@@ -63,7 +79,9 @@ function showProject(config) {
 	};
 }
 
-function findOwningProjects(file, projectForConfig) {
+function findOwningProjects(file, projectForConfig, searchRoot) {
+	if (!isWithin(searchRoot, file)) return [];
+
 	let directory = path.dirname(file);
 	for (;;) {
 		const projects = configsInDirectory(directory).map(projectForConfig);
@@ -76,8 +94,9 @@ function findOwningProjects(file, projectForConfig) {
 			];
 		}
 
+		if (directory === searchRoot) return [];
 		const parent = path.dirname(directory);
-		if (parent === directory) return [];
+		if (parent === directory || !isWithin(searchRoot, parent)) return [];
 		directory = parent;
 	}
 }
@@ -91,7 +110,7 @@ function addSelectedFile(projects, project, file) {
 	selected.files.add(file);
 }
 
-function selectProjects(selection) {
+function selectProjects(selection, searchRoot) {
 	const projectCache = new Map();
 	const projectForConfig = (config) => {
 		let project = projectCache.get(config);
@@ -116,7 +135,7 @@ function selectProjects(selection) {
 				const project = projectForConfig(absolutePath);
 				for (const file of project.files) addSelectedFile(projects, project, file);
 			} else if (SOURCE_FILE_PATTERN.test(absolutePath)) {
-				const owners = findOwningProjects(absolutePath, projectForConfig);
+				const owners = findOwningProjects(absolutePath, projectForConfig, searchRoot);
 				if (owners.length === 0) unownedFiles.push(selectedPath);
 				for (const project of owners) addSelectedFile(projects, project, absolutePath);
 			}
@@ -125,7 +144,7 @@ function selectProjects(selection) {
 
 		if (!stat.isDirectory()) continue;
 		for (const file of sourceFilesInDirectory(absolutePath)) {
-			for (const project of findOwningProjects(file, projectForConfig)) {
+			for (const project of findOwningProjects(file, projectForConfig, searchRoot)) {
 				addSelectedFile(projects, project, file);
 			}
 		}
@@ -214,7 +233,7 @@ function main() {
 		return 0;
 	}
 
-	const projects = selectProjects(selection);
+	const projects = selectProjects(selection, projectSearchRoot(selection.workingDirectory));
 	if (projects.length === 0) {
 		console.log('No selected files are covered by a TypeScript project.');
 		return 0;
