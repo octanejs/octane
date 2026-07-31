@@ -198,11 +198,15 @@ async function loadRoute(
 	options: {
 		beforeNavigation?: (page: import('playwright').Page, errors: string[]) => Promise<void>;
 		waitForNetworkIdle?: boolean;
+		// Deliberate outlier for a caller that knowingly pays a cold dev server's
+		// on-demand compile, which is not an ordinary "wait for this to appear".
+		timeout?: number;
 	} = {},
 ) {
+	const actionTimeout = options.timeout ?? PLAYWRIGHT_ACTION_TIMEOUT;
 	const page = await browser!.newPage();
-	page.setDefaultTimeout(PLAYWRIGHT_ACTION_TIMEOUT);
-	page.setDefaultNavigationTimeout(PLAYWRIGHT_NAVIGATION_TIMEOUT);
+	page.setDefaultTimeout(actionTimeout);
+	page.setDefaultNavigationTimeout(options.timeout ?? PLAYWRIGHT_NAVIGATION_TIMEOUT);
 	const errors: string[] = [];
 	page.on('console', (m) => {
 		if (m.type() === 'error') errors.push(m.text());
@@ -225,14 +229,14 @@ async function loadRoute(
 							requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
 						),
 					null,
-					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					{ timeout: actionTimeout },
 				);
 				// Route preparation and a Vite recovery reload can both finish after
 				// `load`. The behavioral boundary is route-owned DOM, not an arbitrary
 				// two-frame delay. Wait for that boundary before reading the text; the
 				// callers still assert the route rendered user-visible content.
 				await page.waitForFunction(() => document.querySelector('main > *') !== null, null, {
-					timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+					timeout: actionTimeout,
 				});
 				const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
 				return { page, errors, main };
@@ -789,8 +793,19 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 			'--strictPort',
 		]);
 		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
-		// Covers the production-build wait above plus the cold dev boot.
-	}, 420_000);
+		// Answering a request does not mean the client module graph is compiled:
+		// Vite transforms it on demand, and the route cases below run four-at-a-time,
+		// so without this the first of them each pay the shared app shell's compile
+		// at the same time, inside one ordinary action budget. Measured against this
+		// cold server, that left the worst route ~12s into its 20s budget on a fast
+		// machine, which a loaded CI runner has no headroom to absorb; compiling the
+		// shell once here first brings the worst route to ~5.5s. The cold start is
+		// still proven, because this load is the one that pays for it, on a budget
+		// that says so rather than an ordinary one.
+		const warmup = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs', { timeout: 120_000 });
+		await warmup.page.close();
+		// Covers the production-build wait above, the cold dev boot, and the warm-up.
+	}, 540_000);
 
 	afterAll(async () => {
 		await stopServer(server);
