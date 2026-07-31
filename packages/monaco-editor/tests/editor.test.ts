@@ -171,6 +171,22 @@ describe('@octanejs/monaco-editor Editor', () => {
 		await settle();
 	});
 
+	it('prefers the controlled language over defaultLanguage for the initial model', async () => {
+		let editorInstance: MonacoEditor | undefined;
+		const result = mount(Editor as any, {
+			language: 'typescript',
+			defaultLanguage: 'markdown',
+			onMount: (instance: MonacoEditor) => {
+				editorInstance = instance;
+			},
+		});
+		await settle();
+
+		expect(editorInstance!.getModel()?.getLanguageId()).toBe('typescript');
+		result.unmount();
+		await settle();
+	});
+
 	it('switches path models, restores view state, and disposes every owned model', async () => {
 		let editorInstance: MonacoEditor | undefined;
 		const result = mount(Editor as any, {

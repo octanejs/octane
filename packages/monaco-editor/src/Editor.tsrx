@@ -94,7 +94,7 @@ function EditorComponent(props: EditorProps) @{
 			const initialModel = getOrCreateModel(
 				monaco,
 				value ?? defaultValue ?? '',
-				defaultLanguage ?? language ?? '',
+				language ?? defaultLanguage ?? '',
 				initialPath,
 				leasedModelsRef.current,
 			);
@@ -176,7 +176,7 @@ function EditorComponent(props: EditorProps) @{
 		const nextModel = getOrCreateModel(
 			monaco,
 			value ?? defaultValue ?? '',
-			defaultLanguage ?? language ?? '',
+			language ?? defaultLanguage ?? '',
 			nextModelKey,
 			leasedModelsRef.current,
 		);
