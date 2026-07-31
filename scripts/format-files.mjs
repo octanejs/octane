@@ -31,14 +31,18 @@ function parseArguments(argv) {
 
 function main() {
 	const { mode, paths } = parseArguments(process.argv.slice(2));
-	const files = paths.length > 0 ? paths : collectChangedPaths(process.cwd());
+	const usesGitPaths = paths.length === 0;
+	const files = usesGitPaths ? collectChangedPaths(process.cwd()) : paths;
 
 	if (files.length === 0) {
 		console.log('No staged or unstaged files to format.');
 		return 0;
 	}
 
-	const result = spawnSync('prettier', [mode, '--', ...files], {
+	const gitPathOptions = usesGitPaths
+		? ['--ignore-unknown', '--no-error-on-unmatched-pattern']
+		: [];
+	const result = spawnSync('prettier', [mode, ...gitPathOptions, '--', ...files], {
 		cwd: process.cwd(),
 		stdio: 'inherit',
 	});

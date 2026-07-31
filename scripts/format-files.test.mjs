@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 
 const SCRIPT = fileURLToPath(new URL('./format-files.mjs', import.meta.url));
+const REPO_BIN = path.resolve(path.dirname(SCRIPT), '..', 'node_modules', '.bin');
 
 function git(cwd, args) {
 	execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -85,8 +86,10 @@ describe('format-files command', () => {
 			const changedResult = run(fixture.root, fixture.env, ['--check', '--']);
 			assert.equal(changedResult.status, 0, changedResult.stderr);
 			const prettierArguments = JSON.parse(await readFile(fixture.log, 'utf8'));
-			assert.deepEqual(prettierArguments.slice(0, 2), ['--check', '--']);
-			assert.deepEqual(prettierArguments.slice(2).sort(), [
+			const separatorIndex = prettierArguments.indexOf('--');
+			assert.equal(prettierArguments[0], '--check');
+			assert.notEqual(separatorIndex, -1);
+			assert.deepEqual(prettierArguments.slice(separatorIndex + 1).sort(), [
 				'both.ts',
 				'staged.ts',
 				'unstaged.ts',
@@ -94,6 +97,40 @@ describe('format-files command', () => {
 			]);
 		} finally {
 			await rm(fixture.root, { force: true, recursive: true });
+		}
+	});
+
+	test('succeeds when Git changes contain only ignored or unsupported files', async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), 'octane-format-files-real-'));
+
+		try {
+			git(root, ['init', '--quiet']);
+			git(root, ['config', 'user.email', 'test@example.com']);
+			git(root, ['config', 'user.name', 'Test']);
+			await Promise.all([
+				writeFile(path.join(root, '.prettierignore'), 'ignored.js\n'),
+				writeFile(path.join(root, 'ignored.js'), 'export const ignored = 0;\n'),
+				writeFile(path.join(root, 'unsupported.data'), 'before\n'),
+			]);
+			git(root, ['add', '.']);
+			git(root, ['commit', '--quiet', '-m', 'fixture']);
+			await Promise.all([
+				writeFile(path.join(root, 'ignored.js'), 'export const ignored = 1;\n'),
+				writeFile(path.join(root, 'unsupported.data'), 'after\n'),
+			]);
+
+			const result = run(
+				root,
+				{
+					...process.env,
+					PATH: `${REPO_BIN}${path.delimiter}${process.env.PATH ?? ''}`,
+				},
+				['--check', '--'],
+			);
+			assert.equal(result.status, 0, result.stderr);
+			assert.doesNotMatch(result.stderr, /No parser could be inferred|No files matching/);
+		} finally {
+			await rm(root, { force: true, recursive: true });
 		}
 	});
 
