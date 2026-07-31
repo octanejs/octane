@@ -93,29 +93,28 @@ describe('LazyMotion and motion/react-m compatibility', () => {
 		result.unmount();
 	});
 
-	it('ignores a stale async feature load after the loader prop changes', async () => {
-		const first = deferred<typeof domMax>();
-		const second = deferred<typeof domMax>();
-		const firstLoader = () => first.promise;
-		const secondLoader = () => second.promise;
-		const result = mount(AsyncLazyMotionSurface, { features: firstLoader });
+	it('keeps async features active when an inline loader is recreated', async () => {
+		const load = deferred<typeof domMax>();
+		const replacement = deferred<typeof domMax>();
+		const firstLoader = vi.fn(() => load.promise);
+		const replacementLoader = vi.fn(() => replacement.promise);
+		const onDrag = vi.fn();
+		const result = mount(FeatureBundleSurface, { features: firstLoader, onDrag });
 		await nextPaint();
 
-		result.update(AsyncLazyMotionSurface, { features: secondLoader });
+		load.resolve(domMax);
+		await settleAsyncFeatures();
+
+		const node = result.find('#feature-bundle-div') as HTMLElement;
+		result.update(FeatureBundleSurface, { features: replacementLoader, onDrag });
 		await nextPaint();
-		animateMock.mockClear();
 
-		first.resolve(domMax);
-		await settleAsyncFeatures();
-		expect(animateMock).not.toHaveBeenCalled();
-
-		second.resolve(domMax);
-		await settleAsyncFeatures();
-		expect(animateMock).toHaveBeenCalledWith(
-			result.find('#async-lazy-div'),
-			{ opacity: 1 },
-			undefined,
-		);
+		pointer('pointerdown', node, 0, 0);
+		pointer('pointermove', window, 20, 10);
+		expect(node.style.transform).toBe('translateX(20px) translateY(10px)');
+		expect(onDrag).toHaveBeenCalledTimes(1);
+		expect(replacementLoader).not.toHaveBeenCalled();
+		pointer('pointerup', window, 20, 10);
 		result.unmount();
 	});
 

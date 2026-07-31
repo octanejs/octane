@@ -718,7 +718,6 @@ export interface LazyMotionProps {
 }
 
 interface LoadedLazyFeatures {
-	source: LazyMotionFeatures | null;
 	features: MotionFeatureBundle | null;
 	error?: { value: unknown };
 }
@@ -730,25 +729,20 @@ function normalizeFeatures(
 }
 
 export function LazyMotion(props: LazyMotionProps, scope: any): void {
-	const [loaded, setLoaded] = useState<LoadedLazyFeatures>(
-		() => ({ source: null, features: null }),
-		LAZY_STATE,
-	);
+	const [loaded, setLoaded] = useState<LoadedLazyFeatures>(() => ({ features: null }), LAZY_STATE);
 	const source = props.features;
 	const isLoader = typeof source === 'function';
-	const features = isLoader
-		? loaded.source === source
-			? loaded.features
-			: null
-		: normalizeFeatures(source);
-	if (isLoader && loaded.source === source && loaded.error) throw loaded.error.value;
+	const features = isLoader ? loaded.features : normalizeFeatures(source);
+	if (isLoader && loaded.error) throw loaded.error.value;
 
+	// Match Motion's mount-time loader semantics. In particular, an idiomatic
+	// inline `features={() => import(...)}` must survive parent re-renders.
 	useEffect(
 		() => {
 			if (typeof source !== 'function') return;
 			let current = true;
 			const fail = (error: unknown) => {
-				if (current) setLoaded({ source, features: null, error: { value: error } });
+				if (current) setLoaded({ features: null, error: { value: error } });
 			};
 			try {
 				void Promise.resolve(source()).then((value) => {
@@ -760,7 +754,7 @@ export function LazyMotion(props: LazyMotionProps, scope: any): void {
 						fail(error);
 						return;
 					}
-					setLoaded({ source, features });
+					setLoaded({ features });
 				}, fail);
 			} catch (error) {
 				fail(error);
@@ -769,7 +763,7 @@ export function LazyMotion(props: LazyMotionProps, scope: any): void {
 				current = false;
 			};
 		},
-		[source],
+		[],
 		LAZY_EFFECT,
 	);
 
