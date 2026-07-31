@@ -2,6 +2,7 @@ import * as devalue from 'devalue';
 import { octane as octaneVite } from 'octane/compiler/vite';
 import { compileFilterPatterns } from './compile-filter-patterns.js';
 import { getRenderer } from './container-renderer.js';
+import { shouldSkipOctaneTransform } from './should-skip-transform.js';
 
 /**
  * @typedef {import('../types/index.d.ts').OctaneAstroOptions} OctaneAstroOptions
@@ -110,9 +111,11 @@ function getViteConfiguration({
 }
 
 /**
- * Skip Astro virtual modules and `node_modules` before the Octane compiler's
- * SSR `transform` schedule (which may `load()` importers and deadlock Rollup
- * when applied to Astro's own runtime graph).
+ * Skip Astro virtual modules and ordinary `node_modules` before the Octane
+ * compiler's SSR `transform` schedule (which may `load()` importers and
+ * deadlock Rollup when applied to Astro's own runtime graph). Published
+ * Octane bindings under node_modules still pass through — see
+ * `should-skip-transform.js`.
  *
  * @param {import('vite').Plugin} plugin
  * @returns {import('vite').Plugin}
@@ -127,19 +130,6 @@ function astroScopedOctanePlugin(plugin) {
 			return transform.call(this, code, id, options);
 		},
 	};
-}
-
-/**
- * @param {string} id
- */
-function shouldSkipOctaneTransform(id) {
-	if (id.startsWith('\0')) return true;
-	const clean = id.split('?', 1)[0] ?? id;
-	if (clean.includes('/node_modules/') || clean.includes('\\node_modules\\')) return true;
-	if (/\.(astro|md|mdx|css|scss|sass|less|styl|json|svg|png|jpe?g|gif|webp)$/i.test(clean)) {
-		return true;
-	}
-	return !/\.(tsrx|tsx|jsx|ts|js|mts|mjs)$/i.test(clean);
 }
 
 /**
