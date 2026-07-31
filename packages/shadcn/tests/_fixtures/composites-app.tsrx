@@ -26,8 +26,8 @@ import {
 	SidebarSeparator,
 	SidebarTrigger,
 	useSidebar,
-} from '../../src/ui/sidebar.tsrx';
-import { TooltipProvider } from '../../src/ui/tooltip.tsrx';
+} from '../../src/bases/radix/ui/sidebar.tsrx';
+import { TooltipProvider } from '../../src/bases/radix/ui/tooltip.tsrx';
 import {
 	Field,
 	FieldContent,
@@ -39,7 +39,7 @@ import {
 	FieldSeparator,
 	FieldSet,
 	FieldTitle,
-} from '../../src/ui/field.tsrx';
+} from '../../src/bases/radix/ui/field.tsrx';
 
 export function SidebarFixture() @{
 	<SidebarProvider>

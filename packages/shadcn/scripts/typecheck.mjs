@@ -16,13 +16,17 @@ import { fileURLToPath } from 'node:url';
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BIN = resolve(PKG_ROOT, '../../node_modules/.bin/tsrx-tsc');
 
-const run = spawnSync(BIN, ['--noEmit', '-p', 'tsconfig.json'], {
-	cwd: PKG_ROOT,
-	encoding: 'utf8',
-});
-const lines = `${run.stdout ?? ''}${run.stderr ?? ''}`.split('\n');
-const own = lines.filter((line) => /^src[/\\].*error TS/.test(line));
-const foreign = lines.filter((line) => /error TS/.test(line) && !/^src[/\\]/.test(line));
+const check = (project) =>
+	`${spawnSync(BIN, ['--noEmit', '-p', project], { cwd: PKG_ROOT, encoding: 'utf8' }).stdout ?? ''}`;
+
+// Two programs, because they prove different things. `tsconfig.json` covers the
+// authored sources. `tsconfig.consumer.json` covers tests/types/, which imports
+// the package through its PUBLISHED `exports` subpaths — the surface consumers
+// actually see. The source program cannot stand in for it: src/ imports its own
+// files relatively and never exercises the exports map at all.
+const lines = `${check('tsconfig.json')}\n${check('tsconfig.consumer.json')}`.split('\n');
+const own = lines.filter((line) => /^(src|tests)[/\\].*error TS/.test(line));
+const foreign = lines.filter((line) => /error TS/.test(line) && !/^(src|tests)[/\\]/.test(line));
 
 if (foreign.length) {
 	const packages = new Set(
@@ -35,7 +39,7 @@ if (foreign.length) {
 
 if (own.length) {
 	console.error(own.join('\n'));
-	console.error(`\n@octanejs/shadcn: ${own.length} type error(s) in src/.`);
+	console.error(`\n@octanejs/shadcn: ${own.length} type error(s).`);
 	process.exit(1);
 }
-console.log('@octanejs/shadcn: src/ typechecks clean.');
+console.log('@octanejs/shadcn: src/ and the published subpath surface typecheck clean.');
