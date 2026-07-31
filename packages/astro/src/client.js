@@ -45,14 +45,16 @@ export default (element) =>
 		const prefix = element.getAttribute('prefix') ?? '';
 
 		if (client === 'only') {
-			element.innerHTML = '';
-			const { root, created } = getOrCreateRoot(element, () => {
+			// Do not clear `innerHTML` here. Astro re-invokes this hydrator on
+			// prop refreshes (e.g. transition:persist); wiping would destroy nodes
+			// the live Octane root still owns. First `root.render` already clears
+			// leftover fallback/slot markup via createRoot's mount path.
+			const { root } = getOrCreateRoot(element, () => {
 				const r = createRoot(element);
 				element.addEventListener('astro:unmount', () => r.unmount(), { once: true });
 				return r;
 			});
 			root.render(Component, props);
-			void created;
 			return;
 		}
 
