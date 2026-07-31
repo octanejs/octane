@@ -118,10 +118,15 @@ pragma. Use `OctaneNode` for renderables, never `React.ReactNode`.
 ```bash
 pnpm test          # full Vitest run
 pnpm typecheck
+pnpm sync          # refresh shared generated state before pushing
 pnpm format:files [path...]        # defaults to staged and unstaged files
 pnpm format:files:check [path...]  # defaults to staged and unstaged files
 pnpm format:check                  # optional repo-wide gate
 ```
+
+Before pushing commits to `origin`, `upstream`, or any other remote, run
+`pnpm sync`. Review and commit any changes it produces so the generated state is
+included in the pushed commits.
 
 Use the scoped Prettier commands while iterating. With no paths, both use the
 union of staged and unstaged Git diffs; explicit file or directory paths
