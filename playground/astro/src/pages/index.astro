@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { ClientOnlyBadge } from '../components/ClientOnlyBadge.tsrx';
 import { Counter } from '../components/Counter.tsrx';
 import { Greeting } from '../components/Greeting.tsrx';
 import { Panel } from '../components/Panel.tsrx';
@@ -17,6 +18,12 @@ import { Panel } from '../components/Panel.tsrx';
 		<section>
 			<h2>Hydrated counter (client:load)</h2>
 			<Counter client:load start={3} />
+		</section>
+
+		<section>
+			<h2>Client-only island (client:only="octane")</h2>
+			<p>No SSR HTML for this island — it mounts in the browser only.</p>
+			<ClientOnlyBadge client:only="octane" />
 		</section>
 
 		<section>

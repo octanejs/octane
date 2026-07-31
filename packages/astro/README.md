@@ -45,8 +45,11 @@ export function Counter(props: { start?: number }) @{
 ```astro
 ---
 import { Counter } from '../components/Counter.tsrx';
+import { ClientOnlyBadge } from '../components/ClientOnlyBadge.tsrx';
 ---
 <Counter client:load start={0} />
+<!-- Skip SSR; renderer hint must be `octane` (the AstroRenderer.name). -->
+<ClientOnlyBadge client:only="octane" />
 ```
 
 ### `.tsx` ownership (`requireDirective`)

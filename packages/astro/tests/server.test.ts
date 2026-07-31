@@ -4,7 +4,7 @@ import renderer from '../src/server.js';
 
 describe('Astro server renderer', () => {
 	it('exposes the Octane renderer contract', () => {
-		expect(renderer.name).toBe('@octanejs/astro');
+		expect(renderer.name).toBe('octane');
 		expect(renderer.supportsAstroStaticSlot).toBe(true);
 		expect(typeof renderer.check).toBe('function');
 		expect(typeof renderer.renderToStaticMarkup).toBe('function');

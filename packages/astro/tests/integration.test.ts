@@ -27,7 +27,7 @@ describe('integration factory', () => {
 		});
 		expect(renderers).toEqual([
 			{
-				name: '@octanejs/astro',
+				name: 'octane',
 				clientEntrypoint: '@octanejs/astro/client.js',
 				serverEntrypoint: '@octanejs/astro/server.js',
 			},

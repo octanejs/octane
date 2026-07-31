@@ -102,7 +102,7 @@ async function renderToStaticMarkup(Component, props, { default: children, ...sl
 
 /** @type {import('astro').NamedSSRLoadedRendererValue} */
 const renderer = {
-	name: '@octanejs/astro',
+	name: 'octane',
 	check,
 	renderToStaticMarkup,
 	supportsAstroStaticSlot: true,

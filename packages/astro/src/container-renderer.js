@@ -6,7 +6,10 @@
  */
 export function getContainerRenderer() {
 	return {
-		name: '@octanejs/astro',
+		// Short name so Astro's `client:only="octane"` hint matches
+		// (`name === hint` or `@astrojs/${hint}`). Integration package remains
+		// `@octanejs/astro`.
+		name: 'octane',
 		clientEntrypoint: '@octanejs/astro/client.js',
 		serverEntrypoint: '@octanejs/astro/server.js',
 	};
