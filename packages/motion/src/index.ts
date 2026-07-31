@@ -527,7 +527,10 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				const box = { left: r.left, top: r.top, width: r.width, height: r.height };
 				const prev = latest.layoutBox;
 				latest.layoutBox = box;
-				if (!prev) return;
+				if (!prev) {
+					node.style.transform = prevTransform;
+					return;
+				}
 				const projection = projectLayout(prev, box, latest.layoutMode);
 				if (projection) {
 					if (latest.shouldReduceMotion) {
@@ -555,12 +558,15 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				const prev = takeLayoutCell(id);
 				if (prev) {
 					if (!latest.shouldReduceMotion) {
+						const prevTransform = node.style.transform;
 						node.style.transform = '';
 						const box = boxOf(node);
 						const projection = projectLayout(prev, box, latest.layoutMode);
 						if (projection) {
 							node.style.transform = projection.from;
 							animate(node, { transform: projection.to }, layoutTransition(latest.transition));
+						} else {
+							node.style.transform = prevTransform;
 						}
 					}
 				}

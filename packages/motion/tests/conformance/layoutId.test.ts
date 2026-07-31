@@ -57,4 +57,27 @@ describe('layoutId (shared-element crossfade)', () => {
 		expect(animateMock).not.toHaveBeenCalled();
 		reopened.unmount();
 	});
+
+	it('preserves an existing transform when the selected layout mode has no delta', async () => {
+		let box: any = { left: 0, top: 0, width: 100, height: 100 };
+		Element.prototype.getBoundingClientRect = vi.fn(() => box);
+		const props = {
+			layoutId: 'position-only-hero',
+			layout: 'position',
+			style: { transform: 'rotate(15deg)' },
+		};
+
+		const first = mount(NamedHero, props);
+		await nextPaint();
+		first.unmount();
+
+		box = { left: 0, top: 0, width: 200, height: 200 };
+		animateMock.mockClear();
+		const second = mount(NamedHero, props);
+		await nextPaint();
+
+		expect(second.find('#named-hero').style.transform).toBe('rotate(15deg)');
+		expect(animateMock).not.toHaveBeenCalled();
+		second.unmount();
+	});
 });
