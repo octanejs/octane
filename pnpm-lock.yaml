@@ -3914,6 +3914,9 @@ importers:
       devalue:
         specifier: catalog:default
         version: 5.8.2
+      picomatch:
+        specifier: ^4.0.3
+        version: 4.0.5
     devDependencies:
       '@types/node':
         specifier: catalog:default

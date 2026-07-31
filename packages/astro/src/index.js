@@ -1,5 +1,6 @@
 import * as devalue from 'devalue';
 import { octane as octaneVite } from 'octane/compiler/vite';
+import { compileFilterPatterns } from './compile-filter-patterns.js';
 import { getRenderer } from './container-renderer.js';
 
 /**
@@ -153,8 +154,8 @@ function optionsPlugin({ include, exclude, experimentalDisableStreaming }) {
 	const virtualModuleId = '\0' + virtualModule;
 	/** @type {VirtualModuleOptions} */
 	const serialized = {
-		include,
-		exclude,
+		include: compileFilterPatterns(include),
+		exclude: compileFilterPatterns(exclude),
 		experimentalDisableStreaming,
 	};
 	return {

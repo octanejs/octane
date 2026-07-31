@@ -31,10 +31,14 @@ export interface OctaneAstroOptions {
 	experimentalDisableStreaming?: boolean;
 }
 
-/** Options serialized into the `astro:octane:opts` virtual module. */
+/**
+ * Options serialized into the `astro:octane:opts` virtual module.
+ * String globs are compiled to RegExp at Vite config time (Node) so the
+ * SSR server entry never imports picomatch.
+ */
 export interface VirtualModuleOptions {
-	include?: FilterPattern;
-	exclude?: FilterPattern;
+	include: RegExp[] | null;
+	exclude: RegExp[] | null;
 	experimentalDisableStreaming: boolean;
 }
 

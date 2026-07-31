@@ -61,7 +61,8 @@
     "test": "cd ../.. && vitest run --project astro"
   },
   "dependencies": {
-    "devalue": "catalog:default"
+    "devalue": "catalog:default",
+    "picomatch": "^4.0.3"
   },
   "peerDependencies": {
     "astro": ">=5.0.0",
