@@ -92,6 +92,22 @@ export function DeferredEventArgument(props) @{
 	</div>
 }
 
+// An inline handler that reads nothing changeable is installed once at mount.
+// One that captures render state must keep seeing the LATEST capture, which is
+// what makes the install-once proof load-bearing rather than cosmetic.
+const stableLabel = () => 'stable';
+
+export function MountStableHandlers() @{
+	const [log, setLog] = useState('none');
+	const [n, setN] = useState(0);
+	<div>
+		<button id="bump" onClick={() => setN((current) => current + 1)}>{n as string}</button>
+		<button id="stable" onClick={() => setLog(stableLabel())}>{'stable'}</button>
+		<button id="capturing" onClick={() => setLog('n=' + n)}>{'capturing'}</button>
+		<output>{log as string}</output>
+	</div>
+}
+
 export function StableNativeEventCallbacks(props) @{
 	const [n, setN] = useState(0);
 	const increment = () => setN((value) => value + 1);
