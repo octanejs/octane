@@ -79,6 +79,42 @@ describe('typecheck-files command', () => {
 		assert.equal(result.status, 0, result.error?.message);
 	});
 
+	test('ignores build-only configs when selected explicitly or through Git', async () => {
+		const fixture = await createFixture('octane-typecheck-build-config-');
+
+		try {
+			await Promise.all([
+				writeFile(path.join(fixture.root, 'source.ts'), 'export const source = true;\n'),
+				writeFile(
+					path.join(fixture.root, 'tsconfig.build.json'),
+					JSON.stringify({ files: ['./source.ts'] }),
+				),
+			]);
+
+			const explicit = run(fixture.root, fixture.env, ['tsconfig.build.json']);
+			assert.equal(explicit.status, 0, explicit.stderr);
+			assert.match(explicit.stdout, /No selected files are covered by a TypeScript project/);
+			await assert.rejects(access(fixture.log));
+
+			git(fixture.root, ['init', '--quiet']);
+			git(fixture.root, ['config', 'user.email', 'test@example.com']);
+			git(fixture.root, ['config', 'user.name', 'Test']);
+			git(fixture.root, ['add', '.']);
+			git(fixture.root, ['commit', '--quiet', '-m', 'fixture']);
+			await writeFile(
+				path.join(fixture.root, 'tsconfig.build.json'),
+				JSON.stringify({ compilerOptions: { noEmit: false }, files: ['./source.ts'] }),
+			);
+
+			const changed = run(fixture.root, fixture.env);
+			assert.equal(changed.status, 0, changed.stderr);
+			assert.match(changed.stdout, /No selected files are covered by a TypeScript project/);
+			await assert.rejects(access(fixture.log));
+		} finally {
+			await rm(fixture.root, { force: true, recursive: true });
+		}
+	});
+
 	test('checks the union of staged and unstaged files from their TypeScript project', async () => {
 		const fixture = await createFixture();
 

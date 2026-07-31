@@ -112,7 +112,7 @@ function selectProjects(selection) {
 
 		const stat = lstatSync(absolutePath);
 		if (stat.isFile()) {
-			if (path.basename(absolutePath).startsWith('tsconfig') && absolutePath.endsWith('.json')) {
+			if (isTypecheckConfig(absolutePath)) {
 				const project = projectForConfig(absolutePath);
 				for (const file of project.files) addSelectedFile(projects, project, file);
 			} else if (SOURCE_FILE_PATTERN.test(absolutePath)) {
