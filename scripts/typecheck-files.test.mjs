@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 
 const SCRIPT = fileURLToPath(new URL('./typecheck-files.mjs', import.meta.url));
+const REPOSITORY_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 
 function git(cwd, args) {
 	execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -69,6 +70,15 @@ async function invocations(log) {
 }
 
 describe('typecheck-files command', () => {
+	test('keeps interrupted project-local temporary directories out of Git status', () => {
+		const result = spawnSync(
+			'git',
+			['check-ignore', '--quiet', 'packages/octane/.typecheck-files-interrupted/tsconfig-0.json'],
+			{ cwd: REPOSITORY_ROOT },
+		);
+		assert.equal(result.status, 0, result.error?.message);
+	});
+
 	test('checks the union of staged and unstaged files from their TypeScript project', async () => {
 		const fixture = await createFixture();
 
