@@ -18,16 +18,47 @@ async function wait(ms: number): Promise<void> {
 	await settle();
 }
 
+// A toast leaves the DOM one `TIME_BEFORE_UNMOUNT` timer after it is dismissed,
+// so sleeping for that exact budget makes every such assertion a race the test
+// loses whenever the machine is loaded. Poll for the state being asserted
+// instead; the caller still makes the real assertion afterwards.
+async function waitFor(condition: () => boolean, timeout = 2000): Promise<void> {
+	const deadline = Date.now() + timeout;
+	for (;;) {
+		await settle();
+		if (condition() || Date.now() >= deadline) return;
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
+}
+
+// Toasts are delivered to every mounted Toaster, so a root left behind by a
+// failed assertion keeps rendering the next tests' toasts: it doubles
+// `onAutoClose` counts and strands the listeners its Toast children registered.
+// Unmounting only on the success path therefore turns one failure into several,
+// which hides the test that actually broke.
+const mountedRoots = new Set<{ unmount: () => void }>();
+
+function mountApp<P>(...args: Parameters<typeof mount<P>>): ReturnType<typeof mount<P>> {
+	const root = mount<P>(...args);
+	mountedRoots.add(root);
+	return root;
+}
+
+function unmountApp(root: { unmount: () => void }): void {
+	if (mountedRoots.delete(root)) root.unmount();
+}
+
 afterEach(async () => {
 	toast.dismiss();
 	await wait(220);
+	for (const root of [...mountedRoots]) unmountApp(root);
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 
 describe('@octanejs/sonner — Toaster', () => {
 	it('renders the upstream accessibility, data-attribute, content and style contract', async () => {
-		const root = mount(ToasterApp, {
+		const root = mountApp(ToasterApp, {
 			theme: 'dark',
 			richColors: true,
 			position: 'top-center',
@@ -68,13 +99,13 @@ describe('@octanejs/sonner — Toaster', () => {
 		await settle();
 		expect(item.getAttribute('data-removed')).toBe('true');
 		expect(onDismiss).toHaveBeenCalledTimes(1);
-		await wait(220);
+		await waitFor(() => root.container.querySelector('[data-testid="contract-toast"]') === null);
 		expect(root.container.querySelector('[data-testid="contract-toast"]')).toBeNull();
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('updates a toast in place and exposes active toasts through useSonner', async () => {
-		const root = mount(SonnerStateProbe);
+		const root = mountApp(SonnerStateProbe);
 		await settle();
 		toast('Before', { id: 'update', duration: Infinity });
 		await settle();
@@ -93,11 +124,11 @@ describe('@octanejs/sonner — Toaster', () => {
 		expect(root.container.querySelector('[data-sonner-toast]')?.getAttribute('data-type')).toBe(
 			'success',
 		);
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('supports native action/cancel semantics and custom Octane elements', async () => {
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		const action = vi.fn((event: MouseEvent) => event.preventDefault());
 		toast('Action toast', {
@@ -114,7 +145,7 @@ describe('@octanejs/sonner — Toaster', () => {
 		expect(root.container.querySelector('[data-sonner-toast]')).not.toBeNull();
 
 		flushSync(() => (root.container.querySelector('[data-cancel]') as HTMLButtonElement).click());
-		await wait(220);
+		await waitFor(() => root.container.querySelector('[data-sonner-toast]') === null);
 		expect(root.container.querySelector('[data-sonner-toast]')).toBeNull();
 
 		showCustom('custom');
@@ -128,11 +159,11 @@ describe('@octanejs/sonner — Toaster', () => {
 				?.closest('[data-sonner-toast]')
 				?.getAttribute('data-styled'),
 		).toBe('false');
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('routes targeted and global toasts to the matching Toaster', async () => {
-		const root = mount(DualToasterApp);
+		const root = mountApp(DualToasterApp);
 		await settle();
 		toast('Primary', { id: 'primary-toast', toasterId: 'primary', duration: Infinity });
 		toast('Secondary', {
@@ -150,11 +181,11 @@ describe('@octanejs/sonner — Toaster', () => {
 		expect(primary.textContent).not.toContain('Secondary');
 		expect(secondary.textContent).toContain('Secondary');
 		expect(root.container.textContent).toContain('Global');
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('collapses a targeted Toaster when only one of its own toasts remains', async () => {
-		const root = mount(DualToasterApp);
+		const root = mountApp(DualToasterApp);
 		await settle();
 		toast('Primary one', {
 			id: 'primary-one',
@@ -185,11 +216,14 @@ describe('@octanejs/sonner — Toaster', () => {
 		);
 
 		toast.dismiss('primary-two');
-		await wait(260);
+		await waitFor(
+			() =>
+				primaryList.querySelector('[data-sonner-toast]')?.getAttribute('data-expanded') === 'false',
+		);
 		expect(primaryList.querySelector('[data-sonner-toast]')?.getAttribute('data-expanded')).toBe(
 			'false',
 		);
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('uses the front toast height from each position list', async () => {
@@ -211,7 +245,7 @@ describe('@octanejs/sonner — Toaster', () => {
 				toJSON: () => ({}),
 			};
 		});
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		toast('Bottom', { id: 'bottom-height', duration: Infinity });
 		toast('Top', {
@@ -226,11 +260,11 @@ describe('@octanejs/sonner — Toaster', () => {
 		const top = lists.find((list) => list.textContent?.includes('Top'))!;
 		expect(bottom.style.getPropertyValue('--front-toast-height')).toBe('30px');
 		expect(top.style.getPropertyValue('--front-toast-height')).toBe('70px');
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('runs promise loading, extended success, finally and unwrap semantics', async () => {
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		let resolve!: (value: { name: string }) => void;
 		const pending = new Promise<{ name: string }>((done) => {
@@ -262,11 +296,11 @@ describe('@octanejs/sonner — Toaster', () => {
 		expect(item.textContent).toContain('Promise complete');
 		expect(item.getAttribute('data-type')).toBe('success');
 		expect(finallyCallback).toHaveBeenCalledTimes(1);
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('focuses with the default hotkey and restores the previously focused element', async () => {
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		toast('Keyboard toast', { id: 'keyboard', duration: Infinity });
 		await settle();
@@ -282,11 +316,11 @@ describe('@octanejs/sonner — Toaster', () => {
 		origin.focus();
 		await settle();
 		expect(document.activeElement).toBe(origin);
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('auto-closes finite toasts and calls onAutoClose once', async () => {
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		const onAutoClose = vi.fn();
 		toast('Timed toast', {
@@ -297,18 +331,22 @@ describe('@octanejs/sonner — Toaster', () => {
 		await settle();
 		expect(root.container.querySelector('[data-sonner-toast]')).not.toBeNull();
 
-		await wait(90);
+		await waitFor(
+			() =>
+				root.container.querySelector('[data-sonner-toast]')?.getAttribute('data-removed') ===
+				'true',
+		);
 		expect(onAutoClose).toHaveBeenCalledTimes(1);
 		expect(root.container.querySelector('[data-sonner-toast]')?.getAttribute('data-removed')).toBe(
 			'true',
 		);
-		await wait(220);
+		await waitFor(() => root.container.querySelector('[data-sonner-toast]') === null);
 		expect(root.container.querySelector('[data-sonner-toast]')).toBeNull();
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('dismisses with an allowed pointer swipe and reports its direction', async () => {
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		const onDismiss = vi.fn();
 		toast('Swipe toast', {
@@ -339,14 +377,14 @@ describe('@octanejs/sonner — Toaster', () => {
 		expect(item.getAttribute('data-swipe-out')).toBe('true');
 		expect(item.getAttribute('data-swipe-direction')).toBe('right');
 		expect(onDismiss).toHaveBeenCalledTimes(1);
-		await wait(220);
+		await waitFor(() => root.container.querySelector('[data-sonner-toast]') === null);
 		expect(root.container.querySelector('[data-sonner-toast]')).toBeNull();
-		root.unmount();
+		unmountApp(root);
 	});
 
 	it('subscribes to toast state once for the lifetime of the Toaster', async () => {
 		const subscribe = vi.spyOn(ToastState, 'subscribe');
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		expect(subscribe).toHaveBeenCalledTimes(1);
 
@@ -356,14 +394,14 @@ describe('@octanejs/sonner — Toaster', () => {
 		await settle();
 		expect(subscribe).toHaveBeenCalledTimes(1);
 
-		root.unmount();
+		unmountApp(root);
 		subscribe.mockRestore();
 	});
 
 	it('removes the document visibility listener when a toast unmounts', async () => {
 		const add = vi.spyOn(document, 'addEventListener');
 		const remove = vi.spyOn(document, 'removeEventListener');
-		const root = mount(ToasterApp);
+		const root = mountApp(ToasterApp);
 		await settle();
 		toast('Visibility', { id: 'visibility', duration: Infinity });
 		await settle();
@@ -372,7 +410,7 @@ describe('@octanejs/sonner — Toaster', () => {
 			([eventName]) => eventName === 'visibilitychange',
 		);
 		expect(visibilityRegistration).toBeDefined();
-		root.unmount();
+		unmountApp(root);
 		await settle();
 		expect(remove).toHaveBeenCalledWith('visibilitychange', visibilityRegistration?.[1]);
 
@@ -395,11 +433,11 @@ describe('@octanejs/sonner — Toaster', () => {
 			vi.fn(() => mediaQuery),
 		);
 
-		const root = mount(ToasterApp, { theme: 'system' });
+		const root = mountApp(ToasterApp, { theme: 'system' });
 		await settle();
 		expect(addEventListener).toHaveBeenCalledTimes(1);
 		const listener = addEventListener.mock.calls[0][1];
-		root.unmount();
+		unmountApp(root);
 		await settle();
 		expect(removeEventListener).toHaveBeenCalledWith('change', listener);
 	});
