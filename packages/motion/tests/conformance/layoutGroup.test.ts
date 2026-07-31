@@ -109,6 +109,25 @@ describe('LayoutGroup', () => {
 		matching.unmount();
 	});
 
+	it('does not publish a snapshot when a mounted element changes namespaces', async () => {
+		let box: any = { left: 0, top: 0, width: 100, height: 100 };
+		Element.prototype.getBoundingClientRect = vi.fn(() => box);
+
+		const survivor = mount(GroupedHero, { groupId: 'before' });
+		await nextPaint();
+		box = { left: 100, top: 0, width: 100, height: 100 };
+		survivor.update(GroupedHero, { groupId: 'after' });
+
+		box = { left: 300, top: 0, width: 100, height: 100 };
+		animateMock.mockClear();
+		const oldNamespace = mount(GroupedHero, { groupId: 'before' });
+
+		expect(oldNamespace.find('#grouped-hero').style.transform).toBe('');
+		expect(animateMock).not.toHaveBeenCalled();
+		oldNamespace.unmount();
+		survivor.unmount();
+	});
+
 	it('keeps separator-colliding group and layout ids isolated', async () => {
 		let box: any = { left: 0, top: 0, width: 100, height: 100 };
 		Element.prototype.getBoundingClientRect = vi.fn(() => box);

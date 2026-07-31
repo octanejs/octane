@@ -297,6 +297,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.onDragEnd = props.onDragEnd;
 		latest.shouldReduceMotion = shouldReduceMotion;
 		latest.animationEnabled = animationEnabled;
+		latest.layoutEnabled = layoutEnabled;
+		latest.layoutIdKey = layoutIdKey;
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
 		// `initial`: apply instantly on mount (before the animate effect runs).
@@ -548,8 +550,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		);
 
 		// `layoutId`: shared-element crossfade. On mount, if a same-id element recently
-		// unmounted, FLIP from its recorded box to ours; on unmount, record our box for
-		// the next same-id element (the cleanup runs while still in the DOM).
+		// unmounted, FLIP from its recorded box to ours.
 		useLayoutEffect(
 			() => {
 				if (!layoutEnabled) return;
@@ -570,22 +571,22 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						}
 					}
 				}
-				return () => {
-					if (node.isConnected) recordLayoutCell(id, boxOf(node));
-				};
 			},
 			[layoutEnabled, layoutIdKey],
 			LAYOUT_ID,
 		);
 
-		// Exit: this effect's CLEANUP runs on unmount, while the node is still in the
-		// DOM (octane fires cleanups before detaching). We clone the leaving node
-		// OUTSIDE the block's range (so octane's removal doesn't take the clone),
-		// animate the exit on the clone, and remove the clone when it finishes.
+		// Unmount: this cleanup runs while the node is still in the DOM. Record shared
+		// layout state here—not in the keyed claim effect, whose cleanup also runs on
+		// dependency changes—then clone any exiting node outside the block's range.
 		useLayoutEffect(
 			() => () => {
-				if (!latest.animationEnabled) return;
 				const n: HTMLElement | null = latest.node;
+				const layoutId = latest.layoutIdKey;
+				if (latest.layoutEnabled && layoutId && n?.isConnected) {
+					recordLayoutCell(layoutId, boxOf(n));
+				}
+				if (!latest.animationEnabled) return;
 				const exit = latest.exit;
 				if (!exit || !n || !n.isConnected || n.parentNode == null) return;
 				const parent = n.parentNode as HTMLElement;
