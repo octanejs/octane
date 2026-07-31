@@ -110,6 +110,29 @@ const VISX_ALIASES = [
 		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
 	},
 ];
+const STREAMDOWN_SOURCE = resolve(import.meta.dirname, 'packages/streamdown/src');
+const STREAMDOWN_ALIASES = [
+	{
+		find: /^@octanejs\/streamdown\/code$/,
+		replacement: resolve(STREAMDOWN_SOURCE, 'code.ts'),
+	},
+	{
+		find: /^@octanejs\/streamdown\/math$/,
+		replacement: resolve(STREAMDOWN_SOURCE, 'math.ts'),
+	},
+	{
+		find: /^@octanejs\/streamdown\/mermaid$/,
+		replacement: resolve(STREAMDOWN_SOURCE, 'mermaid-plugin.ts'),
+	},
+	{
+		find: /^@octanejs\/streamdown\/cjk$/,
+		replacement: resolve(STREAMDOWN_SOURCE, 'cjk.ts'),
+	},
+	{
+		find: /^@octanejs\/streamdown$/,
+		replacement: resolve(STREAMDOWN_SOURCE, 'index.tsrx'),
+	},
+];
 // Octane's template source map contains zero-width generated segments that are
 // valid in Vite but currently rejected by Vitest's Istanbul/V8 remappers. The
 // Visx coverage project measures the compiled package source directly instead;
@@ -2432,6 +2455,42 @@ export default defineConfig({
 							find: /^@octanejs\/sonner$/,
 							replacement: resolve(import.meta.dirname, 'packages/sonner/src/index.ts'),
 						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'streamdown',
+					include: [
+						'packages/streamdown/tests/**/*.test.ts',
+						'!packages/streamdown/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/streamdown/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: STREAMDOWN_ALIASES,
+				},
+			},
+			{
+				test: {
+					name: 'streamdown-ssr',
+					include: ['packages/streamdown/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						...STREAMDOWN_ALIASES,
 					],
 				},
 			},

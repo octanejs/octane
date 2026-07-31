@@ -26,6 +26,7 @@ playground/octane/src/styles/style-nova.css
 
 # Generated declaration files
 **/*.d.tsrx.ts
+packages/streamdown/**/*.tsrx.d.ts
 packages/visx/**/*.tsrx.d.ts
 
 # TanStack Router owns this generated module's formatting.
