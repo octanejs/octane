@@ -249,8 +249,8 @@ account pushes it.
 ```
 
 An agent commits under a human's credentials, so the author field cannot show
-this and the box is the only signal that separates the two. Leaving it clear is a
-positive claim that a human wrote the diff.
+this and the box is the only signal that separates the two. Leaving it clear or
+omitting the section is a positive claim that a human wrote the diff.
 
 `.github/workflows/label-pr.yml` reads the box and applies the `agent-authored`
 label for you. It runs with the repository's own token rather than yours, so this
@@ -261,11 +261,11 @@ separate `draft-agent-prs.yml` workflow remains a fallback for labels applied by
 a maintainer or GitHub App. A maintainer marks the pull request ready for review
 once it has been looked at.
 
-Keep the section in the body you write, because a pull request that omits it
-fails a check. `gh pr create --fill` builds the body from your commits and drops
-the template, so use `--body-file` instead. Labels are applied before that check
-fails, so the only thing left to fix is the body, and editing it re-runs the
-check. Generated bot pull requests are exempt.
+Only a checked box means agent-authored. An empty box or missing section is
+treated as human-authored, removes a stale `agent-authored` label, and leaves the
+label check successful. Agents must therefore keep and tick the section;
+`gh pr create --fill` drops the template and would make an agent-produced diff
+look human-authored, so use `--body-file` instead.
 
 The repository ships its own agent context: `AGENTS.md` (and its per-tool
 siblings) plus task skills for branching, issues, bug hunting, core changes,
