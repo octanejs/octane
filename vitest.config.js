@@ -2587,6 +2587,11 @@ export default defineConfig({
 					name: 'testing-library',
 					include: ['packages/testing-library/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					// hydrate.test.ts renders its server markup through the shared
+					// hydration harness, which boots a real Vite SSR server in beforeAll —
+					// the same reason the other harness-using projects lift the 5s default.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				// The binding's `.ts` sources call hooks with EXPLICIT slot symbols
