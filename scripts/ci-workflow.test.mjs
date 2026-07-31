@@ -72,7 +72,7 @@ describe('CI workflow aggregation', () => {
 			['typecheck', 'typecheck_checks'],
 		]) {
 			const source = jobSource(reporter);
-			assert.match(source, new RegExp(`needs: \\\\[release_change, ${checks}\\\\]`));
+			assert.match(source, new RegExp(`needs: \\[release_change, ${checks}\\]`));
 			assert.match(source, /if:.*always\(\).*!\s*cancelled\(\)/);
 			assert.match(source, /IS_DRAFT:.*pull_request\.draft == true/);
 			assert.doesNotMatch(source, /actions\/checkout|pnpm install|pnpm typecheck/);
