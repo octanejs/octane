@@ -18,6 +18,7 @@ import {
 	ShadowedHookFactory,
 	RegexCallbackDependency,
 	RegexEventArgument,
+	DeferredEventArgument,
 	StableNativeEventCallbacks,
 	AriaStaticLiterals,
 } from './_fixtures/attrs-events.tsrx';
@@ -205,6 +206,26 @@ describe('events + useState', () => {
 		r.click('button');
 		r.click('button');
 		expect(r.find('button').textContent).toBe('2');
+		r.unmount();
+	});
+
+	it('runs a call-valued event argument only when the event fires', () => {
+		const built: number[] = [];
+		const build = (count: number) => {
+			built.push(count);
+			return `built:${count}`;
+		};
+		const r = mount(DeferredEventArgument, { build });
+
+		expect(built).toEqual([]);
+		r.click('#rerender');
+		r.click('#rerender');
+		expect(r.find('#rerender').textContent).toBe('2');
+		expect(built).toEqual([]);
+
+		r.click('#refresh');
+		expect(built).toEqual([2]);
+		expect(r.find('#refresh').textContent).toBe('built:2');
 		r.unmount();
 	});
 

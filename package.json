@@ -56,7 +56,7 @@
     "release:preflight": "node scripts/npm-release-preflight.mjs",
     "release:preflight:test": "node --test scripts/npm-release-preflight.test.mjs scripts/changesets-publish.test.mjs",
     "release:prepare-publish": "node scripts/prepare-changesets-publish.mjs",
-    "sync": "pnpm bindings:status && pnpm binding-parity:gaps && pnpm packages:inventory && pnpm cli:data && pnpm --filter @octanejs/evals corpus:generate && pnpm rules:generate",
+    "sync": "pnpm bindings:status && pnpm binding-parity:gaps && pnpm packages:inventory && pnpm cli:data && pnpm --filter @octanejs/evals corpus:generate && pnpm rules:generate && pnpm context:budget:check",
     "prepare": "rulesync generate || true",
     "rules:generate": "rulesync generate",
     "rules:check": "rulesync generate --check",

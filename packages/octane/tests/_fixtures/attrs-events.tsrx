@@ -78,6 +78,20 @@ export function RegexEventArgument() @{
 	<button onClick={() => run(/x/g)}>{n as string}</button>
 }
 
+// The event-bundle lowering hoists a handler's call arguments into the
+// component body, so an argument that is itself a call would run on every
+// render instead of on the click that asked for it.
+export function DeferredEventArgument(props) @{
+	const [value, setValue] = useState('initial');
+	const [n, setN] = useState(0);
+	const build = props.build;
+	const bump = () => setN((current) => current + 1);
+	<div>
+		<button id="rerender" onClick={bump}>{n as string}</button>
+		<button id="refresh" onClick={() => setValue(build(n))}>{value as string}</button>
+	</div>
+}
+
 export function StableNativeEventCallbacks(props) @{
 	const [n, setN] = useState(0);
 	const increment = () => setN((value) => value + 1);

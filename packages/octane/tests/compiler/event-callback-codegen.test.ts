@@ -110,6 +110,36 @@ describe('compiler-owned native event callbacks', () => {
 		expect(production).not.toContain('<button onclick=');
 	});
 
+	it('bundles only event arguments that survive being hoisted to render time', () => {
+		const handler = (arg: string) =>
+			compile(
+				`
+        export function App(props) @{
+          const { select, row, n, build } = props;
+          <button onClick={() => select(${arg})}>go</button>
+        }
+      `,
+				'event-bundle-args.tsrx',
+				{ hmr: false, dev: false },
+			).code;
+		const bundled = (arg: string) => /_\$evt\d+\(/.test(handler(arg));
+
+		// The shapes the bundle exists for: a stable callee plus args the runtime
+		// can identity-diff without paying for the evaluation.
+		expect(bundled('row.id')).toBe(true);
+		expect(bundled('row?.id')).toBe(true);
+		expect(bundled('n + 1')).toBe(true);
+		expect(bundled('`row-${row.id}`')).toBe(true);
+
+		// Hoisting these out of the arrow would run them on every render: a call
+		// is arbitrary user work, and a fresh literal or regex can never compare
+		// equal anyway, so the bundle would allocate per render to skip nothing.
+		for (const arg of ['build(n)', '[row]', '{ row }', '/x/g', 'n++']) {
+			expect(handler(arg)).toContain(`() => select(${arg})`);
+			expect(bundled(arg)).toBe(false);
+		}
+	});
+
 	it('retains an Effect Event mount wrapper only for an unshared native event slot', () => {
 		const source = (spread: string) => `
       import { useEffectEvent } from 'octane';

@@ -3937,6 +3937,61 @@ function containsAutoMemoUnsafeStructure(stmts) {
 }
 
 /**
+ * Bundling MOVES an argument's evaluation out of the arrow body and into the
+ * component body, so it now runs on mount and on every update instead of once
+ * per event. That rewrite is only sound for an expression that is
+ * side-effect-free and O(1)-ish to evaluate: `() => setData(makeData(1000))`
+ * otherwise rebuilds the whole dataset on every unrelated render, and the user
+ * never sees a call they can attribute to the click that did not happen.
+ *
+ * The whitelist is deliberately narrower than "pure", because a fresh identity
+ * per evaluation also defeats the runtime arg diff the bundle exists for — an
+ * `ArrayExpression`/`ObjectExpression`/arrow arg can never compare equal, so it
+ * would pay a per-render allocation to skip nothing. Regex is rejected for the
+ * same reason `isInvariantLiteral` rejects it. Anything outside the whitelist
+ * keeps the ordinary closure handler, which evaluates the body exactly when the
+ * event fires.
+ *
+ * Member paths stay in: `() => select(row.id)` is the shape the bundle was
+ * built for, and hoisting a property read is the cost the optimisation trades
+ * against a per-render closure.
+ */
+function isDeferralSafeBundleArg(node) {
+	const value = unwrapTsExpr(node);
+	if (!value) return false;
+	switch (value.type) {
+		case 'Literal':
+			return isInvariantLiteral(value);
+		case 'Identifier':
+			return true;
+		case 'ChainExpression':
+			return isDeferralSafeBundleArg(value.expression);
+		case 'MemberExpression':
+			return (
+				isDeferralSafeBundleArg(value.object) &&
+				(!value.computed || isDeferralSafeBundleArg(value.property))
+			);
+		case 'TemplateLiteral':
+			// A fresh string still compares by VALUE, so the arg diff works.
+			return (value.expressions || []).every(isDeferralSafeBundleArg);
+		case 'UnaryExpression':
+			// `delete` mutates; the rest are pure reads of their operand.
+			return value.operator !== 'delete' && isDeferralSafeBundleArg(value.argument);
+		case 'BinaryExpression':
+		case 'LogicalExpression':
+			return isDeferralSafeBundleArg(value.left) && isDeferralSafeBundleArg(value.right);
+		case 'ConditionalExpression':
+			return (
+				isDeferralSafeBundleArg(value.test) &&
+				isDeferralSafeBundleArg(value.consequent) &&
+				isDeferralSafeBundleArg(value.alternate)
+			);
+		default:
+			return false;
+	}
+}
+
+/**
  * `() => fn(a, b, …)` — a zero-param arrow whose body is a single
  * function call. Returns `{ callee, args }` if so, else null. Used to compile
  * event handlers to the runtime's `{ fn, args }` bundle form so the
@@ -3967,7 +4022,8 @@ function detectStableEventBundle(node) {
 	if (!body || body.type !== 'CallExpression') return null;
 	// Identifier callees only — see the receiver-loss note above.
 	if (!body.callee || body.callee.type !== 'Identifier') return null;
-	// Bail if any arg is a spread — bundle args are positional only.
+	// Bail if any arg is a spread — bundle args are positional only. Everything
+	// else has to survive being hoisted to render time; see the note above.
 	if (body.arguments.some((a) => a.type === 'SpreadElement')) return null;
 	return { callee: body.callee, args: body.arguments };
 }
