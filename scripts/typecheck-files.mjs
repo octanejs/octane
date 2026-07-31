@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	lstatSync,
+	mkdtempSync,
+	readdirSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { resolveFileSelection } from './file-selection.mjs';
 
@@ -39,7 +47,7 @@ function projectSearchRoot(cwd) {
 		cwd,
 		encoding: 'utf8',
 	});
-	return result.status === 0 ? path.resolve(result.stdout.trimEnd()) : path.resolve(cwd);
+	return realpathSync(result.status === 0 ? result.stdout.trimEnd() : cwd);
 }
 
 function isWithin(directory, file) {
@@ -124,10 +132,11 @@ function selectProjects(selection, searchRoot) {
 	const unownedFiles = [];
 
 	for (const selectedPath of selection.paths) {
-		const absolutePath = path.resolve(selection.workingDirectory, selectedPath);
-		if (!existsSync(absolutePath)) {
+		const resolvedPath = path.resolve(selection.workingDirectory, selectedPath);
+		if (!existsSync(resolvedPath)) {
 			throw new Error(`Path does not exist: ${selectedPath}`);
 		}
+		const absolutePath = realpathSync(resolvedPath);
 
 		const stat = lstatSync(absolutePath);
 		if (stat.isFile()) {
@@ -211,7 +220,14 @@ function runProjects(selectedProjects, workingDirectory) {
 			if (result.error) throw result.error;
 			if (result.status !== 0) return result.status ?? 1;
 		} finally {
-			rmSync(temporaryDirectory, { force: true, recursive: true });
+			try {
+				rmSync(temporaryDirectory, { force: true, recursive: true });
+			} catch (error) {
+				const detail = error instanceof Error ? error.message : String(error);
+				console.warn(
+					`Could not remove temporary typecheck directory ${temporaryDirectory}: ${detail}`,
+				);
+			}
 		}
 	}
 	return 0;

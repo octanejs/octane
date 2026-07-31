@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
-import { access, chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import {
+	access,
+	chmod,
+	mkdir,
+	mkdtemp,
+	readFile,
+	realpath,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -145,6 +155,38 @@ describe('typecheck-files command', () => {
 			assert.equal(contained.status, 0, contained.stderr);
 			const [invocation] = await invocations(fixture.log);
 			assert.equal(invocation.config.extends, path.join(packageRoot, 'tsconfig.json'));
+		} finally {
+			await rm(fixture.root, { force: true, recursive: true });
+		}
+	});
+
+	test('resolves selected paths through repository symlinks before ownership checks', async () => {
+		const fixture = await createFixture('octane-typecheck-symlink-');
+		const repository = path.join(fixture.root, 'repository');
+		const linkedRepository = path.join(fixture.root, 'linked-repository');
+
+		try {
+			await mkdir(path.join(repository, 'src'), { recursive: true });
+			await Promise.all([
+				writeFile(path.join(repository, 'src', 'source.ts'), 'export const source = true;\n'),
+				writeFile(
+					path.join(repository, 'tsconfig.json'),
+					JSON.stringify({ files: ['./src/source.ts'] }),
+				),
+			]);
+			git(repository, ['init', '--quiet']);
+			await symlink(
+				repository,
+				linkedRepository,
+				process.platform === 'win32' ? 'junction' : 'dir',
+			);
+
+			const result = run(repository, fixture.env, [
+				path.join(linkedRepository, 'src', 'source.ts'),
+			]);
+			assert.equal(result.status, 0, result.stderr);
+			const [invocation] = await invocations(fixture.log);
+			assert.equal(invocation.config.extends, path.join(repository, 'tsconfig.json'));
 		} finally {
 			await rm(fixture.root, { force: true, recursive: true });
 		}
