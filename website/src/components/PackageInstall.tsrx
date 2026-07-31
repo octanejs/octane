@@ -1,10 +1,8 @@
-// An install snippet with a package-manager switcher: npm / pnpm / yarn / bun
-// tabs (pnpm is the default) over one terminal panel whose command is derived
-// per manager from the SAME package list — so a doc can never show a pnpm line
-// the npm tab contradicts. Docs use it for install fences only; script-running
-// fences (pnpm rsbuild dev, vite build …) stay ordinary code blocks. It owns
-// its own frame + copy button (rather than wrapping CodeBlock) so the tab bar
-// attaches seamlessly to the code as one panel.
+// A package-manager command with npm / pnpm / yarn / bun tabs (pnpm is the
+// default) over one terminal panel. Install commands are derived from one
+// package list, while named recipes cover commands whose shape differs by
+// manager. It owns its own frame + copy button (rather than wrapping CodeBlock)
+// so the tab bar attaches seamlessly to the code as one panel.
 import { useId, useRef, useState } from 'octane';
 import { useCopyToClipboard } from '../hooks/use-copy.ts';
 import copyUrl from '../assets/copy.svg';
@@ -22,11 +20,20 @@ const INSTALL: Record<PackageManager, { add: string; dev: string }> = {
 	bun: { add: 'bun add', dev: 'bun add -d' },
 };
 
+const PACK_DRY_RUN: Record<PackageManager, string> = {
+	npm: 'npm pack --dry-run',
+	pnpm: 'pnpm pack --dry-run',
+	yarn: 'yarn pack --dry-run',
+	bun: 'bun pm pack --dry-run',
+};
+
 interface PackageInstallProps {
 	/** Runtime packages, space-separated — rendered first. */
 	packages?: string;
 	/** Dev packages, space-separated — rendered as the -D line. */
 	dev?: string;
+	/** A package-manager-specific command recipe instead of an install command. */
+	command?: 'pack-dry-run';
 }
 
 // One rendered span in the code block. Newlines between command lines are their
@@ -66,8 +73,12 @@ export function PackageInstall(props: PackageInstallProps) @{
 	const id = useId();
 
 	const lines: string[] = [];
-	if (props.packages) lines.push(INSTALL[manager].add + ' ' + props.packages);
-	if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);
+	if (props.command === 'pack-dry-run') {
+		lines.push(PACK_DRY_RUN[manager]);
+	} else {
+		if (props.packages) lines.push(INSTALL[manager].add + ' ' + props.packages);
+		if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);
+	}
 	const tokens = toTokens(lines);
 
 	// textContent, not innerText: the element holds only our own token spans and a
@@ -264,3 +275,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 		</style>
 	</div>
 }
+
+// New docs should use the general name for non-install recipes. Keep the
+// original export because install snippets already use it throughout the site.
+export const PackageManagerCommand = PackageInstall;

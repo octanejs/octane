@@ -29,6 +29,10 @@ All integrations use the same compiler, runtime selection, source maps, raw
 Octane dependency discovery, and cache dependencies. Choosing a bundler does
 not change component semantics.
 
+Publishing a package built on Octane? Ship its authored modules as a
+[source package](/docs/publishing-libraries) so the consuming application compiles
+the library with the same Octane compiler and runtime as its own code.
+
 All three integrations also accept `profile: true` for a client profiling
 build. See [Profiling](/docs/profiling) for Chrome tracks, render causes, the
 console API, and the recommended production-style workflow.

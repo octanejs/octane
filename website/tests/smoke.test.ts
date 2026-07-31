@@ -332,6 +332,17 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose pre.shiki code')).toBeTruthy();
 	});
 
+	it('/docs/publishing-libraries renders the package-manager dry-run selector', async () => {
+		const { container } = await renderRoute('/docs/publishing-libraries');
+		const firstSection = container.querySelector<HTMLElement>('h2#source-package-contract')!;
+		const tabs = container.querySelectorAll('.pkg-tabs [role="tab"]');
+
+		expect(firstSection.previousElementSibling?.classList.contains('doc-hero')).toBe(true);
+		expect(getComputedStyle(firstSection).borderTopStyle).toBe('none');
+		expect(tabs).toHaveLength(4);
+		expect(container.querySelector('.pkg-code')?.textContent).toBe('pnpm pack --dry-run');
+	});
+
 	it('/docs/bindings links every first-party binding', async () => {
 		const { container } = await renderRoute('/docs/bindings');
 		const packages = BINDING_CATEGORIES.flatMap((category) => category.packages);
