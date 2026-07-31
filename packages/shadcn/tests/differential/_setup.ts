@@ -86,11 +86,16 @@ function compileFixture(srcPath: string): void {
 		return;
 	}
 	// `@octanejs/shadcn` → the vendored pinned upstream barrel (shadcn has no npm
-	// runtime package to rewrite to); relative `src/ui/*.tsrx` imports → the same
-	// barrel; `octane` → `react`.
+	// runtime package to rewrite to); relative `src/bases/<base>/ui/*.tsrx`
+	// imports → the same barrel; `octane` → `react`. The base segment is matched
+	// generically so a fixture pinned to any base rewrites to the one reference
+	// barrel — upstream ships a single component surface across its bases.
 	const rewritten = transformed.code
-		.replace(/from\s*["']@octanejs\/shadcn["']/g, 'from "./upstream-index.js"')
-		.replace(/from\s*["'](?:\.\.\/)+src\/ui\/[\w-]+\.tsrx["']/g, 'from "./upstream-index.js"')
+		.replace(/from\s*["']@octanejs\/shadcn(?:\/[\w./-]+)?["']/g, 'from "./upstream-index.js"')
+		.replace(
+			/from\s*["'](?:\.\.\/)+src\/bases\/[\w-]+\/ui\/[\w-]+\.tsrx["']/g,
+			'from "./upstream-index.js"',
+		)
 		.replace(/from\s*["']octane["']/g, 'from "react"');
 	const slug = basename(srcPath).replace(/\.tsrx$/, '');
 	const outFile = join(CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);

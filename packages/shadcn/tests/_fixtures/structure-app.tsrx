@@ -5,8 +5,12 @@ import {
 	AccordionContent,
 	AccordionItem,
 	AccordionTrigger,
-} from '../../src/ui/accordion.tsrx';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../src/ui/collapsible.tsrx';
+} from '../../src/bases/radix/ui/accordion.tsrx';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '../../src/bases/radix/ui/collapsible.tsrx';
 import {
 	Avatar,
 	AvatarBadge,
@@ -14,10 +18,10 @@ import {
 	AvatarGroup,
 	AvatarGroupCount,
 	AvatarImage,
-} from '../../src/ui/avatar.tsrx';
-import { AspectRatio } from '../../src/ui/aspect-ratio.tsrx';
-import { Progress } from '../../src/ui/progress.tsrx';
-import { ScrollArea, ScrollBar } from '../../src/ui/scroll-area.tsrx';
+} from '../../src/bases/radix/ui/avatar.tsrx';
+import { AspectRatio } from '../../src/bases/radix/ui/aspect-ratio.tsrx';
+import { Progress } from '../../src/bases/radix/ui/progress.tsrx';
+import { ScrollArea, ScrollBar } from '../../src/bases/radix/ui/scroll-area.tsrx';
 
 export function AccordionFixture() @{
 	<Accordion type="single" collapsible defaultValue="a" className="extra-accordion">

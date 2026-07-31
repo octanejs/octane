@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { flushSync } from '../../octane/src/index.js';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
-import { navigationMenuTriggerStyle } from '../src/ui/navigation-menu.tsrx';
+import { navigationMenuTriggerStyle } from '../src/bases/radix/ui/navigation-menu.tsrx';
 import {
 	ContextMenuFixture,
 	DropdownMenuFixture,
