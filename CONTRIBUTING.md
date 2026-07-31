@@ -192,11 +192,15 @@ job.
 ## Before you push
 
 ```bash
-pnpm format:files <path...>   # write, while iterating
-pnpm format:check             # final repo-wide gate
+pnpm format:files             # write, while iterating
+pnpm format:check             # repo-wide gate, when you need one
 pnpm typecheck
 pnpm test
 ```
+
+`format:files` and `format:files:check` default to the union of the staged and
+unstaged Git diffs; pass files or directories to override that. Reach for the
+repo-wide `format:check` only when a change can affect files outside your diff.
 
 Markdown is hand-authored and excluded from Prettier, so a docs-only change has
 no formatting to fix. A targeted test run is fine for a small change, as long as

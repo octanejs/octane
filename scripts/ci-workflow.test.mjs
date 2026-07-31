@@ -52,7 +52,7 @@ function stepScript(workflowSource, stepName) {
 }
 
 describe('CI workflow aggregation', () => {
-	test('runs no jobs for draft pull requests and starts when they become ready', () => {
+	test('runs only required-check reporters for draft pull requests', () => {
 		assert.match(
 			workflow,
 			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft\]$/m,
@@ -63,12 +63,24 @@ describe('CI workflow aggregation', () => {
 		const jobs = workflowJobs();
 		assert.ok(jobs.length > 0, 'expected CI workflow jobs');
 		for (const job of jobs) {
+			if (job === 'lint' || job === 'typecheck') continue;
 			assert.match(jobSource(job), draftGuard, `${job} must not run on a draft pull request`);
+		}
+
+		for (const [reporter, checks] of [
+			['lint', 'lint_checks'],
+			['typecheck', 'typecheck_checks'],
+		]) {
+			const source = jobSource(reporter);
+			assert.match(source, new RegExp(`needs: \\[release_change, ${checks}\\]`));
+			assert.match(source, /if:.*always\(\).*!\s*cancelled\(\)/);
+			assert.match(source, /IS_DRAFT:.*pull_request\.draft == true/);
+			assert.doesNotMatch(source, /actions\/checkout|pnpm install|pnpm typecheck/);
 		}
 	});
 
 	test('does not turn a superseded run into failed aggregate checks', () => {
-		for (const job of ['test', 'examples', 'lint', 'provenance']) {
+		for (const job of ['test', 'examples', 'lint', 'typecheck', 'provenance']) {
 			assert.match(jobSource(job), /if:.*always\(\).*!\s*cancelled\(\)/);
 		}
 	});
@@ -85,7 +97,7 @@ describe('CI workflow aggregation', () => {
 			'test_shard',
 			'website_e2e',
 			'heavy_integration',
-			'typecheck',
+			'typecheck_checks',
 			'example_shard',
 			'three_compat',
 			'lynx_compat',
@@ -98,8 +110,10 @@ describe('CI workflow aggregation', () => {
 			);
 		}
 
-		assert.doesNotMatch(jobSource('lint'), /outputs\.full_ci/);
-		assert.match(jobSource('lint'), /run: pnpm ci:workflow:test/);
+		assert.doesNotMatch(jobSource('lint_checks'), /outputs\.full_ci/);
+		assert.match(jobSource('lint_checks'), /run: pnpm ci:workflow:test/);
+		assert.match(jobSource('lint'), /LINT_CHECKS_RESULT/);
+		assert.match(jobSource('typecheck'), /TYPECHECK_CHECKS_RESULT/);
 		assert.match(jobSource('test'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('examples'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);

@@ -16,14 +16,10 @@ const LIGHTWEIGHT_PATHS = [
 	/^\.rulesync\//,
 	/^\.vscode\//,
 	/^\.github\//,
-	/^scripts\/(?:classify-ci-change(?:\.test)?|ci-workflow\.test)\.mjs$/,
+	/^scripts\/(?:classify-ci-change(?:\.test)?|ci-workflow\.test|format-files(?:\.test)?)\.mjs$/,
 	/^(?:AGENTS|CLAUDE|GEMINI)\.md$/,
 	/^(?:CODE_OF_CONDUCT|CONTRIBUTING|LICENSE|README|SECURITY)(?:\.md)?$/,
 ];
-
-function own(object, key) {
-	return Object.prototype.hasOwnProperty.call(object, key);
-}
 
 function rootPackageChangeIsLightweight(before, after) {
 	if (!before || !after || typeof before !== 'object' || typeof after !== 'object') {
@@ -49,9 +45,8 @@ function rootPackageChangeIsLightweight(before, after) {
 		// affect shipped code. Other existing commands remain conservative
 		// because changing one may alter a product CI entry point.
 		if (script === 'ci:workflow:test') continue;
-		const isNewFormatterHelper =
-			!own(beforeScripts, script) && own(afterScripts, script) && script.startsWith('format:');
-		if (!isNewFormatterHelper) return false;
+		if (script === 'format' || script.startsWith('format:')) continue;
+		return false;
 	}
 
 	return true;
