@@ -10,6 +10,10 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-patch"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: cargo
     directory: /examples/workbench/src-tauri
