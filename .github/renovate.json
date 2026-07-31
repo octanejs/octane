@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["every week"],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["patch"],
+      "minimumReleaseAge": "7 days",
+      "groupName": "all-dependencies"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "groupName": "all-dependencies"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "all-dependencies"
+    }
+  ]
+}
