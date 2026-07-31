@@ -216,14 +216,14 @@ function EditorComponent(props: EditorProps) @{
 		} finally {
 			preventChangeRef.current = false;
 		}
-	}, [value, path]);
+	}, [isEditorReady, value, path]);
 
 	useEffect(() => {
 		const model = editorRef.current?.getModel();
 		if (isEditorReady && model && language && monaco) {
 			monaco.editor.setModelLanguage(model, language);
 		}
-	}, [language, path]);
+	}, [isEditorReady, language, path]);
 
 	useEffect(() => {
 		if (isEditorReady && line !== undefined) {

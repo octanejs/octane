@@ -168,7 +168,7 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 		if (isEditorReady && model && model.getValue() !== nextValue) {
 			model.setValue(nextValue);
 		}
-	}, [original, originalModelPath]);
+	}, [isEditorReady, original, originalModelPath]);
 
 	useEffect(() => {
 		const editorInstance = editorRef.current?.getModifiedEditor();
@@ -191,7 +191,7 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 			]);
 			editorInstance.pushUndoStop();
 		}
-	}, [modified, modifiedModelPath]);
+	}, [isEditorReady, modified, modifiedModelPath]);
 
 	useEffect(() => {
 		const models = editorRef.current?.getModel();
@@ -199,6 +199,7 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 		monaco.editor.setModelLanguage(models.original, originalLanguage ?? language ?? 'text');
 		monaco.editor.setModelLanguage(models.modified, modifiedLanguage ?? language ?? 'text');
 	}, [
+		isEditorReady,
 		language,
 		originalLanguage,
 		modifiedLanguage,

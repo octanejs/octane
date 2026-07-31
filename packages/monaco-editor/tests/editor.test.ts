@@ -187,6 +187,33 @@ describe('@octanejs/monaco-editor Editor', () => {
 		await settle();
 	});
 
+	it('synchronizes controlled props when mounting onto an existing path model', async () => {
+		const existingModel = harness.monaco.editor.createModel(
+			'stale value',
+			'plaintext',
+			harness.monaco.Uri.parse('file:///initial-existing.ts'),
+		);
+		let editorInstance: MonacoEditor | undefined;
+		const result = mount(Editor as any, {
+			path: 'file:///initial-existing.ts',
+			value: 'controlled value',
+			language: 'typescript',
+			onMount: (instance: MonacoEditor) => {
+				editorInstance = instance;
+			},
+		});
+		await settle();
+		await settle();
+
+		expect(editorInstance!.getModel()).toBe(existingModel);
+		expect(existingModel.getValue()).toBe('controlled value');
+		expect(existingModel.getLanguageId()).toBe('typescript');
+		result.unmount();
+		await settle();
+		expect(existingModel.isDisposed()).toBe(false);
+		existingModel.dispose();
+	});
+
 	it('switches path models, restores view state, and disposes every owned model', async () => {
 		let editorInstance: MonacoEditor | undefined;
 		const result = mount(Editor as any, {
@@ -698,6 +725,45 @@ describe('@octanejs/monaco-editor DiffEditor', () => {
 		expect(initialModels.modified.isDisposed()).toBe(true);
 		expect(nextModels.original.isDisposed()).toBe(true);
 		expect(nextModels.modified.isDisposed()).toBe(true);
+	});
+
+	it('synchronizes controlled props when mounting onto existing diff models', async () => {
+		const originalModel = harness.monaco.editor.createModel(
+			'stale original',
+			'plaintext',
+			harness.monaco.Uri.parse('file:///initial-original.ts'),
+		);
+		const modifiedModel = harness.monaco.editor.createModel(
+			'stale modified',
+			'plaintext',
+			harness.monaco.Uri.parse('file:///initial-modified.ts'),
+		);
+		let diffEditor: MonacoDiffEditor | undefined;
+		const result = mount(DiffEditor as any, {
+			original: 'controlled original',
+			modified: 'controlled modified',
+			originalLanguage: 'typescript',
+			modifiedLanguage: 'javascript',
+			originalModelPath: 'file:///initial-original.ts',
+			modifiedModelPath: 'file:///initial-modified.ts',
+			onMount: (instance: MonacoDiffEditor) => {
+				diffEditor = instance;
+			},
+		});
+		await settle();
+		await settle();
+
+		expect(diffEditor!.getModel()).toEqual({ original: originalModel, modified: modifiedModel });
+		expect(originalModel.getValue()).toBe('controlled original');
+		expect(modifiedModel.getValue()).toBe('controlled modified');
+		expect(originalModel.getLanguageId()).toBe('typescript');
+		expect(modifiedModel.getLanguageId()).toBe('javascript');
+		result.unmount();
+		await settle();
+		expect(originalModel.isDisposed()).toBe(false);
+		expect(modifiedModel.isDisposed()).toBe(false);
+		originalModel.dispose();
+		modifiedModel.dispose();
 	});
 
 	it('synchronizes unchanged values and languages when switching to external models', async () => {
