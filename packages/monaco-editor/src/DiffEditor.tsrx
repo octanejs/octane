@@ -163,6 +163,10 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 	}, [originalModelPath, modifiedModelPath]);
 
 	useEffect(() => {
+		if (isEditorReady) editorRef.current?.updateOptions(options);
+	}, [options]);
+
+	useEffect(() => {
 		const model = editorRef.current?.getModel()?.original;
 		const nextValue = original ?? '';
 		if (isEditorReady && model && model.getValue() !== nextValue) {
@@ -206,10 +210,6 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 		originalModelPath,
 		modifiedModelPath,
 	]);
-
-	useEffect(() => {
-		if (isEditorReady) editorRef.current?.updateOptions(options);
-	}, [options]);
 
 	useEffect(() => {
 		if (isEditorReady && monaco) monaco.editor.setTheme(theme);

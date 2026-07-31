@@ -727,6 +727,32 @@ describe('@octanejs/monaco-editor DiffEditor', () => {
 		expect(nextModels.modified.isDisposed()).toBe(true);
 	});
 
+	it('applies updated options before synchronizing the modified value', async () => {
+		let diffEditor: MonacoDiffEditor | undefined;
+		const result = mount(DiffEditor as any, {
+			modified: 'before',
+			options: { readOnly: false },
+			onMount: (instance: MonacoDiffEditor) => {
+				diffEditor = instance;
+			},
+		});
+		await settle();
+
+		const modifiedEditor = diffEditor!.getModifiedEditor();
+		const setValue = vi.spyOn(modifiedEditor, 'setValue');
+		const executeEdits = vi.spyOn(modifiedEditor, 'executeEdits');
+		result.update(DiffEditor as any, {
+			modified: 'after',
+			options: { readOnly: true },
+		});
+		await settle();
+
+		expect(setValue).toHaveBeenCalledWith('after');
+		expect(executeEdits).not.toHaveBeenCalled();
+		result.unmount();
+		await settle();
+	});
+
 	it('synchronizes controlled props when mounting onto existing diff models', async () => {
 		const originalModel = harness.monaco.editor.createModel(
 			'stale original',
