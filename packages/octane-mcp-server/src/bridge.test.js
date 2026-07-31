@@ -186,6 +186,18 @@ describe('bridgeReport', () => {
 		expect(report.plan[0]).toContain('@octanejs/zustand');
 	});
 
+	it('tells the caller to bridge from a pinned copy of the upstream source', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+		await writeFakePackage(root, 'widgets', {
+			'index.js': `
+				import { useState } from 'react';
+				export function useWidget() { return useState(0); }
+			`,
+		});
+		const report = await bridgeReport({ packageName: 'widgets', projectRoot: root });
+		expect(report.plan.join('\n')).toContain('Pin the upstream version');
+	});
+
 	it('errors clearly when the package is not installed', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
 		const report = await bridgeReport({ packageName: 'missing-lib', projectRoot: root });

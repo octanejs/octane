@@ -143,6 +143,25 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(plan.validationCommands).toContain('node benchmarks/bench.mjs --quick --ratios');
 	});
 
+	it('requires pinned-upstream coverage for binding work', () => {
+		const plan = engineeringPlanFor(
+			{ scope: 'library', changeKind: 'feature', paths: ['packages/zustand/src/index.ts'] },
+			true,
+		);
+
+		expect(plan.requiredSkills).toContain('react-library-port');
+		expect(plan.gates.parity.join('\n')).toContain('packages/<name>/UPSTREAM.md');
+		expect(plan.gates.parity.join('\n')).toContain('divergence');
+		expect(plan.gates.parity.join('\n')).toContain("pinned release's own suite");
+
+		const applicationPlan = engineeringPlanFor(
+			{ scope: 'application', changeKind: 'feature', paths: ['src/App.tsrx'] },
+			true,
+		);
+		expect(applicationPlan.gates.parity).toBeUndefined();
+		expect(applicationPlan.requiredSkills).not.toContain('react-library-port');
+	});
+
 	it('blocks framework-core plans when maintainer tools are unavailable', () => {
 		const plan = engineeringPlanFor({ scope: 'framework-core', changeKind: 'bug' });
 

@@ -177,6 +177,8 @@ Bindings — reach for these when asked about the React equivalent:
 
 Many bindings have differential fixtures that drive the Octane and React implementations through the same interactions and compare their output. Others are verified through their framework-neutral cores, focused behavioral and SSR suites, or public-surface and type checks. The generated status table records the evidence and remaining gaps package by package.
 
+Ports are held to a pinned-release standard rather than written from upstream documentation: a binding targets one immutable upstream release, works from that release's React-facing source kept beside the Octane implementation (so the two read together and the next upgrade is a reviewable diff), accounts for every upstream export as ported, reused verbatim from a framework-neutral core, a divergence, or an explicit gap, runs that release's own test suite where it ships one (framework-neutral suites unmodified, React-binding suites ported case by case) rather than only tests written around the port, and records whatever parity cannot reach as a divergence with a behavioral test. Older bindings are being brought up to that bar package by package, so the generated status table remains the place to check a specific package's covered surface and known divergences. Bridging a package that has no binding yet works the same way: pin the version, copy that release's React source into your repository next to your port, and go module by module.
+
 ## Source
 
 - [GitHub repository](https://github.com/octanejs/octane): Runtime, compiler, SSR, bindings, and the full test suite.
