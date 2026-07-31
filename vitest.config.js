@@ -2709,6 +2709,34 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'astro',
+					include: ['packages/astro/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^astro:octane:opts$/,
+							replacement: resolve(import.meta.dirname, 'packages/astro/tests/_fixtures/opts.js'),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/compiler\/vite$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/compiler/vite.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
 					environment: 'node',

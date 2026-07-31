@@ -1,0 +1,41 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Counter } from '../components/Counter.tsrx';
+import { Greeting } from '../components/Greeting.tsrx';
+import { Panel } from '../components/Panel.tsrx';
+---
+
+<Layout title="Octane Astro playground">
+	<main>
+		<h1>@octanejs/astro</h1>
+
+		<section>
+			<h2>Server-only island</h2>
+			<Greeting name="Astro" />
+		</section>
+
+		<section>
+			<h2>Hydrated counter (client:load)</h2>
+			<Counter client:load start={3} />
+		</section>
+
+		<section>
+			<h2>Slotted children</h2>
+			<Panel client:visible>
+				<p>Children from Astro into an Octane island.</p>
+			</Panel>
+		</section>
+	</main>
+</Layout>
+
+<style>
+	main {
+		font-family: system-ui, sans-serif;
+		max-width: 40rem;
+		margin: 2rem auto;
+		padding: 0 1rem;
+	}
+	section {
+		margin-top: 2rem;
+	}
+</style>
