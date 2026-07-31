@@ -5,11 +5,10 @@ globs: **/*
 
 # Octane
 
-Octane is a UI framework by Dominic Gannaway, the successor to Inferno. It gives
-you React's programming model (the same hooks, `memo`, context, portals,
-Suspense, transitions), but it compiles components ahead of time. Components are
-authored in `.tsrx`. It is alpha: the runtime, compiler, and SSR/hydration paths
-all work and have a large test suite, but APIs still move.
+Octane is Dominic Gannaway's successor to Inferno: a React-shaped UI framework
+with hooks, `memo`, context, portals, Suspense, and transitions, compiled ahead
+of time from `.tsrx`. The runtime, compiler, SSR, hydration, and large test suite
+work, but this is alpha and APIs still move.
 
 Trust the source over any summary, this file included:
 
@@ -22,24 +21,17 @@ Trust the source over any summary, this file included:
 - `docs/differences-from-react.md`: the divergence contract.
 - `docs/packages.md`: the generated package inventory, checked by CI.
 
-Route a change to the package that owns the behavior. When an application,
-binding, integration, benchmark, or test exposes a defect in the Octane runtime,
-compiler, scheduler, SSR, hydration, app-core, or build tooling, add a regression
-at the owning package and repair the implementation there. Do not hide it behind
-an application-specific workaround, a weakened test, generated output, or
-test-only behavior, and keep the real integration scenario as end-to-end
+Fix defects in the package that owns the behavior and add the regression there.
+Do not hide framework defects behind app workarounds, weak tests, generated
+output, or test-only behavior; retain the integration scenario as end-to-end
 evidence.
 
 ## The workflows live in skills, so load the skill first
 
-This file does not carry the branch, PR, issue, bug, or audit procedure. Each of
-those is a skill, and a skill only helps if it is loaded before the work starts
-rather than after the work is already done a different way. Load one as soon as
-the task reaches its trigger, including when the trigger is a step you arrived at
-yourself rather than the thing you were asked for:
+Branch, PR, issue, bug, and audit procedures live in skills. Load one when its
+trigger first arises, even if it is a later step you chose:
 
-- `create-a-pr`: any branch, commit, changeset, or PR, including a PR you decided
-  to open at the end of a task that was about something else.
+- `create-a-pr`: before any branch, commit, changeset, or PR.
 - `handle-issue`: a GitHub issue number or link.
 - `bug-hunter`: a failing test, a regression, or behavior that differs from
   expectation.
@@ -52,10 +44,8 @@ yourself rather than the thing you were asked for:
 
 ## Your React instincts are the main failure mode here
 
-Octane is React-shaped and deliberately different in specific places. Reading the
-surrounding code will not warn you, because it looks like React, so a competent
-React change lands as a plausible, confident regression. Check
-`docs/differences-from-react.md` before "fixing" any of these:
+Octane looks like React but differs deliberately. Check
+`docs/differences-from-react.md` before changing any of these:
 
 - Hooks are keyed by compiler-assigned call-site slot, not call order, so a hook
   may sit behind a condition or after an early return. A slot-keyed hook in a
@@ -118,26 +108,23 @@ pragma. Use `OctaneNode` for renderables, never `React.ReactNode`.
 ```bash
 pnpm test          # full Vitest run
 pnpm typecheck
+pnpm sync
 pnpm format:files [path...]        # defaults to staged and unstaged files
 pnpm format:files:check [path...]  # defaults to staged and unstaged files
 pnpm format:check                  # optional repo-wide gate
 ```
 
-Use the scoped Prettier commands while iterating. With no paths, both use the
-union of staged and unstaged Git diffs; explicit file or directory paths
-override that default. `format:files` writes changes and `format:files:check` is
-read-only. Run `pnpm format:check` as a final gate only when a repo-wide check is
-needed; otherwise prefer `format:files:check` to avoid scanning unrelated files.
+Before any push, run `pnpm sync` and commit its generated changes.
 
-`pnpm test` performs its explicit package prechecks and then starts one root
-Vitest invocation for all projects declared in `vitest.config.js`; it does not
-fan out through the packages' own `test` scripts. The root config sets
-`silent: true`, so console output from both passing and failing tests is hidden
-by default across every project. While diagnosing a test, use
-`pnpm test -- --silent=false` to show all test console output, or
-`pnpm test -- --silent=passed-only` to show output only from failing tests.
-Vitest CLI options override the config value; no conditional config logic is
-needed.
+Scoped Prettier commands default to staged and unstaged Git diffs; explicit
+paths override that default. `format:files` writes and `format:files:check` is
+read-only. Use repo-wide `format:check` only when needed.
+
+`pnpm test` runs package prechecks, then one root Vitest invocation for every
+project in `vitest.config.js`; it does not fan out through package `test`
+scripts. Root config uses `silent: true`. While diagnosing, pass
+`--silent=false` for all console output or `--silent=passed-only` for failing
+tests. CLI options override the config.
 
 Add a changeset for user-facing package changes; stay on the `patch` track while
 Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build
