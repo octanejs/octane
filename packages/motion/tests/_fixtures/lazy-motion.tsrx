@@ -15,7 +15,7 @@ export function UnloadedMotionSurface() @{
 
 export function AsyncLazyMotionSurface(props) @{
 	<LazyMotion features={props.features}>
-		<m.div id="async-lazy-div" animate={{ opacity: 1 }}>{'async'}</m.div>
+		<m.div id="async-lazy-div" initial={props.initial} animate={{ opacity: 1 }}>{'async'}</m.div>
 	</LazyMotion>
 }
 

@@ -308,7 +308,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					animate(node, resolvedInitial, { duration: 0 });
 				}
 			},
-			[animationEnabled],
+			[],
 			ENTER,
 		);
 

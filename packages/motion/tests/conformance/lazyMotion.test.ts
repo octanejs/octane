@@ -119,6 +119,27 @@ describe('LazyMotion and motion/react-m compatibility', () => {
 		result.unmount();
 	});
 
+	it('does not reapply initial when async features arrive after mount', async () => {
+		const load = deferred<typeof domMax>();
+		const result = mount(AsyncLazyMotionSurface, {
+			features: () => load.promise,
+			initial: { opacity: 0 },
+		});
+		await nextPaint();
+		animateMock.mockClear();
+
+		load.resolve(domMax);
+		await settleAsyncFeatures();
+
+		expect(animateMock).toHaveBeenCalledOnce();
+		expect(animateMock).toHaveBeenCalledWith(
+			result.find('#async-lazy-div'),
+			{ opacity: 1 },
+			undefined,
+		);
+		result.unmount();
+	});
+
 	it('routes async feature load failures through the nearest error boundary', async () => {
 		const load = deferred<typeof domMax>();
 		const result = mount(LazyMotionErrorSurface, { features: () => load.promise });
