@@ -57,6 +57,30 @@ describe('Astro server renderer', () => {
 		expect(html).toContain('<strong>slotted</strong>');
 	});
 
+	it('camelCases kebab and snake named slots into props and astro-slot names', async () => {
+		function WithNamedSlots(props: { footerNote?: unknown; socialLinks?: unknown }) {
+			return createElement('div', { className: 'panel' }, props.footerNote, props.socialLinks);
+		}
+
+		const { html } = await renderer.renderToStaticMarkup.call(
+			{ result: {} },
+			WithNamedSlots,
+			{},
+			{
+				'footer-note': '<p>footer</p>',
+				social_links: '<nav>links</nav>',
+			},
+			{ hydrate: true, astroStaticSlot: true } as any,
+		);
+
+		expect(html).toContain('<astro-slot name="footerNote">');
+		expect(html).toContain('<astro-slot name="socialLinks">');
+		expect(html).toContain('<p>footer</p>');
+		expect(html).toContain('<nav>links</nav>');
+		expect(html).not.toContain('name="footer-note"');
+		expect(html).not.toContain('name="social_links"');
+	});
+
 	it('check() accepts function components and rejects non-functions', async () => {
 		function Ok() {
 			return createElement('span', null, 'ok');

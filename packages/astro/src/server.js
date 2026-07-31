@@ -3,9 +3,8 @@ import { renderToString } from 'octane/server';
 import opts from 'astro:octane:opts';
 import { createFilter } from './create-filter.js';
 import { nextIdentifierPrefix } from './context.js';
+import { slotName } from './slot-name.js';
 import { staticHtmlElement } from './static-html.js';
-
-const slotName = (str) => str.trim().replace(/[-_]([a-z])/g, (_, w) => w.toUpperCase());
 
 const filter = opts?.include || opts?.exclude ? createFilter(opts.include, opts.exclude) : null;
 
