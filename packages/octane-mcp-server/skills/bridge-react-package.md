@@ -76,7 +76,19 @@ So a bridge never means "run the React package unchanged". It means:
    `*-core` dependency, or a pure internal module). Identify the React surface:
    hooks, components, providers, portals, refs.
 
-2. **Map the React APIs.** Same-name and same-semantics in Octane: `useState`,
+2. **Bridge from the pinned upstream source, not from memory.** Fix the exact
+   upstream version you are bridging and copy that release's React binding source
+   into your repository next to your port, for example
+   `src/vendor/<package>@<version>/`, keeping the upstream LICENSE and leaving
+   the copy unmodified. Put each Octane module beside the upstream module it
+   replaces, and work through them one by one. A bridge written from the README
+   or from type declarations covers the demo path and silently drops the rest of
+   the API. Anything you cannot reach (React internals, class components,
+   synthetic-event timing) goes in a short divergence note next to the port, with
+   what to do instead. On an upgrade, re-copy at the new version: the diff
+   against the old copy is your work list.
+
+3. **Map the React APIs.** Same-name and same-semantics in Octane: `useState`,
    `useReducer`, `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`,
    `useCallback`, `useRef`, `useContext`, `useId`, `useImperativeHandle`,
    `useSyncExternalStore` (full React 19 shape, including `getServerSnapshot`),
@@ -88,7 +100,7 @@ So a bridge never means "run the React package unchanged". It means:
    server rendering imports from `octane/server`, including the streaming
    `renderToPipeableStream`/`renderToReadableStream`.
 
-3. **Handle the gaps:**
+4. **Handle the gaps:**
    - `forwardRef`: does not exist. Accept `ref` as a normal prop (React 19
      style) and drop the wrapper.
    - Class components: rewrite as function components. Error boundary classes
@@ -103,7 +115,7 @@ So a bridge never means "run the React package unchanged". It means:
    - StrictMode double-invoke: does not exist; delete test expectations that
      count double renders.
 
-4. **Custom hooks in plain `.ts` files.** Octane's compiler auto-slots hook
+5. **Custom hooks in plain `.ts` files.** Octane's compiler auto-slots hook
    calls in files it compiles. A binding published as plain `.ts` that calls
    hooks internally must forward the caller's slot: accept a trailing `slot`
    argument and derive stable child slots per call site. The convention used by
@@ -127,13 +139,23 @@ So a bridge never means "run the React package unchanged". It means:
    auto-slotting pass. The simpler alternative: keep the binding in compiled
    files so slots are injected for you.
 
-5. **Re-author shipped components in `.tsrx`.** `props.children` works, refs are
+6. **Re-author shipped components in `.tsrx`.** `props.children` works, refs are
    props, lists use `@for (const x of xs; key x.id) { }`, conditionals use
    `@if`, dynamic text holes use `{expr as string}` unless the expression is
    provably a string.
 
-6. **Validate.** Drive real DOM events against the bridged binding and, where
-   possible, run the same fixture against the React original and compare
+7. **Run the package's own tests.** If the pinned release ships a suite, that is
+   the parity oracle: it encodes what its maintainers care about, and it covers
+   cases a suite written against your own bridge will not think to check. Run the
+   framework-neutral suites unmodified against the core you reused. Port the
+   React-binding ones case by case: fixtures re-authored in `.tsrx`,
+   `@octanejs/testing-library` in place of `@testing-library/react`, upstream case
+   names kept. Write down which upstream test files you ran, ported, or left out
+   and why. Do not soften an upstream assertion to get it green; find out whether
+   it is a bridge bug or a documented Octane divergence first.
+
+8. **Validate the rest.** Drive real DOM events against the bridged binding and,
+   where possible, run the same fixture against the React original and compare
    rendered HTML after each step. Also test what HTML comparison cannot see:
    render counts, subscription add/remove, effect ordering, ref lifecycle.
 
