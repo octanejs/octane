@@ -19,6 +19,16 @@ export function AsyncLazyMotionSurface(props) @{
 	</LazyMotion>
 }
 
+export function LazyMotionErrorSurface(props) @{
+	@try {
+		<LazyMotion features={props.features}>
+			<m.div id="error-lazy-div">{'async'}</m.div>
+		</LazyMotion>
+	} @catch (error) {
+		<div id="lazy-motion-error">{(error as Error).message as string}</div>
+	}
+}
+
 export function FeatureBundleSurface(props) @{
 	<LazyMotion features={props.features}>
 		<m.div

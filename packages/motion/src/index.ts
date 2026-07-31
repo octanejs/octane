@@ -719,6 +719,7 @@ export interface LazyMotionProps {
 interface LoadedLazyFeatures {
 	source: LazyMotionFeatures | null;
 	features: MotionFeatureBundle | null;
+	error?: { value: unknown };
 }
 
 function normalizeFeatures(
@@ -739,16 +740,30 @@ export function LazyMotion(props: LazyMotionProps, scope: any): void {
 			? loaded.features
 			: null
 		: normalizeFeatures(source);
+	if (isLoader && loaded.source === source && loaded.error) throw loaded.error.value;
 
 	useEffect(
 		() => {
 			if (typeof source !== 'function') return;
 			let current = true;
-			Promise.resolve(source()).then((value) => {
-				if (current) {
-					setLoaded({ source, features: normalizeFeatures(value) });
-				}
-			});
+			const fail = (error: unknown) => {
+				if (current) setLoaded({ source, features: null, error: { value: error } });
+			};
+			try {
+				void Promise.resolve(source()).then((value) => {
+					if (!current) return;
+					let features: MotionFeatureBundle;
+					try {
+						features = normalizeFeatures(value);
+					} catch (error) {
+						fail(error);
+						return;
+					}
+					setLoaded({ source, features });
+				}, fail);
+			} catch (error) {
+				fail(error);
+			}
 			return () => {
 				current = false;
 			};

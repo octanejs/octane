@@ -15,6 +15,7 @@ import { mount, nextPaint } from '../_helpers';
 import {
 	AsyncLazyMotionSurface,
 	FeatureBundleSurface,
+	LazyMotionErrorSurface,
 	LazyMotionSurface,
 	StrictLazyMotionSurface,
 	UnloadedMotionSurface,
@@ -23,10 +24,12 @@ import { domAnimation, domMax } from '../../src/index';
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((nextResolve) => {
+	let reject!: (reason: unknown) => void;
+	const promise = new Promise<T>((nextResolve, nextReject) => {
 		resolve = nextResolve;
+		reject = nextReject;
 	});
-	return { promise, resolve };
+	return { promise, reject, resolve };
 }
 
 async function settleAsyncFeatures(): Promise<void> {
@@ -113,6 +116,18 @@ describe('LazyMotion and motion/react-m compatibility', () => {
 			{ opacity: 1 },
 			undefined,
 		);
+		result.unmount();
+	});
+
+	it('routes async feature load failures through the nearest error boundary', async () => {
+		const load = deferred<typeof domMax>();
+		const result = mount(LazyMotionErrorSurface, { features: () => load.promise });
+		await nextPaint();
+
+		load.reject(new Error('feature load failed'));
+		await settleAsyncFeatures();
+
+		expect(result.find('#lazy-motion-error').textContent).toBe('feature load failed');
 		result.unmount();
 	});
 });
