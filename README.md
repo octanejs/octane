@@ -799,7 +799,14 @@ pnpm format       # format the whole repository with Prettier
 pnpm format:check # check the whole repository with Prettier
 ```
 
-During iteration, limit Prettier to one or more files or directories:
+During iteration, limit Prettier to the staged and unstaged files:
+
+```bash
+pnpm format:files
+pnpm format:files:check
+```
+
+Pass one or more files or directories to override the Git-derived defaults:
 
 ```bash
 pnpm format:files README.md packages/octane/src
@@ -807,8 +814,9 @@ pnpm format:files:check README.md packages/octane/src
 ```
 
 `format:files` writes changes; `format:files:check` is read-only. Both accept any
-mix of file and directory paths. Use the repo-wide `pnpm format:check` for the
-final formatting gate.
+mix of file and directory paths. With no paths, both use the union of the staged
+and unstaged Git diffs. Use the repo-wide `pnpm format:check` for the final
+formatting gate.
 
 `pnpm test` runs the projects declared in the root `vitest.config.js` through a
 single Vitest invocation rather than calling each package's `test` script. Test

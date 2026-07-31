@@ -24,7 +24,8 @@ jobs:
   release_change:
     name: classify changeset release
     # GitHub still emits workflow events while a pull request is a draft. Keep
-    # every job behind this guard so those events consume no runner time.
+    # every expensive job behind this guard. The two tiny required-check
+    # reporters below still run so branch protection does not remain pending.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     permissions:
@@ -583,10 +584,9 @@ jobs:
       - name: Run ${{ matrix.lane }} integration tests
         run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
 
-  lint:
+  lint_checks:
+    name: lint checks
     needs: release_change
-    # A skipped job reports success, including when it is a required check. The
-    # classifier only takes this path for the exact bot-owned metadata commit.
     if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
 
@@ -730,8 +730,8 @@ jobs:
       - name: Build octane package and verify dist
         run: pnpm build
 
-  typecheck:
-    name: typecheck
+  typecheck_checks:
+    name: typecheck checks
     needs: release_change
     if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
@@ -757,6 +757,52 @@ jobs:
 
       - name: Validate example catalog and orchestration
         run: pnpm examples:static:check
+
+  # `lint` and `typecheck` are protected-branch contexts. GitHub leaves a
+  # required context pending when every job with that name is skipped, so keep
+  # these reporters cheap and let the real work above remain skipped on drafts.
+  lint:
+    name: lint
+    needs: [release_change, lint_checks]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Report lint status
+        env:
+          IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+          IS_RELEASE_PR: ${{ needs.release_change.outputs.is_release_pr }}
+          RELEASE_CHANGE_RESULT: ${{ needs.release_change.result }}
+          LINT_CHECKS_RESULT: ${{ needs.lint_checks.result }}
+        run: |
+          if [ "$IS_DRAFT" = true ] || [ "$IS_RELEASE_PR" = true ]; then
+            test "$LINT_CHECKS_RESULT" = skipped
+          else
+            test "$RELEASE_CHANGE_RESULT" = success
+            test "$LINT_CHECKS_RESULT" = success
+          fi
+
+  typecheck:
+    name: typecheck
+    needs: [release_change, typecheck_checks]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Report typecheck status
+        env:
+          IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+          IS_RELEASE_PR: ${{ needs.release_change.outputs.is_release_pr }}
+          FULL_CI: ${{ needs.release_change.outputs.full_ci }}
+          RELEASE_CHANGE_RESULT: ${{ needs.release_change.result }}
+          TYPECHECK_CHECKS_RESULT: ${{ needs.typecheck_checks.result }}
+        run: |
+          if [ "$IS_DRAFT" = true ] || [ "$IS_RELEASE_PR" = true ] || [ "$FULL_CI" = false ]; then
+            test "$TYPECHECK_CHECKS_RESULT" = skipped
+          else
+            test "$RELEASE_CHANGE_RESULT" = success
+            test "$TYPECHECK_CHECKS_RESULT" = success
+          fi
 
   example_shard:
     name: example apps (${{ matrix.shard }})
@@ -977,10 +1023,10 @@ jobs:
           test "$RELEASE_CHANGE_RESULT" = success
           test "$TEST_RESULT" = success
           test "$LINT_RESULT" = success
+          test "$TYPECHECK_RESULT" = success
           test "$EXAMPLES_RESULT" = success
 
           if [ "$FULL_CI" = false ]; then
-            test "$TYPECHECK_RESULT" = skipped
             test "$THREE_COMPAT_RESULT" = skipped
             test "$LYNX_COMPAT_RESULT" = skipped
             test "$PACKAGE_RESULT" = skipped

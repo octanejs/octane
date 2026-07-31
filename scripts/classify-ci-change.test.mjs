@@ -80,11 +80,19 @@ describe('classifyCiChange', () => {
 		);
 	});
 
-	test('treats a newly added formatter helper as isolated developer tooling', () => {
+	test('keeps formatter helper paths and script rewrites on the lightweight path', () => {
 		const after = structuredClone(rootPackage);
-		after.scripts['format:files'] = 'prettier --write -- ';
+		after.scripts['format:check'] = 'node scripts/format-files.mjs --check --';
+		after.scripts['format:files'] = 'node scripts/format-files.mjs --write --';
 
-		assert.equal(classify(['package.json'], rootPackage, after), false);
+		assert.equal(
+			classify(
+				['package.json', 'scripts/format-files.mjs', 'scripts/format-files.test.mjs'],
+				rootPackage,
+				after,
+			),
+			false,
+		);
 	});
 
 	test('runs full CI for existing script and dependency changes', () => {
