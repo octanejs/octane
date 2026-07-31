@@ -35,14 +35,14 @@ export function releaseModels(
 			modelLeaseCounts.set(model, nextLeaseCount);
 		}
 
-		if (preservedModels.has(model)) {
-			// keepCurrent* transfers ownership out of the binding. A later
-			// component may adopt the model, but this component must never make it
-			// auto-disposable again.
-			bindingOwnedModels.delete(model);
-		} else if (nextLeaseCount === 0 && bindingOwnedModels.has(model)) {
-			if (!model.isDisposed()) model.dispose();
-			bindingOwnedModels.delete(model);
+		if (nextLeaseCount === 0) {
+			if (preservedModels.has(model)) {
+				// The final keepCurrent* lease transfers ownership out of the binding.
+				bindingOwnedModels.delete(model);
+			} else if (bindingOwnedModels.has(model)) {
+				if (!model.isDisposed()) model.dispose();
+				bindingOwnedModels.delete(model);
+			}
 		}
 	}
 	leasedModels.clear();

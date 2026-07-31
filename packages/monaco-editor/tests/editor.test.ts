@@ -616,6 +616,34 @@ describe('@octanejs/monaco-editor Editor', () => {
 		expect(sharedModel.isDisposed()).toBe(true);
 	});
 
+	it('keeps shared binding ownership when a non-final lease is preserved', async () => {
+		let firstEditor: MonacoEditor | undefined;
+		const first = mount(Editor as any, {
+			path: 'file:///shared-kept.ts',
+			value: 'shared',
+			keepCurrentModel: true,
+			onMount: (instance: MonacoEditor) => {
+				firstEditor = instance;
+			},
+		});
+		await settle();
+		const sharedModel = firstEditor!.getModel()!;
+
+		const second = mount(Editor as any, {
+			path: 'file:///shared-kept.ts',
+			value: 'shared',
+		});
+		await settle();
+
+		first.unmount();
+		await settle();
+		expect(sharedModel.isDisposed()).toBe(false);
+
+		second.unmount();
+		await settle();
+		expect(sharedModel.isDisposed()).toBe(true);
+	});
+
 	it('transfers a kept current model out of binding ownership', async () => {
 		let editorInstance: MonacoEditor | undefined;
 		const result = mount(Editor as any, {
