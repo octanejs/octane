@@ -21,7 +21,8 @@
 
 <!--
 Tick the box above whenever an agent wrote the change, no matter which account
-pushes it. Leaving it clear asserts a human wrote the diff.
+pushes it. Leaving it clear or omitting this section asserts a human wrote the
+diff; either form keeps the label workflow successful.
 
 A bot reads this box and applies the label, so nothing here needs repository
 permissions and it works the same from a fork. The type label comes from the

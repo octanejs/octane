@@ -169,6 +169,30 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'publishing-libraries',
+		title: 'Publishing libraries',
+		description:
+			'Ship complete importable Octane source so each application compiles libraries against its installed runtime.',
+		group: 'Explore',
+		searchTerms: [
+			'library author',
+			'package author',
+			'raw source',
+			'npm publish',
+			'npm pack',
+			'peerDependencies',
+			'package exports',
+			'hookSlots',
+		],
+		sections: [
+			{ id: 'source-package-contract', title: 'The source-package contract' },
+			{ id: 'package-the-source', title: 'Package the source' },
+			{ id: 'authoring-and-types', title: 'Authoring and types' },
+			{ id: 'package-metadata', title: 'Package metadata' },
+			{ id: 'verify-the-package', title: 'Verify the package' },
+		],
+	},
+	{
 		slug: 'bindings',
 		title: 'Bindings',
 		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,

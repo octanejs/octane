@@ -60,8 +60,9 @@ read that path directly if your tool cannot load a skill by name.
 One `create-a-pr` rule must survive not loading it: keep the PR template's
 provenance section and tick its box when an agent produced the diff. An agent
 commits under a human's credentials, so nothing else tells the two apart and a
-clear box asserts a human wrote it. A bot turns it into `agent-authored` and
-derives the type label from the title, so never apply labels yourself.
+clear or missing box asserts a human wrote it. A bot turns a checked box into
+`agent-authored` and derives the type label from the title, so never apply labels
+yourself.
 
 ## Your React instincts are the main failure mode here
 

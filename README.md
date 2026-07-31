@@ -159,6 +159,9 @@ Octane itself. Good places to start:
   each dialect and what TSRX unlocks.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): the
   deliberate divergences, and why everything else matching React is the point.
+- [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): package
+  all importable authored code so applications compile libraries against their
+  own Octane runtime.
 - [Bindings](https://octanejs.dev/docs/bindings): the `@octanejs/*` ports of the
   React ecosystem.
 
