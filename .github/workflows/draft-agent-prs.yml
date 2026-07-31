@@ -1,8 +1,9 @@
 name: Draft agent PRs
 
-# An agent opens its pull request as a draft and labels it afterwards, so the
-# `labeled` event is the one that normally carries the policy. `opened` covers a
-# pull request that already arrives labelled.
+# `label-pr.yml` enforces this policy in the same run that applies its label:
+# events emitted with GITHUB_TOKEN cannot start another workflow. This remains
+# the safety net for a pull request that arrives labelled or receives the label
+# independently, for example from a maintainer or a GitHub App.
 on:
   pull_request_target:
     types: [opened, labeled]
