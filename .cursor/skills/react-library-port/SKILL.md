@@ -62,14 +62,21 @@ Read first:
    - An export that is not done yet is an explicit gap row with what is missing. Silence is what turns a subset into an accidental parity claim.
    - `status.json` must agree with the crosswalk: `surface` describes what is covered, and `divergences` lists what a consumer would notice. `pnpm bindings:status` regenerates `docs/bindings-status.md` from it.
 
-6. **Build test strategy**
+6. **Run the pinned release's own tests**
+   - When upstream ships a suite, it is the strongest parity oracle available, because it encodes behavior the maintainers care about rather than behavior the port happened to think of. Start there instead of writing fresh tests around the implementation you just wrote.
+   - Run its framework-neutral suites unmodified against the core the port reuses. A failure there means the port broke the core's contract, not that the test needs adjusting.
+   - Port its React-binding suites case by case: re-author the fixtures in `.tsrx`, swap `@testing-library/react` for `@octanejs/testing-library`, keep the upstream case name, and cite the origin like the conformance suite does (`// Per <upstream path>:<line>`). `node scripts/scaffold-react-port.mjs <react-test-file>` emits a triage checklist to work from.
+   - `UPSTREAM.md` records the disposition of every upstream test file: run as-is, ported (and where it now lives), or out of scope with the reason (React internals, `react-test-renderer`, StrictMode double-invoke, an API Octane does not expose). Vendor the upstream tests alongside the source when their license allows it, so the next pin is a diff there too.
+   - A committed test must execute, so `.skip`, `it.todo`, and expected-failure markers are not how an unported case is tracked; the crosswalk is (`pnpm test:markers:check`).
+   - Never weaken an upstream assertion to make it pass. Triage it in step 8, and if the answer is a divergence, keep the case and assert Octane's behavior with an `// OCTANE DIVERGENCE:` rationale.
+
+7. **Build test strategy for what upstream does not cover**
    - DOM output over event sequences: use differential tests where the same `.tsrx` fixture runs in Octane and React.
    - Render-count, subscription, effect-order, bailout, and ref lifecycle: use Octane-only conformance tests.
    - Keyed reorder node identity: use identity helpers; do not rely on `innerHTML`.
    - Async/Suspense: make timer/microtask draining explicit and deterministic.
-   - Cite upstream tests when porting behavior.
 
-7. **Triage divergence**
+8. **Triage divergence**
    - Classify each failure as:
      - Octane bug
      - Intentional divergence
@@ -87,7 +94,7 @@ Read first:
      checkbox/radio native change handlers. A real text commit may use
      `suppressNativeChangeWarning` with a behavioral test.
 
-8. **Validate**
+9. **Validate**
    - Run package-specific tests first.
    - Run affected core tests if touching `packages/octane`.
    - Run `pnpm typecheck` for API/package changes.
@@ -100,12 +107,14 @@ Read first:
 - `packages/<name>/upstream/*`: the pinned upstream source, byte-exact, with its
   LICENSE, prettier-ignored, and unpublished.
 - `packages/<name>/UPSTREAM.md`: the pin (package, version, tag commit,
-  advertised range, oracle versions), the source boundary, and the export
-  crosswalk with evidence.
+  advertised range, oracle versions), the source boundary, the export crosswalk
+  with evidence, and the disposition of every upstream test file.
 - `packages/<name>/src/*` binding implementation, laid out to mirror the upstream
   modules it replaces.
 - `status.json` whose `surface` and `divergences` match the crosswalk.
-- Tests that prove core workflows and pin every recorded divergence.
+- The pinned release's own suites run against the port: its framework-neutral
+  tests unmodified, its React-binding tests ported case by case, and every
+  recorded divergence pinned by a test.
 - README with compatibility status and intentional differences.
 - Changeset if user-facing package behavior changed.
 - Optional update to `docs/react-library-compat-plan.md` scorecard.

@@ -110,6 +110,36 @@ The short version:
   components), record the divergence in `UPSTREAM.md` and `status.json` with the
   reason, the alternative, and a behavioral test pinning Octane's behavior.
 
+### Run the upstream suite
+
+If the upstream package ships tests, they are the parity evidence to reach for
+first. They encode the behavior its maintainers care about, which is exactly what
+a port has to reproduce, and they cover cases a fresh suite written against your
+own implementation will not think to check.
+
+- Run upstream's framework-neutral suites unmodified against the core the port
+  reuses. A failure there is the port breaking the core's contract, not a test
+  that needs adjusting.
+- Port the React-binding suites case by case: re-author the fixtures in `.tsrx`,
+  use [`@octanejs/testing-library`](./packages/testing-library) in place of
+  `@testing-library/react`, keep the upstream case name, and cite the origin
+  (`// Per <upstream path>:<line>`), the way the React conformance suite does.
+  `node scripts/scaffold-react-port.mjs <react-test-file>` turns a React test
+  file into a triage checklist to start from.
+- Record the disposition of every upstream test file in `UPSTREAM.md`: run as-is,
+  ported and where it now lives, or out of scope with the reason (React
+  internals, `react-test-renderer`, StrictMode double-invoke, an API Octane does
+  not expose).
+- Never weaken an upstream assertion to make it pass. Triage the failure first;
+  if it turns out to be a deliberate divergence, keep the case and assert
+  Octane's behavior with an `// OCTANE DIVERGENCE:` rationale. Skipped and todo
+  markers are not a tracking mechanism here: `pnpm test:markers:check` rejects
+  them, so an unported case lives in the crosswalk instead.
+
+Fill the remaining gaps (DOM output over event sequences, render counts, effect
+ordering, ref lifecycle, keyed reorder identity) with differential and
+Octane-only tests as the skill describes.
+
 Existing bindings predate this and are not all pinned and vendored yet. Bring one
 up to it when you next touch it.
 

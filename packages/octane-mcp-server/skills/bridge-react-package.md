@@ -139,8 +139,18 @@ So a bridge never means "run the React package unchanged". It means:
    `@if`, dynamic text holes use `{expr as string}` unless the expression is
    provably a string.
 
-7. **Validate.** Drive real DOM events against the bridged binding and, where
-   possible, run the same fixture against the React original and compare
+7. **Run the package's own tests.** If the pinned release ships a suite, that is
+   the parity oracle: it encodes what its maintainers care about, and it covers
+   cases a suite written against your own bridge will not think to check. Run the
+   framework-neutral suites unmodified against the core you reused. Port the
+   React-binding ones case by case: fixtures re-authored in `.tsrx`,
+   `@octanejs/testing-library` in place of `@testing-library/react`, upstream case
+   names kept. Write down which upstream test files you ran, ported, or left out
+   and why. Do not soften an upstream assertion to get it green; find out whether
+   it is a bridge bug or a documented Octane divergence first.
+
+8. **Validate the rest.** Drive real DOM events against the bridged binding and,
+   where possible, run the same fixture against the React original and compare
    rendered HTML after each step. Also test what HTML comparison cannot see:
    render counts, subscription add/remove, effect ordering, ref lifecycle.
 

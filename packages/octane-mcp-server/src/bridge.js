@@ -570,7 +570,10 @@ function planFor(report) {
 		'Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).',
 	);
 	steps.push(
-		'Validate with tests that drive real DOM events and compare behavior against the React original where possible.',
+		"Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+	);
+	steps.push(
+		'Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible.',
 	);
 	return steps;
 }

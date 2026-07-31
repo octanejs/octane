@@ -152,6 +152,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(plan.requiredSkills).toContain('react-library-port');
 		expect(plan.gates.parity.join('\n')).toContain('packages/<name>/UPSTREAM.md');
 		expect(plan.gates.parity.join('\n')).toContain('divergence');
+		expect(plan.gates.parity.join('\n')).toContain("pinned release's own suite");
 
 		const applicationPlan = engineeringPlanFor(
 			{ scope: 'application', changeKind: 'feature', paths: ['src/App.tsrx'] },
