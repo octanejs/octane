@@ -1,10 +1,6 @@
+import { Badge } from '@octanejs/shadcn/Badge';
+import { Button } from '@octanejs/shadcn/Button';
 import {
-	Badge,
-	Button,
-	Tabs,
-	TabsList,
-	TabsTrigger,
-	TabsContent,
 	Dialog,
 	DialogTrigger,
 	DialogContent,
@@ -13,6 +9,8 @@ import {
 	DialogDescription,
 	DialogFooter,
 	DialogClose,
+} from '@octanejs/shadcn/Dialog';
+import {
 	DropdownMenu,
 	DropdownMenuTrigger,
 	DropdownMenuContent,
@@ -22,7 +20,8 @@ import {
 	DropdownMenuCheckboxItem,
 	DropdownMenuSeparator,
 	DropdownMenuShortcut,
-} from '@octanejs/shadcn';
+} from '@octanejs/shadcn/DropdownMenu';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@octanejs/shadcn/Tabs';
 import { createElement, useState } from 'octane';
 
 // Self-contained fixtures for the differential rig: the SAME source runs on

@@ -341,6 +341,14 @@ for a brand-new binding unless the port fixes something inside `packages/octane`
 
 ## Multi-base support (Base UI / React Aria) — measured gap, 2026-07-26
 
+> **Superseded 2026-07-28** by [`shadcn-multi-base-plan.md`](./shadcn-multi-base-plan.md).
+> Two inputs below have since changed, and together they invert the recommended
+> order: the Menu family landed in `@octanejs/base-ui` (31/45 subpaths now, so
+> **6** blockers rather than 12), and `@octanejs/aria/components` turns out to be
+> a `react-aria-components` port covering every family shadcn ships — so the
+> React Aria base needs **no** binding port and goes first. The section below is
+> kept for provenance.
+
 Upstream ships each component against three primitive bases. The Radix base is
 what this package ports today; the blocker for the other two is binding
 coverage, not the shadcn layer. Measured against the pinned upstreams actually

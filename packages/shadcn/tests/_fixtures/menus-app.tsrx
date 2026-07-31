@@ -17,7 +17,7 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
-} from '../../src/ui/dropdown-menu.tsrx';
+} from '../../src/bases/radix/ui/dropdown-menu.tsrx';
 import {
 	ContextMenu,
 	ContextMenuCheckboxItem,
@@ -33,7 +33,7 @@ import {
 	ContextMenuSubContent,
 	ContextMenuSubTrigger,
 	ContextMenuTrigger,
-} from '../../src/ui/context-menu.tsrx';
+} from '../../src/bases/radix/ui/context-menu.tsrx';
 import {
 	Menubar,
 	MenubarCheckboxItem,
@@ -49,7 +49,7 @@ import {
 	MenubarSubContent,
 	MenubarSubTrigger,
 	MenubarTrigger,
-} from '../../src/ui/menubar.tsrx';
+} from '../../src/bases/radix/ui/menubar.tsrx';
 import {
 	NavigationMenu,
 	NavigationMenuContent,
@@ -58,7 +58,7 @@ import {
 	NavigationMenuLink,
 	NavigationMenuList,
 	NavigationMenuTrigger,
-} from '../../src/ui/navigation-menu.tsrx';
+} from '../../src/bases/radix/ui/navigation-menu.tsrx';
 
 export function DropdownMenuFixture() @{
 	const [last, setLast] = useState('none');

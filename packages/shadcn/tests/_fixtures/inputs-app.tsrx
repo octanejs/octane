@@ -2,10 +2,10 @@
 // exercising the representative props the contract tests assert on.
 import { useState } from 'octane';
 
-import { Checkbox } from '../../src/ui/checkbox.tsrx';
-import { RadioGroup, RadioGroupItem } from '../../src/ui/radio-group.tsrx';
-import { Switch } from '../../src/ui/switch.tsrx';
-import { Slider } from '../../src/ui/slider.tsrx';
+import { Checkbox } from '../../src/bases/radix/ui/checkbox.tsrx';
+import { RadioGroup, RadioGroupItem } from '../../src/bases/radix/ui/radio-group.tsrx';
+import { Switch } from '../../src/bases/radix/ui/switch.tsrx';
+import { Slider } from '../../src/bases/radix/ui/slider.tsrx';
 import {
 	Select,
 	SelectContent,
@@ -15,10 +15,10 @@ import {
 	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
-} from '../../src/ui/select.tsrx';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../src/ui/tabs.tsrx';
-import { Toggle } from '../../src/ui/toggle.tsrx';
-import { ToggleGroup, ToggleGroupItem } from '../../src/ui/toggle-group.tsrx';
+} from '../../src/bases/radix/ui/select.tsrx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../src/bases/radix/ui/tabs.tsrx';
+import { Toggle } from '../../src/bases/radix/ui/toggle.tsrx';
+import { ToggleGroup, ToggleGroupItem } from '../../src/bases/radix/ui/toggle-group.tsrx';
 
 export function CheckboxFixture() @{
 	const [checked, setChecked] = useState<boolean | 'indeterminate'>(false);

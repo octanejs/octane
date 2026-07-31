@@ -1,6 +1,6 @@
 // Minimal fixtures for the Badge proof component.
 import { createElement } from 'octane';
-import { Badge } from '@octanejs/shadcn';
+import { Badge } from '@octanejs/shadcn/Badge';
 
 export function DefaultBadge() @{
 	<Badge>New</Badge>
