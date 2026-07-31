@@ -1,5 +1,4 @@
-import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
 import rspack from '@rspack/core';
@@ -7,23 +6,31 @@ import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '@octanejs/rspack-p
 import { pluginOctane } from '@octanejs/rsbuild-plugin';
 import { threeRenderers } from '@octanejs/three/config';
 import { build as viteBuild } from 'vite';
+import { createStagingRoot, stageFixture } from './_stage-fixture.mjs';
 
 const fixtureRoot = fileURLToPath(new URL('../_fixtures/ssr-app', import.meta.url));
 const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
 const repositoryRoot = resolve(packageRoot, '../..');
-const outputs = {
-	vite: resolve(fixtureRoot, 'dist-vite'),
-	rsbuild: resolve(fixtureRoot, 'dist-rsbuild'),
-	rspackClient: resolve(fixtureRoot, 'dist-rspack-client'),
-	rspackServer: resolve(fixtureRoot, 'dist-rspack-server'),
-};
 
-function linkPackage(name, target) {
-	const destination = resolve(fixtureRoot, 'node_modules', ...name.split('/'));
-	mkdirSync(dirname(destination), { recursive: true });
-	rmSync(destination, { recursive: true, force: true });
-	symlinkSync(target, destination, 'dir');
-}
+// The suite passes the staging directory in so it can remove it even when this
+// helper throws; run standalone, the helper makes its own. Either way the build
+// happens outside the checkout. Only the package under test and `app-core` —
+// which the fixture's octane.config.ts imports but `@octanejs/three` does not
+// depend on — are missing from the installed graph mirrored beside it.
+const appRoot = stageFixture(fixtureRoot, process.argv[2] ?? createStagingRoot('three-ssr'), {
+	dependencies: packageRoot,
+	link: {
+		'@octanejs/app-core': resolve(repositoryRoot, 'packages/app-core'),
+		'@octanejs/three': packageRoot,
+	},
+});
+
+const outputs = {
+	vite: resolve(appRoot, 'dist-vite'),
+	rsbuild: resolve(appRoot, 'dist-rsbuild'),
+	rspackClient: resolve(appRoot, 'dist-rspack-client'),
+	rspackServer: resolve(appRoot, 'dist-rspack-server'),
+};
 
 async function compileRspack(config) {
 	const compiler = rspack(config);
@@ -49,7 +56,8 @@ async function compileRspack(config) {
 	});
 }
 
-function moduleEvidence(stats, suffix) {
+function moduleEvidence(stats, file) {
+	const suffix = `${sep}src${sep}${file}`;
 	const module = [...stats.compilation.modules].find((candidate) =>
 		String(candidate.resource ?? candidate.nameForCondition?.() ?? '').endsWith(suffix),
 	);
@@ -59,33 +67,18 @@ function moduleEvidence(stats, suffix) {
 	};
 }
 
-for (const output of Object.values(outputs)) {
-	rmSync(output, { recursive: true, force: true });
-}
-
-linkPackage('@octanejs/app-core', resolve(repositoryRoot, 'packages/app-core'));
-linkPackage('@octanejs/rsbuild-plugin', resolve(repositoryRoot, 'packages/rsbuild-plugin-octane'));
-linkPackage('@octanejs/rspack-plugin', resolve(repositoryRoot, 'packages/rspack-plugin-octane'));
-linkPackage('@octanejs/three', packageRoot);
-linkPackage('@octanejs/vite-plugin', resolve(repositoryRoot, 'packages/vite-plugin-octane'));
-linkPackage('@rsbuild/core', resolve(packageRoot, 'node_modules/@rsbuild/core'));
-linkPackage('@rspack/core', resolve(packageRoot, 'node_modules/@rspack/core'));
-linkPackage('octane', resolve(repositoryRoot, 'packages/octane'));
-linkPackage('three', resolve(packageRoot, 'node_modules/three'));
-linkPackage('vite', resolve(packageRoot, 'node_modules/vite'));
-
 const previousOutDir = process.env.OCTANE_THREE_SSR_OUTDIR;
 try {
 	process.env.OCTANE_THREE_SSR_OUTDIR = 'dist-vite';
 	await viteBuild({
-		root: fixtureRoot,
-		configFile: resolve(fixtureRoot, 'vite.config.ts'),
+		root: appRoot,
+		configFile: resolve(appRoot, 'vite.config.ts'),
 		logLevel: 'silent',
 	});
 
 	process.env.OCTANE_THREE_SSR_OUTDIR = 'dist-rsbuild';
 	const rsbuild = await createRsbuild({
-		cwd: fixtureRoot,
+		cwd: appRoot,
 		rsbuildConfig: {
 			plugins: [pluginOctane({ hmr: false })],
 		},
@@ -99,7 +92,7 @@ try {
 async function buildRawRspack(environment) {
 	const output = environment === 'client' ? outputs.rspackClient : outputs.rspackServer;
 	return compileRspack({
-		context: fixtureRoot,
+		context: appRoot,
 		mode: 'development',
 		target: environment === 'client' ? 'web' : 'node',
 		entry: './src/raw-entry.js',
@@ -112,14 +105,15 @@ async function buildRawRspack(environment) {
 
 const rawClient = await buildRawRspack('client');
 const rawServer = await buildRawRspack('server');
-const rawClientScene = moduleEvidence(rawClient, '/src/Scene.three.tsrx');
-const rawServerScene = moduleEvidence(rawServer, '/src/Scene.three.tsrx');
-const rawClientSetup = moduleEvidence(rawClient, '/src/scene-setup.ts');
-const rawServerSetup = moduleEvidence(rawServer, '/src/scene-setup.ts');
+const rawClientScene = moduleEvidence(rawClient, 'Scene.three.tsrx');
+const rawServerScene = moduleEvidence(rawServer, 'Scene.three.tsrx');
+const rawClientSetup = moduleEvidence(rawClient, 'scene-setup.ts');
+const rawServerSetup = moduleEvidence(rawServer, 'scene-setup.ts');
 
 console.log(
 	'__OCTANE_THREE_SSR_EVIDENCE__' +
 		JSON.stringify({
+			appRoot,
 			raw: {
 				clientScene: rawClientScene,
 				clientSetupPresent: rawClientSetup.present,

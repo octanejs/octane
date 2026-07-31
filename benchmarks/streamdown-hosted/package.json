@@ -1,0 +1,16 @@
+{
+  "name": "octane-streamdown-hosted-benchmarks",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Browser benchmark for the React Streamdown to React-hosted Octane Streamdown compatibility boundary.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:long": "node run.mjs 16"
+  },
+  "dependencies": {
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  }
+}

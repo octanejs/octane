@@ -101,17 +101,17 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 **Octane references**
 
-- [packages/octane/tests/compiler-vite-options.test.ts](../packages/octane/tests/compiler-vite-options.test.ts) — “changes emitted hot-update support for both hmr values” — Direct Vite integration coverage for explicit HMR, SSR-mode, and ownership booleans.
+- [packages/octane/tests/compiler/compiler-vite-options.test.ts](../packages/octane/tests/compiler/compiler-vite-options.test.ts) — “changes emitted hot-update support for both hmr values” — Direct Vite integration coverage for explicit HMR, SSR-mode, and ownership booleans.
 - [packages/rspack-plugin-octane/tests/rspack.test.ts](../packages/rspack-plugin-octane/tests/rspack.test.ts) — “erases profiling and full diagnostics from a real production bundle” — Real bundle proof for the disabled profiling path; the adjacent profiled-runtime test covers the enabled path.
 - [packages/rsbuild-plugin-octane/tests/target.test.ts](../packages/rsbuild-plugin-octane/tests/target.test.ts) — “maps build.minify=false to webworker optimization” — Preserves both values of the shared app build boolean.
 - [packages/rspeedy-plugin-octane/tests/plugin.test.ts](../packages/rspeedy-plugin-octane/tests/plugin.test.ts) — “preserves an asymmetric public-boolean matrix in the installed Rspack integration” — Locks the newest public Rspack-backed adapter into an asymmetric option matrix that detects cross-wiring.
 
 **Executable evidence**
 
-- [changes emitted hot-update support for both hmr values](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `vite-client`; observables: `emitted-code`
-- [forces server output despite a client transform signal](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `production-compile`, `vite-client`, `vite-ssr`; observables: `emitted-code`
-- [forces client output despite a server transform signal](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `production-compile`, `vite-client`, `vite-ssr`; observables: `emitted-code`
-- [changes ownership of an unmarked project TSX module for both directive values](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `vite-client`, `vite-ssr`; observables: `emitted-code`
+- [changes emitted hot-update support for both hmr values](../packages/octane/tests/compiler/compiler-vite-options.test.ts) — modes: `vite-client`; observables: `emitted-code`
+- [forces server output despite a client transform signal](../packages/octane/tests/compiler/compiler-vite-options.test.ts) — modes: `production-compile`, `vite-client`, `vite-ssr`; observables: `emitted-code`
+- [forces client output despite a server transform signal](../packages/octane/tests/compiler/compiler-vite-options.test.ts) — modes: `production-compile`, `vite-client`, `vite-ssr`; observables: `emitted-code`
+- [changes ownership of an unmarked project TSX module for both directive values](../packages/octane/tests/compiler/compiler-vite-options.test.ts) — modes: `vite-client`, `vite-ssr`; observables: `emitted-code`
 - [preserves both hmr values at the compiler output boundary](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `vite-client`; observables: `emitted-code`
 - [preserves both requireDirective values at the compiler ownership boundary](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `vite-client`; observables: `emitted-code`
 - [preserves build.minify=true and build.target=false in resolved Vite config](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `production-compile`, `vite-client`; observables: `resolved-configuration`
@@ -124,15 +124,15 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 - [transpiles TypeScript only when plugin transpilation is enabled](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`; observables: `bundle-contents`
 - [splits client-only renderer dependencies from the raw server graph with stable module identity](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`; observables: `bundle-contents`, `package-resolution`
 - [erases profiling and full diagnostics from a real production bundle](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`, `production-compile`; observables: `bundle-contents`
-- [executes the profiled runtime](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`, `production-compile`; observables: `bundle-contents`
+- [executes one profiled runtime and deduplicates profiling imports from raw dependencies](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`, `production-compile`; observables: `bundle-contents`
 - [preserves asymmetric public compiler booleans through custom client/server environments](../packages/rsbuild-plugin-octane/tests/renderer-config.test.ts) — modes: `rsbuild`; observables: `resolved-configuration`
 - [maps build.minify=true to webworker optimization](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `resolved-configuration`
 - [maps build.minify=false to webworker optimization](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `resolved-configuration`
 - [maps build.target=false without dropping the false-valued configuration](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `resolved-configuration`
-- [emits profiling only in the client production bundle](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `bundle-contents`
+- [builds targeted client/server runtimes with generated import.meta and client-only profiling](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `bundle-contents`
 - [preserves an asymmetric public-boolean matrix in the installed Rspack integration](../packages/rspeedy-plugin-octane/tests/plugin.test.ts) — modes: `rspeedy`; observables: `resolved-configuration`
 - [removes hot-update entries when hmr is explicitly false in development](../packages/rspeedy-plugin-octane/tests/plugin.test.ts) — modes: `rspeedy`; observables: `resolved-configuration`
-- [assembles a normal Octane application and generated receiver into a native bundle](../packages/rspeedy-plugin-octane/tests/build.test.ts) — modes: `rspeedy`; observables: `bundle-contents`, `package-resolution`
+- [assembles self-contained native bundles for every authored application entry](../packages/rspeedy-plugin-octane/tests/build.test.ts) — modes: `rspeedy`; observables: `bundle-contents`, `package-resolution`
 
 **Rationale.** Redact's forwardRef and class-component flags are out of scope. Octane's inventory composes adapter-level resolved-configuration checks with executable owning-compiler proofs, including real Vite/Rspack/Rsbuild/Rspeedy bundles, renderer routing, shared minification, Rspack transpilation, and the false-valued target sentinel. Diagnostic-only compiler escape hatches and unrelated runtime/server config are excluded.
 
@@ -601,7 +601,7 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 **Executable evidence**
 
-- [discovers a parent package and routes raw dependency imports to the SSR runtime](../packages/octane/tests/vite-integration.test.ts) — modes: `vite-ssr`, `production-compile`; observables: `package-resolution`, `markup`
+- [discovers a parent package and routes raw dependency imports to the SSR runtime](../packages/octane/tests/compiler/vite-integration.test.ts) — modes: `vite-ssr`, `production-compile`; observables: `package-resolution`, `markup`
 - [builds client and server graphs with maps, raw dependencies, and one target runtime](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`; observables: `package-resolution`
 - [builds routed client/server environments and serves the production SSR handler](../packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts) — modes: `rsbuild`, `production-compile`; observables: `package-resolution`, `markup`
 - command: `pnpm packages:pack:check` — modes: `packaged-consumer`, `vite-client`, `vite-ssr`, `production-compile`; observables: `package-resolution`, `markup`

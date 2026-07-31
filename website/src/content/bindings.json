@@ -7,6 +7,7 @@
       "@octanejs/valtio",
       "@octanejs/jotai",
       "@octanejs/mobx",
+      "@octanejs/rxjs",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",
       "@octanejs/tanstack-store"
@@ -27,6 +28,11 @@
     ]
   },
   {
+    "title": "Web3",
+    "description": "Wallet connection, chain state, contract reads, signing, and transactions.",
+    "packages": ["@octanejs/wagmi", "@octanejs/rainbowkit"]
+  },
+  {
     "title": "UI and interaction",
     "description": "Primitives, browser hooks, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
     "packages": [
@@ -42,18 +48,21 @@
       "@octanejs/cmdk",
       "@octanejs/shadcn",
       "@octanejs/lucide",
+      "@octanejs/phosphor-icons",
+      "@octanejs/usehooks-ts",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer"
     ]
   },
   {
     "title": "Forms and content",
-    "description": "Forms, rich-text editing, MDX, and translations.",
+    "description": "Forms, rich-text editing, streaming Markdown, MDX, and translations.",
     "packages": [
       "@octanejs/hook-form",
       "@octanejs/tanstack-form",
       "@octanejs/lexical",
       "@octanejs/tiptap",
+      "@octanejs/streamdown",
       "@octanejs/mdx",
       "@octanejs/i18next"
     ]

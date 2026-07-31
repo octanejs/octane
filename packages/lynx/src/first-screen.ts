@@ -4,7 +4,11 @@ import type { LynxFirstScreenRenderResult } from './main-renderer.js';
 
 /** Main-thread root contract installed by the generated receiver entry. */
 export interface LynxFirstScreenHost {
-	render<Props>(component: UniversalComponent<Props>, props: Props): LynxFirstScreenRenderResult;
+	/** Returns null when the receiver defers rendering to the engine lifecycle. */
+	render<Props>(
+		component: UniversalComponent<Props>,
+		props: Props,
+	): LynxFirstScreenRenderResult | null;
 	markSyncReady(): void;
 	unmount(): void;
 }
@@ -37,7 +41,7 @@ function requireHost(): LynxFirstScreenHost {
 export interface LynxFirstScreenRoot {
 	readonly renderer: 'lynx';
 	readonly ready: Promise<void>;
-	render<Props>(component: LynxComponent<Props>, props?: Props): LynxFirstScreenRenderResult;
+	render<Props>(component: LynxComponent<Props>, props?: Props): LynxFirstScreenRenderResult | null;
 	flushTransport(): Promise<void>;
 	unmount(): Promise<void>;
 }

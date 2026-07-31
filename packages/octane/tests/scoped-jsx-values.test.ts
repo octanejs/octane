@@ -83,6 +83,22 @@ function InspectContextAttribute(props: { child: OctaneNode }) @{
 	</section>
 }
 
+function InspectChildrenThenProvide(props: { child: OctaneNode }) @{
+	const child = Children.only(props.child) as ElementDescriptor;
+	const inspected = String(child.props.children);
+	<ValueContext.Provider value={inspected === 'outer' ? 'inner' : 'unexpected'}>
+		{child}
+	</ValueContext.Provider>
+}
+
+function InspectRecordThenProvide(props: { child: OctaneNode }) @{
+	const child = Children.only(props.child) as ElementDescriptor;
+	const inspected = String(child.props['data-value']);
+	<ValueContext.Provider value={inspected === 'outer' ? 'inner' : 'unexpected'}>
+		{child}
+	</ValueContext.Provider>
+}
+
 function InnerFragmentComponent() @{
 	<strong data-context="fragment-component-tag">inner</strong>
 }
@@ -174,6 +190,20 @@ export function RootInspectedAttributeContext() @{
 	<ValueContext.Provider value="inner">
 		<InspectContextAttribute child={content} />
 	</ValueContext.Provider>
+}
+
+export function InspectedChildrenProviderContext() @{
+	const content = <span data-context="inspected-provider-children">
+		{getterValue.current as string}
+	</span>;
+	<InspectChildrenThenProvide child={content} />
+}
+
+export function InspectedRecordProviderContext() @{
+	const content = <span data-context="inspected-provider-record" data-value={getterValue.current}>
+		attribute
+	</span>;
+	<InspectRecordThenProvide child={content} />
 }
 
 export function VariableContext() @{
@@ -609,6 +639,7 @@ const contextScenarios = [
 	['DirectContext', '[data-context="direct"]'],
 	['DirectDynamicComponentContext', '[data-context="fragment-component-tag"]'],
 	['RootDynamicComponentContext', '[data-context="fragment-component-tag"]'],
+	['InspectedChildrenProviderContext', '[data-context="inspected-provider-children"]'],
 	['VariableContext', '[data-context="variable"]'],
 	['PropContext', '[data-context="prop"]'],
 	['NestedContext', '[data-context="nested"]'],
@@ -680,6 +711,7 @@ for (const fixture of fixtures) {
 			['RootHostAttributeContext', '[data-context="root-host-attribute"]'],
 			['RootSpreadAttributeContext', '[data-context="root-spread-attribute"]'],
 			['RootComponentAttributeContext', '[data-context="root-component-attribute"]'],
+			['InspectedRecordProviderContext', '[data-context="inspected-provider-record"]'],
 		] as const) {
 			it(`${exportName} evaluates host attributes inside its provider`, () => {
 				const result = mount(fixture.client[exportName]);

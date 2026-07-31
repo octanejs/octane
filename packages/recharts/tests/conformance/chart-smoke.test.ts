@@ -38,6 +38,13 @@ async function settle() {
 	}
 }
 
+async function restoreAnimationFrameGlobals() {
+	// Unmounting charts can enqueue one final store notification. Keep the
+	// animation-frame globals alive until that callback has had a timer turn.
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	vi.unstubAllGlobals();
+}
+
 describe('Phase 1 chart pipeline (octane side)', () => {
 	it('BarChart renders bars and axes', async () => {
 		const r = mount(BarChartApp);
@@ -232,7 +239,7 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			expect(ends).toEqual(['end']);
 			result.unmount();
 		} finally {
-			vi.unstubAllGlobals();
+			await restoreAnimationFrameGlobals();
 		}
 	});
 
@@ -269,7 +276,7 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			).toBe('#82ca9d');
 			result.unmount();
 		} finally {
-			vi.unstubAllGlobals();
+			await restoreAnimationFrameGlobals();
 		}
 	});
 
@@ -329,7 +336,7 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			expect(ends).toHaveLength(6);
 			result.unmount();
 		} finally {
-			vi.unstubAllGlobals();
+			await restoreAnimationFrameGlobals();
 		}
 	});
 

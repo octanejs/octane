@@ -1,0 +1,51 @@
+{
+  "upstream": {
+    "package": "usehooks-ts",
+    "version": "3.1.1",
+    "source": "https://github.com/juliencrn/usehooks-ts/tree/v3.1.1",
+    "license": "MIT"
+  },
+  "surface": "First host-safe cohort: useBoolean, useCounter, useToggle, useMap, useStep, useDebounceCallback, useDebounceValue, useInterval, useTimeout, useIsMounted, and useUnmount.",
+  "inventory": {
+    "supportedState": ["useBoolean", "useCounter", "useToggle", "useMap", "useStep"],
+    "supportedTiming": ["useDebounceCallback", "useDebounceValue", "useInterval", "useTimeout"],
+    "supportedLifecycle": ["useIsMounted", "useUnmount"],
+    "deferredComposed": ["useCountdown"],
+    "deferredStorageMedia": [
+      "useDarkMode",
+      "useLocalStorage",
+      "useMediaQuery",
+      "useReadLocalStorage",
+      "useSessionStorage",
+      "useTernaryDarkMode"
+    ],
+    "deferredBrowserGlobal": [
+      "useClickAnyWhere",
+      "useCopyToClipboard",
+      "useDocumentTitle",
+      "useIsClient",
+      "useScreen",
+      "useWindowSize"
+    ],
+    "deferredDomEventElement": [
+      "useEventCallback",
+      "useEventListener",
+      "useHover",
+      "useOnClickOutside",
+      "useScrollLock"
+    ],
+    "deferredObserversAndInjection": ["useIntersectionObserver", "useResizeObserver", "useScript"],
+    "deferredImplementationUtility": ["useIsomorphicLayoutEffect"]
+  },
+  "divergences": [
+    "Only the listed pure, timing, and lifecycle hooks are exported; browser storage/media hooks and DOM observer/direct-element hooks are deliberately absent.",
+    "Public setter types are structurally equivalent to React Dispatch/SetStateAction without importing React types."
+  ],
+  "ssr": "Supported for the listed cohort. Effects and timers do not run during server rendering; hydration activates lifecycle and timing work without requiring browser reads during render.",
+  "verified": "2026-07-29",
+  "notes": [
+    "Audited against the exact usehooks-ts 3.1.1 npm tarball (SHA-1 0bb7f38f36f8219ee4509cc5e944ae610fb97656).",
+    "Storage/media are deferred: initializeWithValue:false exists upstream, but this first cohort does not claim deterministic Octane SSR/hydration parity without dedicated host-event evidence.",
+    "Deferred browser/DOM exports: useClickAnyWhere, useCopyToClipboard, useCountdown, useDarkMode, useDocumentTitle, useEventCallback, useEventListener, useHover, useIntersectionObserver, useIsClient, useIsomorphicLayoutEffect, useLocalStorage, useMediaQuery, useOnClickOutside, useReadLocalStorage, useResizeObserver, useScreen, useScript, useScrollLock, useSessionStorage, useTernaryDarkMode, and useWindowSize."
+  ]
+}

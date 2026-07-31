@@ -6,4 +6,8 @@ import { installMainThreadProcessData } from './main-thread-process-data.js';
 // lifecycle events. Octane consumes those events directly, so its processor is
 // intentionally the identity function.
 installMainThreadProcessData();
-installLynxMainThread({ firstScreen: true, firstScreenSync: 'manual' });
+installLynxMainThread({
+	firstScreen: true,
+	firstScreenSync: 'manual',
+	firstScreenRender: 'engine',
+});

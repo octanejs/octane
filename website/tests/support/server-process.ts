@@ -6,6 +6,7 @@
 // their own copy.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
 // leftover server from an earlier run (or another checkout) already listening
@@ -21,6 +22,68 @@ export function getFreePort(): Promise<number> {
 			srv.close(() => resolve(port));
 		});
 	});
+}
+
+// Same ephemeral port, but HELD until the caller is ready to bind it for real.
+//
+// getFreePort() closes the probe socket before returning, which is fine when the
+// server spawns immediately after. The production setup now builds the site
+// first — a minute or more between choosing the port and binding it — and an
+// unheld port is free for any other process (a parallel vitest project, another
+// checkout) to take in that window. `--strictPort` would then kill the preview
+// server on startup. Keeping the socket listening reserves the number, so the
+// only gap is the few milliseconds between release() and the spawn.
+export async function reserveFreePort(): Promise<{ port: number; release: () => Promise<void> }> {
+	const srv = createServer();
+	const port = await new Promise<number>((resolve, reject) => {
+		srv.once('error', reject);
+		srv.listen(0, '127.0.0.1', () => {
+			resolve((srv.address() as import('node:net').AddressInfo).port);
+		});
+	});
+	return {
+		port,
+		release: () => new Promise<void>((resolve) => srv.close(() => resolve())),
+	};
+}
+
+// Cross-process readiness handshake for a server built in the BACKGROUND.
+//
+// globalSetup runs in the Vitest main process and the specs run in workers, so a
+// promise cannot be shared between them — a file can. The producer writes the
+// terminal state exactly once (see writeReadyState) and the consumer polls for
+// it. Without this, a spec would only ever learn "the origin never answered",
+// turning a real build failure into an opaque timeout.
+export async function writeReadyState(
+	readyFile: string,
+	state: { ok: true } | { ok: false; error: string },
+): Promise<void> {
+	// Write-then-rename: a spec polling mid-write must never parse a partial
+	// file. rename(2) is atomic within a filesystem.
+	const pending = `${readyFile}.pending`;
+	await writeFile(pending, JSON.stringify(state), 'utf8');
+	await rename(pending, readyFile);
+}
+
+export async function waitForReadyState(readyFile: string, timeoutMs: number): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	for (;;) {
+		let raw: string | undefined;
+		try {
+			raw = await readFile(readyFile, 'utf8');
+		} catch {
+			// Not written yet.
+		}
+		if (raw !== undefined) {
+			const state = JSON.parse(raw) as { ok: boolean; error?: string };
+			if (state.ok) return;
+			throw new Error(`website production build failed:\n${state.error ?? 'unknown error'}`);
+		}
+		if (Date.now() > deadline) {
+			throw new Error(`website production server was not ready within ${timeoutMs}ms`);
+		}
+		await new Promise((r) => setTimeout(r, 250));
+	}
 }
 
 // Spawn a server in its OWN process group so stopServer() can kill the whole
@@ -96,9 +159,12 @@ export async function stopServer(child: ChildProcess | undefined): Promise<void>
 		}
 	};
 	signalGroup('SIGTERM');
-	await new Promise((r) => {
-		child.once('exit', r);
-		setTimeout(r, 3000);
+	await new Promise<void>((resolve) => {
+		const timeout = setTimeout(resolve, 3000);
+		child.once('exit', () => {
+			clearTimeout(timeout);
+			resolve();
+		});
 	});
 	if (child.exitCode === null) signalGroup('SIGKILL');
 }

@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "@react-rxjs/core + @react-rxjs/utils",
+    "version": "0.10.8 / 0.9.7"
+  },
+  "surface": "Core bind/state/Subscribe APIs and the complete @react-rxjs/utils surface.",
+  "divergences": [
+    "StateObservable values are not JSX nodes; render them through useStateObservable or bind.",
+    "@react-rxjs/dom is omitted because octane batches updates without ReactDOM.unstable_batchedUpdates."
+  ],
+  "ssr": "useSyncExternalStore supplies the state snapshot during server rendering; browser-only ReactDOM batching helpers are intentionally absent.",
+  "verified": "2026-07-30"
+}

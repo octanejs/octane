@@ -74,7 +74,7 @@ their conformance tests land.
 
 1. **Compiler**: type-only statements nested in function bodies crashed esrap
    (nulled `typeAnnotation`) — now pruned like top-level ones
-   (`packages/octane/tests/compile-nested-type-statements.test.ts`).
+   (`packages/octane/tests/compiler/compile-nested-type-statements.test.ts`).
 2. **Runtime**: zero-arg `useState()`/`useRef()` missed the trailing-slot ABI
    reinterpretation and threw
    (`packages/octane/tests/zero-arg-hooks.test.tsrx`).

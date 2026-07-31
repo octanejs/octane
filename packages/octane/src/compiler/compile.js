@@ -3995,11 +3995,22 @@ function isConditionalJsx(node) {
 	);
 }
 
-/** Wrap an expression as a BlockStatement body, so makeIfCall can consume it. */
+/** Wrap a ternary arm as a BlockStatement body, so makeIfCall can consume it. */
 function wrapAsBlockStmt(node) {
 	if (!node) return null;
 	// null / Literal(null) / Literal(false) → no branch
 	if (node.type === 'Literal' && (node.value === null || node.value === false)) return null;
+	if (!isJsxLike(node)) {
+		// A non-JSX arm (`{cond ? xs.map(…) : <Jsx/>}`, a string, a variable
+		// holding an element, a nested ternary) is the branch's render VALUE. As
+		// a bare statement the branch body would evaluate-and-discard it, so wrap
+		// it as the authored-equivalent `<>{expr}</>` — the branch renders the
+		// value through the fragment's child hole. The hole sits at the
+		// fragment's ROOT, a value position on both compilers: a nested ternary
+		// stays a value hole here (it is NOT re-claimed into a nested ifBlock),
+		// which is why the server claim requires host-child position too.
+		node = inheritOriginLoc(b.jsx_fragment([b.jsx_expression_container(node, node)]), node);
+	}
 	return b.block([node]);
 }
 
@@ -7482,7 +7493,15 @@ function ssrCompileBodyWithMapTemps(
 		((!!(node.body && node.body.type === 'JSXCodeBlock') && !returnedOutput) ||
 			returnedFragmentRoot) &&
 		inheritSoleCompRoot(bodyNodes, ctx);
+	// Body/sub ROOTS (including fragment-root children) are not host-element
+	// children: the client routes rich holes there through the de-opt value
+	// path (a portal has no host to stamp — see the emitNodeHtml root branch),
+	// so the ternary claim must stay off until an element's own children walk
+	// (ssrEmitElement) turns the flag on.
+	const prevHostChildPos = ctx._ssrHostChildPos;
+	ctx._ssrHostChildPos = false;
 	const htmlExpr = ssrEmitNodes(bodyNodes, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
+	ctx._ssrHostChildPos = prevHostChildPos;
 	ctx._ssrInheritRoot = prevInheritRoot;
 	ctx._returnedFragmentTemplate = prevReturnedFragmentTemplate;
 	ctx._tsxValuePos = prevValuePos;
@@ -8587,6 +8606,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
 		// the first text part must protect a leading newline (see ssrEmitNodes).
 		const nlGuardFirst = tag === 'pre' || tag === 'textarea' || tag === 'listing';
+		// These children sit directly under a host element — the one position
+		// where the client claims `{cond ? A : B}` holes (emitElementHtml). Root
+		// positions reset this in ssrCompileBody.
+		const prevHostChildPos = ctx._ssrHostChildPos;
+		ctx._ssrHostChildPos = true;
 		childrenExpr = ssrEmitNodes(
 			normChildren,
 			ctx,
@@ -8597,6 +8621,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			childComponentNs,
 			nlGuardFirst,
 		);
+		ctx._ssrHostChildPos = prevHostChildPos;
 	}
 	// `children=` and spread-held children are content props, not attributes.
 	// With no nested JSX children, the last present writer renders as the host's
@@ -8925,18 +8950,35 @@ function ssrCompileSub(
 ) {
 	const fnName = `${baseName}$${ctx.nextHelperId++}`;
 	const synth = { params: paramNodes || [], body: bodyStmts };
-	const fn = ssrCompileBody(
-		synth,
-		ctx,
-		fnName,
-		cssHash,
-		[],
-		parentNs || 'html',
-		false,
-		componentNs,
-		returnedFragmentTemplate,
-		returnedFragmentRoot,
-	);
+	// Returned-tree mirror subs (`__sfragment`): extractFragment folds EVERY
+	// expression hole in the mirrored tree into a descriptor value hole on the
+	// client (`props.hN` + childTextHole), even holes sitting inside host
+	// elements. Mark them so ssrEmitTsrxExpression keeps `{cond ? A : B}` on
+	// ssrChild throughout the mirror, matching that fold. Directive-arm subs
+	// reset the flag through this same save/restore, so an @if INSIDE a mirror
+	// claims again, exactly like the client. (Component `__schildren` subs are
+	// NOT folded wholesale — only their ROOT holes are the children-as-props
+	// value, which `_ssrHostChildPos` already leaves unclaimed — while a hole
+	// inside a host element within children claims like any template child.)
+	const prevFoldedExprHoles = ctx._ssrFoldedExprHoles;
+	ctx._ssrFoldedExprHoles = baseName === '__sfragment';
+	let fn;
+	try {
+		fn = ssrCompileBody(
+			synth,
+			ctx,
+			fnName,
+			cssHash,
+			[],
+			parentNs || 'html',
+			false,
+			componentNs,
+			returnedFragmentTemplate,
+			returnedFragmentRoot,
+		);
+	} finally {
+		ctx._ssrFoldedExprHoles = prevFoldedExprHoles;
+	}
 	return { fnName, fn };
 }
 
@@ -8944,10 +8986,19 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	// rewriteHookCalls: key any `use(thenable)` in the @if test (it bypasses the
 	// setup rewrite, so without a stable key it collides with sibling/body use()).
 	const testExpr = rewriteHookCalls(node.test, ctx, name);
-	const thenStmts =
-		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
-	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
-	inlinedSubs.push(thenSub.fn);
+	// A null consequent (`{cond ? null : <Jsx/>}` lowered by wrapAsBlockStmt)
+	// means "no then branch". It must emit like a MISSING @else — plain '' with
+	// no inner arm range — because the hydrating client renders that branch with
+	// a null body and adopts an empty slot range.
+	const thenStmts = node.consequent
+		? node.consequent.type === 'BlockStatement'
+			? node.consequent.body
+			: [node.consequent]
+		: null;
+	const thenSub = thenStmts
+		? ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs)
+		: null;
+	if (thenSub) inlinedSubs.push(thenSub.fn);
 	let elseCall = ssrHtmlTemplate([], node, ctx);
 	let elseFnName = null;
 	if (node.alternate) {
@@ -8968,26 +9019,33 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrControl');
 	ctx.runtimeNeeded.add('ssrArm');
-	registerDirectiveOrigin(ctx, node, ['_$ssrControl', '_$ssrArm', thenSub.fnName, elseFnName]);
+	registerDirectiveOrigin(ctx, node, [
+		'_$ssrControl',
+		'_$ssrArm',
+		thenSub ? thenSub.fnName : null,
+		elseFnName,
+	]);
 	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = ssrCall(
-		'ssrArm',
-		[
-			b.literal('then', '"then"'),
-			ssrThunk(
-				ssrCall(
-					'ssrBlock',
-					[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
-					node.consequent,
-				),
+	const thenInner = thenSub
+		? ssrCall(
+				'ssrArm',
+				[
+					b.literal('then', '"then"'),
+					ssrThunk(
+						ssrCall(
+							'ssrBlock',
+							[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
+							node.consequent,
+						),
+						node.consequent,
+					),
+				],
 				node.consequent,
-			),
-		],
-		node.consequent,
-	);
+			)
+		: ssrHtmlTemplate([], node, ctx);
 	const elseInner = node.alternate
 		? ssrCall(
 				'ssrArm',
@@ -9440,6 +9498,30 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 	) {
 		ctx.runtimeNeeded.add('ssrPortal');
 		return ssrCall('ssrPortal', [], node);
+	}
+	if (
+		node.returnedJsxValue !== true &&
+		ctx._tsxValuePos !== true &&
+		ctx._ssrFoldedExprHoles !== true &&
+		ctx._ssrHostChildPos === true &&
+		isConditionalJsx(expr)
+	) {
+		// Mirror the client's claim EXACTLY: only emitElementHtml's children
+		// walk lowers `{cond ? A : B}` with a JSX arm to an @if, so both sides
+		// compile each arm as an ordinary arm body and the hydration shapes
+		// (control key, arm ranges, a keyed `.map` claimed inside a value arm)
+		// agree by construction. Everywhere else the hole is a VALUE on the
+		// client and must stay on ssrChild here: returned `.tsx` trees
+		// (`_tsxValuePos`), returned-tree mirrors whose holes extractFragment
+		// folds to `props.hN` (`_ssrFoldedExprHoles`), and every non-host-child
+		// position — body/arm/fragment roots and component-children roots,
+		// where a rich hole rides the de-opt value path because a portal there
+		// has no host to stamp (`_ssrHostChildPos`).
+		const asIf = {
+			...b.if(expr.test, wrapAsBlockStmt(expr.consequent), wrapAsBlockStmt(expr.alternate)),
+			loc: expr.loc, // same devLoc/control-key position as the client's claim
+		};
+		return ssrEmitIf(asIf, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 	}
 	ctx.runtimeNeeded.add('ssrChild');
 	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
@@ -20169,10 +20251,16 @@ function hoistBodyHelper(
 // ===========================================================================
 
 function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
-	// node.test, node.consequent (BlockStatement | Element), node.alternate (BlockStatement | IfStatement | null)
+	// node.test, node.consequent (BlockStatement | Element | null), node.alternate (BlockStatement | IfStatement | null)
+	// A null consequent (`{cond ? null : <Jsx/>}` lowered by wrapAsBlockStmt)
+	// means "no then branch" — same contract as the null alternate: the helper
+	// slot compiles to `null` and the runtime renders an empty branch.
 
-	const thenStmts =
-		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
+	const thenStmts = node.consequent
+		? node.consequent.type === 'BlockStatement'
+			? node.consequent.body
+			: [node.consequent]
+		: null;
 	const elseStmts = node.alternate
 		? node.alternate.type === 'BlockStatement'
 			? node.alternate.body
@@ -20180,20 +20268,22 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		: null;
 	// Phase 2: one shared env tuple for both branches (see unionEnv).
 	const envNames = unionEnv(ctx, [
-		{ stmts: thenStmts, params: [] },
+		thenStmts && { stmts: thenStmts, params: [] },
 		elseStmts && { stmts: elseStmts, params: [] },
 	]);
-	const thenHelperName = hoistBodyHelper(
-		ctx,
-		inlinedSubs,
-		'__then',
-		thenStmts,
-		[],
-		parentNs,
-		cssHash,
-		envNames,
-		directiveKeywordOrigin(ctx, node),
-	);
+	const thenHelperName = thenStmts
+		? hoistBodyHelper(
+				ctx,
+				inlinedSubs,
+				'__then',
+				thenStmts,
+				[],
+				parentNs,
+				cssHash,
+				envNames,
+				directiveKeywordOrigin(ctx, node),
+			)
+		: null;
 
 	let elseHelperName = null;
 	if (elseStmts) {

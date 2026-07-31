@@ -1,0 +1,303 @@
+.page {
+	width: 100%;
+	height: 100%;
+	background-color: black;
+	display: linear;
+	linear-orientation: vertical;
+}
+
+/* Amount */
+.amount-wrapper {
+	margin: 40px 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.amount-label {
+	font-size: 12px;
+	font-weight: 500;
+	color: #ffffffa6;
+	margin-bottom: 8px;
+}
+
+.amount-value {
+	display: flex;
+	align-items: flex-end;
+}
+
+.amount-currency {
+	font-size: 28px;
+	font-weight: 500;
+	color: #ff6740;
+}
+
+.amount-number {
+	font-size: 38px;
+	font-weight: 500;
+	color: #ff6740;
+}
+
+/* Card */
+.card-content {
+	height: 100px;
+	perspective: 1000px;
+	cursor: pointer;
+	margin-left: 20px;
+	margin-right: 20px;
+	margin-bottom: 24px;
+}
+
+.card-content .card-front,
+.card-content .card-back {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	border-radius: 12px;
+	padding-left: 26px;
+	background: linear-gradient(135deg, #ff6740 0%, #71829e 100%);
+}
+
+.card-content .card-number {
+	display: flex;
+	align-items: center;
+	margin-top: 26px;
+}
+
+.card-content .card-number .first-digits,
+.card-content .card-number .last-digits {
+	margin-right: 8px;
+	font-size: 20px;
+	font-weight: 500;
+	color: #ffffff;
+	letter-spacing: 2px;
+}
+
+.card-content .card-number .middle-digits {
+	opacity: 0.6;
+	font-size: 20px;
+	font-weight: 500;
+	color: #ffffff;
+	letter-spacing: 2px;
+}
+
+.card-content .card-info {
+	margin-top: 6px;
+}
+
+.card-content .card-info text {
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.8);
+}
+
+.card-content .card-inputs {
+	padding: 0 20px;
+	align-items: center;
+	display: linear;
+	linear-orientation: horizontal;
+}
+
+.card-content .card-inputs .input-group {
+	margin-bottom: 16px;
+}
+
+.card-content .card-inputs .input-group .input-label {
+	color: rgba(255, 255, 255, 0.8);
+	font-size: 14px;
+	margin-bottom: 8px;
+	font-weight: 600;
+}
+
+.card-content .card-inputs .input-group .input-field {
+	height: 40px;
+	padding-left: 4px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 8px;
+	width: 100px;
+}
+
+.card-content .card-inputs .input-group .input-field-small {
+	height: 40px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 8px;
+	width: 60px;
+	margin-left: 10px;
+}
+
+.card-content .card-inputs .input-ccv {
+	display: linear;
+	linear-orientation: horizontal;
+	align-items: center;
+}
+
+.card-content .card-back {
+	background: linear-gradient(90deg, #71829e 0%, #282e38 100%);
+}
+
+.card-content .card-back .card-inputs {
+	padding: 22px 0px;
+	align-items: center;
+}
+
+.card-content .card-back .card-inputs .input-group .input-label {
+	font-size: 14px;
+	font-weight: 400;
+	color: rgba(255, 255, 255, 0.65);
+}
+
+.card-content .card-back .card-inputs .input-group .input-field {
+	width: 120px;
+	height: 29px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+}
+
+.card-content .card-back .card-inputs .input-group .input-field text {
+	font-size: 14px;
+	font-weight: 400;
+	color: #ffffff;
+	margin-left: 5px;
+}
+
+.card-content .card-back .card-inputs .input-ccv {
+	position: absolute;
+	right: 26px;
+	top: 45px;
+	display: flex;
+	align-items: center;
+}
+
+.card-content .card-back .card-inputs .input-ccv .input-label {
+	font-size: 14px;
+	font-weight: 400;
+	padding-top: 4px;
+	color: rgba(255, 255, 255, 0.65);
+	line-height: 0;
+}
+
+.card-content .card-back .card-inputs .input-ccv .input-field-small {
+	width: 60px;
+	height: 29px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 6px;
+}
+
+.front {
+	animation: backToFront 0.5s both;
+	transform: translateZ(0);
+}
+
+.back {
+	animation: frontToBack 0.5s both;
+	transform: translateZ(0);
+}
+
+@keyframes frontToBack {
+	0% {
+		transform: rotateY(0deg) translateZ(1);
+	}
+	100% {
+		transform: rotateY(180deg) translateZ(0);
+	}
+}
+
+@keyframes backToFront {
+	0% {
+		transform: rotateY(-180deg) translateZ(0);
+	}
+	100% {
+		transform: rotateY(0deg) translateZ(1);
+	}
+}
+
+/* BankCardScrollView */
+.payment-wrapper {
+	padding: 0 20px;
+}
+
+.payment-title {
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.8);
+	margin-bottom: 12px;
+	margin-left: 12px;
+}
+
+.payment-container {
+	background-color: #282e38;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.payment-sv {
+	height: 230px;
+	display: flex;
+	flex-direction: column;
+}
+
+.payment-header {
+	margin-bottom: 16px;
+}
+
+.payment-header-title {
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.65);
+}
+
+.payment-card {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 56px;
+	padding: 0 16px;
+	margin-bottom: 1px;
+	background: transparent;
+}
+
+.payment-card-info {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.payment-card-icon {
+	width: 24px;
+	height: 24px;
+}
+
+.payment-card-name {
+	font-size: 14px;
+	color: #ffffff;
+}
+
+.payment-check-icon {
+	width: 20px;
+	height: 20px;
+}
+
+/* BottomNode */
+.bottom-node {
+	position: absolute;
+	bottom: 30px;
+	left: 0;
+	right: 0;
+	padding: 12px 20px;
+	background-color: black;
+}
+
+.bottom-continue-button {
+	background: #ff6740;
+	padding: 16px;
+	border-radius: 8px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.bottom-continue-text {
+	color: white;
+	font-size: 16px;
+	font-weight: 500;
+}

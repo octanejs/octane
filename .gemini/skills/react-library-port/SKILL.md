@@ -68,7 +68,9 @@ Read first:
    - Run package-specific tests first.
    - Run affected core tests if touching `packages/octane`.
    - Run `pnpm typecheck` for API/package changes.
-   - Run `pnpm format:check` or format changed files.
+   - Run `pnpm format:files <path...>` while iterating and
+     `pnpm format:files:check <path...>` for a scoped check. Use the repo-wide
+     `pnpm format:check` for the final gate.
 
 ## Deliverables
 

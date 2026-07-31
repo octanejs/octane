@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 46 binding package(s).**
+**0 active pin(s) across 52 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -33,14 +33,18 @@ surface and evidence.
 | `@octanejs/mobx` | 0 |
 | `@octanejs/motion` | 0 |
 | `@octanejs/nuqs` | 0 |
+| `@octanejs/phosphor-icons` | 0 |
 | `@octanejs/radix` | 0 |
+| `@octanejs/rainbowkit` | 0 |
 | `@octanejs/react-error-boundary` | 0 |
 | `@octanejs/recharts` | 0 |
 | `@octanejs/redux` | 0 |
 | `@octanejs/redux-toolkit` | 0 |
 | `@octanejs/remix-router` | 0 |
+| `@octanejs/rxjs` | 0 |
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/sonner` | 0 |
+| `@octanejs/streamdown` | 0 |
 | `@octanejs/styled-components` | 0 |
 | `@octanejs/stylex` | 0 |
 | `@octanejs/tanstack-ai` | 0 |
@@ -58,6 +62,8 @@ surface and evidence.
 | `@octanejs/testing-library` | 0 |
 | `@octanejs/three` | 0 |
 | `@octanejs/tiptap` | 0 |
+| `@octanejs/usehooks-ts` | 0 |
 | `@octanejs/valtio` | 0 |
 | `@octanejs/visx` | 0 |
+| `@octanejs/wagmi` | 0 |
 | `@octanejs/zustand` | 0 |

@@ -1,0 +1,92 @@
+[data-rk] {
+	font-family: var(--rk-font-body);
+}
+
+.rk-connect-button,
+.rk-wallet-button,
+.rk-action {
+	min-height: 44px;
+	border: 0;
+	padding: 0 16px;
+	font: inherit;
+	cursor: pointer;
+}
+
+.rk-connect-button,
+.rk-wallet-button {
+	border-radius: var(--rk-connect-radius);
+	background: var(--rk-connect-background);
+	color: var(--rk-connect-text);
+}
+
+.rk-action {
+	border-radius: var(--rk-action-radius);
+	background: var(--rk-accent);
+	color: var(--rk-accent-foreground);
+}
+
+.rk-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 2147483647;
+	display: grid;
+	place-items: center;
+	background: rgb(0 0 0 / 55%);
+	padding: 16px;
+}
+
+.rk-dialog {
+	width: min(420px, 100%);
+	max-height: min(640px, calc(100vh - 32px));
+	overflow: auto;
+	border-radius: var(--rk-modal-radius);
+	background: var(--rk-modal-background);
+	color: var(--rk-modal-text);
+	padding: 20px;
+	box-shadow: 0 16px 64px rgb(0 0 0 / 30%);
+}
+
+.rk-dialog-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.rk-close {
+	min-width: 44px;
+	min-height: 44px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	font-size: 20px;
+	cursor: pointer;
+}
+
+.rk-list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
+	padding: 0;
+	list-style: none;
+}
+
+.rk-list button {
+	width: 100%;
+	min-height: 44px;
+	text-align: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.rk-dialog {
+		animation: rk-enter 120ms ease-out;
+	}
+}
+
+@keyframes rk-enter {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}

@@ -1,0 +1,126 @@
+/* SafeArea */
+.safe-area {
+	width: 100%;
+	height: 100%;
+	padding-bottom: 20px;
+	display: flex;
+	flex-direction: column;
+	background-color: #000;
+}
+
+.android {
+	padding-bottom: 0;
+}
+
+/* Page */
+.page-container {
+	flex: 1;
+	width: 100%;
+	padding-bottom: 30px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	background-color: #000;
+}
+
+.card-detail-container {
+	position: absolute;
+	width: 100%;
+	background: linear-gradient(180deg, rgba(17, 17, 19, 0) 29.47%, #111113 99.97%);
+	bottom: 75px;
+}
+
+.card-detail {
+	background-color: #282e38;
+	border-radius: 12px;
+	width: calc(100% - 40px);
+	margin: 0 20px 18px 20px;
+	padding: 21px;
+	box-sizing: border-box;
+}
+
+.card-detail-title {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 15px;
+}
+
+.card-detail-title-price {
+	font-size: 24px;
+	color: #ff6740;
+}
+
+.card-detail-amount {
+	color: rgba(255, 255, 255, 0.85);
+	text-align: right;
+	font-size: 12px;
+}
+
+.card-detail-desc {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.card-detail-desc-text {
+	font-size: 17px;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.order-button {
+	background-color: #ff6740;
+	border-radius: 8px;
+	width: calc(100% - 40px);
+	margin: 0 20px;
+	padding: 13px 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.order-text {
+	font-size: 17px;
+	color: #fff;
+}
+
+/* Indicator */
+.indicator {
+	position: absolute;
+	bottom: 140px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.indicator .indicator-item {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	margin: 0 5px;
+	background-color: rgba(255, 255, 255, 0.5);
+}
+
+.indicator .indicator-item.active {
+	background-color: #ff6740;
+}
+
+/* Swiper */
+.swiper-wrapper {
+	flex: 1;
+	width: 100%;
+}
+
+.swiper-container {
+	display: linear;
+	linear-orientation: horizontal;
+	height: 100%;
+}
+
+.swiper-item {
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+}

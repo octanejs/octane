@@ -1,5 +1,187 @@
 # octane
 
+## 0.1.21
+
+### Patch Changes
+
+- 10efc28: Fix hydration mismatch recovery corrupting the DOM when a branch adopts a
+  non-spanning server range.
+
+  When an `@if`/`@switch` (or an `@if`-lowered ternary) hydrates a slot whose
+  server content leads with a nested `<!--[-->…<!--]-->` pair, the branch adopted
+  that first pair as its own range without checking that the pair spans the whole
+  slot. Against a differently-encoded server shape — for example a legacy
+  value-hole list serialized as an outer pair plus one pair per keyed item — the
+  branch then owned only a prefix of the slot: the next branch swap left the
+  stranded remainder on screen next to the new arm, and re-entering the original
+  arm mounted into detached anchors, rendering nothing (or throwing
+  `NotFoundError` on insertion, depending on the shape). Recovery must never
+  crash or leak — it is the production safety net for stale server HTML.
+
+  The branch adoption now verifies the nested pair reaches the slot's close
+  marker. When it does not, the runtime treats it as a structural hydration
+  mismatch: it warns in development, discards the server range, and client-builds
+  the branch fresh with hydration suspended for that subtree, so cursor-greedy
+  adoption (such as a keyed list's markerless item path) cannot claim the slot's
+  own close marker.
+
+- 39bfc49: Fix a crash when a sole-child value hole leaves and re-enters array mode.
+
+  An element whose only child is a `{expr}` hole renders markerless (the slot
+  owns the whole element), and an array value lazily mints a comment marker pair
+  inside the element to anchor the keyed list. Clearing the slot on a later kind
+  flip swept those markers out of the DOM but kept the slot's references to
+  them, so the next mount anchored on detached comments: flipping
+  array → text/null/host → array crashed with
+  `Cannot read properties of null (reading 'nodeType')`, and array → component
+  threw `NotFoundError` while inserting the new content. The owns-parent clear
+  now forgets the swept marker pair, so re-entering array mode re-mints a live
+  pair and every other regime returns to the markerless baseline.
+
+- 4863b39: Render the non-JSX arm of a ternary child hole instead of discarding it, and
+  stop crashing on a `null` consequent.
+
+  `{cond ? A : B}` at a JSX child position lowers to an ifBlock when either arm
+  is a JSX literal. The other arm's value — a keyed `.map(…)` array, a string, a
+  variable holding an element, a nested ternary, a falsy primitive — was compiled
+  into the branch helper as a bare expression statement, so its value was
+  evaluated and dropped and the hole rendered empty. React renders that arm's
+  value, and server rendering already did too, so the same component could ship
+  content from the server that the hydrating client blanked out. A `null`
+  consequent (`{cond ? null : <Jsx/>}`) did not compile at all: the lowering
+  crashed reading the missing branch.
+
+  A non-JSX arm now lowers to the authored-equivalent `<>{expr}</>`, so the
+  branch renders the value through the fragment's child hole: keyed `.map` arms
+  take the same keyed fast path as `@for`, nested ternaries become nested
+  ifBlocks, and primitives (including `0`) render as text. A `null`/`false`
+  consequent compiles to an ifBlock with an empty then branch, mirroring the
+  long-supported `null` alternate. The server now claims template-form ternary
+  holes symmetrically (`ssrControl` + arm ranges, exactly like an authored
+  `@if`), so the hydrating client adopts the taken arm's DOM — including keyed
+  list arms — instead of relying on shape coincidence. Value-form positions
+  (returned `.tsx` trees, whose holes the client folds into descriptor value
+  holes) keep their existing `ssrChild` output byte-for-byte.
+
+- ef82ba3: Defer a held synchronous transition's whole commit.
+
+  A transition that suspends now holds the entire screen — including everything
+  it patched outside the suspended boundary. Shell text, attributes, controlled
+  form state and keyed structure revert with the hold, `isPending` stays on, and
+  the new screen lands in one step when the data arrives, matching what async
+  Actions already did. The composition benchmark records zero exposed
+  intermediate states for a transition update, level with React.
+
+  A value hole that leaves array mode during a held transition now re-asserts
+  the held rows instead of showing the flipped-in content early, and a
+  sole-child hole that flips array to text and back no longer crashes on the
+  wiped list markers.
+
+  One residual is pinned at its own benchmark ceiling: the promoted round after
+  a dependent request resolves re-creates warm-started fetches (served by the
+  application cache, so nothing refetches over the network) until the follow-up
+  resume work restores the exact creation floor.
+
+## 0.1.20
+
+### Patch Changes
+
+- c6370b6: Add `octane/testing` with `clampJsdomScrollTop()`, an opt-in helper that clamps
+  jsdom's stored scroll position to its reported range and dispatches the
+  resulting native scroll event.
+- dd272ad: Expose a stable native error-boundary reset ref for renderer adapters.
+- c151b71: Add optional Strong mode for clearer state and ref behavior. Enable it across an
+  application with `compiler: { strong: true }`, in one module with `"use strong"`,
+  or through the Vite, Rspack, and Rsbuild plugin options. Strong modules reject
+  state updates during render, direct state updates while setting up an effect, and
+  render-time writes to refs, with `useLinkedState` available for state that
+  should follow another value.
+- 66b51d8: Run the mount effects of components a boundary rendered but never committed.
+
+  A `useEffect` could be lost outright. When a Suspense boundary suspended on
+  something rendered _after_ a sibling — a `@for` of children followed by a
+  component that calls `use()` on a pending promise, say — those earlier siblings
+  had already run their hooks before the attempt was abandoned. Their effects were
+  queued and then dropped along with the rest of the aborted attempt, but the
+  slots kept the dependency arrays that attempt had stamped. When the promise
+  resolved and the content was revealed, the re-render compared those deps, found
+  them unchanged, and enqueued nothing. The mount body never ran, and neither did
+  the cleanup it would have returned, so subscriptions, timers, and observers set
+  up in `useEffect` silently never started. `useLayoutEffect` was unaffected.
+
+  Hiding a boundary behind its fallback still leaves passive effects subscribed,
+  which is what React does for content that is on screen and merely hidden. That
+  now applies only to effects that actually ran. One that never ran has no
+  subscription to preserve, so it resets like a layout effect and fires when the
+  boundary finally commits — React fires every mount effect in the subtree when a
+  suspended mount lands.
+
+  This also covers a boundary that commits, then re-renders with a new child and
+  suspends: the new child's effects mount on reveal while its already-committed
+  siblings keep the subscriptions they had.
+
+- a57c32a: Hold a Suspense boundary whole through a transition.
+
+  A transition that suspended used to leave part of the new screen on top of the
+  old one. Rendering and mutating happen in one walk, so a component patched its
+  own attributes and text on the way down and only afterwards found that a child
+  below it was still loading — the boundary kept its old content but the markup
+  around it had already moved on. The same thing happened when a held boundary
+  replayed its body and only some of the data had arrived: the resolved parts
+  committed and the rest stayed behind.
+
+  A suspended attempt now undoes its own binding writes, so the boundary either
+  updates completely or not at all. The undo runs in the same flush as the change,
+  so nothing intermediate is ever painted and transitions stay monotonic — no
+  visible rollback, no invalid intermediate structure.
+
+  `benchmarks/async-composition` records zero exposed intermediate states for a
+  transition update, level with React, with its ceiling tightened from one to zero.
+
+  Controlled `value`, `checked` and `selected` are held too, along with their
+  `default*` mirrors and the record of what was last projected.
+
+  Two things a transition can still change early: content it patched outside a
+  suspended boundary, and a structural change above one such as a keyed list
+  reordering.
+
+- e38a557: Hold a keyed list whole through a suspended transition.
+
+  A transition that dropped a row and then suspended used to lose the row from the
+  held screen: the list reconciled first, the boundary decided to hold second, and
+  by then the row's DOM, state and cleanups were already gone. A list the boundary
+  was supposed to be holding frozen showed up with rows missing.
+
+  Removals inside a boundary now defer their teardown while a hold is still
+  possible. The nodes come out of the way so the reconcile can finish, but they
+  are kept, and the row's scope — its state, its effects, its cleanups — is left
+  untouched until the outcome is known. If the boundary holds, the rows come back
+  exactly as they were, cleanups never having run; once the transition commits,
+  the removal goes through for real and cleanups fire then.
+
+  The list restores as a whole — order, membership and the `@empty` branch
+  together — so reorders roll back alongside removals.
+
+- bd90e27: Keyed-list parking only defers what a hold can restore.
+
+  A value-position keyed list whose slot leaves array mode (the value stops
+  being an array) discards the slot itself, so rows removed by that flip have
+  nothing to be restored into. They no longer park for a possible hold — their
+  teardown runs inline with the attempt that removed them, exactly as it did
+  before rows learned to wait — instead of being deferred past the rest of the
+  render as unrestorable.
+
+  The rollback that puts a held list back also stops if a teardown cleanup
+  flips the enclosing boundary to `@catch` mid-restore, instead of writing into
+  a disposed range.
+
+- ae6811d: Add `useLinkedState` for local state that can be edited independently but should
+  reset or adjust when an input changes. The new value is available immediately,
+  without an effect or a state update during render. Calculations can inspect the
+  previous source and value, choose custom equality checks, and use the same
+  optional latest-value getter as `useState`.
+- 62d81b8: Guard `hot.data` in the universal webpack-HMR handoff: webpack and rspack leave `module.hot.data` undefined until a previous instance of the module has disposed, so the emitted `hot.data.__octaneUniversalComponents` read crashed every dev bundle on its first evaluation.
+
 ## 0.1.19
 
 ### Patch Changes

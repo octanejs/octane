@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 // expected union from the workspace manifests, so publishing a new binding
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
+	'usehooks-ts': '@octanejs/usehooks-ts',
 	zustand: '@octanejs/zustand',
 	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',
@@ -17,6 +18,8 @@ export const KNOWN_BINDINGS = {
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
+	wagmi: '@octanejs/wagmi',
+	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-store': '@octanejs/tanstack-store',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',
@@ -35,6 +38,7 @@ export const KNOWN_BINDINGS = {
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
+	'@phosphor-icons/react': '@octanejs/phosphor-icons',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'react-aria': '@octanejs/aria',
 	'react-aria-components': '@octanejs/aria',
@@ -45,6 +49,13 @@ export const KNOWN_BINDINGS = {
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
+	streamdown: '@octanejs/streamdown',
+	// The official plugins are consolidated as subpaths of the same package.
+	// The bundled bridge skill documents each exact import rewrite.
+	'@streamdown/code': '@octanejs/streamdown',
+	'@streamdown/math': '@octanejs/streamdown',
+	'@streamdown/mermaid': '@octanejs/streamdown',
+	'@streamdown/cjk': '@octanejs/streamdown',
 	shadcn: '@octanejs/shadcn',
 	recharts: '@octanejs/recharts',
 	'@react-three/fiber': '@octanejs/three',
@@ -99,6 +110,8 @@ export const KNOWN_BINDINGS = {
 	'@visx/zoom': '@octanejs/visx',
 	'react-redux': '@octanejs/redux',
 	'@reduxjs/toolkit': '@octanejs/redux-toolkit',
+	'@react-rxjs/core': '@octanejs/rxjs',
+	'@react-rxjs/utils': '@octanejs/rxjs',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
 	'@mdx-js/react': '@octanejs/mdx',
@@ -122,6 +135,7 @@ export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
 export const KNOWN_VANILLA_CORES = {
 	'@apollo/client': '@apollo/client',
 	'@tanstack/react-query': '@tanstack/query-core',
+	wagmi: '@wagmi/core',
 	'@tanstack/react-table': '@tanstack/table-core',
 	'@tanstack/react-virtual': '@tanstack/virtual-core',
 	'@tanstack/react-form': '@tanstack/form-core',

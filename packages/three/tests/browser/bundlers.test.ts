@@ -1,15 +1,29 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	realpathSync,
+	rmSync,
+	statSync,
+} from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import { extname, relative, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { extname, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const fixtureRoot = resolve(import.meta.dirname, '../_fixtures/bundler-app');
-const viteOutput = resolve(fixtureRoot, 'dist-vite');
-const rsbuildOutput = resolve(fixtureRoot, 'dist-rsbuild');
-const rspackOutput = resolve(fixtureRoot, 'dist-rspack');
-const fixtureNodeModules = resolve(fixtureRoot, 'node_modules');
+// The helper stages a copy of the fixture here and builds it, so no bundler
+// output, resolver cache, or `node_modules` link lands in the checkout. The
+// suite owns the directory rather than the helper so an interrupted or failed
+// build still gets cleaned up. The realpath matters on macOS: its temp
+// directory is reached through the /var -> /private/var alias, and Rolldown
+// only accepts an HTML input under the exact normalized build root.
+const stagedRoot = realpathSync(mkdtempSync(join(tmpdir(), 'octane-three-bundler-')));
+const viteOutput = resolve(stagedRoot, 'dist-vite');
+const rsbuildOutput = resolve(stagedRoot, 'dist-rsbuild');
+const rspackOutput = resolve(stagedRoot, 'dist-rspack');
 const buildHelper = resolve(import.meta.dirname, '_build-bundlers.mjs');
 const buildEvidenceMarker = '__OCTANE_THREE_BUNDLER_EVIDENCE__';
 const execFileAsync = promisify(execFile);
@@ -70,12 +84,8 @@ let viteOrigin = '';
 let bundlerEvidence: BundlerEvidence;
 
 beforeAll(async () => {
-	for (const output of [viteOutput, rsbuildOutput, rspackOutput]) {
-		rmSync(output, { recursive: true, force: true });
-	}
-
-	const { stdout } = await execFileAsync(process.execPath, [buildHelper], {
-		cwd: fixtureRoot,
+	const { stdout } = await execFileAsync(process.execPath, [buildHelper, stagedRoot], {
+		cwd: stagedRoot,
 		maxBuffer: 20 * 1024 * 1024,
 	});
 	const evidenceLine = stdout.split('\n').findLast((line) => line.startsWith(buildEvidenceMarker));
@@ -100,10 +110,7 @@ afterAll(async () => {
 		}
 		staticServer.close((error) => (error === undefined ? resolveClose() : reject(error)));
 	});
-	for (const output of [viteOutput, rsbuildOutput, rspackOutput]) {
-		rmSync(output, { recursive: true, force: true });
-	}
-	rmSync(fixtureNodeModules, { recursive: true, force: true });
+	rmSync(stagedRoot, { recursive: true, force: true });
 });
 
 describe('Three Canvas bundler and browser integration', () => {

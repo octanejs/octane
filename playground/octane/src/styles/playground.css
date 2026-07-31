@@ -176,6 +176,60 @@ pre.boom {
 	font-family: ui-monospace, Menlo, monospace;
 	font-size: 12px;
 }
+.phosphor-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+	gap: 12px;
+	margin-top: 16px;
+}
+.phosphor-grid > div {
+	display: grid;
+	justify-items: center;
+	gap: 8px;
+	padding: 20px 12px;
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.8);
+	background: var(--card);
+}
+.phosphor-grid span {
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+
+.metrics-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 8px;
+	margin: 0 0 16px;
+}
+.metrics-grid > div {
+	min-width: 0;
+	padding: 10px;
+	border: 1px solid var(--border);
+	border-radius: calc(var(--radius) * 0.6);
+	background: var(--background);
+}
+.metrics-grid dt {
+	color: var(--muted-foreground);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.metrics-grid dd {
+	margin: 4px 0 0;
+	font-weight: 600;
+}
+.metric-address {
+	overflow: hidden;
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.panel + .panel {
+	margin-top: 12px;
+}
 
 /* @octanejs/cmdk ships unstyled — it exposes a DOM contract of `cmdk-*`
  * attributes to style against. Ported here from the playground's old inline

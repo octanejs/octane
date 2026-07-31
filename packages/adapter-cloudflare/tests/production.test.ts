@@ -1,34 +1,44 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Miniflare } from 'miniflare';
 import { build } from 'vite';
+import { createTempProject } from '../../octane/tests/_temp-project.js';
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
 const repoRoot = resolve(packageRoot, '../..');
-const fixtureRoot = join(packageRoot, 'tests/_fixtures/app');
-const distDir = join(fixtureRoot, 'dist');
+const fixtureSource = join(packageRoot, 'tests/_fixtures/app');
+
+let projectRoot: string;
+let distDir: string;
+let disposeProject: () => void;
+let worker: Miniflare;
 
 function linkPackage(name: string, target: string) {
-	const destination = join(fixtureRoot, 'node_modules', name);
+	const destination = join(projectRoot, 'node_modules', name);
 	mkdirSync(dirname(destination), { recursive: true });
 	rmSync(destination, { recursive: true, force: true });
 	symlinkSync(target, destination, 'dir');
 }
 
-let worker: Miniflare;
-
 beforeAll(async () => {
+	// `insideWorkspace`: this fixture boots in workerd, which cannot load modules
+	// from an `os.tmpdir()` root. See createTempProject.
+	({ root: projectRoot, dispose: disposeProject } = createTempProject('cloudflare-vite', {
+		insideWorkspace: true,
+	}));
+	distDir = join(projectRoot, 'dist');
+	cpSync(fixtureSource, projectRoot, { recursive: true });
+
 	linkPackage('octane', join(repoRoot, 'packages/octane'));
 	linkPackage('@octanejs/app-core', join(repoRoot, 'packages/app-core'));
 	linkPackage('@octanejs/vite-plugin', join(repoRoot, 'packages/vite-plugin-octane'));
 	linkPackage('@octanejs/adapter-cloudflare', packageRoot);
 	linkPackage('vite', join(repoRoot, 'packages/vite-plugin-octane/node_modules/vite'));
 
-	rmSync(distDir, { recursive: true, force: true });
-	await build({ root: fixtureRoot, logLevel: 'silent' });
+	await build({ root: projectRoot, logLevel: 'silent' });
 
 	worker = new Miniflare({
 		modules: true,
@@ -42,8 +52,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await worker?.dispose();
-	rmSync(distDir, { recursive: true, force: true });
-	rmSync(join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
+	disposeProject?.();
 });
 
 describe('Cloudflare production build', { timeout: 30_000 }, () => {

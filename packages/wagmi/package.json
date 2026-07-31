@@ -1,0 +1,58 @@
+{
+  "name": "@octanejs/wagmi",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Wagmi v3 bindings for Octane over @wagmi/core and @octanejs/tanstack-query.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/wagmi"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./connectors": "./src/connectors.ts",
+    "./chains": "./src/chains.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project wagmi"
+  },
+  "dependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
+    "@wagmi/connectors": "catalog:default",
+    "@wagmi/core": "catalog:default",
+    "viem": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default",
+    "wagmi": "catalog:default"
+  }
+}

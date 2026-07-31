@@ -663,9 +663,12 @@ describe('manifest-declared manual hook slots', () => {
 			'mdx',
 			'mobx',
 			'motion',
+			'phosphor-icons',
 			'radix',
+			'rainbowkit',
 			'react-error-boundary',
 			'remix-router',
+			'rxjs',
 			'styled-components',
 			'stylex',
 			'tanstack-query',
@@ -677,7 +680,9 @@ describe('manifest-declared manual hook slots', () => {
 			'testing-library',
 			'three',
 			'tiptap',
+			'usehooks-ts',
 			'valtio',
+			'wagmi',
 			'zustand',
 		]);
 	});

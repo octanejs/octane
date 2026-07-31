@@ -1,7 +1,8 @@
 // Focused contract for the newcomer-oriented Core APIs guide. This file owns
 // the route's learning structure, local navigation, and real interactive
 // examples so the unusually large page does not need duplicate generic smoke
-// coverage.
+// coverage. Its timeout absorbs the website job's background build contention
+// without serializing that build and this test.
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
@@ -394,5 +395,5 @@ describe('Core APIs documentation', () => {
 			});
 			expect(mobileToggle.getAttribute('aria-expanded')).toBe('false');
 		}
-	});
+	}, 60_000);
 });

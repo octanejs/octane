@@ -50,7 +50,11 @@ import type {
 	LynxListComponentAtIndexes,
 	LynxListEnqueueComponent,
 } from './papi.js';
-import type { LynxActivatedMainThreadWorklet, LynxMainThreadWorkletRegistry } from './worklets.js';
+import {
+	getThreadFunctionDescriptor,
+	type LynxActivatedMainThreadWorklet,
+	type LynxMainThreadWorkletRegistry,
+} from './worklets.js';
 import {
 	decodeLynxPortalTargetId,
 	isLynxPortalTargetHandle,
@@ -428,7 +432,22 @@ function cloneProps(value: unknown, label: string): Readonly<Record<string, unkn
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		throw hostError(`${label} must be a plain object.`);
 	}
-	const clone = cloneHostValue(value, new WeakMap());
+	// The render-only main graph authors `main-thread:` event props as tagged
+	// callables. Unwrap them to their plain worklet descriptors here, exactly as
+	// the background client driver does before transport; an untagged function
+	// still fails through cloneHostValue below.
+	let source = value as Record<string, unknown>;
+	let rewritten: Record<string, unknown> | null = null;
+	for (const [name, item] of Object.entries(source)) {
+		if (!name.startsWith('main-thread:') || name === 'main-thread:ref') continue;
+		if (typeof item !== 'function') continue;
+		const descriptor = getThreadFunctionDescriptor(item);
+		if (descriptor === null) continue;
+		if (rewritten === null) rewritten = { ...source };
+		rewritten[name] = descriptor;
+	}
+	if (rewritten !== null) source = rewritten;
+	const clone = cloneHostValue(source, new WeakMap());
 	if (clone === null || typeof clone !== 'object' || Array.isArray(clone)) {
 		throw hostError(`${label} must be a plain object.`);
 	}

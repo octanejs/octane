@@ -175,11 +175,14 @@ re-applies the content it was supposed to hold.
 React does not have this problem: `isPending` commits in a separate pass at a different
 priority from the transition itself.
 
-So the prerequisite is not the journal or deferred destruction — it is decoupling the
-pending cue from the transition render, so `useTransition` listeners publish at a priority
-an attempt does not unwind. That reverses the intent of the comment above and changes
-documented scheduling behaviour, so it needs its own design and its own change. The
-deferred-commit work sits behind it.
+~~So the prerequisite is decoupling the pending cue from the transition render.~~
+**Corrected 2026-07-29**: that diagnosis named the wrong lever. `AsyncActionKeepsCommittedState`
+already renders `pending` beside old content in one transition-tagged render — cell STAGING
+separates cue from content, not priority. The cue's storage (`slotRef.isPending`) survives any
+rollback; only its rendered bindings revert, and an urgent re-render with the content cells
+reverted re-publishes exactly those bindings (everything else no-ops on its bag guard). The
+actual prerequisite is extending the async-Action staging batch to held synchronous
+transitions. Design and phases: [docs/transition-deferred-commit-plan.md](../../docs/transition-deferred-commit-plan.md).
 
 The async Action batching in #6 prevents the shell tear while an Action is in flight, but
 does not close the synchronous case. Fallback-visible retries are capture-safe and never had
