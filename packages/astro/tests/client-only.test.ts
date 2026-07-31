@@ -46,4 +46,23 @@ describe('client:only hydrator', () => {
 		expect(label?.isConnected).toBe(true);
 		expect(label?.textContent).toBe('two');
 	});
+
+	it('creates a fresh root after astro:unmount instead of reusing a dead one', () => {
+		const island = document.createElement('div');
+		island.setAttribute('ssr', '');
+		document.body.append(island);
+
+		const hydrate = createHydrator(island);
+		hydrate(Label, { text: 'first' }, {}, { client: 'only' });
+		expect(island.querySelector('#label')?.textContent).toBe('first');
+
+		island.dispatchEvent(new Event('astro:unmount'));
+
+		// Astro may remount the same element after view transitions / teardown.
+		island.setAttribute('ssr', '');
+		expect(() => {
+			hydrate(Label, { text: 'remounted' }, {}, { client: 'only' });
+		}).not.toThrow();
+		expect(island.querySelector('#label')?.textContent).toBe('remounted');
+	});
 });

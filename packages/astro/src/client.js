@@ -21,6 +21,24 @@ function getOrCreateRoot(element, creator) {
 }
 
 /**
+ * Unmount and drop the WeakMap entry so a later hydrate on the same element
+ * creates a fresh root instead of calling `render` on a dead one.
+ *
+ * @param {HTMLElement} element
+ * @param {import('octane').Root} root
+ */
+function attachUnmount(element, root) {
+	element.addEventListener(
+		'astro:unmount',
+		() => {
+			root.unmount();
+			rootMap.delete(element);
+		},
+		{ once: true },
+	);
+}
+
+/**
  * @param {HTMLElement} element
  */
 export default (element) =>
@@ -51,7 +69,7 @@ export default (element) =>
 			// leftover fallback/slot markup via createRoot's mount path.
 			const { root } = getOrCreateRoot(element, () => {
 				const r = createRoot(element);
-				element.addEventListener('astro:unmount', () => r.unmount(), { once: true });
+				attachUnmount(element, r);
 				return r;
 			});
 			root.render(Component, props);
@@ -62,7 +80,7 @@ export default (element) =>
 			const r = hydrateRoot(element, Component, props, {
 				identifierPrefix: prefix,
 			});
-			element.addEventListener('astro:unmount', () => r.unmount(), { once: true });
+			attachUnmount(element, r);
 			return r;
 		});
 		// hydrateRoot already applied the initial tree; only re-render on refresh.
