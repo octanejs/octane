@@ -546,6 +546,9 @@ function planFor(report) {
 		);
 	}
 	steps.push(
+		"Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+	);
+	steps.push(
 		'Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).',
 	);
 	const rewrites = (report.apis ?? []).filter(

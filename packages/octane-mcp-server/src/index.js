@@ -276,6 +276,16 @@ export function engineeringPlanFor(input, repoMode = false) {
 	if (scope === 'framework-core' && repoMode) {
 		plan.requiredSkills.push('octane-core-extend', 'performance-audit');
 	}
+	// A binding is a port of one pinned upstream release, so its gates are about
+	// coverage of that release rather than the runtime cost gates above.
+	if (plan.areas.some((entry) => entry.area === 'ecosystem-binding')) {
+		plan.gates.parity = [
+			'Port module by module from the pinned upstream release vendored under packages/<name>/upstream/, not from the README, the type declarations, or memory.',
+			'Account for every export of the pinned upstream React entry points in the packages/<name>/UPSTREAM.md crosswalk: ported, reused verbatim from a framework-neutral core, divergence, or not applicable, each with its evidence. An unfinished export is an explicit gap row.',
+			'Record what parity cannot reach as a divergence in UPSTREAM.md and status.json, with the reason, what the consumer should do instead, and a behavioral test pinning the Octane behavior.',
+		];
+		if (repoMode) plan.requiredSkills.push('react-library-port');
+	}
 	if (scope === 'framework-core' && !repoMode) {
 		plan.blockingConditions = [
 			'Framework-core work requires the MCP server to run against an Octane monorepo checkout. Set OCTANE_REPO_ROOT, reconnect, and request this plan again so maintainer skills and repository validation are available.',
