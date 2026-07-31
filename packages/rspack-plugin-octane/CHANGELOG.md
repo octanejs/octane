@@ -1,5 +1,13 @@
 # @octanejs/rspack-plugin
 
+## 0.1.17
+
+### Patch Changes
+
+- Updated dependencies [43df1f9]
+- Updated dependencies [7a112b4]
+  - octane@0.1.22
+
 ## 0.1.16
 
 ### Patch Changes

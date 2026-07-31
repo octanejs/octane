@@ -1,5 +1,11 @@
 # @octanejs/adapter-cloudflare
 
+## 0.0.12
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.18
+
 ## 0.0.11
 
 ### Patch Changes
