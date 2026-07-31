@@ -262,46 +262,74 @@ describe('Pull request labels', () => {
 		labels = [],
 		state = 'open',
 		user = { type: 'User' },
+		runDraftPolicy = false,
+		timeline = [],
 	}) {
 		const added = [];
 		const removed = [];
+		const converted = [];
 		const notices = [];
 		const failures = [];
+		const pull = {
+			number: 500,
+			node_id: 'PR_node',
+			draft: false,
+			state,
+			title,
+			body,
+			user,
+			labels: labels.map((name) => ({ name })),
+		};
 		const github = {
 			rest: {
 				pulls: {
-					get: async () => ({
-						data: {
-							number: 500,
-							state,
-							title,
-							body,
-							user,
-							labels: labels.map((name) => ({ name })),
-						},
-					}),
+					get: async () => ({ data: pull }),
 				},
 				issues: {
-					addLabels: async ({ labels: names }) => added.push(...names),
-					removeLabel: async ({ name }) => removed.push(name),
+					addLabels: async ({ labels: names }) => {
+						added.push(...names);
+						pull.labels.push(...names.map((name) => ({ name })));
+					},
+					removeLabel: async ({ name }) => {
+						removed.push(name);
+						pull.labels = pull.labels.filter((label) => label.name !== name);
+					},
+					listEventsForTimeline: async () => undefined,
 				},
 			},
+			paginate: async () => timeline,
+			graphql: async (_query, variables) => {
+				converted.push(variables.id);
+				return {};
+			},
 		};
-		const execute = new AsyncFunction(
+		const executeLabeller = new AsyncFunction(
 			'github',
 			'context',
 			'core',
 			stepScript(labelWorkflow, 'Apply the labels the pull request declares'),
 		);
+		const context = {
+			repo: { owner: 'octanejs', repo: 'octane' },
+			payload: { pull_request: { number: 500 } },
+		};
+		const core = {
+			notice: (message) => notices.push(message),
+			setFailed: (message) => failures.push(message),
+		};
 
-		return execute(
-			github,
-			{ repo: { owner: 'octanejs', repo: 'octane' }, payload: { pull_request: { number: 500 } } },
-			{
-				notice: (message) => notices.push(message),
-				setFailed: (message) => failures.push(message),
-			},
-		).then(() => ({ added, removed, notices, failures }));
+		return executeLabeller(github, context, core)
+			.then(() => {
+				if (!runDraftPolicy) return;
+				const executeDraftPolicy = new AsyncFunction(
+					'github',
+					'context',
+					'core',
+					stepScript(labelWorkflow, 'Convert an agent-authored pull request back to draft'),
+				);
+				return executeDraftPolicy(github, context, core);
+			})
+			.then(() => ({ added, removed, converted, notices, failures }));
 	}
 
 	test('reads the type off a conventional-commit title', async () => {
@@ -339,6 +367,17 @@ describe('Pull request labels', () => {
 		assert.match(notices.join('\n'), /no conventional-commit type/);
 	});
 
+	test('removes a stale type when the pull request title becomes invalid', async () => {
+		const { added, removed, notices } = await runLabeller({
+			title: 'Work in progress',
+			labels: ['feat', 'blocked'],
+		});
+
+		assert.deepEqual(added, []);
+		assert.deepEqual(removed, ['feat']);
+		assert.match(notices.join('\n'), /no conventional-commit type/);
+	});
+
 	test('ignores an unknown type rather than inventing a label', async () => {
 		const { added } = await runLabeller({ title: 'wip(runtime): halfway there' });
 
@@ -348,11 +387,34 @@ describe('Pull request labels', () => {
 	test('applies agent-authored from a ticked box, whoever pushed it', async () => {
 		const { added, failures } = await runLabeller({
 			title: 'feat(zag): add bindings',
-			body: `## Summary\n\nA thing.\n\n${TICKED}\n`,
+			body: `## Summary\n\nA thing.\n\n## Provenance\n\n${TICKED}\n`,
 		});
 
 		assert.deepEqual(added, ['feat', 'agent-authored']);
 		assert.deepEqual(failures, []);
+	});
+
+	test('labels and drafts a ready agent pull request in one workflow run', async () => {
+		const { added, converted, failures } = await runLabeller({
+			title: 'feat(zag): add bindings',
+			body: `## Provenance\n\n${TICKED}\n`,
+			runDraftPolicy: true,
+		});
+
+		assert.deepEqual(added, ['feat', 'agent-authored']);
+		assert.deepEqual(converted, ['PR_node']);
+		assert.deepEqual(failures, []);
+	});
+
+	test('does not redraft an agent pull request after a deliberate ready transition', async () => {
+		const { converted, notices } = await runLabeller({
+			body: `## Provenance\n\n${TICKED}\n`,
+			runDraftPolicy: true,
+			timeline: [{ event: 'ready_for_review' }],
+		});
+
+		assert.deepEqual(converted, []);
+		assert.match(notices.join('\n'), /already marked ready for review/);
 	});
 
 	test('tolerates the checkbox spellings a real body contains', async () => {
@@ -361,7 +423,10 @@ describe('Pull request labels', () => {
 			'* [x] agent-authored',
 			'  - [x]   agent-authored, via Claude Code',
 		]) {
-			const { added } = await runLabeller({ title: 'docs: a thing', body: `Body\n\n${line}\n` });
+			const { added } = await runLabeller({
+				title: 'docs: a thing',
+				body: `## Provenance\n\n${line}\n`,
+			});
 
 			assert.ok(added.includes('agent-authored'), line);
 		}
@@ -375,6 +440,17 @@ describe('Pull request labels', () => {
 
 		assert.deepEqual(added, ['feat']);
 		assert.deepEqual(failures, []);
+	});
+
+	test('does not accept a provenance checkbox outside the provenance section', async () => {
+		const { added, failures } = await runLabeller({
+			title: 'feat: a thing',
+			body: `## Validation\n\n${TICKED}\n`,
+		});
+
+		assert.deepEqual(added, ['feat']);
+		assert.equal(failures.length, 1);
+		assert.match(failures[0], /does not declare provenance/);
 	});
 
 	test('does not read a declaration out of a quoted example', async () => {
@@ -472,7 +548,7 @@ describe('Pull request labels', () => {
 	test('writes nothing when the labels already match the declaration', async () => {
 		const { added, removed, notices } = await runLabeller({
 			title: 'docs: split the README',
-			body: `Body\n\n${TICKED}\n`,
+			body: `## Provenance\n\n${TICKED}\n`,
 			labels: ['docs', 'agent-authored'],
 		});
 
@@ -498,7 +574,16 @@ describe('Pull request labels', () => {
 			labelWorkflow,
 			/on:\n {2}pull_request_target:\n {4}types: \[opened, reopened, edited\]/,
 		);
+		assert.match(labelWorkflow, /^ {6}issues: read$/m);
 		assert.match(labelWorkflow, /^ {6}pull-requests: write$/m);
+		assert.match(
+			labelWorkflow,
+			/- name: Convert an agent-authored pull request back to draft[\s\S]*?if: always\(\)/,
+		);
+		assert.match(
+			labelWorkflow,
+			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
+		);
 		assert.doesNotMatch(labelWorkflow, /actions\/checkout/);
 		assert.doesNotMatch(labelWorkflow, /contents: write/);
 	});

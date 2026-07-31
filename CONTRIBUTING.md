@@ -254,10 +254,12 @@ positive claim that a human wrote the diff.
 
 `.github/workflows/label-pr.yml` reads the box and applies the `agent-authored`
 label for you. It runs with the repository's own token rather than yours, so this
-works identically from a fork and needs nothing from a maintainer. From there,
-`.github/workflows/draft-agent-prs.yml` converts the pull request back to draft
-if it was opened ready, and a maintainer marks it ready for review once it has
-been looked at.
+works identically from a fork and needs nothing from a maintainer. The same
+workflow converts the pull request back to draft if it was opened ready, because
+a label added by the repository token cannot trigger another workflow. The
+separate `draft-agent-prs.yml` workflow remains a fallback for labels applied by
+a maintainer or GitHub App. A maintainer marks the pull request ready for review
+once it has been looked at.
 
 Keep the section in the body you write, because a pull request that omits it
 fails a check. `gh pr create --fill` builds the body from your commits and drops
