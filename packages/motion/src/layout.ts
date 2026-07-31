@@ -66,9 +66,8 @@ export function layoutCellKey(namespace: readonly string[] | undefined, layoutId
 }
 
 // Shared layout snapshots only bridge replacements in the current synchronous
-// commit. Unclaimed snapshots expire at the next microtask, and the hard limit
-// prevents a large deletion from retaining an unbounded number of boxes.
-const MAX_LAYOUT_CELLS = 256;
+// commit. Preserve every handoff in that commit, then expire anything unclaimed
+// at the next microtask so no snapshot survives into a later turn.
 const layoutCells = new Map<string, LayoutBox>();
 let pendingClear: object | null = null;
 
@@ -84,12 +83,6 @@ function scheduleLayoutCellClear(): void {
 }
 
 export function recordLayoutCell(id: string, box: LayoutBox): void {
-	if (layoutCells.has(id)) {
-		layoutCells.delete(id);
-	} else if (layoutCells.size >= MAX_LAYOUT_CELLS) {
-		const oldest = layoutCells.keys().next().value;
-		if (oldest !== undefined) layoutCells.delete(oldest);
-	}
 	layoutCells.set(id, box);
 	scheduleLayoutCellClear();
 }
@@ -101,7 +94,6 @@ export function takeLayoutCell(id: string): LayoutBox | undefined {
 }
 
 export const layoutCellsForTests = {
-	maxSize: MAX_LAYOUT_CELLS,
 	size: (): number => layoutCells.size,
 	reset(): void {
 		layoutCells.clear();

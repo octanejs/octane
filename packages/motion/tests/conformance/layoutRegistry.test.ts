@@ -8,14 +8,17 @@ afterEach(() => {
 });
 
 describe('layoutId snapshot registry', () => {
-	it('keeps the registry bounded during a large synchronous deletion', () => {
-		for (let i = 0; i < layoutCellsForTests.maxSize + 20; i++) {
+	it('keeps every same-commit snapshot available until it is claimed', () => {
+		const count = 300;
+		for (let i = 0; i < count; i++) {
 			recordLayoutCell(`hero-${i}`, box);
 		}
 
-		expect(layoutCellsForTests.size()).toBe(layoutCellsForTests.maxSize);
-		expect(takeLayoutCell('hero-0')).toBeUndefined();
-		expect(takeLayoutCell(`hero-${layoutCellsForTests.maxSize + 19}`)).toEqual(box);
+		expect(layoutCellsForTests.size()).toBe(count);
+		for (let i = 0; i < count; i++) {
+			expect(takeLayoutCell(`hero-${i}`)).toEqual(box);
+		}
+		expect(layoutCellsForTests.size()).toBe(0);
 	});
 
 	it('clears unclaimed snapshots at the next microtask', async () => {
