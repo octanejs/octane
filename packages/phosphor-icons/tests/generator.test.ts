@@ -6,13 +6,15 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const packageRoot = resolve(import.meta.dirname, '..');
+const generatorProcessTimeout = 20_000;
 
-describe('@octanejs/phosphor-icons — generator', () => {
+describe('@octanejs/phosphor-icons — generator', { timeout: 30_000 }, () => {
 	it('is deterministic for the pinned core metadata and assets', () => {
 		expect(
 			execFileSync(process.execPath, ['scripts/generate.mjs', '--check'], {
 				cwd: packageRoot,
 				encoding: 'utf8',
+				timeout: generatorProcessTimeout,
 			}),
 		).toContain('1512 icons');
 	});
@@ -31,6 +33,7 @@ describe('@octanejs/phosphor-icons — generator', () => {
 			const result = spawnSync(process.execPath, ['scripts/generate.mjs', '--check'], {
 				cwd: fixtureRoot,
 				encoding: 'utf8',
+				timeout: generatorProcessTimeout,
 			});
 			expect(result.status).toBe(1);
 			expect(result.stderr).toContain('stale src/icons/camera.ts');

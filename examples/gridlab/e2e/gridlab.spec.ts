@@ -179,6 +179,7 @@ test('copies a native range and pastes a tabular selection without losing cell f
 	await page.keyboard.press('ArrowRight');
 	await expect(cell(page, 'C5')).toBeFocused();
 	await expect(page.getByRole('textbox', { name: 'Cell address' })).toHaveValue('C5');
+	await expect(page.getByTestId('sync-status')).toHaveText('All changes saved');
 
 	await jumpTo(page, 'A1');
 	await page.keyboard.press('Enter');

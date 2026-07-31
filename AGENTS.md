@@ -120,6 +120,7 @@ pragma. Use `OctaneNode` for renderables, never `React.ReactNode`.
 ```bash
 pnpm test          # full Vitest run
 pnpm typecheck
+pnpm typecheck:files [path...]     # defaults to staged and unstaged files
 pnpm sync
 pnpm format:files [path...]        # defaults to staged and unstaged files
 pnpm format:files:check [path...]  # defaults to staged and unstaged files
@@ -128,9 +129,9 @@ pnpm format:check                  # optional repo-wide gate
 
 Before any push, run `pnpm sync` and commit its generated changes.
 
-Scoped Prettier commands default to staged and unstaged Git diffs; explicit
-paths override that default. `format:files` writes and `format:files:check` is
-read-only. Use repo-wide `format:check` only when needed.
+Scoped typecheck and Prettier commands default to staged and unstaged Git diffs;
+explicit files or directories override that default. `format:files` writes and
+`format:files:check` is read-only. Use repo-wide checks only when needed.
 
 `pnpm test` runs package prechecks, then one root Vitest invocation for every
 project in `vitest.config.js`; it does not fan out through package `test`
