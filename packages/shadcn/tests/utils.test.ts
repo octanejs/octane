@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cn } from '@octanejs/shadcn';
+import { cn } from '@octanejs/shadcn/cn';
 
 describe('@octanejs/shadcn — cn()', () => {
 	it('composes clsx-style inputs (strings, arrays, objects, falsy dropout)', () => {

@@ -14,6 +14,13 @@
 /* Tailwind v4 doesn't scan .tsrx by default — include the app sources. */
 @source '../**/*.tsrx';
 
+/* The Radix tab renders registry-INSTALLED components under src/components/ui,
+ * which the glob above already covers. The other bases are imported straight
+ * from @octanejs/shadcn's per-family subpaths, so their sources live outside
+ * this app and Tailwind would emit no rules for any class they alone use —
+ * the components render, unstyled. */
+@source '../../../../packages/shadcn/src/bases/**/*.tsrx';
+
 @custom-variant dark (&:is(.dark *));
 
 /* Upstream's Tailwind v4 base layer (pinned apps/v4/app/globals.css): v4's

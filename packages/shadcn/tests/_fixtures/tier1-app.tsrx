@@ -1,11 +1,8 @@
 // Tier-1 fixtures: one small composition per component family, exercising the
 // representative props the contract tests assert on.
 import { createElement } from 'octane';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/Alert';
 import {
-	Alert,
-	AlertAction,
-	AlertDescription,
-	AlertTitle,
 	Breadcrumb,
 	BreadcrumbEllipsis,
 	BreadcrumbItem,
@@ -13,7 +10,9 @@ import {
 	BreadcrumbList,
 	BreadcrumbPage,
 	BreadcrumbSeparator,
-	Button,
+} from '@octanejs/shadcn/Breadcrumb';
+import { Button } from '@octanejs/shadcn/Button';
+import {
 	Card,
 	CardAction,
 	CardContent,
@@ -21,24 +20,28 @@ import {
 	CardFooter,
 	CardHeader,
 	CardTitle,
+} from '@octanejs/shadcn/Card';
+import {
 	Empty,
 	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-	Input,
+} from '@octanejs/shadcn/Empty';
+import { Input } from '@octanejs/shadcn/Input';
+import {
 	Item,
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
 	ItemSeparator,
 	ItemTitle,
-	Kbd,
-	KbdGroup,
-	Label,
-	NativeSelect,
-	NativeSelectOption,
+} from '@octanejs/shadcn/Item';
+import { Kbd, KbdGroup } from '@octanejs/shadcn/Kbd';
+import { Label } from '@octanejs/shadcn/Label';
+import { NativeSelect, NativeSelectOption } from '@octanejs/shadcn/NativeSelect';
+import {
 	Pagination,
 	PaginationContent,
 	PaginationEllipsis,
@@ -46,9 +49,11 @@ import {
 	PaginationLink,
 	PaginationNext,
 	PaginationPrevious,
-	Separator,
-	Skeleton,
-	Spinner,
+} from '@octanejs/shadcn/Pagination';
+import { Separator } from '@octanejs/shadcn/Separator';
+import { Skeleton } from '@octanejs/shadcn/Skeleton';
+import { Spinner } from '@octanejs/shadcn/Spinner';
+import {
 	Table,
 	TableBody,
 	TableCaption,
@@ -56,8 +61,8 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-	Textarea,
-} from '@octanejs/shadcn';
+} from '@octanejs/shadcn/Table';
+import { Textarea } from '@octanejs/shadcn/Textarea';
 
 export function AlertFixture() @{
 	<Alert variant="destructive">

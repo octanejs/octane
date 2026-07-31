@@ -5035,6 +5035,9 @@ importers:
 
   packages/shadcn:
     dependencies:
+      '@octanejs/aria':
+        specifier: workspace:*
+        version: link:../aria
       '@octanejs/lucide':
         specifier: workspace:*
         version: link:../lucide
@@ -6162,6 +6165,9 @@ importers:
 
   playground/octane:
     dependencies:
+      '@octanejs/aria':
+        specifier: workspace:*
+        version: link:../../packages/aria
       '@octanejs/cmdk':
         specifier: workspace:*
         version: link:../../packages/cmdk
@@ -6189,6 +6195,9 @@ importers:
       '@octanejs/rxjs':
         specifier: workspace:*
         version: link:../../packages/rxjs
+      '@octanejs/shadcn':
+        specifier: workspace:*
+        version: link:../../packages/shadcn
       '@octanejs/sonner':
         specifier: workspace:*
         version: link:../../packages/sonner

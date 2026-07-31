@@ -70,8 +70,14 @@ Targeted alternatives are acceptable for small changes, but PR body must say wha
 
 ## Create PR with GitHub CLI
 
+Immediately before committing and pushing, synchronize the repository and
+review the resulting diff. Include every relevant generated change in the
+commit:
+
 ```bash
 git checkout -b <branch>
+pnpm sync
+git status --short
 git add <files>
 git commit -m "<type>: <summary>"
 git push -u origin <branch>
