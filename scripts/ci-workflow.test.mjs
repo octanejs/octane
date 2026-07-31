@@ -11,6 +11,7 @@ const draftWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/draft-agent-prs.yml'),
 	'utf8',
 );
+const labelWorkflow = readFileSync(path.join(REPO, '.github/workflows/label-pr.yml'), 'utf8');
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function jobSource(job) {
@@ -248,5 +249,210 @@ describe('Agent pull request draft policy', () => {
 			draftWorkflow,
 			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
 		);
+	});
+});
+
+describe('Pull request labels', () => {
+	const TICKED = '- [x] An agent produced this diff (`agent-authored`)';
+	const EMPTY = '- [ ] An agent produced this diff (`agent-authored`)';
+
+	function runLabeller({
+		title = 'chore: a thing',
+		body = `## Provenance\n\n${EMPTY}\n`,
+		labels = [],
+		state = 'open',
+		user = { type: 'User' },
+	}) {
+		const added = [];
+		const removed = [];
+		const notices = [];
+		const failures = [];
+		const github = {
+			rest: {
+				pulls: {
+					get: async () => ({
+						data: {
+							number: 500,
+							state,
+							title,
+							body,
+							user,
+							labels: labels.map((name) => ({ name })),
+						},
+					}),
+				},
+				issues: {
+					addLabels: async ({ labels: names }) => added.push(...names),
+					removeLabel: async ({ name }) => removed.push(name),
+				},
+			},
+		};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			stepScript(labelWorkflow, 'Apply the labels the pull request declares'),
+		);
+
+		return execute(
+			github,
+			{ repo: { owner: 'octanejs', repo: 'octane' }, payload: { pull_request: { number: 500 } } },
+			{
+				notice: (message) => notices.push(message),
+				setFailed: (message) => failures.push(message),
+			},
+		).then(() => ({ added, removed, notices, failures }));
+	}
+
+	test('reads the type off a conventional-commit title', async () => {
+		for (const [title, type] of [
+			['feat(lynx): add a thing', 'feat'],
+			['fix: repair a thing', 'fix'],
+			['perf!: drop a slow path', 'perf'],
+			['ci(workflows): only run when needed', 'ci'],
+		]) {
+			const { added, removed, failures } = await runLabeller({ title });
+
+			assert.deepEqual(added, [type], title);
+			assert.deepEqual(removed, []);
+			assert.deepEqual(failures, []);
+		}
+	});
+
+	test('moves the type label when a pull request is retitled', async () => {
+		const { added, removed } = await runLabeller({
+			title: 'fix(compiler): render the non-JSX arm',
+			labels: ['feat', 'blocked'],
+		});
+
+		assert.deepEqual(added, ['fix']);
+		// Only the superseded type goes. Everything else on the pull request is
+		// somebody's deliberate act.
+		assert.deepEqual(removed, ['feat']);
+	});
+
+	test('leaves the type alone when the title names no type', async () => {
+		const { added, removed, notices } = await runLabeller({ title: 'Format' });
+
+		assert.deepEqual(added, []);
+		assert.deepEqual(removed, []);
+		assert.match(notices.join('\n'), /no conventional-commit type/);
+	});
+
+	test('ignores an unknown type rather than inventing a label', async () => {
+		const { added } = await runLabeller({ title: 'wip(runtime): halfway there' });
+
+		assert.deepEqual(added, []);
+	});
+
+	test('applies agent-authored from a ticked box, whoever pushed it', async () => {
+		const { added, failures } = await runLabeller({
+			title: 'feat(zag): add bindings',
+			body: `## Summary\n\nA thing.\n\n${TICKED}\n`,
+		});
+
+		assert.deepEqual(added, ['feat', 'agent-authored']);
+		assert.deepEqual(failures, []);
+	});
+
+	test('tolerates the checkbox spellings a real body contains', async () => {
+		for (const line of [
+			'- [X] An agent produced this diff (`agent-authored`)',
+			'* [x] agent-authored',
+			'  - [x]   agent-authored, via Claude Code',
+		]) {
+			const { added } = await runLabeller({ title: 'docs: a thing', body: `Body\n\n${line}\n` });
+
+			assert.ok(added.includes('agent-authored'), line);
+		}
+	});
+
+	test('retracts the label when the box is unticked', async () => {
+		const { added, removed } = await runLabeller({
+			title: 'docs: a thing',
+			labels: ['docs', 'agent-authored'],
+		});
+
+		assert.deepEqual(added, []);
+		assert.deepEqual(removed, ['agent-authored']);
+	});
+
+	test('fails a body that skipped the template entirely', async () => {
+		const { failures } = await runLabeller({
+			title: 'feat: a thing',
+			body: 'Body written by `gh pr create --fill`.',
+		});
+
+		assert.equal(failures.length, 1);
+		assert.match(failures[0], /does not declare provenance/);
+		assert.match(failures[0], /Editing the body re-runs this check/);
+	});
+
+	test('labels the pull request before failing on a missing declaration', async () => {
+		// A red check must leave nothing to redo but the body itself.
+		const { added, failures } = await runLabeller({
+			title: 'feat: a thing',
+			body: 'No template here.',
+		});
+
+		assert.deepEqual(added, ['feat']);
+		assert.equal(failures.length, 1);
+	});
+
+	test('treats a missing declaration as silence, not a denial', async () => {
+		// `gh pr create --fill` drops the template, so stripping the label here
+		// would undo a maintainer while the check is already telling them to fix it.
+		const { added, removed } = await runLabeller({
+			title: 'docs: a thing',
+			body: 'No template here.',
+			labels: ['docs', 'agent-authored'],
+		});
+
+		assert.deepEqual(added, []);
+		assert.deepEqual(removed, []);
+	});
+
+	test('never asks a generated pull request to declare anything', async () => {
+		const { failures } = await runLabeller({
+			title: 'Version Packages',
+			body: 'Generated by Changesets.',
+			user: { type: 'Bot' },
+		});
+
+		assert.deepEqual(failures, []);
+	});
+
+	test('writes nothing when the labels already match the declaration', async () => {
+		const { added, removed, notices } = await runLabeller({
+			title: 'docs: split the README',
+			body: `Body\n\n${TICKED}\n`,
+			labels: ['docs', 'agent-authored'],
+		});
+
+		assert.deepEqual(added, []);
+		assert.deepEqual(removed, []);
+		assert.deepEqual(notices, []);
+	});
+
+	test('does nothing once the pull request has closed', async () => {
+		const { added, removed, failures } = await runLabeller({
+			title: 'feat: a thing',
+			body: 'No template here.',
+			state: 'closed',
+		});
+
+		assert.deepEqual(added, []);
+		assert.deepEqual(removed, []);
+		assert.deepEqual(failures, []);
+	});
+
+	test('runs with a writable token without checking out pull request code', () => {
+		assert.match(
+			labelWorkflow,
+			/on:\n {2}pull_request_target:\n {4}types: \[opened, reopened, edited\]/,
+		);
+		assert.match(labelWorkflow, /^ {6}pull-requests: write$/m);
+		assert.doesNotMatch(labelWorkflow, /actions\/checkout/);
+		assert.doesNotMatch(labelWorkflow, /contents: write/);
 	});
 });
