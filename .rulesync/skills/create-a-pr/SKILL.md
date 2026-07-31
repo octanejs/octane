@@ -84,8 +84,8 @@ gh pr create --draft --body-file <file>
 ```
 
 Write the body to a temp file and pass it explicitly. Do not use `--fill`: it
-builds the body from your commits and drops the template, taking the provenance
-section with it.
+builds the body from your commits and drops the template, which would falsely
+classify an agent-produced diff as human-authored.
 
 Apply no labels, and never pass `--label`. Your token has no rights to label at
 all when the PR comes from a fork, and `.github/workflows/label-pr.yml` applies
@@ -114,19 +114,16 @@ you write, and tick the box, because an agent produced the diff:
 - [x] An agent produced this diff (`agent-authored`)
 ```
 
-Leaving the box clear is a positive claim that a human wrote the diff, so it is
-never the safe thing to do when unsure. An agent commits under a human's
-credentials, which is why nothing else in the PR can tell the two apart.
+Leaving the box clear or omitting the section is a positive claim that a human
+wrote the diff, so neither is safe when an agent produced it. An agent commits
+under a human's credentials, which is why nothing else in the PR can tell the
+two apart.
 
-`.github/workflows/label-pr.yml` reads the box and applies `agent-authored`. It
-runs as a bot with the repository's own token, so this works identically from a
-fork and needs nothing from a maintainer.
-
-Omitting the section **fails the check**, which is why `--fill` is not an option.
-It still labels the PR first, so the only thing left to fix is the body, and
-editing the body re-runs the check. A missing section never clears an existing
-label, because silence is not a denial, but do not lean on that: state the fact.
-Only generated bot pull requests are exempt.
+`.github/workflows/label-pr.yml` applies `agent-authored` only for a checked box.
+An empty box or missing section is human-authored, removes a stale agent label,
+and leaves the label check successful. The workflow runs as a bot with the
+repository's own token, so this works identically from a fork and needs nothing
+from a maintainer.
 
 ## Labels
 
