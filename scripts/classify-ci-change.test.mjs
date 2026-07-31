@@ -80,14 +80,22 @@ describe('classifyCiChange', () => {
 		);
 	});
 
-	test('keeps formatter helper paths and script rewrites on the lightweight path', () => {
+	test('keeps scoped developer helper paths and script rewrites on the lightweight path', () => {
 		const after = structuredClone(rootPackage);
 		after.scripts['format:check'] = 'node scripts/format-files.mjs --check --';
 		after.scripts['format:files'] = 'node scripts/format-files.mjs --write --';
+		after.scripts['typecheck:files'] = 'node scripts/typecheck-files.mjs --';
 
 		assert.equal(
 			classify(
-				['package.json', 'scripts/format-files.mjs', 'scripts/format-files.test.mjs'],
+				[
+					'package.json',
+					'scripts/file-selection.mjs',
+					'scripts/format-files.mjs',
+					'scripts/format-files.test.mjs',
+					'scripts/typecheck-files.mjs',
+					'scripts/typecheck-files.test.mjs',
+				],
 				rootPackage,
 				after,
 			),

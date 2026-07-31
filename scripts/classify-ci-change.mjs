@@ -16,7 +16,7 @@ const LIGHTWEIGHT_PATHS = [
 	/^\.rulesync\//,
 	/^\.vscode\//,
 	/^\.github\//,
-	/^scripts\/(?:classify-ci-change(?:\.test)?|ci-workflow\.test|format-files(?:\.test)?)\.mjs$/,
+	/^scripts\/(?:classify-ci-change(?:\.test)?|ci-workflow\.test|file-selection|format-files(?:\.test)?|typecheck-files(?:\.test)?)\.mjs$/,
 	/^(?:AGENTS|CLAUDE|GEMINI)\.md$/,
 	/^(?:CODE_OF_CONDUCT|CONTRIBUTING|LICENSE|README|SECURITY)(?:\.md)?$/,
 ];
@@ -46,6 +46,7 @@ function rootPackageChangeIsLightweight(before, after) {
 		// because changing one may alter a product CI entry point.
 		if (script === 'ci:workflow:test') continue;
 		if (script === 'format' || script.startsWith('format:')) continue;
+		if (script === 'typecheck:files') continue;
 		return false;
 	}
 
