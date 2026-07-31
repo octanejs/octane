@@ -78,16 +78,16 @@ git status --short
 git add <files>
 git commit -m "<type>: <summary>"
 git push -u origin <branch>
-gh pr create --draft --fill
-gh pr edit <number> --add-label <type> --add-label agent-authored
+gh pr create --draft --body-file <file>
 ```
 
-If using `gh pr create --body-file`, write the PR body to a temp file and pass it explicitly.
+Write the body to a temp file and pass it explicitly. Do not use `--fill`: it
+builds the body from your commits and drops the template, taking the provenance
+section with it.
 
-Label after the PR exists rather than with `gh pr create --label`, so a rejected
-label cannot cost you the PR. An outside contributor's token has no rights to
-label at all; when the edit fails, leave the PR open and name the intended labels
-in the final response.
+Apply no labels, and never pass `--label`. Your token has no rights to label at
+all when the PR comes from a fork, and `.github/workflows/label-pr.yml` applies
+both labels as a bot, which does.
 
 ## Leave the PR as a draft
 
@@ -101,30 +101,41 @@ every job while the pull request is a draft and starts on the
 including drafts, outside Actions, so people can watch and respond to its issue
 comments before making a draft ready. Vercel may also report separately.
 
-`.github/workflows/draft-agent-prs.yml` converts an `agent-authored` PR that was
-opened outside draft back into a draft, so a forgotten `--draft` costs a round
-trip instead of passing unnoticed. It leaves the PR alone once anyone has marked
-it ready for review, so it never undoes `gh pr ready`.
+## Declare provenance in the PR body
+
+Keep the provenance section from `.github/pull_request_template.md` in the body
+you write, and tick the box, because an agent produced the diff:
+
+```md
+## Provenance
+
+- [x] An agent produced this diff (`agent-authored`)
+```
+
+Leaving the box clear is a positive claim that a human wrote the diff, so it is
+never the safe thing to do when unsure. An agent commits under a human's
+credentials, which is why nothing else in the PR can tell the two apart.
+
+`.github/workflows/label-pr.yml` reads the box and applies `agent-authored`. It
+runs as a bot with the repository's own token, so this works identically from a
+fork and needs nothing from a maintainer.
+
+Omitting the section **fails the check**, which is why `--fill` is not an option.
+It still labels the PR first, so the only thing left to fix is the body, and
+editing the body re-runs the check. A missing section never clears an existing
+label, because silence is not a denial, but do not lean on that: state the fact.
+Only generated bot pull requests are exempt.
 
 ## Labels
 
-Every PR carries exactly one type label. Every PR whose diff an agent produced
-also carries `agent-authored`.
-
-- Type: the conventional-commit type already in the PR title, one of `feat`,
-  `fix`, `docs`, `test`, `perf`, `refactor`, `chore`, `ci`. A `feat(lynx): …`
-  title takes `feat`. Never apply two.
-- `agent-authored`: apply whenever an agent wrote the change, no matter which
-  account pushes it. The author field cannot show this, because an agent commits
-  under the human's credentials, so the label is the only signal that separates
-  human PRs from agent PRs. Absence of the label asserts a human wrote the diff:
-  never drop it to make a PR read as hand-written. Humans add nothing, and
-  `-label:agent-authored` is the human-authored filter.
-- `bug` and `enhancement` belong to issues. Do not put them on a PR.
-- Do not invent labels. `gh label list` is the full set; adding a type means
-  creating the label in the repo first.
+Do not apply labels. Both are applied by the bot above: the type label (`feat`,
+`fix`, `docs`, `test`, `perf`, `refactor`, `chore`, `ci`) from the PR title, and
+`agent-authored` from the box. Retitling moves the type label, and a title the
+regex cannot read leaves the PR unlabelled, which is the signal to fix the title.
+`bug` and `enhancement` belong to issues.
 
 ## Final response
 
-Return PR URL, branch, commit summary, labels applied, and validation evidence.
+Return PR URL, branch, commit summary, provenance declared, and validation
+evidence.
 The PR stays a draft.

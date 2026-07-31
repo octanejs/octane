@@ -227,8 +227,10 @@ Octane is 0.x, so every changeset stays on the `patch` track. `major` and
 - The pull request body should say what changed, why, and what you ran to
   validate it. Call out anything you deliberately left unverified.
 - Every pull request carries exactly one type label: `feat`, `fix`, `docs`,
-  `test`, `perf`, `refactor`, `chore`, or `ci`, matching the title. `bug` and
-  `enhancement` belong to issues.
+  `test`, `perf`, `refactor`, `chore`, or `ci`. You do not apply it;
+  `.github/workflows/label-pr.yml` reads it off the title, so a
+  conventional-commit title is all it takes. `bug` and `enhancement` belong to
+  issues.
 
 CI intentionally runs nothing while a pull request is a draft and starts on the
 `ready_for_review` event. From there it runs the sharded test suite on Node 22 and
@@ -238,13 +240,32 @@ suite. Documentation-only changes take a lighter path.
 
 ## AI-assisted contributions
 
-Agent-written changes are welcome, with one rule: label the pull request
-`agent-authored` whenever an agent produced the diff, no matter which account
-pushes it. An agent commits under a human's credentials, so the author field
-cannot show it and the label is the only signal that separates the two.
-`.github/workflows/draft-agent-prs.yml` converts an `agent-authored` pull request
-back to draft if it was opened ready, and a maintainer marks it ready for review
+Agent-written changes are welcome, with one rule: tick the provenance box in the
+pull request template whenever an agent produced the diff, no matter which
+account pushes it.
+
+```md
+- [x] An agent produced this diff (`agent-authored`)
+```
+
+An agent commits under a human's credentials, so the author field cannot show
+this and the box is the only signal that separates the two. Leaving it clear is a
+positive claim that a human wrote the diff.
+
+`.github/workflows/label-pr.yml` reads the box and applies the `agent-authored`
+label for you. It runs with the repository's own token rather than yours, so this
+works identically from a fork and needs nothing from a maintainer. The same
+workflow converts the pull request back to draft if it was opened ready, because
+a label added by the repository token cannot trigger another workflow. The
+separate `draft-agent-prs.yml` workflow remains a fallback for labels applied by
+a maintainer or GitHub App. A maintainer marks the pull request ready for review
 once it has been looked at.
+
+Keep the section in the body you write, because a pull request that omits it
+fails a check. `gh pr create --fill` builds the body from your commits and drops
+the template, so use `--body-file` instead. Labels are applied before that check
+fails, so the only thing left to fix is the body, and editing it re-runs the
+check. Generated bot pull requests are exempt.
 
 The repository ships its own agent context: `AGENTS.md` (and its per-tool
 siblings) plus task skills for branching, issues, bug hunting, core changes,
