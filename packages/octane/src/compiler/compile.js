@@ -3944,17 +3944,33 @@ function containsAutoMemoUnsafeStructure(stmts) {
  * otherwise rebuilds the whole dataset on every unrelated render, and the user
  * never sees a call they can attribute to the click that did not happen.
  *
- * The whitelist is deliberately narrower than "pure", because a fresh identity
- * per evaluation also defeats the runtime arg diff the bundle exists for — an
- * `ArrayExpression`/`ObjectExpression`/arrow arg can never compare equal, so it
- * would pay a per-render allocation to skip nothing. Regex is rejected for the
- * same reason `isInvariantLiteral` rejects it. Anything outside the whitelist
- * keeps the ordinary closure handler, which evaluates the body exactly when the
- * event fires.
+ * The whitelist is deliberately narrower than "pure", for two reasons.
  *
- * Member paths stay in: `() => select(row.id)` is the shape the bundle was
- * built for, and hoisting a property read is the cost the optimisation trades
- * against a per-render closure.
+ * A fresh identity per evaluation defeats the runtime arg diff the bundle
+ * exists for — an `ArrayExpression`/`ObjectExpression`/arrow arg can never
+ * compare equal, so it would pay a per-render allocation to skip nothing.
+ * Regex is rejected for the same reason `isInvariantLiteral` rejects it.
+ *
+ * The line is drawn at VALUE STABILITY, not at "provably pure". An accepted
+ * expression must yield at render time what it would have yielded at click
+ * time, and must not do unbounded or author-visible work to get there. A
+ * property read can reach a getter and `a + b` can reach `valueOf` — but that
+ * is the standing premise of the optimization, not a new risk: `select(row.id)`
+ * is the shape it was built for, and refusing property reads would leave it
+ * with nothing to optimize. Refusing arithmetic while accepting `row.id` would
+ * draw the same line in two places, so both stay.
+ *
+ * What cannot stay are the expressions that break value stability outright:
+ * a CALL does unbounded work and can be observed happening (`makeData(1000)`
+ * rebuilt a whole dataset per render), a fresh array/object/regex allocates an
+ * identity that can never compare equal, and an assignment or `++` mutates.
+ *
+ * `.current` is rejected because a ref genuinely returns the WRONG VALUE here,
+ * not merely an early one: `queueRefAttach` runs AFTER the mount that reads it,
+ * so a hoisted `ref.current` hands the first click the `null` it held before
+ * the ref was attached. Computed members fail closed for the same reason —
+ * `ref[key]` can spell `current` without saying so, and
+ * `isAutoMemoCalculationDependency` already refuses every computed key.
  */
 function isDeferralSafeBundleArg(node) {
 	const value = unwrapTsExpr(node);
@@ -3967,15 +3983,16 @@ function isDeferralSafeBundleArg(node) {
 		case 'ChainExpression':
 			return isDeferralSafeBundleArg(value.expression);
 		case 'MemberExpression':
-			return (
-				isDeferralSafeBundleArg(value.object) &&
-				(!value.computed || isDeferralSafeBundleArg(value.property))
-			);
+			// Computed keys fail closed: the key is only known at runtime, so
+			// `ref[k]` can reach `.current` without naming it.
+			if (value.computed) return false;
+			if (value.property?.name === 'current') return false;
+			return isDeferralSafeBundleArg(value.object);
 		case 'TemplateLiteral':
 			// A fresh string still compares by VALUE, so the arg diff works.
 			return (value.expressions || []).every(isDeferralSafeBundleArg);
 		case 'UnaryExpression':
-			// `delete` mutates; the rest are pure reads of their operand.
+			// `delete` mutates; the rest only read their operand.
 			return value.operator !== 'delete' && isDeferralSafeBundleArg(value.argument);
 		case 'BinaryExpression':
 		case 'LogicalExpression':
@@ -6129,6 +6146,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		nextHookMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
+		currentBodyIsComponentScope: false, // planning the component body itself, not a nested arm
 		currentProfileComponentId: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
@@ -10519,6 +10537,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	}
 	ctx.currentInvariantLocals = invariantLocals;
 	ctx.currentEventInvariantLocals = eventInvariantLocals;
+	// Same gate `findMountEventCallbackSinks` uses: the lifetime proof below is
+	// defined relative to the COMPONENT's scope, so it is only sound while
+	// planning that scope's own JSX.
+	const prevBodyIsComponentScope = ctx.currentBodyIsComponentScope;
+	ctx.currentBodyIsComponentScope = options?.autoCallback === true;
 	// M3 inherit-range: only a real `@{ … }` (JSXCodeBlock) component body spans
 	// its block's whole range — synthetic sub-bodies (@if/@for/@try arms,
 	// children render-fns) pass statement arrays and stay unflagged. planJsx
@@ -10552,6 +10575,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
+	ctx.currentBodyIsComponentScope = prevBodyIsComponentScope;
 	ctx._inheritBody = prevInheritBody;
 	ctx._fnOrigin = prevFnOrigin;
 	ctx._foldedDirectiveCalls = prevFDC;
@@ -11121,6 +11145,49 @@ function isEventHandlerInvariantExpr(node, ctx) {
 			value.type === 'Identifier' &&
 			ctx.currentEventInvariantLocals?.has(value.name) === true)
 	);
+}
+
+/**
+ * An inline `onClick={() => …}` arrow is rebuilt and reassigned to its DOM slot
+ * on every render. When nothing the arrow reads can change, that write is dead
+ * work: the handler can be installed once at mount and left alone, which is
+ * already what a NAMED handler gets through `findMountEventCallbackSinks`.
+ * Recognising the inline form closes the gap between the two spellings.
+ *
+ * "Nothing it reads can change" means every free identifier is either proven
+ * event-invariant for this component (a useState setter, a ref object, a
+ * useEffectEvent wrapper, …) or is not a component local at all — module scope,
+ * an import, or a global, each fixed for the module's lifetime. That second
+ * clause is the same inference `isArrowStableOver` makes.
+ *
+ * Sound only while planning the component body's own JSX.
+ * `collectComponentLocals` deliberately ignores nested blocks, so inside a
+ * `@for` item body the loop variable is absent from the set and would read as
+ * module scope — and a keyed survivor can be handed a different item without
+ * remounting, which would freeze the first item's capture in the slot forever.
+ */
+function isMountStableInlineHandler(node, ctx) {
+	if (ctx.hmr || ctx.profile || !ctx.currentBodyIsComponentScope) return false;
+	const value = unwrapTsExpr(node);
+	// A FunctionExpression is reachable through its own binding name and carries
+	// its own `this`/`arguments`; only the arrow form is a pure lexical capture.
+	if (value?.type !== 'ArrowFunctionExpression') return false;
+	const locals = ctx.currentComponentLocals;
+	if (!locals) return false;
+	const paramScope = new Set();
+	for (const p of value.params || []) collectBindings(p, paramScope);
+	// Params are walked alongside the body: their names are already bound in
+	// `paramScope`, but a default (`(e, x = n) => …`) is an ordinary expression
+	// that runs per call and can reach a changing local.
+	for (const name of collectFreeIdentifiers([value.body, ...(value.params || [])], paramScope)) {
+		// `arguments` is the render call's own, and a DIRECT `eval` resolves
+		// component locals this walk cannot see — either would tie the installed
+		// closure to whatever the first render happened to hold.
+		if (name === 'arguments' || name === 'eval') return false;
+		if (!locals.has(name)) continue;
+		if (ctx.currentEventInvariantLocals?.has(name) !== true) return false;
+	}
+	return true;
 }
 
 // Object/array/function literals allocate a new identity on every evaluation,
@@ -19546,7 +19613,8 @@ function emitElementHtml(
 					slotKey,
 					ns: hostNs,
 					dev: ctx.dev,
-					mountOnly: isEventHandlerInvariantExpr(inner, ctx),
+					mountOnly:
+						isEventHandlerInvariantExpr(inner, ctx) || isMountStableInlineHandler(inner, ctx),
 				});
 			}
 		} else if (attrName === 'class') {
