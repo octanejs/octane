@@ -13,150 +13,96 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
-Octane is a fast, JavaScript UI framework — the successor to
-[Inferno](https://github.com/infernojs/inferno), the React-like library built to
-stay close to the speed of hand-written DOM code. Octane keeps that goal and
-modernizes everything around it: you write with the React API you already know,
-but a compiler removes the virtual DOM, Suspense waterfalls, rules-of-hooks
-bookkeeping, and hand-maintained dependency arrays before your app ships.
-
-If you know React, you already know Octane. `useState`, `useEffect`, `memo`,
-context, portals, Suspense, transitions — same API, same mental model, checked
-the boring way against a large behavioral test suite. React-derived coverage is
-tracked case-by-case in the generated
-[React parity coverage report](./docs/react-parity-coverage.md), rather than
-inferred from the size of the whole suite. Your React knowledge just works.
-
-Speed was never going to be enough on its own, though. The reason to reach for
-Octane is the day-to-day feel:
-
-- **Write the JSX you already write.** Standard `.tsx`/`.jsx` runs out of the
-  box — paste a component from the React docs and it works, hooks and all.
-- **Or opt into `.tsrx` for more.** TSRX is the spiritual successor to JSX: the
-  same mental model, plus template directives (`@if`, `@for`, `@switch`, `@try`)
-  that compile to keyed fast paths, and an `@{ … }` shorthand that lets setup sit
-  right next to the output. Mix both dialects in one app and import freely across
-  the boundary — you choose per component.
-- **Write the closure, not its dependency list.** Omit the array from
-  `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
-  or `useImperativeHandle` and the compiler derives it from lexical captures,
-  including knowledge of stable setters, dispatchers, refs, state getters, and
-  effect events. It is the no-bookkeeping dependency DX associated with signal
-  frameworks, while keeping the hooks model you already know. Explicit arrays
-  remain authoritative; pass `null` when you intentionally want every render.
-  Built-in hook calls retain this inference inside custom hooks, including
-  compiler-processed plain `.ts`/`.js` modules. A separate, narrower rule also
-  infers omitted dependency arguments at calls to locally declared custom
-  wrappers in fully compiled `.tsrx`/`.tsx` modules when they transparently
-  forward a callback and final dependency parameter to one of these hooks.
-- **No rules of hooks.** Hooks are tracked by call site, not call order, so a
-  hook can live inside an `if` or after an early return — the usual React
-  footguns simply aren't there. The one rule that remains is enforced for you:
-  a hook in a plain JS loop is a compile error (every iteration would share one
-  call-site slot) — loop with the keyed `@for` directive instead, where each
-  item gets its own hook state.
-- **The platform, not a reimplementation of it.** Real delegated DOM events,
-  controlled form components on native events (React's `value`/`checked`
-  semantics — `onInput` per edit, native `onChange` on commit), and
-  refs-as-props (`ref={cb}`, `ref={obj}`, even `ref={[a, b]}`) — no synthetic
-  layer second-guessing the browser.
-- **No virtual DOM.** Components re-render like React, but a compiled render path
-  and a LIS-based keyed reconciler keep the runtime overhead minimal.
+Octane is a fast JavaScript UI framework, and the successor to
+[Inferno](https://github.com/infernojs/inferno). You write components with the
+React API you already know, and a compiler turns them into direct DOM code before
+they ship. No virtual DOM, no rules-of-hooks bookkeeping, and no dependency
+arrays to maintain by hand.
 
 Created by [Dominic Gannaway](https://github.com/trueadm), who also created
 Inferno and has worked on React, Lexical, Ripple, and Svelte.
 
-## Status
+```jsx
+import { useState } from 'octane';
 
-Octane is currently in alpha development.
+export function Counter() @{
+	const [count, setCount] = useState(0);
 
-The core suite contains **3,900+ distinct behavioral tests** across conformance,
-differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
-project reruns the normal suite against the production compiler path, so those
-executions are valuable mode coverage but are not counted again as unique tests.
-This is an Octane suite count, not a claim that every test was ported from React;
-the exact pinned snapshot and source-attributed React counts come from the
-[coverage ledger and report](./docs/react-parity-coverage.md).
+	<button onClick={() => setCount(count + 1)}>
+		{'Count: ' + count}
+	</button>
+}
+```
 
-## At a glance
+## Why Octane
 
-- **The full React hook API** — `useState`, `useEffect`, `useMemo`, `useRef`,
-  `useId`, `useTransition`, `useDeferredValue`, `use`, and the rest — with the
-  same effect ordering and Suspense semantics, plus compiler-inferred dependency
-  lists when you omit them. In production builds, `useMemo`/`useCallback`
-  compile to inline caches: a dependency hit allocates nothing — no factory
-  closure, no deps array.
-- **Editable state that follows its source** — `useLinkedState` resets or
-  adjusts local state as soon as an input changes, without an effect or a
-  state update during render.
-- **Promises in render are safe** — no `cache()` wrapper: creations feeding
-  `use()` are memoized at their declarations, including local `.then` chains
-  (`const p = fetchUser(id); const t = p.then(…); use(t)`). Independent
-  requests start together, one suspension per stratum, and descendant fetch
-  trees prefetch while an ancestor is still suspended.
-- **Fully async** — transitions, deferred values, and `<Activity>`.
-- **Streaming SSR and byte-stable hydration** — out-of-order Suspense flushing
-  over Node or web streams, or buffered/static rendering when you want it.
-- **Errors handled two ways** — the `<ErrorBoundary>` component, or `@try` /
-  `@catch` in TSRX.
-- **`class` / `className` composes clsx-style** everywhere — strings, arrays,
+**Your React knowledge transfers.** `useState`, `useEffect`, `memo`, context,
+portals, Suspense, transitions: same API, same mental model, checked case by case
+against a large behavioral suite. React-derived coverage is tracked in the
+generated [parity report](./docs/react-parity-coverage.md) rather than inferred
+from the size of the suite.
+
+**Standard JSX works, `.tsrx` gives you more.** Paste a component from the React
+docs into a `.tsx` file and it runs. Or author in `.tsrx`, the spiritual
+successor to JSX, and get template directives (`@if`, `@for`, `@switch`, `@try`)
+that compile to keyed fast paths, plus an `@{ … }` shorthand that puts setup next
+to the output. Mix both dialects in one app and import across the boundary.
+
+**Write the closure, not its dependency list.** Omit the array from `useEffect`,
+`useMemo`, `useCallback`, and friends, and the compiler derives it from what the
+closure actually captures, including stable setters, dispatchers, refs, and state
+getters. This is the no-bookkeeping DX people associate with signal frameworks,
+without leaving the hooks model. Explicit arrays still mean exactly what they
+mean in React.
+
+**No rules of hooks.** Hooks are tracked by call site, not call order, so a hook
+can live inside an `if` or after an early return. The one rule left is enforced
+for you: a hook in a plain JS loop is a compile error, because every iteration
+would share a single call-site slot. Use the keyed `@for` directive instead,
+where each item gets its own hook state.
+
+**The platform, not a reimplementation of it.** Real delegated DOM events,
+controlled form components on native events (React's `value`/`checked` semantics,
+with `onInput` per edit and native `onChange` on commit), and refs as plain props
+(`ref={cb}`, `ref={obj}`, even `ref={[a, b]}`). No synthetic layer second-guessing
+the browser.
+
+**No virtual DOM.** Components re-render like React, but a compiled render path
+and an LIS-based keyed reconciler keep the runtime overhead minimal.
+
+Octane is deliberately narrow where React has grown wide: no class components, no
+Server Components, no synthetic event system. Those are choices, not gaps, and
+they are written down in
+[Differences from React](https://octanejs.dev/docs/differences-from-react).
+
+## Also in the box
+
+- **Editable state that follows its source.** `useLinkedState` resets or adjusts
+  local state as soon as an input changes, with no effect and no state update
+  during render.
+- **Promises in render are safe.** No `cache()` wrapper: creations feeding
+  `use()` are memoized at their declarations, including local `.then` chains.
+  Independent requests start together, one suspension per stratum, and descendant
+  fetch trees prefetch while an ancestor is still suspended.
+- **Streaming SSR and byte-stable hydration**, with out-of-order Suspense
+  flushing over Node or web streams, or buffered and static rendering when you
+  want it.
+- **Deferred hydration.** `<Hydrate>` keeps server HTML visible but inert until
+  it is worth activating, and splits its children into their own chunk by
+  default.
+- **`class` / `className` composes clsx-style** everywhere: strings, arrays,
   objects, and nesting, at every apply site.
-- **Refs as props**, including array composition (`ref={[a, b]}`) — no
-  `forwardRef`. Works with spreads, SSR, and hydration.
-- **Controlled form components on native events** — `value`/`checked` follow
-  React's controlled semantics exactly; `defaultValue`/`defaultChecked` opt out.
-  The per-edit handler is the native `onInput`; `onChange` keeps its browser
-  commit meaning rather than React's synthetic text-input meaning.
+- **A current-state getter.** `useState` and `useReducer` return
+  `[state, update, getState]`, so a delayed callback can read the latest value
+  instead of a stale capture.
 
-Octane is deliberately narrow where React has grown wide: **no class components,
-no Server Components, no synthetic event system.** Those are choices, not gaps —
-see [Differences from React](https://octanejs.dev/docs/differences-from-react).
+## Install
 
-### Native text events
-
-Use `onInput` when text state should update with each edit. Octane reports
-`OCTANE_NATIVE_TEXT_ONCHANGE` when a text-entry `<input>` or `<textarea>` appears
-to use React's per-edit `onChange` convention. Statically known JSX is reported by
-the compiler; unresolved spreads and dynamic input types are checked in development
-after their final props are applied. The warning does not rewrite the event:
-`onChange` remains the native commit event.
-
-```tsx
-<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
-```
-
-Native commit-on-blur behavior is valid. Mark that intent explicitly so tools and
-development diagnostics do not recommend a per-edit handler:
-
-```tsx
-<input
-  defaultValue={savedDraft}
-  onChange={(event) => save(event.currentTarget.value)}
-  suppressNativeChangeWarning
-/>
-```
-
-The suppression is a JS-only host hint: it is not serialized, changes no event
-behavior, and should not be used on component callbacks, selects, checkboxes, or
-radios. Those cases are already outside the text-entry warning.
-
-## Quick start
-
-### Install
-
-Octane's published packages require Node.js 22 or newer.
+Octane's published packages need Node.js 22 or newer.
 
 ```bash
 pnpm add octane @octanejs/vite-plugin
 ```
-
-Or let the CLI wire it up, including the TypeScript settings `.tsrx` needs:
-
-```bash
-pnpm dlx @octanejs/cli init
-```
-
-For any Vite app, add Octane's Vite integration:
 
 ```ts
 // vite.config.ts
@@ -164,74 +110,9 @@ import { defineConfig } from 'vite';
 import { octane } from '@octanejs/vite-plugin';
 
 export default defineConfig({
-  plugins: [octane()],
+	plugins: [octane()],
 });
 ```
-
-Without `octane.config.ts`, the plugin compiles a normal client-only SPA and
-preserves Vite's standard HTML handling. Add an Octane config with routes to
-activate routing, streaming SSR, hydration, and client/server production builds.
-
-Octane also supports Rspack and Rsbuild 2.x. Use the low-level Rspack plugin
-when you own the application shell and entries yourself:
-
-```bash
-pnpm add -D @rspack/core @octanejs/rspack-plugin
-```
-
-```js
-// rspack.config.mjs
-import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
-
-export default {
-  entry: './src/main.tsrx',
-  plugins: [new OctaneRspackPlugin()],
-};
-```
-
-Use the Rsbuild plugin for the full Octane app layer: routing, streaming dev
-SSR, hydration entries, client/server production environments, preview, and
-deployment adapters.
-
-```bash
-pnpm add @octanejs/rsbuild-plugin
-pnpm add -D @rsbuild/core
-```
-
-```ts
-// rsbuild.config.ts
-import { defineConfig } from '@rsbuild/core';
-import { pluginOctane } from '@octanejs/rsbuild-plugin';
-
-export default defineConfig({
-  plugins: [pluginOctane()],
-});
-```
-
-The same `@octanejs/vite-plugin` setup above provides these app-level features
-for Vite. See the
-[build tools guide](https://octanejs.dev/docs/build-tools) for SPA, SSR,
-client/server target, HMR, and config examples.
-
-Pass `profile: true` to the Vite, Rspack, or Rsbuild integration to create a
-client profiling build with component timing, render counts and causes,
-schedule-to-render delay, Chrome Performance tracks, and a bounded console API.
-Normal production builds omit the compiler metadata and tree-shake the recorder
-unless application code imports `octane/profiling` directly. See the
-[profiling guide](https://octanejs.dev/docs/profiling).
-
-Production client compilation automatically reuses conservative same-module
-pure component regions and keyed lists by inferred lexical dependencies, using
-React-Compiler-style strict-identity snapshots and the normal context-aware
-Block/keyed-list machinery. There is nothing to configure and no flag to
-learn: the proof fails closed, so HMR, dev, profiling, and server builds use
-normal reconciliation, and effects, refs, mutable ambient reads, custom
-comparators, and Suspense/transition boundaries keep their authored
-every-render behavior. Caching render-used imported calculations and their
-descriptor output is a later phase that ships together with per-key descriptor
-reuse.
-
-### Mount
 
 ```ts
 // main.ts
@@ -242,610 +123,104 @@ const root = createRoot(document.getElementById('root')!);
 root.render(App, { title: 'Hello world!' });
 ```
 
-### Server render and hydrate
+Or let the CLI wire it up, including the TypeScript settings `.tsrx` needs:
 
-Octane's SSR entry points mirror React's, so this maps onto what you already do.
-`octane/server` is the request-time renderer (React's `react-dom/server`) — pick
-buffered (`renderToString`) or streaming (`renderToPipeableStream` /
-`renderToReadableStream`); `octane/static` is the static-generation renderer
-(`react-dom/static`). Buffered renders hand back `{ html, css }` — hoisted
-`<title>`/`<meta>`/`<link>` fold into `html` (as in React 19), and `css` is the
-deduped scoped-`<style>` tags, which the client's `injectStyle` matches on
-hydration so styles cross the boundary exactly once.
-
-```ts
-// entry-server.ts
-import { renderToString } from 'octane/server'; // sync; fallbacks for suspended boundaries
-import { prerender } from 'octane/static'; // async; awaits all Suspense data
-import { App } from './App.tsrx';
-
-export async function renderApp() {
-  const { html, css } = await prerender(App); // { html, css }
-  return { html, css };
-}
+```bash
+pnpm dlx @octanejs/cli init
 ```
 
-| API | Module | Await | Suspense boundary that suspends |
-| --- | --- | --- | --- |
-| `renderToString(el, props?, opts?)` | `octane/server` | no (sync) | renders its `@pending` fallback |
-| `renderToStaticMarkup(el, props?, opts?)` | `octane/server` | no (sync) | fallback; **no** hydration markers/seeds |
-| `renderToPipeableStream(el, props?, opts?)` | `octane/server` | streams | shell ships the fallback; boundary streams in when it settles |
-| `renderToReadableStream(el, props?, opts?)` | `octane/server` | streams | shell ships the fallback; boundary streams in when it settles |
-| `prerender(el, props?, opts?)` | `octane/static` | yes | awaits data, renders the success arm |
-
-The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, a root-local
-`identifierPrefix`, an `AbortSignal`, and a per-render `timeoutMs`). See
-[docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense on the server,
-head hoisting, `module server` RPC) and the SSR roadmap.
-
-### Deferred hydration
-
-Use `<Hydrate>` for server-rendered content that should stay visible but does
-not need to become interactive immediately. `when` chooses the activation
-strategy, `split` controls compiler extraction (on by default), and `prefetch`
-can prepare the generated child chunk or other resources ahead of activation.
-
-```tsrx
-import { Hydrate } from 'octane';
-import { visible } from 'octane/hydration';
-
-export function ProductPage() @{
-	<Hydrate when={visible({ rootMargin: '400px' })}>
-		<Reviews />
-	</Hydrate>
-}
-```
-
-The initial server DOM is adopted in place and remains inert until the strategy
-opens the boundary. See [docs/deferred-hydration.md](./docs/deferred-hydration.md)
-for strategies, code splitting, prefetching, fallbacks, and nesting behavior.
-
-### Streaming SSR
-
-This is the fast-first-paint story, and it works the way React's does.
-`renderToPipeableStream` (Node streams) and `renderToReadableStream` (web streams)
-flush a **shell** immediately — the full page, with `@pending` fallbacks standing
-in for anything still suspended — so the browser paints without waiting on your
-slowest data. Each Suspense boundary then streams in **out of order** the moment
-its data settles, as a hidden segment plus a tiny inline swap script. When the
-client hydrates, `hydrateRoot` adopts the swapped-in DOM byte-for-byte, per-boundary
-`use()` seeds included — no re-render, no flash.
-
-```ts
-// entry-server.ts (Node)
-import { renderToPipeableStream } from 'octane/server';
-import { App } from './App.tsrx';
-
-export function renderApp(res) {
-  const { pipe } = renderToPipeableStream(App, undefined, {
-    onShellReady() {
-      res.statusCode = 200;
-      res.setHeader('content-type', 'text/html');
-      pipe(res); // shell flushes now; boundaries stream in behind it
-    },
-    onShellError(err) {
-      res.statusCode = 500;
-      res.end('<!doctype html>Server error');
-    },
-  });
-}
-```
-
-`renderToReadableStream` returns a `Promise<ReadableStream<Uint8Array>>` that
-resolves once the shell is ready (rejects on a shell error). It is pull-driven,
-honors consumer cancellation, and carries an `allReady` promise that settles
-when every boundary chunk has been accepted under backpressure; consume the
-stream concurrently rather than awaiting `allReady` before reading. The Node
-stream honors `write(false)`/`drain` and cancels on destination error or close.
-Both accept a `StreamOptions` (`RenderOptions` plus `onShellReady()`,
-`onShellError(err)`, and `onAllReady()`). The Vite and Rsbuild metaframework
-plugins render through `renderToReadableStream` by default.
-
-```ts
-// entry-client.ts
-import { hydrateRoot } from 'octane';
-import { App } from './App.tsrx';
-
-hydrateRoot(document.getElementById('app')!, App);
-```
-
-## Core syntax
-
-### Components
-
-A component is any function you use at a `<Foo/>` site — there's no separate
-"component" declaration. A function renders whatever it returns: a JSX root, a
-primitive (coerced to text), `null`, or an array. `@{ … }` is simply shorthand
-for returning JSX — `function f() @{ … }` desugars to `function f() { … return
-<jsx> }` — so hooks and locals can sit next to the output (the `@{ … }` scope ends
-with one output node, a JSX element or a fragment). Both forms compile
-identically, and any function can use either.
-
-```jsx
-import { useState } from 'octane';
-
-export function Counter() @{
-  const [count, setCount] = useState(0);
-
-  <button onClick={() => setCount(count + 1)}>
-    {'Count: ' + count}
-  </button>
-}
-```
-
-The same component written with an explicit `return` is identical — and a
-function is free to return a non-JSX value, which is coerced like any renderable:
-
-```jsx
-export function Counter() {
-  const [count, setCount] = useState(0);
-  return <button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>;
-}
-
-function Label(props) {
-  if (props.hidden) return null; // renders nothing
-  return props.text; // a string renders as text
-}
-```
-
-### State and effects
-
-```jsx
-import { useState, useEffect } from 'octane';
-
-export function Timer() @{
-  const [seconds, setSeconds] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  });
-
-  <p>{'Elapsed: ' + seconds}</p>
-}
-```
-
-Dependency arrays are optional in Octane. When one is omitted from
-`useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`,
-or `useImperativeHandle`, the compiler derives it from the callback's reactive
-captures. It understands member reads and stable hook results such as state
-setters, reducer dispatchers, refs, and state getters. It also omits
-`useEffectEvent` results because Effect Events are non-reactive captures, even
-though React-compatible wrappers have a fresh identity on each render.
-
-This applies to built-in hook calls inside compiler-processed custom hooks,
-including custom hooks written in plain `.ts` or `.js` modules:
-
-```ts
-import { useEffect, useMemo } from 'octane';
-
-export function useLoggedValue(value: string, log: (value: string) => void) {
-  const formatted = useMemo(() => value.toUpperCase());
-
-  useEffect(() => {
-    log(formatted);
-  });
-
-  return formatted;
-}
-```
-
-The memo's inferred dependency is `value`; the effect's inferred dependencies
-are `formatted` and `log`. Changes propagate through the custom hook without
-requiring its caller to pass a dependency array.
-
-Explicit arrays keep their React meaning and are never rewritten. Pass `null`
-for the uncommon every-render form:
-
-```jsx
-useEffect(() => sync(room.id)); // inferred from the closure
-useEffect(() => initialize(), []); // explicitly mount/reconnect only
-useEffect(() => sync(room.id), [room.id]); // explicit dependencies
-useEffect(() => measure(), null); // explicitly after every commit
-```
-
-Inferring a missing dependency argument at a **call to a custom wrapper** is a
-separate case. In a fully compiled `.tsrx`/`.tsx` module, a locally declared
-wrapper qualifies when it transparently forwards a callback and its final
-dependency parameter:
-
-```jsx
-function useTrackedEffect(callback, dependencies) {
-  useEffect(callback, dependencies);
-}
-
-useTrackedEffect(() => sync(room.id)); // inferred from the closure
-```
-
-This proof is deliberately local and conservative. The surgical pass for plain
-`.ts`/`.js` modules still infers direct built-in hook calls, but it does not
-infer dependency arguments at calls to custom wrappers. Imported or method-style
-wrappers and wrappers that transform or inspect their callback or dependency
-parameter also require an explicit dependency argument.
-
-`useState` and `useReducer` also expose an optional third tuple member: a stable getter for
-the hook's latest state. It is useful in async callbacks and other long-lived
-closures where capturing the render's state value would go stale:
-
-```jsx
-export function SaveButton() @{
-  const [draft, setDraft, getDraft] = useState('');
-
-  const saveLater = async () => {
-    await waitForConnection();
-    await save(getDraft()); // the latest draft, not the render that started this callback
-  };
-
-  <button onClick={saveLater}>{'Save ' + draft}</button>
-}
-```
-
-The compiler emits a getter-enabled hook only when the third tuple member can
-be observed. Ordinary `[state, setState]` and `[state, dispatch]` destructures
-keep the existing two-item runtime path and allocate no getter. Escaped or
-ambiguous tuples conservatively receive the complete three-item shape. The
-getter reads the latest scheduled hook value, which may be newer than the
-currently committed DOM during a pending render.
-
-### State that follows another value
-
-Use `useLinkedState` when a value can be edited locally but should reset or
-adjust when another value changes. For example, a profile editor should keep
-unsaved edits while showing the same user, then start fresh when a different
-user is selected:
-
-```jsx
-import { useLinkedState } from 'octane';
-
-export function ProfileEditor({ user }) @{
-  const [name, setName] = useLinkedState(user.id, () => user.name);
-
-  <input value={name} onInput={(event) => setName(event.currentTarget.value)} />
-}
-```
-
-`user.id` is the source. When it changes, Octane calculates the new name before
-the component reads it. There is no effect, no state update during render, and
-no extra render just to correct stale state.
-
-The calculation also receives the previous source and local value. Use them when
-changing inputs should preserve a valid choice instead of always starting over:
-
-```jsx
-const [selection, setSelection] = useLinkedState(
-  items,
-  (nextItems, previous) =>
-    nextItems.find((item) => item.id === previous?.value?.id) ??
-    nextItems[0] ??
-    null,
-);
-```
-
-The first calculation receives `undefined` for `previous`; later source changes
-receive `{ source, value }`. Sources and values use `Object.is` by default. Pass
-`{ sourceEqual, valueEqual }` as a third argument when you need different
-comparisons. Like `useState`, `useLinkedState` also supports an optional third
-tuple item, `getValue`, for reading the latest value from a delayed callback.
-
-### Strong mode
-
-Strong mode is an optional compiler check for state and refs. Start with one
-module by placing `"use strong"` before its imports:
-
-```tsx
-"use strong";
-
-import { useLinkedState } from 'octane';
-
-export function ProfileEditor({ user }) {
-  const [name, setName] = useLinkedState(user.id, () => user.name);
-
-  return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
-}
-```
-
-When the project is ready, enable it for all application-owned modules:
-
-```ts
-// octane.config.ts
-export default {
-  compiler: {
-    strong: true,
-  },
-};
-```
-
-The Vite and Rsbuild app integrations read this setting from `octane.config.ts`.
-Vite, Rspack, and Rsbuild also accept `strong: true` directly in their Octane
-plugin options; use the plugin option for a standalone Rspack setup. An
-explicit plugin setting takes precedence over `octane.config.ts`. Dependencies
-keep their existing behavior unless one of their own modules opts in with
-`"use strong"`.
-
-Strong mode reports three patterns as compile errors:
-
-- Calling a `useState`, `useReducer`, or `useLinkedState` updater during render.
-- Calling one of those updaters directly while an effect is being set up.
-- Assigning to a `useRef` object's `current` value during render.
-
-Update state in event handlers instead. When state should reset or adjust after
-an input changes, use `useLinkedState`. Effects that connect to external systems
-and refs used for DOM elements, timers, or event callbacks remain valid. Strong
-mode does not restrict `Date.now()`, `Math.random()`, or similar values.
-
-`"use strong"` only affects the current module. Put it at the top of the file,
-before imports or other code; comments and other directives may come first. In
-files that also use an Octane JSX ownership pragma, keep the pragma first:
-
-```tsx
-/** @jsxImportSource octane */
-"use strong";
-
-import { useState } from 'octane';
-```
-
-### Conditional hooks
-
-Unlike React, a hook can sit behind a guard or after an early `return`:
-
-```jsx
-import { useState, useEffect } from 'octane';
-
-export function Panel(props) @{
-  const [n, setN] = useState(0);
-
-  // An early return before a hook is fine in octane. Each hook call site has a
-  // stable compiler-assigned slot, so render order can't desync the hooks.
-  if (props.hidden) return;
-
-  useEffect(() => {
-    console.log('n changed:', n);
-  });
-
-  <button onClick={() => setN(n + 1)}>{'count: ' + n}</button>
-}
-```
-
-### Control flow
-
-Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
-and `@try`. Plain JavaScript control flow stays in setup code.
-
-Directive arms keep setup and output separate: a bare expression statement such as
-`console.log(value);` or `value;` is setup and does not render. To render a computed
-value, make the output explicit with a fragment: `<>{value}</>`.
-
-```jsx
-export function Feed(props) @{
-  <ul>
-    @for (const item of props.items; key item.id) {
-      <li>{item.title as string}</li>
-    } @empty {
-      <li>Nothing to show</li>
-    }
-  </ul>
-}
-```
-
-```jsx
-export function Greeting(props) @{
-  @if (props.name) {
-    <p>{'Hello, ' + props.name}</p>
-  } @else {
-    <p>Hello, stranger</p>
-  }
-}
-```
-
-### Inline scripts
-
-An authored `<script>` body is static, raw script text. Braces are literal source,
-so blocks and object literals work normally; Octane does not treat `{...}` inside
-the body as a TSRX interpolation:
-
-```jsx
-export function Bootstrap() @{
-  <script>
-    window.appConfig = { locale: 'en-GB' };
-  </script>
-}
-```
-
-For a dynamic whole-script value, use the standard raw-content prop. Serialize
-structured values explicitly:
-
-```jsx
-export function Rules(props) @{
-  <script
-    type="speculationrules"
-    dangerouslySetInnerHTML={{ __html: JSON.stringify(props.rules) }}
-  />
-}
-```
-
-`<script>{JSON.stringify(props.rules) as string}</script>` is static script source,
-not an interpolation; the cast does not change the raw-text grammar.
-`dangerouslySetInnerHTML` supplies the complete body and cannot be combined with
-child content. Client mounts and updates write it through `textContent`; server
-rendering neutralizes case-insensitive opening and closing `script` tokens without
-HTML-escaping ordinary JavaScript or JSON characters. This prevents the value from
-creating sibling markup, but it does not validate or sanitize executable
-JavaScript—only inject executable source you trust.
-
-### Class composition
-
-`class` (and its alias `className`) accepts more than a string. Octane composes the
-value the same way the `clsx` / `classnames` libraries do — from strings, numbers,
-arrays, objects, and any nesting of those — so you can build a class list inline
-without a helper. Falsy parts (`false`, `0`, `null`, `undefined`, `''`) drop out;
-object keys are kept when their value is truthy.
-
-```jsx
-export function Button(props) @{
-  <button
-    class={[
-      'btn',
-      props.size,                       // 'btn lg'
-      { active: props.active, disabled: props.disabled },
-      props.extra,                      // string | array | object | falsy
-    ]}
-  >
-    {props.label as string}
-  </button>
-}
-```
-
-Composition is native to the runtime (no dependency) and works everywhere a class
-does: dynamic bindings, `{...spread}` props, SVG elements, scoped-`<style>` components
-(the scope hash is appended after your classes), and server rendering (the SSR output
-and client render compose byte-identically, so hydration never mismatches).
-
-> Unlike React — which coerces `className={['a', 'b']}` to the string `"a,b"` — this is
-> a deliberate Octane convenience. A plain string still takes the fast path.
+Rspack and Rsbuild are supported too. [Getting started](./docs/getting-started.md)
+covers all three build tools, server rendering, hydration, streaming, deferred
+hydration, and profiling.
+
+## Status
+
+Octane is in alpha. The runtime, compiler, and SSR/hydration paths all work, but
+APIs still move.
+
+The core suite contains **3,900+ distinct behavioral tests** across conformance,
+differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
+project reruns the normal suite against the production compiler path, which is
+valuable mode coverage but is not counted again as unique tests. This is an
+Octane suite count, not a claim that every test was ported from React; the pinned
+snapshot and source-attributed React counts live in the
+[coverage ledger and report](./docs/react-parity-coverage.md).
 
 ## Documentation
 
 The full docs live at **[octanejs.dev](https://octanejs.dev)**, a site built with
 Octane itself. Good places to start:
 
-- **[Quick start](https://octanejs.dev/docs/quick-start)** — install, mount, and
-  the `.tsrx` essentials.
-- **[Build tools](https://octanejs.dev/docs/build-tools)** — configure Vite,
-  Rspack, or Rsbuild for SPA compilation and full-stack SSR.
-- **[TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx)** — when to reach for
-  each dialect and exactly what TSRX unlocks: compiled `@for` collections,
-  template control flow, and text holes.
-- **[Differences from React](https://octanejs.dev/docs/differences-from-react)** —
-  the deliberate divergences, and why everything else matching React is the point.
-- **[Bindings](https://octanejs.dev/docs/bindings)** — the `@octanejs/*` ports of
-  the React ecosystem.
+- [Quick start](https://octanejs.dev/docs/quick-start): install, mount, and the
+  `.tsrx` essentials.
+- [Build tools](https://octanejs.dev/docs/build-tools): Vite, Rspack, or Rsbuild
+  for SPA compilation and full-stack SSR.
+- [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): when to reach for
+  each dialect and what TSRX unlocks.
+- [Differences from React](https://octanejs.dev/docs/differences-from-react): the
+  deliberate divergences, and why everything else matching React is the point.
+- [Bindings](https://octanejs.dev/docs/bindings): the `@octanejs/*` ports of the
+  React ecosystem.
+
+In this repository:
+
+- [Getting started](./docs/getting-started.md): install, build tools, mount, SSR,
+  streaming, deferred hydration, profiling.
+- [TSRX basics](./docs/tsrx-basics.md): components, hooks, control flow, class
+  composition, text input events, strong mode.
+- [Server rendering](./docs/ssr.md) and
+  [deferred hydration](./docs/deferred-hydration.md): the full references.
+- [Differences from React](./docs/differences-from-react.md): the divergence
+  contract.
+- [Bindings status](./docs/bindings-status.md): what each `@octanejs/*` package
+  ports, its upstream version, and its known divergences.
 
 ## Packages
 
-This is a pnpm monorepo containing the core runtime+compiler, the metaframework
-plugin (and its Vercel and Cloudflare adapters), the CLI, an MCP server, private evaluation tooling, and
-the framework bindings. The current workspace package inventory and counts are
-generated from the workspace manifests in
-[`docs/packages.md`](./docs/packages.md):
+This is a pnpm monorepo. [`docs/packages.md`](./docs/packages.md) is the
+generated inventory; the shape of it is:
 
-- [`octane`](./packages/octane) is the runtime and the compiler together. It covers
+- [`octane`](./packages/octane) is the runtime and the compiler together:
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, exposed at `octane/compiler` with bundler adapters at
   `octane/compiler/vite` and `octane/compiler/bundler`.
-- [`@octanejs/app-core`](./packages/app-core) contains the bundler-neutral app
-  config, routing, SSR, hydration code generation, and production handler used
-  by the metaframework integrations.
-- [`@octanejs/rspack-plugin`](./packages/rspack-plugin-octane) is the low-level
-  Rspack compiler integration; [`@octanejs/rsbuild-plugin`](./packages/rsbuild-plugin-octane)
-  is the full Rsbuild metaframework integration.
-- [`@octanejs/vite-plugin`](./packages/vite-plugin-octane) is the recommended
-  integration for every Vite app: compiler integration for SPAs, plus dev SSR,
-  routing, hydration, and production server builds when app routes are configured;
-  [`@octanejs/adapter-vercel`](./packages/adapter-vercel) deploys its build
-  output to Vercel, while
-  [`@octanejs/adapter-cloudflare`](./packages/adapter-cloudflare) emits a
-  streaming module Worker for Cloudflare Workers Static Assets.
-- [`@octanejs/tanstack-start`](./packages/tanstack-start) is the public Octane
-  TanStack Start integration. It owns the Octane-specific Start runtime,
-  file-route generation, server-function compilation, streaming SSR, hydration,
-  and Vite development and production integration, using
-  [`@octanejs/tanstack-router`](./packages/tanstack-router) as its router binding.
-- [`@octanejs/cli`](./packages/cli) is the `octane` command line: `init` wires
-  Octane into an existing project, `doctor` finds and repairs the
-  misconfigurations that break Octane quietly, `add` installs a binding and
-  reports its divergences, `explain` decodes a runtime error code, and `mcp add`
-  registers the MCP server with Claude Code, Codex, Cursor, or VS Code.
-- [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
-  compile tooling to AI agents over MCP.
-- [`@octanejs/evals`](./packages/octane-evals) is the private workspace package
-  for standalone Octane application prompts, starter workspaces, behavioral
-  graders, public reference implementations, and reproducible evaluation
-  tooling. It measures framework use rather than monorepo repair. Active
-  held-out material stays outside the repository.
-- The `@octanejs/*` framework bindings — each an octane port of a React library:
-  [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
-  [`ai`](./packages/tanstack-ai), [`query`](./packages/tanstack-query),
-  [`store`](./packages/tanstack-store),
-  [`form`](./packages/tanstack-form), [`apollo-client`](./packages/apollo-client),
-  [`motion`](./packages/motion),
-  [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
-  [`remix-router`](./packages/remix-router),
-  [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
-  [`lexical`](./packages/lexical), [`tiptap`](./packages/tiptap),
-  [`floating-ui`](./packages/floating-ui),
-  [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
-  [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
-  [`recharts`](./packages/recharts), [`visx`](./packages/visx),
-  [`three`](./packages/three),
-  [`lucide`](./packages/lucide),
-  [`redux`](./packages/redux), [`redux-toolkit`](./packages/redux-toolkit),
-  [`testing-library`](./packages/testing-library),
-  [`i18next`](./packages/i18next), and [`mdx`](./packages/mdx).
-  Parity varies by package — some are behaviorally complete, others are
-  explicitly partial or alpha. [`docs/bindings-status.md`](./docs/bindings-status.md)
-  is the generated per-package status table (upstream version, supported
-  surface, known divergences, SSR/hydration, last evidence check), sourced
-  from each package's `status.json` and checked in CI.
+- The app layer: [`@octanejs/app-core`](./packages/app-core) holds the
+  bundler-neutral config, routing, SSR, hydration codegen, and production
+  handler, and the [Vite](./packages/vite-plugin-octane),
+  [Rspack](./packages/rspack-plugin-octane), and
+  [Rsbuild](./packages/rsbuild-plugin-octane) integrations build on it.
+  [`adapter-vercel`](./packages/adapter-vercel) and
+  [`adapter-cloudflare`](./packages/adapter-cloudflare) deploy the output;
+  [`@octanejs/tanstack-start`](./packages/tanstack-start) is the TanStack Start
+  integration.
+- Tooling: [`@octanejs/cli`](./packages/cli) (`init`, `doctor`, `add`, `explain`,
+  `mcp add`) and [`@octanejs/mcp-server`](./packages/octane-mcp-server), which
+  exposes Octane docs and compile tooling to AI agents over MCP.
+- The `@octanejs/*` bindings, each an Octane port of a React library: state
+  (zustand, jotai, valtio, mobx, redux, redux-toolkit, tanstack-store), data and
+  routing (tanstack-query, apollo-client, tanstack-router, remix-router), UI
+  (radix, base-ui, aria, shadcn, motion, dnd-kit, sonner, floating-ui, lucide),
+  forms and content (hook-form, tanstack-form, lexical, tiptap, mdx, i18next),
+  data-heavy screens (tanstack-table, tanstack-virtual, recharts, visx), 3D
+  (three), Web3 (wagmi, rainbowkit), and more.
 
-## Development
+Parity varies by package. Some are behaviorally complete, others are explicitly
+partial or alpha, and
+[`docs/bindings-status.md`](./docs/bindings-status.md) is the generated table of
+record: upstream version, supported surface, known divergences, SSR/hydration
+coverage, and when the evidence was last checked.
 
-Octane uses [pnpm](https://pnpm.io) for package management and workspace scripts.
+## Contributing
+
+Bug reports, regression tests, docs, bindings, and core fixes are all welcome.
+[CONTRIBUTING.md](./CONTRIBUTING.md) covers setup, where a change belongs, the
+test policy, the generated files, and how pull requests are labelled and landed.
 
 ```bash
-pnpm install      # install workspace dependencies
-pnpm test         # run the test suite
-pnpm typecheck    # type-check packages, website, and examples
-pnpm format       # format the whole repository with Prettier
-pnpm format:check # check the whole repository with Prettier
+pnpm install
+pnpm test
+pnpm typecheck
 ```
-
-During iteration, limit Prettier to the staged and unstaged files:
-
-```bash
-pnpm format:files
-pnpm format:files:check
-```
-
-Pass one or more files or directories to override the Git-derived defaults:
-
-```bash
-pnpm format:files README.md packages/octane/src
-pnpm format:files:check README.md packages/octane/src
-```
-
-`format:files` writes changes; `format:files:check` is read-only. Both accept any
-mix of file and directory paths. With no paths, both use the union of the staged
-and unstaged Git diffs. Use the repo-wide `pnpm format:check` for the final
-formatting gate.
-
-`pnpm test` runs the projects declared in the root `vitest.config.js` through a
-single Vitest invocation rather than calling each package's `test` script. Test
-console output is silent by default for every project, including failures. Pass
-`--silent=false` through the root script when debugging, or use
-`--silent=passed-only` to print output only for failing tests:
-
-```bash
-pnpm test -- --silent=false
-pnpm test -- --silent=passed-only
-```
-
-Command-line options override the root Vitest config.
-
-### Playground
-
-The playground under [`playground/octane`](./playground/octane) covers state, keyed
-lists, conditional rendering, `@switch`, dynamic components, and suspense:
-
-```bash
-pnpm --filter octane-playground dev
-```
-
-### Product examples
-
-The applications under [`examples/`](./examples) are runnable demonstrations
-and Playwright-backed regression fixtures. Validate their manifests, tooling
-contracts, strict TypeScript support code, and production builds with
-`pnpm examples:check`; run their browser journeys with `pnpm examples:e2e`.
 
 ## License
 
