@@ -4024,7 +4024,7 @@ function detectStableEventBundle(node) {
 	if (!body.callee || body.callee.type !== 'Identifier') return null;
 	// Bail if any arg is a spread — bundle args are positional only. Everything
 	// else has to survive being hoisted to render time; see the note above.
-	if (body.arguments.some((a) => a.type === 'SpreadElement')) return null;
+	if (!body.arguments.every(isDeferralSafeBundleArg)) return null;
 	return { callee: body.callee, args: body.arguments };
 }
 
