@@ -68,7 +68,7 @@ describe('layout (FLIP)', () => {
 		r.unmount();
 	});
 
-	it('matches Echo layout="size" and transition.layout usage', async () => {
+	it('supports layout="size" with transition.layout', async () => {
 		let box: any = { left: 0, top: 0, width: 100, height: 50 };
 		Element.prototype.getBoundingClientRect = vi.fn(() => box);
 		const layoutTransition = { duration: 0.24, ease: 'easeOut' };
