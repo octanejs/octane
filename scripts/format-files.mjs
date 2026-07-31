@@ -15,10 +15,20 @@ function changedPaths(cwd, staged) {
 }
 
 function collectChangedPaths(cwd) {
+	const repositoryRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+		cwd,
+		encoding: 'utf8',
+	}).trimEnd();
 	// Keep the two layers separate: staged and unstaged edits can cancel each
 	// other relative to HEAD while both still identify a file being worked on.
-	const paths = new Set([...changedPaths(cwd, true), ...changedPaths(cwd, false)]);
-	return [...paths].filter((file) => existsSync(path.resolve(cwd, file)));
+	const paths = new Set([
+		...changedPaths(repositoryRoot, true),
+		...changedPaths(repositoryRoot, false),
+	]);
+	return {
+		files: [...paths].filter((file) => existsSync(path.resolve(repositoryRoot, file))),
+		repositoryRoot,
+	};
 }
 
 function parseArguments(argv) {
@@ -32,7 +42,10 @@ function parseArguments(argv) {
 function main() {
 	const { mode, paths } = parseArguments(process.argv.slice(2));
 	const usesGitPaths = paths.length === 0;
-	const files = usesGitPaths ? collectChangedPaths(process.cwd()) : paths;
+	const workingDirectory = process.cwd();
+	const changed = usesGitPaths ? collectChangedPaths(workingDirectory) : undefined;
+	const files = changed?.files ?? paths;
+	const prettierCwd = changed?.repositoryRoot ?? workingDirectory;
 
 	if (files.length === 0) {
 		console.log('No staged or unstaged files to format.');
@@ -43,7 +56,7 @@ function main() {
 		? ['--ignore-unknown', '--no-error-on-unmatched-pattern']
 		: [];
 	const result = spawnSync('prettier', [mode, ...gitPathOptions, '--', ...files], {
-		cwd: process.cwd(),
+		cwd: prettierCwd,
 		stdio: 'inherit',
 	});
 	if (result.error) throw result.error;

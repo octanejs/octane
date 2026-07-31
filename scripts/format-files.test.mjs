@@ -134,6 +134,38 @@ describe('format-files command', () => {
 		}
 	});
 
+	test('formats Git paths from the repository root when run from a subdirectory', async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), 'octane-format-files-subdirectory-'));
+		const nested = path.join(root, 'packages', 'fixture');
+
+		try {
+			await mkdir(nested, { recursive: true });
+			git(root, ['init', '--quiet']);
+			git(root, ['config', 'user.email', 'test@example.com']);
+			git(root, ['config', 'user.name', 'Test']);
+			await writeFile(path.join(root, 'changed.js'), 'const value = { nested: false };\n');
+			git(root, ['add', '.']);
+			git(root, ['commit', '--quiet', '-m', 'fixture']);
+			await writeFile(path.join(root, 'changed.js'), 'const value={nested:true}\n');
+
+			const result = run(
+				nested,
+				{
+					...process.env,
+					PATH: `${REPO_BIN}${path.delimiter}${process.env.PATH ?? ''}`,
+				},
+				['--write', '--'],
+			);
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(
+				await readFile(path.join(root, 'changed.js'), 'utf8'),
+				'const value = { nested: true };\n',
+			);
+		} finally {
+			await rm(root, { force: true, recursive: true });
+		}
+	});
+
 	test('passes explicit paths through without requiring a Git repository', async () => {
 		const fixture = await createFixture();
 
