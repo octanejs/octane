@@ -62,11 +62,35 @@ jobs:
               );
             }
 
+            // A fenced example or a commented-out line is text about the box,
+            // not the box itself, and a pull request that documents this
+            // workflow quotes the line in both forms.
+            let fenced = false;
+            const live = (pull.body ?? "")
+              .replace(/<!--[\s\S]*?-->/g, "\n")
+              .split("\n")
+              .filter((line) => {
+                if (/^[ \t]*(?:```|~~~)/.test(line)) {
+                  fenced = !fenced;
+                  return false;
+                }
+                return !fenced;
+              })
+              .join("\n");
+
+            // The template's own section is the declaration, so a Validation
+            // item that happens to mention the label cannot outrank it. A body
+            // that dropped the heading but kept the line still declares.
+            const heading = /^[ \t]*#{1,6}[ \t]+provenance[ \t]*$/im.exec(live);
+            const after = heading ? live.slice(heading.index + heading[0].length) : live;
+            const nextHeading = heading ? /^[ \t]*#{1,6}[ \t]/m.exec(after) : null;
+            const scope = nextHeading ? after.slice(0, nextHeading.index) : after;
+
             // Three states, not two. A body with no checkbox at all is silence,
             // not a denial, so it must not strip a label somebody applied by
             // hand. Only an explicit empty box retracts the claim.
             const box = new RegExp(`^[ \\t]*[-*][ \\t]*\\[([^\\]]*)\\][^\\n]*${AGENT}`, "im").exec(
-              pull.body ?? "",
+              scope,
             );
             if (box) {
               const claimed = /x/i.test(box[1]);

@@ -367,6 +367,53 @@ describe('Pull request labels', () => {
 		}
 	});
 
+	test('reads the box in the provenance section, not an earlier mention', async () => {
+		const { added, failures } = await runLabeller({
+			title: 'feat: a thing',
+			body: `## Validation\n\n- [x] targeted tests: agent-authored fixtures\n\n## Provenance\n\n${EMPTY}\n`,
+		});
+
+		assert.deepEqual(added, ['feat']);
+		assert.deepEqual(failures, []);
+	});
+
+	test('does not read a declaration out of a quoted example', async () => {
+		const { added, failures } = await runLabeller({
+			title: 'ci: document the box',
+			body: `## Summary\n\nA body needs:\n\n\`\`\`md\n${TICKED}\n\`\`\`\n`,
+		});
+
+		assert.deepEqual(added, ['ci']);
+		assert.equal(failures.length, 1);
+		assert.match(failures[0], /does not declare provenance/);
+	});
+
+	test('does not read a declaration out of a commented-out box', async () => {
+		const { added, failures } = await runLabeller({
+			title: 'docs: a thing',
+			body: `## Provenance\n\n<!--\n${TICKED}\n-->\n`,
+		});
+
+		assert.deepEqual(added, ['docs']);
+		assert.equal(failures.length, 1);
+	});
+
+	test('reads the checked-in template as a declaration either way', async () => {
+		const template = readFileSync(path.join(REPO, '.github/pull_request_template.md'), 'utf8');
+		assert.ok(template.includes(EMPTY), 'the template must carry the provenance box');
+
+		const human = await runLabeller({ title: 'fix: a thing', body: template });
+		const agent = await runLabeller({
+			title: 'fix: a thing',
+			body: template.replace(EMPTY, TICKED),
+		});
+
+		assert.deepEqual(human.added, ['fix']);
+		assert.deepEqual(human.failures, []);
+		assert.deepEqual(agent.added, ['fix', 'agent-authored']);
+		assert.deepEqual(agent.failures, []);
+	});
+
 	test('retracts the label when the box is unticked', async () => {
 		const { added, removed } = await runLabeller({
 			title: 'docs: a thing',
