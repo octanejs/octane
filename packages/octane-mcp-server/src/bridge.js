@@ -49,6 +49,13 @@ export const KNOWN_BINDINGS = {
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
+	streamdown: '@octanejs/streamdown',
+	// The official plugins are consolidated as subpaths of the same package.
+	// The bundled bridge skill documents each exact import rewrite.
+	'@streamdown/code': '@octanejs/streamdown',
+	'@streamdown/math': '@octanejs/streamdown',
+	'@streamdown/mermaid': '@octanejs/streamdown',
+	'@streamdown/cjk': '@octanejs/streamdown',
 	shadcn: '@octanejs/shadcn',
 	recharts: '@octanejs/recharts',
 	'@react-three/fiber': '@octanejs/three',

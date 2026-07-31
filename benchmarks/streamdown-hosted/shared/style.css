@@ -1,0 +1,19 @@
+:root {
+	font-family: system-ui, sans-serif;
+	color: #111827;
+	background: #ffffff;
+}
+
+body {
+	margin: 0;
+}
+
+#main {
+	max-width: 900px;
+	margin: 0 auto;
+	padding: 16px;
+}
+
+.bench-streamdown {
+	min-height: 1px;
+}

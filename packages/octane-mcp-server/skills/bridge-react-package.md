@@ -32,6 +32,11 @@ of bridging by hand:
 | `@base-ui-components/react` | `@octanejs/base-ui` |
 | `@dnd-kit/react` | `@octanejs/dnd-kit` |
 | `sonner` | `@octanejs/sonner` |
+| `streamdown` | `@octanejs/streamdown` |
+| `@streamdown/code` | `@octanejs/streamdown/code` |
+| `@streamdown/math` | `@octanejs/streamdown/math` |
+| `@streamdown/mermaid` | `@octanejs/streamdown/mermaid` |
+| `@streamdown/cjk` | `@octanejs/streamdown/cjk` |
 | `recharts` | `@octanejs/recharts` |
 | `@react-three/fiber` | `@octanejs/three` |
 | `@visx/*` | `@octanejs/visx` |

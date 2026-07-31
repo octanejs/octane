@@ -40,6 +40,8 @@ packages:
   - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
+  - benchmarks/streamdown-hosted
+  - benchmarks/streamdown-hosted/*
   - benchmarks/tauri-shell
   - benchmarks/tauri-shell/*
   - benchmarks/tanstack-start

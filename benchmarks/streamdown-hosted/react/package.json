@@ -1,0 +1,24 @@
+{
+  "name": "react-streamdown-hosted-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "vite --host --port 5300 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5300 --strictPort"
+  },
+  "dependencies": {
+    "@streamdown/code": "1.1.1",
+    "@streamdown/math": "1.0.2",
+    "katex": "^0.16.27",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "streamdown": "2.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "terser": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

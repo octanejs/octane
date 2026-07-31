@@ -1,0 +1,137 @@
+import type { OctaneNode } from 'octane';
+import { useContext, useEffect, useRef, useState } from 'octane';
+import { StreamdownContext } from '../../index.tsrx';
+import { useIcons } from '../icon-context.tsrx';
+import { useCn } from '../prefix-context.tsrx';
+import { useTranslations } from '../translations-context.tsrx';
+import {
+	extractTableDataFromElement,
+	findTableForControl,
+	tableDataToCSV,
+	tableDataToMarkdown,
+	tableDataToTSV,
+} from './utils';
+
+export interface TableCopyDropdownProps {
+	children?: OctaneNode;
+	className?: string;
+	onCopy?: (format: 'csv' | 'tsv' | 'md') => void;
+	onError?: (error: Error) => void;
+	timeout?: number;
+}
+
+export const TableCopyDropdown = ({
+	children,
+	className,
+	onCopy,
+	onError,
+	timeout = 2000,
+}: TableCopyDropdownProps) => {
+	const cn = useCn();
+	const [isOpen, setIsOpen] = useState(false);
+	const [isCopied, setIsCopied] = useState(false);
+	const dropdownRef = useRef<HTMLDivElement | null>(null);
+	const timeoutRef = useRef(0);
+	const { isAnimating } = useContext(StreamdownContext);
+	const t = useTranslations();
+
+	const copyTableData = async (format: 'csv' | 'tsv' | 'md') => {
+		if (typeof window === 'undefined' || !navigator?.clipboard?.write) {
+			onError?.(new Error('Clipboard API not available'));
+			return;
+		}
+
+		try {
+			const tableElement = findTableForControl(dropdownRef.current);
+
+			if (!tableElement) {
+				onError?.(new Error('Table not found'));
+				return;
+			}
+
+			const tableData = extractTableDataFromElement(tableElement);
+
+			const formatters = {
+				csv: tableDataToCSV,
+				tsv: tableDataToTSV,
+				md: tableDataToMarkdown,
+			};
+			const formatter = formatters[format] || tableDataToMarkdown;
+			const content = formatter(tableData);
+
+			const clipboardItemData = new ClipboardItem({
+				'text/plain': new Blob([content], { type: 'text/plain' }),
+				'text/html': new Blob([tableElement.outerHTML], {
+					type: 'text/html',
+				}),
+			});
+
+			await navigator.clipboard.write([clipboardItemData]);
+			setIsCopied(true);
+			setIsOpen(false);
+			onCopy?.(format);
+			timeoutRef.current = window.setTimeout(() => setIsCopied(false), timeout);
+		} catch (error) {
+			onError?.(error as Error);
+		}
+	};
+
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const path = event.composedPath();
+			if (dropdownRef.current && !path.includes(dropdownRef.current)) {
+				setIsOpen(false);
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			window.clearTimeout(timeoutRef.current);
+		};
+	}, []);
+
+	const icons = useIcons();
+	const Icon = isCopied ? icons.CheckIcon : icons.CopyIcon;
+
+	return <div className={cn('relative')} ref={dropdownRef}>
+		<button
+			className={cn(
+				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+				className,
+			)}
+			disabled={isAnimating}
+			onClick={() => setIsOpen(!isOpen)}
+			title={t.copyTable}
+			type="button"
+		>
+			{children ?? <Icon height={14} width={14} />}
+		</button>
+		{isOpen
+			? <div
+					className={cn(
+						'absolute top-full right-0 z-20 mt-1 min-w-[120px] overflow-hidden rounded-md border border-border bg-background shadow-lg',
+					)}
+				>
+					<button
+						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
+						onClick={() => copyTableData('md')}
+						title={t.copyTableAsMarkdown}
+						type="button"
+					>{t.tableFormatMarkdown}</button>
+					<button
+						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
+						onClick={() => copyTableData('csv')}
+						title={t.copyTableAsCsv}
+						type="button"
+					>{t.tableFormatCsv}</button>
+					<button
+						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
+						onClick={() => copyTableData('tsv')}
+						title={t.copyTableAsTsv}
+						type="button"
+					>{t.tableFormatTsv}</button>
+				</div>
+			: null}
+	</div>;
+};

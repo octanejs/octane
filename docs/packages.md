@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**63 publishable package(s), including 51 framework binding(s).**
+**64 publishable package(s), including 52 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -50,6 +50,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.6` | 1 |
 | `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.6` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.16` | 2 |
+| `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.0` | 6 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.13` | 1 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.20` | 2 |
 | `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.15` | 1 |
