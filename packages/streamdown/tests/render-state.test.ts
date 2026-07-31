@@ -30,6 +30,22 @@ describe('@octanejs/streamdown render state', () => {
 		}
 	});
 
+	it('does not render code actions when every code control is disabled', () => {
+		const mounted = mount(StreamdownHarness, {
+			children: '```ts\nconst answer = 42;\n```',
+			controls: {
+				code: { copy: false, download: false },
+			},
+			mode: 'static',
+		});
+
+		try {
+			expect(mounted.container.querySelector('[data-streamdown="code-block-actions"]')).toBeNull();
+		} finally {
+			mounted.unmount();
+		}
+	});
+
 	it('updates Markdown options inside existing streaming blocks', () => {
 		const props = {
 			children: 'A paragraph.',

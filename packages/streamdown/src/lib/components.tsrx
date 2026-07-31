@@ -722,6 +722,7 @@ const CodeComponent = ({ node, className, children, ...props }: CodeComponentPro
 	const showCodeControls = shouldShowControls(controlsConfig, 'code');
 	const showDownload = shouldShowCodeControl(controlsConfig, 'download');
 	const showCopy = shouldShowCodeControl(controlsConfig, 'copy');
+	const shouldShowCodeControls = showCodeControls && (showDownload || showCopy);
 
 	return <CodeBlock
 		className={className}
@@ -731,7 +732,7 @@ const CodeComponent = ({ node, className, children, ...props }: CodeComponentPro
 		lineNumbers={showLineNumbers}
 		startLine={startLine}
 	>
-		{showCodeControls
+		{shouldShowCodeControls
 			? <>
 					{showDownload ? <CodeBlockDownloadButton code={code} language={language} /> : null}
 					{showCopy ? <CodeBlockCopyButton /> : null}
