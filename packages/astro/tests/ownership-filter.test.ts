@@ -93,4 +93,18 @@ describe('astroScopedOctanePlugin ownership', () => {
 		);
 		expect(projectSkip).toBeNull();
 	});
+
+	it('treats Vite-realpathed workspace bindings as ownership-bypass targets', async () => {
+		const { dirname, join } = await import('node:path');
+		const { fileURLToPath } = await import('node:url');
+		const { isInstalledOctaneCompilerTarget } = await import('../src/should-skip-transform.js');
+		const zustandSource = join(
+			dirname(fileURLToPath(import.meta.url)),
+			'../../zustand/src/index.ts',
+		);
+
+		const ownership = createOwnershipFilter(['**/components/octane/**'], undefined);
+		expect(ownership!(zustandSource)).toBe(false);
+		expect(isInstalledOctaneCompilerTarget(zustandSource)).toBe(true);
+	});
 });

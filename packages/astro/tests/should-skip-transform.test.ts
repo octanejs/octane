@@ -78,4 +78,17 @@ describe('isInstalledOctaneCompilerTarget', () => {
 			false,
 		);
 	});
+
+	it('recognizes Vite-realpathed workspace bindings next to this package', () => {
+		const testsDir = dirname(fileURLToPath(import.meta.url));
+		const zustandSource = join(testsDir, '../../zustand/src/index.ts');
+		const octaneRuntime = join(testsDir, '../../octane/src/index.ts');
+		expect(isInstalledOctaneCompilerTarget(zustandSource)).toBe(true);
+		expect(isInstalledOctaneCompilerTarget(octaneRuntime)).toBe(true);
+		expect(isInstalledOctaneCompilerTarget(zustandSource + '?t=1')).toBe(true);
+		// This integration itself must not be an ownership-bypass compile target.
+		expect(isInstalledOctaneCompilerTarget(thisPackageServer)).toBe(false);
+		// A consumer app at packages/astro is not a sibling of THIS package root.
+		expect(isInstalledOctaneCompilerTarget('/apps/packages/astro/src/Counter.tsrx')).toBe(false);
+	});
 });

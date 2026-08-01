@@ -1,8 +1,14 @@
-import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Absolute root of this `@octanejs/astro` package (workspace or installed). */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+/** Parent directory that holds sibling workspace packages (e.g. `…/packages`). */
+const WORKSPACE_PACKAGES_DIR = resolve(PACKAGE_ROOT, '..');
+
+/** @type {Map<string, boolean>} */
+const octanePackageNameCache = new Map();
 
 /**
  * Path filter for the Astro-scoped Octane Vite plugin. Skip Astro virtual
@@ -29,9 +35,9 @@ export function shouldSkipOctaneTransform(id) {
 }
 
 /**
- * True for published `@octanejs/*` (except this integration) and `octane`
- * under node_modules — project `include`/`exclude` must not gate these; they
- * ship raw Octane sources that always need the compiler.
+ * True for `@octanejs/*` (except this integration) and `octane` that must
+ * always reach the compiler — under `node_modules` or Vite-realpathed to a
+ * sibling of this package. Project `include`/`exclude` must not gate them.
  *
  * @param {string} id
  * @returns {boolean}
@@ -39,7 +45,8 @@ export function shouldSkipOctaneTransform(id) {
 export function isInstalledOctaneCompilerTarget(id) {
 	if (typeof id !== 'string' || id.startsWith('\0')) return false;
 	const clean = id.split('?', 1)[0] ?? id;
-	return isInstalledOctanePackagePath(clean);
+	if (isOctaneAstroIntegrationPath(clean)) return false;
+	return isInstalledOctanePackagePath(clean) || isRealpathedOctaneWorkspacePackage(clean);
 }
 
 /**
@@ -68,4 +75,40 @@ function isInstalledOctanePackagePath(clean) {
 			clean,
 		) || /(?:^|[\\/])node_modules[\\/]octane(?:[\\/]|$)/.test(clean)
 	);
+}
+
+/**
+ * Vite realpaths `workspace:*` links, so binding ids look like
+ * `…/packages/zustand/…` with no `node_modules` segment. Recognize siblings of
+ * this package whose `package.json` name is `octane` or `@octanejs/*`.
+ *
+ * @param {string} clean
+ */
+function isRealpathedOctaneWorkspacePackage(clean) {
+	const path = clean.replace(/\\/g, '/');
+	const packagesDir = WORKSPACE_PACKAGES_DIR.replace(/\\/g, '/');
+	if (!path.startsWith(packagesDir + '/')) return false;
+	const pkgSeg = path.slice(packagesDir.length + 1).split('/')[0];
+	if (!pkgSeg || pkgSeg === 'astro') return false;
+	return packageJsonIsOctaneCompilerTarget(join(WORKSPACE_PACKAGES_DIR, pkgSeg));
+}
+
+/**
+ * @param {string} pkgDir
+ * @returns {boolean}
+ */
+function packageJsonIsOctaneCompilerTarget(pkgDir) {
+	const cached = octanePackageNameCache.get(pkgDir);
+	if (cached !== undefined) return cached;
+	let ok = false;
+	try {
+		const name = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).name;
+		ok =
+			name === 'octane' ||
+			(typeof name === 'string' && name.startsWith('@octanejs/') && name !== '@octanejs/astro');
+	} catch {
+		ok = false;
+	}
+	octanePackageNameCache.set(pkgDir, ok);
+	return ok;
 }
