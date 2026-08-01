@@ -271,6 +271,114 @@ function plan(project, mode, integration) {
 	return { changes, manual };
 }
 
+/**
+ * Wire Octane into the project at `project.root`: plan the files, report them,
+ * apply them, install what is missing.
+ *
+ * Shared with `octane create`, which is the same work against a directory it
+ * has just made rather than one that was already there. Driving this from
+ * outside, by re-entering `main` with an argv, meant a second copy of every
+ * question about whether the CLI can prompt; one `ctx` removes that.
+ *
+ * @param {import('../../kernel/context.js').Ctx} ctx
+ * @param {import('../../kernel/project.js').Project} project
+ * @param {{ title: string, mode?: string, modeFlag?: string, install?: boolean,
+ *   packageManager?: string }} options
+ * @returns {Promise<{ exitCode?: number, json: Record<string, unknown> }>}
+ */
+export async function applyInit(ctx, project, options) {
+	const mode = /** @type {keyof typeof MODES} */ (
+		options.mode ??
+			(await ctx.ui.select({
+				message: 'What are you building?',
+				flag: options.modeFlag ?? '--mode',
+				initial: 'spa',
+				options: Object.entries(MODES).map(([value, entry]) => ({
+					value,
+					label: entry.label,
+					hint: entry.hint,
+				})),
+			}))
+	);
+
+	// Detection reads a lockfile, and a project that has never been installed
+	// has none to read. A caller that knows which manager it was invoked
+	// through can say so, rather than watching the fallback write the wrong
+	// kind of lockfile into a brand-new project.
+	const installing =
+		options.packageManager === undefined
+			? project
+			: {
+					...project,
+					packageManager: /** @type {typeof project.packageManager} */ (options.packageManager),
+				};
+
+	const integration = integrationFor(project.bundler, mode);
+	const { changes, manual } = plan(project, mode, integration);
+	const declared = project.declaredDependencies;
+	const dependencies = integration.dependencies.filter((name) => !declared[name]);
+	const devDependencies = integration.devDependencies.filter((name) => !declared[name]);
+
+	ctx.ui.intro(options.title);
+
+	if (changes.length === 0 && dependencies.length === 0 && devDependencies.length === 0) {
+		ctx.ui.outro('Already set up. Run `octane doctor` to confirm.');
+		return { json: { ok: true, mode, changes: [], installed: [] } };
+	}
+
+	ctx.ui.note(
+		ctx.dryRun ? 'Would change' : 'Will change',
+		changes.length > 0
+			? changes.map((c) => `${c.file}  ${ctx.ui.colors.dim(c.summary)}`)
+			: ['nothing'],
+	);
+	if (dependencies.length + devDependencies.length > 0) {
+		ctx.ui.note('Will install', [
+			...dependencies,
+			...devDependencies.map((name) => `${name} (dev)`),
+		]);
+	}
+
+	if (ctx.dryRun) {
+		return { json: { ok: true, dryRun: true, mode, changes: changes.map((c) => c.file), manual } };
+	}
+
+	const confirmed = await ctx.ui.confirm({ message: 'Apply?', flag: '--yes', initial: true });
+	if (!confirmed)
+		return { exitCode: EXIT.OK, json: { ok: true, mode, changes: [], installed: [] } };
+
+	for (const change of changes) change.apply();
+
+	/** @type {string[]} */
+	const installed = [];
+	if (options.install !== false && dependencies.length + devDependencies.length > 0) {
+		const spinner = ctx.ui.spinner(`Installing with ${installing.packageManager ?? 'npm'}`);
+		try {
+			for (const [names, dev] of [
+				[dependencies, false],
+				[devDependencies, true],
+			]) {
+				if (/** @type {string[]} */ (names).length === 0) continue;
+				await installPackages(ctx, installing, /** @type {string[]} */ (names), {
+					dev: Boolean(dev),
+				});
+				installed.push(.../** @type {string[]} */ (names));
+			}
+		} catch (error) {
+			spinner.stop('Install failed');
+			throw error;
+		}
+		spinner.stop(`Installed ${installed.length} package(s)`);
+	} else if (dependencies.length + devDependencies.length > 0) {
+		manual.push(`Install: ${[...dependencies, ...devDependencies].join(' ')}`);
+	}
+
+	if (manual.length > 0) ctx.ui.note('Do this by hand', manual);
+	ctx.ui.outro('Run `octane doctor` to verify the result.');
+
+	return { json: { ok: true, mode, changes: changes.map((c) => c.file), installed, manual } };
+}
+
 export default defineCommand({
 	requiresProject: true,
 	description:
@@ -298,109 +406,17 @@ export default defineCommand({
 	},
 
 	async run(ctx, input) {
-		const project = ctx.project();
-
 		if (!input.flags.force && !ctx.dryRun && (await isDirty(ctx))) {
 			throw new CliError('This project has uncommitted changes.', {
 				hint: 'Commit or stash first so you can review what init writes, or pass --force.',
 			});
 		}
 
-		const mode = /** @type {keyof typeof MODES} */ (
-			input.flags.mode ??
-				(await ctx.ui.select({
-					message: 'What are you building?',
-					flag: '--mode',
-					initial: 'spa',
-					options: Object.entries(MODES).map(([value, entry]) => ({
-						value,
-						label: entry.label,
-						hint: entry.hint,
-					})),
-				}))
-		);
-
-		// Detection reads a lockfile, and a project that has never been installed
-		// has none to read. A caller that knows which manager it was invoked
-		// through can say so, rather than watching the fallback write the wrong
-		// kind of lockfile into a brand-new project.
-		const installing =
-			input.flags['package-manager'] === undefined
-				? project
-				: {
-						...project,
-						packageManager: /** @type {typeof project.packageManager} */ (
-							input.flags['package-manager']
-						),
-					};
-
-		const integration = integrationFor(project.bundler, mode);
-		const { changes, manual } = plan(project, mode, integration);
-		const declared = project.declaredDependencies;
-		const dependencies = integration.dependencies.filter((name) => !declared[name]);
-		const devDependencies = integration.devDependencies.filter((name) => !declared[name]);
-
-		ctx.ui.intro('octane init');
-
-		if (changes.length === 0 && dependencies.length === 0 && devDependencies.length === 0) {
-			ctx.ui.outro('Already set up. Run `octane doctor` to confirm.');
-			return { json: { ok: true, mode, changes: [], installed: [] } };
-		}
-
-		ctx.ui.note(
-			ctx.dryRun ? 'Would change' : 'Will change',
-			changes.length > 0
-				? changes.map((c) => `${c.file}  ${ctx.ui.colors.dim(c.summary)}`)
-				: ['nothing'],
-		);
-		if (dependencies.length + devDependencies.length > 0) {
-			ctx.ui.note('Will install', [
-				...dependencies,
-				...devDependencies.map((name) => `${name} (dev)`),
-			]);
-		}
-
-		if (ctx.dryRun) {
-			return {
-				json: { ok: true, dryRun: true, mode, changes: changes.map((c) => c.file), manual },
-			};
-		}
-
-		const confirmed = await ctx.ui.confirm({ message: 'Apply?', flag: '--yes', initial: true });
-		if (!confirmed)
-			return { exitCode: EXIT.OK, json: { ok: true, mode, changes: [], installed: [] } };
-
-		for (const change of changes) change.apply();
-
-		/** @type {string[]} */
-		const installed = [];
-		if (input.flags.install && dependencies.length + devDependencies.length > 0) {
-			const spinner = ctx.ui.spinner(`Installing with ${installing.packageManager ?? 'npm'}`);
-			try {
-				for (const [names, dev] of [
-					[dependencies, false],
-					[devDependencies, true],
-				]) {
-					if (/** @type {string[]} */ (names).length === 0) continue;
-					await installPackages(ctx, installing, /** @type {string[]} */ (names), {
-						dev: Boolean(dev),
-					});
-					installed.push(.../** @type {string[]} */ (names));
-				}
-			} catch (error) {
-				spinner.stop('Install failed');
-				throw error;
-			}
-			spinner.stop(`Installed ${installed.length} package(s)`);
-		} else if (dependencies.length + devDependencies.length > 0) {
-			manual.push(`Install: ${[...dependencies, ...devDependencies].join(' ')}`);
-		}
-
-		if (manual.length > 0) ctx.ui.note('Do this by hand', manual);
-		ctx.ui.outro('Run `octane doctor` to verify the result.');
-
-		return {
-			json: { ok: true, mode, changes: changes.map((c) => c.file), installed, manual },
-		};
+		return applyInit(ctx, ctx.project(), {
+			title: 'octane init',
+			mode: input.flags.mode,
+			install: input.flags.install,
+			packageManager: input.flags['package-manager'],
+		});
 	},
 });

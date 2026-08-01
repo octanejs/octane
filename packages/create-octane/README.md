@@ -30,10 +30,15 @@ start.
 
 ## What it does
 
-It creates the directory and a `package.json`, then hands the directory to
-[`octane init`](../cli), which writes the TypeScript settings `.tsrx` needs, the
-bundler config, the scripts, and the entry files. Both commands scaffold the
-same project, because they run the same code.
+It runs [`octane create`](../cli), which makes the directory and its
+`package.json` and then writes the TypeScript settings `.tsrx` needs, the
+bundler config, the scripts, and the entry files. That last part is the same
+code `octane init` runs against a project you already have, so the two cannot
+scaffold different projects.
+
+This package is only the entry point. Everything above lives in
+[`@octanejs/cli`](../cli), so `npm create octane my-app` and
+`octane create my-app` are the same command reached two ways.
 
 Dependencies are installed through your package manager, which is also what
 records them in `package.json`. Pass `--no-install` to skip that, and the list

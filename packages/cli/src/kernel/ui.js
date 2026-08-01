@@ -129,6 +129,22 @@ export function createUi({ mode, yes = false, stdout = process.stdout }) {
 		},
 
 		/**
+		 * A free-text answer. `initial` is what an empty submission means, not
+		 * pre-filled input: someone accepting the offer by pressing enter and
+		 * someone typing it out should land in the same place.
+		 *
+		 * @param {{ message: string, flag: string, placeholder?: string, initial?: string }} options
+		 * @returns {Promise<string>}
+		 */
+		async text({ message, flag, placeholder, initial }) {
+			if (mode !== 'interactive') return String(unattended(flag, initial));
+			const answer = String(
+				guard(await clack.text({ message, placeholder, defaultValue: initial })),
+			);
+			return answer.trim() === '' && initial !== undefined ? initial : answer.trim();
+		},
+
+		/**
 		 * @param {{ message: string, flag: string, options: Choice[], initial?: string[] }} options
 		 * @returns {Promise<string[]>}
 		 */

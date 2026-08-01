@@ -3,24 +3,30 @@
 '@octanejs/cli': patch
 ---
 
-Add `create-octane`, and give `octane init` the files an app needs to actually run.
+Add `octane create` and `create-octane`, and give `octane init` the files an app
+needs to actually run.
 
 `npm create octane my-app` now scaffolds a project from an empty directory.
 There are two templates, matching the two shapes `octane init` already knew:
 `spa` for a client-only app, and `fullstack` for routing, server rendering, and
 a production build.
 
+The scaffold is `octane create`, a command in the CLI. The published
+`create-octane` is only the entry point: `npm create octane` arrives with the
+project name as the first argument, so its bin puts `create` in front of argv
+and hands over. Everything else, including the two templates and the files
+themselves, is shared with `octane init`, which does the same work against a
+project that already exists.
+
 Leave an argument off and you are asked for it, so `npm create octane` on its
 own walks through a project name, offered as `octane-app`, and a template. A
 flag always wins over a question, and with nothing to answer on, a missing
 argument is a usage error rather than a prompt nobody can see.
 
-On a terminal, `init` still lists what it will write and install and asks to
-confirm, the same as running it yourself. Declining leaves nothing behind:
-`create-octane` removes the directory and the manifest it had created and says
-so, rather than reporting a project that was never written. With nobody there to
-answer, `--yes` is passed instead, decided by asking the CLI whether it can
-prompt rather than by guessing.
+On a terminal it still lists what it will write and install and asks to confirm,
+the same as running `octane init` yourself. Declining leaves nothing behind: the
+directory and the manifest it had created are removed and it says so, rather
+than reporting a project that was never written.
 
 Installing goes through the manager that ran the command, read from
 `npm_config_user_agent`, so `pnpm create octane` installs with pnpm rather than
@@ -32,11 +38,13 @@ accepted and `cd My App!` is not a command anyone can paste. After
 gains `--package-manager <name>`, which also covers running it by hand in a
 project that has no lockfile to detect yet.
 
-Two other CLI fixes came out of that. `--yes` now means "stop asking" on a terminal
-too: it was consulted only once the CLI had decided nobody was watching, so
-typing it in a real shell did nothing. And `resolveMode` is exported, so a
-caller driving `main` can get the CLI's own answer to whether it will prompt
-instead of keeping a second copy of the rule.
+One other CLI fix came out of that. `--yes` now means "stop asking" on a
+terminal too: it was consulted only once the CLI had decided nobody was
+watching, so typing it in a real shell did nothing.
+
+`ctx.ui` gains `text`, the free-text prompt the project name needs. An empty
+submission means the offered default, so accepting it by pressing enter and
+typing it out land in the same place.
 
 Both templates are deliberately bare: one component, no styling, and the
 smallest config that runs. A scaffolded project also passes its own
@@ -52,10 +60,7 @@ package.json wins over a config file when a project has both. A field holding a
 path is followed to the file it names, and one naming a shareable config is
 reported as settings this command cannot read.
 
-The package creates the directory and its `package.json`, then hands the
-directory to `octane init`. The templates stay in the CLI rather than being
-copied here, so the two commands cannot drift into scaffolding different
-projects. A directory has to be empty, except that a fresh `.git` is allowed,
+A directory has to be empty, except that a fresh `.git` is allowed,
 since `mkdir app && cd app && git init` is a common way to start and holds no
 work to protect. A name that lands on an existing file is reported as one,
 rather than read as a directory and thrown as `ENOTDIR`.

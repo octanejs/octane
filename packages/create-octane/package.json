@@ -34,14 +34,12 @@
     "create-octane": "src/bin.js"
   },
   "exports": {
-    ".": "./src/index.js",
     "./package.json": "./package.json"
   },
   "scripts": {
     "test": "cd ../.. && vitest run --project create-octane"
   },
   "dependencies": {
-    "@clack/prompts": "catalog:default",
     "@octanejs/cli": "workspace:*"
   },
   "devDependencies": {

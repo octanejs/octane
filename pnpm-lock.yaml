@@ -3992,9 +3992,6 @@ importers:
 
   packages/create-octane:
     dependencies:
-      '@clack/prompts':
-        specifier: catalog:default
-        version: 1.7.0
       '@octanejs/cli':
         specifier: workspace:*
         version: link:../cli
