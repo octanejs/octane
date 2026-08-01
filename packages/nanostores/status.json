@@ -1,0 +1,16 @@
+{
+  "upstream": {
+    "package": "@nanostores/react",
+    "version": "1.1.0"
+  },
+  "surface": "Complete 1:1 port: the framework-agnostic `nanostores` core (atom, map, computed, listenKeys, …) is reused verbatim; the thin React binding `useStore` is reimplemented on Octane's hooks (`useSyncExternalStore`, `useCallback`, `useRef`) with the same `UseStoreOptions` (`deps`, `keys`, `ssr`).",
+  "divergences": [
+    "Hook slots: Octane keys hooks by a compiler-injected per-call-site Symbol, so `useStore` accepts the caller's slot as a trailing arg and derives stable child slots via an internal `subSlot` helper. This is an Octane mechanism, not a public-API difference — `useStore(store)`/`useStore(store, opts)` behave identically to React."
+  ],
+  "ssr": "Supported via the `ssr` option (`'initial'` or a `getServerSnapshot` function) fed to Octane's `useSyncExternalStore`; server/client hydration is covered by tests compiling the same `.tsrx` fixture in both modes.",
+  "verified": "2026-08-01",
+  "notes": [
+    "2026-08-01: Confirmed the reported \"hook slots collide without parent\" is not a defect — `useStore` is reached through `withSlot`, so `subSlot` returning undefined resolves to the caller's distinct call-site symbol (same as every other @octanejs binding). Empirical test in `test/slot-collision.test.tsrx`.",
+    "2026-08-01: `subSlot` was un-exported and memoized to match the sibling-binding convention; it is no longer part of the public surface (upstream exports only `useStore` + `UseStoreOptions`)."
+  ]
+}

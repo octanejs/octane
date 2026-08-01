@@ -28,11 +28,33 @@ import { useCallback, useRef, useSyncExternalStore } from 'octane'
 // custom hook. Follows the convention used by the official @octanejs bindings:
 // when the component's call site supplies a slot, each internal hook call gets
 // a deterministic `<slot>:<tag>` Symbol; without a slot we pass undefined and
-// let the hook fall back to its default identity.
-export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-  return slot !== undefined
-    ? Symbol.for((slot.description ?? '') + ':' + tag)
-    : undefined
+// let the hook fall back to its default identity (resolveSlot folds in the
+// caller's call-site symbol from the withSlot path stack — so a slotless
+// wrapper does NOT collapse its inner hooks onto one identity).
+//
+// Memoized — subSlot runs per hook call per render, and the naive form pays a
+// string concat + global symbol-registry lookup each time. The cache is keyed
+// by the slot symbol itself; the minted value is byte-identical to the uncached
+// Symbol.for result, so identity is preserved across re-renders and across the
+// per-package copies of this helper. Key universe is bounded: slots are
+// per-call-site module constants (never minted per render).
+let subSlotCache = new Map<symbol, Map<string, symbol>>()
+// Internal: not exported. Upstream `@nanostores/react` exports only `useStore`
+// and `UseStoreOptions`; `subSlot` is an Octane hook-slot helper that lives here
+// only because `package.json` opts this module into `octane.hookSlots.manual`.
+function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
+  if (slot === undefined) {
+    return undefined
+  }
+  let byTag = subSlotCache.get(slot)
+  if (byTag === undefined) {
+    subSlotCache.set(slot, (byTag = new Map()))
+  }
+  let sym = byTag.get(tag)
+  if (sym === undefined) {
+    byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':' + tag)))
+  }
+  return sym
 }
 
 type StoreKeys<T> = T extends { setKey: (k: infer K, v: any) => unknown }
@@ -116,14 +138,17 @@ export function useStore<SomeStore extends Store>(
   // (e.g. `useReducer(reducer, initialArg, initOrSlot, slot)`). A Symbol is
   // never a valid `UseStoreOptions` value, so `typeof options === "symbol"` is
   // the unambiguous discriminator octane uses throughout its runtime.
-  if (typeof options === "symbol") {
+  if (typeof options === 'symbol') {
     slot = options
     options = undefined
   }
 
   let { keys, deps = [store, keys], ssr } = options ?? {}
 
-  let snapshotRef = useRef<StoreValue<SomeStore>>(store.get(), subSlot(slot, 'ref'))
+  let snapshotRef = useRef<StoreValue<SomeStore>>(
+    store.get(),
+    subSlot(slot, 'ref')
+  )
   snapshotRef.current = store.get()
 
   let subscribe = useCallback(
@@ -134,7 +159,11 @@ export function useStore<SomeStore extends Store>(
         // Keep runtime parity with upstream: a non-map store passed with
         // `keys` fails inside nanostores exactly as it always has (see the
         // index.ts override in oxlint.config.ts for the assertion)
-        return listenKeys(store as StoreWithKeys, keys, emit(snapshotRef, onChange))
+        return listenKeys(
+          store as StoreWithKeys,
+          keys,
+          emit(snapshotRef, onChange)
+        )
       }
       return store.listen(emit(snapshotRef, onChange))
     },
@@ -152,5 +181,10 @@ export function useStore<SomeStore extends Store>(
         : ssr
   }
 
-  return useSyncExternalStore(subscribe, get, server, subSlot(slot, 'external-store'))
+  return useSyncExternalStore(
+    subscribe,
+    get,
+    server,
+    subSlot(slot, 'external-store')
+  )
 }
