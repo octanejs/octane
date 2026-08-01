@@ -57,8 +57,10 @@ describe('docs search index', () => {
 		const snippets = result.lines.map((line) => line.parts.map((part) => part.text).join(''));
 
 		expect(result.slug).toBe('quick-start');
+		// Spans a sentence boundary on purpose: the prose has to come through
+		// whole, not cut at the first full stop inside the expression.
 		expect(snippets.join(' ')).toContain(
-			'requires Node.js 22 or newer. Octane is currently alpha software',
+			'you need Node.js 22 or newer. Octane is currently alpha software',
 		);
 		expect(snippets.join(' ')).not.toMatch(/[{}]/);
 	});

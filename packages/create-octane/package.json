@@ -1,0 +1,48 @@
+{
+  "name": "create-octane",
+  "version": "0.0.1",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Create an Octane app: npm create octane my-app",
+  "license": "MIT",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/create-octane"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "octane",
+    "create",
+    "scaffold",
+    "tsrx"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "create-octane": "src/bin.js"
+  },
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "cd ../.. && vitest run --project create-octane"
+  },
+  "dependencies": {
+    "@octanejs/cli": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "catalog:default"
+  }
+}
