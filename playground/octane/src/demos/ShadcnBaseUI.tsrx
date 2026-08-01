@@ -1,18 +1,33 @@
 // The Base UI base of @octanejs/shadcn, rendered from the package's own
 // per-family subpaths (@octanejs/shadcn/base-ui/<Family>).
 //
-// THIS IS A PARTIAL BASE. Only the families that need no headless primitive are
-// here yet; everything primitive-backed (Button, Checkbox, Switch, Dialog,
-// Popover, …) is still waiting on transcribed upstream sources, because Base
-// UI's primitive API is structurally different from React Aria's and cannot be
-// derived from the aria base.
+// THIS IS A PARTIAL BASE, and the families here have three different pedigrees.
+// Check them differently:
 //
-// WHAT TO LOOK FOR when checking manually: only `Alert` has been verified
-// byte-identical to upstream's Base UI source. The other five were derived from
-// this package's React Aria base, so compare them against the React Aria tab —
-// they SHOULD look the same, and any difference is a porting bug worth
-// reporting. `Skeleton` is the likeliest to be wrong: its background token is
-// known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
+//   Accordion — transcribed from upstream and running on the real
+//     @octanejs/base-ui accordion primitive. The only genuinely INTERACTIVE
+//     family so far, so exercise it: single mode should collapse an open item
+//     when its trigger is clicked, opening one should close the others, and the
+//     disabled item should not respond at all.
+//
+//   Alert — transcribed and verified byte-identical to upstream's source. Should
+//     need no scrutiny.
+//
+//   Everything else — DERIVED from this package's React Aria base, not
+//     transcribed. Compare against the React Aria tab: they should look
+//     identical, and any difference is a porting bug worth reporting.
+//     `Skeleton` is the likeliest to be wrong, since its background token is
+//     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
+//
+// Still absent: every other primitive-backed family (Button, Checkbox, Switch,
+// Dialog, Popover, …). Base UI's primitive API is structurally different from
+// React Aria's, so those cannot be derived and need transcribed sources.
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from '@octanejs/shadcn/base-ui/Accordion';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/base-ui/Alert';
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
 import {
@@ -56,13 +71,40 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 6 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 7 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Only Alert is verified against upstream's Base UI source. The rest are derived from the
-				React Aria base: compare the two tabs, they should be visually identical. Primitive-backed
-				families (Button, Checkbox, Switch, Dialog, …) are not ported yet.
+				Accordion is transcribed from upstream and runs on the real primitive. Alert is verified
+				against upstream's Base UI source. The rest are derived from the React Aria base: compare
+				the two tabs, they should be visually identical. Primitive-backed families (Button,
+				Checkbox, Switch, Dialog, …) are not ported yet.
 			</p>
 		</div>
+
+		<Section
+			title="Accordion"
+			note="Transcribed from upstream. Runs on the @octanejs/base-ui accordion primitive — this one is really interactive, so click the triggers."
+		>
+			<Accordion defaultValue={['item-1']}>
+				<AccordionItem value="item-1">
+					<AccordionTrigger>Is it accessible?</AccordionTrigger>
+					<AccordionContent>
+						Yes. The trigger is a real button, the panel gets role="region", and the two are wired
+						together with aria-controls and aria-labelledby.
+					</AccordionContent>
+				</AccordionItem>
+				<AccordionItem value="item-2">
+					<AccordionTrigger>Does single mode collapse?</AccordionTrigger>
+					<AccordionContent>
+						Opening this one should close the others, and clicking an open trigger should close it.
+						That behavior had no test upstream under jsdom, so a regression test was added.
+					</AccordionContent>
+				</AccordionItem>
+				<AccordionItem value="item-3" disabled>
+					<AccordionTrigger>Disabled item</AccordionTrigger>
+					<AccordionContent>You should not be able to reach this.</AccordionContent>
+				</AccordionItem>
+			</Accordion>
+		</Section>
 
 		<Section title="Alert" note="Verified byte-identical to upstream.">
 			<div class="space-y-3">

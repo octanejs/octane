@@ -166,6 +166,8 @@ import { Textarea as X75 } from '@octanejs/shadcn/react-aria/Textarea';
 type _75 = Assert<NotAny<typeof X75>>;
 import { toggleVariants as X76 } from '@octanejs/shadcn/react-aria/Toggle';
 type _76 = Assert<NotAny<typeof X76>>;
+import { Accordion as X86 } from '@octanejs/shadcn/base-ui/Accordion';
+type _86 = Assert<NotAny<typeof X86>>;
 import { alertVariants as X79 } from '@octanejs/shadcn/base-ui/Alert';
 type _79 = Assert<NotAny<typeof X79>>;
 import { AspectRatio as X80 } from '@octanejs/shadcn/base-ui/AspectRatio';

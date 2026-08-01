@@ -104,6 +104,7 @@
     "./react-aria/Tabs": "./src/bases/react-aria/ui/tabs.tsrx",
     "./react-aria/Textarea": "./src/bases/react-aria/ui/textarea.tsrx",
     "./react-aria/Toggle": "./src/bases/react-aria/ui/toggle.tsrx",
+    "./base-ui/Accordion": "./src/bases/base-ui/ui/accordion.tsrx",
     "./base-ui/Alert": "./src/bases/base-ui/ui/alert.tsrx",
     "./base-ui/AspectRatio": "./src/bases/base-ui/ui/aspect-ratio.tsrx",
     "./base-ui/Card": "./src/bases/base-ui/ui/card.tsrx",
@@ -124,6 +125,7 @@
   },
   "dependencies": {
     "@octanejs/aria": "workspace:*",
+    "@octanejs/base-ui": "workspace:*",
     "@octanejs/lucide": "workspace:*",
     "@octanejs/radix": "workspace:*",
     "@octanejs/sonner": "workspace:*",
