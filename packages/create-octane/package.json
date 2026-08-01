@@ -1,6 +1,6 @@
 {
   "name": "create-octane",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "engines": {
     "node": ">=22"

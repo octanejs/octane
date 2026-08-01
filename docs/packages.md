@@ -18,7 +18,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.18` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.16` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.20` | 2 |
-| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.1` | 2 |
+| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.2` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.5` | 1 |
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.10` | 1 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.15` | 1 |
@@ -75,7 +75,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.22` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.2` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.21` | 5 |
-| `create-octane` | [`packages/create-octane`](../packages/create-octane) | other package | `0.0.1` | 1 |
+| `create-octane` | [`packages/create-octane`](../packages/create-octane) | other package | `0.0.2` | 1 |
 | `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.22` | 20 |
 
 ## Private packages
