@@ -8,8 +8,12 @@ const MANAGERS = {
 	bun: { add: ['add'], dev: '-d' },
 };
 
-/** The managers this CLI knows how to drive. */
-export const PACKAGE_MANAGERS = /** @type {const} */ (['pnpm', 'npm', 'yarn', 'bun']);
+/**
+ * The managers this CLI knows how to drive. Derived rather than written out, so
+ * that a flag can never offer a manager `installCommand` would silently answer
+ * with npm's spelling.
+ */
+export const PACKAGE_MANAGERS = Object.keys(MANAGERS);
 
 /**
  * @param {import('./project.js').Project} project

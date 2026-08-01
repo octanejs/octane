@@ -15,7 +15,12 @@ const SOURCE_EXTENSIONS = new Set(['.tsrx', '.tsx', '.ts', '.jsx', '.js', '.mts'
 const SOURCE_FILE_LIMIT = 5000;
 const EXTENDS_LIMIT = 10;
 
-const LOCKFILES = /** @type {const} */ ([
+/**
+ * Which lockfile means which manager. Exported so the installer's coverage of
+ * these can be checked: a lockfile naming a manager the installer has no
+ * spelling for would be detected and then installed through npm.
+ */
+export const LOCKFILES = /** @type {const} */ ([
 	['pnpm-lock.yaml', 'pnpm'],
 	['package-lock.json', 'npm'],
 	['yarn.lock', 'yarn'],
