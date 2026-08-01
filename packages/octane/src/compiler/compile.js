@@ -4405,6 +4405,31 @@ export function hasOwnValueReturn(node) {
 }
 
 /**
+ * Whether a statement list always completes abruptly, so control can never fall
+ * past its end. Lets an outputless `@{ … }` body drop the tail return it would
+ * otherwise synthesize, because the body's own returns already cover every path.
+ *
+ * Deliberately syntactic: `return`, `throw`, a block that ends abruptly, and an
+ * if/else whose arms both do. Anything subtler keeps the tail, which is always
+ * safe — the runtime reads a fallen-through `undefined` as "this body already
+ * emitted its template", so the tail must stay wherever reachability is unproven.
+ */
+function alwaysCompletesAbruptly(statements) {
+	const last = statements[statements.length - 1];
+	if (!last) return false;
+	if (last.type === 'ReturnStatement' || last.type === 'ThrowStatement') return true;
+	if (last.type === 'BlockStatement') return alwaysCompletesAbruptly(last.body || []);
+	if (last.type === 'IfStatement') {
+		return (
+			!!last.alternate &&
+			alwaysCompletesAbruptly([last.consequent]) &&
+			alwaysCompletesAbruptly([last.alternate])
+		);
+	}
+	return false;
+}
+
+/**
  * A mixed shorthand's early return must always reach renderReturnedValue. The
  * runtime reserves `undefined` for a compiled-void body that already emitted its
  * template, so normalize every component-level early return through `?? null`.
@@ -10562,10 +10587,20 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const shellOrigin = node.loc ? node : node.id?.loc ? node.id : prevFnOrigin;
 	let plan = null;
 	let returnedExpression = null;
-	if (returnedOutput) {
-		const rendered = jsxNodes[0];
+	if (returnedOutput && jsxNodes.length === 0) {
+		// A `@{ … }` body can carry value returns with NO trailing output node —
+		// `@{ … return null }` while a component is being written, or a React-shaped
+		// `return <jsx>` inside the block. There is no template to lower: the body's
+		// own returns are the whole output, so the tail is a plain `null` covering
+		// the fall-through path. When the body provably never falls through, that
+		// tail is unreachable and is dropped. Statement returns already normalized
+		// to `?? null`.
+		if (!alwaysCompletesAbruptly(rewrittenStatements)) {
+			returnedExpression = b.literal(null, 'null', node);
+		}
+	} else if (returnedOutput) {
 		returnedExpression = lowerReturnJsx(
-			rewriteHookCalls(rendered, ctx, name, options?.localHookSlots === true),
+			rewriteHookCalls(jsxNodes[0], ctx, name, options?.localHookSlots === true),
 			ctx,
 			inlinedSubs,
 			cssHash,
