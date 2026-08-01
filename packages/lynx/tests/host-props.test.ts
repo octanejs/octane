@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
 	LYNX_CSS_SCOPE_PROP,
@@ -36,6 +37,21 @@ describe('Lynx host prop normalization', () => {
 			undefined,
 		);
 		expect(planLynxHostPropPatch('view', { class: 'a' }, {}).classes?.value).toBe('');
+	});
+
+	it('accepts a style and CSS-scope object authored in another realm', () => {
+		// Host props reach the main thread from the background — a distinct realm in
+		// production (an iframe on Lynx for Web) — so a `style`/CSS-scope object is
+		// plain but carries the sender realm's Object.prototype. A prototype-identity
+		// check rejected it as "must be a plain object", aborting every commit that
+		// styled a node. Author them in a real second realm to prove they normalize.
+		const foreign = vm.runInNewContext(
+			`({ style: { backgroundColor: 'red', width: '100rpx' }, scope: { cssId: 7, entryName: 'main' } })`,
+		) as { style: object; scope: object };
+		expect(Object.getPrototypeOf(foreign.style)).not.toBe(Object.prototype);
+
+		expect(normalizeLynxInlineStyle(foreign.style)).toBe('background-color:red;width:100rpx');
+		expect(decodeLynxCSSScopeMetadata(foreign.scope)).toEqual({ cssId: 7, entryName: 'main' });
 	});
 
 	it('serializes object styles, custom properties, and supported Lynx units', () => {

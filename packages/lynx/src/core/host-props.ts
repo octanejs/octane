@@ -1,4 +1,5 @@
 import { LYNX_NODES_REF_ATTRIBUTE } from './nodes-ref.js';
+import { hasCrossRealmPlainPrototype } from './plain-object.js';
 import {
 	parseLynxMainThreadEventProp,
 	parseLynxNativeEventProp,
@@ -211,8 +212,7 @@ export function normalizeLynxInlineStyle(value: unknown): string | undefined {
 	if (typeof value !== 'object' || Array.isArray(value)) {
 		throw propError('style must be a string, a plain object, null, or undefined.');
 	}
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) {
+	if (!hasCrossRealmPlainPrototype(value)) {
 		throw propError('style must be a plain object.');
 	}
 
@@ -246,8 +246,7 @@ export function decodeLynxCSSScopeMetadata(value: unknown): NormalizedLynxCSSSco
 	if (typeof value !== 'object' || Array.isArray(value)) {
 		throw propError('CSS scope metadata must be a number, plain object, null, or undefined.');
 	}
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) {
+	if (!hasCrossRealmPlainPrototype(value)) {
 		throw propError('CSS scope metadata must be a plain object.');
 	}
 	for (const name of Object.keys(value)) {

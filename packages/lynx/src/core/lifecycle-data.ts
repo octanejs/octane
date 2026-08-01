@@ -1,4 +1,5 @@
 import { hasOwnSymbolFields } from './own-symbols.js';
+import { hasCrossRealmPlainPrototype } from './plain-object.js';
 import type { UniversalSerializableValue } from 'octane/universal/native';
 import type { Lynx, LynxGlobalEventEmitter } from '../platform.js';
 import {
@@ -172,8 +173,7 @@ function cloneLifecycleValue(
 			return Object.freeze(output);
 		}
 
-		const prototype = Object.getPrototypeOf(value);
-		if (prototype !== Object.prototype && prototype !== null) {
+		if (!hasCrossRealmPlainPrototype(value)) {
 			throw lifecycleDataError(label, 'requires arrays or plain objects.');
 		}
 		const names = ownEnumerableDataNames(value, label);
@@ -197,8 +197,7 @@ export function snapshotLynxLifecycleData(value: unknown, label = 'data'): LynxL
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		throw lifecycleDataError(label, 'must be a plain object.');
 	}
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) {
+	if (!hasCrossRealmPlainPrototype(value)) {
 		throw lifecycleDataError(label, 'must be a plain object.');
 	}
 	return cloneLifecycleValue(value, label, {
@@ -222,8 +221,7 @@ function lifecycleRecordEntries(
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		throw lifecycleDataError(label, 'must be a plain object.');
 	}
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) {
+	if (!hasCrossRealmPlainPrototype(value)) {
 		throw lifecycleDataError(label, 'must be a plain object.');
 	}
 	const entries: Array<readonly [string, UniversalSerializableValue]> = [];
@@ -233,8 +231,7 @@ function lifecycleRecordEntries(
 			throw lifecycleDataError(`${label}.${name}`, 'contains a non-clone-safe value.');
 		}
 		if (field !== null && typeof field === 'object' && !Array.isArray(field)) {
-			const fieldPrototype = Object.getPrototypeOf(field);
-			if (fieldPrototype !== Object.prototype && fieldPrototype !== null) {
+			if (!hasCrossRealmPlainPrototype(field)) {
 				throw lifecycleDataError(`${label}.${name}`, 'requires an array or plain object.');
 			}
 		}

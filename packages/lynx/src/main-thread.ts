@@ -1,4 +1,5 @@
 import { hasOwnSymbolFields } from './core/own-symbols.js';
+import { hasCrossRealmPlainPrototype } from './core/plain-object.js';
 import type {
 	UniversalComponent,
 	UniversalHostBatch,
@@ -212,8 +213,7 @@ function lifecycleRecord(value: unknown, label: string): Record<string, unknown>
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		throw new TypeError(`Octane Lynx ${label} must be a plain object.`);
 	}
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) {
+	if (!hasCrossRealmPlainPrototype(value)) {
 		throw new TypeError(`Octane Lynx ${label} must be a plain object.`);
 	}
 	if (hasOwnSymbolFields(value)) {

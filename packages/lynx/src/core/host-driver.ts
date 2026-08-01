@@ -16,6 +16,7 @@ import {
 	type LynxNativeEventBinding,
 	type LynxNativeEventToken,
 } from './native-events.js';
+import { hasCrossRealmPlainPrototype } from './plain-object.js';
 import {
 	createLynxFirstTree,
 	LYNX_FIRST_TREE_STATE,
@@ -394,8 +395,9 @@ function cloneHostValue(value: unknown, clones: WeakMap<object, object>): unknow
 	if (Array.isArray(value)) {
 		clone = [];
 	} else {
-		const prototype = Object.getPrototypeOf(value);
-		if (prototype !== Object.prototype && prototype !== null) {
+		// Host props arrive from the background thread, a distinct realm in
+		// production, so their prototype is that realm's Object.prototype.
+		if (!hasCrossRealmPlainPrototype(value)) {
 			throw hostError(
 				`host props require plain objects, received ${Object.prototype.toString.call(value)}.`,
 			);

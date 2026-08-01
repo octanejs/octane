@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	UNIVERSAL_TRANSPORT_PROTOCOL_VERSION,
@@ -234,6 +235,56 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 }
 
 describe('@octanejs/lynx transported protocol', () => {
+	it('validates messages built in another realm, as the background thread is in production', () => {
+		// The two Lynx threads are separate JS realms in production — on Lynx for
+		// Web the background runs in its own iframe/worker — so every message a
+		// thread receives is a plain object whose prototype is the *sender's*
+		// realm's Object.prototype, never identical to the receiver's. A
+		// prototype-identity plain-object check rejected all of them: the readiness
+		// handshake never completed (`main-ready-request` bounced) and no commit
+		// could apply, so the background could not commit and nothing updated. The
+		// single-realm jsdom suite could never observe this. Build the envelopes in
+		// a real second realm and prove both validators accept them.
+		const foreign = vm.runInNewContext(
+			`({
+				request: {
+					protocol: ${LYNX_TRANSPORT_PROTOCOL_VERSION},
+					renderer: ${JSON.stringify(LYNX_TRANSPORT_RENDERER)},
+					type: 'main-ready-request',
+					request: 1,
+				},
+				reply: {
+					protocol: ${LYNX_TRANSPORT_PROTOCOL_VERSION},
+					renderer: ${JSON.stringify(LYNX_TRANSPORT_RENDERER)},
+					type: 'main-ready',
+					request: 0,
+				},
+				commit: {
+					protocol: ${LYNX_TRANSPORT_PROTOCOL_VERSION},
+					renderer: ${JSON.stringify(LYNX_TRANSPORT_RENDERER)},
+					root: 1,
+					version: 1,
+					type: 'commit',
+					batch: {
+						renderer: ${JSON.stringify(LYNX_TRANSPORT_RENDERER)},
+						version: 1,
+						commands: [{ op: 'create', id: 1, type: 'view', props: { value: 1 } }],
+					},
+				},
+			})`,
+		) as { request: LynxMainReadyRequest; reply: unknown; commit: unknown };
+
+		// The objects are genuinely cross-realm: their prototype is not this realm's.
+		expect(Object.getPrototypeOf(foreign.request)).not.toBe(Object.prototype);
+		expect(Object.getPrototypeOf((foreign.commit as { batch: object }).batch)).not.toBe(
+			Object.prototype,
+		);
+
+		expect(validateLynxBackgroundOutboundMessage(foreign.request)).toBe(foreign.request);
+		expect(validateLynxBackgroundOutboundMessage(foreign.commit)).toBe(foreign.commit);
+		expect(validateLynxBackgroundInboundMessage(foreign.reply)).toBe(foreign.reply);
+	});
+
 	it('pins the universal protocol and strictly validates every envelope', () => {
 		expect(LYNX_TRANSPORT_PROTOCOL_VERSION).toBe(UNIVERSAL_TRANSPORT_PROTOCOL_VERSION);
 		const commit: UniversalTransportCommitMessage = {
