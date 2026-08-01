@@ -115,6 +115,12 @@ Typecheck any program containing `.tsrx` with `tsrx-tsc --noEmit`, never plain
 `tsc`. Octane-owned `.tsx` files carry a leading `/** @jsxImportSource octane */`
 pragma. Use `OctaneNode` for renderables, never `React.ReactNode`.
 
+## Published packages
+
+Ship every importable `.tsrx`, `.tsx`, `.ts`, and `.js` module as authored and
+point package exports at that source. Never publish Octane compiler output; the
+consuming application compiles the source with its own toolchain.
+
 ## Working here
 
 ```bash

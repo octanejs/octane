@@ -51,6 +51,7 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, and Chrome trace data.
 - [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
+- [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): Ship the complete authored source graph, including `.tsrx`, `.tsx`, `.ts`, and `.js`, point package exports at that source, and let the consuming application compile it. Do not publish precompiled Octane output.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
 - [Playground](https://octanejs.dev/playground): Write TSRX or TSX in the browser and see the compiled octane output and the live rendered result side by side.
