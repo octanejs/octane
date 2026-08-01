@@ -180,7 +180,9 @@ function plan(project, mode, integration) {
 			// files only make sense together. fullstack needs no entry here: the
 			// plugin injects hydration, in dev through its middleware and in
 			// production at transformIndexHtml.
-			if (mode === 'spa') {
+			// Guarded like every other file here: a project can have lost its
+			// index.html and still own the entry that used to be loaded from it.
+			if (mode === 'spa' && !existsSync(at('src/main.ts'))) {
 				changes.push({
 					file: 'src/main.ts',
 					summary: 'create, mounting App into #root',

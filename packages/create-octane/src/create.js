@@ -143,7 +143,11 @@ export function parseArgv(argv) {
  * @param {{ cwd?: string, stdout?: NodeJS.WritableStream, stderr?: NodeJS.WritableStream,
  *   tty?: boolean, prompts?: Prompts,
  *   cli?: { env?: NodeJS.ProcessEnv, stdout?: NodeJS.WritableStream,
- *     stderr?: NodeJS.WritableStream, tty?: boolean } }} [options]
+ *     stderr?: NodeJS.WritableStream, tty?: boolean, exec?: {
+ *       which: (bin: string) => string | null,
+ *       run: (file: string, args: string[], options?: { cwd?: string })
+ *         => Promise<{ code: number, stdout: string, stderr: string }>,
+ *     } } }} [options]
  * @returns {Promise<number>}
  */
 export async function create(argv, options = {}) {
@@ -245,19 +249,22 @@ export async function create(argv, options = {}) {
 	// same style as the questions above rather than dropping to plain text
 	// halfway through.
 	const exitCode = await main(argvForInit, cli);
-	if (exitCode !== EXIT.OK) return exitCode;
 
-	// A successful exit does not mean init wrote anything: declining its confirm
-	// is a normal, successful answer. Only the manifest written above would be
-	// left behind, and a lone package.json is not a project, so this undoes its
-	// own work rather than reporting a scaffold that does not exist. The
-	// directory goes only when this command is the one that made it.
+	// Whether init succeeded or failed, it may have written nothing, and a lone
+	// package.json is not a project. Declining the confirm is a normal,
+	// successful answer; an install that failed is not, and both leave the same
+	// nothing behind. Undoing it matters either way, because the directory it
+	// left would make the obvious retry fail as already occupied. The directory
+	// itself goes only when this command is the one that made it, and anything
+	// init did manage to write is left alone to be looked at.
 	if (readdirSync(target).length <= 1) {
 		rmSync(path.join(target, 'package.json'), { force: true });
 		if (!existed) rmSync(target, { recursive: true, force: true });
-		stdout.write('Nothing was created.\n');
-		return EXIT.OK;
+		if (exitCode === EXIT.OK) stdout.write('Nothing was created.\n');
+		return exitCode;
 	}
+
+	if (exitCode !== EXIT.OK) return exitCode;
 
 	// No frame of its own around any of this. init already draws one around its
 	// report, and a second set of borders from here only ever left a dangling

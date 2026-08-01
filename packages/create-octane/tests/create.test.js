@@ -156,6 +156,25 @@ describe('create-octane', () => {
 		expect(read(cwd, 'my-app/keep.txt')).toBe('mine\n');
 	});
 
+	it('keeps the scaffold when only the install failed', async () => {
+		// init writes the files before it installs anything, so a failed install
+		// leaves a project that needs one command to finish. Removing it because
+		// the exit code was non-zero would throw that away.
+		const cwd = workspace();
+		const failing = {
+			which: () => '/usr/bin/npm',
+			run: async () => ({ code: 1, stdout: '', stderr: 'network is down' }),
+		};
+
+		const result = await run(['my-app', '--template', 'spa'], cwd, {
+			cli: { tty: false, exec: failing },
+		});
+
+		expect(result.exitCode).not.toBe(0);
+		expect(existsSync(path.join(cwd, 'my-app/index.html'))).toBe(true);
+		expect(existsSync(path.join(cwd, 'my-app/src/App.tsrx'))).toBe(true);
+	});
+
 	it('asks for a name and a template when it is given neither', async () => {
 		const cwd = workspace();
 		const { asked, prompts } = fakePrompts({ text: 'my-app', select: 'fullstack' });

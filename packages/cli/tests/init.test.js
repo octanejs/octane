@@ -118,6 +118,33 @@ describe('octane init', () => {
 		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
 	});
 
+	it('keeps a client entry the project already has', async () => {
+		// A project can have lost its index.html and still own the entry that used
+		// to be loaded from it, and overwriting that is not a scaffold's call.
+		const original = "import { mount } from './mine';\nmount();\n";
+		const { root } = fixture({ 'src/main.ts': original });
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(read(root, 'src/main.ts')).toBe(original);
+	});
+
+	it('recognises every config name Prettier itself resolves', async () => {
+		// Missing one means writing a second config that shadows theirs, since
+		// `.prettierrc` wins the search order over most of the others.
+		for (const file of ['.prettierrc.toml', '.prettierrc.mts', 'prettier.config.cts']) {
+			const { root } = fixture({ [file]: '# theirs\n' });
+
+			await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+				exec: gitExec(),
+			});
+
+			expect(existsSync(path.join(root, '.prettierrc')), file).toBe(false);
+		}
+	});
+
 	it('leaves TypeScript to the toolchain that carries its own', async () => {
 		// Naming it installs the newest release, which is not necessarily one
 		// `tsrx-tsc` can start under, and nothing in a scaffolded project reads a
