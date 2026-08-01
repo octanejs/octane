@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**65 publishable package(s), including 52 framework binding(s).**
+**66 publishable package(s), including 52 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -17,6 +17,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.17` | 6 |
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.18` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.16` | 3 |
+| `@octanejs/astro` | [`packages/astro`](../packages/astro) | compiler integration | `0.0.1` | 5 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.20` | 2 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.2` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.5` | 1 |
