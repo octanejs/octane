@@ -812,18 +812,20 @@ function CollapsiblePanel(props: any): any {
 	const hiddenUntilFound = hiddenUntilFoundProp ?? false;
 	const keepMounted = keepMountedProp ?? false;
 
-	useLayoutEffect(
-		() => {
-			if (hiddenUntilFound && keepMountedProp === false) {
-				console.warn(
-					'Base UI: The `keepMounted={false}` prop on `Collapsible.Panel` is ignored when ' +
-						'`hiddenUntilFound` is enabled, since the panel must remain mounted while closed.',
-				);
-			}
-		},
-		[hiddenUntilFound, keepMountedProp],
-		subSlot(slot, 'warn'),
-	);
+	if (process.env.NODE_ENV !== 'production') {
+		useLayoutEffect(
+			() => {
+				if (hiddenUntilFound && keepMountedProp === false) {
+					console.warn(
+						'Base UI: The `keepMounted={false}` prop on `Collapsible.Panel` is ignored when ' +
+							'`hiddenUntilFound` is enabled, since the panel must remain mounted while closed.',
+					);
+				}
+			},
+			[hiddenUntilFound, keepMountedProp],
+			subSlot(slot, 'warn'),
+		);
+	}
 
 	useLayoutEffect(
 		() => {

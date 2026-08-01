@@ -3,8 +3,9 @@
 // compiled MDX component. docs.ts zips this with the MDX imports for the
 // site; the remote MCP server (mcp/) imports only this file plus the raw
 // .mdx sources, so it never pulls compiled components into its bundle.
-// Its import chain must stay MDX-free (bindings.ts is JSON-only).
+// Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
 import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
+import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
 	id: string;
@@ -51,6 +52,32 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'full-app-configuration', title: 'Full app configuration' },
 			{ id: 'production-and-preview', title: 'Production and preview' },
 			{ id: 'renderer-targets', title: 'Renderer targets' },
+		],
+	},
+	{
+		slug: 'framework-integrations',
+		title: 'Framework integrations',
+		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} first-party integrations for Astro, Docusaurus, and TanStack Start.`,
+		group: 'Start here',
+		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
+			integration.title,
+			integration.packageName,
+			integration.model,
+			integration.description,
+			...(integration.packageName === '@octanejs/tanstack-start'
+				? [
+						'@octanejs/tanstack-router',
+						'@octanejs/tanstack-query',
+						'@octanejs/tanstack-form',
+						'TanStack bindings',
+					]
+				: []),
+		]),
+		sections: [
+			{ id: 'choose-a-framework', title: 'Choose a framework' },
+			{ id: 'astro', title: 'Astro islands' },
+			{ id: 'docusaurus', title: 'Docusaurus content sites' },
+			{ id: 'tanstack-start', title: 'TanStack Start applications' },
 		],
 	},
 	{
