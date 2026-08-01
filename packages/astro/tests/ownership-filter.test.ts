@@ -51,4 +51,46 @@ describe('astroScopedOctanePlugin ownership', () => {
 		);
 		expect(skipped).toBeNull();
 	});
+
+	it('does not let project include globs block installed @octanejs bindings', async () => {
+		const integration = octane({ include: ['**/components/octane/**'] });
+		/** @type {any[]} */
+		const configs = [];
+		integration.hooks['astro:config:setup']({
+			addRenderer: () => {},
+			updateConfig: (c) => {
+				configs.push(c);
+				return c;
+			},
+			command: 'dev',
+			injectScript: () => {},
+		});
+
+		const plugins = configs[0].vite.plugins as Array<{
+			name?: string;
+			transform?: (code: string, id: string, options?: unknown) => unknown;
+		}>;
+		const scoped = plugins.find((p) => p.name === 'octane');
+		expect(scoped?.transform).toBeTypeOf('function');
+
+		// Ownership would reject this id; the transform must still enter the
+		// compiler (may throw on empty source — must not be the early `null` skip).
+		let result: unknown = 'unset';
+		try {
+			result = await scoped!.transform!(
+				'export function X() { return null }',
+				'/app/node_modules/@octanejs/zustand/src/index.tsrx',
+			);
+		} catch {
+			result = 'threw';
+		}
+		expect(result).not.toBeNull();
+		expect(result).not.toBe('unset');
+
+		const projectSkip = await scoped!.transform!(
+			'export function Button() {}',
+			'/app/src/components/react/Button.tsrx',
+		);
+		expect(projectSkip).toBeNull();
+	});
 });

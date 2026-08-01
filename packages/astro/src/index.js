@@ -3,7 +3,10 @@ import { octane as octaneVite } from 'octane/compiler/vite';
 import { compileFilterPatterns } from './compile-filter-patterns.js';
 import { getRenderer } from './container-renderer.js';
 import { createOwnershipFilter } from './ownership-filter.js';
-import { shouldSkipOctaneTransform } from './should-skip-transform.js';
+import {
+	isInstalledOctaneCompilerTarget,
+	shouldSkipOctaneTransform,
+} from './should-skip-transform.js';
 
 /**
  * @typedef {import('../types/index.d.ts').OctaneAstroOptions} OctaneAstroOptions
@@ -117,7 +120,7 @@ function getViteConfiguration({
  * include/exclude ownership before the Octane compiler's SSR `transform`
  * schedule (which may `load()` importers and deadlock Rollup when applied to
  * Astro's own runtime graph). Published Octane bindings under node_modules
- * still pass through — see `should-skip-transform.js`.
+ * bypass ownership — project `include` globs must not block them.
  *
  * @param {import('vite').Plugin} plugin
  * @param {((id: string) => boolean) | null} ownershipFilter
@@ -130,7 +133,9 @@ function astroScopedOctanePlugin(plugin, ownershipFilter) {
 		...plugin,
 		transform(code, id, options) {
 			if (shouldSkipOctaneTransform(id)) return null;
-			if (ownershipFilter && !ownershipFilter(id)) return null;
+			if (ownershipFilter && !isInstalledOctaneCompilerTarget(id) && !ownershipFilter(id)) {
+				return null;
+			}
 			return transform.call(this, code, id, options);
 		},
 	};

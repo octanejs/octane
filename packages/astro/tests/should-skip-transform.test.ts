@@ -1,5 +1,12 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { shouldSkipOctaneTransform } from '../src/should-skip-transform.js';
+import {
+	isInstalledOctaneCompilerTarget,
+	shouldSkipOctaneTransform,
+} from '../src/should-skip-transform.js';
+
+const thisPackageServer = join(dirname(fileURLToPath(import.meta.url)), '../src/server.js');
 
 describe('shouldSkipOctaneTransform', () => {
 	it('skips Vite virtual modules and Astro/static assets', () => {
@@ -50,18 +57,25 @@ describe('shouldSkipOctaneTransform', () => {
 		).toBe(true);
 	});
 
-	it('skips the workspace packages/astro tree after Vite realpath', () => {
-		expect(
-			shouldSkipOctaneTransform('/home/jesse/wsl-projects/oss/octane/packages/astro/src/server.js'),
-		).toBe(true);
-		expect(
-			shouldSkipOctaneTransform(
-				'/home/jesse/wsl-projects/oss/octane/packages/astro/src/client.js?v=hmr',
-			),
-		).toBe(true);
-		// Sibling packages must still compile.
+	it('skips only this package root after Vite realpath, not a consumer packages/astro app', () => {
+		expect(shouldSkipOctaneTransform(thisPackageServer)).toBe(true);
+		expect(shouldSkipOctaneTransform(thisPackageServer + '?v=hmr')).toBe(true);
+		expect(shouldSkipOctaneTransform('/apps/packages/astro/src/islands/Counter.tsrx')).toBe(false);
 		expect(
 			shouldSkipOctaneTransform('/home/jesse/wsl-projects/oss/octane/packages/octane/src/index.ts'),
 		).toBe(false);
+	});
+});
+
+describe('isInstalledOctaneCompilerTarget', () => {
+	it('recognizes binding packages that must bypass project include globs', () => {
+		expect(
+			isInstalledOctaneCompilerTarget('/app/node_modules/@octanejs/zustand/src/index.tsrx'),
+		).toBe(true);
+		expect(isInstalledOctaneCompilerTarget('/app/node_modules/octane/src/index.ts')).toBe(true);
+		expect(isInstalledOctaneCompilerTarget('/src/components/octane/Counter.tsrx')).toBe(false);
+		expect(isInstalledOctaneCompilerTarget('/app/node_modules/@octanejs/astro/src/server.js')).toBe(
+			false,
+		);
 	});
 });
