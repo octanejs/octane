@@ -65,7 +65,10 @@ const writeFile = (file, body) => () => {
  * @returns {{ where: string, declared: string | null }}
  */
 function prettierSettings(root, files, fromManifest) {
-	if (files.length > 0) {
+	// package.json comes first in Prettier's own search order, ahead of every
+	// config file, so when a project has both it is the field that decides. Read
+	// the file instead and init can approve a config Prettier never loads.
+	if (fromManifest === undefined) {
 		return { where: files[0], declared: readFileSync(path.join(root, files[0]), 'utf8') };
 	}
 	if (typeof fromManifest !== 'string') {

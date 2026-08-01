@@ -273,6 +273,23 @@ describe('octane init', () => {
 		expect(note).not.toContain('package.json');
 	});
 
+	it('reads the config Prettier would, when a project has two', async () => {
+		// package.json comes first in Prettier's search order, ahead of every
+		// config file. Reading the file instead approves a config Prettier never
+		// loads and leaves .tsrx unparseable by the one it does.
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: { singleQuote: true } },
+			'.prettierrc': '{\n\t"plugins": ["@tsrx/prettier-plugin"]\n}\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).toContain('the prettier field of package.json');
+	});
+
 	it('says it cannot check a shared config rather than guessing at one', async () => {
 		// Resolving a bare specifier is the package manager's job. Claiming the
 		// plugin is missing would be a guess, and so would staying quiet.

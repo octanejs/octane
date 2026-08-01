@@ -146,6 +146,17 @@ describe('create-octane', () => {
 		expect(existsSync(path.join(cwd, 'my-app/index.html'))).toBe(true);
 	});
 
+	it('reports a name that lands on a file instead of throwing ENOTDIR', async () => {
+		const cwd = workspace();
+		writeFileSync(path.join(cwd, 'my-app'), 'not a directory\n');
+
+		const result = await run(['my-app', '--template', 'spa', '--no-install'], cwd);
+
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain('is not a directory');
+		expect(read(cwd, 'my-app')).toBe('not a directory\n');
+	});
+
 	it('scaffolds into a directory holding nothing but a fresh repository', async () => {
 		// `mkdir app && cd app && git init` is a common way to start, and a
 		// repository with nothing in it holds no work of theirs to protect.

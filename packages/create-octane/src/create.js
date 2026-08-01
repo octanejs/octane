@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import * as clack from '@clack/prompts';
 import { EXIT, PACKAGE_MANAGERS, main, resolveMode } from '@octanejs/cli';
@@ -239,6 +239,13 @@ export async function create(argv, options = {}) {
 
 	const target = path.resolve(cwd, directory);
 	const existed = existsSync(target);
+	// A name that lands on a file is a mistake worth saying out loud. Reading it
+	// as a directory throws ENOTDIR, and a raw stack trace tells someone who
+	// mistyped a name nothing about what to do next.
+	if (existed && !statSync(target).isDirectory()) {
+		stderr.write(`${directory} already exists and is not a directory.\n`);
+		return EXIT.FAILURE;
+	}
 	// A repository with nothing in it is not a project. `mkdir app && cd app &&
 	// git init` is a common enough way to start that refusing it would leave this
 	// check protecting work that is not there, which is the only thing it is for.

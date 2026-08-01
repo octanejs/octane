@@ -44,17 +44,19 @@ Prettier's own default style rather than the repository's.
 `init` now writes a `.prettierrc` registering `@tsrx/prettier-plugin`, and
 installs it along with `prettier`, because Prettier cannot parse `.tsrx` without
 it. A project that already has a Prettier config keeps it, and is told which
-plugin to add, the same rule already applied to a bundler config. A `prettier`
-field in package.json holding a path is followed to the file it names, so a
-project that registers the plugin there is not told to register it again; a
-field naming a shareable config is reported as one this command cannot read.
+plugin to add, the same rule already applied to a bundler config. Which config
+gets read follows Prettier's own search order, so the `prettier` field of
+package.json wins over a config file when a project has both. A field holding a
+path is followed to the file it names, and one naming a shareable config is
+reported as settings this command cannot read.
 
 The package creates the directory and its `package.json`, then hands the
 directory to `octane init`. The templates stay in the CLI rather than being
 copied here, so the two commands cannot drift into scaffolding different
 projects. A directory has to be empty, except that a fresh `.git` is allowed,
 since `mkdir app && cd app && git init` is a common way to start and holds no
-work to protect.
+work to protect. A name that lands on an existing file is reported as one,
+rather than read as a directory and thrown as `ENOTDIR`.
 
 `octane init` itself wrote no HTML shell and no client entry, in either mode.
 That left `--mode spa` with a wired-up bundler, no entry component, and nothing
