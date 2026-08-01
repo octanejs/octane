@@ -8,6 +8,9 @@ const MANAGERS = {
 	bun: { add: ['add'], dev: '-d' },
 };
 
+/** The managers this CLI knows how to drive. */
+export const PACKAGE_MANAGERS = /** @type {const} */ (['pnpm', 'npm', 'yarn', 'bun']);
+
 /**
  * @param {import('./project.js').Project} project
  * @param {string[]} names

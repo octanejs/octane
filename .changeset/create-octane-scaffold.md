@@ -22,7 +22,15 @@ so, rather than reporting a project that was never written. With nobody there to
 answer, `--yes` is passed instead, decided by asking the CLI whether it can
 prompt rather than by guessing.
 
-Two CLI fixes came out of that. `--yes` now means "stop asking" on a terminal
+Installing goes through the manager that ran the command, read from
+`npm_config_user_agent`, so `pnpm create octane` installs with pnpm rather than
+answering a pnpm user with a `package-lock.json`. The next steps it prints name
+that manager too, and quote the directory, since a name with a space in it is
+accepted and `cd My App!` is not a command anyone can paste. For this `init`
+gains `--package-manager <name>`, which also covers running it by hand in a
+project that has no lockfile to detect yet.
+
+Two other CLI fixes came out of that. `--yes` now means "stop asking" on a terminal
 too: it was consulted only once the CLI had decided nobody was watching, so
 typing it in a real shell did nothing. And `resolveMode` is exported, so a
 caller driving `main` can get the CLI's own answer to whether it will prompt

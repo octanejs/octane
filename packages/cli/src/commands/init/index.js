@@ -3,7 +3,7 @@ import path from 'node:path';
 import { defineCommand } from '../../kernel/command.js';
 import { setCompilerOption } from '../../kernel/edit.js';
 import { CliError, EXIT } from '../../kernel/errors.js';
-import { installPackages } from '../../kernel/install.js';
+import { PACKAGE_MANAGERS, installPackages } from '../../kernel/install.js';
 import {
 	MODES,
 	PRETTIER_CONFIG_FILES,
@@ -285,6 +285,12 @@ export default defineCommand({
 			default: true,
 			description: 'Install dependencies (--no-install skips).',
 		},
+		'package-manager': {
+			type: 'string',
+			choices: PACKAGE_MANAGERS,
+			placeholder: '<name>',
+			description: 'Install with this one instead of the project’s own.',
+		},
 		force: { type: 'boolean', description: 'Proceed even with uncommitted changes.' },
 	},
 
@@ -310,6 +316,20 @@ export default defineCommand({
 					})),
 				}))
 		);
+
+		// Detection reads a lockfile, and a project that has never been installed
+		// has none to read. A caller that knows which manager it was invoked
+		// through can say so, rather than watching the fallback write the wrong
+		// kind of lockfile into a brand-new project.
+		const installing =
+			input.flags['package-manager'] === undefined
+				? project
+				: {
+						...project,
+						packageManager: /** @type {typeof project.packageManager} */ (
+							input.flags['package-manager']
+						),
+					};
 
 		const integration = integrationFor(project.bundler, mode);
 		const { changes, manual } = plan(project, mode, integration);
@@ -352,14 +372,14 @@ export default defineCommand({
 		/** @type {string[]} */
 		const installed = [];
 		if (input.flags.install && dependencies.length + devDependencies.length > 0) {
-			const spinner = ctx.ui.spinner(`Installing with ${project.packageManager ?? 'npm'}`);
+			const spinner = ctx.ui.spinner(`Installing with ${installing.packageManager ?? 'npm'}`);
 			try {
 				for (const [names, dev] of [
 					[dependencies, false],
 					[devDependencies, true],
 				]) {
 					if (/** @type {string[]} */ (names).length === 0) continue;
-					await installPackages(ctx, project, /** @type {string[]} */ (names), {
+					await installPackages(ctx, installing, /** @type {string[]} */ (names), {
 						dev: Boolean(dev),
 					});
 					installed.push(.../** @type {string[]} */ (names));

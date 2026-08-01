@@ -146,6 +146,43 @@ describe('octane init', () => {
 		expect(read(root, 'index.html')).toContain('src="/src/main.ts"');
 	});
 
+	it('installs with the manager it was told to use', async () => {
+		// Detection reads a lockfile, and a project that has never been installed
+		// has none. Without a way to say so, the fallback writes the wrong kind of
+		// lockfile into a brand-new project.
+		const { root } = fixture();
+		/** @type {string[][]} */
+		const ran = [];
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ args) => {
+				if (file !== 'git') ran.push([file, ...args]);
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		};
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'pnpm'], {
+			exec,
+		});
+
+		expect(ran.length).toBeGreaterThan(0);
+		expect(ran.every(([file]) => file === 'pnpm')).toBe(true);
+		// `add`, not `install`: that is how pnpm spells it.
+		expect(ran[0]).toContain('add');
+	});
+
+	it('rejects a package manager it cannot drive', async () => {
+		const { root } = fixture();
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'cargo'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain('pnpm, npm, yarn, bun');
+	});
+
 	it('recognises every config name Prettier itself resolves', async () => {
 		// Missing one means writing a second config that shadows theirs, since
 		// `.prettierrc` wins the search order over most of the others.

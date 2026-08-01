@@ -190,6 +190,51 @@ describe('create-octane', () => {
 		expect(existsSync(path.join(cwd, 'my-app/src/App.tsrx'))).toBe(true);
 	});
 
+	it('installs with the package manager that ran it', async () => {
+		// The directory is new, so there is no lockfile for the CLI to read. Left
+		// to the fallback, `pnpm create` would install through npm and answer with
+		// the wrong kind of lockfile.
+		const cwd = workspace();
+		/** @type {string[][]} */
+		const ran = [];
+		const exec = {
+			which: () => '/usr/bin/pnpm',
+			run: async (/** @type {string} */ file, /** @type {string[]} */ args) => {
+				ran.push([file, ...args]);
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		};
+
+		const result = await run(['my-app', '--template', 'spa'], cwd, {
+			env: { npm_config_user_agent: 'pnpm/9.1.0 npm/? node/v22.0.0 darwin arm64' },
+			cli: { tty: false, exec },
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(ran.map(([file]) => file)).toEqual(['pnpm', 'pnpm']);
+		// `add`, not `install`: that is how pnpm spells it.
+		expect(ran[0]).toContain('add');
+		expect(result.stdout).toContain('pnpm run dev');
+	});
+
+	it('falls back to npm when nothing says which manager ran it', async () => {
+		const cwd = workspace();
+
+		const result = await run(['my-app', '--template', 'spa', '--no-install'], cwd);
+
+		expect(result.stdout).toContain('npm run dev');
+	});
+
+	it('quotes a directory name that a shell would not survive', async () => {
+		// The name is whatever they typed, and this command accepts spaces in it.
+		// An unquoted `cd My App!` is a next step that fails when pasted.
+		const cwd = workspace();
+
+		const result = await run(['My App!', '--template', 'spa', '--no-install'], cwd);
+
+		expect(result.stdout).toContain("cd 'My App!'");
+	});
+
 	it('asks for a name and a template when it is given neither', async () => {
 		const cwd = workspace();
 		const { asked, prompts } = fakePrompts({ text: 'my-app', select: 'fullstack' });

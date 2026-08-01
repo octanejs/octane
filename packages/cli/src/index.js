@@ -5,3 +5,4 @@ export { resolveMode } from './kernel/ui.js';
 export { defineCommand } from './kernel/command.js';
 export { CliError, EXIT } from './kernel/errors.js';
 export { detectProject } from './kernel/project.js';
+export { PACKAGE_MANAGERS } from './kernel/install.js';

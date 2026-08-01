@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import * as clack from '@clack/prompts';
-import { EXIT, main, resolveMode } from '@octanejs/cli';
+import { EXIT, PACKAGE_MANAGERS, main, resolveMode } from '@octanejs/cli';
 
 /** The two shapes an Octane app comes in, named as `octane init` names them. */
 export const TEMPLATES = ['spa', 'fullstack'];
@@ -67,6 +67,35 @@ const clackPrompts = {
 function cancelled(prompts) {
 	prompts.cancel('Nothing was created.');
 	return EXIT.OK;
+}
+
+/**
+ * Which package manager ran this command.
+ *
+ * `npm create`, `pnpm create` and `yarn create` all set `npm_config_user_agent`
+ * to something starting `name/version`. It is the only signal there is: the
+ * directory is new, so there is no lockfile for the CLI to detect, and without
+ * this a `pnpm create` would be handed to npm and answered with the wrong kind
+ * of lockfile.
+ *
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string | null}
+ */
+function invokedThrough(env) {
+	const name = (env.npm_config_user_agent ?? '').split('/')[0];
+	return /** @type {readonly string[]} */ (PACKAGE_MANAGERS).includes(name) ? name : null;
+}
+
+/**
+ * Quote a path for the shell the next-steps text is going to be pasted into.
+ * A directory name is whatever someone typed, and this command accepts names
+ * with spaces in them.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function shellArgument(value) {
+	return /^[\w./@-]+$/.test(value) ? value : `'${value.replaceAll("'", String.raw`'\''`)}'`;
 }
 
 /**
@@ -243,6 +272,11 @@ export async function create(argv, options = {}) {
 	// init never asks which one again in a slightly different style.
 	const argvForInit = ['init', '--cwd', target, '--force', '--mode', template];
 
+	// Whoever ran `create` owns this project's tooling, and init has no lockfile
+	// to work that out from in a directory this new.
+	const packageManager = invokedThrough(env);
+	if (packageManager) argvForInit.push('--package-manager', packageManager);
+
 	const cli = { ...options.cli };
 	cli.tty ??= interactive;
 	// On a terminal init lists what it will write and install and asks to
@@ -284,7 +318,11 @@ export async function create(argv, options = {}) {
 	// No frame of its own around any of this. init already draws one around its
 	// report, and a second set of borders from here only ever left a dangling
 	// one open or closed.
-	const next = parsed.install === false ? '  npm install\n' : '';
-	stdout.write(`\nDone. Next:\n\n  cd ${directory}\n${next}  npm run dev\n`);
+	// Spelled for the manager they used, since telling a pnpm user to run npm is
+	// how a project ends up with two lockfiles. `run` is the one spelling every
+	// manager accepts.
+	const runner = packageManager ?? 'npm';
+	const next = parsed.install === false ? `  ${runner} install\n` : '';
+	stdout.write(`\nDone. Next:\n\n  cd ${shellArgument(directory)}\n${next}  ${runner} run dev\n`);
 	return EXIT.OK;
 }
