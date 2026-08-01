@@ -9,11 +9,23 @@ The hosted version of this material, with more prose around it, lives at
 
 Octane's published packages require Node.js 22 or newer.
 
+Starting from nothing, one command scaffolds a project that runs, with a
+client-only or a server-rendered template:
+
+```bash
+npm create octane my-app
+```
+
+The rest of this page is for adding Octane to a project you already have.
+Install the runtime and a build-tool integration:
+
 ```bash
 pnpm add octane @octanejs/vite-plugin
 ```
 
-The CLI can wire it up instead, including the TypeScript settings `.tsrx` needs:
+The CLI can wire that up instead, including the TypeScript settings `.tsrx`
+needs. It writes the same files `npm create octane` does, into the project you
+run it in:
 
 ```bash
 pnpm dlx @octanejs/cli init

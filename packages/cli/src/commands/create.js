@@ -112,6 +112,16 @@ export default defineCommand({
 			throw new CliError(`${directory} already exists and is not empty.`);
 		}
 
+		// `mkdirSync` with `recursive` makes every missing parent too, so a name
+		// like `apps/web` creates two directories. Undoing only the leaf would
+		// leave an empty tree standing, which is not nothing. Leaf first, and only
+		// the ones that were not already there.
+		/** @type {string[]} */
+		const made = [];
+		for (let dir = target; !existsSync(dir) && path.dirname(dir) !== dir; dir = path.dirname(dir)) {
+			made.push(dir);
+		}
+
 		mkdirSync(target, { recursive: true });
 		writeFileSync(
 			path.join(target, 'package.json'),
@@ -145,14 +155,18 @@ export default defineCommand({
 			// Nothing written means no project, and a lone package.json is not one.
 			// Declining the confirm is a normal answer and a failure is not, but
 			// both leave the same nothing behind, and the directory left over would
-			// make the obvious retry fail as already occupied. The directory itself
-			// goes only when this command is the one that made it, so a `.git` that
-			// was already there survives, which is also why this cannot be inferred
-			// afterwards from whether the directory is still standing.
+			// make the obvious retry fail as already occupied. Only what this
+			// command made goes, so a directory that was already there survives
+			// with its `.git`, which is also why this cannot be inferred afterwards
+			// from whether the directory is still standing.
 			wrote = readdirSync(target).some((entry) => !before.has(entry));
 			if (!wrote) {
 				rmSync(path.join(target, 'package.json'), { force: true });
-				if (!existed) rmSync(target, { recursive: true, force: true });
+				for (const dir of made) {
+					// Anything left in one of these by now is not ours to remove.
+					if (readdirSync(dir).length > 0) break;
+					rmSync(dir, { recursive: true, force: true });
+				}
 			}
 		}
 

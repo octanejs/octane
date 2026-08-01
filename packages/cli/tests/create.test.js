@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -145,6 +153,39 @@ describe('octane create', () => {
 		expect(result.exitCode).toBe(0);
 		expect(existsSync(path.join(cwd, 'my-app/index.html'))).toBe(true);
 		expect(existsSync(path.join(cwd, 'my-app/.git'))).toBe(true);
+	});
+
+	it('creates the parents a nested name needs', async () => {
+		const cwd = workspace();
+
+		const result = await create([
+			'apps/web',
+			'--cwd',
+			cwd,
+			'--template',
+			'spa',
+			'--yes',
+			'--no-install',
+		]);
+
+		expect(result.exitCode).toBe(0);
+		expect(existsSync(path.join(cwd, 'apps/web/index.html'))).toBe(true);
+		// The manifest is named for the directory, not for the path to it.
+		expect(JSON.parse(read(path.join(cwd, 'apps/web'), 'package.json')).name).toBe('web');
+	});
+
+	it('leaves nothing behind, including the parents it made', async () => {
+		// `--dry-run` is the reachable half of "nothing was written": it reports
+		// the plan and applies none of it, the same state declining the confirm
+		// leaves. Undoing only the leaf would leave `apps` standing and empty,
+		// which is not nothing, and would make the obvious retry harder to reason
+		// about than a clean directory.
+		const cwd = workspace();
+
+		const result = await create(['apps/web', '--cwd', cwd, '--template', 'spa', '--dry-run']);
+
+		expect(result.exitCode).toBe(0);
+		expect(readdirSync(cwd)).toEqual([]);
 	});
 
 	it('refuses a directory that already has something in it', async () => {

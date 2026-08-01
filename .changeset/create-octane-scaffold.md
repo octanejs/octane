@@ -42,6 +42,10 @@ One other CLI fix came out of that. `--yes` now means "stop asking" on a
 terminal too: it was consulted only once the CLI had decided nobody was
 watching, so typing it in a real shell did nothing.
 
+The package entry exports what it did before. `resolveMode` and
+`PACKAGE_MANAGERS` were briefly added for a caller that drove `main` from
+another package, and that caller no longer exists.
+
 `ctx.ui` gains `text`, the free-text prompt the project name needs. An empty
 submission means the offered default, so accepting it by pressing enter and
 typing it out land in the same place.

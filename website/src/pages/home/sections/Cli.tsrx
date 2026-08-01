@@ -39,6 +39,7 @@ const TRANSCRIPT = [
 ];
 
 const COMMANDS = [
+	{ name: 'npm create octane', body: 'Scaffold an app that runs, from an empty directory.' },
 	{ name: 'octane init', body: 'Wire Octane into a project you already have.' },
 	{ name: 'octane doctor --fix', body: 'Find the quiet breakage, then repair it.' },
 	{ name: 'octane add react-hook-form', body: 'Install the binding that ports it.' },
