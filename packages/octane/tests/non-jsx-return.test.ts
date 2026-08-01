@@ -14,6 +14,9 @@ import {
 	MixedTransitionApp,
 	NestedMixed,
 	NestedMixedInline,
+	NestedOutputless,
+	Outputless,
+	OutputlessTerminal,
 } from './_fixtures/non-jsx-return.tsrx';
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/non-jsx-return.tsrx');
@@ -200,6 +203,57 @@ describe('generic component return reconciliation', () => {
 		r.unmount();
 	});
 
+	function exercisesOutputlessBody(body: typeof Outputless | typeof NestedOutputless) {
+		const r = mount(body as any, { mode: 'host', label: 'unused', start: 1 });
+		const host = r.find('.outputless-host');
+		expect(host.textContent).toBe('1');
+
+		// Setup runs even though the block has no template, so the hook slot keeps
+		// its state across renders driven from inside the returned value.
+		r.click('.outputless-host');
+		expect(r.find('.outputless-host')).toBe(host);
+		expect(host.textContent).toBe('2');
+
+		r.update(body as any, { mode: 'text', label: 'plain', start: 1 });
+		expect(r.findAll('.outputless-host')).toHaveLength(0);
+		expect(r.container.textContent).toBe('plain');
+
+		// No trailing output node and no matching return: the body renders nothing.
+		r.update(body as any, { mode: 'none', label: 'unused', start: 1 });
+		expect(r.container.textContent).toBe('');
+
+		r.update(body as any, { mode: 'host', label: 'unused', start: 5 });
+		expect(r.find('.outputless-host').textContent).toBe('2');
+		r.unmount();
+	}
+
+	it('renders a `@{}` body whose only output comes from its own returns', () => {
+		exercisesOutputlessBody(Outputless);
+	});
+
+	it('renders an outputless `@{}` body nested under a compiled template', () => {
+		exercisesOutputlessBody(NestedOutputless);
+	});
+
+	// The sibling above proves the fall-through path still renders empty; this one
+	// proves a body that always returns keeps every returned value, including the
+	// `null` the runtime must not confuse with an already-emitted template.
+	it('renders an outputless `@{}` body whose every path returns', () => {
+		const r = mount(OutputlessTerminal as any, { mode: 'host', label: 'unused', start: 7 });
+		expect(r.find('.terminal-host').textContent).toBe('7');
+
+		r.update(OutputlessTerminal as any, { mode: 'text', label: 'plain', start: 7 });
+		expect(r.findAll('.terminal-host')).toHaveLength(0);
+		expect(r.container.textContent).toBe('plain');
+
+		r.update(OutputlessTerminal as any, { mode: 'null', label: 'unused', start: 7 });
+		expect(r.container.textContent).toBe('');
+
+		r.update(OutputlessTerminal as any, { mode: 'host', label: 'unused', start: 7 });
+		expect(r.find('.terminal-host').textContent).toBe('7');
+		r.unmount();
+	});
+
 	it('threads folded-list cache dependencies through a returned template', () => {
 		const items = [
 			{ id: 1, label: 'one' },
@@ -254,6 +308,45 @@ export function Parent(p) @{
 		expect(code).not.toContain('componentSlotVoid');
 		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(5);
 		expect(code.match(/_\$componentSlotLite\(/g)).toHaveLength(1);
+	});
+});
+
+// The `@{ … }` tail return IS the block's output. With no output node in the
+// block that tail is `null`: load-bearing wherever the body can fall through
+// (the runtime reads a fallen-through `undefined` as "this body already emitted
+// its template"), unreachable when the body's own returns cover every path.
+// Reachability is a property of the emitted body, so assert it there — a render
+// cannot distinguish a dropped tail from an unreachable one.
+describe('outputless `@{}` tail return', () => {
+	const emit = (body: string) =>
+		compile(`export function A(props) @{${body}}`, 'outputless.tsrx', { hmr: false }).code;
+
+	it('keeps the tail `null` when the body can fall through', () => {
+		const code = emit('\n\tif (props.a) return props.label;\n');
+		expect(code.match(/\breturn\b/g)).toHaveLength(2);
+		expect(code).toContain('return null;');
+	});
+
+	it('keeps the tail when an `if` has no `else`', () => {
+		const code = emit('\n\tif (props.a) { return props.a; }\n');
+		expect(code).toContain('return null;');
+	});
+
+	it('drops the unreachable tail when every path already returns', () => {
+		const code = emit('\n\tconst x = props.a;\n\treturn x;\n');
+		expect(code.match(/\breturn\b/g)).toHaveLength(1);
+		expect(code).not.toContain('return null;');
+	});
+
+	it('drops the tail when both arms of an if/else return', () => {
+		const code = emit('\n\tif (props.a) { return props.a; } else { return props.b; }\n');
+		expect(code.match(/\breturn\b/g)).toHaveLength(2);
+		expect(code).not.toContain('return null;');
+	});
+
+	it('drops the tail when the body ends in a throw', () => {
+		const code = emit("\n\tif (props.a) return props.a;\n\tthrow new Error('unreachable');\n");
+		expect(code).not.toContain('return null;');
 	});
 });
 
@@ -315,6 +408,43 @@ describe('non-JSX return on the server (props-first ABI)', () => {
 		expect(container.querySelectorAll('.mixed-inline')).toHaveLength(1);
 		expect(container.querySelector('.mixed-inline')?.textContent).toBe('again');
 		root.unmount();
+		container.remove();
+	});
+
+	it('renders and hydrates a `@{}` body that has no output node', async () => {
+		const server = serverModule();
+		const props = { mode: 'host', label: 'unused', start: 3 };
+		const { html } = await ServerRT.renderToString(server.NestedOutputless, props);
+		expect(html).toContain('3');
+
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const host = container.querySelector('.outputless-host');
+
+		const root = hydrateRoot(container, NestedOutputless as any, props);
+		flushSync(() => {});
+		expect(container.querySelector('.outputless-host')).toBe(host);
+		expect(host?.textContent).toBe('3');
+
+		flushSync(() => root.render(NestedOutputless as any, { ...props, mode: 'none' }));
+		expect(container.querySelector('.outputless-host')).toBeNull();
+		expect(container.textContent).toBe('');
+		root.unmount();
+		container.remove();
+	});
+
+	it('server-renders the empty output of an outputless `@{}` body', async () => {
+		const server = serverModule();
+		const { html } = await ServerRT.renderToString(server.Outputless, {
+			mode: 'none',
+			label: 'unused',
+			start: 0,
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		expect(container.textContent).toBe('');
 		container.remove();
 	});
 
