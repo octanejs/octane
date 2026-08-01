@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createFixture, runCli } from './helpers/fixture.js';
+import { createFixture, installed, runCli } from './helpers/fixture.js';
 
 /** @type {{ cleanup: () => void }[]} */
 const fixtures = [];
@@ -31,6 +31,22 @@ function gitExec({ dirty = false } = {}) {
 	};
 }
 
+/** Records what the CLI asked the package manager to install, and succeeds. */
+function recordingExec() {
+	/** @type {string[][]} */
+	const args = [];
+	return {
+		args,
+		exec: {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ argv) => {
+				if (file !== 'git') args.push(argv);
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		},
+	};
+}
+
 /**
  * @param {string} root
  * @param {string} file
@@ -46,12 +62,17 @@ describe('octane init', () => {
 		});
 
 		expect(result.exitCode).toBe(0);
-		expect(read(root, 'vite.config.ts')).toContain("from 'octane/compiler/vite'");
+		expect(read(root, 'vite.config.ts')).toContain('from "octane/compiler/vite"');
 		expect(JSON.parse(read(root, 'tsconfig.json')).compilerOptions).toMatchObject({
 			jsxImportSource: 'octane',
 			plugins: [{ name: '@tsrx/typescript-plugin' }],
 		});
 		expect(JSON.parse(read(root, 'package.json')).scripts.typecheck).toContain('tsrx-tsc');
+		// A wired-up bundler still serves nothing without a page and an entry to
+		// mount, so `vite` has to have something to open.
+		expect(read(root, 'index.html')).toContain('<script type="module" src="/src/main.ts">');
+		expect(read(root, 'src/main.ts')).toContain('createRoot');
+		expect(read(root, 'src/App.tsrx')).toContain('export function App()');
 		// The SSR-only files belong to the other mode.
 		expect(existsSync(path.join(root, 'octane.config.ts'))).toBe(false);
 	});
@@ -63,8 +84,344 @@ describe('octane init', () => {
 			exec: gitExec(),
 		});
 
-		expect(read(root, 'vite.config.ts')).toContain("from '@octanejs/vite-plugin'");
-		expect(read(root, 'octane.config.ts')).toContain("entry: ['App', '/src/App.tsrx']");
+		expect(read(root, 'vite.config.ts')).toContain('from "@octanejs/vite-plugin"');
+		// The route entry the config names has to exist, or the build resolves
+		// nothing.
+		expect(read(root, 'octane.config.ts')).toContain('entry: ["App", "/src/App.tsrx"]');
+		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(true);
+
+		// The production build refuses to run without a template, and refuses a
+		// template that does not carry both markers.
+		const html = read(root, 'index.html');
+		expect(html).toContain('<!--ssr-head-->');
+		expect(html).toContain('<!--ssr-body-->');
+		// The plugin owns hydration, so a second entry script here would compete
+		// with the one it injects.
+		expect(html).not.toContain('<script type="module"');
+		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
+	});
+
+	it('states the markers an existing page is missing instead of editing it', async () => {
+		const { root } = fixture({
+			'index.html':
+				'<!doctype html>\n<html>\n\t<body>\n\t\t<div id="root"></div>\n\t</body>\n</html>\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		// Splicing markers into someone's own HTML is the same guesswork as
+		// rewriting their bundler config, so init says what to add and stops.
+		expect(read(root, 'index.html')).not.toContain('ssr-head');
+		expect(result.json().manual.join(' ')).toContain('<!--ssr-head-->');
+	});
+
+	it('adds no orphan component to a client project that already has its own page', async () => {
+		// The project's own index.html names its own entry, so a component this
+		// command invented would sit there unreferenced.
+		const { root } = fixture({
+			'index.html':
+				'<!doctype html>\n<html>\n\t<body>\n\t\t<div id="app"></div>\n\t\t<script type="module" src="/src/boot.ts"></script>\n\t</body>\n</html>\n',
+		});
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(false);
+		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
+	});
+
+	it('keeps a client entry the project already has', async () => {
+		// A project can have lost its index.html and still own the entry that used
+		// to be loaded from it, and overwriting that is not a scaffold's call.
+		const original = "import { mount } from './mine';\nmount();\n";
+		const { root } = fixture({ 'src/main.ts': original });
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(read(root, 'src/main.ts')).toBe(original);
+	});
+
+	it('adds no component when it is keeping the entry that would import it', async () => {
+		// The entry it writes is the one that imports App.tsrx. Keeping theirs
+		// means keeping whatever theirs imports, so writing the component anyway
+		// leaves a file nothing references.
+		const { root } = fixture({ 'src/main.ts': "import { mount } from './mine';\nmount();\n" });
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(false);
+		// The page it needed is still missing, and that one it does write.
+		expect(read(root, 'index.html')).toContain('src="/src/main.ts"');
+	});
+
+	it('installs with the manager it was told to use', async () => {
+		// Detection reads a lockfile, and a project that has never been installed
+		// has none. Without a way to say so, the fallback writes the wrong kind of
+		// lockfile into a brand-new project.
+		const { root } = fixture();
+		/** @type {string[][]} */
+		const ran = [];
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ args) => {
+				if (file !== 'git') ran.push([file, ...args]);
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		};
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'pnpm'], {
+			exec,
+		});
+
+		expect(ran.length).toBeGreaterThan(0);
+		expect(ran.every(([file]) => file === 'pnpm')).toBe(true);
+		// `add`, not `install`: that is how pnpm spells it.
+		expect(ran[0]).toContain('add');
+	});
+
+	it('rejects a package manager it cannot drive', async () => {
+		const { root } = fixture();
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'cargo'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain('pnpm, npm, yarn, bun');
+	});
+
+	it('recognises every config name Prettier itself resolves', async () => {
+		// Missing one means writing a second config that shadows theirs, since
+		// `.prettierrc` wins the search order over most of the others.
+		for (const file of ['.prettierrc.toml', '.prettierrc.mts', 'prettier.config.cts']) {
+			const { root } = fixture({ [file]: '# theirs\n' });
+
+			await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+				exec: gitExec(),
+			});
+
+			expect(existsSync(path.join(root, '.prettierrc')), file).toBe(false);
+		}
+	});
+
+	it('installs TypeScript at the range the toolchain declares', async () => {
+		// `typescript` is a required peer of the plugin that ships `tsrx-tsc`, and
+		// nothing in the toolchain carries a compiler of its own. npm and pnpm
+		// install a required peer themselves, so this is redundant there; yarn
+		// does not, and without it `yarn create octane` leaves a project whose
+		// typecheck script dies on `Cannot find module 'typescript'`.
+		const { root } = fixture(
+			installed('@tsrx/typescript-plugin', '0.3.118', {
+				peerDependencies: { typescript: '^5.9.3' },
+			}),
+		);
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
+
+		const requested = recorder.args.flat();
+		expect(requested).toContain('typescript@^5.9.3');
+		// Never bare: that resolves to the newest major, which `tsrx-tsc` cannot
+		// start under, which is how a fresh scaffold ends up unable to typecheck.
+		expect(requested).not.toContain('typescript');
+	});
+
+	it('leaves a TypeScript the project already declares alone', async () => {
+		const { root } = fixture({
+			'package.json': {
+				name: 'app',
+				type: 'module',
+				devDependencies: { typescript: '5.9.3' },
+			},
+			...installed('@tsrx/typescript-plugin', '0.3.118', {
+				peerDependencies: { typescript: '^5.9.3' },
+			}),
+		});
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
+
+		// Matched as a whole argument: `@tsrx/typescript-plugin` is on every one of
+		// these lines and contains the word.
+		expect(recorder.args.flat().filter((arg) => /^typescript(@|$)/.test(arg))).toEqual([]);
+	});
+
+	it('names TypeScript in the manual list when it installs nothing', async () => {
+		// The range lives inside a plugin that was never installed, so it cannot
+		// be quoted here. Saying the name without it would send people to the
+		// major that cannot run.
+		const { root } = fixture();
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).toContain('typescript');
+	});
+
+	it('registers the Prettier plugin, without which .tsrx cannot be parsed', async () => {
+		const { root } = fixture();
+
+		const result = await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--json'], {
+			exec: gitExec(),
+		});
+
+		expect(JSON.parse(read(root, '.prettierrc')).plugins).toEqual(['@tsrx/prettier-plugin']);
+		expect(result.json().installed).toEqual(
+			expect.arrayContaining(['prettier', '@tsrx/prettier-plugin']),
+		);
+	});
+
+	it('states the Prettier edit for a project that already has its own config', async () => {
+		// Formatting config comes in JSON, YAML and JavaScript, so rewriting it is
+		// the same guesswork as rewriting a bundler config.
+		const original = '{\n\t"singleQuote": true\n}\n';
+		const { root } = fixture({ '.prettierrc': original });
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(read(root, '.prettierrc')).toBe(original);
+		expect(result.json().manual.join(' ')).toContain('@tsrx/prettier-plugin');
+	});
+
+	it('follows the prettier field of package.json to the config it points at', async () => {
+		// The field holds either the settings or a path to them. Searching the
+		// path itself for the plugin name asks the wrong file, which both misses a
+		// plugin that is registered and names a package.json field to add it to.
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: './config/prettier.json' },
+			'config/prettier.json': { plugins: ['@tsrx/prettier-plugin'] },
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).not.toContain('Prettier plugins');
+	});
+
+	it('names the file to edit, not the field that points at it', async () => {
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: './config/prettier.json' },
+			'config/prettier.json': { singleQuote: true },
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		const note = result
+			.json()
+			.manual.find((/** @type {string} */ line) => line.includes('@tsrx/prettier-plugin'));
+		expect(note).toContain(path.join('config', 'prettier.json'));
+		expect(note).not.toContain('package.json');
+	});
+
+	it('picks the config file Prettier would, when a project has several', async () => {
+		// The first name in the list that exists is the one Prettier reads, so the
+		// list has to be in its order. `.prettierrc.js` beats `.prettierrc.toml`,
+		// which sorts last of all of them rather than with the other data formats.
+		const withPlugin = 'plugins: ["@tsrx/prettier-plugin"]\n';
+
+		// Reading the wrong file here means staying quiet about a project whose
+		// active config cannot parse .tsrx.
+		const quiet = fixture({
+			'.prettierrc.toml': '# theirs\n',
+			'.prettierrc.js': `export default { ${withPlugin} };\n`,
+		});
+		const quietResult = await runCli(
+			['init', '--cwd', quiet.root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+		expect(quietResult.json().manual.join(' ')).not.toContain('Prettier plugins');
+
+		// And the other way: the instruction has to name the file that is actually
+		// in force, not whichever one happens to be found first.
+		const noisy = fixture({
+			'.prettierrc.toml': withPlugin,
+			'.prettierrc.js': 'export default { singleQuote: true };\n',
+		});
+		const noisyResult = await runCli(
+			['init', '--cwd', noisy.root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+		expect(noisyResult.json().manual.join(' ')).toContain('.prettierrc.js');
+	});
+
+	it('reads the config Prettier would, when a project has two', async () => {
+		// package.json comes first in Prettier's search order, ahead of every
+		// config file. Reading the file instead approves a config Prettier never
+		// loads and leaves .tsrx unparseable by the one it does.
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: { singleQuote: true } },
+			'.prettierrc': '{\n\t"plugins": ["@tsrx/prettier-plugin"]\n}\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).toContain('the prettier field of package.json');
+	});
+
+	it('says it cannot check a shared config rather than guessing at one', async () => {
+		// Resolving a bare specifier is the package manager's job. Claiming the
+		// plugin is missing would be a guess, and so would staying quiet.
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: '@acme/prettier-config' },
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).toContain('@acme/prettier-config');
+		expect(existsSync(path.join(root, '.prettierrc'))).toBe(false);
+	});
+
+	it('stays quiet when the Prettier plugin is already registered', async () => {
+		const { root } = fixture({
+			'.prettierrc': '{\n\t"plugins": ["@tsrx/prettier-plugin"]\n}\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).not.toContain('Prettier plugins');
+	});
+
+	it('honours --yes on a terminal, where people actually type it', async () => {
+		// It used to be consulted only off-TTY, so the flag did nothing in a real
+		// shell, and anything wanting an unattended run had to pretend there was
+		// no terminal. Without the fix this blocks on the confirm prompt.
+		const { root } = fixture();
+
+		const result = await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+			tty: true,
+			env: { NO_COLOR: '', CI: '' },
+		});
+
+		expect(result.exitCode).toBe(0);
 		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(true);
 	});
 

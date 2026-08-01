@@ -118,10 +118,29 @@ src/Form.tsrx
 as well as errors, and a file that will not parse is reported as an error
 without stopping the rest of the run.
 
+<h2 id="create">octane create</h2>
+
+Creates an Octane app in a new directory. This is what `npm create octane`
+runs, so `npm create octane my-app` and `octane create my-app` are the same
+command reached two ways.
+
+```bash
+octane create my-app --template spa        # client-only app
+octane create my-app --template fullstack  # routing, SSR, and a production build
+```
+
+Leave an argument off and you are asked for it. Dependencies are installed with
+the package manager that ran the command, since a directory this new has no
+lockfile to go by; `--no-install` skips that and prints the list instead.
+
+The directory has to be empty, though a repository with nothing committed to it
+is allowed, since `git init` before scaffolding is a common way to start.
+
 <h2 id="init">octane init</h2>
 
 Adds Octane to a project you already have: the bundler plugin, the TypeScript
-settings `.tsrx` needs, the scripts, and the dependencies.
+settings `.tsrx` needs, the scripts, and the dependencies. This is the same work
+`octane create` does, against a directory that was already there.
 
 ```bash
 octane init --mode spa        # client-only app

@@ -60,6 +60,20 @@ export function createUi({ mode, yes = false, stdout = process.stdout }) {
 		);
 	};
 
+	/**
+	 * Whether `--yes` already answers this question.
+	 *
+	 * It means "stop asking me", which is as true on a terminal as it is in a
+	 * pipe. Consulting it only once the CLI had decided nobody was watching made
+	 * the flag do nothing in the one place people type it by hand, and left a
+	 * caller wanting an unattended run no choice but to claim there was no
+	 * terminal, which costs the interactive rendering with it. A question with no
+	 * default has nothing to answer with, so it is still asked.
+	 *
+	 * @param {unknown} initial
+	 */
+	const answered = (initial) => yes && initial !== undefined;
+
 	/** @param {unknown} value */
 	const guard = (value) => {
 		if (clack.isCancel(value)) throw new CliError('Cancelled.');
@@ -124,8 +138,26 @@ export function createUi({ mode, yes = false, stdout = process.stdout }) {
 		 * @returns {Promise<string>}
 		 */
 		async select({ message, flag, options, initial }) {
+			if (answered(initial)) return String(initial);
 			if (mode !== 'interactive') return String(unattended(flag, initial));
 			return String(guard(await clack.select({ message, options, initialValue: initial })));
+		},
+
+		/**
+		 * A free-text answer. `initial` is what an empty submission means, not
+		 * pre-filled input: someone accepting the offer by pressing enter and
+		 * someone typing it out should land in the same place.
+		 *
+		 * @param {{ message: string, flag: string, placeholder?: string, initial?: string }} options
+		 * @returns {Promise<string>}
+		 */
+		async text({ message, flag, placeholder, initial }) {
+			if (answered(initial)) return String(initial);
+			if (mode !== 'interactive') return String(unattended(flag, initial));
+			const answer = String(
+				guard(await clack.text({ message, placeholder, defaultValue: initial })),
+			);
+			return answer.trim() === '' && initial !== undefined ? initial : answer.trim();
 		},
 
 		/**
@@ -133,6 +165,9 @@ export function createUi({ mode, yes = false, stdout = process.stdout }) {
 		 * @returns {Promise<string[]>}
 		 */
 		async multiselect({ message, flag, options, initial }) {
+			// `answered` is a boolean, not a type guard, and this is the one prompt
+			// that hands its default straight back rather than coercing it.
+			if (answered(initial)) return /** @type {string[]} */ (initial);
 			if (mode !== 'interactive') {
 				return /** @type {string[]} */ (unattended(flag, initial));
 			}
@@ -146,6 +181,7 @@ export function createUi({ mode, yes = false, stdout = process.stdout }) {
 		 * @returns {Promise<boolean>}
 		 */
 		async confirm({ message, flag, initial = true }) {
+			if (answered(initial)) return Boolean(initial);
 			if (mode !== 'interactive') return Boolean(unattended(flag, initial));
 			return Boolean(guard(await clack.confirm({ message, initialValue: initial })));
 		},

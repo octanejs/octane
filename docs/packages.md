@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**64 publishable package(s), including 52 framework binding(s).**
+**65 publishable package(s), including 52 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -75,6 +75,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.22` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.2` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.21` | 5 |
+| `create-octane` | [`packages/create-octane`](../packages/create-octane) | other package | `0.0.1` | 1 |
 | `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.22` | 20 |
 
 ## Private packages

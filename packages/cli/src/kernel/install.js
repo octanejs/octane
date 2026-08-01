@@ -9,6 +9,13 @@ const MANAGERS = {
 };
 
 /**
+ * The managers this CLI knows how to drive. Derived rather than written out, so
+ * that a flag can never offer a manager `installCommand` would silently answer
+ * with npm's spelling.
+ */
+export const PACKAGE_MANAGERS = Object.keys(MANAGERS);
+
+/**
  * @param {import('./project.js').Project} project
  * @param {string[]} names
  * @param {boolean} dev

@@ -55,9 +55,18 @@ export function integrationFor(bundler, mode) {
 	return {
 		specifier: target[mode].specifier,
 		dependencies: ['octane', ...target[mode].packages],
-		// The bundler itself is only ours to install when we are the ones
-		// creating its config.
-		devDependencies: ['@tsrx/typescript-plugin', ...(bundler === null ? ['vite'] : [])],
+		// TypeScript is absent from this list on purpose, but it does get
+		// installed: naming it here would take the newest major, which `tsrx-tsc`
+		// cannot start under, so it is installed afterwards at the range
+		// @tsrx/typescript-plugin declares as its peer. Nothing in the toolchain
+		// carries a compiler of its own. The bundler is only ours to install when
+		// we are the ones creating its config.
+		devDependencies: [
+			'@tsrx/typescript-plugin',
+			'@tsrx/prettier-plugin',
+			'prettier',
+			...(bundler === null ? ['vite'] : []),
+		],
 	};
 }
 
@@ -65,49 +74,161 @@ export function integrationFor(bundler, mode) {
  * @param {keyof typeof MODES} mode
  * @returns {string}
  */
-export const viteConfig = (mode) => `import { defineConfig } from 'vite';
-import { octane } from '${integrationFor('vite', mode).specifier}';
+export const viteConfig = (mode) => `import { defineConfig } from "vite";
+import { octane } from "${integrationFor('vite', mode).specifier}";
 
 export default defineConfig({
-\tplugins: [octane()],
-\tbuild: { target: 'esnext' },
+  plugins: [octane()],
+  build: { target: "esnext" },
 });
 `;
 
-export const octaneConfig = `import { defineConfig, RenderRoute } from '@octanejs/vite-plugin';
+/** One route, naming its export so a typo fails loudly instead of rendering the wrong component. */
+export const octaneConfig = `import { defineConfig, RenderRoute } from "@octanejs/vite-plugin";
 
 export default defineConfig({
-\trouter: {
-\t\troutes: [new RenderRoute({ path: '/', entry: ['App', '/src/App.tsrx'] })],
-\t},
+  router: {
+    routes: [new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })],
+  },
 });
 `;
 
+/** The component both templates start from. */
 export const appComponent = `export function App() @{
-\t<div class="app">
-\t\t<h1>{'Hello from Octane' as string}</h1>
-\t</div>
+  <main>
+    <h1>Hello from Octane</h1>
+    <p>Edit src/App.tsrx and save.</p>
+  </main>
 }
 `;
 
-export const tsconfig = {
-	compilerOptions: {
-		target: 'esnext',
-		module: 'esnext',
-		moduleResolution: 'bundler',
-		lib: ['esnext', 'dom', 'dom.iterable'],
-		strict: true,
-		noEmit: true,
-		allowImportingTsExtensions: true,
-		isolatedModules: true,
-		esModuleInterop: true,
-		skipLibCheck: true,
-		jsx: 'react-jsx',
-		jsxImportSource: 'octane',
-		plugins: [{ name: '@tsrx/typescript-plugin' }],
-	},
-	include: ['src/**/*', 'vite.config.ts'],
-};
+const SPA_INDEX_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Octane app</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+`;
+
+const SSR_INDEX_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Octane app</title>
+    <!--ssr-head-->
+  </head>
+  <body>
+    <div id="root"><!--ssr-body--></div>
+  </body>
+</html>
+`;
+
+/** The markers `validateSsrTemplate` requires of a fullstack index.html. */
+export const SSR_MARKERS = ['<!--ssr-head-->', '<!--ssr-body-->'];
+
+/**
+ * The HTML shell.
+ *
+ * `spa` is an ordinary Vite page, so it loads the client entry itself.
+ * `fullstack` loads nothing: the metaframework plugin owns the hydration entry,
+ * injecting the virtual module in dev and the hashed script at build. Its
+ * markers are a contract rather than decoration — `validateSsrTemplate` rejects
+ * a template that does not carry exactly one of each.
+ *
+ * @param {keyof typeof MODES} mode
+ * @returns {string}
+ */
+export const indexHtml = (mode) => (mode === 'fullstack' ? SSR_INDEX_HTML : SPA_INDEX_HTML);
+
+/**
+ * The client bootstrap, `spa` only. `render(App)` is the body-and-props
+ * overload, which keeps the entry plain TypeScript with no JSX pragma to carry.
+ */
+export const clientEntry = `import { createRoot } from "octane";
+import { App } from "./App.tsrx";
+
+const root = createRoot(document.getElementById("root")!);
+root.render(App);
+`;
+
+/**
+ * Prettier cannot parse `.tsrx` on its own, so a project that formats without
+ * this plugin either skips those files or mangles them.
+ */
+export const prettierConfig = `{
+  "plugins": ["@tsrx/prettier-plugin"]
+}
+`;
+
+/**
+ * The config filenames Prettier itself looks for, in the order it looks. A
+ * project that already has one owns its formatting, and this command states the
+ * edit instead of picking a fight with it.
+ *
+ * The order is load-bearing, not decorative: the first of these that exists is
+ * the one Prettier reads, so it is the one to inspect for the plugin and to
+ * name in an instruction. Note how little of it is alphabetical. The module
+ * variants interleave `.prettierrc.X` with `prettier.config.X` by type rather
+ * than grouping by prefix, and `.toml` sorts last rather than with the other
+ * data formats. Taken from prettier 3.9.6 and confirmed against it.
+ *
+ * `package.json` comes before all of these and is handled by its own check,
+ * since the file existing says nothing about whether it configures Prettier.
+ * `package.yaml`, which Prettier searches second, is not covered: telling one
+ * that configures Prettier from one that does not needs a YAML parser this
+ * package does not carry.
+ */
+export const PRETTIER_CONFIG_FILES = [
+	'.prettierrc',
+	'.prettierrc.json',
+	'.prettierrc.yml',
+	'.prettierrc.yaml',
+	'.prettierrc.json5',
+	'.prettierrc.js',
+	'prettier.config.js',
+	'.prettierrc.ts',
+	'prettier.config.ts',
+	'.prettierrc.mjs',
+	'prettier.config.mjs',
+	'.prettierrc.mts',
+	'prettier.config.mts',
+	'.prettierrc.cjs',
+	'prettier.config.cjs',
+	'.prettierrc.cts',
+	'prettier.config.cts',
+	'.prettierrc.toml',
+];
+
+export const tsconfig = `{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "plugins": [
+      {
+        "name": "@tsrx/typescript-plugin"
+      }
+    ]
+  },
+  "include": ["src/**/*", "vite.config.ts"]
+}
+`;
 
 /**
  * Scripts that are correct whatever the bundler is. `tsrx-tsc` is the only

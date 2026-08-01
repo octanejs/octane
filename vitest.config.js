@@ -2725,6 +2725,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'create-octane',
+					include: ['packages/create-octane/tests/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'octane-evals',
 					include: ['packages/octane-evals/tests/**/*.test.ts'],
 					environment: 'node',

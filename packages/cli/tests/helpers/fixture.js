@@ -56,7 +56,8 @@ export function installed(name, version, extra = {}, under = '') {
  * pins the non-interactive path so a test can never block on a prompt.
  *
  * @param {string[]} argv
- * @param {{ env?: NodeJS.ProcessEnv, exec?: import('../../src/kernel/exec.js').Exec }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv, exec?: import('../../src/kernel/exec.js').Exec,
+ *   tty?: boolean }} [options]
  * @returns {Promise<RunResult>}
  */
 export async function runCli(argv, options = {}) {
@@ -68,7 +69,9 @@ export async function runCli(argv, options = {}) {
 	const home = options.env?.HOME ?? mkdtempSync(path.join(tmpdir(), 'octane-cli-home-'));
 
 	const exitCode = await main(argv, {
-		tty: false,
+		// `tty: true` is how a test reaches the interactive branches. Anything
+		// that would then block on a prompt has to be answered by a flag.
+		tty: options.tty ?? false,
 		env: { ...options.env, HOME: home, USERPROFILE: home },
 		exec: options.exec,
 		stdout: /** @type {any} */ ({ write: (/** @type {string} */ chunk) => (stdout += chunk) }),
