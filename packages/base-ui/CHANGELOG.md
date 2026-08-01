@@ -1,5 +1,34 @@
 # @octanejs/base-ui
 
+## 0.1.21
+
+### Patch Changes
+
+- 2ee31bd: Add `Accordion` — Root, Item, Header, Trigger and Panel, matching Base UI v1.6.0's anatomy.
+
+  Available as `@octanejs/base-ui/accordion` and from the package root. It builds directly on
+  `Collapsible`: each `Item` runs its own `useCollapsibleRoot` and provides `CollapsibleRootContext`,
+  so Trigger and Panel reuse the collapsible open/transition machinery unchanged — which is exactly
+  how upstream composes them. `CollapsibleRootContext` is now exported for that reason.
+
+  Ships with `tests/upstream/accordion.test.ts`: 15 cases ported from Base UI's own suite with
+  assertions unchanged, plus 3 covering single-vs-multiple toggling, which upstream only exercises
+  in blocks it skips under jsdom.
+
+- d6d8a60: Add `Collapsible` — Root, Trigger, and Panel, matching Base UI v1.6.0's anatomy.
+
+  Available as `@octanejs/base-ui/collapsible` and from the package root. This also lands the
+  `collapsibleOpenStateMapping` util, kept separate from the identically-named export in
+  `popupStateMapping` because upstream's two `triggerOpenStateMapping`s emit different attributes
+  (`data-panel-open` vs `data-popup-open`).
+
+  The port ships with `tests/upstream/collapsible.test.ts`: Base UI's own test file, assertions
+  unchanged, so behavioral drift fails the same case it would fail upstream.
+
+- Updated dependencies [c1ad31b]
+  - octane@0.1.23
+  - @octanejs/floating-ui@0.1.22
+
 ## 0.1.20
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @octanejs/dexie
 
+## 0.1.16
+
+### Patch Changes
+
+- Updated dependencies [c1ad31b]
+  - octane@0.1.23
+
 ## 0.1.15
 
 ### Patch Changes

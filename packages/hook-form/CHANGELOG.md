@@ -1,5 +1,12 @@
 # @octanejs/hook-form
 
+## 0.1.20
+
+### Patch Changes
+
+- Updated dependencies [c1ad31b]
+  - octane@0.1.23
+
 ## 0.1.19
 
 ### Patch Changes
