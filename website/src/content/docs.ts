@@ -10,6 +10,7 @@ import CoreApis from './docs/core-apis.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import ReactCompat from './docs/react-compat.mdx';
+import PublishingLibraries from './docs/publishing-libraries.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
 import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
@@ -29,6 +30,7 @@ const components: Record<string, DocEntry['component']> = {
 	'differences-from-react': DifferencesFromReact,
 	'react-compat': ReactCompat,
 	profiling: Profiling,
+	'publishing-libraries': PublishingLibraries,
 	bindings: Bindings,
 };
 

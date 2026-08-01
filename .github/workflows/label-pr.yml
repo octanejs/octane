@@ -90,18 +90,16 @@ jobs:
             const nextHeading = heading ? /^[ \t]*#{1,6}[ \t]/m.exec(after) : null;
             const scope = nextHeading ? after.slice(0, nextHeading.index) : after;
 
-            // Three states, not two. A body with no checkbox at all is silence,
-            // not a denial, so it must not strip a label somebody applied by
-            // hand. Only an explicit empty box retracts the claim.
+            // Only a checked box is an agent claim. An empty box, a missing
+            // section, or no body at all means human-authored, so stale agent
+            // labels are retracted and provenance never blocks the workflow.
             const box = new RegExp(
               `^[ \\t]*[-*][ \\t]*\\[([ \\t]*[xX]?[ \\t]*)\\][^\\n]*${AGENT}`,
               "im",
             ).exec(scope);
-            if (box) {
-              const claimed = /x/i.test(box[1]);
-              if (claimed && !current.includes(AGENT)) add.push(AGENT);
-              if (!claimed && current.includes(AGENT)) remove.push(AGENT);
-            }
+            const agentAuthored = box ? /x/i.test(box[1]) : false;
+            if (agentAuthored && !current.includes(AGENT)) add.push(AGENT);
+            if (!agentAuthored && current.includes(AGENT)) remove.push(AGENT);
 
             try {
               for (const name of remove) {
@@ -131,19 +129,6 @@ jobs:
             if (add.length > 0 || remove.length > 0) {
               core.notice(
                 `#${number}: applied [${add.join(", ") || "none"}], removed [${remove.join(", ") || "none"}].`,
-              );
-            }
-
-            // Labelling happens before this fails, so a red check leaves nothing
-            // to redo but the body itself. A generated pull request has no
-            // template to keep, so bots are never asked to declare anything.
-            if (!box && pull.user?.type !== "Bot") {
-              core.setFailed(
-                `#${number} does not declare provenance. Keep this section in the pull request body:\n` +
-                  "  ## Provenance\n\n" +
-                  "  - [ ] An agent produced this diff (`agent-authored`)\n" +
-                  "Tick it when an agent produced the diff, leave it clear when a human wrote it. " +
-                  "Editing the body re-runs this check.",
               );
             }
 

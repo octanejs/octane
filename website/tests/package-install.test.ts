@@ -12,7 +12,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-function mount(props: { packages?: string; dev?: string }) {
+function mount(props: { packages?: string; dev?: string; command?: 'pack-dry-run' }) {
 	const utils = render(PackageInstall as any, { props });
 	const tab = (name: string) =>
 		Array.from(utils.container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
@@ -50,6 +50,18 @@ describe('PackageInstall', () => {
 	it('renders a single line when there are no dev packages', () => {
 		const { command } = mount({ packages: '@octanejs/zustand' });
 		expect(command()).toBe('pnpm add @octanejs/zustand');
+	});
+
+	it('renders the native pack dry-run command for every manager', () => {
+		const { tab, command } = mount({ command: 'pack-dry-run' });
+
+		expect(command()).toBe('pnpm pack --dry-run');
+		fireEvent.click(tab('npm'));
+		expect(command()).toBe('npm pack --dry-run');
+		fireEvent.click(tab('yarn'));
+		expect(command()).toBe('yarn pack --dry-run');
+		fireEvent.click(tab('bun'));
+		expect(command()).toBe('bun pm pack --dry-run');
 	});
 
 	it('moves selection with arrow keys and keeps one tab in the tab order', () => {
