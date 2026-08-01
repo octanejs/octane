@@ -111,7 +111,23 @@ async function openHome() {
 	};
 }
 
+/** Astro clears `ssr` on the island after the framework hydrator returns. */
+async function waitForPanelHydrated(page: import('playwright').Page) {
+	await page.waitForFunction(() => {
+		const island = document.querySelector('astro-island[component-export="Panel"]');
+		return island != null && !island.hasAttribute('ssr');
+	});
+}
+
 describe('Astro + Octane production smoke', () => {
+	it('SSRs Greeting text into the initial HTML without client JS', async () => {
+		const res = await fetch(origin + '/');
+		expect(res.ok).toBe(true);
+		const html = await res.text();
+		expect(html).toContain('data-testid="greeting"');
+		expect(html).toContain('Hello, Astro');
+	});
+
 	it('SSRs Greeting text into the initial page', async () => {
 		const session = await openHome();
 		try {
@@ -155,8 +171,10 @@ describe('Astro + Octane production smoke', () => {
 	it('keeps default slot children after hydration', async () => {
 		const session = await openHome();
 		try {
-			await session.page.getByTestId('panel').waitFor({ state: 'visible' });
-			expect((await session.page.getByTestId('panel-child').textContent())?.trim()).toBe(
+			await waitForPanelHydrated(session.page);
+			const child = session.page.getByTestId('panel-child');
+			expect(await child.count()).toBe(1);
+			expect((await child.textContent())?.trim()).toBe(
 				'Children from Astro into an Octane island.',
 			);
 			expect(session.pageErrors).toEqual([]);
@@ -169,10 +187,10 @@ describe('Astro + Octane production smoke', () => {
 	it('keeps named footer-note slot after hydration', async () => {
 		const session = await openHome();
 		try {
-			await session.page.getByTestId('panel-footer').waitFor({ state: 'visible' });
-			expect((await session.page.getByTestId('panel-footer-child').textContent())?.trim()).toBe(
-				'Named footer slot.',
-			);
+			await waitForPanelHydrated(session.page);
+			const footerChild = session.page.getByTestId('panel-footer-child');
+			expect(await footerChild.count()).toBe(1);
+			expect((await footerChild.textContent())?.trim()).toBe('Named footer slot.');
 			expect(session.pageErrors).toEqual([]);
 			expect(session.hydrationMismatches).toEqual([]);
 		} finally {
