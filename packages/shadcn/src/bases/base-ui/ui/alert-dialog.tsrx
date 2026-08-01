@@ -49,8 +49,9 @@ export function AlertDialogContent({ className, size = 'default', ...props }: Re
 	any
 >) @{
 	<AlertDialogPortal>
-		<AlertDialogOverlay />
+		<AlertDialogOverlay key="overlay" />
 		<AlertDialogPrimitive.Popup
+			key="content"
 			data-slot="alert-dialog-content"
 			data-size={size}
 			className={cn(
