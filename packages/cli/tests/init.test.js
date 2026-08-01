@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createFixture, runCli } from './helpers/fixture.js';
+import { createFixture, installed, runCli } from './helpers/fixture.js';
 
 /** @type {{ cleanup: () => void }[]} */
 const fixtures = [];
@@ -46,12 +46,17 @@ describe('octane init', () => {
 		});
 
 		expect(result.exitCode).toBe(0);
-		expect(read(root, 'vite.config.ts')).toContain("from 'octane/compiler/vite'");
+		expect(read(root, 'vite.config.ts')).toContain('from "octane/compiler/vite"');
 		expect(JSON.parse(read(root, 'tsconfig.json')).compilerOptions).toMatchObject({
 			jsxImportSource: 'octane',
 			plugins: [{ name: '@tsrx/typescript-plugin' }],
 		});
 		expect(JSON.parse(read(root, 'package.json')).scripts.typecheck).toContain('tsrx-tsc');
+		// A wired-up bundler still serves nothing without a page and an entry to
+		// mount, so `vite` has to have something to open.
+		expect(read(root, 'index.html')).toContain('<script type="module" src="/src/main.ts">');
+		expect(read(root, 'src/main.ts')).toContain('createRoot');
+		expect(read(root, 'src/App.tsrx')).toContain('export function App()');
 		// The SSR-only files belong to the other mode.
 		expect(existsSync(path.join(root, 'octane.config.ts'))).toBe(false);
 	});
@@ -63,8 +68,123 @@ describe('octane init', () => {
 			exec: gitExec(),
 		});
 
-		expect(read(root, 'vite.config.ts')).toContain("from '@octanejs/vite-plugin'");
-		expect(read(root, 'octane.config.ts')).toContain("entry: ['App', '/src/App.tsrx']");
+		expect(read(root, 'vite.config.ts')).toContain('from "@octanejs/vite-plugin"');
+		// The route entry the config names has to exist, or the build resolves
+		// nothing.
+		expect(read(root, 'octane.config.ts')).toContain('entry: ["App", "/src/App.tsrx"]');
+		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(true);
+
+		// The production build refuses to run without a template, and refuses a
+		// template that does not carry both markers.
+		const html = read(root, 'index.html');
+		expect(html).toContain('<!--ssr-head-->');
+		expect(html).toContain('<!--ssr-body-->');
+		// The plugin owns hydration, so a second entry script here would compete
+		// with the one it injects.
+		expect(html).not.toContain('<script type="module"');
+		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
+	});
+
+	it('states the markers an existing page is missing instead of editing it', async () => {
+		const { root } = fixture({
+			'index.html':
+				'<!doctype html>\n<html>\n\t<body>\n\t\t<div id="root"></div>\n\t</body>\n</html>\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		// Splicing markers into someone's own HTML is the same guesswork as
+		// rewriting their bundler config, so init says what to add and stops.
+		expect(read(root, 'index.html')).not.toContain('ssr-head');
+		expect(result.json().manual.join(' ')).toContain('<!--ssr-head-->');
+	});
+
+	it('adds no orphan component to a client project that already has its own page', async () => {
+		// The project's own index.html names its own entry, so a component this
+		// command invented would sit there unreferenced.
+		const { root } = fixture({
+			'index.html':
+				'<!doctype html>\n<html>\n\t<body>\n\t\t<div id="app"></div>\n\t\t<script type="module" src="/src/boot.ts"></script>\n\t</body>\n</html>\n',
+		});
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(false);
+		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
+	});
+
+	it('leaves TypeScript to the toolchain that carries its own', async () => {
+		// Naming it installs the newest release, which is not necessarily one
+		// `tsrx-tsc` can start under, and nothing in a scaffolded project reads a
+		// workspace copy: the typechecker and the Prettier plugin each bring one.
+		const { root } = fixture();
+
+		const result = await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--json'], {
+			exec: gitExec(),
+		});
+
+		expect(result.json().installed).not.toContain('typescript');
+	});
+
+	it('registers the Prettier plugin, without which .tsrx cannot be parsed', async () => {
+		const { root } = fixture();
+
+		const result = await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--json'], {
+			exec: gitExec(),
+		});
+
+		expect(JSON.parse(read(root, '.prettierrc')).plugins).toEqual(['@tsrx/prettier-plugin']);
+		expect(result.json().installed).toEqual(
+			expect.arrayContaining(['prettier', '@tsrx/prettier-plugin']),
+		);
+	});
+
+	it('states the Prettier edit for a project that already has its own config', async () => {
+		// Formatting config comes in JSON, YAML and JavaScript, so rewriting it is
+		// the same guesswork as rewriting a bundler config.
+		const original = '{\n\t"singleQuote": true\n}\n';
+		const { root } = fixture({ '.prettierrc': original });
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(read(root, '.prettierrc')).toBe(original);
+		expect(result.json().manual.join(' ')).toContain('@tsrx/prettier-plugin');
+	});
+
+	it('stays quiet when the Prettier plugin is already registered', async () => {
+		const { root } = fixture({
+			'.prettierrc': '{\n\t"plugins": ["@tsrx/prettier-plugin"]\n}\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).not.toContain('Prettier plugins');
+	});
+
+	it('honours --yes on a terminal, where people actually type it', async () => {
+		// It used to be consulted only off-TTY, so the flag did nothing in a real
+		// shell, and anything wanting an unattended run had to pretend there was
+		// no terminal. Without the fix this blocks on the confirm prompt.
+		const { root } = fixture();
+
+		const result = await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+			tty: true,
+			env: { NO_COLOR: '', CI: '' },
+		});
+
+		expect(result.exitCode).toBe(0);
 		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(true);
 	});
 

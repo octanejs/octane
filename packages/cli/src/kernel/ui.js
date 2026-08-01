@@ -146,6 +146,12 @@ export function createUi({ mode, yes = false, stdout = process.stdout }) {
 		 * @returns {Promise<boolean>}
 		 */
 		async confirm({ message, flag, initial = true }) {
+			// `--yes` means "stop asking me", which is as true on a terminal as it
+			// is in a pipe. Consulting it only off-TTY made the flag do nothing in
+			// the one place people type it by hand, and left a caller that wanted
+			// an unattended run no choice but to claim there was no terminal,
+			// which costs the interactive rendering as well.
+			if (yes) return Boolean(initial);
 			if (mode !== 'interactive') return Boolean(unattended(flag, initial));
 			return Boolean(guard(await clack.confirm({ message, initialValue: initial })));
 		},

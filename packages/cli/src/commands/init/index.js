@@ -6,11 +6,16 @@ import { CliError, EXIT } from '../../kernel/errors.js';
 import { installPackages } from '../../kernel/install.js';
 import {
 	MODES,
+	PRETTIER_CONFIG_FILES,
 	SCRIPTS,
+	SSR_MARKERS,
 	VITE_SCRIPTS,
 	appComponent,
+	clientEntry,
+	indexHtml,
 	integrationFor,
 	octaneConfig,
+	prettierConfig,
 	tsconfig,
 	viteConfig,
 } from './templates.js';
@@ -63,7 +68,7 @@ function plan(project, mode, integration) {
 		changes.push({
 			file: 'tsconfig.json',
 			summary: 'create, configured for .tsrx',
-			apply: writeFile(at('tsconfig.json'), `${JSON.stringify(tsconfig, null, 2)}\n`),
+			apply: writeFile(at('tsconfig.json'), tsconfig),
 		});
 	} else {
 		const file = project.tsconfig.path;
@@ -93,6 +98,29 @@ function plan(project, mode, integration) {
 					writeFileSync(file, text);
 				},
 			});
+		}
+	}
+
+	// Formatting is nobody's bundler's business, so this runs whichever one the
+	// project uses. Without the plugin Prettier cannot parse `.tsrx` at all.
+	const prettierFiles = PRETTIER_CONFIG_FILES.filter((file) => existsSync(at(file)));
+	const prettierInManifest = project.manifest.prettier !== undefined;
+	if (prettierFiles.length === 0 && !prettierInManifest) {
+		changes.push({
+			file: '.prettierrc',
+			summary: 'create, registering @tsrx/prettier-plugin',
+			apply: writeFile(at('.prettierrc'), prettierConfig),
+		});
+	} else {
+		// Their config is theirs, and it can be JSON, YAML, or JavaScript. Reading
+		// it as text is enough to tell whether the plugin is already named, which
+		// is all that decides between staying quiet and stating the edit.
+		const where = prettierInManifest ? 'the prettier field of package.json' : prettierFiles[0];
+		const declared = prettierInManifest
+			? JSON.stringify(project.manifest.prettier)
+			: readFileSync(at(prettierFiles[0]), 'utf8');
+		if (!declared.includes('@tsrx/prettier-plugin')) {
+			manual.push(`Add "@tsrx/prettier-plugin" to the Prettier plugins in ${where}.`);
 		}
 	}
 
@@ -127,18 +155,58 @@ function plan(project, mode, integration) {
 		);
 	}
 
-	if (mode === 'fullstack' && scaffoldsVite) {
-		if (!project.octaneConfigPath) {
+	if (scaffoldsVite) {
+		if (mode === 'fullstack' && !project.octaneConfigPath) {
 			changes.push({
 				file: 'octane.config.ts',
 				summary: 'create, with one route at /',
 				apply: writeFile(at('octane.config.ts'), octaneConfig),
 			});
 		}
-		if (!existsSync(at('src/App.tsrx'))) {
+
+		// Without a shell and an entry there is nothing to serve: `vite` has no
+		// page to open and a fullstack build fails outright, because the plugin
+		// requires an index.html once octane.config.ts declares routes. Each file
+		// is written only when it is absent, so an existing project keeps its own.
+		const writesShell = !existsSync(at('index.html'));
+		if (writesShell) {
+			changes.push({
+				file: 'index.html',
+				summary:
+					mode === 'fullstack' ? 'create, carrying the SSR markers' : 'create, loading src/main.ts',
+				apply: writeFile(at('index.html'), indexHtml(mode)),
+			});
+			// spa is plain Vite, so the page loads the entry itself and the two
+			// files only make sense together. fullstack needs no entry here: the
+			// plugin injects hydration, in dev through its middleware and in
+			// production at transformIndexHtml.
+			if (mode === 'spa') {
+				changes.push({
+					file: 'src/main.ts',
+					summary: 'create, mounting App into #root',
+					apply: writeFile(at('src/main.ts'), clientEntry),
+				});
+			}
+		} else if (mode === 'fullstack') {
+			// Their index.html is theirs to edit, and splicing markers into
+			// arbitrary HTML is the same guesswork as rewriting a bundler config.
+			const html = readFileSync(at('index.html'), 'utf8');
+			const missing = SSR_MARKERS.filter((marker) => !html.includes(marker));
+			if (missing.length > 0) {
+				manual.push(`In index.html, add ${missing.join(' and ')}: SSR renders into those markers.`);
+			}
+		}
+
+		// fullstack always needs it, because octane.config.ts names it as the
+		// route entry. spa needs it only alongside the entry that imports it, so a
+		// project with its own page does not collect an orphan component.
+		if ((mode === 'fullstack' || writesShell) && !existsSync(at('src/App.tsrx'))) {
 			changes.push({
 				file: 'src/App.tsrx',
-				summary: 'create the route entry referenced by octane.config.ts',
+				summary:
+					mode === 'fullstack'
+						? 'create the route entry referenced by octane.config.ts'
+						: 'create the entry component',
 				apply: writeFile(at('src/App.tsrx'), appComponent),
 			});
 		}
