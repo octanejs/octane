@@ -39,6 +39,22 @@ function attachUnmount(element, root) {
 }
 
 /**
+ * Astro appends `<!--astro:end-->` for `await-children` islands. The island CE
+ * only removes that marker on the MutationObserver path (document still
+ * `loading`). When the island connects after `interactive`/`complete`, or via
+ * the DOMContentLoaded fallback, the comment stays and `hydrateRoot` reports
+ * "client expected the end of the root but the server rendered a comment".
+ *
+ * @param {HTMLElement} element
+ */
+function stripAstroEndMarker(element) {
+	const last = element.lastChild;
+	if (last != null && last.nodeType === 8 && last.nodeValue === 'astro:end') {
+		last.remove();
+	}
+}
+
+/**
  * @param {HTMLElement} element
  */
 export default (element) =>
@@ -78,6 +94,8 @@ export default (element) =>
 			root.render(Component, props);
 			return;
 		}
+
+		stripAstroEndMarker(element);
 
 		const { root, created } = getOrCreateRoot(element, () => {
 			const r = hydrateRoot(element, Component, props, {

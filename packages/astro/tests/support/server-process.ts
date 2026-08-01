@@ -34,6 +34,26 @@ export async function reserveFreePort(): Promise<{ port: number; release: () => 
 	};
 }
 
+// Spawn a detached process group so stopServer() can kill the whole tree.
+// `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the
+// real node process underneath.
+export function spawnDetached(
+	cwd: string,
+	args: string[],
+	env: NodeJS.ProcessEnv = {},
+	stdio: 'ignore' | 'pipe' = 'ignore',
+): ChildProcess {
+	// Ignore stdin always — a piped stdin keeps some wrappers (pnpm) waiting.
+	const stdioOption =
+		stdio === 'pipe' ? (['ignore', 'pipe', 'pipe'] as const) : ('ignore' as const);
+	return spawn('pnpm', args, {
+		cwd,
+		stdio: stdioOption,
+		detached: true,
+		env: { ...process.env, ...env },
+	});
+}
+
 // Spawn a server in its OWN process group so stopServer() can kill the whole
 // tree. `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the
 // real node server underneath.
@@ -42,11 +62,36 @@ export function spawnServer(
 	args: string[],
 	env: NodeJS.ProcessEnv = {},
 ): ChildProcess {
-	return spawn('pnpm', args, {
-		cwd,
-		stdio: 'ignore',
-		detached: true,
-		env: { ...process.env, ...env },
+	return spawnDetached(cwd, args, env, 'ignore');
+}
+
+/**
+ * Wait for a detached child to exit. Rejects on spawn `error` or nonzero exit.
+ *
+ * @param {ChildProcess} child
+ * @returns {Promise<{ code: number | null; output: string }>}
+ */
+export function waitForExit(child: ChildProcess): Promise<{ code: number | null; output: string }> {
+	let output = '';
+	child.stdout?.on('data', (chunk: Buffer | string) => {
+		output += String(chunk);
+	});
+	child.stderr?.on('data', (chunk: Buffer | string) => {
+		output += String(chunk);
+	});
+	return new Promise((resolve, reject) => {
+		let settled = false;
+		child.once('error', (err) => {
+			if (settled) return;
+			settled = true;
+			reject(err);
+		});
+		child.once('exit', (code) => {
+			if (settled) return;
+			settled = true;
+			if (code === 0) resolve({ code, output });
+			else reject(new Error(`process exited with code ${code}\n${output}`));
+		});
 	});
 }
 
@@ -63,7 +108,7 @@ export function waitForServer(child: ChildProcess, url: string, timeoutMs: numbe
 		const probe = async () => {
 			if (settled) return;
 			try {
-				const res = await fetch(url);
+				const res = await fetch(url, { signal: AbortSignal.timeout(2_000) });
 				if (res.status < 500) {
 					await new Promise((r) => setTimeout(r, 50));
 					if (settled) return;
@@ -77,7 +122,7 @@ export function waitForServer(child: ChildProcess, url: string, timeoutMs: numbe
 					return resolve();
 				}
 			} catch {
-				// not up yet
+				// not up yet (or probe timed out)
 			}
 			if (Date.now() > deadline) {
 				settled = true;
