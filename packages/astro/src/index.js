@@ -2,14 +2,13 @@ import * as devalue from 'devalue';
 import { octane as octaneVite } from 'octane/compiler/vite';
 import { compileFilterPatterns } from './compile-filter-patterns.js';
 import { getRenderer } from './container-renderer.js';
+import { createOwnershipFilter } from './ownership-filter.js';
 import { shouldSkipOctaneTransform } from './should-skip-transform.js';
 
 /**
  * @typedef {import('../types/index.d.ts').OctaneAstroOptions} OctaneAstroOptions
  * @typedef {import('../types/index.d.ts').VirtualModuleOptions} VirtualModuleOptions
  */
-
-const ASTRO_EXCLUDE = /\.astro$/;
 
 /**
  * @param {OctaneAstroOptions} [options]
@@ -75,17 +74,20 @@ function getViteConfiguration({
 	hmr,
 	experimentalDisableStreaming,
 }) {
-	const mergedExclude = mergeExclude(exclude);
+	const ownershipFilter = createOwnershipFilter(include, exclude);
 
 	return {
 		plugins: [
 			astroScopedOctanePlugin(
 				octaneVite({
-					exclude: pathFragmentsFromExclude(mergedExclude),
+					// Literal fragments only — the compiler uses `file.includes(...)`.
+					// Astro globs / RegExp ownership live in `ownershipFilter` below.
+					exclude: ['.astro'],
 					requireDirective,
 					profile,
 					hmr,
 				}),
+				ownershipFilter,
 			),
 			optionsPlugin({
 				include,
@@ -111,22 +113,24 @@ function getViteConfiguration({
 }
 
 /**
- * Skip Astro virtual modules and ordinary `node_modules` before the Octane
- * compiler's SSR `transform` schedule (which may `load()` importers and
- * deadlock Rollup when applied to Astro's own runtime graph). Published
- * Octane bindings under node_modules still pass through — see
- * `should-skip-transform.js`.
+ * Skip Astro virtual modules / ordinary node_modules, then apply Astro
+ * include/exclude ownership before the Octane compiler's SSR `transform`
+ * schedule (which may `load()` importers and deadlock Rollup when applied to
+ * Astro's own runtime graph). Published Octane bindings under node_modules
+ * still pass through — see `should-skip-transform.js`.
  *
  * @param {import('vite').Plugin} plugin
+ * @param {((id: string) => boolean) | null} ownershipFilter
  * @returns {import('vite').Plugin}
  */
-function astroScopedOctanePlugin(plugin) {
+function astroScopedOctanePlugin(plugin, ownershipFilter) {
 	const transform = plugin.transform;
 	if (typeof transform !== 'function') return plugin;
 	return {
 		...plugin,
 		transform(code, id, options) {
 			if (shouldSkipOctaneTransform(id)) return null;
+			if (ownershipFilter && !ownershipFilter(id)) return null;
 			return transform.call(this, code, id, options);
 		},
 	};
@@ -168,34 +172,4 @@ function optionsPlugin({ include, exclude, experimentalDisableStreaming }) {
 			}
 		},
 	};
-}
-
-/**
- * @param {OctaneAstroOptions['exclude']} exclude
- */
-function mergeExclude(exclude) {
-	if (exclude == null) return ASTRO_EXCLUDE;
-	if (Array.isArray(exclude)) return [...exclude, ASTRO_EXCLUDE];
-	return [exclude, ASTRO_EXCLUDE];
-}
-
-/**
- * Map Astro include/exclude patterns onto the path-fragment `exclude` list the
- * Octane Vite compiler accepts (string fragments only).
- *
- * @param {string | RegExp | Array<string | RegExp>} exclude
- * @returns {string[] | undefined}
- */
-function pathFragmentsFromExclude(exclude) {
-	const list = Array.isArray(exclude) ? exclude : [exclude];
-	const fragments = [];
-	for (const pattern of list) {
-		if (typeof pattern === 'string') {
-			fragments.push(pattern);
-		}
-	}
-	// Always keep the literal `.astro` fragment so the compiler skips Astro's
-	// virtual script modules even when only RegExp excludes were provided.
-	if (!fragments.includes('.astro')) fragments.push('.astro');
-	return fragments;
 }
