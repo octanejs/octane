@@ -83,7 +83,12 @@ export interface CollapsibleRootContextValue {
 	state: CollapsibleRootState;
 }
 
-const CollapsibleRootContext = createContext<CollapsibleRootContextValue | undefined>(undefined);
+// Exported because Accordion.Item provides its OWN value for this context rather than rendering a
+// Collapsible.Root — that is how upstream shares the whole collapsible open/transition machinery
+// with each accordion item. Consumers should reach for `useCollapsibleRootContext` instead.
+export const CollapsibleRootContext = createContext<CollapsibleRootContextValue | undefined>(
+	undefined,
+);
 
 export function useCollapsibleRootContext(): CollapsibleRootContextValue {
 	const context = useContext(CollapsibleRootContext);

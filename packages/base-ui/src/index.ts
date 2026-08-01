@@ -3,6 +3,7 @@
 // (`@octanejs/base-ui/separator`, `@octanejs/base-ui/use-render`, …). This barrel
 // re-exports the public surface for convenience as components land.
 export { Separator } from './separator';
+export { Accordion } from './accordion';
 export { AlertDialog } from './alert-dialog';
 export { Avatar } from './avatar';
 export { Button } from './button';
