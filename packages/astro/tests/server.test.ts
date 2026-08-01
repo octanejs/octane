@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, injectStyle } from 'octane/server';
+import { createElement, injectStyle, ssrHeadEl } from 'octane/server';
 import renderer from '../src/server.js';
 
 describe('Astro server renderer', () => {
@@ -106,5 +106,27 @@ describe('Astro server renderer', () => {
 		expect(html).toContain('.greeting{color:teal}');
 		expect(html).toContain('<span');
 		expect(html.indexOf('<style')).toBeLessThan(html.indexOf('<span'));
+	});
+
+	it('keeps hoisted title/meta out of island HTML for hydrateRoot', async () => {
+		// Compiler-hoisted head uses `ssrHeadEl` (not createElement('title')).
+		// Default fold prepends that markup into body-only island HTML; separate
+		// withholds it so hydrateRoot's adoption cursor stays on the body root.
+		function WithHead() {
+			ssrHeadEl('t0', 'title', null, 'Island title');
+			ssrHeadEl('m0', 'meta', { name: 'description', content: 'island desc' }, null);
+			return createElement('span', null, 'body');
+		}
+		const { html } = await renderer.renderToStaticMarkup.call(
+			{ result: {} },
+			WithHead,
+			{},
+			{},
+			undefined,
+		);
+		expect(html).toContain('<span>body</span>');
+		expect(html).not.toContain('<title');
+		expect(html).not.toContain('name="description"');
+		expect(html).not.toContain('Island title');
 	});
 });

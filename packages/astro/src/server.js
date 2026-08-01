@@ -92,8 +92,15 @@ async function renderToStaticMarkup(Component, props, { default: children, ...sl
 	// future streaming path; v1 always uses hydratable `renderToString`.
 	void opts?.experimentalDisableStreaming;
 
+	// `headChannel: 'separate'` withholds hoisted `<title>`/`<meta>`/`<link>`
+	// from the island HTML. Default fold would prepend them into the body,
+	// and `hydrateRoot` only skips leading `data-octane` style tags — so that
+	// head markup would become the adoption cursor and break hydration.
+	// Astro owns document `<head>`; discard the separate channel (same as
+	// app-core / docusaurus hosts that splice it themselves).
 	const { html, css } = renderToString(Component, newProps, {
 		identifierPrefix: prefix,
+		headChannel: 'separate',
 	});
 
 	const cssBlock = typeof css === 'string' && css.length > 0 ? css : '';
