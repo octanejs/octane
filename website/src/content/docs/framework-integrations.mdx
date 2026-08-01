@@ -13,37 +13,50 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 	<h1>Framework integrations</h1>
 	<p className="doc-lede">
 		{
-			'Use Octane where another framework owns the application shell. These integrations connect Octane rendering and compilation to the framework’s routes, content, server lifecycle, or islands model.'
+			'Use Octane with the framework that already runs your app. Each integration takes care of the framework-specific setup.'
 		}
 	</p>
 </div>
 
-<h2 id="choose-a-framework">Choose the framework boundary</h2>
+<h2 id="choose-a-framework">Find the right integration</h2>
 
-Framework integrations are different from both build tools and bindings. Vite, Rspack,
-and Rsbuild choose the compilation pipeline. A binding adapts a library’s React-facing
-hooks or components. A framework integration connects Octane to a host that owns more of
-the application.
+Choose the package for the framework that runs your app. It covers more than
+compilation, including routes, server rendering, hydration, and content. If you only
+need compiler support, see [Build tools](/docs/build-tools). For React library ports,
+see [Bindings](/docs/bindings).
 
 <FrameworkIntegrationsDirectory />
 
 <aside className="doc-callout note">
-	<p className="doc-callout-title">TanStack Start, not TanStack as a whole</p>
+	<p className="doc-callout-title">Already have a React app?</p>
 	<p>
-		<code>TanStack Start</code>
 		{
-			' is the full-stack framework. Router, Query, Form, Store, Table, Virtual, AI, and the other TanStack packages remain library bindings. '
+			'React isn’t in the list above because it’s a UI library, not a full app framework. If you already have a React 19 app, '
 		}
-		<a href="/docs/bindings#find-a-binding">Browse the TanStack bindings</a>
+		<code>octane/react</code>
+		{' lets you add compiled Octane components one at a time. '}
+		<a href="/docs/react-compat">Read the React compatibility guide</a>
 		{'.'}
+	</p>
+</aside>
+
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">Don’t see your framework?</p>
+	<p>
+		<a href="https://github.com/octanejs/octane/issues/new/choose">Open an issue</a>
+		{
+			' to suggest an integration and agree on the approach. If you’d like to help build it, check the '
+		}
+		<a href="https://github.com/octanejs/octane/pulls">open pull requests</a>
+		{', then send one of your own.'}
 	</p>
 </aside>
 
 <h2 id="astro">Astro islands</h2>
 
-Use `@octanejs/astro` when Astro owns pages, layouts, routing, and the HTML shell while
-Octane owns individual islands. The integration compiles `.tsrx` and explicitly owned
-`.tsx` files, server-renders island HTML, and hydrates through Astro’s `client:*`
+Use `@octanejs/astro` when most of the page belongs to Astro and you want to add Octane
+islands. The integration compiles every `.tsrx` file and any `.tsx` files you assign to
+Octane. It renders those components on the server and connects them to Astro’s `client:*`
 directives.
 
 <PackageInstall packages="octane @octanejs/astro" />
@@ -66,17 +79,17 @@ import { Counter } from '../components/Counter.tsrx';
 <Counter client:load start={0} />
 ```
 
-Astro’s client directives decide when the outer island hydrates. Octane’s own deferred
-hydration can still control work inside the island. See the
+Astro still decides when each island hydrates. You can use Octane’s deferred hydration
+for work inside an island. The
 [`@octanejs/astro` package guide](https://github.com/octanejs/octane/tree/main/packages/astro)
-for client-only islands, mixed JSX frameworks, ownership filters, and all integration
+covers client-only islands, mixed JSX frameworks, ownership filters, and the available
 options.
 
 <h2 id="docusaurus">Docusaurus content sites</h2>
 
-`@octanejs/docusaurus` adopts Docusaurus’s headless content boundary: configuration,
-plugins, routes, generated data, and MDX. It provides an Octane-native router, static
-rendering and hydration helpers, and an initial classic documentation theme.
+Use `@octanejs/docusaurus` to keep Docusaurus’s configuration, plugins, routes, generated
+data, and MDX while rendering the site with Octane. The package includes an Octane router,
+static rendering, hydration helpers, and a starter documentation theme.
 
 <PackageInstall packages="octane @octanejs/docusaurus @docusaurus/core@3.10.1" />
 
@@ -91,17 +104,16 @@ export default defineConfig({
 });
 ```
 
-This integration is a technical preview. It does not run React-authored themes or
-swizzles unchanged, and a complete `start`/`build` CLI workflow is not yet part of its
-supported surface. Read the
+This package is a technical preview. React themes and swizzles need changes, and the full
+`start` and `build` workflow isn’t ready yet. Check the
 [`@octanejs/docusaurus` package guide](https://github.com/octanejs/octane/tree/main/packages/docusaurus)
 for the pinned Docusaurus version, theme setup, and current scope.
 
 <h2 id="tanstack-start">TanStack Start applications</h2>
 
-`@octanejs/tanstack-start` is the full-stack TanStack Start integration for Octane. It
-owns file-route generation, route splitting, server functions, streaming SSR, hydration,
-and the Vite development and production environments. This website runs on it.
+Use `@octanejs/tanstack-start` for a full-stack Octane app built on TanStack Start. It
+includes file-based routing, route splitting, server functions, streaming SSR, hydration,
+and the Vite setup for development and production. This website uses it.
 
 <PackageInstall packages="octane @octanejs/tanstack-start @octanejs/tanstack-router" dev="vite" />
 
@@ -115,8 +127,8 @@ export default defineConfig({
 });
 ```
 
-Application code imports Start APIs from the framework integration and routing APIs from
-the router binding:
+Import server and app APIs from the Start package. Import route APIs from the router
+binding:
 
 ```ts
 import { createServerFn } from '@octanejs/tanstack-start';
@@ -125,6 +137,7 @@ import { createFileRoute } from '@octanejs/tanstack-router';
 
 See the
 [`@octanejs/tanstack-start` package guide](https://github.com/octanejs/octane/tree/main/packages/tanstack-start)
-for the public client, server, RPC, hydration, and Vite entries. For Query, Form, Store,
-Table, Virtual, Router utilities, and other library APIs, use the
-[TanStack bindings in the bindings directory](/docs/bindings#find-a-binding).
+for the client, server, RPC, hydration, and Vite entry points. TanStack Start is the
+framework. Query, Form, Store, Table, Virtual, Router, and the other TanStack packages are
+libraries; you’ll find their Octane ports in the
+[TanStack bindings directory](/docs/bindings#find-a-binding).
