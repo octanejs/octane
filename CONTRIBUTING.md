@@ -267,6 +267,13 @@ label check successful. Agents must therefore keep and tick the section;
 `gh pr create --fill` drops the template and would make an agent-produced diff
 look human-authored, so use `--body-file` instead.
 
+When an agent updates an existing pull request body, it must merge its changes
+into the current body rather than replace it from a template. Bot-managed
+regions are opaque and must be preserved byte-for-byte, including Cursor
+Bugbot's `<!-- CURSOR_SUMMARY -->` through `<!-- /CURSOR_SUMMARY -->` block.
+The agent refetches immediately before the edit and verifies the body afterward
+so a concurrent bot update is not silently lost.
+
 The repository ships its own agent context: `AGENTS.md` (and its per-tool
 siblings) plus task skills for branching, issues, bug hunting, core changes,
 performance audits, and binding ports. Point your agent at those rather than

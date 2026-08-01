@@ -16,7 +16,9 @@ const LIGHTWEIGHT_PATHS = [
 	/^\.rulesync\//,
 	/^\.vscode\//,
 	/^\.github\//,
+	/^packages\/octane-mcp-server\/skills\/[^/]+\.md$/,
 	/^scripts\/(?:classify-ci-change(?:\.test)?|ci-workflow\.test|file-selection|format-files(?:\.test)?|typecheck-files(?:\.test)?)\.mjs$/,
+	/^website\/public\/llms\.txt$/,
 	/^(?:AGENTS|CLAUDE|GEMINI)\.md$/,
 	/^(?:CODE_OF_CONDUCT|CONTRIBUTING|LICENSE|README|SECURITY)(?:\.md)?$/,
 ];

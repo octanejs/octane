@@ -34,6 +34,9 @@ details but do not replace these gates.
   hydration with production-compiled output and preserve abort/error behavior.
 - Treat bundle size and dependency cost as performance. Check for an official
   binding before adding a compatibility layer or a second framework runtime.
+- Publish every importable `.tsrx`, `.tsx`, `.ts`, and `.js` module as authored
+  and point package exports at that source. Do not ship Octane compiler output;
+  let the consuming application compile the source with its own toolchain.
 - When you do port a React package yourself, work from a pinned copy of that
   release's source kept beside your port, cover its exports rather than the demo
   path, and write down what parity could not reach. The `bridge-react-package`

@@ -123,7 +123,14 @@ const root = createRoot(document.getElementById('root')!);
 root.render(App, { title: 'Hello world!' });
 ```
 
-Or let the CLI wire it up, including the TypeScript settings `.tsrx` needs:
+To start from nothing instead, scaffold a project that already runs:
+
+```bash
+npm create octane my-app
+```
+
+Or, in a project you already have, let the CLI wire it up, including the
+TypeScript settings `.tsrx` needs:
 
 ```bash
 pnpm dlx @octanejs/cli init
