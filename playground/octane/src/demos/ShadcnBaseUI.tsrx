@@ -5,10 +5,17 @@
 // Check them differently:
 //
 //   Accordion — transcribed from upstream and running on the real
-//     @octanejs/base-ui accordion primitive. The only genuinely INTERACTIVE
-//     family so far, so exercise it: single mode should collapse an open item
-//     when its trigger is clicked, opening one should close the others, and the
-//     disabled item should not respond at all.
+//     @octanejs/base-ui accordion primitive. The most INTERACTIVE family here, so
+//     exercise it: single mode should collapse an open item when its trigger is
+//     clicked, opening one should close the others, and the disabled item should
+//     not respond at all.
+//
+//   Button, Input, Label, Separator — running on real Base UI primitives
+//     (Button, Field.Control, Field.Label, Separator). Their class strings are
+//     still derived, but their BEHAVIOR is the primitive's. Separator is the one
+//     to look hardest at: Base UI emits `aria-orientation` like RAC rather than
+//     `data-orientation` like Radix, so it needs the aria base's conditional
+//     utilities. If a separator has no thickness, that is the bug.
 //
 //   Alert — transcribed and verified byte-identical to upstream's source. Should
 //     need no scrutiny.
@@ -19,8 +26,8 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: every other primitive-backed family (Button, Checkbox, Switch,
-// Dialog, Popover, …). Base UI's primitive API is structurally different from
+// Still absent: the overlay and form-control families (Checkbox, Switch, Dialog,
+// Popover, Tooltip, …). Base UI's primitive API is structurally different from
 // React Aria's, so those cannot be derived and need transcribed sources.
 import {
 	Accordion,
@@ -29,6 +36,12 @@ import {
 	AccordionTrigger,
 } from '@octanejs/shadcn/base-ui/Accordion';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/base-ui/Alert';
+import { Button } from '@octanejs/shadcn/base-ui/Button';
+import { Input } from '@octanejs/shadcn/base-ui/Input';
+import { Kbd, KbdGroup } from '@octanejs/shadcn/base-ui/Kbd';
+import { Label } from '@octanejs/shadcn/base-ui/Label';
+import { Separator } from '@octanejs/shadcn/base-ui/Separator';
+import { Textarea } from '@octanejs/shadcn/base-ui/Textarea';
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
 import {
 	Card,
@@ -71,12 +84,13 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 7 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 14 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Accordion is transcribed from upstream and runs on the real primitive. Alert is verified
-				against upstream's Base UI source. The rest are derived from the React Aria base: compare
-				the two tabs, they should be visually identical. Primitive-backed families (Button,
-				Checkbox, Switch, Dialog, …) are not ported yet.
+				Accordion, Button, Input, Label and Separator run on real Base UI primitives. Alert is
+				verified byte-identical to upstream's Base UI source. Every other class string is derived
+				from the React Aria base, so compare the two tabs — they should look identical, and any
+				difference is a porting bug. Checkbox, Switch, Dialog and the other overlay and form-control
+				families are not ported yet.
 			</p>
 		</div>
 
@@ -104,6 +118,74 @@ export function ShadcnBaseUIDemo() @{
 					<AccordionContent>You should not be able to reach this.</AccordionContent>
 				</AccordionItem>
 			</Accordion>
+		</Section>
+
+		<Section
+			title="Button"
+			note="Runs on the @octanejs/base-ui Button primitive. cva strings are shared across upstream's bases; the Base UI base omits data-variant/data-size by design."
+		>
+			<div class="space-y-3">
+				<div class="flex flex-wrap items-center gap-2">
+					<Button>Default</Button>
+					<Button variant="secondary">Secondary</Button>
+					<Button variant="outline">Outline</Button>
+					<Button variant="ghost">Ghost</Button>
+					<Button variant="destructive">Destructive</Button>
+					<Button variant="link">Link</Button>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<Button size="xs">xs</Button>
+					<Button size="sm">sm</Button>
+					<Button>default</Button>
+					<Button size="lg">lg</Button>
+					<Button disabled>Disabled</Button>
+				</div>
+			</div>
+		</Section>
+
+		<Section
+			title="Input, Textarea and Label"
+			note="Input is Base UI's Field.Control; Textarea is a plain host, since Base UI ships no textarea primitive."
+		>
+			<div class="grid max-w-sm gap-4">
+				<div class="grid gap-2">
+					<Label>Email</Label>
+					<Input type="email" placeholder="you@example.com" />
+				</div>
+				<div class="grid gap-2">
+					<Label>Message</Label>
+					<Textarea placeholder="Type your message…" />
+				</div>
+				<Input placeholder="Disabled" disabled />
+			</div>
+		</Section>
+
+		<Section
+			title="Separator"
+			note="The one family where copying the wrong base is a real bug: Base UI emits aria-orientation like RAC, not data-orientation like Radix. Both directions should be visible below."
+		>
+			<div class="space-y-4">
+				<div>
+					<p class="text-sm">Above</p>
+					<Separator class="my-2" />
+					<p class="text-sm">Below</p>
+				</div>
+				<div class="flex h-8 items-center gap-3 text-sm">
+					<span>Left</span>
+					<Separator orientation="vertical" />
+					<span>Middle</span>
+					<Separator orientation="vertical" />
+					<span>Right</span>
+				</div>
+			</div>
+		</Section>
+
+		<Section title="Kbd" note="Plain host elements — Base UI ships no Keyboard primitive.">
+			<KbdGroup>
+				<Kbd>Ctrl</Kbd>
+				<Kbd>Shift</Kbd>
+				<Kbd>K</Kbd>
+			</KbdGroup>
 		</Section>
 
 		<Section title="Alert" note="Verified byte-identical to upstream.">
