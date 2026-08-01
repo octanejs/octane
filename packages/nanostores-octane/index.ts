@@ -9,11 +9,17 @@
 //
 // The one octane-specific detail is hook slots: octane keys hooks by a
 // compiler-injected per-call-site Symbol, appended as the LAST argument of
-// every `use*` call. This file is a plain `.ts` module — the octane compiler
-// does not inject slots into it — so `useStore` accepts the caller's slot as
-// its trailing argument and derives stable child slots (one per internal hook
-// call) via `subSlot`. Because the slot is per call site, `useStore(a)` and
-// `useStore(b)` in one component stay independent, just like in React.
+// every `use*` call. A plain `.ts` module is still eligible for octane's
+// surgical hook-slot pass, which would append a trailing Symbol to each
+// inner base-hook call — for `useSyncExternalStore(...rest)` that injected
+// Symbol becomes the slot and silently overrides the `subSlot(slot, …)`
+// argument this binding authors. So `package.json` declares
+// `octane.hookSlots.manual: ["index.ts"]` to opt this hand-slotted module out
+// of auto-slotting: `useStore` accepts the caller's slot as its trailing
+// argument and derives stable child slots (one per internal hook call) via
+// `subSlot`, which stays authoritative. Because the slot is per call site,
+// `useStore(a)` and `useStore(b)` in one component stay independent, just like
+// in React.
 import type { Store, StoreValue } from 'nanostores'
 import { listenKeys } from 'nanostores'
 import { useCallback, useRef, useSyncExternalStore } from 'octane'

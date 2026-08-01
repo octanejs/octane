@@ -56,6 +56,11 @@
     "nanostores": "^1.2.0",
     "octane": "0.1.21"
   },
+  "octane": {
+    "hookSlots": {
+      "manual": ["index.ts"]
+    }
+  },
   "size-limit": [
     {
       "import": {
