@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { defineCommand } from '../../kernel/command.js';
 import { setCompilerOption } from '../../kernel/edit.js';
@@ -49,6 +49,38 @@ const writeFile = (file, body) => () => {
 	mkdirSync(path.dirname(file), { recursive: true });
 	writeFileSync(file, body);
 };
+
+/**
+ * Where a project keeps its Prettier settings, and what they say, so a caller
+ * can tell whether the plugin is already registered there.
+ *
+ * The `prettier` field of package.json holds either the settings themselves or
+ * a path to them, and the two have to be read differently. `declared` is null
+ * when the settings are real but out of reach: the field may name a shareable
+ * config, and resolving a bare module specifier is the package manager's job.
+ *
+ * @param {string} root
+ * @param {string[]} files config files found in the project, in Prettier's search order
+ * @param {unknown} fromManifest the `prettier` field of package.json
+ * @returns {{ where: string, declared: string | null }}
+ */
+function prettierSettings(root, files, fromManifest) {
+	if (files.length > 0) {
+		return { where: files[0], declared: readFileSync(path.join(root, files[0]), 'utf8') };
+	}
+	if (typeof fromManifest !== 'string') {
+		return {
+			where: 'the prettier field of package.json',
+			declared: JSON.stringify(fromManifest),
+		};
+	}
+	// A path is relative to the package.json naming it. Anything that does not
+	// land on a file is a specifier for the resolver, not a path.
+	const file = path.resolve(root, fromManifest);
+	return existsSync(file) && statSync(file).isFile()
+		? { where: path.relative(root, file), declared: readFileSync(file, 'utf8') }
+		: { where: fromManifest, declared: null };
+}
 
 /**
  * @param {import('../../kernel/project.js').Project} project
@@ -104,8 +136,7 @@ function plan(project, mode, integration) {
 	// Formatting is nobody's bundler's business, so this runs whichever one the
 	// project uses. Without the plugin Prettier cannot parse `.tsrx` at all.
 	const prettierFiles = PRETTIER_CONFIG_FILES.filter((file) => existsSync(at(file)));
-	const prettierInManifest = project.manifest.prettier !== undefined;
-	if (prettierFiles.length === 0 && !prettierInManifest) {
+	if (prettierFiles.length === 0 && project.manifest.prettier === undefined) {
 		changes.push({
 			file: '.prettierrc',
 			summary: 'create, registering @tsrx/prettier-plugin',
@@ -115,11 +146,13 @@ function plan(project, mode, integration) {
 		// Their config is theirs, and it can be JSON, YAML, or JavaScript. Reading
 		// it as text is enough to tell whether the plugin is already named, which
 		// is all that decides between staying quiet and stating the edit.
-		const where = prettierInManifest ? 'the prettier field of package.json' : prettierFiles[0];
-		const declared = prettierInManifest
-			? JSON.stringify(project.manifest.prettier)
-			: readFileSync(at(prettierFiles[0]), 'utf8');
-		if (!declared.includes('@tsrx/prettier-plugin')) {
+		const { where, declared } = prettierSettings(root, prettierFiles, project.manifest.prettier);
+		if (declared === null) {
+			// Saying "add it" would be a guess, and so would saying nothing.
+			manual.push(
+				`Prettier settings come from ${where}, which this command cannot read: check that "@tsrx/prettier-plugin" is among its plugins.`,
+			);
+		} else if (!declared.includes('@tsrx/prettier-plugin')) {
 			manual.push(`Add "@tsrx/prettier-plugin" to the Prettier plugins in ${where}.`);
 		}
 	}
@@ -169,6 +202,13 @@ function plan(project, mode, integration) {
 		// requires an index.html once octane.config.ts declares routes. Each file
 		// is written only when it is absent, so an existing project keeps its own.
 		const writesShell = !existsSync(at('index.html'));
+		// spa is plain Vite, so the page loads the entry itself and the two files
+		// only make sense together. fullstack needs no entry here: the plugin
+		// injects hydration, in dev through its middleware and in production at
+		// transformIndexHtml.
+		// Guarded like every other file here: a project can have lost its
+		// index.html and still own the entry that used to be loaded from it.
+		const writesClientEntry = writesShell && mode === 'spa' && !existsSync(at('src/main.ts'));
 		if (writesShell) {
 			changes.push({
 				file: 'index.html',
@@ -176,13 +216,7 @@ function plan(project, mode, integration) {
 					mode === 'fullstack' ? 'create, carrying the SSR markers' : 'create, loading src/main.ts',
 				apply: writeFile(at('index.html'), indexHtml(mode)),
 			});
-			// spa is plain Vite, so the page loads the entry itself and the two
-			// files only make sense together. fullstack needs no entry here: the
-			// plugin injects hydration, in dev through its middleware and in
-			// production at transformIndexHtml.
-			// Guarded like every other file here: a project can have lost its
-			// index.html and still own the entry that used to be loaded from it.
-			if (mode === 'spa' && !existsSync(at('src/main.ts'))) {
+			if (writesClientEntry) {
 				changes.push({
 					file: 'src/main.ts',
 					summary: 'create, mounting App into #root',
@@ -201,8 +235,10 @@ function plan(project, mode, integration) {
 
 		// fullstack always needs it, because octane.config.ts names it as the
 		// route entry. spa needs it only alongside the entry that imports it, so a
-		// project with its own page does not collect an orphan component.
-		if ((mode === 'fullstack' || writesShell) && !existsSync(at('src/App.tsrx'))) {
+		// project with its own page does not collect an orphan component. That is
+		// the entry this run writes, not the shell: keeping someone's src/main.ts
+		// means keeping whatever it imports, which is not this file.
+		if ((mode === 'fullstack' || writesClientEntry) && !existsSync(at('src/App.tsrx'))) {
 			changes.push({
 				file: 'src/App.tsrx',
 				summary:

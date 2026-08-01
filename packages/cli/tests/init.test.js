@@ -131,6 +131,21 @@ describe('octane init', () => {
 		expect(read(root, 'src/main.ts')).toBe(original);
 	});
 
+	it('adds no component when it is keeping the entry that would import it', async () => {
+		// The entry it writes is the one that imports App.tsrx. Keeping theirs
+		// means keeping whatever theirs imports, so writing the component anyway
+		// leaves a file nothing references.
+		const { root } = fixture({ 'src/main.ts': "import { mount } from './mine';\nmount();\n" });
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(existsSync(path.join(root, 'src/App.tsrx'))).toBe(false);
+		// The page it needed is still missing, and that one it does write.
+		expect(read(root, 'index.html')).toContain('src="/src/main.ts"');
+	});
+
 	it('recognises every config name Prettier itself resolves', async () => {
 		// Missing one means writing a second config that shadows theirs, since
 		// `.prettierrc` wins the search order over most of the others.
@@ -184,6 +199,57 @@ describe('octane init', () => {
 
 		expect(read(root, '.prettierrc')).toBe(original);
 		expect(result.json().manual.join(' ')).toContain('@tsrx/prettier-plugin');
+	});
+
+	it('follows the prettier field of package.json to the config it points at', async () => {
+		// The field holds either the settings or a path to them. Searching the
+		// path itself for the plugin name asks the wrong file, which both misses a
+		// plugin that is registered and names a package.json field to add it to.
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: './config/prettier.json' },
+			'config/prettier.json': { plugins: ['@tsrx/prettier-plugin'] },
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).not.toContain('Prettier plugins');
+	});
+
+	it('names the file to edit, not the field that points at it', async () => {
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: './config/prettier.json' },
+			'config/prettier.json': { singleQuote: true },
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		const note = result
+			.json()
+			.manual.find((/** @type {string} */ line) => line.includes('@tsrx/prettier-plugin'));
+		expect(note).toContain(path.join('config', 'prettier.json'));
+		expect(note).not.toContain('package.json');
+	});
+
+	it('says it cannot check a shared config rather than guessing at one', async () => {
+		// Resolving a bare specifier is the package manager's job. Claiming the
+		// plugin is missing would be a guess, and so would staying quiet.
+		const { root } = fixture({
+			'package.json': { name: 'app', type: 'module', prettier: '@acme/prettier-config' },
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(result.json().manual.join(' ')).toContain('@acme/prettier-config');
+		expect(existsSync(path.join(root, '.prettierrc'))).toBe(false);
 	});
 
 	it('stays quiet when the Prettier plugin is already registered', async () => {

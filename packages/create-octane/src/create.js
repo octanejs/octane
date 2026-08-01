@@ -210,7 +210,10 @@ export async function create(argv, options = {}) {
 
 	const target = path.resolve(cwd, directory);
 	const existed = existsSync(target);
-	if (existed && readdirSync(target).length > 0) {
+	// A repository with nothing in it is not a project. `mkdir app && cd app &&
+	// git init` is a common enough way to start that refusing it would leave this
+	// check protecting work that is not there, which is the only thing it is for.
+	if (existed && readdirSync(target).some((entry) => entry !== '.git')) {
 		// Emptying someone's directory is not this command's call to make.
 		stderr.write(`${directory} already exists and is not empty.\n`);
 		return EXIT.FAILURE;
@@ -225,6 +228,11 @@ export async function create(argv, options = {}) {
 			2,
 		)}\n`,
 	);
+	// What sits there before init runs: the manifest just written, and a `.git`
+	// if the directory came with one. The cleanup below asks what init added
+	// rather than counting entries, so it cannot disagree with the rule above
+	// about what an empty directory may already hold.
+	const before = new Set(readdirSync(target));
 
 	// `--force` is not a shortcut here. init refuses a dirty tree so `git diff`
 	// stays a usable review of what it wrote, and that reasoning is about a
@@ -261,9 +269,10 @@ export async function create(argv, options = {}) {
 	// successful answer; an install that failed is not, and both leave the same
 	// nothing behind. Undoing it matters either way, because the directory it
 	// left would make the obvious retry fail as already occupied. The directory
-	// itself goes only when this command is the one that made it, and anything
-	// init did manage to write is left alone to be looked at.
-	if (readdirSync(target).length <= 1) {
+	// itself goes only when this command is the one that made it, so a `.git`
+	// that was already there survives, and anything init did manage to write is
+	// left alone to be looked at.
+	if (!readdirSync(target).some((entry) => !before.has(entry))) {
 		rmSync(path.join(target, 'package.json'), { force: true });
 		if (!existed) rmSync(target, { recursive: true, force: true });
 		if (exitCode === EXIT.OK) stdout.write('Nothing was created.\n');

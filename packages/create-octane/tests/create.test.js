@@ -146,6 +146,19 @@ describe('create-octane', () => {
 		expect(existsSync(path.join(cwd, 'my-app/index.html'))).toBe(true);
 	});
 
+	it('scaffolds into a directory holding nothing but a fresh repository', async () => {
+		// `mkdir app && cd app && git init` is a common way to start, and a
+		// repository with nothing in it holds no work of theirs to protect.
+		const cwd = workspace();
+		mkdirSync(path.join(cwd, 'my-app/.git'), { recursive: true });
+
+		const result = await run(['my-app', '--template', 'spa', '--no-install'], cwd);
+
+		expect(result.exitCode).toBe(0);
+		expect(existsSync(path.join(cwd, 'my-app/index.html'))).toBe(true);
+		expect(existsSync(path.join(cwd, 'my-app/.git'))).toBe(true);
+	});
+
 	it('refuses a directory that already has something in it', async () => {
 		const cwd = workspace();
 		mkdirSync(path.join(cwd, 'my-app'), { recursive: true });

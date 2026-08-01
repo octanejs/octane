@@ -36,13 +36,17 @@ Prettier's own default style rather than the repository's.
 `init` now writes a `.prettierrc` registering `@tsrx/prettier-plugin`, and
 installs it along with `prettier`, because Prettier cannot parse `.tsrx` without
 it. A project that already has a Prettier config keeps it, and is told which
-plugin to add, the same rule already applied to a bundler config.
-
+plugin to add, the same rule already applied to a bundler config. A `prettier`
+field in package.json holding a path is followed to the file it names, so a
+project that registers the plugin there is not told to register it again; a
+field naming a shareable config is reported as one this command cannot read.
 
 The package creates the directory and its `package.json`, then hands the
 directory to `octane init`. The templates stay in the CLI rather than being
 copied here, so the two commands cannot drift into scaffolding different
-projects.
+projects. A directory has to be empty, except that a fresh `.git` is allowed,
+since `mkdir app && cd app && git init` is a common way to start and holds no
+work to protect.
 
 `octane init` itself wrote no HTML shell and no client entry, in either mode.
 That left `--mode spa` with a wired-up bundler, no entry component, and nothing
@@ -50,7 +54,10 @@ for `vite` to open, while `--mode fullstack` produced a project whose production
 build failed outright, because `@octanejs/vite-plugin` requires an `index.html`
 once `octane.config.ts` declares routes. Both modes now get an `index.html`, spa
 also gets a `src/main.ts` that mounts `App` into `#root`, and the entry
-component is written for spa as well as fullstack.
+component is written for spa as well as fullstack. Every one of those files is
+written only when it is absent, and spa adds the component only alongside the
+entry that imports it, so a project keeping its own `src/main.ts` does not
+collect one nothing references.
 
 The fullstack shell carries the `<!--ssr-head-->` and `<!--ssr-body-->` markers
 the server renderer requires, and no entry script, since the plugin injects
