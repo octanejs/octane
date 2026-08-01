@@ -15,7 +15,45 @@ import {
 	AccordionTrigger,
 } from '@octanejs/shadcn/base-ui/Accordion';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/base-ui/Alert';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogMedia,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@octanejs/shadcn/base-ui/AlertDialog';
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
+import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from '@octanejs/shadcn/base-ui/Dialog';
+import {
+	Popover,
+	PopoverContent,
+	PopoverDescription,
+	PopoverHeader,
+	PopoverTitle,
+	PopoverTrigger,
+} from '@octanejs/shadcn/base-ui/Popover';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@octanejs/shadcn/base-ui/Tooltip';
+import { RadioGroup, RadioGroupItem } from '@octanejs/shadcn/base-ui/RadioGroup';
+import { Switch } from '@octanejs/shadcn/base-ui/Switch';
 import { Button } from '@octanejs/shadcn/base-ui/Button';
 import {
 	Card,
@@ -141,4 +179,84 @@ export function SpinnerCase() @{
 
 export function TextareaCase() @{
 	<Textarea placeholder="Message" />
+}
+
+// Rendered OPEN so the portalled tree actually exists in the DOM. A closed alert-dialog renders
+// only its trigger, which would make any assertion about the content vacuous.
+export function AlertDialogCase() @{
+	<AlertDialog defaultOpen>
+		<AlertDialogTrigger>Open</AlertDialogTrigger>
+		<AlertDialogContent>
+			<AlertDialogHeader>
+				<AlertDialogMedia>
+					<span>icon</span>
+				</AlertDialogMedia>
+				<AlertDialogTitle>Are you sure?</AlertDialogTitle>
+				<AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+			</AlertDialogHeader>
+			<AlertDialogFooter>
+				<AlertDialogCancel>Cancel</AlertDialogCancel>
+				<AlertDialogAction>Continue</AlertDialogAction>
+			</AlertDialogFooter>
+		</AlertDialogContent>
+	</AlertDialog>
+}
+
+export function CheckboxCase() @{
+	<Checkbox defaultChecked />
+}
+
+export function CheckboxDisabledCase() @{
+	<Checkbox disabled />
+}
+
+export function SwitchCase() @{
+	<Switch defaultChecked />
+}
+
+export function SwitchDisabledCase() @{
+	<Switch disabled />
+}
+
+export function RadioGroupCase() @{
+	<RadioGroup defaultValue="a">
+		<RadioGroupItem value="a" />
+		<RadioGroupItem value="b" disabled />
+	</RadioGroup>
+}
+
+// Rendered OPEN so the portalled tree exists. A closed overlay renders only its trigger, which
+// would make every assertion about the content vacuous.
+export function DialogCase() @{
+	<Dialog defaultOpen>
+		<DialogTrigger>Open dialog</DialogTrigger>
+		<DialogContent>
+			<DialogHeader>
+				<DialogTitle>Dialog title</DialogTitle>
+				<DialogDescription>Dialog description.</DialogDescription>
+			</DialogHeader>
+			<DialogFooter>Footer content</DialogFooter>
+		</DialogContent>
+	</Dialog>
+}
+
+export function PopoverCase() @{
+	<Popover defaultOpen>
+		<PopoverTrigger>Open popover</PopoverTrigger>
+		<PopoverContent>
+			<PopoverHeader>
+				<PopoverTitle>Popover title</PopoverTitle>
+				<PopoverDescription>Popover description.</PopoverDescription>
+			</PopoverHeader>
+		</PopoverContent>
+	</Popover>
+}
+
+export function TooltipCase() @{
+	<TooltipProvider>
+		<Tooltip defaultOpen>
+			<TooltipTrigger>Hover me</TooltipTrigger>
+			<TooltipContent>Tooltip body</TooltipContent>
+		</Tooltip>
+	</TooltipProvider>
 }

@@ -36,7 +36,46 @@ import {
 	AccordionTrigger,
 } from '@octanejs/shadcn/base-ui/Accordion';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/base-ui/Alert';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogMedia,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@octanejs/shadcn/base-ui/AlertDialog';
 import { Button } from '@octanejs/shadcn/base-ui/Button';
+import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from '@octanejs/shadcn/base-ui/Dialog';
+import {
+	Popover,
+	PopoverContent,
+	PopoverDescription,
+	PopoverHeader,
+	PopoverTitle,
+	PopoverTrigger,
+} from '@octanejs/shadcn/base-ui/Popover';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@octanejs/shadcn/base-ui/Tooltip';
+import { RadioGroup, RadioGroupItem } from '@octanejs/shadcn/base-ui/RadioGroup';
+import { Switch } from '@octanejs/shadcn/base-ui/Switch';
 import { Input } from '@octanejs/shadcn/base-ui/Input';
 import { Kbd, KbdGroup } from '@octanejs/shadcn/base-ui/Kbd';
 import { Label } from '@octanejs/shadcn/base-ui/Label';
@@ -84,7 +123,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 14 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 21 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Accordion, Button, Input, Label and Separator run on real Base UI primitives. Alert is
 				verified byte-identical to upstream's Base UI source. Every other class string is derived
@@ -186,6 +225,132 @@ export function ShadcnBaseUIDemo() @{
 				<Kbd>Shift</Kbd>
 				<Kbd>K</Kbd>
 			</KbdGroup>
+		</Section>
+
+		<Section
+			title="AlertDialog"
+			note="Transcribed from upstream. Portals to document.body — open it, then dismiss with Cancel or Escape."
+		>
+			<AlertDialog>
+				<AlertDialogTrigger render={<Button variant="outline" />}>
+					Delete account
+				</AlertDialogTrigger>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogMedia>
+							<TriangleAlertIcon />
+						</AlertDialogMedia>
+						<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This permanently deletes your account and removes your data from our servers.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction>Continue</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</Section>
+
+		<Section
+			title="Checkbox, Switch and RadioGroup"
+			note="Highest-risk families: Base UI publishes data-checked/data-unchecked, not Radix's data-[state=checked], and every Root is a span so `disabled:` can never match. Toggle each one — if the appearance does not change, the dialect is wrong."
+		>
+			<div class="space-y-4">
+				<div class="flex flex-wrap items-center gap-6">
+					<Label class="gap-2">
+						<Checkbox />
+						Unchecked
+					</Label>
+					<Label class="gap-2">
+						<Checkbox defaultChecked />
+						Checked
+					</Label>
+					<Label class="gap-2">
+						<Checkbox disabled />
+						Disabled
+					</Label>
+				</div>
+
+				<div class="flex flex-wrap items-center gap-6">
+					<Label class="gap-2">
+						<Switch />
+						Off
+					</Label>
+					<Label class="gap-2">
+						<Switch defaultChecked />
+						On
+					</Label>
+					<Label class="gap-2">
+						<Switch size="sm" defaultChecked />
+						Small
+					</Label>
+					<Label class="gap-2">
+						<Switch disabled />
+						Disabled
+					</Label>
+				</div>
+
+				<RadioGroup defaultValue="comfortable">
+					<Label class="gap-2">
+						<RadioGroupItem value="default" />
+						Default
+					</Label>
+					<Label class="gap-2">
+						<RadioGroupItem value="comfortable" />
+						Comfortable
+					</Label>
+					<Label class="gap-2">
+						<RadioGroupItem value="compact" disabled />
+						Compact (disabled)
+					</Label>
+				</RadioGroup>
+			</div>
+		</Section>
+
+		<Section
+			title="Dialog, Popover and Tooltip"
+			note="All portalled. Base UI adds a Positioner layer and names its transform-origin var --transform-origin, not Radix's --radix-*. Watch the open animation: scaling from the wrong corner means the var is wrong."
+		>
+			<div class="flex flex-wrap items-center gap-3">
+				<Dialog>
+					<DialogTrigger render={<Button variant="outline" />}>Open dialog</DialogTrigger>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Edit profile</DialogTitle>
+							<DialogDescription>
+								Make changes to your profile here. Click save when you are done.
+							</DialogDescription>
+						</DialogHeader>
+						<div class="grid gap-2">
+							<Label>Name</Label>
+							<Input placeholder="Your name" />
+						</div>
+						<DialogFooter>
+							<DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+							<Button>Save changes</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+
+				<Popover>
+					<PopoverTrigger render={<Button variant="outline" />}>Open popover</PopoverTrigger>
+					<PopoverContent>
+						<PopoverHeader>
+							<PopoverTitle>Dimensions</PopoverTitle>
+							<PopoverDescription>Set the dimensions for the layer.</PopoverDescription>
+						</PopoverHeader>
+					</PopoverContent>
+				</Popover>
+
+				<TooltipProvider>
+					<Tooltip>
+						<TooltipTrigger render={<Button variant="outline" />}>Hover me</TooltipTrigger>
+						<TooltipContent>Add to library</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+			</div>
 		</Section>
 
 		<Section title="Alert" note="Verified byte-identical to upstream.">
