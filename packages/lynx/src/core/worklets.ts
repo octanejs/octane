@@ -5,6 +5,7 @@
  */
 
 import { hasOwnSymbolFields } from './own-symbols.js';
+import { hasCrossRealmPlainPrototype } from './plain-object.js';
 
 export type LynxThreadFunctionKind = 'main-thread' | 'background';
 
@@ -166,8 +167,7 @@ function exactKeys(value: object, keys: readonly string[], label: string): void 
 }
 
 function isPlainRecord(value: object): value is Record<string, unknown> {
-	const prototype = Object.getPrototypeOf(value);
-	return prototype === Object.prototype || prototype === null;
+	return hasCrossRealmPlainPrototype(value);
 }
 
 function setOwnDataProperty<T extends object>(target: T, key: string, value: unknown): void {
