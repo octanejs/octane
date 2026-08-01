@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**66 publishable package(s), including 52 framework binding(s).**
+**66 publishable package(s), including 52 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -17,14 +17,14 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.17` | 6 |
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.18` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.16` | 3 |
-| `@octanejs/astro` | [`packages/astro`](../packages/astro) | compiler integration | `0.0.1` | 5 |
+| `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.1` | 5 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.20` | 2 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.2` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.5` | 1 |
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.10` | 1 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.15` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.17` | 4 |
-| `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | metaframework | `0.0.6` | 8 |
+| `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | framework integration | `0.0.6` | 8 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.21` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.19` | 1 |
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.17` | 3 |
@@ -62,7 +62,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.21` | 1 |
 | `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.21` | 6 |
 | `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.0.11` | 1 |
-| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | metaframework | `0.1.11` | 12 |
+| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.1.11` | 12 |
 | `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.16` | 1 |
 | `@octanejs/tanstack-table` | [`packages/tanstack-table`](../packages/tanstack-table) | framework binding | `0.1.19` | 5 |
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.19` | 1 |

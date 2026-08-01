@@ -118,6 +118,14 @@ describe('docs search ranking', () => {
 		expect(snippets.join(' ')).toContain('@octanejs/dexie');
 	});
 
+	it('finds Astro in the framework integrations guide', async () => {
+		const index = await loadSearchIndex();
+		const [top] = searchDocs(index, '@octanejs/astro');
+
+		expect(top.slug).toBe('framework-integrations');
+		expect(top.id).toBe('astro');
+	});
+
 	it('requires every term to match, and ignores queries shorter than two characters', async () => {
 		const index = await loadSearchIndex();
 

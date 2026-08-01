@@ -5,21 +5,25 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PACKAGES_ROOT = path.join(REPO_ROOT, 'packages');
 export const INVENTORY_PATH = path.join(REPO_ROOT, 'docs/packages.md');
+export const FRAMEWORK_INTEGRATIONS_PATH = path.join(
+	REPO_ROOT,
+	'website/src/content/framework-integrations.json',
+);
 
 const SPECIAL_ROLES = new Map([
 	['octane', 'core runtime + compiler'],
 	['@octanejs/app-core', 'metaframework core'],
-	// Docusaurus owns application routing/content orchestration. This package
-	// adopts that metaframework boundary rather than binding a React library API.
-	['@octanejs/docusaurus', 'metaframework'],
+	// Host frameworks own application routing/content orchestration. These
+	// packages adopt that boundary rather than binding a React library API.
+	['@octanejs/docusaurus', 'framework integration'],
 	['@octanejs/rspack-plugin', 'compiler integration'],
 	['@octanejs/rspeedy-plugin', 'native compiler integration'],
-	['@octanejs/astro', 'compiler integration'],
+	['@octanejs/astro', 'framework integration'],
 	['@octanejs/rsbuild-plugin', 'metaframework'],
 	['@octanejs/vite-plugin', 'metaframework'],
-	// TanStack Start is a metaframework integration rather than a library
+	// TanStack Start is a framework integration rather than a library
 	// binding, so it stays outside the binding status/catalog contract.
-	['@octanejs/tanstack-start', 'metaframework'],
+	['@octanejs/tanstack-start', 'framework integration'],
 	['@octanejs/mcp-server', 'agent tooling'],
 	// The CLI inspects and configures other people's projects, including ones
 	// that have no Octane installed yet, which is exactly what `octane init`
@@ -91,6 +95,62 @@ export function getPublishablePackages() {
 
 export function getBindingPackages() {
 	return getPublishablePackages().filter((pkg) => pkg.role === 'framework binding');
+}
+
+export function getFrameworkIntegrationPackages() {
+	return getPublishablePackages().filter((pkg) => pkg.role === 'framework integration');
+}
+
+export function validateFrameworkIntegrationCatalog(packages = getWorkspacePackages()) {
+	const errors = [];
+	let catalog;
+	try {
+		catalog = readJson(FRAMEWORK_INTEGRATIONS_PATH);
+	} catch (error) {
+		return [`website/src/content/framework-integrations.json is not valid JSON: ${error.message}`];
+	}
+
+	if (!Array.isArray(catalog)) {
+		return ['website/src/content/framework-integrations.json must be an array'];
+	}
+
+	const catalogPackages = new Set();
+	for (const [index, integration] of catalog.entries()) {
+		const label = `website/src/content/framework-integrations.json entry ${index + 1}`;
+		if (!integration || typeof integration !== 'object') {
+			errors.push(`${label} must be an object`);
+			continue;
+		}
+		for (const field of ['title', 'packageName', 'model', 'description']) {
+			if (typeof integration[field] !== 'string' || !integration[field].trim()) {
+				errors.push(`${label} needs a non-empty "${field}"`);
+			}
+		}
+		if (typeof integration.packageName !== 'string') continue;
+		if (catalogPackages.has(integration.packageName)) {
+			errors.push(`${label} lists ${integration.packageName} more than once`);
+		}
+		catalogPackages.add(integration.packageName);
+	}
+
+	const integrations = packages.filter(
+		(pkg) => !pkg.private && pkg.role === 'framework integration',
+	);
+	const integrationNames = new Set(integrations.map((pkg) => pkg.name));
+	for (const integration of integrations) {
+		if (!catalogPackages.has(integration.name)) {
+			errors.push(`website/src/content/framework-integrations.json is missing ${integration.name}`);
+		}
+	}
+	for (const packageName of catalogPackages) {
+		if (!integrationNames.has(packageName)) {
+			errors.push(
+				`website/src/content/framework-integrations.json lists unknown framework integration ${packageName}`,
+			);
+		}
+	}
+
+	return errors;
 }
 
 export function validateWorkspacePackages(packages = getWorkspacePackages()) {
@@ -198,6 +258,7 @@ function exportCount(manifest) {
 export function renderWorkspaceInventory(packages = getWorkspacePackages()) {
 	const publishable = packages.filter((pkg) => !pkg.private);
 	const bindings = publishable.filter((pkg) => pkg.role === 'framework binding');
+	const frameworkIntegrations = publishable.filter((pkg) => pkg.role === 'framework integration');
 	let md = `# Package inventory (generated)
 
 <!-- GENERATED FILE — do not edit. Regenerate with \`pnpm packages:inventory\`. -->
@@ -206,7 +267,7 @@ This inventory is derived from the manifests directly under \`packages/\`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**${publishable.length} publishable package(s), including ${bindings.length} framework binding(s).**
+**${publishable.length} publishable package(s), including ${bindings.length} framework binding(s) and ${frameworkIntegrations.length} framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline \`>=22\`.
 
@@ -231,7 +292,10 @@ All publishable packages share the enforced Node.js engine baseline \`>=22\`.
 
 function runCli() {
 	const packages = getWorkspacePackages();
-	const errors = validateWorkspacePackages(packages);
+	const errors = [
+		...validateWorkspacePackages(packages),
+		...validateFrameworkIntegrationCatalog(packages),
+	];
 	if (errors.length) {
 		console.error(`package inventory is invalid:\n  - ${errors.join('\n  - ')}`);
 		process.exit(1);
