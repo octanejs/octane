@@ -236,6 +236,21 @@ describe('create-octane', () => {
 		expect(result.stdout).toContain('npm run dev');
 	});
 
+	it('offers no install that would install nothing', async () => {
+		// init records dependencies by handing them to the package manager, so
+		// skipping that leaves the manifest with none in it. A bare `install` then
+		// resolves an empty manifest and the dev server fails on a missing octane.
+		const cwd = workspace();
+
+		const result = await run(['my-app', '--template', 'spa', '--no-install'], cwd);
+
+		const nextSteps = result.stdout.slice(result.stdout.indexOf('Done. Next:'));
+		expect(nextSteps).not.toMatch(/^\s*(?:npm|pnpm|yarn|bun) install$/m);
+		// The packages to install are already named in init's own report.
+		expect(nextSteps).toContain('Do this by hand');
+		expect(nextSteps).toContain('npm run dev');
+	});
+
 	it('quotes a directory name that a shell would not survive', async () => {
 		// The name is whatever they typed, and this command accepts spaces in it.
 		// An unquoted `cd My App!` is a next step that fails when pasted.

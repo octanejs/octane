@@ -329,7 +329,14 @@ export async function create(argv, options = {}) {
 	// how a project ends up with two lockfiles. `run` is the one spelling every
 	// manager accepts.
 	const runner = packageManager ?? 'npm';
-	const next = parsed.install === false ? `  ${runner} install\n` : '';
+	// Skipping the install leaves the manifest with no dependencies in it at all,
+	// because init records them by handing them to the package manager rather
+	// than writing ranges of its own. A bare `install` would resolve an empty
+	// manifest, succeed at nothing, and leave the `run dev` below to fail on a
+	// missing octane. init has already printed the exact packages, so send them
+	// there rather than spelling a command that does not do the job.
+	const next =
+		parsed.install === false ? '  install the packages listed under "Do this by hand"\n' : '';
 	stdout.write(`\nDone. Next:\n\n  cd ${shellArgument(directory)}\n${next}  ${runner} run dev\n`);
 	return EXIT.OK;
 }

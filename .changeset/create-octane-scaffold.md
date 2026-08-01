@@ -26,7 +26,9 @@ Installing goes through the manager that ran the command, read from
 `npm_config_user_agent`, so `pnpm create octane` installs with pnpm rather than
 answering a pnpm user with a `package-lock.json`. The next steps it prints name
 that manager too, and quote the directory, since a name with a space in it is
-accepted and `cd My App!` is not a command anyone can paste. For this `init`
+accepted and `cd My App!` is not a command anyone can paste. After
+`--no-install` they point at the package list `init` printed, rather than at an
+`install` that would resolve a manifest with nothing in it yet. For this `init`
 gains `--package-manager <name>`, which also covers running it by hand in a
 project that has no lockfile to detect yet.
 
