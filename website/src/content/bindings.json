@@ -7,6 +7,7 @@
       "@octanejs/valtio",
       "@octanejs/jotai",
       "@octanejs/mobx",
+      "@octanejs/nanostores",
       "@octanejs/rxjs",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",
