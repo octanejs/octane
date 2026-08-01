@@ -12,6 +12,10 @@ const draftWorkflow = readFileSync(
 	'utf8',
 );
 const labelWorkflow = readFileSync(path.join(REPO, '.github/workflows/label-pr.yml'), 'utf8');
+const createPrSkill = readFileSync(
+	path.join(REPO, '.rulesync/skills/create-a-pr/SKILL.md'),
+	'utf8',
+);
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function jobSource(job) {
@@ -249,6 +253,16 @@ describe('Agent pull request draft policy', () => {
 			draftWorkflow,
 			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
 		);
+	});
+});
+
+describe('Agent pull request body policy', () => {
+	test('preserves bot-managed summaries when updating an existing pull request', () => {
+		assert.match(createPrSkill, /fetch its current body with `gh pr view`/);
+		assert.match(createPrSkill, /preserve them\s+byte-for-byte/);
+		assert.match(createPrSkill, /<!-- CURSOR_SUMMARY -->/);
+		assert.match(createPrSkill, /<!-- \/CURSOR_SUMMARY -->/);
+		assert.match(createPrSkill, /After `gh pr edit`, fetch it again and verify/);
 	});
 });
 
