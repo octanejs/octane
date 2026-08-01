@@ -109,6 +109,20 @@ async function dispatch(argv, options) {
 		return EXIT.OK;
 	}
 
+	// A command that has not asked for `rest` would drop these on the floor. That
+	// is the same failure the parser refuses for an unknown flag, and it arrives
+	// here by an ordinary route: npm eats the `--` and forwards what follows, so
+	// `npm create octane app -- --template spa` is correct and the identical line
+	// under pnpm or yarn hands the `--` straight through. Dropped silently, the
+	// run then fails saying --template is required, naming the one flag that was
+	// in fact supplied.
+	if (parsed.rest.length > 0 && !module.passthrough) {
+		throw usageError(
+			`Unexpected arguments after --: ${parsed.rest.join(' ')}`,
+			'npm needs `--` to forward flags. pnpm and yarn forward them already, so drop it there.',
+		);
+	}
+
 	// Commands that write into a project need one to exist. Without this they
 	// fail deep inside an fs call with a raw ENOENT stack.
 	if (module.requiresProject && ctx.project().manifestPath === null) {

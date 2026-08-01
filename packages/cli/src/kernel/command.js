@@ -18,6 +18,9 @@
  * @property {CommandEntry[]} [subcommands]
  * @property {boolean} [requiresProject] refuse to run outside a package.json,
  *   for commands that write into one
+ * @property {boolean} [passthrough] read the tokens after a bare `--` as
+ *   `input.rest`. Without it they are a usage error rather than a silent drop,
+ *   on the same reasoning as an unknown flag
  * @property {(ctx: import('./context.js').Ctx, input: CommandInput) => Promise<CommandResult>} [run]
  */
 

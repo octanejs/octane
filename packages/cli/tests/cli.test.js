@@ -94,6 +94,27 @@ describe('the CLI kernel', () => {
 		expect(result.stderr).toMatch(/Unknown command: banana/);
 	});
 
+	it('rejects tokens after a bare -- for a command that does not read them', async () => {
+		// npm consumes the `--` itself and forwards what follows, so
+		// `npm create octane app -- --template spa` is the correct npm spelling and
+		// the identical line hands the `--` straight through under pnpm and yarn.
+		// No command reads `rest`, so those flags used to be dropped in silence and
+		// the run then failed reporting --template missing, naming the very flag
+		// that was sitting in the caller's command line.
+		const result = await runCli(['create', 'app', '--', '--yes', '--template', 'spa']);
+
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toMatch(/Unexpected arguments after --: --yes --template spa/);
+		expect(result.stderr).not.toMatch(/--template is required/);
+	});
+
+	it('leaves a trailing -- with nothing after it alone', async () => {
+		// The terminator on its own discards nothing, so it is not a usage error.
+		const result = await runCli(['doctor', '--help', '--']);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain('--fix');
+	});
+
 	it('reports errors as JSON when --json is set, in either spelling', async () => {
 		for (const flag of ['--json', '--json=true']) {
 			const result = await runCli(['banana', flag]);
