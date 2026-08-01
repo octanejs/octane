@@ -127,11 +127,10 @@ describe('@octanejs/shadcn — Base UI accordion interleaves children with its o
 	});
 });
 
-// AlertDialogCancel is the only place in this base that uses Base UI's render-as-ELEMENT
-// contract (`render={<Button/>}`), which is what lets Close keep its dismiss behavior while
-// looking like a Button. Deleting that prop leaves the Cancel rendering its label just fine, so
-// the child-text oracle above cannot see the difference — this asserts the composition itself.
-describe('@octanejs/shadcn — Base UI alert-dialog composes Close with Button via render', () => {
+// AlertDialog actions use Base UI's render-as-ELEMENT contract (`render={<Button/>}`), which lets
+// Close keep its dismiss behavior while looking like a Button. Rendering a plain Button preserves
+// the label and styles but silently drops dismissal, so exercise both parts of the contract.
+describe('@octanejs/shadcn — Base UI alert-dialog actions compose Close with Button', () => {
 	it('renders Cancel as a button carrying the Button variant classes', async () => {
 		const m = mount(F.AlertDialogCase as never);
 		try {
@@ -152,7 +151,7 @@ describe('@octanejs/shadcn — Base UI alert-dialog composes Close with Button v
 		}
 	});
 
-	it('renders Action as a Button', async () => {
+	it('renders Action as a Button and dismisses the dialog', async () => {
 		const m = mount(F.AlertDialogCase as never);
 		try {
 			await settle();
@@ -162,6 +161,10 @@ describe('@octanejs/shadcn — Base UI alert-dialog composes Close with Button v
 			expect(action).not.toBe(null);
 			expect(action!.className).toContain('inline-flex');
 			expect(action!.textContent).toContain('Continue');
+
+			flushSync(() => action!.click());
+			await settle();
+			expect(document.body.querySelector('[data-slot="alert-dialog-content"]')).toBe(null);
 		} finally {
 			m.unmount();
 		}

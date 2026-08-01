@@ -1,13 +1,16 @@
 // Base UI base alert-dialog — transcribed from upstream's `bases/base-ui/ui/alert-dialog.tsx`
-// (maintainer-supplied), running on @octanejs/base-ui's AlertDialog. Part mapping:
-// Overlay -> Backdrop, Content -> Popup, Cancel -> Close.
+// (maintainer-supplied), running on @octanejs/base-ui's AlertDialog. Upstream part mapping:
+// Overlay -> Backdrop, Content -> Popup, Cancel -> Close. This port also composes Action via Close.
 //
-// ONE DELIBERATE DEPARTURE FROM THE SOURCE: upstream's AlertDialogTitle carries
-// `cn-font-heading`, a semantic hook from the pinned cn-* system. This package ships the
-// default-Tailwind utilities-inlined flavor instead, the react-aria base already drops this exact
-// class for that reason, and nothing in the playground defines it (0 occurrences in the built
-// CSS), so keeping it would ship a class that resolves to nothing. Every other class string is
-// verbatim.
+// TWO DELIBERATE DEPARTURES FROM THE SOURCE:
+// - Upstream's AlertDialogTitle carries `cn-font-heading`, a semantic hook from the pinned cn-*
+//   system. This package ships the default-Tailwind utilities-inlined flavor instead, the
+//   react-aria base already drops this exact class for that reason, and nothing in the playground
+//   defines it (0 occurrences in the built CSS), so keeping it would ship a class that resolves
+//   to nothing. Every other class string is verbatim.
+// - Upstream renders AlertDialogAction as a plain Button, so it does not dismiss the dialog.
+//   Composing it through Close preserves the public Button-like API and supplies the expected
+//   confirm-and-dismiss behavior shown by Base UI's own alert-dialog examples.
 //
 // Octane adaptations: no `"use client"`; refs are props. AlertDialogContent composes its
 // Portal/Overlay/Popup tree internally, so consumer children still flow through the ordinary
@@ -114,12 +117,22 @@ export function AlertDialogDescription({ className, ...props }: Record<string, a
 	/>
 }
 
-export function AlertDialogAction({ className, ...props }: Record<string, any>) @{
-	<Button data-slot="alert-dialog-action" className={cn(className)} {...props} />
+export function AlertDialogAction({
+	className,
+	variant = 'default',
+	size = 'default',
+	...props
+}: Record<string, any>) @{
+	<AlertDialogPrimitive.Close
+		data-slot="alert-dialog-action"
+		className={cn(className)}
+		render={<Button variant={variant} size={size} />}
+		{...props}
+	/>
 }
 
 // `render` takes an ELEMENT here, not a function — that is Base UI's render-prop contract, and
-// it is what lets Close keep its dismiss behavior while looking like a Button.
+// it is what lets each action keep Close's dismiss behavior while looking like a Button.
 export function AlertDialogCancel({
 	className,
 	variant = 'outline',
