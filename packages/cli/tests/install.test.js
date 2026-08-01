@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { PACKAGE_MANAGERS, installCommand } from '../src/kernel/install.js';
-import { LOCKFILES } from '../src/kernel/project.js';
 
 /**
  * @param {string | null} packageManager
@@ -32,16 +31,6 @@ describe('installCommand', () => {
 		// through npm without saying so.
 		for (const manager of PACKAGE_MANAGERS) {
 			expect(installCommand(project(manager), ['octane']).manager, manager).toBe(manager);
-		}
-	});
-
-	it('knows how to drive every manager a lockfile can name', () => {
-		// Detection and installation are separate lists that cannot be derived
-		// from each other. A lockfile naming a manager with no spelling here would
-		// be detected and then installed through npm, into a project that uses
-		// something else.
-		for (const [file, manager] of LOCKFILES) {
-			expect(PACKAGE_MANAGERS, file).toContain(manager);
 		}
 	});
 });

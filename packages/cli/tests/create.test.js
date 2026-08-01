@@ -311,6 +311,19 @@ describe('octane create', () => {
 		expect(result.stdout).toContain("cd 'My App!'");
 	});
 
+	it('writes a dash-prefixed name so cd reads it as a name', async () => {
+		// `cd` parses its argument for options before anything else, so quoting is
+		// not enough here: `cd '-app'` fails exactly like `cd -app`, and a lone
+		// `cd -` quietly goes to the previous directory instead.
+		const cwd = workspace();
+
+		const result = await create(['-', '--cwd', cwd, '--template', 'spa', '--yes', '--no-install']);
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain('cd ./-');
+		expect(result.stdout).not.toMatch(/cd -$/m);
+	});
+
 	it('turns a directory name npm would reject into one it accepts', async () => {
 		const cwd = workspace();
 

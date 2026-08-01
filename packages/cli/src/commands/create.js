@@ -27,15 +27,20 @@ export function invokedThrough(env) {
 }
 
 /**
- * Quote a path for the shell the next-steps text is going to be pasted into.
- * A directory name is whatever someone typed, and this command accepts names
- * with spaces in them.
+ * Write a directory name so the shell the next step gets pasted into reads it
+ * as a name. It is whatever someone typed at the prompt, and this command
+ * accepts spaces and leading dashes in it.
+ *
+ * A leading dash needs more than quoting: `cd` parses its argument for options
+ * first, so `cd '-app'` fails the same way `cd -app` does, and a lone `cd -`
+ * silently goes somewhere else entirely. `./` in front makes it a path again.
  *
  * @param {string} value
  * @returns {string}
  */
 export function shellArgument(value) {
-	return /^[\w./@-]+$/.test(value) ? value : `'${value.replaceAll("'", String.raw`'\''`)}'`;
+	const name = value.startsWith('-') ? `./${value}` : value;
+	return /^[\w./@-]+$/.test(name) ? name : `'${name.replaceAll("'", String.raw`'\''`)}'`;
 }
 
 /**
