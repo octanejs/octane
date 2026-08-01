@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": ["node"],
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  },
+  "include": ["index.ts", "vitest.config.ts", "test/**/*"],
+  "exclude": ["**/errors.ts"]
+}

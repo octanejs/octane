@@ -1,0 +1,71 @@
+{
+  "name": "@octanejs/nanostores",
+  "version": "1.1.0",
+  "description": "Octane integration for Nano Stores, a tiny state manager with many atomic tree-shakable stores",
+  "keywords": [
+    "octane",
+    "state",
+    "state manager",
+    "store"
+  ],
+  "license": "MIT",
+  "author": "Andrey Sitnik <andrey@sitnik.es>",
+  "repository": "octanejs/nanostores",
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/ai"
+    }
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test:lint": "oxlint .",
+    "test:coverage": "vitest run --coverage",
+    "test:types": "tsc -p tsconfig.types.json",
+    "test:size": "size-limit",
+    "test:unit": "vitest run",
+    "test": "pnpm run /^test:/"
+  },
+  "devDependencies": {
+    "@logux/oxc-configs": "^0.4.0",
+    "@octanejs/testing-library": "^0.1.18",
+    "@size-limit/preset-small-lib": "^12.1.0",
+    "@tsrx/typescript-plugin": "^0.3.118",
+    "@types/node": "^26.0.1",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "actions-up": "^1.14.3",
+    "jsdom": "^30.0.1",
+    "nanodelay": "^2.0.2",
+    "nanostores": "^1.3.0",
+    "octane": "^0.1.21",
+    "oxlint": "^1.71.0",
+    "oxlint-tsgolint": "^0.23.0",
+    "size-limit": "^12.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "nanostores": "^1.2.0",
+    "octane": "0.1.21"
+  },
+  "size-limit": [
+    {
+      "import": {
+        "index.ts": "{ useStore }",
+        "nanostores": "{ map, computed }"
+      },
+      "limit": "1.2 KB"
+    }
+  ],
+  "engines": {
+    "node": "^20.0.0 || >=22.0.0"
+  }
+}
