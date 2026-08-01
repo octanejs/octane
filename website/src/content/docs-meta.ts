@@ -57,7 +57,7 @@ export const docsMeta: DocMeta[] = [
 	{
 		slug: 'framework-integrations',
 		title: 'Framework integrations',
-		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} first-party integrations for Astro, Docusaurus, and TanStack Start.`,
+		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} app frameworks through first-party integrations.`,
 		group: 'Start here',
 		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
 			integration.title,
@@ -74,7 +74,7 @@ export const docsMeta: DocMeta[] = [
 				: []),
 		]),
 		sections: [
-			{ id: 'choose-a-framework', title: 'Choose a framework' },
+			{ id: 'choose-a-framework', title: 'Find the right integration' },
 			{ id: 'astro', title: 'Astro islands' },
 			{ id: 'docusaurus', title: 'Docusaurus content sites' },
 			{ id: 'tanstack-start', title: 'TanStack Start applications' },
