@@ -11,6 +11,7 @@ export { DirectionProvider, useDirection } from './direction-provider';
 export type { TextDirection } from './direction-provider';
 export { useMediaQuery } from './unstable-use-media-query';
 export { Checkbox } from './checkbox';
+export { Collapsible } from './collapsible';
 export { ContextMenu } from './context-menu';
 export { CheckboxGroup } from './checkbox-group';
 export { Dialog } from './dialog';
