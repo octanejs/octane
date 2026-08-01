@@ -66,6 +66,37 @@ export function MixedFragment(props) @{
 	</>
 }
 
+// A `@{ … }` body need not reach an output node at all: every rendered value can
+// come from its own returns, leaving the block with no template. Falling off the
+// end then renders nothing, exactly like the trailing `return null` a reader
+// would write by hand. Setup still runs, so slot-keyed hooks keep their state
+// across the value the body chose to return.
+export function Outputless(props) @{
+	const [count, setCount] = useState(props.start);
+
+	if (props.mode === 'text') return props.label;
+	if (props.mode === 'host') {
+		return <b class="outputless-host" onClick={() => setCount(count + 1)}>{count as string}</b>;
+	}
+}
+
+// Same shape, but every path returns, so the block's tail return is
+// unreachable. The runtime must still read this body as returned output rather
+// than as one that already emitted a template.
+export function OutputlessTerminal(props) @{
+	const [count] = useState(props.start);
+
+	if (props.mode === 'null') return null;
+	if (props.mode === 'text') return props.label;
+	return <b class="terminal-host">{count as string}</b>;
+}
+
+export function NestedOutputless(props) @{
+	<main class="outputless-parent">
+		<Outputless mode={props.mode} label={props.label} start={props.start} />
+	</main>
+}
+
 export function NestedMixedInline(props) @{
 	<main class="mixed-parent">
 		<MixedInline mode={props.mode} label={props.label} detail={props.detail} />
