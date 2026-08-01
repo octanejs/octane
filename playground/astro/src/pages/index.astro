@@ -28,8 +28,9 @@ import { Panel } from '../components/Panel.tsrx';
 
 		<section>
 			<h2>Slotted children</h2>
-			<Panel client:visible>
-				<p>Children from Astro into an Octane island.</p>
+			<Panel client:load>
+				<p data-testid="panel-child">Children from Astro into an Octane island.</p>
+				<p slot="footer-note" data-testid="panel-footer-child">Named footer slot.</p>
 			</Panel>
 		</section>
 	</main>

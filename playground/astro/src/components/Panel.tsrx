@@ -1,8 +1,11 @@
-export function Panel(props: { children?: any }) @{
+export function Panel(props: { children?: any; footerNote?: any }) @{
 	<>
-		<section class="panel">
+		<section class="panel" data-testid="panel">
 			<h3>Panel</h3>
-			{props.children}
+			<div data-testid="panel-children">{props.children}</div>
+			@if (props.footerNote) {
+				<footer data-testid="panel-footer">{props.footerNote}</footer>
+			}
 		</section>
 		<style>
 			.panel {

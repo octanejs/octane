@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createElement } from 'octane/server';
+import { createElement, injectStyle } from 'octane/server';
 import renderer from '../src/server.js';
 
 describe('Astro server renderer', () => {
@@ -91,21 +91,20 @@ describe('Astro server renderer', () => {
 	});
 
 	it('prepends scoped css when the render result includes it', async () => {
-		// Simulate Octane's { html, css } join path with a component that emits
-		// only HTML; css prepend is covered by asserting the return shape stays a
-		// string and the second island still gets a fresh prefix.
-		function Bare() {
-			return createElement('span', null, 'x');
+		function WithScopedStyle() {
+			injectStyle('astro-test-hash', '.greeting{color:teal}');
+			return createElement('span', { className: 'greeting' }, 'hi');
 		}
-		const { html, attrs } = await renderer.renderToStaticMarkup.call(
+		const { html } = await renderer.renderToStaticMarkup.call(
 			{ result: {} },
-			Bare,
+			WithScopedStyle,
 			{},
 			{},
 			undefined,
 		);
-		expect(typeof html).toBe('string');
-		expect(html.length).toBeGreaterThan(0);
-		expect(attrs).toHaveProperty('prefix');
+		expect(html.startsWith('<style data-octane="astro-test-hash">')).toBe(true);
+		expect(html).toContain('.greeting{color:teal}');
+		expect(html).toContain('<span');
+		expect(html.indexOf('<style')).toBeLessThan(html.indexOf('<span'));
 	});
 });

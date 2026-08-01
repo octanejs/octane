@@ -16,3 +16,21 @@ export function staticHtmlElement(createElement, { value, name, hydrate = true }
 	}
 	return createElement(tagName, props);
 }
+
+/**
+ * Always-bailout slot wrapper shared by SSR and client so the hydrate tree
+ * matches (component → astro-slot) and hydrator re-invokes skip updates —
+ * same contract as `@astrojs/react`'s `memo(StaticHtml, () => true)`.
+ *
+ * @param {(type: any, props?: any, ...children: any[]) => any} createElement
+ * @param {(Component: any, areEqual?: (a: any, b: any) => boolean) => any} memo
+ */
+export function createStaticHtml(createElement, memo) {
+	/**
+	 * @param {{ value: string | null | undefined; name?: string; hydrate?: boolean }} props
+	 */
+	function StaticHtml(props) {
+		return staticHtmlElement(createElement, props);
+	}
+	return memo(StaticHtml, () => true);
+}

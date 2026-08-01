@@ -1,6 +1,6 @@
 import { createElement, createRoot, hydrateRoot } from 'octane';
 import { slotName } from './slot-name.js';
-import { staticHtmlElement } from './static-html.js';
+import StaticHtml from './static-html-client.js';
 
 /** @type {WeakMap<HTMLElement, import('octane').Root>} */
 const rootMap = new WeakMap();
@@ -53,11 +53,11 @@ export default (element) =>
 
 		for (const [key, value] of Object.entries(slotted)) {
 			const name = slotName(key);
-			props[name] = staticHtmlElement(createElement, { value, name });
+			props[name] = createElement(StaticHtml, { value, name });
 		}
 
 		if (children != null) {
-			props.children = staticHtmlElement(createElement, { value: children });
+			props.children = createElement(StaticHtml, { value: children });
 		}
 
 		const prefix = element.getAttribute('prefix') ?? '';

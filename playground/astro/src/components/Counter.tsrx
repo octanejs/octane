@@ -3,7 +3,7 @@ import { useState } from 'octane';
 export function Counter(props: { start?: number }) @{
 	const [count, setCount] = useState(props.start ?? 0);
 	<>
-		<button type="button" class="counter" onClick={() => setCount(count + 1)}>
+		<button type="button" class="counter" data-testid="counter" onClick={() => setCount(count + 1)}>
 			{'Count: ' + count}
 		</button>
 		<style>

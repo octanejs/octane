@@ -1,12 +1,13 @@
-import { createElement } from 'octane/server';
+import { createElement, memo } from 'octane/server';
 import { renderToString } from 'octane/server';
 import opts from 'astro:octane:opts';
 import { createFilter } from './create-filter.js';
 import { nextIdentifierPrefix } from './context.js';
 import { slotName } from './slot-name.js';
-import { staticHtmlElement } from './static-html.js';
+import { createStaticHtml } from './static-html.js';
 
 const filter = opts?.include || opts?.exclude ? createFilter(opts.include, opts.exclude) : null;
+const StaticHtml = createStaticHtml(createElement, memo);
 
 /**
  * @param {any} Component
@@ -67,7 +68,7 @@ async function renderToStaticMarkup(Component, props, { default: children, ...sl
 	const slots = {};
 	for (const [key, value] of Object.entries(slotted)) {
 		const name = slotName(key);
-		slots[name] = staticHtmlElement(createElement, {
+		slots[name] = createElement(StaticHtml, {
 			hydrate: needsHydration(metadata),
 			value,
 			name,
@@ -81,7 +82,7 @@ async function renderToStaticMarkup(Component, props, { default: children, ...sl
 
 	const newChildren = children ?? props.children;
 	if (newChildren != null) {
-		newProps.children = staticHtmlElement(createElement, {
+		newProps.children = createElement(StaticHtml, {
 			hydrate: needsHydration(metadata),
 			value: newChildren,
 		});

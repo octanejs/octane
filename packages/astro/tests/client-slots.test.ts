@@ -1,39 +1,39 @@
-import { describe, it, expect } from 'vitest';
-import { createElement, renderToString } from 'octane/server';
-import { slotName } from '../src/slot-name.js';
-import { staticHtmlElement } from '../src/static-html.js';
+/** @vitest-environment jsdom */
+import { describe, it, expect, afterEach } from 'vitest';
+import { createElement } from 'octane';
+import createHydrator from '../src/client.js';
 
-/**
- * Mirrors the named-slot assignment loop in `client.js` so `client:only`
- * template keys (kebab/snake) become the same camelCase props SSR emits.
- */
-function assignClientSlottedProps(slotted: Record<string, string>) {
-	const props: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(slotted)) {
-		const name = slotName(key);
-		props[name] = staticHtmlElement(createElement, { value, name });
-	}
-	return props;
+function Host(props: { footerNote?: unknown; socialLinks?: unknown }) {
+	return createElement('div', { id: 'host' }, props.footerNote, props.socialLinks);
 }
 
 describe('client named-slot assignment', () => {
-	it('maps kebab/snake template keys to camelCase props', () => {
-		const props = assignClientSlottedProps({
-			'footer-note': '<p>footer</p>',
-			social_links: '<nav>links</nav>',
-		});
+	afterEach(() => {
+		document.body.replaceChildren();
+	});
 
-		expect(props).toHaveProperty('footerNote');
-		expect(props).toHaveProperty('socialLinks');
-		expect(props).not.toHaveProperty('footer-note');
-		expect(props).not.toHaveProperty('social_links');
+	it('maps kebab/snake template keys to camelCase props via createHydrator', () => {
+		const island = document.createElement('div');
+		island.setAttribute('ssr', '');
+		document.body.append(island);
 
-		function Host(hostProps: { footerNote?: unknown; socialLinks?: unknown }) {
-			return createElement('div', null, hostProps.footerNote, hostProps.socialLinks);
-		}
+		createHydrator(island)(
+			Host,
+			{},
+			{
+				'footer-note': '<p id="footer">footer</p>',
+				social_links: '<nav id="social">links</nav>',
+			},
+			{ client: 'only' },
+		);
 
-		const { html } = renderToString(Host, props);
-		expect(html).toContain('<astro-slot name="footerNote">');
-		expect(html).toContain('<astro-slot name="socialLinks">');
+		const footerSlot = island.querySelector('astro-slot[name="footerNote"]');
+		const socialSlot = island.querySelector('astro-slot[name="socialLinks"]');
+		expect(footerSlot).not.toBeNull();
+		expect(socialSlot).not.toBeNull();
+		expect(footerSlot?.querySelector('#footer')?.textContent).toBe('footer');
+		expect(socialSlot?.querySelector('#social')?.textContent).toBe('links');
+		expect(island.querySelector('astro-slot[name="footer-note"]')).toBeNull();
+		expect(island.querySelector('astro-slot[name="social_links"]')).toBeNull();
 	});
 });

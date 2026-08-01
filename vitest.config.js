@@ -2711,6 +2711,7 @@ export default defineConfig({
 				test: {
 					name: 'astro',
 					include: ['packages/astro/tests/**/*.test.ts'],
+					exclude: ['packages/astro/tests/**/*.e2e.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
@@ -2733,6 +2734,18 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/octane/src/compiler/vite.js'),
 						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'astro-e2e',
+					include: ['packages/astro/tests/astro.e2e.test.ts'],
+					environment: 'node',
+					globals: false,
+					hookTimeout: 320_000,
+					testTimeout: 60_000,
+					fileParallelism: false,
+					...(process.env.CI ? { maxWorkers: 1 } : {}),
 				},
 			},
 			{
