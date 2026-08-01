@@ -21,6 +21,13 @@ describe('createOwnershipFilter', () => {
 		expect(filter!('/src/components/octane/Counter.tsrx')).toBe(true);
 		expect(filter!('/src/components/react/Button.tsx')).toBe(false);
 	});
+
+	it('treats empty include as claim-nothing (not unrestricted)', () => {
+		const filter = createOwnershipFilter([], undefined);
+		expect(filter).not.toBeNull();
+		expect(filter!('/src/components/octane/Counter.tsrx')).toBe(false);
+		expect(filter!('/src/App.tsrx')).toBe(false);
+	});
 });
 
 describe('astroScopedOctanePlugin ownership', () => {

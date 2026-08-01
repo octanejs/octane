@@ -53,10 +53,10 @@ describe('createFilter', () => {
 });
 
 describe('compileFilterPatterns', () => {
-	it('returns null for nullish or empty input', () => {
+	it('returns null for nullish input and [] for empty arrays', () => {
 		expect(compileFilterPatterns(undefined)).toBeNull();
 		expect(compileFilterPatterns(null)).toBeNull();
-		expect(compileFilterPatterns([])).toBeNull();
+		expect(compileFilterPatterns([])).toEqual([]);
 	});
 
 	it('passes RegExp through and compiles string globs', () => {
@@ -66,5 +66,19 @@ describe('compileFilterPatterns', () => {
 		expect(compiled[1]).toBeInstanceOf(RegExp);
 		expect(compiled[0].test('/a/Counter.tsrx')).toBe(true);
 		expect(compiled[1].test('/src/components/octane/x.tsrx')).toBe(true);
+	});
+});
+
+describe('empty include claims nothing', () => {
+	it('createFilter rejects every id when include is an empty list', () => {
+		const filter = createFilter([], null);
+		expect(filter).not.toBeNull();
+		expect(filter!('/src/components/octane/Counter.tsrx')).toBe(false);
+		expect(filter!('/anything.tsrx')).toBe(false);
+	});
+
+	it('compileFilterPatterns([]) feeds createFilter a claim-nothing include', () => {
+		const filter = createFilter(compileFilterPatterns([]), null);
+		expect(filter!('/src/App.tsrx')).toBe(false);
 	});
 });

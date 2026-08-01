@@ -67,7 +67,7 @@
   "peerDependencies": {
     "astro": ">=5.0.0",
     "octane": "workspace:*",
-    "vite": ">=7.0.0"
+    "vite": ">=6.0.0"
   },
   "devDependencies": {
     "@types/node": "catalog:default",

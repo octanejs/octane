@@ -11,7 +11,9 @@ import picomatch from 'picomatch';
 export function compileFilterPatterns(patterns) {
 	if (patterns == null) return null;
 	const list = Array.isArray(patterns) ? patterns : [patterns];
-	if (list.length === 0) return null;
+	// Empty `include: []` must stay `[]` (match nothing), not `null` ("no
+	// filter"). `createFilter` treats null include as unrestricted.
+	if (list.length === 0) return [];
 
 	return list.map((pattern) => {
 		if (pattern instanceof RegExp) return pattern;
