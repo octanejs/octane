@@ -273,6 +273,37 @@ describe('octane init', () => {
 		expect(note).not.toContain('package.json');
 	});
 
+	it('picks the config file Prettier would, when a project has several', async () => {
+		// The first name in the list that exists is the one Prettier reads, so the
+		// list has to be in its order. `.prettierrc.js` beats `.prettierrc.toml`,
+		// which sorts last of all of them rather than with the other data formats.
+		const withPlugin = 'plugins: ["@tsrx/prettier-plugin"]\n';
+
+		// Reading the wrong file here means staying quiet about a project whose
+		// active config cannot parse .tsrx.
+		const quiet = fixture({
+			'.prettierrc.toml': '# theirs\n',
+			'.prettierrc.js': `export default { ${withPlugin} };\n`,
+		});
+		const quietResult = await runCli(
+			['init', '--cwd', quiet.root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+		expect(quietResult.json().manual.join(' ')).not.toContain('Prettier plugins');
+
+		// And the other way: the instruction has to name the file that is actually
+		// in force, not whichever one happens to be found first.
+		const noisy = fixture({
+			'.prettierrc.toml': withPlugin,
+			'.prettierrc.js': 'export default { singleQuote: true };\n',
+		});
+		const noisyResult = await runCli(
+			['init', '--cwd', noisy.root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+		expect(noisyResult.json().manual.join(' ')).toContain('.prettierrc.js');
+	});
+
 	it('reads the config Prettier would, when a project has two', async () => {
 		// package.json comes first in Prettier's search order, ahead of every
 		// config file. Reading the file instead approves a config Prettier never

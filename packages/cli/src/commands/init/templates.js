@@ -168,29 +168,42 @@ export const prettierConfig = `{
 `;
 
 /**
- * The config filenames Prettier itself looks for. A project that already has
- * one owns its formatting, and this command states the edit instead of picking
- * a fight with it.
+ * The config filenames Prettier itself looks for, in the order it looks. A
+ * project that already has one owns its formatting, and this command states the
+ * edit instead of picking a fight with it.
+ *
+ * The order is load-bearing, not decorative: the first of these that exists is
+ * the one Prettier reads, so it is the one to inspect for the plugin and to
+ * name in an instruction. Note how little of it is alphabetical. The module
+ * variants interleave `.prettierrc.X` with `prettier.config.X` by type rather
+ * than grouping by prefix, and `.toml` sorts last rather than with the other
+ * data formats. Taken from prettier 3.9.6 and confirmed against it.
+ *
+ * `package.json` comes before all of these and is handled by its own check,
+ * since the file existing says nothing about whether it configures Prettier.
+ * `package.yaml`, which Prettier searches second, is not covered: telling one
+ * that configures Prettier from one that does not needs a YAML parser this
+ * package does not carry.
  */
 export const PRETTIER_CONFIG_FILES = [
 	'.prettierrc',
 	'.prettierrc.json',
-	'.prettierrc.json5',
-	'.prettierrc.yaml',
 	'.prettierrc.yml',
-	'.prettierrc.toml',
+	'.prettierrc.yaml',
+	'.prettierrc.json5',
 	'.prettierrc.js',
-	'.prettierrc.mjs',
-	'.prettierrc.cjs',
-	'.prettierrc.ts',
-	'.prettierrc.mts',
-	'.prettierrc.cts',
 	'prettier.config.js',
-	'prettier.config.mjs',
-	'prettier.config.cjs',
+	'.prettierrc.ts',
 	'prettier.config.ts',
+	'.prettierrc.mjs',
+	'prettier.config.mjs',
+	'.prettierrc.mts',
 	'prettier.config.mts',
+	'.prettierrc.cjs',
+	'prettier.config.cjs',
+	'.prettierrc.cts',
 	'prettier.config.cts',
+	'.prettierrc.toml',
 ];
 
 export const tsconfig = `{
