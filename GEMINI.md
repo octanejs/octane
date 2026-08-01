@@ -57,12 +57,10 @@ trigger first arises, even if it is a later step you chose:
 Each skill is `.rulesync/skills/<name>/SKILL.md`, with a generated per-tool copy;
 read that path directly if your tool cannot load a skill by name.
 
-One `create-a-pr` rule must survive not loading it: keep the PR template's
-provenance section and tick its box when an agent produced the diff. An agent
-commits under a human's credentials, so nothing else tells the two apart and a
-clear or missing box asserts a human wrote it. A bot turns a checked box into
-`agent-authored` and derives the type label from the title, so never apply labels
-yourself.
+Without `create-a-pr`: keep and tick provenance for agent work (clear or missing
+asserts human); never apply PR labels. Existing PR body edits must merge,
+preserve `<!-- CURSOR_SUMMARY -->` through `<!-- /CURSOR_SUMMARY -->`
+byte-for-byte, refetch before writing, and verify after.
 
 ## Your React instincts are the main failure mode here
 

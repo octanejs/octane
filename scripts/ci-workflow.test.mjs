@@ -16,6 +16,11 @@ const createPrSkill = readFileSync(
 	path.join(REPO, '.rulesync/skills/create-a-pr/SKILL.md'),
 	'utf8',
 );
+const projectRule = readFileSync(path.join(REPO, '.rulesync/rules/project.md'), 'utf8');
+const pullRequestTemplate = readFileSync(
+	path.join(REPO, '.github/pull_request_template.md'),
+	'utf8',
+);
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function jobSource(job) {
@@ -260,9 +265,14 @@ describe('Agent pull request body policy', () => {
 	test('preserves bot-managed summaries when updating an existing pull request', () => {
 		assert.match(createPrSkill, /fetch its current body with `gh pr view`/);
 		assert.match(createPrSkill, /preserve them\s+byte-for-byte/);
-		assert.match(createPrSkill, /<!-- CURSOR_SUMMARY -->/);
-		assert.match(createPrSkill, /<!-- \/CURSOR_SUMMARY -->/);
 		assert.match(createPrSkill, /After `gh pr edit`, fetch it again and verify/);
+
+		for (const source of [createPrSkill, projectRule]) {
+			assert.match(source, /<!-- CURSOR_SUMMARY -->/);
+			assert.match(source, /<!-- \/CURSOR_SUMMARY -->/);
+		}
+		assert.match(pullRequestTemplate, /Preserve every bot-managed HTML comment region/);
+		assert.match(pullRequestTemplate, /never replace the body from a fresh template/);
 	});
 });
 
@@ -485,13 +495,12 @@ describe('Pull request labels', () => {
 	});
 
 	test('reads the checked-in template as a declaration either way', async () => {
-		const template = readFileSync(path.join(REPO, '.github/pull_request_template.md'), 'utf8');
-		assert.ok(template.includes(EMPTY), 'the template must carry the provenance box');
+		assert.ok(pullRequestTemplate.includes(EMPTY), 'the template must carry the provenance box');
 
-		const human = await runLabeller({ title: 'fix: a thing', body: template });
+		const human = await runLabeller({ title: 'fix: a thing', body: pullRequestTemplate });
 		const agent = await runLabeller({
 			title: 'fix: a thing',
-			body: template.replace(EMPTY, TICKED),
+			body: pullRequestTemplate.replace(EMPTY, TICKED),
 		});
 
 		assert.deepEqual(human.added, ['fix']);
