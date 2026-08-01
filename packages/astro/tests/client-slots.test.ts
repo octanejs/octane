@@ -36,4 +36,25 @@ describe('client named-slot assignment', () => {
 		expect(island.querySelector('astro-slot[name="footer-note"]')).toBeNull();
 		expect(island.querySelector('astro-slot[name="social_links"]')).toBeNull();
 	});
+
+	it('wraps props.children in StaticHtml when the default slot is absent', () => {
+		function WithChildren(props: { children?: unknown }) {
+			return createElement('div', { id: 'host' }, props.children);
+		}
+
+		const island = document.createElement('div');
+		island.setAttribute('ssr', '');
+		document.body.append(island);
+
+		createHydrator(island)(
+			WithChildren,
+			{ children: '<strong id="from-props">from-props</strong>' },
+			{},
+			{ client: 'only' },
+		);
+
+		const slot = island.querySelector('astro-slot');
+		expect(slot).not.toBeNull();
+		expect(slot?.querySelector('#from-props')?.textContent).toBe('from-props');
+	});
 });

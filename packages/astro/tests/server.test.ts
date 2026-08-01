@@ -57,6 +57,23 @@ describe('Astro server renderer', () => {
 		expect(html).toContain('<strong>slotted</strong>');
 	});
 
+	it('falls back to props.children when the default slot is absent', async () => {
+		function WithChildren(props: { children?: unknown }) {
+			return createElement('div', { className: 'wrap' }, props.children);
+		}
+
+		const { html } = await renderer.renderToStaticMarkup.call(
+			{ result: {} },
+			WithChildren,
+			{ children: '<em>from-props</em>' },
+			{},
+			{ hydrate: true, astroStaticSlot: true } as any,
+		);
+
+		expect(html).toContain('<astro-slot>');
+		expect(html).toContain('<em>from-props</em>');
+	});
+
 	it('camelCases kebab and snake named slots into props and astro-slot names', async () => {
 		function WithNamedSlots(props: { footerNote?: unknown; socialLinks?: unknown }) {
 			return createElement('div', { className: 'panel' }, props.footerNote, props.socialLinks);

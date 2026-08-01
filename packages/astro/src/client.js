@@ -56,8 +56,11 @@ export default (element) =>
 			props[name] = createElement(StaticHtml, { value, name });
 		}
 
-		if (children != null) {
-			props.children = createElement(StaticHtml, { value: children });
+		// Match SSR: when the default slot is absent, still wrap `props.children`
+		// in StaticHtml so hydrate sees the same astro-slot tree the server emitted.
+		const newChildren = children ?? props.children;
+		if (newChildren != null) {
+			props.children = createElement(StaticHtml, { value: newChildren });
 		}
 
 		const prefix = element.getAttribute('prefix') ?? '';
