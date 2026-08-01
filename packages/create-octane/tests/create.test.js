@@ -55,9 +55,11 @@ async function run(argv, cwd, overrides = {}) {
 
 	const exitCode = await create(argv, {
 		cwd,
-		// Pinned rather than inherited: whether the suite happens to run on a
-		// terminal must not decide which path is under test.
+		// Pinned rather than inherited: neither the terminal the suite happens to
+		// run on nor a CI variable in its environment may decide which path is
+		// under test.
 		tty: false,
+		env: {},
 		stdout: out.stream,
 		stderr: err.stream,
 		cli: { tty: false, stdout: out.stream, stderr: err.stream },
@@ -214,6 +216,20 @@ describe('create-octane', () => {
 
 		expect(result.exitCode).toBe(0);
 		expect(readdirSync(cwd)).toEqual([]);
+	});
+
+	it('does not ask on a terminal nobody is watching', async () => {
+		// A TTY is necessary but not sufficient. CI and NO_COLOR are how the CLI
+		// already decides this, and answering it differently here left the two
+		// halves of one flow disagreeing about whether anyone was there.
+		for (const env of [{ CI: 'true' }, { NO_COLOR: '1' }]) {
+			const { asked, prompts } = fakePrompts({ text: 'my-app', select: 'spa' });
+
+			const result = await run(['--no-install'], workspace(), { tty: true, env, prompts });
+
+			expect(result.exitCode, JSON.stringify(env)).toBe(2);
+			expect(asked, JSON.stringify(env)).toEqual([]);
+		}
 	});
 
 	it('asks for a directory rather than guessing one', async () => {

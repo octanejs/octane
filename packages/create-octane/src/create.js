@@ -141,7 +141,7 @@ export function parseArgv(argv) {
  *
  * @param {string[]} argv
  * @param {{ cwd?: string, stdout?: NodeJS.WritableStream, stderr?: NodeJS.WritableStream,
- *   tty?: boolean, prompts?: Prompts,
+ *   tty?: boolean, env?: NodeJS.ProcessEnv, prompts?: Prompts,
  *   cli?: { env?: NodeJS.ProcessEnv, stdout?: NodeJS.WritableStream,
  *     stderr?: NodeJS.WritableStream, tty?: boolean, exec?: {
  *       which: (bin: string) => string | null,
@@ -154,7 +154,14 @@ export async function create(argv, options = {}) {
 	const stdout = options.stdout ?? process.stdout;
 	const stderr = options.stderr ?? process.stderr;
 	const cwd = options.cwd ?? process.cwd();
-	const interactive = options.tty ?? process.stdout.isTTY === true;
+	const env = options.env ?? process.env;
+	// The same question `init` asks itself, asked the same way. A terminal is
+	// necessary but not sufficient: `CI` and `NO_COLOR` mean nobody is watching
+	// even when one is attached, and deciding that here with a bare TTY check
+	// while asking `resolveMode` further down left this command prompting where
+	// the one it drives had already concluded there was no one to answer.
+	const interactive =
+		resolveMode({ tty: options.tty ?? process.stdout.isTTY === true, env }) === 'interactive';
 
 	const parsed = parseArgv(argv);
 
@@ -233,11 +240,10 @@ export async function create(argv, options = {}) {
 	// On a terminal init lists what it will write and install and asks to
 	// confirm, which is worth seeing before any of it happens. With nobody there
 	// the same prompt is a dead end rather than a question, and init refuses to
-	// run at all without `--yes`, so the flag goes on exactly then. `resolveMode`
-	// is the CLI's own answer to "can I prompt", asked rather than reimplemented:
-	// a terminal is necessary but not sufficient, since NO_COLOR and CI also
-	// decide it.
-	const willPrompt = resolveMode({ tty: cli.tty, env: cli.env ?? process.env }) === 'interactive';
+	// run at all without `--yes`, so the flag goes on exactly then. Asked of the
+	// options init will actually receive, which a caller can set apart from this
+	// command's own.
+	const willPrompt = resolveMode({ tty: cli.tty, env: cli.env ?? env }) === 'interactive';
 	if (!willPrompt) argvForInit.push('--yes');
 	// Installing is what puts the dependencies in package.json: init records them
 	// through the package manager rather than pinning versions of its own. Skip
