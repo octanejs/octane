@@ -18,7 +18,9 @@ export function createFilter(include, exclude) {
 		if (typeof id !== 'string') return false;
 		if (id.includes('\0')) return false;
 
-		const pathId = id.replace(/\\/g, '/');
+		// Strip Vite query suffixes (`?t=…`, `?v=…`) so include/exclude globs
+		// match the real path — same split as `shouldSkipOctaneTransform`.
+		const pathId = (id.split('?', 1)[0] ?? id).replace(/\\/g, '/');
 
 		if (excludeList !== null) {
 			for (const pattern of excludeList) {

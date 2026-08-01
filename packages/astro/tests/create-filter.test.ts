@@ -36,6 +36,20 @@ describe('createFilter', () => {
 		const filter = createFilter(compileFilterPatterns(['**/*.tsrx']), null);
 		expect(filter('file\0.tsrx')).toBe(false);
 	});
+
+	it('strips Vite query suffixes before matching', () => {
+		const include = compileFilterPatterns(['**/components/octane/**']);
+		const filter = createFilter(include, null);
+		expect(filter('/src/components/octane/Counter.tsrx?t=123')).toBe(true);
+		expect(filter('/src/components/react/Button.tsx?v=abc')).toBe(false);
+
+		const exclude = createFilter(null, compileFilterPatterns(['**/components/react/**']));
+		expect(exclude('/src/components/react/Button.tsrx?t=1')).toBe(false);
+		expect(exclude('/src/components/octane/Counter.tsrx?t=1')).toBe(true);
+
+		const anchored = createFilter(/Counter\.tsrx$/, null);
+		expect(anchored('/a/Counter.tsrx?t=hmr')).toBe(true);
+	});
 });
 
 describe('compileFilterPatterns', () => {
