@@ -97,6 +97,18 @@ function MapTest(props: any) @{
   </div>
 }
 
+// `useStore(store)` (no options) and `useStore(store, { keys })` (with options)
+// in the SAME component. The compiler appends the call-site slot as the last
+// argument, so the no-options call reaches `useStore` as `useStore(atom, slot)`
+// — exercising the slot-stripping guard that keeps the two `useStore` hook
+// chains (and their inner useRef/useCallback slots) independent.
+function MixedOptionsTest(props: any) @{
+  props.onRender()
+  let value = useStore(props.atom)
+  let { a } = useStore(props.mapStore, { keys: ['a'] })
+  <div data-testid="mixed">{value + '-' + a}</div>
+}
+
 function LifecycleTest(props: any) @{
   let value = useStore(props.store)
   if (value !== 2) throw new Error()
@@ -144,6 +156,37 @@ test('renders simple store', async () => {
   })
   equal(screen.queryByTestId('test1'), null)
   equal(renders, 2)
+})
+
+test('useStore with and without options in one component', async () => {
+  let atomStore = atom('x')
+  let keyed = map<{ a?: string }>({ a: 'A' })
+  let renders = 0
+
+  render(MixedOptionsTest, {
+    props: { atom: atomStore, mapStore: keyed, onRender: () => renders++ }
+  })
+  equal(screen.getByTestId('mixed').textContent, 'x-A')
+  equal(renders, 1)
+
+  // both stores update in one batch — the no-options atom (slot stripped from
+  // `options`) and the keys-filtered map re-render together
+  await act(async () => {
+    atomStore.set('y')
+    keyed.setKey('a', 'B')
+    await delay(1)
+  })
+  equal(screen.getByTestId('mixed').textContent, 'y-B')
+  equal(renders, 2)
+
+  // a map key NOT in `keys` must not re-render, while the atom still does
+  await act(async () => {
+    keyed.setKey('b', 'ignored')
+    atomStore.set('z')
+    await delay(1)
+  })
+  equal(screen.getByTestId('mixed').textContent, 'z-B')
+  equal(renders, 3)
 })
 
 test('does not reload store on component changes', async () => {

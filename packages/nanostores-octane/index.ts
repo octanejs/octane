@@ -98,6 +98,23 @@ export function useStore<SomeStore extends Store>(
   options?: UseStoreOptions<SomeStore>,
   slot?: symbol
 ): StoreValue<SomeStore> {
+  // The octane compiler appends a per-call-site Symbol slot as the LAST
+  // argument of every `use*` call, so a call that omits `options` reaches us
+  // as `useStore(store, sym)`. With `options` declared before `slot`, the
+  // slot lands in `options`; a Symbol is truthy, so `options ?? {}` keeps it,
+  // and `slot` stays `undefined`. `subSlot(undefined, …)` then returns
+  // `undefined` for every inner base hook, so `useRef` and `useCallback`
+  // both fall back to the caller's `withSlot` symbol and collide on one hook
+  // slot. Strip the compiler slot before destructuring — exactly how octane's
+  // own base hooks handle an optional leading param ahead of a trailing slot
+  // (e.g. `useReducer(reducer, initialArg, initOrSlot, slot)`). A Symbol is
+  // never a valid `UseStoreOptions` value, so `typeof options === "symbol"` is
+  // the unambiguous discriminator octane uses throughout its runtime.
+  if (typeof options === "symbol") {
+    slot = options
+    options = undefined
+  }
+
   let { keys, deps = [store, keys], ssr } = options ?? {}
 
   let snapshotRef = useRef<StoreValue<SomeStore>>(store.get(), subSlot(slot, 'ref'))
