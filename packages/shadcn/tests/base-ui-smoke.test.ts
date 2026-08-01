@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { flushSync } from 'octane';
+import { createElement, flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import * as F from './_fixtures/base-ui-smoke.tsrx';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@octanejs/shadcn/base-ui/Tooltip';
 
 // Portalled families (alert-dialog and friends) mount their popup from an EFFECT and render it
 // into document.body, not into the mount container. Asserting on `m.container` without flushing
@@ -313,5 +319,50 @@ describe('@octanejs/shadcn — Base UI overlays reference the CSS vars their pos
 		} finally {
 			m.unmount();
 		}
+	});
+});
+
+// TooltipContent is the one wrapper in this base that hands an ARRAY to a primitive's children:
+// the consumer's node plus the Arrow. Octane reconciles array children as a keyed list, so an
+// unkeyed consumer node both warns and can be mismatched against the arrow when its identity
+// changes. The other families' key warnings come from the @octanejs/base-ui primitives
+// themselves and are outside this package's control — this asserts only the part this base owns.
+//
+// THE CHILD MUST BE BUILT WITH createElement, not authored as .tsrx JSX. Compiled JSX children
+// arrive as a tagged block, and the missing-key check only inspects element DESCRIPTORS — so a
+// .tsrx fixture passes whether or not the key is there. The first version of this test made
+// exactly that mistake and could not fail.
+describe('@octanejs/shadcn — Base UI tooltip keys the children it composes', () => {
+	function TooltipWithDescriptorChild() {
+		return createElement(TooltipProvider, {
+			children: createElement(Tooltip, {
+				defaultOpen: true,
+				children: [
+					createElement(TooltipTrigger, { key: 'trigger' }, 'Hover me'),
+					createElement(
+						TooltipContent,
+						{ key: 'content' },
+						createElement('span', { id: 'body' }, 'Tooltip element body'),
+					),
+				],
+			}),
+		});
+	}
+
+	it('emits no missing-key warning for a descriptor child', async () => {
+		const seen: string[] = [];
+		const warn = console.warn;
+		console.warn = (...args: unknown[]) => {
+			seen.push(args.map(String).join(' '));
+		};
+		const m = mount(TooltipWithDescriptorChild as never);
+		try {
+			await settle();
+		} finally {
+			console.warn = warn;
+			m.unmount();
+		}
+
+		expect(seen.filter((w) => /unique "key" prop/.test(w))).toEqual([]);
 	});
 });

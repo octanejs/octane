@@ -12,7 +12,7 @@
 //
 // UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than
 // transcribed from upstream's Base UI source.
-import { createElement, type OctaneNode } from 'octane';
+import { createElement, Fragment, type OctaneNode } from 'octane';
 import { Tooltip as TooltipPrimitive } from '@octanejs/base-ui/tooltip';
 
 import { cn } from '../../../lib/utils';
@@ -55,8 +55,13 @@ export function TooltipContent({
 					className,
 				),
 				...props,
+				// Octane reconciles ARRAY children as a keyed list, so every entry needs a key —
+				// including the consumer's. Leaving `children` bare emits the missing-key warning
+				// and lets the consumer node be mismatched against the arrow when its identity
+				// changes. The consumer may pass anything (a string, an element, an array), so it
+				// is wrapped in a keyed Fragment rather than keyed in place.
 				children: [
-					children,
+					createElement(Fragment, { key: 'content', children }),
 					createElement(TooltipPrimitive.Arrow, {
 						key: 'arrow',
 						className: 'z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground',
