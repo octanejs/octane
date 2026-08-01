@@ -67,6 +67,29 @@ Targeted alternatives are acceptable for small changes, but PR body must say wha
 - ...
 ```
 
+## Preserve managed sections when updating an existing PR
+
+The template above is for creating a new pull request. Before editing an
+existing pull request body, fetch its current body with `gh pr view` and merge
+the desired changes into that body. Never replace it from a newly generated
+template.
+
+Treat paired bot-managed HTML comment regions as opaque and preserve them
+byte-for-byte. In particular, Cursor Bugbot owns this region:
+
+```md
+<!-- CURSOR_SUMMARY -->
+...
+<!-- /CURSOR_SUMMARY -->
+```
+
+Refetch the body immediately before writing because a bot can update it after a
+commit is pushed. After `gh pr edit`, fetch it again and verify that every
+managed region remains. If an edit races with a bot and removes one, recover the
+latest region from the pull request's edit history and restore it before ending
+the task. Adding or checking provenance is never a reason to discard an
+existing summary, description, comment region, or maintainer-authored text.
+
 ## Create PR with GitHub CLI
 
 Immediately before committing and pushing, synchronize the repository and

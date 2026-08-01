@@ -27,4 +27,8 @@ diff; either form keeps the label workflow successful.
 A bot reads this box and applies the label, so nothing here needs repository
 permissions and it works the same from a fork. The type label comes from the
 conventional-commit type in the title. Do not apply either by hand.
+
+When updating an existing pull request, merge this template content into the
+current body. Preserve every bot-managed HTML comment region and all existing
+maintainer-authored text; never replace the body from a fresh template.
 -->

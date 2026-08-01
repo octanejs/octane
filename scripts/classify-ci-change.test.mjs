@@ -23,6 +23,13 @@ describe('classifyCiChange', () => {
 		assert.equal(classify(['docs/ssr.md', '.changeset/friendly-dogs.md']), false);
 		assert.equal(classify(['AGENTS.md', '.rulesync/rules/root.md']), false);
 		assert.equal(classify(['benchmarks/baselines/local/dbmon.json']), false);
+		assert.equal(
+			classify([
+				'packages/octane-mcp-server/skills/build-octane-software.md',
+				'website/public/llms.txt',
+			]),
+			false,
+		);
 	});
 
 	test('runs full CI when any executable file changes', () => {
