@@ -86,6 +86,32 @@ function prettierSettings(root, files, fromManifest) {
 }
 
 /**
+ * The TypeScript range `tsrx-tsc` will start under, read from the plugin that
+ * ships it once that plugin is on disk.
+ *
+ * It is a required peer there, not a dependency, so nothing carries a compiler
+ * of its own. npm and pnpm install a required peer themselves; yarn does not,
+ * and leaves a project whose `typecheck` script dies on `Cannot find module
+ * 'typescript'`. Naming the package with no range is not the fix either: that
+ * takes the newest major, which `tsrx-tsc` cannot start under. So the range
+ * comes from the toolchain's own declaration, never from a guess here.
+ *
+ * @param {string} root
+ * @returns {string | null} null when the plugin is not installed yet
+ */
+function toolchainTypescriptRange(root) {
+	try {
+		const manifest = JSON.parse(
+			readFileSync(path.join(root, 'node_modules/@tsrx/typescript-plugin/package.json'), 'utf8'),
+		);
+		const range = manifest.peerDependencies?.typescript;
+		return typeof range === 'string' && range !== '' ? range : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * @param {import('../../kernel/project.js').Project} project
  * @param {keyof typeof MODES} mode
  * @param {ReturnType<typeof integrationFor>} integration
@@ -364,13 +390,33 @@ export async function applyInit(ctx, project, options) {
 				});
 				installed.push(.../** @type {string[]} */ (names));
 			}
+
+			// Now that the plugin is on disk it can say which TypeScript it runs
+			// under. A package manager that installs required peers has already
+			// put one there and this pins the same range explicitly; one that does
+			// not, like yarn, would otherwise leave `typecheck` unable to start.
+			if (!declared.typescript) {
+				const range = toolchainTypescriptRange(project.root);
+				if (range === null) {
+					manual.push('Install typescript, at the range @tsrx/typescript-plugin declares.');
+				} else {
+					await installPackages(ctx, installing, [`typescript@${range}`], { dev: true });
+					installed.push('typescript');
+				}
+			}
 		} catch (error) {
 			spinner.stop('Install failed');
 			throw error;
 		}
 		spinner.stop(`Installed ${installed.length} package(s)`);
 	} else if (dependencies.length + devDependencies.length > 0) {
-		manual.push(`Install: ${[...dependencies, ...devDependencies].join(' ')}`);
+		// The range lives in the plugin, which is not installed yet, so it cannot
+		// be quoted here. Naming the package without one would send people to the
+		// newest major, which `tsrx-tsc` cannot start under.
+		manual.push(
+			`Install: ${[...dependencies, ...devDependencies].join(' ')}`,
+			'then typescript, at the range @tsrx/typescript-plugin declares as its peer.',
+		);
 	}
 
 	if (manual.length > 0) ctx.ui.note('Do this by hand', manual);

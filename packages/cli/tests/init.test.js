@@ -31,6 +31,22 @@ function gitExec({ dirty = false } = {}) {
 	};
 }
 
+/** Records what the CLI asked the package manager to install, and succeeds. */
+function recordingExec() {
+	/** @type {string[][]} */
+	const args = [];
+	return {
+		args,
+		exec: {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ argv) => {
+				if (file !== 'git') args.push(argv);
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		},
+	};
+}
+
 /**
  * @param {string} root
  * @param {string} file
@@ -197,17 +213,60 @@ describe('octane init', () => {
 		}
 	});
 
-	it('leaves TypeScript to the toolchain that carries its own', async () => {
-		// Naming it installs the newest release, which is not necessarily one
-		// `tsrx-tsc` can start under, and nothing in a scaffolded project reads a
-		// workspace copy: the typechecker and the Prettier plugin each bring one.
+	it('installs TypeScript at the range the toolchain declares', async () => {
+		// `typescript` is a required peer of the plugin that ships `tsrx-tsc`, and
+		// nothing in the toolchain carries a compiler of its own. npm and pnpm
+		// install a required peer themselves, so this is redundant there; yarn
+		// does not, and without it `yarn create octane` leaves a project whose
+		// typecheck script dies on `Cannot find module 'typescript'`.
+		const { root } = fixture(
+			installed('@tsrx/typescript-plugin', '0.3.118', {
+				peerDependencies: { typescript: '^5.9.3' },
+			}),
+		);
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
+
+		const requested = recorder.args.flat();
+		expect(requested).toContain('typescript@^5.9.3');
+		// Never bare: that resolves to the newest major, which `tsrx-tsc` cannot
+		// start under, which is how a fresh scaffold ends up unable to typecheck.
+		expect(requested).not.toContain('typescript');
+	});
+
+	it('leaves a TypeScript the project already declares alone', async () => {
+		const { root } = fixture({
+			'package.json': {
+				name: 'app',
+				type: 'module',
+				devDependencies: { typescript: '5.9.3' },
+			},
+			...installed('@tsrx/typescript-plugin', '0.3.118', {
+				peerDependencies: { typescript: '^5.9.3' },
+			}),
+		});
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
+
+		// Matched as a whole argument: `@tsrx/typescript-plugin` is on every one of
+		// these lines and contains the word.
+		expect(recorder.args.flat().filter((arg) => /^typescript(@|$)/.test(arg))).toEqual([]);
+	});
+
+	it('names TypeScript in the manual list when it installs nothing', async () => {
+		// The range lives inside a plugin that was never installed, so it cannot
+		// be quoted here. Saying the name without it would send people to the
+		// major that cannot run.
 		const { root } = fixture();
 
-		const result = await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--json'], {
-			exec: gitExec(),
-		});
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
 
-		expect(result.json().installed).not.toContain('typescript');
+		expect(result.json().manual.join(' ')).toContain('typescript');
 	});
 
 	it('registers the Prettier plugin, without which .tsrx cannot be parsed', async () => {

@@ -55,12 +55,12 @@ export function integrationFor(bundler, mode) {
 	return {
 		specifier: target[mode].specifier,
 		dependencies: ['octane', ...target[mode].packages],
-		// TypeScript is deliberately absent. `tsrx-tsc` and the Prettier plugin
-		// each carry the compiler they need, so nothing here reads a workspace
-		// copy, while naming it installs the newest release rather than the one
-		// the toolchain supports — which is how a scaffold ends up unable to
-		// typecheck itself. The bundler is only ours to install when we are the
-		// ones creating its config.
+		// TypeScript is absent from this list on purpose, but it does get
+		// installed: naming it here would take the newest major, which `tsrx-tsc`
+		// cannot start under, so it is installed afterwards at the range
+		// @tsrx/typescript-plugin declares as its peer. Nothing in the toolchain
+		// carries a compiler of its own. The bundler is only ours to install when
+		// we are the ones creating its config.
 		devDependencies: [
 			'@tsrx/typescript-plugin',
 			'@tsrx/prettier-plugin',

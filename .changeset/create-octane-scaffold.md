@@ -64,6 +64,16 @@ package.json wins over a config file when a project has both. A field holding a
 path is followed to the file it names, and one naming a shareable config is
 reported as settings this command cannot read.
 
+`init` also installs `typescript`, at the range `@tsrx/typescript-plugin`
+declares as its peer, read from the plugin once it is on disk rather than
+chosen here. It is a required peer of the plugin that ships `tsrx-tsc`, and
+nothing in the toolchain carries a compiler of its own, so npm and pnpm install
+it themselves but yarn does not: `yarn create octane` used to produce a project
+whose `typecheck` script died on `Cannot find module 'typescript'`. Naming the
+package with no range is not the fix either, since that takes the newest major,
+which `tsrx-tsc` cannot start under. With `--no-install` the range cannot be
+read yet, so the package is named in the list to install by hand instead.
+
 A directory has to be empty, except that a fresh `.git` is allowed,
 since `mkdir app && cd app && git init` is a common way to start and holds no
 work to protect. A name that lands on an existing file is reported as one,
