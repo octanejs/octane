@@ -5045,6 +5045,9 @@ importers:
       '@octanejs/aria':
         specifier: workspace:*
         version: link:../aria
+      '@octanejs/base-ui':
+        specifier: workspace:*
+        version: link:../base-ui
       '@octanejs/lucide':
         specifier: workspace:*
         version: link:../lucide

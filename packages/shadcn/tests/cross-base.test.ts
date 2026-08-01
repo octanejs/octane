@@ -87,6 +87,15 @@ const KNOWN_DIVERGENCES: Record<string, { slots?: string[]; exports?: string[]; 
 		exports: ['PopoverAnchor', 'PopoverContent'],
 		why: 'RAC positions against its trigger, so there is no separate root or anchor part',
 	},
+	// Base UI positions against an `anchor` PROP on its Positioner rather than rendering a
+	// separate Anchor element, so there is no part to port and no slot to emit. Faking one would
+	// mean inventing an element upstream does not have.
+	'base-ui/popover.tsrx': {
+		slots: ['popover-anchor'],
+		exports: ['PopoverAnchor'],
+		why: 'Base UI positions via the Positioner’s anchor prop, so there is no Anchor part',
+	},
+
 	'react-aria/scroll-area.tsrx': {
 		slots: ['scroll-area-viewport', 'scroll-area-scrollbar', 'scroll-area-thumb'],
 		exports: ['ScrollBar'],

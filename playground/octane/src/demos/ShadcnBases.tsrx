@@ -8,6 +8,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsrx';
 import { ShadcnDemo } from './Shadcn.tsrx';
 import { ShadcnReactAriaDemo } from './ShadcnReactAria.tsrx';
+import { ShadcnBaseUIDemo } from './ShadcnBaseUI.tsrx';
 
 export function ShadcnBasesDemo() @{
 	<div class="space-y-6">
@@ -27,13 +28,7 @@ export function ShadcnBasesDemo() @{
 			</TabsContent>
 
 			<TabsContent value="base-ui">
-				<div class="rounded-lg border border-dashed p-8 text-center">
-					<p class="text-sm font-medium">Base UI base not ported yet</p>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Blocked on six @octanejs/base-ui primitives: collapsible, accordion, tabs, scroll-area,
-						select, navigation-menu.
-					</p>
-				</div>
+				<ShadcnBaseUIDemo />
 			</TabsContent>
 		</Tabs>
 	</div>
