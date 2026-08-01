@@ -8,6 +8,11 @@ import { getRouter } from '../src/router.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
 import {
+	FRAMEWORK_INTEGRATIONS,
+	FRAMEWORK_INTEGRATION_COUNT,
+	frameworkIntegrationRepositoryHref,
+} from '../src/content/framework-integrations.ts';
+import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
 	OCTANE_CARDS,
@@ -360,6 +365,28 @@ describe('website routes', () => {
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
 			expect(link?.textContent).toBe(packageName);
 		}
+	});
+
+	it('/docs/framework-integrations links every first-party framework integration', async () => {
+		const { container } = await renderRoute('/docs/framework-integrations');
+		const packageLinks = Array.from(
+			container.querySelectorAll<HTMLAnchorElement>(
+				'.framework-integration-directory a[href*="/packages/"]',
+			),
+		);
+
+		expect(packageLinks).toHaveLength(FRAMEWORK_INTEGRATION_COUNT);
+		expect(container.querySelector('.doc-eyebrow')?.textContent).toBe(
+			`${FRAMEWORK_INTEGRATION_COUNT} first-party framework integrations`,
+		);
+		for (const integration of FRAMEWORK_INTEGRATIONS) {
+			const href = frameworkIntegrationRepositoryHref(integration.packageName);
+			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
+			expect(link?.textContent).toBe(integration.packageName);
+		}
+		expect(findLink(container, '/docs/bindings#find-a-binding')?.textContent).toContain(
+			'TanStack bindings',
+		);
 	});
 
 	it('an unknown route renders the root notFoundComponent inside the layout', async () => {

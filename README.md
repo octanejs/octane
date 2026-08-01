@@ -171,6 +171,8 @@ Octane itself. Good places to start:
   own Octane runtime.
 - [Bindings](https://octanejs.dev/docs/bindings): the `@octanejs/*` ports of the
   React ecosystem.
+- [Framework integrations](https://octanejs.dev/docs/framework-integrations):
+  use Octane with Astro, Docusaurus, or TanStack Start.
 
 In this repository:
 

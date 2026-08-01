@@ -5,6 +5,7 @@
 // MCP server); this module zips it with the compiled components.
 import QuickStart from './docs/quick-start.mdx';
 import BuildTools from './docs/build-tools.mdx';
+import FrameworkIntegrations from './docs/framework-integrations.mdx';
 import Cli from './docs/cli.mdx';
 import CoreApis from './docs/core-apis.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
@@ -24,6 +25,7 @@ export interface DocEntry extends DocMeta {
 const components: Record<string, DocEntry['component']> = {
 	'quick-start': QuickStart,
 	'build-tools': BuildTools,
+	'framework-integrations': FrameworkIntegrations,
 	cli: Cli,
 	'core-apis': CoreApis,
 	'tsrx-vs-tsx': TsrxVsTsx,
