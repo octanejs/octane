@@ -49,4 +49,19 @@ describe('shouldSkipOctaneTransform', () => {
 			),
 		).toBe(true);
 	});
+
+	it('skips the workspace packages/astro tree after Vite realpath', () => {
+		expect(
+			shouldSkipOctaneTransform('/home/jesse/wsl-projects/oss/octane/packages/astro/src/server.js'),
+		).toBe(true);
+		expect(
+			shouldSkipOctaneTransform(
+				'/home/jesse/wsl-projects/oss/octane/packages/astro/src/client.js?v=hmr',
+			),
+		).toBe(true);
+		// Sibling packages must still compile.
+		expect(
+			shouldSkipOctaneTransform('/home/jesse/wsl-projects/oss/octane/packages/octane/src/index.ts'),
+		).toBe(false);
+	});
 });

@@ -11,6 +11,9 @@
 export function shouldSkipOctaneTransform(id) {
 	if (id.startsWith('\0')) return true;
 	const clean = id.split('?', 1)[0] ?? id;
+	// Always skip this integration — Vite may realpath the workspace package to
+	// `packages/astro/...` (no `node_modules` segment).
+	if (isOctaneAstroIntegrationPath(clean)) return true;
 	const inNodeModules = clean.includes('/node_modules/') || clean.includes('\\node_modules\\');
 	if (inNodeModules && !isInstalledOctanePackagePath(clean)) return true;
 	if (/\.(astro|md|mdx|css|scss|sass|less|styl|json|svg|png|jpe?g|gif|webp)$/i.test(clean)) {
@@ -20,9 +23,23 @@ export function shouldSkipOctaneTransform(id) {
 }
 
 /**
+ * `@octanejs/astro` under node_modules or the workspace `packages/astro` tree.
+ * It sits on Astro's SSR graph via `ssr.noExternal` and must not re-enter the
+ * async transform schedule.
+ *
+ * @param {string} clean
+ */
+function isOctaneAstroIntegrationPath(clean) {
+	const path = clean.replace(/\\/g, '/');
+	return (
+		/(?:^|\/)packages\/astro(?:\/|$)/.test(path) ||
+		/(?:^|\/)node_modules\/@octanejs\/astro(?:\/|$)/.test(path)
+	);
+}
+
+/**
  * Registry / pnpm layouts for packages the Octane compiler must still see.
- * `@octanejs/astro` is excluded: it sits on Astro's SSR graph via
- * `ssr.noExternal` and must not re-enter the async transform schedule.
+ * `@octanejs/astro` is handled by `isOctaneAstroIntegrationPath` instead.
  *
  * @param {string} clean
  */
