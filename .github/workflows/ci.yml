@@ -19,6 +19,7 @@ env:
   WEBSITE_DOCS_SPEC: website/tests/core-apis-docs.test.ts
   WEBSITE_E2E_SPEC: website/tests/ssr-hydration.e2e.test.ts
   WEBSITE_SSR_SPEC: website/tests/ssr-smoke.test.ts
+  ASTRO_E2E_SPEC: packages/astro/tests/astro.e2e.test.ts
 
 jobs:
   release_change:
@@ -450,6 +451,7 @@ jobs:
           --exclude "packages/dexie/tests/browser/**/*.test.ts"
           --exclude "packages/tiptap/tests/browser/**/*.test.ts"
           --exclude "packages/three/tests/browser/**/*.test.ts"
+          --exclude "$ASTRO_E2E_SPEC"
 
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
@@ -560,6 +562,9 @@ jobs:
               packages/dexie/tests/browser
               packages/tiptap/tests/browser
               packages/three/tests/browser
+          - lane: astro
+            chromium: true
+            specs: packages/astro/tests/astro.e2e.test.ts
 
     steps:
       - name: Checkout code
@@ -578,8 +583,12 @@ jobs:
         run: pnpm install --prod false --frozen-lockfile
 
       - name: Install Playwright Chromium
-        if: ${{ matrix.chromium }}
+        if: ${{ matrix.chromium && matrix.lane != 'astro' }}
         run: pnpm --filter website exec playwright install --with-deps chromium
+
+      - name: Install Playwright Chromium (astro)
+        if: ${{ matrix.lane == 'astro' }}
+        run: pnpm --filter @octanejs/astro exec playwright install --with-deps chromium
 
       - name: Run ${{ matrix.lane }} integration tests
         run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1

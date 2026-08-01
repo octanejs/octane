@@ -374,6 +374,7 @@ catalogs:
     typescript: ^5.9.3
     valtio: ^2.3.2
     vite: ^8.1.5
+    astro: ^5.16.0
     vite-plugin-solid: '3.0.0-next.5'
     # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with
     # vapor; pinned to a 3.6 prerelease like solid-js's 2.0 beta. The fixtures
@@ -414,7 +415,7 @@ minimumReleaseAgeExclude:
   - 'shadcn@4.14.1'
   - 'tailwindcss@4.3.3'
   - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.18 || 0.1.19 || 0.1.21
+  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

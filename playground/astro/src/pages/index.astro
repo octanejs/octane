@@ -1,0 +1,49 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { ClientOnlyBadge } from '../components/ClientOnlyBadge.tsrx';
+import { Counter } from '../components/Counter.tsrx';
+import { Greeting } from '../components/Greeting.tsrx';
+import { Panel } from '../components/Panel.tsrx';
+---
+
+<Layout title="Octane Astro playground">
+	<main>
+		<h1>@octanejs/astro</h1>
+
+		<section>
+			<h2>Server-only island</h2>
+			<Greeting name="Astro" />
+		</section>
+
+		<section>
+			<h2>Hydrated counter (client:load)</h2>
+			<Counter client:load start={3} />
+		</section>
+
+		<section>
+			<h2>Client-only island (client:only="octane")</h2>
+			<p>No SSR HTML for this island — it mounts in the browser only.</p>
+			<ClientOnlyBadge client:only="octane" />
+		</section>
+
+		<section>
+			<h2>Slotted children</h2>
+			<Panel client:load>
+				<p data-testid="panel-child">Children from Astro into an Octane island.</p>
+				<p slot="footer-note" data-testid="panel-footer-child">Named footer slot.</p>
+			</Panel>
+		</section>
+	</main>
+</Layout>
+
+<style>
+	main {
+		font-family: system-ui, sans-serif;
+		max-width: 40rem;
+		margin: 2rem auto;
+		padding: 0 1rem;
+	}
+	section {
+		margin-top: 2rem;
+	}
+</style>

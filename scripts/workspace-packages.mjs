@@ -14,6 +14,7 @@ const SPECIAL_ROLES = new Map([
 	['@octanejs/docusaurus', 'metaframework'],
 	['@octanejs/rspack-plugin', 'compiler integration'],
 	['@octanejs/rspeedy-plugin', 'native compiler integration'],
+	['@octanejs/astro', 'compiler integration'],
 	['@octanejs/rsbuild-plugin', 'metaframework'],
 	['@octanejs/vite-plugin', 'metaframework'],
 	// TanStack Start is a metaframework integration rather than a library
@@ -33,6 +34,7 @@ const SPECIAL_ROLES = new Map([
 
 const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/app-core',
+	'@octanejs/astro',
 	'@octanejs/docusaurus',
 	'@octanejs/rspack-plugin',
 	'@octanejs/rspeedy-plugin',

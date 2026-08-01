@@ -1,0 +1,80 @@
+{
+  "name": "@octanejs/astro",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Use Octane components as Astro islands — SSR, hydration, and .tsrx/.tsx compilation via octane/compiler/vite",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/astro"
+  },
+  "keywords": [
+    "astro-integration",
+    "astro-component",
+    "renderer",
+    "octane"
+  ],
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "module": "src/index.js",
+  "main": "src/index.js",
+  "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./client.js": {
+      "types": "./types/client.d.ts",
+      "import": "./src/client.js",
+      "default": "./src/client.js"
+    },
+    "./server.js": {
+      "types": "./types/server.d.ts",
+      "import": "./src/server.js",
+      "default": "./src/server.js"
+    },
+    "./container-renderer": {
+      "types": "./types/container-renderer.d.ts",
+      "import": "./src/container-renderer.js",
+      "default": "./src/container-renderer.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "cd ../.. && vitest run --project astro"
+  },
+  "dependencies": {
+    "devalue": "catalog:default",
+    "picomatch": "^4.0.3"
+  },
+  "peerDependencies": {
+    "astro": ">=5.0.0",
+    "octane": "workspace:*",
+    "vite": ">=6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:default",
+    "astro": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

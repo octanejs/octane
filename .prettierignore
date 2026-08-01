@@ -22,6 +22,7 @@ playground/octane/src/styles/style-nova.css
 **/.netlify/
 **/.nitro/
 **/.output/
+**/.astro/
 **/.tanstack/
 **/.vercel/
 **/.wrangler/
