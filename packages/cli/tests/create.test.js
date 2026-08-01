@@ -341,6 +341,25 @@ describe('octane create', () => {
 		expect(existsSync(path.join(cwd, 'octane-app/index.html'))).toBe(true);
 	});
 
+	it('answers every question with --yes on a terminal, not just the confirm', async () => {
+		// `--yes` is documented as accepting every prompt with its default. It
+		// reached the confirm and stopped there, so on a real terminal this still
+		// blocked on the name and the template, which is the one place people
+		// type the flag by hand. Without the fix this test hangs rather than
+		// fails.
+		const cwd = workspace();
+
+		const result = await create(['--cwd', cwd, '--yes', '--no-install'], {
+			tty: true,
+			env: { NO_COLOR: '', CI: '' },
+		});
+
+		expect(result.exitCode).toBe(0);
+		// The offered name, and the offered template with it.
+		expect(existsSync(path.join(cwd, 'octane-app/index.html'))).toBe(true);
+		expect(existsSync(path.join(cwd, 'octane-app/octane.config.ts'))).toBe(false);
+	});
+
 	it('asks for a directory rather than guessing one', async () => {
 		// Without `--yes` there is nothing standing in for the answer, and picking
 		// a name on someone's behalf is not this command's call.

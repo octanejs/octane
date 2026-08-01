@@ -39,8 +39,11 @@ gains `--package-manager <name>`, which also covers running it by hand in a
 project that has no lockfile to detect yet.
 
 One other CLI fix came out of that. `--yes` now means "stop asking" on a
-terminal too: it was consulted only once the CLI had decided nobody was
-watching, so typing it in a real shell did nothing.
+terminal too, for every kind of question rather than only the confirm: it was
+consulted once the CLI had decided nobody was watching, so typing it in a real
+shell did nothing, and `octane create --yes` then blocked on the very questions
+the flag was meant to answer. A question with no default has nothing to answer
+with, so it is still asked.
 
 The package entry exports what it did before. `resolveMode` and
 `PACKAGE_MANAGERS` were briefly added for a caller that drove `main` from
