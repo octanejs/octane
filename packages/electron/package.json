@@ -38,6 +38,7 @@
     "./renderer": "./src/renderer/index.ts",
     "./preload": "./src/preload/index.ts",
     "./main": "./src/main/index.ts",
+    "./main/native": "./src/main/electron-apis.ts",
     "./common": "./src/common/index.ts"
   },
   "scripts": {

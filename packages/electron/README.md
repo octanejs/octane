@@ -9,6 +9,7 @@ that layout for Octane:
 | Import | Process | Role |
 | --- | --- | --- |
 | `@octanejs/electron/main` | main | Register default `ipcMain` handlers |
+| `@octanejs/electron/main/native` | main | Re-exports `Menu`, `Tray`, `session`, `protocol`, `BrowserWindow`, … |
 | `@octanejs/electron/preload` | preload | `contextBridge` expose of Electron IPC + desktop helpers |
 | `@octanejs/electron` | renderer | Octane hooks and promise helpers over that bridge |
 
@@ -90,9 +91,9 @@ Reactive reads over the default bridge push channels.
 ## Desktop helpers
 
 `app`, `windowControls`, `dialog`, `shell`, `clipboard`, and `screen` are
-promise helpers over the same bridge (no hooks). Main-only Electron modules
-(`BrowserWindow`, `Menu`, `Tray`, …) stay in the main process — import them from
-`electron` / `@octanejs/electron/main` there.
+promise helpers over the same bridge (no hooks). Main-only constructors
+(`Menu`, `Tray`, `session`, `protocol`, `BrowserWindow`, …) are available from
+`@octanejs/electron/main/native` in the main process — see below.
 
 ## Off-host behavior
 
@@ -107,8 +108,14 @@ Everything is guarded on `window.__OCTANE_ELECTRON__`:
 
 Tests install a mock with `installElectronBridge` from `@octanejs/electron`.
 
-## Not covered in the renderer
+## Not covered in the renderer (intentional)
 
-Constructing `BrowserWindow`, `Menu`, `Tray`, `session`, `protocol`, and other
-main-only APIs is out of scope for Octane UI code — same as a React Electron app.
-See `UPSTREAM.md` for the module crosswalk.
+`Menu`, `Tray`, `session`, `protocol`, `BrowserWindow` construction, and related
+main-only APIs are not bridged into Octane UI code — the same constraint a React
+Electron app has under contextIsolation. Import them in the main process:
+
+```ts
+import { Menu, Tray, session, protocol, BrowserWindow } from '@octanejs/electron/main/native';
+```
+
+Or import the same symbols from `electron` / `electron/main`. See `UPSTREAM.md`.

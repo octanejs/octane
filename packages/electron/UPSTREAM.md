@@ -31,12 +31,20 @@ Octane does not vendor Electron sources. The package:
 | `clipboard` | main | Bridged (`clipboard.*`) |
 | `nativeTheme` | main | Bridged (`useNativeTheme`) |
 | `screen` | main | Bridged (`screen.*`) |
-| `webFrame` / `webUtils` | preload/renderer | N/A in v1 — import from `electron` in preload when needed |
-| `BrowserWindow` construction | main | N/A in renderer — import from `electron` in main |
-| `Menu` / `MenuItem` / `Tray` | main | N/A in renderer — import from `electron` in main |
-| `session` / `protocol` / `net` | main | N/A in renderer — import from `electron` in main |
-| `Notification` / `globalShortcut` / `autoUpdater` | main | N/A in v1 — import from `electron` in main |
-| `utilityProcess` | utility | N/A in v1 |
+| `webFrame` / `webUtils` | preload | Import from `electron` in preload when needed |
+| `BrowserWindow` construction | main | Re-exported from `@octanejs/electron/main/native` — not bridged to the renderer |
+| `Menu` / `MenuItem` / `Tray` | main | Re-exported from `@octanejs/electron/main/native` — intentional main-only (same as React Electron apps) |
+| `session` / `protocol` / `net` | main | Re-exported from `@octanejs/electron/main/native` — intentional main-only |
+| `Notification` / `globalShortcut` / `autoUpdater` | main | Re-exported from `@octanejs/electron/main/native` — intentional main-only |
+| `utilityProcess` | utility | Out of scope for this binding |
+
+## Not covered in the renderer (intentional)
+
+Menu, Tray, session, protocol, and other main-only constructors are **not**
+missing ports: under contextIsolation they cannot live in Octane UI code. Import
+them from `@octanejs/electron/main/native` (or `electron` / `electron/main`) in
+the main process, the same way a React Electron app does. Bridging them into the
+renderer would invent an unsafe second API surface.
 
 ## Divergences
 
