@@ -87,6 +87,10 @@ So a bridge never means "run the React package unchanged". It means:
    synthetic-event timing) goes in a short divergence note next to the port, with
    what to do instead. On an upgrade, re-copy at the new version: the diff
    against the old copy is your work list.
+   Inspect both the published package and the canonical repository at the pinned
+   tag. Do not assume the registry artifact contains source, tests, fixtures,
+   snapshots, or runner configuration; fetch missing evidence from the tagged
+   repository and record which artifact supplied it.
 
 3. **Map the React APIs.** Same-name and same-semantics in Octane: `useState`,
    `useReducer`, `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`,
@@ -153,6 +157,10 @@ So a bridge never means "run the React package unchanged". It means:
    names kept. Write down which upstream test files you ran, ported, or left out
    and why. Do not soften an upstream assertion to get it green; find out whether
    it is a bridge bug or a documented Octane divergence first.
+   Prove the evidence machinery fails closed too: removing, renaming, skipping,
+   or failing to execute a recorded case, or changing pinned evidence, must make
+   validation fail. A green port suite is not trustworthy when its collector can
+   silently go stale.
 
 8. **Validate the rest.** Drive real DOM events against the bridged binding and,
    where possible, run the same fixture against the React original and compare

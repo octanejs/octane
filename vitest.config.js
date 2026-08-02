@@ -1548,12 +1548,25 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'hook-form-pristine',
+					include: ['packages/hook-form/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'hook-form',
 					include: [
 						'packages/hook-form/tests/**/*.test.ts',
 						'packages/hook-form/tests/**/*.test.tsx',
 					],
-					exclude: [...configDefaults.exclude, 'packages/hook-form/tests/**/*.server.test.tsx'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/hook-form/tests/**/*.server.test.tsx',
+						'packages/hook-form/tests/upstream-original.test.ts',
+					],
 					environment: 'jsdom',
 					// Differential precompile: rewrites `@octanejs/hook-form` →
 					// `react-hook-form` so the React side runs the real binding.
@@ -1563,6 +1576,7 @@ export default defineConfig({
 					// jest setup. clear/reset/restore mirror upstream's jest config so
 					// spy state never leaks between ported tests.
 					setupFiles: ['packages/hook-form/tests/_setup.ts'],
+					fileParallelism: false,
 					clearMocks: true,
 					mockReset: true,
 					restoreMocks: true,

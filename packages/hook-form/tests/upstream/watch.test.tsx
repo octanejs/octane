@@ -202,7 +202,7 @@ describe('Watch', () => {
 		expect(screen.getByText('test')).toBeVisible();
 	});
 
-	// OCTANE DIVERGENCE: after handleSubmit, RHF emits two state notifications in SEPARATE
+	// OCTANE DIVERGENCE[hook-form-microtask-batching][runtime:9ade2443c59bd598]: after handleSubmit, RHF emits two state notifications in SEPARATE
 	// microtasks ({ errors: {} } before `await onValid`, then the final submitted
 	// state). React 18+ coalesces both into ONE committed render (render work is
 	// scheduled on a macrotask), but octane's scheduler flushes per microtask (see
