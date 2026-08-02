@@ -907,7 +907,9 @@ test('rejects additional properties at every strict manifest level', () => {
 test('CLI validates, lists, and rejects malformed invocations', () => {
 	const cli = join(import.meta.dirname, 'harness.mjs');
 	const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
-	assert.equal(run('validate').status, 0);
+	// Exercise validation through a non-Vitest lane. Real project collection is
+	// integration work owned by the parity job, not a unit-test side effect.
+	assert.equal(run('validate', '--lane', 'hook-form-pristine-types').status, 0);
 	const listed = run('list');
 	assert.equal(listed.status, 0);
 	assert.match(listed.stdout, /hook-form-pristine-upstream.*verified/);

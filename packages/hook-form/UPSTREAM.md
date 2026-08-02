@@ -88,6 +88,13 @@ There are no skipped, todo, or expected-failure cases. Any removed/renamed test
 artifact, unrecorded title change, missing extra, or vendored-byte drift fails
 `upstream:verify`.
 
+In the root Vitest project, `testExecution.group: react-parity` owns the adapted
+upstream and differential test patterns. The ordinary sharded config derives
+their complement, so the package-authored conformance cases still run without
+repeating manifest-owned parity work. This follows the repository-wide
+[React parity test-execution contract](../../docs/react-parity-testing.md); the
+workflow does not enumerate this package.
+
 The pristine lane runs all 1,193 tests and eight snapshots in the original Jest
 suite against React. Its local Jest wrapper removes only the optional
 `jest-preview` dashboard transforms/setup; test source, SWC transformation,

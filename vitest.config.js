@@ -1547,6 +1547,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'hook-form-pristine',
 					include: ['packages/hook-form/tests/upstream-original.test.ts'],
@@ -1556,6 +1557,15 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/hook-form/tests/upstream/**/*.test.ts',
+						'packages/hook-form/tests/upstream/**/*.test.tsx',
+						'packages/hook-form/tests/differential/**/*.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.tsx',
+					],
+				},
 				test: {
 					name: 'hook-form',
 					include: [
@@ -1609,6 +1619,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				// react-hook-form's own jest config runs `*.server.test.tsx` in a
 				// node environment; same split here — node transform mode also makes
 				// the octane plugin compile in `mode: 'server'`, which the server

@@ -13,13 +13,7 @@ import {
 import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
 import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
-import {
-	loadManifest,
-	requiredExecutableLanes,
-	verifyLaneEnvironment,
-	verifyManifestFiles,
-	verifyManifestTestSelections,
-} from './harness-lib.mjs';
+import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -129,16 +123,11 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
-		await verifyManifestTestSelections(manifest, REPO);
-		if (manifest.provenance.verification === 'verified') {
-			for (const lane of requiredExecutableLanes(manifest)) {
-				execFileSync(
-					process.execPath,
-					[HARNESS_PATH, 'run', '--manifest', relativeFile, '--lane', lane.id],
-					{ cwd: REPO, stdio: 'inherit' },
-				);
-			}
-		}
+		const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
+		execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
+			cwd: REPO,
+			stdio: 'inherit',
+		});
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);
 	}
