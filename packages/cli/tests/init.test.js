@@ -171,6 +171,48 @@ describe('octane init', () => {
 		expect(read(root, 'src/styles.css')).toContain('--accent');
 	});
 
+	// The whole invariant rather than another single case: every scaffolded
+	// component reads the theme tokens, so whenever `init` writes one of them the
+	// stylesheet has to land too. The cases below vary which files the project
+	// already owns, which is what decides the subset `init` still writes — and
+	// each subset has been a separate escape at some point.
+	it.each([
+		{ name: 'an empty project', mode: 'fullstack', files: {} },
+		{ name: 'an empty spa project', mode: 'spa', files: {} },
+		{
+			name: 'only the counter is missing',
+			mode: 'fullstack',
+			files: {
+				'index.html':
+					'<!doctype html>\n<html><head><!--ssr-head--></head>' +
+					'<body><div id="root"><!--ssr-body--></div></body></html>\n',
+				'src/App.tsrx': 'export function App() @{\n  <main>theirs</main>\n}\n',
+				'src/Layout.tsrx': 'export function Layout(props) @{\n  <div>{props.children}</div>\n}\n',
+			},
+		},
+		{
+			name: 'the project owns the page but not the shell',
+			mode: 'fullstack',
+			files: { 'src/App.tsrx': 'export function App() @{\n  <main>theirs</main>\n}\n' },
+		},
+	])(
+		'writes the theme tokens alongside any component it scaffolds, given $name',
+		async ({ mode, files }) => {
+			const { root } = fixture(files);
+
+			await runCli(['init', '--cwd', root, '--mode', mode, '--yes', '--no-install'], {
+				exec: gitExec(),
+			});
+
+			const components = ['src/App.tsrx', 'src/Layout.tsrx', 'src/Counter.tsrx'].filter(
+				(file) => !(file in files) && existsSync(path.join(root, file)),
+			);
+			// The scenario has to actually scaffold something, or it proves nothing.
+			expect(components.length, 'scaffolded no component').toBeGreaterThan(0);
+			expect(existsSync(path.join(root, 'src/styles.css')), components.join(', ')).toBe(true);
+		},
+	);
+
 	it('states the stylesheet tag to add when the project keeps its own page', async () => {
 		// fullstack writes its entry component whether or not it writes the shell,
 		// so on a project that already has an index.html the scaffolded page would

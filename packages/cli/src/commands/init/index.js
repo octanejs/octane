@@ -287,32 +287,47 @@ function plan(project, mode, integration) {
 		const writesLayout =
 			mode === 'fullstack' && (writesApp || writesCounter) && !existsSync(at('src/Layout.tsrx'));
 
+		// The components this run scaffolds, in the order the app reads: the entry,
+		// the frame it renders through, then the second page. Collected as a list
+		// rather than pushed one `if` at a time because the stylesheet below is
+		// derived from it — every one of these reads the theme tokens, and a
+		// second enumeration saying which ones do has been wrong every time it was
+		// written. Adding a page here cannot forget to bring the tokens with it.
+		const pages = [];
 		if (writesApp) {
-			changes.push({
+			pages.push({
 				file: 'src/App.tsrx',
 				summary:
 					mode === 'fullstack'
 						? 'create the route entry referenced by octane.config.ts'
 						: 'create the entry component',
-				apply: writeFile(at('src/App.tsrx'), appComponent(mode)),
+				body: appComponent(mode),
 			});
 		}
-		// Reported in the order the app reads: the entry, the frame it renders
-		// through, the second page, then the endpoint behind them both.
 		if (writesLayout) {
-			changes.push({
+			pages.push({
 				file: 'src/Layout.tsrx',
 				summary: 'create the frame both pages share',
-				apply: writeFile(at('src/Layout.tsrx'), layoutComponent),
+				body: layoutComponent,
 			});
 		}
 		if (writesCounter) {
-			changes.push({
+			pages.push({
 				file: 'src/Counter.tsrx',
 				summary: 'create the route entry for /counter',
-				apply: writeFile(at('src/Counter.tsrx'), counterComponent),
+				body: counterComponent,
 			});
 		}
+		for (const page of pages) {
+			changes.push({
+				file: page.file,
+				summary: page.summary,
+				apply: writeFile(at(page.file), page.body),
+			});
+		}
+
+		// Not a page: it renders nothing and reads no tokens, so it is deliberately
+		// outside the list above.
 		if (scaffoldsRoutes && !existsSync(at('src/server/health.ts'))) {
 			changes.push({
 				file: 'src/server/health.ts',
@@ -321,14 +336,14 @@ function plan(project, mode, integration) {
 			});
 		}
 		// The reset and theme tokens, which two separate things depend on: the
-		// shell links the file, and every scaffolded component reads the tokens in
-		// it. Either one alone is enough to need it, and they do not imply each
-		// other — this command writes pages without a shell when the project has
-		// its own `index.html`, and writes a shell without pages when the project
-		// has its own routing. Tying the stylesheet to just one of them leaves the
-		// other side broken: a page whose every colour, border and surface
-		// resolves to nothing, or a shell linking a file that was never created.
-		if ((writesShell || writesApp || writesLayout) && !existsSync(at('src/styles.css'))) {
+		// shell links the file, and every component above reads the tokens in it.
+		// Either one alone is enough to need it, and they do not imply each other —
+		// this command writes pages without a shell when the project has its own
+		// `index.html`, and writes a shell without pages when the project has its
+		// own routing. Tying the stylesheet to just one of them leaves the other
+		// side broken: a page whose every colour, border and surface resolves to
+		// nothing, or a shell linking a file that was never created.
+		if ((writesShell || pages.length > 0) && !existsSync(at('src/styles.css'))) {
 			changes.push({
 				file: 'src/styles.css',
 				summary: 'create the reset and the theme tokens',
