@@ -25,6 +25,91 @@ Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
   upstream `cn-*` semantic hooks and need a shadcn style sheet (e.g.
   `style-nova`). `status.json` lists exactly which families are which.
 
+## Component coverage
+
+Each primitive base ships the families its primitives support, exactly as upstream's do.
+Switching `style` changes which primitive a component is built on — the `data-slot` contract and
+component names stay identical.
+
+<!-- BEGIN COVERAGE -->
+
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 21/44
+
+✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
+
+| Family | Radix | React Aria | Base UI |
+| --- | :---: | :---: | :---: |
+| `accordion` | ✅ | ✅ | ✅ |
+| `alert` | ✅ | ✅ | ✅ |
+| `alert-dialog` | ✅ | ✅ | ✅ |
+| `aspect-ratio` | ✅ | ✅ | ✅ |
+| `avatar` | ✅ | ✅ | — |
+| `badge` | ✅ | ✅ | — |
+| `breadcrumb` | ✅ | ✅ | — |
+| `button` | ✅ | ✅ | ✅ |
+| `card` | ✅ | ✅ | ✅ |
+| `checkbox` | ✅ | ✅ | ✅ |
+| `collapsible` | ✅ | ✅ | — |
+| `context-menu` | ✅ | ⛔ | — |
+| `dialog` | ✅ | ✅ | ✅ |
+| `dropdown-menu` | ✅ | ⛔ | — |
+| `empty` | ✅ | ✅ | ✅ |
+| `field` | ✅ | ✅ | — |
+| `hover-card` | ✅ | ⛔ | — |
+| `input` | ✅ | ✅ | ✅ |
+| `item` | ✅ | ✅ | — |
+| `kbd` | ✅ | ✅ | ✅ |
+| `label` | ✅ | ✅ | ✅ |
+| `menubar` | ✅ | ⛔ | — |
+| `native-select` | ✅ | ✅ | ✅ |
+| `navigation-menu` | ✅ | ⛔ | ⛔ |
+| `pagination` | ✅ | ✅ | — |
+| `popover` | ✅ | ✅ | ✅ |
+| `progress` | ✅ | ⛔ | — |
+| `radio-group` | ✅ | ✅ | ✅ |
+| `scroll-area` | ✅ | ✅ | ⛔ |
+| `select` | ✅ | ⛔ | ⛔ |
+| `separator` | ✅ | ✅ | ✅ |
+| `sheet` | ✅ | ✅ | — |
+| `sidebar` | ✅ | ⛔ | — |
+| `skeleton` | ✅ | ✅ | ✅ |
+| `slider` | ✅ | ✅ | — |
+| `sonner` | ✅ | ⛔ | ⛔ |
+| `spinner` | ✅ | ✅ | ✅ |
+| `switch` | ✅ | ✅ | ✅ |
+| `table` | ✅ | ✅ | — |
+| `tabs` | ✅ | ✅ | ⛔ |
+| `textarea` | ✅ | ✅ | ✅ |
+| `toggle` | ✅ | ✅ | — |
+| `toggle-group` | ✅ | ⛔ | — |
+| `tooltip` | ✅ | ⛔ | ✅ |
+
+**Blocked**
+
+| Base | Family | Reason |
+| --- | --- | --- |
+| Base UI | `navigation-menu` | @octanejs/base-ui has no navigation-menu primitive |
+| Base UI | `scroll-area` | @octanejs/base-ui has no scroll-area primitive |
+| Base UI | `select` | @octanejs/base-ui has no select primitive |
+| Base UI | `sonner` | needs next-themes, which has no octane binding |
+| Base UI | `tabs` | @octanejs/base-ui has no tabs primitive |
+| React Aria | `context-menu` | no counterpart in upstream’s aria base |
+| React Aria | `dropdown-menu` | no counterpart in upstream’s aria base |
+| React Aria | `hover-card` | no counterpart in upstream’s aria base |
+| React Aria | `menubar` | no counterpart in upstream’s aria base |
+| React Aria | `navigation-menu` | no counterpart in upstream’s aria base |
+| React Aria | `progress` | no counterpart in upstream’s aria base |
+| React Aria | `select` | needs input-group |
+| React Aria | `sidebar` | no counterpart in upstream’s aria base |
+| React Aria | `sonner` | needs next-themes, which has no octane binding |
+| React Aria | `toggle-group` | no counterpart in upstream’s aria base |
+| React Aria | `tooltip` | no counterpart in upstream’s aria base |
+
+<!-- END COVERAGE -->
+
+The table is generated from the sources by `pnpm coverage:build` and gated by `coverage:check`,
+so it cannot drift as families land.
+
 ## Installing with the shadcn CLI
 
 The registry is consumed by the **upstream** `shadcn` CLI — nothing octane-specific is
