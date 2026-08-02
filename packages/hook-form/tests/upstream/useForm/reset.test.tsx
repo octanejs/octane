@@ -1172,7 +1172,7 @@ describe('reset', () => {
 		expect(mounted).toEqual([false, true]);
 	});
 
-	// OCTANE DIVERGENCE: octane re-renders App a third time. With isValid subscribed, the
+	// OCTANE DIVERGENCE[hook-form-reset-extra-render][runtime:9874a97bb66b95e4]: octane re-renders App a third time. With isValid subscribed, the
 	// post-mount effect chain (useForm's mount + _setValid notification, then
 	// reset({})'s state.next) lands as two separate render passes in octane
 	// where React batches them into one — `mounted` records [false, false, true]

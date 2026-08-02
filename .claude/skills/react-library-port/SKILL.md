@@ -40,6 +40,7 @@ Read first:
    - Note unsupported React assumptions: class components, `forwardRef`, synthetic events, React-style text `onChange`, StrictMode-only behavior, React internals. Controlled `value`/`checked` itself is supported.
 
 2. **Pin the upstream release and bring its source into the repository**
+   - Inspect both the published package contents (`npm pack --dry-run` or the equivalent) and the canonical repository at the release tag. Do not assume the registry artifact contains source, tests, build scripts, or even the same file layout as the repository. If source or tests are absent from the package, fetch them from the canonical tagged repository and record which artifact supplied each boundary.
    - Pick one immutable upstream release and record it in `packages/<name>/UPSTREAM.md`: package, exact version, tag commit SHA, the supported upstream range the port advertises, and any peer or oracle versions (`packages/three/UPSTREAM.md` is the model).
    - Vendor the upstream React-facing source at that pin under `packages/<name>/upstream/`, byte-exact and unmodified, keeping the upstream directory layout, its LICENSE, and its copyright headers. `.prettierignore` already covers `packages/*/upstream/`, so vendored bytes stay unformatted; leave the directory out of the package's published `files` so it remains development evidence rather than shipped code.
    - Confirm the upstream license permits that redistribution before vendoring. When it does not, work from a checkout pinned to the same commit outside the repository and say so in `UPSTREAM.md`; everything below still applies.
@@ -65,12 +66,19 @@ Read first:
    - `status.json` must agree with the crosswalk: `surface` describes what is covered, and `divergences` lists what a consumer would notice. `pnpm bindings:status` regenerates `docs/bindings-status.md` from it.
 
 6. **Run the pinned release's own tests**
+   - First prove what test suite actually exists at the pin. Inspect the repository, package scripts, workspaces, fixtures, snapshots, and test configuration rather than inferring coverage from filenames or the published package. Record when a release genuinely ships no tests; “tests were not present in the npm tarball” is not evidence that the repository has none.
    - When upstream ships a suite, it is the strongest parity oracle available, because it encodes behavior the maintainers care about rather than behavior the port happened to think of. Start there instead of writing fresh tests around the implementation you just wrote.
    - Run its framework-neutral suites unmodified against the core the port reuses. A failure there means the port broke the core's contract, not that the test needs adjusting.
    - Port its React-binding suites case by case: re-author the fixtures in `.tsrx`, swap `@testing-library/react` for `@octanejs/testing-library`, keep the upstream case name, and cite the origin like the conformance suite does (`// Per <upstream path>:<line>`). `node scripts/scaffold-react-port.mjs <react-test-file>` emits a triage checklist to work from.
    - `UPSTREAM.md` records the disposition of every upstream test file: run as-is, ported (and where it now lives), or out of scope with the reason (React internals, `react-test-renderer`, StrictMode double-invoke, an API Octane does not expose). Vendor the upstream tests alongside the source when their license allows it, so the next pin is a diff there too.
    - A committed test must execute, so `.skip`, `it.todo`, and expected-failure markers are not how an unported case is tracked; the crosswalk is (`pnpm test:markers:check`).
    - Never weaken an upstream assertion to make it pass. Triage it in step 8, and if the answer is a divergence, keep the case and assert Octane's behavior with an `// OCTANE DIVERGENCE:` rationale.
+   - Test the parity machinery itself. Add negative controls proving that a removed, renamed, skipped, stale, or unexecuted upstream case fails validation, and that provenance or fixture drift cannot leave the harness green. A green port suite without these controls proves behavior only if the evidence collector is already assumed correct.
+   - Classify every test in both directions. Every upstream test artifact needs a recorded disposition, and every port-authored test needs exactly one classification: unmodified upstream, adapted upstream, React/Octane differential, Octane-only divergence/framework contract, or not applicable with a reason.
+   - Every port-authored test used to support a React-parity claim must run the same observable scenario against the pinned React implementation or cite the pinned upstream test that covers it. Octane-only divergence and framework-contract tests must say why they are unpaired and must not be counted as React-parity evidence.
+   - Treat upstream type tests as executable parity evidence, not merely inspiration. Run the vendored suite unchanged with its original compiler and pinned React type dependencies, run a one-for-one adapted suite with the Octane compiler configuration, and require equivalent accept/reject results except for explicit divergences.
+   - Inventory and hash both type suites at file and assertion-group granularity. Record the exact allowed transformations (for example import roots, `.tsx`/`.tsrx` component paths, or a documented event-name mapping), reject every other structural change, and add negative controls for a skipped file, deleted assertion, and removed `@ts-expect-error`.
+   - Register pristine and adapted runtime and type lanes with `react-parity:check` and the package's CI entry point. A locally runnable helper that CI never invokes is not parity evidence.
 
 7. **Build test strategy for what upstream does not cover**
    - DOM output over event sequences: use differential tests where the same `.tsrx` fixture runs in Octane and React.
@@ -100,6 +108,7 @@ Read first:
    - Run package-specific tests first.
    - Run affected core tests if touching `packages/octane`.
    - Run `pnpm typecheck` for API/package changes.
+   - Run `pnpm react-parity:check` for binding work and confirm every required manifest lane executes rather than only validates metadata.
    - Run `pnpm format:files <path...>` while iterating and
      `pnpm format:files:check <path...>` for a scoped check. Use the repo-wide
      `pnpm format:check` for the final gate.
@@ -117,6 +126,9 @@ Read first:
 - The pinned release's own suites run against the port: its framework-neutral
   tests unmodified, its React-binding tests ported case by case, and every
   recorded divergence pinned by a test.
+- Pristine and adapted type suites, hashed assertion inventories, permitted
+  transformation ledger, negative controls, and exhaustive port-test
+  classifications wired into `react-parity:check` and package CI.
 - README with compatibility status and intentional differences.
 - Changeset if user-facing package behavior changed.
 - Optional update to `docs/react-library-compat-plan.md` scorecard.

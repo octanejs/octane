@@ -8,7 +8,15 @@
  */
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
+import {
+	readFileSync,
+	writeFileSync,
+	mkdirSync,
+	existsSync,
+	readdirSync,
+	statSync,
+	rmSync,
+} from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,26 +33,20 @@ function hashString(s: string): string {
 
 function compileOne(srcPath: string): void {
 	const source = readFileSync(srcPath, 'utf8');
-	let compiled;
-	try {
-		compiled = compileToReact(source, srcPath);
-	} catch {
-		return;
+	const compiled = compileToReact(source, srcPath);
+	if (compiled.errors && compiled.errors.length > 0) {
+		throw new Error(
+			`React fixture compilation failed for ${srcPath}: ${JSON.stringify(compiled.errors)}`,
+		);
 	}
-	if (compiled.errors && compiled.errors.length > 0) return;
-	let transformed;
-	try {
-		transformed = esbuildTransformSync(compiled.code, {
-			loader: 'tsx',
-			jsx: 'automatic',
-			jsxImportSource: 'react',
-			target: 'esnext',
-			format: 'esm',
-			sourcefile: srcPath,
-		});
-	} catch {
-		return;
-	}
+	const transformed = esbuildTransformSync(compiled.code, {
+		loader: 'tsx',
+		jsx: 'automatic',
+		jsxImportSource: 'react',
+		target: 'esnext',
+		format: 'esm',
+		sourcefile: srcPath,
+	});
 	const rewritten = transformed.code
 		.replace(
 			/from\s+["']@octanejs\/hook-form(\/[^"']*)?["']/g,
@@ -57,7 +59,8 @@ function compileOne(srcPath: string): void {
 }
 
 export async function setup(): Promise<void> {
-	if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+	rmSync(CACHE_DIR, { recursive: true, force: true });
+	mkdirSync(CACHE_DIR, { recursive: true });
 	if (!existsSync(FIXTURE_DIR)) return;
 	const walk = (dir: string): string[] => {
 		const out: string[] = [];

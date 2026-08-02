@@ -1,11 +1,12 @@
 {
   "upstream": { "package": "react-hook-form", "version": "7.81.0" },
-  "surface": "Complete port of react-hook-form 7.81.0 (upstream commit b7df98c2) with the upstream test suite ported: `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.",
+  "surface": "Complete port of react-hook-form 7.81.0 (tag commit 46b217e034dd92f7aa3cb3a478815556b416b299). The automated parity check runs all 1,193 original tests against the pinned React package as a pristine baseline; the Octane port separately runs byte-locked, unfiltered DOM and server suites with exact collected/executed inventories containing 1,187 entries representing 1,178 unique file/full-name identities. The nine duplicate entries are repeated titles within the DOM inventory; the server inventory is disjoint. Coverage includes `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.",
   "divergences": [
     "`register()` returns `onInput` (octane's native per-keystroke event) instead of React's synthetic `onChange`; mode names and `register` option keys keep the upstream spelling.",
-    "Ported tests directly assert Octane's documented microtask-flush commit granularity, eager `Object.is` setState bailout, and native input-event delivery; the suite contains no skipped or expected-failure cases."
+    "The structured parity ledger records native no-op input delivery, microtask batching, duplicate resolver notification, async act flush, reset render-count, and eager `Object.is` bailout differences with executable case identities, consumer impact, and migration guidance; the suite contains no skipped or expected-failure cases."
   ],
   "ssr": "Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup.",
-  "verified": "2026-07-14",
+  "verified": "2026-08-01",
+  "parityEvidence": "packages/hook-form/audit/react-parity.json",
   "docs": ["docs/octanejs-hook-form-plan.md"]
 }

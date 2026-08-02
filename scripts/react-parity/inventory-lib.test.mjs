@@ -78,6 +78,18 @@ describe('extractTestCases', () => {
 		assert.notEqual(matrix[0].caseId, matrix[1].caseId);
 	});
 
+	test('expands static each rows wrapped in a const assertion', () => {
+		const matrix = extractTestCases(
+			`test.each([['alpha'], ['beta']] as const)('value %s', value => value);`,
+		);
+
+		assert.deepEqual(
+			matrix.map((testCase) => testCase.title),
+			['value alpha', 'value beta'],
+		);
+		assert.equal(matrix[0].parameterization.confidence, 'exact');
+	});
+
 	test('multiplies registrations inside a static describe.each matrix', () => {
 		const cases = extractTestCases(`
 			describe.each(['button', 'input'])('%s', tag => {

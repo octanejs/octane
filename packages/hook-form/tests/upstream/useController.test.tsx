@@ -32,6 +32,8 @@ describe('useController', () => {
 		render(<Component />);
 	});
 
+	// OCTANE DIVERGENCE[hook-form-native-input-handler][adapted:controller-on-input]: Octane exposes native onInput instead of React's synthetic onChange.
+	// @parity-case adapted:controller-on-input
 	it('should return a promise-like value from field.onInput', async () => {
 		let onChangeResult: any;
 

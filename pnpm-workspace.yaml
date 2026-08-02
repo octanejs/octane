@@ -54,8 +54,12 @@ packages:
   - website-mcp
 
 allowBuilds:
+  # The pinned react-hook-form suite uses its upstream SWC/Jest transform.
+  '@swc/core': true
   esbuild: true
   playwright: true
+  # Jest's resolver ships a native binary selected by its install script.
+  unrs-resolver: true
   # Miniflare's local Cloudflare runtime binary; required by the adapter's
   # committed workerd integration test, with no project code generation.
   workerd: true
@@ -70,7 +74,6 @@ allowBuilds:
   # Docusaurus pulls core-js transitively. Its postinstall only prints funding
   # information and is not required for the shipped polyfill modules.
   core-js: false
-
 # Variables
 esrap_common: &esrap_common ^2.3.0
 

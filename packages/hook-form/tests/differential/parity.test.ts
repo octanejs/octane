@@ -14,6 +14,7 @@ const FIXTURE = resolve(__dirname, '../_fixtures/forms.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/hook-form vs real react-hook-form', () => {
+	// @parity-case differential:register
 	it('register: typing → per-keystroke validation → submit → reset renders byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'RegisterForm', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -48,6 +49,7 @@ describe('differential: @octanejs/hook-form vs real react-hook-form', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:controller
 	it('Controller: controlled typing, fieldState, reset renders byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ControllerForm', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -66,6 +68,7 @@ describe('differential: @octanejs/hook-form vs real react-hook-form', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:field-array
 	it('useFieldArray: append/prepend/remove/swap/move/update renders byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ArrayForm', undefined, CACHE);
 		await d.step('mount', () => {});
