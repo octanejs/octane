@@ -266,21 +266,24 @@ function plan(project, mode, integration) {
 			}
 		}
 
-		// fullstack always needs it, because octane.config.ts names it as the
-		// route entry. spa needs it only alongside the entry that imports it, so a
+		// The pages belong to the routes this run declares, so they follow the
+		// octane.config.ts written above and are not written into a project that
+		// brought its own. That config names its own entries, which may not be
+		// these files at all; writing them there produces components nothing
+		// routes to, and a shared layout whose nav links 404 because the routes
+		// behind them were never declared. A missing entry in someone's own config
+		// is a real problem, but it is `octane doctor`'s to report, not this
+		// command's to paper over with a page they did not ask for.
+		const scaffoldsRoutes = mode === 'fullstack' && !project.octaneConfigPath;
+		// spa needs the component only alongside the entry that imports it, so a
 		// project with its own page does not collect an orphan component. That is
 		// the entry this run writes, not the shell: keeping someone's src/main.ts
 		// means keeping whatever it imports, which is not this file.
-		const writesApp =
-			(mode === 'fullstack' || writesClientEntry) && !existsSync(at('src/App.tsrx'));
-		// /counter and the health handler exist because the octane.config.ts above
-		// routes to them, so they follow that file and are not written into a
-		// project that brought its own config, where nothing would reach them.
-		const scaffoldsRoutes = mode === 'fullstack' && !project.octaneConfigPath;
+		const writesApp = (scaffoldsRoutes || writesClientEntry) && !existsSync(at('src/App.tsrx'));
 		const writesCounter = scaffoldsRoutes && !existsSync(at('src/Counter.tsrx'));
 		// Both fullstack pages import the layout, so it follows whichever of them
-		// this run writes rather than tracking the config: writing one of those
-		// pages without it would scaffold an app whose own import does not resolve.
+		// this run writes: writing one of those pages without it would scaffold an
+		// app whose own import does not resolve.
 		const writesLayout =
 			mode === 'fullstack' && (writesApp || writesCounter) && !existsSync(at('src/Layout.tsrx'));
 

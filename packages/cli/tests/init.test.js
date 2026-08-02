@@ -101,13 +101,13 @@ describe('octane init', () => {
 		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
 	});
 
-	it('scaffolds the layout its pages import even when the project owns the route config', async () => {
-		// A project that brought its own octane.config.ts keeps it, so /counter and
-		// the health handler are not written — nothing would route to them. The
-		// entry component still is, and it renders through the shared layout, so
-		// the layout has to follow the page rather than the config. Skipping it
-		// here scaffolds an App.tsrx whose own import does not resolve, and the
-		// failure surfaces as a broken build rather than anything init reports.
+	it('scaffolds no pages into a project that brought its own route config', async () => {
+		// The pages exist to serve the routes this command declares. A project with
+		// its own octane.config.ts keeps it, and that config names its own entries,
+		// so writing these files would leave components nothing routes to — and a
+		// shared layout whose nav links to /counter and /api/health, two routes
+		// that config never declared, so both 404. The rest of the wiring is
+		// correct everywhere and still runs.
 		const { root } = fixture({
 			'octane.config.ts':
 				'import { defineConfig, RenderRoute } from "@octanejs/vite-plugin";\n\n' +
@@ -120,12 +120,20 @@ describe('octane init', () => {
 			exec: gitExec(),
 		});
 
-		expect(read(root, 'src/App.tsrx')).toContain('from "./Layout.tsrx"');
-		expect(read(root, 'src/Layout.tsrx')).toContain('export function Layout(');
-		// Theirs, untouched — and so the routes it does not declare stay unwritten.
+		for (const file of [
+			'src/App.tsrx',
+			'src/Layout.tsrx',
+			'src/Counter.tsrx',
+			'src/server/health.ts',
+			'src/styles.css',
+		]) {
+			expect(existsSync(path.join(root, file)), file).toBe(false);
+		}
+		// Theirs, untouched.
 		expect(read(root, 'octane.config.ts')).not.toContain('/counter');
-		expect(existsSync(path.join(root, 'src/Counter.tsrx'))).toBe(false);
-		expect(existsSync(path.join(root, 'src/server/health.ts'))).toBe(false);
+		// The parts that are correct whatever the routing looks like still land.
+		expect(read(root, 'vite.config.ts')).toContain('from "@octanejs/vite-plugin"');
+		expect(JSON.parse(read(root, 'package.json')).scripts.typecheck).toContain('tsrx-tsc');
 	});
 
 	it('states the stylesheet tag to add when the project keeps its own page', async () => {

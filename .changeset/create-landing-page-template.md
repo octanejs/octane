@@ -32,3 +32,9 @@ states the `<link>` to add, the same way it already states the SSR markers.
 
 `tsconfig.json` now includes `octane.config.ts`, so a route entry naming an
 export that does not exist fails `typecheck` rather than at request time.
+
+`octane init --mode fullstack` no longer writes an entry component into a
+project that brought its own `octane.config.ts`. The pages belong to the routes
+this command declares; that config names its own entries, which may not be these
+files at all, so writing them produced components nothing routed to. A missing
+entry in someone's own config stays `octane doctor`'s to report.
