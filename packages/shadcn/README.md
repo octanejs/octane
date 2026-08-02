@@ -159,10 +159,40 @@ pnpm --dir packages/shadcn registry:serve   # http://localhost:4517
 Then point `components.json` at `http://localhost:4517/styles/{style}/{name}.json`, which is
 what `playground/octane` does.
 
+## Importing from the package
+
+There is no barrel entry. Every family has its own subpath, so an app pulls in only what it
+uses — the Radix base at the bare name, the others under their base:
+
 ```tsx
-import { Button, Dialog, Tabs } from '@octanejs/shadcn';
+// Radix base (the bare subpaths)
+import { Button } from '@octanejs/shadcn/Button';
+import { Dialog, DialogContent, DialogTitle } from '@octanejs/shadcn/Dialog';
+
+// React Aria base
+import { Button } from '@octanejs/shadcn/react-aria/Button';
+
+// Base UI base
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogMedia,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@octanejs/shadcn/base-ui/AlertDialog';
+
 import '@octanejs/shadcn/theme.css';
 ```
+
+Subpaths are `PascalCase` and map to the family, not the export: `AlertDialogTrigger` and its
+siblings all come from `.../AlertDialog`. `cn` lives at `@octanejs/shadcn/cn`, shared types at
+`@octanejs/shadcn/types`, and `useIsMobile` at `@octanejs/shadcn/hooks/use-mobile`.
+
 
 Octane adaptations are uniform and documented per file: no `"use client"`,
 refs as props, native events (`onInput` per keystroke), `asChild` and Portal
