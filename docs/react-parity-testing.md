@@ -39,12 +39,12 @@ tests, list only the parity-owned patterns in `testExecution.include`:
 		group: 'react-parity',
 		include: [
 			'packages/example/tests/upstream/**/*.test.ts',
-			'packages/example/tests/differential/**/*.test.ts',
 		],
 	},
 	test: {
 		name: 'example',
 		include: ['packages/example/tests/**/*.test.ts'],
+		exclude: ['packages/example/tests/differential/**/*.test.ts'],
 	},
 }
 ```
@@ -67,10 +67,32 @@ from the project passed through that config. The base config remains the
 canonical local project: `pnpm vitest run --project <name>` still sees every
 file in its normal `test.include`.
 
-Use separate Vitest projects only when the tests genuinely require different
-environments or transforms, such as pristine Jest evidence, adapted DOM tests,
-and server-mode compilation. Mark each fully group-owned project with the same
-`testExecution.group`.
+Use separate Vitest projects when tests genuinely require different
+environments, transforms, or preparation, such as pristine Jest evidence,
+adapted DOM tests, differential tests, and server-mode compilation. Mark each
+fully group-owned project with the same `testExecution.group`.
+
+Differential tests must have their own project because their React-side fixture
+compilation and cache preparation do not belong to the full adapted suite:
+
+```js
+{
+	testExecution: { group: 'react-parity' },
+	test: {
+		name: 'example-differential',
+		include: ['packages/example/tests/differential/**/*.test.ts'],
+		environment: 'jsdom',
+		globalSetup: ['packages/example/tests/differential/_setup.ts'],
+	},
+}
+```
+
+Exclude the differential patterns from every broader project whose `include`
+would otherwise match them. Do not attach differential `globalSetup` to the
+adapted-suite project, run the preparation from each test file, or serialize or
+cap the adapted suite's workers to accommodate differential setup. Leave worker
+selection to Vitest unless measurements establish a project-specific reason to
+override it.
 
 ## Manifest and project ownership
 
@@ -109,15 +131,16 @@ The ordinary test matrix uses `vitest.ci-sharded.config.js`. Do not add:
 - a package-specific exclusion environment variable;
 - another full execution of a parity-owned project in the ordinary shards.
 
-The parity harness validates all selected identities once per manifest, caches
-collection per Vitest project, and then executes every available required lane.
-Running each lane through a fresh harness process defeats that cache and is a
-performance regression.
+The parity harness executes every available required lane and uses each runner's
+JSON report to verify that every declared file and test identity passed exactly
+once. It does not run a separate Vitest collection pass before execution.
+`harness.mjs validate` retains collection for an explicit validation-only check.
 
 ## Adding or changing a binding
 
 1. Define the complete local project and its aliases/setup in
-   `vitest.config.js`.
+   `vitest.config.js`. Put differential tests and their `globalSetup` in a
+   separate, non-overlapping project.
 2. Add `testExecution: { group: 'react-parity' }` when the whole project belongs
    to parity, or add `include` with only the parity-owned file patterns when the
    project is mixed.
@@ -137,4 +160,3 @@ performance regression.
 6. Run `pnpm ci:workflow:test`. Its regression coverage verifies that the
    workflow stays package-agnostic, fully owned projects disappear from the
    ordinary shards, and mixed projects retain only their non-parity tests.
-

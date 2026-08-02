@@ -480,9 +480,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
-      # The manifest validator collects each Vitest project once, then runs all
-      # required runtime and type lanes in the same process so that collection
-      # is not repeated for the full, focused, and differential evidence.
+      # The manifest runner executes every required runtime and type lane. Each
+      # runner's JSON report proves the exact identities without a separate
+      # pre-execution Vitest collection pass.
       - name: Check React parity inventories and execute required lanes
         run: |
           pnpm react-parity:test

@@ -1562,8 +1562,6 @@ export default defineConfig({
 					include: [
 						'packages/hook-form/tests/upstream/**/*.test.ts',
 						'packages/hook-form/tests/upstream/**/*.test.tsx',
-						'packages/hook-form/tests/differential/**/*.test.ts',
-						'packages/hook-form/tests/differential/**/*.test.tsx',
 					],
 				},
 				test: {
@@ -1576,17 +1574,15 @@ export default defineConfig({
 						...configDefaults.exclude,
 						'packages/hook-form/tests/**/*.server.test.tsx',
 						'packages/hook-form/tests/upstream-original.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.tsx',
 					],
 					environment: 'jsdom',
-					// Differential precompile: rewrites `@octanejs/hook-form` →
-					// `react-hook-form` so the React side runs the real binding.
-					globalSetup: ['packages/hook-form/tests/differential/_setup.ts'],
 					// The ported upstream suite uses @testing-library/jest-dom matchers
 					// (toBeVisible, toBeInTheDocument, …) — same as react-hook-form's own
 					// jest setup. clear/reset/restore mirror upstream's jest config so
 					// spy state never leaks between ported tests.
 					setupFiles: ['packages/hook-form/tests/_setup.ts'],
-					fileParallelism: false,
 					clearMocks: true,
 					mockReset: true,
 					restoreMocks: true,
@@ -1596,6 +1592,42 @@ export default defineConfig({
 				// testing-library the ported suite mounts through is NOT (its harness
 				// calls hooks with explicit slot symbols — declared in its package.json,
 				// so the plugin skips it automatically).
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/hook-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hook-form\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-differential',
+					include: [
+						'packages/hook-form/tests/differential/**/*.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.tsx',
+					],
+					environment: 'jsdom',
+					// Rewrites the fixture imports so the React side runs the real binding.
+					globalSetup: ['packages/hook-form/tests/differential/_setup.ts'],
+					setupFiles: ['packages/hook-form/tests/_setup.ts'],
+					globals: false,
+				},
 				plugins: [octane()],
 				resolve: {
 					alias: [

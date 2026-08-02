@@ -12,6 +12,10 @@ const shardedVitestConfigSource = readFileSync(
 );
 const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
 const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
+const reactParityHarness = readFileSync(
+	path.join(REPO, 'scripts/react-parity/harness.mjs'),
+	'utf8',
+);
 const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.config.js')));
 const { configureShardedProjects, default: shardedVitestConfig } = await import(
 	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
@@ -167,10 +171,28 @@ describe('CI workflow aggregation', () => {
 		const shardedProjects = new Map(
 			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
 		);
-		for (const project of ['hook-form-pristine', 'hook-form', 'hook-form-server']) {
+		for (const project of [
+			'hook-form-pristine',
+			'hook-form',
+			'hook-form-differential',
+			'hook-form-server',
+		]) {
 			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
 		}
+		for (const project of ['hook-form', 'hook-form-server']) {
+			assert.equal(baseProjects.get(project).test.maxWorkers, undefined);
+			assert.equal(baseProjects.get(project).test.fileParallelism, undefined);
+		}
+		assert.equal(baseProjects.get('hook-form').test.globalSetup, undefined);
+		assert.deepEqual(baseProjects.get('hook-form-differential').test.include, [
+			'packages/hook-form/tests/differential/**/*.test.ts',
+			'packages/hook-form/tests/differential/**/*.test.tsx',
+		]);
+		assert.deepEqual(baseProjects.get('hook-form-differential').test.globalSetup, [
+			'packages/hook-form/tests/differential/_setup.ts',
+		]);
 		assert.equal(shardedProjects.has('hook-form-pristine'), false);
+		assert.equal(shardedProjects.has('hook-form-differential'), false);
 		assert.equal(shardedProjects.has('hook-form-server'), false);
 		assert.deepEqual(shardedProjects.get('hook-form').test.include, [
 			'packages/hook-form/tests/**/*.test.ts',
@@ -190,15 +212,19 @@ describe('CI workflow aggregation', () => {
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
 
-		// The manifest runner owns all required lanes in one process so Vitest's
-		// collected-project cache survives across the full, focused, and
-		// differential evidence instead of being rebuilt once per lane.
+		// The manifest runner owns all required lanes in one process. Execution
+		// reports prove exact identities, so only explicit validation collects.
 		assert.match(
 			reactParityCheck,
 			/manifest\.provenance\.verification === 'verified' \? 'run-required' : 'validate'/,
 		);
 		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
 		assert.doesNotMatch(reactParityCheck, /'--lane'/);
+		const executionMarker = "} else {\n\tif (action === 'run-required'";
+		const executionStart = reactParityHarness.indexOf(executionMarker);
+		assert.notEqual(executionStart, -1);
+		const executionBranch = reactParityHarness.slice(executionStart);
+		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
 	});
 
 	test('derives sharded projects generically from execution-group ownership', () => {

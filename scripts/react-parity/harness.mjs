@@ -65,7 +65,6 @@ if (action === 'validate') {
 				: manifest.lanes;
 	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
-	await verifyManifestTestSelections({ ...manifest, lanes: selected }, root);
 	for (const lane of selected) {
 		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
 		const [command, ...commandArgs] = buildLaneArgv(lane, root);
