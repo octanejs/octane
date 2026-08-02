@@ -31,9 +31,12 @@ export function useWindowState(...rest: [symbol?]): WindowState {
 				seenLiveUpdate = true;
 				setState(next);
 			});
-			bridge.window.getState().then((next) => {
-				if (!disposed && !seenLiveUpdate && next != null) setState(next);
-			});
+			bridge.window
+				.getState()
+				.then((next) => {
+					if (!disposed && !seenLiveUpdate && next != null) setState(next);
+				})
+				.catch(() => {});
 			return () => {
 				disposed = true;
 				stop();

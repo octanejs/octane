@@ -23,9 +23,12 @@ export function useNativeTheme(...rest: [symbol?]): boolean {
 				seenLiveUpdate = true;
 				setDark(value);
 			});
-			host.nativeTheme.shouldUseDarkColors().then((value) => {
-				if (!disposed && !seenLiveUpdate) setDark(value);
-			});
+			host.nativeTheme
+				.shouldUseDarkColors()
+				.then((value) => {
+					if (!disposed && !seenLiveUpdate) setDark(value);
+				})
+				.catch(() => {});
 			return () => {
 				disposed = true;
 				stop();

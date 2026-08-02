@@ -12,12 +12,15 @@ afterEach(async () => {
 function deferred<T>(): {
 	promise: Promise<T>;
 	resolve: (value: T) => void;
+	reject: (reason?: unknown) => void;
 } {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((done) => {
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((done, fail) => {
 		resolve = done;
+		reject = fail;
 	});
-	return { promise, resolve };
+	return { promise, resolve, reject };
 }
 
 function emptyDesktopApi(
@@ -70,6 +73,36 @@ describe('useNativeTheme', () => {
 		});
 		await flush();
 		expect(result.find('#theme').textContent).toBe('dark');
+		result.unmount();
+	});
+
+	it('swallows a rejected initial theme snapshot without unhandled rejection', async () => {
+		const snapshot = deferred<boolean>();
+		const rejections: unknown[] = [];
+		const onRejection = (event: PromiseRejectionEvent) => {
+			rejections.push(event.reason);
+			event.preventDefault();
+		};
+		window.addEventListener('unhandledrejection', onRejection);
+
+		installElectronBridge(
+			emptyDesktopApi({
+				nativeTheme: {
+					shouldUseDarkColors: () => snapshot.promise,
+					onUpdated: () => () => {},
+				},
+			}),
+		);
+
+		const result = mount(ThemeReader);
+		await flush();
+		await act(() => {
+			snapshot.reject(new Error('theme ipc failed'));
+		});
+		await flush();
+		expect(result.find('#theme').textContent).toBe('light');
+		expect(rejections).toEqual([]);
+		window.removeEventListener('unhandledrejection', onRejection);
 		result.unmount();
 	});
 });
