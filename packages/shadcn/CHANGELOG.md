@@ -1,5 +1,86 @@
 # @octanejs/shadcn
 
+## 0.0.8
+
+### Patch Changes
+
+- 749223b: Add `accordion` to the Base UI base, at `@octanejs/shadcn/base-ui/Accordion`.
+
+  Transcribed from upstream's Base UI source with class strings and `data-slot` names verbatim, and
+  running on the newly ported `@octanejs/base-ui/accordion` primitive — the first primitive-backed
+  family in this base. `@octanejs/base-ui` is now a dependency of the package.
+
+- 749223b: Add `alert-dialog` to the Base UI base, at `@octanejs/shadcn/base-ui/AlertDialog`.
+
+  Transcribed from upstream's Base UI source and running on `@octanejs/base-ui`'s AlertDialog —
+  the first portalled family in this base. Upstream maps Overlay to Backdrop, Content to Popup, and
+  Cancel to Close. This port also maps Action to Close, with both actions composing a Button through
+  Base UI's render-as-element contract so confirming dismisses the dialog.
+
+  The overlay and popup use stable keys so Octane can reconcile the portal siblings by identity.
+
+  The title drops upstream's `cn-font-heading`, matching the React Aria base: this package ships
+  the default-Tailwind utilities-inlined flavor rather than the pinned `cn-*` semantic hooks, so
+  that class resolves to nothing here.
+
+- 749223b: Start the Base UI base, reachable at `@octanejs/shadcn/base-ui/<Family>`.
+
+  Seven primitive-free families land: `alert`, `aspect-ratio`, `card`, `empty`, `native-select`,
+  `skeleton` and `spinner`. Only `alert` is transcribed from upstream's Base UI source and
+  verified byte-identical to it — the other six are derived from the React Aria base and each
+  file's header says so, because the bases do genuinely diverge.
+
+  Nothing primitive-backed is included. Base UI's primitive API is structurally different from
+  React Aria's, so those families cannot be derived and need transcribed upstream sources.
+
+- 749223b: Add `checkbox`, `switch` and `radio-group` to the Base UI base.
+
+  Their conditional utilities are adapted rather than copied. Base UI publishes bare
+  `data-checked`/`data-unchecked` where the Radix base publishes `data-state="checked"`, and every
+  Root renders a `<span role="…">` that is never `:disabled`, so `disabled:` variants become
+  `data-disabled:`. Copying either wrong form yields a control whose appearance never changes.
+
+  Both dialects are pinned by tests that assert the rendered DOM carries the attributes the class
+  strings target, so a wrong-base copy fails rather than rendering silently dead styling.
+
+- 749223b: Add the foundation families to the Base UI base: `button`, `input`, `label`, `separator`,
+  `textarea` and `kbd`.
+
+  `button`, `input`, `label` and `separator` run on real `@octanejs/base-ui` primitives, so their
+  behavior is the primitive's rather than derived. `textarea` and `kbd` are plain hosts because
+  Base UI ships no textarea or Keyboard primitive.
+
+  `separator` takes the React Aria base's class string rather than the Radix one on purpose: Base
+  UI publishes orientation as `aria-orientation`, so Radix's `data-horizontal:` utilities would
+  never match and the separator would render with no thickness.
+
+  No `LinkButton` — Base UI has no `Link` primitive, and upstream composes links through `render`
+  instead. `pagination`, which consumes it in the React Aria base, stays unported until the
+  upstream source shows how.
+
+- 749223b: Add `dialog`, `popover` and `tooltip` to the Base UI base.
+
+  Positioning is adapted rather than copied. Base UI inserts a Positioner layer
+  (`Portal > Positioner > Popup`) and publishes its transform origin as `--transform-origin`, where
+  Radix publishes `--radix-<part>-content-transform-origin`. A copied Radix class would reference a
+  variable nothing sets, so the popup would scale from the wrong corner on open — visible only in
+  motion. Tooltip additionally drops Radix's `data-[state=delayed-open]` utilities, which have no
+  Base UI counterpart.
+
+  `PopoverAnchor` is deliberately absent: Base UI positions through the Positioner's `anchor` prop
+  rather than rendering an Anchor element, so there is no part to port. Recorded as a known
+  divergence in the cross-base contract test.
+
+- Updated dependencies [2ee31bd]
+- Updated dependencies [d6d8a60]
+- Updated dependencies [c1ad31b]
+  - @octanejs/base-ui@0.1.21
+  - octane@0.1.23
+  - @octanejs/aria@0.0.17
+  - @octanejs/lucide@0.1.18
+  - @octanejs/radix@0.1.22
+  - @octanejs/sonner@0.1.18
+
 ## 0.0.7
 
 ### Patch Changes

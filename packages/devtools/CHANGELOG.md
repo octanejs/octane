@@ -1,5 +1,12 @@
 # @octanejs/devtools
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [c1ad31b]
+  - octane@0.1.23
+
 ## 0.0.10
 
 ### Patch Changes
