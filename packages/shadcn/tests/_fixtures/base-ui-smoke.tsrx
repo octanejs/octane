@@ -30,6 +30,11 @@ import {
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
 import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@octanejs/shadcn/base-ui/Collapsible';
+import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
@@ -259,4 +264,11 @@ export function TooltipCase() @{
 			<TooltipContent>Tooltip body</TooltipContent>
 		</Tooltip>
 	</TooltipProvider>
+}
+
+export function CollapsibleCase() @{
+	<Collapsible defaultOpen>
+		<CollapsibleTrigger>Toggle</CollapsibleTrigger>
+		<CollapsibleContent>Collapsible body</CollapsibleContent>
+	</Collapsible>
 }

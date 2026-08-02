@@ -208,6 +208,8 @@ import { PopoverTrigger as X98 } from '@octanejs/shadcn/base-ui/Popover';
 type _98 = Assert<NotAny<typeof X98>>;
 import { TooltipProvider as X99 } from '@octanejs/shadcn/base-ui/Tooltip';
 type _99 = Assert<NotAny<typeof X99>>;
+import { Collapsible as X100 } from '@octanejs/shadcn/base-ui/Collapsible';
+type _100 = Assert<NotAny<typeof X100>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';

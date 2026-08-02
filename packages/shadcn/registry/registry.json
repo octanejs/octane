@@ -187,6 +187,21 @@
       ]
     },
     {
+      "name": "collapsible",
+      "type": "registry:ui",
+      "title": "Collapsible",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "files": [
+        {
+          "path": "ui/collapsible.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/collapsible.tsrx"
+        }
+      ]
+    },
+    {
       "name": "dialog",
       "type": "registry:ui",
       "title": "Dialog",

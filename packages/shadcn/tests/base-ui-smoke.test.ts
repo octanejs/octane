@@ -60,6 +60,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Button', F.ButtonCase, 'Press'],
 	['Card', F.CardCase, 'Footer'],
 	['Checkbox', F.CheckboxCase, null],
+	['Collapsible', F.CollapsibleCase, 'Collapsible body'],
 	['Dialog', F.DialogCase, 'Dialog title', true],
 	['Popover', F.PopoverCase, 'Popover title', true],
 	['Tooltip', F.TooltipCase, 'Tooltip body', true],
@@ -367,5 +368,39 @@ describe('@octanejs/shadcn — Base UI tooltip keys the children it composes', (
 		}
 
 		expect(seen.filter((w) => /unique "key" prop/.test(w))).toEqual([]);
+	});
+});
+
+// Collapsible renames one part on the way through: shadcn's `CollapsibleContent` is Base UI's
+// `Collapsible.Panel`. Wiring it to the wrong part is the realistic mistake, and the child-text
+// oracle above cannot see it — an open Trigger renders its children too, so the text appears
+// either way. These assert the two properties that actually separate the parts.
+describe('@octanejs/shadcn — Base UI collapsible maps Content to Panel, not Trigger', () => {
+	it('links the trigger to the content via aria-controls', () => {
+		const m = mount(F.CollapsibleCase as never);
+		try {
+			const trigger = m.container.querySelector('[data-slot="collapsible-trigger"]')!;
+			const content = m.container.querySelector('[data-slot="collapsible-content"]')!;
+
+			// Only the panel is the trigger's controlled region; a second trigger would have no id
+			// for aria-controls to point at.
+			expect(trigger.getAttribute('aria-controls')).toBe(content.getAttribute('id'));
+			expect(trigger.getAttribute('aria-controls')).toBeTruthy();
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders the trigger as a button and the content as a non-button region', () => {
+		const m = mount(F.CollapsibleCase as never);
+		try {
+			const trigger = m.container.querySelector('[data-slot="collapsible-trigger"]')!;
+			const content = m.container.querySelector('[data-slot="collapsible-content"]')!;
+
+			expect(trigger.tagName).toBe('BUTTON');
+			expect(content.tagName).not.toBe('BUTTON');
+		} finally {
+			m.unmount();
+		}
 	});
 });

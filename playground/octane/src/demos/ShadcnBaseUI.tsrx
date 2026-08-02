@@ -26,9 +26,10 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: the overlay and form-control families (Checkbox, Switch, Dialog,
-// Popover, Tooltip, …). Base UI's primitive API is structurally different from
-// React Aria's, so those cannot be derived and need transcribed sources.
+// Still absent: 22 of 44 families. Four are blocked on unported @octanejs/base-ui
+// primitives (navigation-menu, scroll-area, select, tabs) and sonner on
+// next-themes; the rest are simply not ported yet. The README carries the
+// generated per-base coverage table.
 import {
 	Accordion,
 	AccordionContent,
@@ -50,6 +51,11 @@ import {
 } from '@octanejs/shadcn/base-ui/AlertDialog';
 import { Button } from '@octanejs/shadcn/base-ui/Button';
 import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@octanejs/shadcn/base-ui/Collapsible';
 import {
 	Dialog,
 	DialogClose,
@@ -123,13 +129,13 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 21 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 22 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Accordion, Button, Input, Label and Separator run on real Base UI primitives. Alert is
-				verified byte-identical to upstream's Base UI source. Every other class string is derived
-				from the React Aria base, so compare the two tabs — they should look identical, and any
-				difference is a porting bug. Checkbox, Switch, Dialog and the other overlay and form-control
-				families are not ported yet.
+				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
+				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
+				Collapsible. Alert is verified byte-identical to upstream's Base UI source. The remaining
+				class strings are derived from the React Aria base, so compare the two tabs: they should
+				look identical, and any difference is a porting bug.
 			</p>
 		</div>
 
@@ -351,6 +357,21 @@ export function ShadcnBaseUIDemo() @{
 					</Tooltip>
 				</TooltipProvider>
 			</div>
+		</Section>
+
+		<Section
+			title="Collapsible"
+			note="Unstyled in every base — layout is the consumer's. Click to toggle; the trigger's aria-controls points at the panel."
+		>
+			<Collapsible class="w-full max-w-sm space-y-2">
+				<CollapsibleTrigger render={<Button variant="outline" />}>
+					Toggle details
+				</CollapsibleTrigger>
+				<CollapsibleContent class="rounded-lg border p-3 text-sm text-muted-foreground">
+					Base UI calls this part Panel; shadcn calls it CollapsibleContent. Same element, same
+					data-slot.
+				</CollapsibleContent>
+			</Collapsible>
 		</Section>
 
 		<Section title="Alert" note="Verified byte-identical to upstream.">
