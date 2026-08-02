@@ -162,7 +162,7 @@ describe('CI workflow aggregation', () => {
 		assert.match(planner, /name: plan React parity execution/);
 		assert.match(planner, /node-version: 24\.18\.0/);
 		assert.match(planner, /pnpm react-parity:test/);
-		assert.match(planner, /pnpm react-parity:plan/);
+		assert.match(planner, /pnpm react-parity:validate/);
 		assert.match(planner, /receipts\.mjs verify --json/);
 		assert.match(planner, /planReactParityCi/);
 		assert.match(planner, /buildExecutionMatrix\(currentPlan, \[\]\)/);
@@ -175,7 +175,11 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(`${planner}\n${execution}`, /node-version: \[22, 24\]/);
 		assert.doesNotMatch(workflow, /hook-form/);
 
-		assert.doesNotMatch(jobSource('lint_checks'), /react-parity/);
+		assert.match(jobSource('lint_checks'), /pnpm react-parity:validate/);
+		assert.doesNotMatch(
+			jobSource('lint_checks'),
+			/react-parity:(?:check|test|harness)|receipts\.mjs/,
+		);
 		assert.match(jobSource('release_change'), /"React parity provenance"/);
 		assert.match(
 			jobSource('test_shard'),

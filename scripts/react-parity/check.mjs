@@ -33,7 +33,6 @@ const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTyp
 	.sort();
 const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
 const validateOnly = process.argv.includes('--validate-only');
-const planOnly = process.argv.includes('--plan-only');
 const errors = [];
 const executableManifests = [];
 try {
@@ -128,11 +127,11 @@ for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
 		await verifyManifestFiles(manifest, REPO);
-		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
-		for (const lane of manifest.lanes) {
-			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
-		}
-		if (!planOnly) {
+		if (!validateOnly) {
+			const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
+			for (const lane of manifest.lanes) {
+				await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
+			}
 			execFileSync(process.execPath, [HARNESS_PATH, 'validate', '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',
@@ -149,7 +148,7 @@ if (errors.length) {
 	process.exit(1);
 }
 
-if (!validateOnly && !planOnly) {
+if (!validateOnly) {
 	try {
 		await verifyAllReceipts(REPO);
 		for (const { relativeFile, manifest } of executableManifests) {

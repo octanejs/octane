@@ -488,7 +488,7 @@ jobs:
         run: pnpm react-parity:test
 
       - name: Validate React parity evidence
-        run: pnpm react-parity:plan
+        run: pnpm react-parity:validate
 
       - name: Recompute committed receipt hashes
         run: |
@@ -804,6 +804,12 @@ jobs:
       # remain at zero under the committed-test policy above.
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
+
+      # Keep metadata, generated coverage, and public React-parity claims valid
+      # even when a lightweight documentation change skips parity execution.
+      # This static mode does not process the test suite or calculate receipts.
+      - name: Validate React parity evidence
+        run: pnpm react-parity:validate
 
       # Redact's issues, pull requests, and tests are mined at a pinned commit
       # into an authored contract ledger. This network-free gate validates its
