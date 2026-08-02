@@ -261,6 +261,10 @@ export async function registerOctaneElectronMainFromElectron(options?: {
 	getWindow?: RegisterOctaneElectronMainOptions['getWindow'];
 }): Promise<() => void> {
 	const electron = await import('electron');
+	const getWindow =
+		options?.getWindow ??
+		((event: { sender: unknown }) =>
+			electron.BrowserWindow.fromWebContents(event.sender as Electron.WebContents) ?? undefined);
 	return registerOctaneElectronMain({
 		ipcMain: electron.ipcMain,
 		app: electron.app,
@@ -269,7 +273,7 @@ export async function registerOctaneElectronMainFromElectron(options?: {
 		clipboard: electron.clipboard,
 		nativeTheme: electron.nativeTheme,
 		screen: electron.screen,
-		getWindow: options?.getWindow,
+		getWindow,
 		getAllWebContents: () => electron.webContents.getAllWebContents(),
 	});
 }

@@ -1,6 +1,77 @@
 import { describe, expect, it, vi } from 'vitest';
 import { OCTANE_ELECTRON_CHANNELS } from '../../src/common/channels';
-import { registerOctaneElectronMain, trackOctaneElectronWindow } from '../../src/main/index';
+import {
+	registerOctaneElectronMain,
+	registerOctaneElectronMainFromElectron,
+	trackOctaneElectronWindow,
+} from '../../src/main/index';
+
+const electronHandlers = new Map<string, (...args: any[]) => any>();
+const fakeWindow = {
+	minimize: vi.fn(),
+	maximize: vi.fn(),
+	unmaximize: vi.fn(),
+	close: vi.fn(),
+	isMaximized: () => true,
+	isMinimized: () => false,
+	isFullScreen: () => false,
+	getTitle: () => 'T',
+	setTitle: vi.fn(),
+	webContents: { send: vi.fn() },
+	on: vi.fn(),
+	removeListener: vi.fn(),
+};
+
+vi.mock('electron', () => ({
+	ipcMain: {
+		handle: (channel: string, listener: (...args: any[]) => any) => {
+			electronHandlers.set(channel, listener);
+		},
+		removeHandler: (channel: string) => {
+			electronHandlers.delete(channel);
+		},
+	},
+	app: {
+		getVersion: () => '1.0.0',
+		getName: () => 'App',
+		getPath: (name: string) => `/paths/${name}`,
+		quit: vi.fn(),
+	},
+	dialog: {
+		showOpenDialog: vi.fn(async (window: unknown) => ({ window, canceled: true, filePaths: [] })),
+		showSaveDialog: vi.fn(async () => ({ canceled: true })),
+		showMessageBox: vi.fn(async () => ({ response: 0 })),
+	},
+	shell: {
+		openExternal: async () => {},
+		showItemInFolder: () => {},
+		openPath: async () => '',
+	},
+	clipboard: {
+		readText: () => 'clip',
+		writeText: () => {},
+	},
+	nativeTheme: {
+		shouldUseDarkColors: true,
+		on: () => {},
+	},
+	screen: {
+		getPrimaryDisplay: () => ({
+			id: 1,
+			label: 'main',
+			bounds: { x: 0, y: 0, width: 100, height: 100 },
+			workArea: { x: 0, y: 0, width: 100, height: 80 },
+			scaleFactor: 1,
+			rotation: 0,
+		}),
+		getAllDisplays: () => [],
+		on: () => {},
+	},
+	webContents: { getAllWebContents: () => [] },
+	BrowserWindow: {
+		fromWebContents: (sender: unknown) => (sender === 'the-sender' ? fakeWindow : null),
+	},
+}));
 
 describe('registerOctaneElectronMain', () => {
 	it('registers handlers and serves app metadata', async () => {
@@ -109,5 +180,41 @@ describe('trackOctaneElectronWindow', () => {
 			},
 		]);
 		stop();
+	});
+});
+
+describe('registerOctaneElectronMainFromElectron', () => {
+	it('resolves the invoking BrowserWindow via BrowserWindow.fromWebContents by default', async () => {
+		const dispose = await registerOctaneElectronMainFromElectron();
+		const event = { sender: 'the-sender' };
+
+		await electronHandlers.get(OCTANE_ELECTRON_CHANNELS.windowMinimize)!(event);
+		expect(fakeWindow.minimize).toHaveBeenCalledTimes(1);
+
+		const state = await electronHandlers.get(OCTANE_ELECTRON_CHANNELS.windowGetState)!(event);
+		expect(state).toEqual({
+			isMaximized: true,
+			isMinimized: false,
+			isFullScreen: false,
+			title: 'T',
+		});
+
+		const { window } = await electronHandlers.get(OCTANE_ELECTRON_CHANNELS.dialogShowOpen)!(
+			event,
+			{},
+		);
+		expect(window).toBe(fakeWindow);
+
+		dispose();
+	});
+
+	it('yields no window for a sender with no owning BrowserWindow', async () => {
+		const dispose = await registerOctaneElectronMainFromElectron();
+		const event = { sender: 'unknown-sender' };
+
+		const state = await electronHandlers.get(OCTANE_ELECTRON_CHANNELS.windowGetState)!(event);
+		expect(state).toBeNull();
+
+		dispose();
 	});
 });
