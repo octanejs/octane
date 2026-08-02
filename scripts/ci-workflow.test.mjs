@@ -4,6 +4,14 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
 
+import {
+	parityManifestsForTestSelection,
+	selectedPackageRoots,
+	selectedPortedLibraries,
+	selectedTestProjects,
+	vitestArgumentsForTestSelection,
+} from './run-tests-lib.mjs';
+
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
 const shardedVitestConfigSource = readFileSync(
@@ -12,6 +20,11 @@ const shardedVitestConfigSource = readFileSync(
 );
 const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
 const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
+const localTestRunner = readFileSync(path.join(REPO, 'scripts/run-tests.mjs'), 'utf8');
+const rootPackage = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+const hookFormPackage = JSON.parse(
+	readFileSync(path.join(REPO, 'packages/hook-form/package.json'), 'utf8'),
+);
 const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.config.js')));
 const { configureShardedProjects, default: shardedVitestConfig } = await import(
 	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
@@ -115,6 +128,8 @@ describe('CI workflow aggregation', () => {
 
 		for (const job of [
 			'test_shard',
+			'react_parity_plan',
+			'react_parity_execute',
 			'react_parity_checks',
 			'website_e2e',
 			'heavy_integration',
@@ -140,17 +155,28 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);
 	});
 
-	test('runs package parity once on Node 24 outside lint and the general shards', () => {
+	test('runs only unproven pristine lanes while retaining every Octane lane on pinned Node 24', () => {
+		const planner = jobSource('react_parity_plan');
+		const execution = jobSource('react_parity_execute');
 		const parity = jobSource('react_parity_checks');
-		assert.match(parity, /name: React parity checks/);
-		assert.match(parity, /node-version: 24/);
-		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
-		assert.match(parity, /pnpm react-parity:test/);
-		assert.match(parity, /pnpm react-parity:check/);
+		assert.match(planner, /name: plan React parity execution/);
+		assert.match(planner, /node-version: 24\.18\.0/);
+		assert.match(planner, /pnpm react-parity:test/);
+		assert.match(planner, /pnpm react-parity:plan/);
+		assert.match(planner, /receipts\.mjs verify --json/);
+		assert.match(planner, /planReactParityCi/);
+		assert.match(planner, /buildExecutionMatrix\(currentPlan, \[\]\)/);
+		assert.match(execution, /node-version: 24\.18\.0/);
+		assert.match(execution, /receipts\.mjs run/);
+		assert.match(execution, /matrix\.manifest/);
+		assert.match(execution, /toJSON\(matrix\.lanes\)/);
+		assert.match(parity, /name: React parity provenance/);
+		assert.match(parity, /needs: \[release_change, react_parity_plan, react_parity_execute\]/);
+		assert.doesNotMatch(`${planner}\n${execution}`, /node-version: \[22, 24\]/);
 		assert.doesNotMatch(workflow, /hook-form/);
 
 		assert.doesNotMatch(jobSource('lint_checks'), /react-parity/);
-		assert.match(jobSource('release_change'), /"React parity checks"/);
+		assert.match(jobSource('release_change'), /"React parity provenance"/);
 		assert.match(
 			jobSource('test_shard'),
 			/pnpm test\s+--config vitest\.ci-sharded\.config\.js\s+--shard=/,
@@ -167,9 +193,10 @@ describe('CI workflow aggregation', () => {
 		const shardedProjects = new Map(
 			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
 		);
-		for (const project of ['hook-form-pristine', 'hook-form', 'hook-form-server']) {
+		for (const project of ['hook-form', 'hook-form-server']) {
 			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
 		}
+		assert.equal(baseProjects.has('hook-form-pristine'), false);
 		assert.equal(shardedProjects.has('hook-form-pristine'), false);
 		assert.equal(shardedProjects.has('hook-form-server'), false);
 		assert.deepEqual(shardedProjects.get('hook-form').test.include, [
@@ -190,15 +217,85 @@ describe('CI workflow aggregation', () => {
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
 
-		// The manifest runner owns all required lanes in one process so Vitest's
-		// collected-project cache survives across the full, focused, and
-		// differential evidence instead of being rebuilt once per lane.
-		assert.match(
-			reactParityCheck,
-			/manifest\.provenance\.verification === 'verified' \? 'run-required' : 'validate'/,
+		// The parity audit only verifies committed receipts. Receipt generation is
+		// owned by the generic local test runner.
+		assert.match(reactParityCheck, /verifyAllReceipts/);
+		assert.match(reactParityCheck, /requiredReceiptLanes/);
+		assert.match(reactParityCheck, /laneIds\.flatMap\(\(lane\) => \['--lane', lane\]\)/);
+
+		assert.match(rootPackage.scripts.test, /node scripts\/run-tests\.mjs/);
+		assert.equal(rootPackage.scripts['test:projects'], undefined);
+		assert.match(localTestRunner, /runStaleReceiptLanes/);
+		assert.match(localTestRunner, /parityManifestsForTestSelection/);
+		assert.match(hookFormPackage.scripts.test, /pnpm -w test --ported-libs hook-form/);
+		assert.doesNotMatch(hookFormPackage.scripts.test, /react-parity:receipts|react-parity\.json/);
+	});
+
+	test('scopes receipt generation from test projects and package paths', async () => {
+		assert.deepEqual(
+			[...selectedTestProjects(['--project', 'alpha', '--project=!ignored'])],
+			['alpha'],
 		);
-		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
-		assert.doesNotMatch(reactParityCheck, /'--lane'/);
+		assert.deepEqual(
+			[...selectedPackageRoots(['/repo/packages/beta/tests/example.test.ts'])],
+			['packages/beta'],
+		);
+		assert.deepEqual(
+			[...selectedPortedLibraries(['--ported-libs', 'alpha,beta', '--ported-libs=alpha'])],
+			['alpha', 'beta'],
+		);
+		assert.deepEqual(
+			vitestArgumentsForTestSelection(['--ported-libs', 'beta,alpha', '--reporter=verbose']),
+			['--reporter=verbose', 'packages/beta', 'packages/alpha'],
+		);
+		assert.throws(
+			() => selectedPortedLibraries(['--ported-libs', '../alpha']),
+			/invalid --ported-libs package directory/,
+		);
+
+		const manifests = [
+			'packages/alpha/audit/react-parity.json',
+			'packages/beta/audit/react-parity.json',
+		];
+		const load = async (path) => ({
+			lanes: [{ project: path.includes('/alpha/') ? 'alpha' : 'beta' }],
+		});
+		assert.deepEqual(
+			await parityManifestsForTestSelection({
+				root: REPO,
+				args: ['--project', 'alpha'],
+				discover: async () => manifests,
+				load,
+			}),
+			[manifests[0]],
+		);
+		assert.deepEqual(
+			await parityManifestsForTestSelection({
+				root: REPO,
+				args: ['packages/beta/tests/example.test.ts'],
+				discover: async () => manifests,
+				load,
+			}),
+			[manifests[1]],
+		);
+		assert.deepEqual(
+			await parityManifestsForTestSelection({
+				root: REPO,
+				args: ['--ported-libs', 'beta'],
+				discover: async () => manifests,
+				load,
+			}),
+			[manifests[1]],
+		);
+		await assert.rejects(
+			parityManifestsForTestSelection({
+				root: REPO,
+				args: ['--ported-libs', 'missing'],
+				discover: async () => manifests,
+				load,
+			}),
+			/ported libraries have no React parity manifest: missing/,
+		);
 	});
 
 	test('derives sharded projects generically from execution-group ownership', () => {

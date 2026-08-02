@@ -12,6 +12,7 @@ import {
 	compareTestIdentities,
 	describeTestIdentityMismatch,
 	nodeMajorSatisfies,
+	nodeVersionSatisfies,
 	requiredExecutableLanes,
 	summarizeRuntimeInventories,
 	toPortablePath,
@@ -635,6 +636,9 @@ test('evaluates exact and minimum Node major requirements', () => {
 	assert.equal(nodeMajorSatisfies('22', 22), true);
 	assert.equal(nodeMajorSatisfies('22', 24), false);
 	assert.throws(() => nodeMajorSatisfies('^22', 22), /Unsupported Node requirement/);
+	assert.equal(nodeVersionSatisfies('24.18.0', '24.18.0'), true);
+	assert.equal(nodeVersionSatisfies('24.18.0', '24.18.1'), false);
+	assert.equal(nodeVersionSatisfies('>=24.18.0', '25.0.0'), true);
 });
 
 test('rejects stale divergences and accepts one divergence matching multiple known cases', () => {

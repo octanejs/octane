@@ -62,6 +62,10 @@ project declares upstream and differential files as `react-parity` execution
 group ownership; the generic sharded config derives the remaining local
 conformance suite according to the
 [React parity test-execution contract](../../docs/react-parity-testing.md).
+The committed [`audit/react-parity.receipts.json`](./audit/react-parity.receipts.json)
+records the successfully tested pristine React runtime and type input hashes.
+Normal tests skip those lanes while the automatically derived package inputs are
+unchanged; CI executes and certifies every new hash before reusing it.
 
 ## License
 

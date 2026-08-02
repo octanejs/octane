@@ -316,7 +316,7 @@ jobs:
 
               const requiredFullJobs = [
                 "website integration suite",
-                "React parity checks",
+                "React parity provenance",
                 "typecheck",
                 "validate publishable packages",
                 ...["package-builds", "eval-corpus", "browser"].map(
@@ -455,14 +455,18 @@ jobs:
           --exclude "packages/three/tests/browser/**/*.test.ts"
           --exclude "$ASTRO_E2E_SPEC"
 
-  react_parity_checks:
-    name: React parity checks
+  react_parity_plan:
+    name: plan React parity execution
     needs: release_change
-    # The complete package suite is intentionally Node 24-only. Like the
-    # general shards, an authenticated release or lightweight change inherits
-    # the last successful full run through CI provenance.
     if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      has_work: ${{ steps.provenance.outputs.has_work }}
+      matrix: ${{ steps.provenance.outputs.matrix }}
 
     steps:
       - name: Checkout code
@@ -474,19 +478,111 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 24
+          node-version: 24.18.0
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
-      # The manifest validator collects each Vitest project once, then runs all
-      # required runtime and type lanes in the same process so that collection
-      # is not repeated for the full, focused, and differential evidence.
-      - name: Check React parity inventories and execute required lanes
+      - name: Test the React parity harness
+        run: pnpm react-parity:test
+
+      - name: Validate React parity evidence
+        run: pnpm react-parity:plan
+
+      - name: Recompute committed receipt hashes
         run: |
-          pnpm react-parity:test
-          pnpm react-parity:check
+          node scripts/react-parity/receipts.mjs verify --json > "$RUNNER_TEMP/react-parity-current.json"
+
+      # A committed receipt is a local pass claim. CI skips it only when an
+      # earlier trusted run certified the identical package/lane/input hash.
+      # Missing API evidence fails open by putting every pristine lane back in
+      # the execution matrix. Non-receipted Octane lanes always remain there in
+      # phase one.
+      - name: Resolve trusted React parity provenance
+        id: provenance
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          CURRENT_PLAN: ${{ runner.temp }}/react-parity-current.json
+        with:
+          script: |
+            const { readFileSync } = require("node:fs");
+            const { pathToFileURL } = require("node:url");
+            const currentPlan = JSON.parse(readFileSync(process.env.CURRENT_PLAN, "utf8"));
+            const moduleUrl = pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/scripts/react-parity/ci-provenance-lib.mjs`,
+            ).href;
+            const { buildExecutionMatrix, planReactParityCi } = await import(moduleUrl);
+
+            let plan;
+            try {
+              plan = await planReactParityCi({ github, context, currentPlan });
+            } catch (error) {
+              core.warning(
+                `Could not verify prior React parity provenance: ${error.message}. Running every required lane.`,
+              );
+              plan = buildExecutionMatrix(currentPlan, []);
+            }
+            core.setOutput("has_work", String(plan.hasWork));
+            core.setOutput("matrix", JSON.stringify(plan.matrix));
+            core.notice(
+              `${plan.inherited} pristine lane receipt(s) inherited trusted provenance.`,
+            );
+
+  react_parity_execute:
+    name: React parity execution (${{ matrix.package }})
+    needs: [release_change, react_parity_plan]
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' && needs.react_parity_plan.result == 'success' && needs.react_parity_plan.outputs.has_work == 'true' }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.react_parity_plan.outputs.matrix) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.18.0
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      - name: Execute required package lanes
+        env:
+          MANIFEST: ${{ matrix.manifest }}
+          LANES_JSON: ${{ toJSON(matrix.lanes) }}
+        run: >-
+          node scripts/react-parity/receipts.mjs run
+          --manifest "$MANIFEST"
+          --lanes-json "$LANES_JSON"
+
+  react_parity_checks:
+    name: React parity provenance
+    needs: [release_change, react_parity_plan, react_parity_execute]
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify current receipt provenance
+        env:
+          PLAN_RESULT: ${{ needs.react_parity_plan.result }}
+          EXECUTION_RESULT: ${{ needs.react_parity_execute.result }}
+          HAS_WORK: ${{ needs.react_parity_plan.outputs.has_work }}
+        run: |
+          test "$PLAN_RESULT" = success
+          if [ "$HAS_WORK" = true ]; then
+            test "$EXECUTION_RESULT" = success
+          else
+            test "$EXECUTION_RESULT" = skipped
+          fi
 
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and

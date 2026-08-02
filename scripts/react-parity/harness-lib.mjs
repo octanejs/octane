@@ -25,14 +25,8 @@ const PROVENANCE_FIELDS = [
 	'license',
 	'integrity',
 ];
-const ENVIRONMENT_FIELDS = [
-	'node',
-	'platform',
-	'arch',
-	'packageManager',
-	'lockfile',
-	'lockfileSha256',
-];
+const REQUIRED_ENVIRONMENT_FIELDS = ['node', 'platform', 'arch', 'packageManager', 'lockfile'];
+const ENVIRONMENT_FIELDS = [...REQUIRED_ENVIRONMENT_FIELDS, 'lockfileSha256'];
 const ROOT_KEYS = new Set([
 	'$schema',
 	'schemaVersion',
@@ -121,11 +115,24 @@ function sourceStringLiterals(value) {
 	];
 }
 
-export function nodeMajorSatisfies(requirement, actualMajor) {
-	const match = /^(>=)?(\d+)$/.exec(requirement);
+export function nodeVersionSatisfies(requirement, actualVersion) {
+	const match = /^(>=)?(\d+)(?:\.(\d+)\.(\d+))?$/.exec(requirement);
 	if (!match) throw new Error(`Unsupported Node requirement: ${requirement}`);
-	const requiredMajor = Number(match[2]);
-	return match[1] === '>=' ? actualMajor >= requiredMajor : actualMajor === requiredMajor;
+	const actual = actualVersion.split('.').map(Number);
+	const required = [Number(match[2]), Number(match[3] ?? 0), Number(match[4] ?? 0)];
+	if (match[1]) {
+		for (let index = 0; index < required.length; index++) {
+			if (actual[index] !== required[index]) return actual[index] > required[index];
+		}
+		return true;
+	}
+	return match[3]
+		? actual.every((part, index) => part === required[index])
+		: actual[0] === required[0];
+}
+
+export function nodeMajorSatisfies(requirement, actualMajor) {
+	return nodeVersionSatisfies(requirement, `${actualMajor}.0.0`);
 }
 
 export function toPortablePath(path) {
@@ -280,12 +287,15 @@ export function validateManifest(manifest) {
 	if (Object.keys(manifest.environments).length === 0) fail('environments must be non-empty');
 	for (const [id, environment] of Object.entries(manifest.environments)) {
 		requiredString(id, 'environment id');
-		for (const field of ENVIRONMENT_FIELDS) {
+		for (const field of REQUIRED_ENVIRONMENT_FIELDS) {
 			requiredString(environment?.[field], `environments.${id}.${field}`);
 		}
 		for (const key of Object.keys(environment))
 			if (!ENVIRONMENT_KEYS.has(key)) fail(`environment ${id} has unknown key "${key}"`);
-		if (!/^[a-f0-9]{64}$/.test(environment.lockfileSha256))
+		if (
+			environment.lockfileSha256 !== undefined &&
+			!/^[a-f0-9]{64}$/.test(environment.lockfileSha256)
+		)
 			fail(`environments.${id}.lockfileSha256 must be sha256`);
 	}
 
@@ -675,18 +685,19 @@ async function discoverAdaptedFiles(root, scan) {
 
 export async function verifyLaneEnvironment(manifest, lane, root, pnpmVersion) {
 	const environment = manifest.environments[lane.environment];
-	const actualMajor = Number(process.versions.node.split('.')[0]);
-	if (!nodeMajorSatisfies(environment.node, actualMajor))
-		throw new Error(`Node ${actualMajor} does not satisfy ${environment.node}`);
+	if (!nodeVersionSatisfies(environment.node, process.versions.node))
+		throw new Error(`Node ${process.versions.node} does not satisfy ${environment.node}`);
 	if (environment.platform !== 'any' && environment.platform !== process.platform)
 		throw new Error(`platform must be ${environment.platform}`);
 	if (environment.arch !== 'any' && environment.arch !== process.arch)
 		throw new Error(`architecture must be ${environment.arch}`);
 	if (environment.packageManager !== `pnpm@${pnpmVersion.trim()}`)
 		throw new Error(`package manager must be ${environment.packageManager}`);
-	const lockfile = await readFile(resolve(root, environment.lockfile));
-	const digest = createHash('sha256').update(lockfile).digest('hex');
-	if (digest !== environment.lockfileSha256) throw new Error('lockfile integrity mismatch');
+	if (environment.lockfileSha256 !== undefined) {
+		const lockfile = await readFile(resolve(root, environment.lockfile));
+		const digest = createHash('sha256').update(lockfile).digest('hex');
+		if (digest !== environment.lockfileSha256) throw new Error('lockfile integrity mismatch');
+	}
 }
 
 export function verifyLaneCollectedTests(lane, collectedTests, root) {

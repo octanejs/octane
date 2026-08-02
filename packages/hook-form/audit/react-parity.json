@@ -35,12 +35,11 @@
   },
   "environments": {
     "workspace-node": {
-      "node": ">=22",
+      "node": "24.18.0",
       "platform": "any",
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
-      "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "158c20b1be7230db9f6a3af36ea860469e5c4aae8d2ccc03c7a80c74bba519a8"
+      "lockfile": "pnpm-lock.yaml"
     }
   },
   "lanes": [
@@ -59,11 +58,6 @@
         "inventory": "packages/hook-form/audit/pristine-runtime.json"
       },
       "files": [
-        {
-          "path": "packages/hook-form/tests/upstream-original.test.ts",
-          "role": "support",
-          "sha256": "e1ad5f6651c539087c69fdfe800253f084abdf7f8d468dde1dd2a2584f9354e0"
-        },
         {
           "path": "packages/hook-form/audit/pristine-runtime.json",
           "role": "support",
@@ -303,7 +297,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "a02a01ccacc748720cc44a6c8a0fa1cddaa611372672f6c69d43d7c0abc68f53"
+          "sha256": "8f70404a53338c563ae6debeb9d85c32a8bc28636e55492ee043b4ab317cf00d"
         }
       ]
     }

@@ -92,6 +92,9 @@ Read first:
      package manifests automatically; do not create a package-specific CI entry
      point. A locally runnable helper that the generic React parity job never
      invokes is not parity evidence.
+   - After creating or changing parity tests—or changing their dependencies or
+     test tooling—run `pnpm test --ported-libs <name>` (or just `pnpm test` for
+     the full suite) and commit the updated receipt.
    - Make every Vitest-backed `lane.project` match a project name in
      `vitest.config.js`. Keep parity lane files inside `testExecution.include`
      for a mixed project, and keep Octane-only conformance/framework-contract
@@ -128,7 +131,10 @@ Read first:
      non-parity complement.
    - Run affected core tests if touching `packages/octane`.
    - Run `pnpm typecheck` for API/package changes.
-   - Run `pnpm react-parity:check` for binding work and confirm every required manifest lane executes rather than only validates metadata.
+   - Run `pnpm test --ported-libs <name>` first so stale pristine lanes pass and
+     update their receipts. Then run `pnpm react-parity:check` for binding work;
+     it verifies the committed receipts and executes every non-receipted lane
+     without writing repository evidence.
    - Run `pnpm format:files <path...>` while iterating and
      `pnpm format:files:check <path...>` for a scoped check. Use the repo-wide
      `pnpm format:check` for the final gate.
@@ -148,8 +154,8 @@ Read first:
   recorded divergence pinned by a test.
 - Pristine and adapted type suites, hashed assertion inventories, permitted
   transformation ledger, negative controls, and exhaustive port-test
-  classifications wired into `react-parity:check` and the generic React parity
-  execution group.
+  classifications wired into `react-parity:check`, a committed per-package
+  pristine receipt, and the generic React parity execution group.
 - README with compatibility status and intentional differences.
 - Changeset if user-facing package behavior changed.
 - Optional update to `docs/react-library-compat-plan.md` scorecard.

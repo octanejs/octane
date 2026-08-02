@@ -21,11 +21,6 @@
       "path": "packages/hook-form/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs every declared scenario against pinned react-hook-form and @octanejs/hook-form through the shared differential rig."
-    },
-    {
-      "path": "packages/hook-form/tests/upstream-original.test.ts",
-      "disposition": "unmodified-upstream-suite-wrapper",
-      "oracle": "Runs all 1,193 pinned upstream Jest tests byte-exact against React."
     }
   ]
 }

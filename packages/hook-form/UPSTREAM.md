@@ -21,7 +21,10 @@ package, and are locked file-by-file by `upstream/SHA256SUMS`.
 Run `pnpm --dir packages/hook-form upstream:verify` to check the vendored bytes
 and the one-for-one adapted-suite inventory. Run
 `pnpm --dir packages/hook-form test:upstream` to execute the original React/Jest
-suite unchanged.
+suite unchanged. Normal root and package tests use the committed
+`audit/react-parity.receipts.json`: while its automatically derived pristine
+runtime and type hashes are current, those React-only lanes are not repeated.
+Changing an input runs them again and rewrites the receipt after success.
 
 ## Runtime export crosswalk
 
@@ -96,7 +99,8 @@ repeating manifest-owned parity work. This follows the repository-wide
 workflow does not enumerate this package.
 
 The pristine lane runs all 1,193 tests and eight snapshots in the original Jest
-suite against React. Its local Jest wrapper removes only the optional
+suite against React when its receipt hash changes. CI certifies each new hash
+before later runs may inherit it. The local Jest configuration removes only the optional
 `jest-preview` dashboard transforms/setup; test source, SWC transformation,
 environments, assertions, and snapshots remain upstream-exact. The adapted and
 differential lanes then verify the Octane port, including the native input-event

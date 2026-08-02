@@ -164,6 +164,10 @@ put package paths in `ci.yml`, create package-specific parity jobs, or encode
 shard/Node/job details in the base project metadata. Package manifests under
 `packages/*/audit/react-parity.json` are discovered automatically.
 
+After creating or changing parity tests—or changing their dependencies or test
+tooling—run `pnpm test --ported-libs <name>` (or just `pnpm test` for the full
+suite) and commit the updated receipt.
+
 Fill the remaining gaps (DOM output over event sequences, render counts, effect
 ordering, ref lifecycle, keyed reorder identity) with differential and
 Octane-only tests as the skill describes.

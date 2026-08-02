@@ -20,8 +20,7 @@ const manifestPath = resolve(
 	root,
 	manifestFlag === -1 ? 'packages/hook-form/audit/react-parity.json' : args[manifestFlag + 1],
 );
-const laneFlag = args.indexOf('--lane');
-const laneId = laneFlag === -1 ? undefined : args[laneFlag + 1];
+const laneIds = args.flatMap((value, index) => (value === '--lane' ? [args[index + 1]] : []));
 
 for (let index = 0; index < args.length; index += 2) {
 	if (!['--manifest', '--lane'].includes(args[index]) || !args[index + 1])
@@ -38,8 +37,12 @@ const manifest = await loadManifest(manifestPath);
 await verifyManifestFiles(manifest, root);
 
 if (action === 'validate') {
-	const selected = laneId ? manifest.lanes.filter((lane) => lane.id === laneId) : manifest.lanes;
-	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
+	const selected =
+		laneIds.length > 0
+			? manifest.lanes.filter((lane) => laneIds.includes(lane.id))
+			: manifest.lanes;
+	if (selected.length !== (laneIds.length || manifest.lanes.length))
+		throw new Error(`Unknown or duplicate lane: ${laneIds.join(', ')}`);
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 	for (const lane of selected) {
 		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
@@ -54,16 +57,17 @@ if (action === 'validate') {
 		);
 	}
 } else {
-	if (action === 'run-required' && laneId) {
+	if (action === 'run-required' && laneIds.length > 0) {
 		throw new Error('run-required does not accept --lane');
 	}
 	const selected =
 		action === 'run-required'
 			? requiredExecutableLanes(manifest)
-			: laneId
-				? manifest.lanes.filter((lane) => lane.id === laneId)
+			: laneIds.length > 0
+				? manifest.lanes.filter((lane) => laneIds.includes(lane.id))
 				: manifest.lanes;
-	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
+	if (selected.length !== (laneIds.length || manifest.lanes.length))
+		throw new Error(`Unknown or duplicate lane: ${laneIds.join(', ')}`);
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 	await verifyManifestTestSelections({ ...manifest, lanes: selected }, root);
 	for (const lane of selected) {

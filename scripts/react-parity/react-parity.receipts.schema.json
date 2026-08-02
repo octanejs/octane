@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://octanejs.dev/schemas/react-parity.receipts.schema.json",
+  "title": "React parity test receipts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "fingerprintVersion", "manifest", "node", "lanes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "fingerprintVersion": { "const": 1 },
+    "manifest": { "type": "string", "pattern": "^packages/[^/]+/audit/react-parity\\.json$" },
+    "node": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "lanes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["inputSha256"],
+        "properties": {
+          "inputSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}

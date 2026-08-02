@@ -13,7 +13,7 @@
     "url": "git+https://github.com/octanejs/octane.git"
   },
   "scripts": {
-    "test": "pnpm three:upstream:check && pnpm --dir packages/visx compile:check && pnpm --dir packages/visx types:check && vitest run",
+    "test": "pnpm three:upstream:check && pnpm --dir packages/visx compile:check && pnpm --dir packages/visx types:check && node scripts/run-tests.mjs",
     "three:test": "pnpm --filter @octanejs/three test",
     "three:upstream:check": "pnpm --dir packages/three upstream:check",
     "build": "pnpm --filter octane build",
@@ -74,6 +74,8 @@
     "react-parity:harness:validate": "node scripts/react-parity/harness.mjs validate",
     "react-parity:harness:list": "node scripts/react-parity/harness.mjs list",
     "react-parity:harness:run": "node scripts/react-parity/harness.mjs run",
+    "react-parity:plan": "node scripts/react-parity/check.mjs --plan-only",
+    "react-parity:validate": "node scripts/react-parity/check.mjs --validate-only",
     "redact-audit:generate": "node scripts/redact-audit/generate.mjs",
     "redact-audit:check": "node scripts/redact-audit/generate.mjs --check && node --test scripts/redact-audit/*.test.mjs",
     "error-codes:generate": "node scripts/error-codes/generate.mjs",
@@ -105,6 +107,7 @@
     "svelte-check": "catalog:default",
     "typescript": "catalog:default",
     "vitest": "catalog:default",
+    "yaml": "catalog:default",
     "jsdom": "catalog:default",
     "happy-dom": "catalog:default",
     "esbuild": "catalog:default"

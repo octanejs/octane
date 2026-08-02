@@ -13,7 +13,13 @@ import {
 import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
 import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
-import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
+import {
+	loadManifest,
+	requiredExecutableLanes,
+	verifyLaneEnvironment,
+	verifyManifestFiles,
+} from './harness-lib.mjs';
+import { requiredReceiptLanes, verifyAllReceipts } from './receipts-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -26,7 +32,10 @@ const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTyp
 	.filter((manifest) => existsSync(path.join(REPO, manifest)))
 	.sort();
 const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
+const validateOnly = process.argv.includes('--validate-only');
+const planOnly = process.argv.includes('--plan-only');
 const errors = [];
+const executableManifests = [];
 try {
 	verifyHookFormUpstream(REPO);
 } catch (error) {
@@ -123,11 +132,13 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
-		const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
-		execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
-			cwd: REPO,
-			stdio: 'inherit',
-		});
+		if (!planOnly) {
+			execFileSync(process.execPath, [HARNESS_PATH, 'validate', '--manifest', relativeFile], {
+				cwd: REPO,
+				stdio: 'inherit',
+			});
+		}
+		executableManifests.push({ relativeFile, manifest });
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);
 	}
@@ -136,6 +147,34 @@ for (const relativeFile of BINDING_MANIFESTS) {
 if (errors.length) {
 	console.error(`React parity audit failed:\n  - ${errors.join('\n  - ')}`);
 	process.exit(1);
+}
+
+if (!validateOnly && !planOnly) {
+	try {
+		await verifyAllReceipts(REPO);
+		for (const { relativeFile, manifest } of executableManifests) {
+			if (manifest.provenance.verification !== 'verified') continue;
+			const receipted = new Set(requiredReceiptLanes(manifest).map((lane) => lane.id));
+			const laneIds = requiredExecutableLanes(manifest)
+				.filter((lane) => !receipted.has(lane.id))
+				.map((lane) => lane.id);
+			if (laneIds.length === 0) continue;
+			execFileSync(
+				process.execPath,
+				[
+					HARNESS_PATH,
+					'run',
+					'--manifest',
+					relativeFile,
+					...laneIds.flatMap((lane) => ['--lane', lane]),
+				],
+				{ cwd: REPO, stdio: 'inherit' },
+			);
+		}
+	} catch (error) {
+		console.error(`React parity execution failed: ${error.message}`);
+		process.exit(1);
+	}
 }
 
 console.log(

@@ -388,6 +388,7 @@ catalogs:
     '@vue/runtime-vapor': 3.6.0-rc.1
     '@vitejs/plugin-vue': ^6.0.8
     vitest: ^4.1.10
+    yaml: 2.9.0
     yjs: ^13.6.31
     zustand: ^5.0.14
 

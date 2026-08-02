@@ -297,7 +297,7 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["node", "platform", "arch", "packageManager", "lockfile", "lockfileSha256"],
+        "required": ["node", "platform", "arch", "packageManager", "lockfile"],
         "properties": {
           "node": { "type": "string", "minLength": 1 },
           "platform": { "type": "string", "minLength": 1 },

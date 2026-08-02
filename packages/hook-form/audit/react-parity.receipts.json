@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../scripts/react-parity/react-parity.receipts.schema.json",
+  "schemaVersion": 1,
+  "fingerprintVersion": 1,
+  "manifest": "packages/hook-form/audit/react-parity.json",
+  "node": "24.18.0",
+  "lanes": {
+    "hook-form-pristine-types": {
+      "inputSha256": "sha256:52363052d9a0ec0566e6768d63c55eb0b7a751267c7451c249806cf78cba39bc"
+    },
+    "hook-form-pristine-upstream": {
+      "inputSha256": "sha256:9c87fedc90df96f9132a08685013a4c4d29eb366db201e03c6f7303b4b46670b"
+    }
+  }
+}

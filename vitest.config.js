@@ -1547,16 +1547,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'hook-form-pristine',
-					include: ['packages/hook-form/tests/upstream-original.test.ts'],
-					environment: 'node',
-					sequence: { groupOrder: 1 },
-					globals: false,
-				},
-			},
-			{
 				testExecution: {
 					group: 'react-parity',
 					include: [
@@ -1572,11 +1562,7 @@ export default defineConfig({
 						'packages/hook-form/tests/**/*.test.ts',
 						'packages/hook-form/tests/**/*.test.tsx',
 					],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/hook-form/tests/**/*.server.test.tsx',
-						'packages/hook-form/tests/upstream-original.test.ts',
-					],
+					exclude: [...configDefaults.exclude, 'packages/hook-form/tests/**/*.server.test.tsx'],
 					environment: 'jsdom',
 					// Differential precompile: rewrites `@octanejs/hook-form` →
 					// `react-hook-form` so the React side runs the real binding.

@@ -18,7 +18,11 @@ if (process.argv.includes('--write')) {
 const result = verifyHookFormTypes(root);
 const manifest = await loadManifest(resolve(root, 'packages/hook-form/audit/react-parity.json'));
 const typeLanes = manifest.lanes.filter(
-	(lane) => lane.oracle === 'required' && lane.available !== false && lane.type.endsWith('-types'),
+	(lane) =>
+		lane.oracle === 'required' &&
+		lane.available !== false &&
+		lane.type.endsWith('-types') &&
+		(!process.argv.includes('--adapted-only') || lane.type === 'adapted-types'),
 );
 for (const lane of typeLanes) {
 	const [command, ...args] = buildTypeScriptCompilerArgv(
