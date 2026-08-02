@@ -3,6 +3,7 @@ title: CLI
 ---
 
 import { PackageInstall } from '../../components/PackageInstall.tsrx';
+import { FileTree } from '../../components/FileTree.tsrx';
 
 <div className="doc-hero">
 	<h1>CLI</h1>
@@ -126,12 +127,54 @@ command reached two ways.
 
 ```bash
 octane create my-app --template spa        # client-only app
-octane create my-app --template fullstack  # routing, SSR, and a production build
+octane create my-app --template fullstack  # routing, SSR, and a server route
 ```
 
 Leave an argument off and you are asked for it. Dependencies are installed with
 the package manager that ran the command, since a directory this new has no
 lockfile to go by; `--no-install` skips that and prints the list instead.
+
+Both templates open on a landing page that links back into these docs, and both
+are a working starting point rather than a directory of things to delete.
+`spa` mounts one component into an `index.html`:
+
+<FileTree
+	label="Files created by the spa template"
+	entries={[
+		{ path: 'index.html' },
+		{ path: 'vite.config.ts' },
+		{ path: 'tsconfig.json' },
+		{ path: '.prettierrc' },
+		{ path: 'src/main.ts' },
+		{ path: 'src/App.tsrx' },
+		{ path: 'src/styles.css' },
+	]}
+/>
+
+`fullstack` uses the app layer rather than describing it — a second page that
+arrives server-rendered and becomes interactive on hydration, and an endpoint
+that returns a `Response` instead of a component:
+
+<FileTree
+	label="Files created by the fullstack template"
+	entries={[
+		{ path: 'index.html', note: 'SSR markers' },
+		{ path: 'octane.config.ts', note: 'routes' },
+		{ path: 'vite.config.ts' },
+		{ path: 'tsconfig.json' },
+		{ path: '.prettierrc' },
+		{ path: 'src/App.tsrx' },
+		{ path: 'src/Counter.tsrx' },
+		{ path: 'src/Layout.tsrx' },
+		{ path: 'src/styles.css' },
+		{ path: 'src/server/health.ts', note: 'GET /api/health' },
+	]}
+/>
+
+The palette, typography and card styling are this site's own, so a new app and
+these docs look like one thing. `src/styles.css` holds the tokens and both
+colour schemes, and each component carries its own scoped `<style>`. There is no
+CSS framework to uninstall.
 
 The directory has to be empty, though a repository with nothing committed to it
 is allowed, since `git init` before scaffolding is a common way to start.
@@ -148,8 +191,8 @@ octane init --mode fullstack  # routing, SSR, and a production build
 ```
 
 `spa` wires `octane/compiler/vite`. `fullstack` wires `@octanejs/vite-plugin`
-and scaffolds an `octane.config.ts` with one route, plus the entry component it
-points at.
+and scaffolds the same files [`create`](#create) writes, including the
+`octane.config.ts` and the entry components its routes point at.
 
 It never overwrites a script you already defined, and it will not rewrite an
 existing bundler config: an arbitrary `vite.config.ts` cannot be edited

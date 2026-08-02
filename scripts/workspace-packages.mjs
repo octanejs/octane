@@ -31,6 +31,10 @@ const SPECIAL_ROLES = new Map([
 	// uninstallable in the case it is meant to solve.
 	['@octanejs/cli', 'developer tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
+	// The one package people type by name rather than install. It is a thin entry
+	// point onto `octane create`, so it carries no scope and would otherwise fall
+	// through the `@octanejs/` test below into "other package".
+	['create-octane', 'project scaffolder'],
 	// Original Octane API rather than a port of an upstream library, so it has no
 	// binding status.json / parity contract to satisfy.
 	['@octanejs/seo', 'document metadata'],

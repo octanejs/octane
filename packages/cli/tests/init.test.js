@@ -101,6 +101,142 @@ describe('octane init', () => {
 		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
 	});
 
+	it('scaffolds no pages into a project that brought its own route config', async () => {
+		// The pages exist to serve the routes this command declares. A project with
+		// its own octane.config.ts keeps it, and that config names its own entries,
+		// so writing these files would leave components nothing routes to — and a
+		// shared layout whose nav links to /counter and /api/health, two routes
+		// that config never declared, so both 404. The rest of the wiring is
+		// correct everywhere and still runs.
+		const { root } = fixture({
+			'octane.config.ts':
+				'import { defineConfig, RenderRoute } from "@octanejs/vite-plugin";\n\n' +
+				'export default defineConfig({\n' +
+				'  router: { routes: [new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })] },\n' +
+				'});\n',
+		});
+
+		await runCli(['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		for (const file of [
+			'src/App.tsrx',
+			'src/Layout.tsrx',
+			'src/Counter.tsrx',
+			'src/server/health.ts',
+		]) {
+			expect(existsSync(path.join(root, file)), file).toBe(false);
+		}
+		// Theirs, untouched.
+		expect(read(root, 'octane.config.ts')).not.toContain('/counter');
+		// The parts that are correct whatever the routing looks like still land.
+		expect(read(root, 'vite.config.ts')).toContain('from "@octanejs/vite-plugin"');
+		expect(JSON.parse(read(root, 'package.json')).scripts.typecheck).toContain('tsrx-tsc');
+		// The shell is still written, because routing requires one — so the
+		// stylesheet it links has to be written with it. See the case below.
+		expect(read(root, 'index.html')).toContain('/src/styles.css');
+		expect(existsSync(path.join(root, 'src/styles.css'))).toBe(true);
+	});
+
+	// The shell always links the stylesheet, so writing one without the other
+	// leaves a tag pointing at a file that does not exist. The two paths that
+	// reach it write no page at all, which is why guarding the stylesheet on the
+	// pages alone is not enough.
+	it.each([
+		{
+			name: 'fullstack keeps the project’s routing',
+			mode: 'fullstack',
+			files: {
+				'octane.config.ts':
+					'import { defineConfig, RenderRoute } from "@octanejs/vite-plugin";\n\n' +
+					'export default defineConfig({\n' +
+					'  router: { routes: [new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })] },\n' +
+					'});\n',
+			},
+		},
+		{
+			name: 'spa keeps the project’s entry component',
+			mode: 'spa',
+			files: { 'src/App.tsrx': 'export function App() @{\n  <main>theirs</main>\n}\n' },
+		},
+	])('writes the stylesheet its new shell links when $name', async ({ mode, files }) => {
+		const { root } = fixture(files);
+
+		await runCli(['init', '--cwd', root, '--mode', mode, '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(read(root, 'index.html')).toContain('/src/styles.css');
+		expect(read(root, 'src/styles.css')).toContain('--accent');
+	});
+
+	// The whole invariant rather than another single case: every scaffolded
+	// component reads the theme tokens, so whenever `init` writes one of them the
+	// stylesheet has to land too. The cases below vary which files the project
+	// already owns, which is what decides the subset `init` still writes — and
+	// each subset has been a separate escape at some point.
+	it.each([
+		{ name: 'an empty project', mode: 'fullstack', files: {} },
+		{ name: 'an empty spa project', mode: 'spa', files: {} },
+		{
+			name: 'only the counter is missing',
+			mode: 'fullstack',
+			files: {
+				'index.html':
+					'<!doctype html>\n<html><head><!--ssr-head--></head>' +
+					'<body><div id="root"><!--ssr-body--></div></body></html>\n',
+				'src/App.tsrx': 'export function App() @{\n  <main>theirs</main>\n}\n',
+				'src/Layout.tsrx': 'export function Layout(props) @{\n  <div>{props.children}</div>\n}\n',
+			},
+		},
+		{
+			name: 'the project owns the page but not the shell',
+			mode: 'fullstack',
+			files: { 'src/App.tsrx': 'export function App() @{\n  <main>theirs</main>\n}\n' },
+		},
+	])(
+		'writes the theme tokens alongside any component it scaffolds, given $name',
+		async ({ mode, files }) => {
+			const { root } = fixture(files);
+
+			await runCli(['init', '--cwd', root, '--mode', mode, '--yes', '--no-install'], {
+				exec: gitExec(),
+			});
+
+			const components = ['src/App.tsrx', 'src/Layout.tsrx', 'src/Counter.tsrx'].filter(
+				(file) => !(file in files) && existsSync(path.join(root, file)),
+			);
+			// The scenario has to actually scaffold something, or it proves nothing.
+			expect(components.length, 'scaffolded no component').toBeGreaterThan(0);
+			expect(existsSync(path.join(root, 'src/styles.css')), components.join(', ')).toBe(true);
+		},
+	);
+
+	it('states the stylesheet tag to add when the project keeps its own page', async () => {
+		// fullstack writes its entry component whether or not it writes the shell,
+		// so on a project that already has an index.html the scaffolded page would
+		// otherwise read theme tokens that nothing declares — every colour, border
+		// and surface on it resolving to nothing. The stylesheet is still written;
+		// only the tag linking it is the project's own file to edit.
+		const { root } = fixture({
+			'index.html':
+				'<!doctype html>\n<html>\n\t<head>\n\t\t<!--ssr-head-->\n\t</head>\n' +
+				'\t<body>\n\t\t<div id="root"><!--ssr-body--></div>\n\t</body>\n</html>\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(read(root, 'src/styles.css')).toContain('--accent');
+		expect(read(root, 'index.html')).not.toContain('stylesheet');
+		expect(result.json().manual.join(' ')).toContain(
+			'<link rel="stylesheet" href="/src/styles.css" />',
+		);
+	});
+
 	it('states the markers an existing page is missing instead of editing it', async () => {
 		const { root } = fixture({
 			'index.html':

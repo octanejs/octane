@@ -12,7 +12,12 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-function mount(props: { packages?: string; dev?: string; command?: 'pack-dry-run' }) {
+function mount(props: {
+	packages?: string;
+	dev?: string;
+	command?: 'pack-dry-run' | 'create';
+	directory?: string;
+}) {
 	const utils = render(PackageInstall as any, { props });
 	const tab = (name: string) =>
 		Array.from(utils.container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
@@ -62,6 +67,27 @@ describe('PackageInstall', () => {
 		expect(command()).toBe('yarn pack --dry-run');
 		fireEvent.click(tab('bun'));
 		expect(command()).toBe('bun pm pack --dry-run');
+	});
+
+	it('renders each manager’s scaffold command, naming the target directory', () => {
+		const { tab, command } = mount({ command: 'create', directory: 'my-app' });
+
+		expect(command()).toBe('pnpm create octane my-app');
+		// npm carries the dist-tag so a cached create-octane is not what runs.
+		fireEvent.click(tab('npm'));
+		expect(command()).toBe('npm create octane@latest my-app');
+		fireEvent.click(tab('yarn'));
+		expect(command()).toBe('yarn create octane my-app');
+		fireEvent.click(tab('bun'));
+		expect(command()).toBe('bun create octane my-app');
+	});
+
+	it('falls back to a placeholder directory when the scaffold target is unnamed', () => {
+		// A create command with no directory would otherwise read `pnpm create
+		// octane`, which prompts rather than scaffolding — not what a docs snippet
+		// showing a one-line start should copy out.
+		const { command } = mount({ command: 'create' });
+		expect(command()).toBe('pnpm create octane my-app');
 	});
 
 	it('moves selection with arrow keys and keeps one tab in the tab order', () => {

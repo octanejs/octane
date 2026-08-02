@@ -12,8 +12,12 @@ import {
 	VITE_SCRIPTS,
 	appComponent,
 	clientEntry,
+	counterComponent,
+	globalStyles,
+	healthRoute,
 	indexHtml,
 	integrationFor,
+	layoutComponent,
 	octaneConfig,
 	prettierConfig,
 	tsconfig,
@@ -221,7 +225,7 @@ function plan(project, mode, integration) {
 		if (mode === 'fullstack' && !project.octaneConfigPath) {
 			changes.push({
 				file: 'octane.config.ts',
-				summary: 'create, with one route at /',
+				summary: 'create, with routes for /, /counter, and GET /api/health',
 				apply: writeFile(at('octane.config.ts'), octaneConfig),
 			});
 		}
@@ -262,20 +266,97 @@ function plan(project, mode, integration) {
 			}
 		}
 
-		// fullstack always needs it, because octane.config.ts names it as the
-		// route entry. spa needs it only alongside the entry that imports it, so a
+		// The pages belong to the routes this run declares, so they follow the
+		// octane.config.ts written above and are not written into a project that
+		// brought its own. That config names its own entries, which may not be
+		// these files at all; writing them there produces components nothing
+		// routes to, and a shared layout whose nav links 404 because the routes
+		// behind them were never declared. A missing entry in someone's own config
+		// is a real problem, but it is `octane doctor`'s to report, not this
+		// command's to paper over with a page they did not ask for.
+		const scaffoldsRoutes = mode === 'fullstack' && !project.octaneConfigPath;
+		// spa needs the component only alongside the entry that imports it, so a
 		// project with its own page does not collect an orphan component. That is
 		// the entry this run writes, not the shell: keeping someone's src/main.ts
 		// means keeping whatever it imports, which is not this file.
-		if ((mode === 'fullstack' || writesClientEntry) && !existsSync(at('src/App.tsrx'))) {
-			changes.push({
+		const writesApp = (scaffoldsRoutes || writesClientEntry) && !existsSync(at('src/App.tsrx'));
+		const writesCounter = scaffoldsRoutes && !existsSync(at('src/Counter.tsrx'));
+		// Both fullstack pages import the layout, so it follows whichever of them
+		// this run writes: writing one of those pages without it would scaffold an
+		// app whose own import does not resolve.
+		const writesLayout =
+			mode === 'fullstack' && (writesApp || writesCounter) && !existsSync(at('src/Layout.tsrx'));
+
+		// The components this run scaffolds, in the order the app reads: the entry,
+		// the frame it renders through, then the second page. Collected as a list
+		// rather than pushed one `if` at a time because the stylesheet below is
+		// derived from it — every one of these reads the theme tokens, and a
+		// second enumeration saying which ones do has been wrong every time it was
+		// written. Adding a page here cannot forget to bring the tokens with it.
+		const pages = [];
+		if (writesApp) {
+			pages.push({
 				file: 'src/App.tsrx',
 				summary:
 					mode === 'fullstack'
 						? 'create the route entry referenced by octane.config.ts'
 						: 'create the entry component',
-				apply: writeFile(at('src/App.tsrx'), appComponent),
+				body: appComponent(mode),
 			});
+		}
+		if (writesLayout) {
+			pages.push({
+				file: 'src/Layout.tsrx',
+				summary: 'create the frame both pages share',
+				body: layoutComponent,
+			});
+		}
+		if (writesCounter) {
+			pages.push({
+				file: 'src/Counter.tsrx',
+				summary: 'create the route entry for /counter',
+				body: counterComponent,
+			});
+		}
+		for (const page of pages) {
+			changes.push({
+				file: page.file,
+				summary: page.summary,
+				apply: writeFile(at(page.file), page.body),
+			});
+		}
+
+		// Not a page: it renders nothing and reads no tokens, so it is deliberately
+		// outside the list above.
+		if (scaffoldsRoutes && !existsSync(at('src/server/health.ts'))) {
+			changes.push({
+				file: 'src/server/health.ts',
+				summary: 'create the handler for GET /api/health',
+				apply: writeFile(at('src/server/health.ts'), healthRoute),
+			});
+		}
+		// The reset and theme tokens, which two separate things depend on: the
+		// shell links the file, and every component above reads the tokens in it.
+		// Either one alone is enough to need it, and they do not imply each other —
+		// this command writes pages without a shell when the project has its own
+		// `index.html`, and writes a shell without pages when the project has its
+		// own routing. Tying the stylesheet to just one of them leaves the other
+		// side broken: a page whose every colour, border and surface resolves to
+		// nothing, or a shell linking a file that was never created.
+		if ((writesShell || pages.length > 0) && !existsSync(at('src/styles.css'))) {
+			changes.push({
+				file: 'src/styles.css',
+				summary: 'create the reset and the theme tokens',
+				apply: writeFile(at('src/styles.css'), globalStyles),
+			});
+			// The shell this command writes carries the tag. When the project
+			// brought its own, splicing one into it is the same guesswork as
+			// rewriting their bundler config, so state the line instead.
+			if (!writesShell) {
+				manual.push(
+					'In index.html, add <link rel="stylesheet" href="/src/styles.css" />: the scaffolded pages read their theme tokens from it.',
+				);
+			}
 		}
 	}
 

@@ -9,12 +9,32 @@ The hosted version of this material, with more prose around it, lives at
 
 Octane's published packages require Node.js 22 or newer.
 
-Starting from nothing, one command scaffolds a project that runs, with a
-client-only or a server-rendered template:
+Starting from nothing, one command writes a project that runs and installs it:
 
 ```bash
 npm create octane my-app
+cd my-app
+npm run dev
 ```
+
+`pnpm create octane my-app`, `yarn create octane my-app`, and
+`npx create-octane my-app` all reach the same place. It asks what you are
+building, or you can answer up front:
+
+```bash
+npm create octane my-app -- --template spa        # client-only app
+npm create octane my-app -- --template fullstack  # routing, SSR, and a server route
+```
+
+npm needs that `--` to forward the flag; pnpm and yarn forward it already, so
+drop it there. `spa` is a client-only app: the compiler plugin, an `index.html`,
+and an entry that mounts one component. `fullstack` adds `octane.config.ts`, a
+second page, streaming SSR, hydration, a `GET /api/health` server route, and a
+production build. Both open on a page that links back into the documentation.
+
+`--no-install` skips the install and prints the dependency list instead. The
+scaffolder is `octane create`; see the
+[CLI guide](https://octanejs.dev/docs/cli#create) for the rest of its flags.
 
 The rest of this page is for adding Octane to a project you already have.
 Install the runtime and a build-tool integration:
