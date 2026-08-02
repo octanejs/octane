@@ -4,8 +4,10 @@ export { OCTANE_ELECTRON_CHANNELS, OCTANE_ELECTRON_GLOBAL } from '../common/chan
 export {
 	ElectronUnavailableError,
 	clearElectronBridge,
+	getElectronBridgeKey,
 	hasElectronHost,
 	installElectronBridge,
+	setElectronBridgeKey,
 } from './internal';
 
 export { useInvoke } from './useInvoke';

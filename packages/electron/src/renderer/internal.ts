@@ -25,24 +25,41 @@ export function splitSlot(args: any[]): [any[], symbol | undefined] {
 	return [slot === undefined ? args : args.slice(0, -1), slot];
 }
 
+/** Active `window` / `globalThis` key the renderer reads for the bridge. */
+let activeApiKey: string = OCTANE_ELECTRON_GLOBAL;
+
 /**
- * Raised when renderer code needs the Electron bridge and
- * `window.__OCTANE_ELECTRON__` is missing: SSR, a plain browser tab, or a test
- * that forgot to install a mock host.
+ * Raised when renderer code needs the Electron bridge and the configured global
+ * is missing: SSR, a plain browser tab, or a test that forgot to install a mock
+ * host. If preload used a custom `apiKey`, call `setElectronBridgeKey` first.
  */
 export class ElectronUnavailableError extends Error {
 	constructor(what: string) {
 		super(
-			`${what} requires an Electron host: window.${OCTANE_ELECTRON_GLOBAL} is not present. ` +
-				'Run under Electron with @octanejs/electron/preload, or install a mock bridge in tests.',
+			`${what} requires an Electron host: window.${activeApiKey} is not present. ` +
+				'Run under Electron with @octanejs/electron/preload, or install a mock bridge in tests. ' +
+				'If preload passed a custom apiKey, call setElectronBridgeKey with the same key before using the hooks.',
 		);
 		this.name = 'ElectronUnavailableError';
 	}
 }
 
+/**
+ * Point renderer hooks at a custom bridge global. Required when preload called
+ * `exposeOctaneElectron({ apiKey })` with a non-default key — preload and the
+ * renderer are separate realms, so the key must be configured on both sides.
+ */
+export function setElectronBridgeKey(apiKey: string = OCTANE_ELECTRON_GLOBAL): void {
+	activeApiKey = apiKey;
+}
+
+export function getElectronBridgeKey(): string {
+	return activeApiKey;
+}
+
 export function getElectronBridge(): OctaneElectronAPI | undefined {
 	if (typeof globalThis === 'undefined') return undefined;
-	const bridge = (globalThis as any)[OCTANE_ELECTRON_GLOBAL];
+	const bridge = (globalThis as any)[activeApiKey];
 	return bridge == null ? undefined : (bridge as OctaneElectronAPI);
 }
 
@@ -55,11 +72,14 @@ export function installElectronBridge(
 	api: OctaneElectronAPI,
 	apiKey = OCTANE_ELECTRON_GLOBAL,
 ): void {
+	setElectronBridgeKey(apiKey);
 	(globalThis as any)[apiKey] = api;
 }
 
-export function clearElectronBridge(apiKey = OCTANE_ELECTRON_GLOBAL): void {
-	delete (globalThis as any)[apiKey];
+export function clearElectronBridge(apiKey?: string): void {
+	const key = apiKey ?? activeApiKey;
+	delete (globalThis as any)[key];
+	if (key === activeApiKey) setElectronBridgeKey(OCTANE_ELECTRON_GLOBAL);
 }
 
 function isPlainRecord(args: unknown): args is Record<string, unknown> {

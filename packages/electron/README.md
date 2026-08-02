@@ -56,6 +56,20 @@ exposeOctaneElectron({ ipcRenderer, contextBridge });
 import { useInvoke, useNativeTheme, shell } from '@octanejs/electron';
 ```
 
+A custom `apiKey` must be configured on both sides (preload and renderer are
+separate realms):
+
+```ts
+// preload
+exposeOctaneElectron({ ipcRenderer, contextBridge, apiKey: 'myElectronAPI' });
+```
+
+```ts
+// renderer
+import { setElectronBridgeKey } from '@octanejs/electron';
+setElectronBridgeKey('myElectronAPI');
+```
+
 ## Hooks
 
 ### `useInvoke(channel, args?, options?)`
@@ -97,7 +111,8 @@ promise helpers over the same bridge (no hooks). Main-only constructors
 
 ## Off-host behavior
 
-Everything is guarded on `window.__OCTANE_ELECTRON__`:
+Everything is guarded on the configured bridge global (default
+`window.__OCTANE_ELECTRON__`):
 
 | | no Electron bridge |
 | --- | --- |

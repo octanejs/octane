@@ -67,4 +67,18 @@ describe('exposeOctaneElectron', () => {
 		});
 		expect(exposeInMainWorld).toHaveBeenCalledWith(OCTANE_ELECTRON_GLOBAL, api);
 	});
+
+	it('honours a custom apiKey on the contextBridge', () => {
+		const exposeInMainWorld = vi.fn();
+		exposeOctaneElectron({
+			apiKey: 'myElectronAPI',
+			ipcRenderer: {
+				invoke: async () => null,
+				on: () => {},
+				removeListener: () => {},
+			},
+			contextBridge: { exposeInMainWorld },
+		});
+		expect(exposeInMainWorld).toHaveBeenCalledWith('myElectronAPI', expect.any(Object));
+	});
 });

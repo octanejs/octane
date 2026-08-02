@@ -6,6 +6,7 @@ import {
 	type WindowState,
 	ElectronUnavailableError,
 	app,
+	setElectronBridgeKey,
 	shell,
 	useInvoke,
 	useInvokeState,
@@ -52,3 +53,5 @@ expectType<boolean | undefined>(eventOptions.enabled);
 expectType<InvokeState<Item[]>>(state);
 expectType<Error>(new ElectronUnavailableError('useInvoke'));
 expectType<(channel: string, ...args: unknown[]) => Promise<unknown>>(api.invoke);
+expectType<void>(setElectronBridgeKey('myElectronAPI'));
+expectType<void>(setElectronBridgeKey());
