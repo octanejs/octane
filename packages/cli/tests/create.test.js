@@ -65,8 +65,21 @@ describe('octane create', () => {
 		expect(read(app, 'index.html')).toContain('<script type="module" src="/src/main.ts">');
 		expect(read(app, 'src/main.ts')).toContain('createRoot');
 		expect(read(app, 'src/App.tsrx')).toContain('export function App()');
+		// The landing page is the app: it links into the documentation rather than
+		// leaving a placeholder to delete, and it mounts standalone, because this
+		// template has one page and so no shared frame to route through.
+		expect(read(app, 'src/App.tsrx')).toContain('https://octanejs.dev/docs/quick-start');
+		expect(read(app, 'src/App.tsrx')).not.toContain('Layout.tsrx');
+		// The theme tokens the page reads, and the shell tag that resolves them.
+		// Linked rather than imported: a CSS import is injected by JavaScript in
+		// dev, so the tokens would land after the markup that reads them.
+		expect(read(app, 'src/styles.css')).toContain('--accent');
+		expect(read(app, 'index.html')).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 		// The SSR files belong to the other template.
 		expect(existsSync(path.join(app, 'octane.config.ts'))).toBe(false);
+		expect(existsSync(path.join(app, 'src/Layout.tsrx'))).toBe(false);
+		expect(existsSync(path.join(app, 'src/Counter.tsrx'))).toBe(false);
+		expect(existsSync(path.join(app, 'src/server/health.ts'))).toBe(false);
 	});
 
 	it('creates a routed, server-rendered app whose template carries the SSR markers', async () => {
@@ -91,7 +104,29 @@ describe('octane create', () => {
 		// be a second, competing one.
 		expect(html).not.toContain('<script type="module"');
 		expect(existsSync(path.join(app, 'src/main.ts'))).toBe(false);
-		expect(read(app, 'octane.config.ts')).toContain('RenderRoute');
+
+		// Every route the config declares resolves to a file that exports what the
+		// route names. A route entry naming a missing export renders the wrong
+		// component or fails at request time, and `octane doctor` reports exactly
+		// this pairing, so the scaffold has to satisfy it on the way out.
+		const config = read(app, 'octane.config.ts');
+		expect(config).toContain('new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })');
+		expect(config).toContain(
+			'new RenderRoute({ path: "/counter", entry: ["Counter", "/src/Counter.tsrx"] })',
+		);
+		expect(config).toContain('new ServerRoute({ path: "/api/health", handler: health })');
+		expect(read(app, 'src/App.tsrx')).toContain('export function App()');
+		expect(read(app, 'src/Counter.tsrx')).toContain('export function Counter()');
+		expect(read(app, 'src/server/health.ts')).toContain('export function health()');
+
+		// Both pages render through the one frame, which is why it is scaffolded
+		// at all — writing either without it leaves an import that cannot resolve.
+		expect(read(app, 'src/Layout.tsrx')).toContain('export function Layout(');
+		expect(read(app, 'src/App.tsrx')).toContain('from "./Layout.tsrx"');
+		expect(read(app, 'src/Counter.tsrx')).toContain('from "./Layout.tsrx"');
+
+		expect(read(app, 'src/styles.css')).toContain('--accent');
+		expect(html).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 	});
 
 	it('scaffolds inside a working tree that has unrelated changes', async () => {

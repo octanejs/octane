@@ -4,6 +4,8 @@ Create an Octane app in a new directory.
 
 ```bash
 npm create octane my-app
+cd my-app
+npm run dev
 ```
 
 `pnpm create octane my-app`, `yarn create octane my-app`, and
@@ -19,26 +21,59 @@ npm create octane my-app -- --template spa
 npm create octane my-app -- --template fullstack
 ```
 
+npm needs that `--` to forward the flag; pnpm and yarn forward it already, so
+drop it there.
+
 `spa` is a client-only app: the compiler plugin, an `index.html`, and an entry
 that mounts one component.
 
-`fullstack` adds `octane.config.ts` with one route, streaming SSR, hydration,
-and a production build.
+```
+index.html
+vite.config.ts
+tsconfig.json
+.prettierrc
+src/
+  main.ts        mounts App into #root
+  App.tsrx       the landing page
+  styles.css     the reset and the theme tokens
+```
 
-Both are deliberately bare. There is no styling and nothing to delete before you
-start.
+`fullstack` adds `octane.config.ts` with routing, streaming SSR, hydration, and
+a production build, and it uses that surface rather than describing it: a second
+page, and an endpoint that returns a `Response` instead of a component.
+
+```
+index.html            carries the <!--ssr-head--> / <!--ssr-body--> markers
+octane.config.ts      2 render routes + 1 server route
+vite.config.ts
+tsconfig.json
+.prettierrc
+src/
+  App.tsrx            /
+  Counter.tsrx        /counter — server-rendered, then hydrated
+  Layout.tsrx         the frame both pages share
+  styles.css          the reset and the theme tokens
+  server/health.ts    GET /api/health
+```
+
+Both open on a page that links back into the documentation, and both are a
+working starting point rather than a directory of things to delete. The palette,
+typography and card styling are [octanejs.dev](https://octanejs.dev)'s own, so a
+new app and the documentation look like one thing; `src/styles.css` holds the
+tokens and both colour schemes, and each component carries its own scoped
+`<style>`. There is no CSS framework to uninstall.
 
 ## What it does
 
-It runs [`octane create`](../cli), which makes the directory and its
-`package.json` and then writes the TypeScript settings `.tsrx` needs, the
-bundler config, the scripts, and the entry files. That last part is the same
-code `octane init` runs against a project you already have, so the two cannot
-scaffold different projects.
+It runs [`octane create`](https://octanejs.dev/docs/cli#create), which makes the
+directory and its `package.json` and then writes the TypeScript settings `.tsrx`
+needs, the bundler config, the scripts, and the entry files. That last part is
+the same code `octane init` runs against a project you already have, so the two
+cannot scaffold different projects.
 
 This package is only the entry point. Everything above lives in
-[`@octanejs/cli`](../cli), so `npm create octane my-app` and
-`octane create my-app` are the same command reached two ways.
+[`@octanejs/cli`](https://octanejs.dev/docs/cli), so `npm create octane my-app`
+and `octane create my-app` are the same command reached two ways.
 
 Dependencies are installed through your package manager, which is also what
 records them in `package.json`. Pass `--no-install` to skip that, and the list

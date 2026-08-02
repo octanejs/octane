@@ -5,6 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
+import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
 import {
@@ -321,6 +322,13 @@ describe('website routes', () => {
 			const tag = section.level === 3 ? 'h3' : 'h2';
 			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
+		// And the other direction. Registering a section is what puts it in this
+		// table of contents, in the sidebar reading order, and in the section list
+		// the remote MCP server serves from the same registry — so an `<h2>` that
+		// no entry names is invisible in all three at once, while the loop above
+		// still passes. `<h3>` stays opt-in: it marks a subsection that a document
+		// may or may not want surfaced.
+		expectRegisteredHeadings(container, doc);
 		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
 		expect(sidebarLinks).toHaveLength(docs.length);
 		expect(sidebar.querySelectorAll('.sidebar-group')).toHaveLength(docGroups.length);

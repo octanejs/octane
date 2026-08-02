@@ -624,6 +624,55 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'electron',
+					include: [
+						'packages/electron/tests/conformance/**/*.test.ts',
+						'packages/electron/tests/preload/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/electron$/,
+							replacement: resolve(import.meta.dirname, 'packages/electron/src/renderer/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'electron-main',
+					include: ['packages/electron/tests/main/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'electron-ssr',
+					include: ['packages/electron/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/electron$/,
+							replacement: resolve(import.meta.dirname, 'packages/electron/src/renderer/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',
