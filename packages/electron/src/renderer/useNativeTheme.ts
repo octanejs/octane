@@ -16,10 +16,16 @@ export function useNativeTheme(...rest: [symbol?]): boolean {
 			const host = getElectronBridge();
 			if (host === undefined) return;
 			let disposed = false;
-			host.nativeTheme.shouldUseDarkColors().then((value) => {
-				if (!disposed) setDark(value);
+			// Live pushes win over the initial snapshot: subscribe first, then ignore
+			// the async read if an update already landed (or the effect cleaned up).
+			let seenLiveUpdate = false;
+			const stop = host.nativeTheme.onUpdated((value) => {
+				seenLiveUpdate = true;
+				setDark(value);
 			});
-			const stop = host.nativeTheme.onUpdated((value) => setDark(value));
+			host.nativeTheme.shouldUseDarkColors().then((value) => {
+				if (!disposed && !seenLiveUpdate) setDark(value);
+			});
 			return () => {
 				disposed = true;
 				stop();

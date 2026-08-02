@@ -24,10 +24,16 @@ export function useWindowState(...rest: [symbol?]): WindowState {
 			const bridge = getElectronBridge();
 			if (bridge === undefined) return;
 			let disposed = false;
-			bridge.window.getState().then((next) => {
-				if (!disposed && next != null) setState(next);
+			// Live pushes win over the initial snapshot: subscribe first, then ignore
+			// the async read if an update already landed (or the effect cleaned up).
+			let seenLiveUpdate = false;
+			const stop = bridge.window.onStateChange((next) => {
+				seenLiveUpdate = true;
+				setState(next);
 			});
-			const stop = bridge.window.onStateChange((next) => setState(next));
+			bridge.window.getState().then((next) => {
+				if (!disposed && !seenLiveUpdate && next != null) setState(next);
+			});
 			return () => {
 				disposed = true;
 				stop();
