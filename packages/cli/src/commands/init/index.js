@@ -12,8 +12,11 @@ import {
 	VITE_SCRIPTS,
 	appComponent,
 	clientEntry,
+	counterComponent,
+	healthRoute,
 	indexHtml,
 	integrationFor,
+	layoutComponent,
 	octaneConfig,
 	prettierConfig,
 	tsconfig,
@@ -221,7 +224,7 @@ function plan(project, mode, integration) {
 		if (mode === 'fullstack' && !project.octaneConfigPath) {
 			changes.push({
 				file: 'octane.config.ts',
-				summary: 'create, with one route at /',
+				summary: 'create, with routes for /, /counter, and GET /api/health',
 				apply: writeFile(at('octane.config.ts'), octaneConfig),
 			});
 		}
@@ -267,14 +270,50 @@ function plan(project, mode, integration) {
 		// project with its own page does not collect an orphan component. That is
 		// the entry this run writes, not the shell: keeping someone's src/main.ts
 		// means keeping whatever it imports, which is not this file.
-		if ((mode === 'fullstack' || writesClientEntry) && !existsSync(at('src/App.tsrx'))) {
+		const writesApp =
+			(mode === 'fullstack' || writesClientEntry) && !existsSync(at('src/App.tsrx'));
+		// /counter and the health handler exist because the octane.config.ts above
+		// routes to them, so they follow that file and are not written into a
+		// project that brought its own config, where nothing would reach them.
+		const scaffoldsRoutes = mode === 'fullstack' && !project.octaneConfigPath;
+		const writesCounter = scaffoldsRoutes && !existsSync(at('src/Counter.tsrx'));
+		// Both fullstack pages import the layout, so it follows whichever of them
+		// this run writes rather than tracking the config: writing one of those
+		// pages without it would scaffold an app whose own import does not resolve.
+		const writesLayout =
+			mode === 'fullstack' && (writesApp || writesCounter) && !existsSync(at('src/Layout.tsrx'));
+
+		if (writesApp) {
 			changes.push({
 				file: 'src/App.tsrx',
 				summary:
 					mode === 'fullstack'
 						? 'create the route entry referenced by octane.config.ts'
 						: 'create the entry component',
-				apply: writeFile(at('src/App.tsrx'), appComponent),
+				apply: writeFile(at('src/App.tsrx'), appComponent(mode)),
+			});
+		}
+		// Reported in the order the app reads: the entry, the frame it renders
+		// through, the second page, then the endpoint behind them both.
+		if (writesLayout) {
+			changes.push({
+				file: 'src/Layout.tsrx',
+				summary: 'create the frame both pages share',
+				apply: writeFile(at('src/Layout.tsrx'), layoutComponent),
+			});
+		}
+		if (writesCounter) {
+			changes.push({
+				file: 'src/Counter.tsrx',
+				summary: 'create the route entry for /counter',
+				apply: writeFile(at('src/Counter.tsrx'), counterComponent),
+			});
+		}
+		if (scaffoldsRoutes && !existsSync(at('src/server/health.ts'))) {
+			changes.push({
+				file: 'src/server/health.ts',
+				summary: 'create the handler for GET /api/health',
+				apply: writeFile(at('src/server/health.ts'), healthRoute),
 			});
 		}
 	}

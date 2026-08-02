@@ -126,12 +126,41 @@ command reached two ways.
 
 ```bash
 octane create my-app --template spa        # client-only app
-octane create my-app --template fullstack  # routing, SSR, and a production build
+octane create my-app --template fullstack  # routing, SSR, and a server route
 ```
 
 Leave an argument off and you are asked for it. Dependencies are installed with
 the package manager that ran the command, since a directory this new has no
 lockfile to go by; `--no-install` skips that and prints the list instead.
+
+Both templates open on a landing page that links back into these docs, and both
+are a working starting point rather than a directory of things to delete.
+`spa` mounts one component into an `index.html`:
+
+```
+index.html
+vite.config.ts · tsconfig.json · .prettierrc
+src/main.ts     mounts App into #root
+src/App.tsrx    the landing page
+```
+
+`fullstack` uses the app layer rather than describing it — a second page that
+arrives server-rendered and becomes interactive on hydration, and an endpoint
+that returns a `Response` instead of a component:
+
+```
+index.html            carries the <!--ssr-head--> / <!--ssr-body--> markers
+octane.config.ts      2 render routes + 1 server route
+vite.config.ts · tsconfig.json · .prettierrc
+src/App.tsrx          /
+src/Counter.tsrx      /counter — server-rendered, then hydrated
+src/Layout.tsrx       the frame both pages share
+src/server/health.ts  GET /api/health
+```
+
+Styling is scoped `<style>` inside each component, plus a reset and the
+light/dark theme tokens in `index.html`. There is no stylesheet and no CSS
+framework to uninstall.
 
 The directory has to be empty, though a repository with nothing committed to it
 is allowed, since `git init` before scaffolding is a common way to start.
@@ -148,8 +177,8 @@ octane init --mode fullstack  # routing, SSR, and a production build
 ```
 
 `spa` wires `octane/compiler/vite`. `fullstack` wires `@octanejs/vite-plugin`
-and scaffolds an `octane.config.ts` with one route, plus the entry component it
-points at.
+and scaffolds the same files [`create`](#create) writes, including the
+`octane.config.ts` and the entry components its routes point at.
 
 It never overwrites a script you already defined, and it will not rewrite an
 existing bundler config: an arbitrary `vite.config.ts` cannot be edited

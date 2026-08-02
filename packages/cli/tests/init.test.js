@@ -101,6 +101,33 @@ describe('octane init', () => {
 		expect(existsSync(path.join(root, 'src/main.ts'))).toBe(false);
 	});
 
+	it('scaffolds the layout its pages import even when the project owns the route config', async () => {
+		// A project that brought its own octane.config.ts keeps it, so /counter and
+		// the health handler are not written — nothing would route to them. The
+		// entry component still is, and it renders through the shared layout, so
+		// the layout has to follow the page rather than the config. Skipping it
+		// here scaffolds an App.tsrx whose own import does not resolve, and the
+		// failure surfaces as a broken build rather than anything init reports.
+		const { root } = fixture({
+			'octane.config.ts':
+				'import { defineConfig, RenderRoute } from "@octanejs/vite-plugin";\n\n' +
+				'export default defineConfig({\n' +
+				'  router: { routes: [new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })] },\n' +
+				'});\n',
+		});
+
+		await runCli(['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(read(root, 'src/App.tsrx')).toContain('from "./Layout.tsrx"');
+		expect(read(root, 'src/Layout.tsrx')).toContain('export function Layout(');
+		// Theirs, untouched — and so the routes it does not declare stay unwritten.
+		expect(read(root, 'octane.config.ts')).not.toContain('/counter');
+		expect(existsSync(path.join(root, 'src/Counter.tsrx'))).toBe(false);
+		expect(existsSync(path.join(root, 'src/server/health.ts'))).toBe(false);
+	});
+
 	it('states the markers an existing page is missing instead of editing it', async () => {
 		const { root } = fixture({
 			'index.html':

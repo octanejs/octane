@@ -8,7 +8,7 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 	<h1>Quick start</h1>
 	<p className="doc-lede">
 		{
-			'Install Octane, connect it to a page, and build your first stateful component. If you already have a Vite project, the whole path takes three small files.'
+			'Scaffold an app that already runs, or add Octane to a project you already have. Either way you end with the same thing: a component, a root, and a page.'
 		}
 	</p>
 </div>
@@ -17,12 +17,56 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 	<p className="doc-callout-title">Before you begin</p>
 	<p>
 		{
-			'This guide adds Octane to an existing Vite project. To start from nothing instead, run npm create octane my-app, which scaffolds a project that already runs. Either way you need Node.js 22 or newer. Octane is currently alpha software, so pin versions when you use it in a real project.'
+			'You need Node.js 22 or newer. Octane is currently alpha software, so pin versions when you use it in a real project.'
 		}
 	</p>
 </aside>
 
-<h2 id="install">Install and configure</h2>
+<h2 id="scaffold">Create a new app</h2>
+
+One command writes the project and installs it:
+
+<PackageInstall command="create" directory="my-app" />
+
+It asks what you are building, then writes the TypeScript settings `.tsrx` needs, the
+bundler config, the scripts, and the entry files, and installs the dependencies with the
+package manager you ran it through. Answer the prompt up front with `--template`:
+
+```bash
+npm create octane my-app -- --template spa        # client-only app
+npm create octane my-app -- --template fullstack  # routing, SSR, and a server route
+```
+
+npm needs that `--` to forward the flag; pnpm and yarn forward it already, so drop it
+there. Then:
+
+```bash
+cd my-app
+npm run dev
+```
+
+`spa` is a client-only app. `fullstack` adds `octane.config.ts`, a second page, streaming
+SSR, hydration, a server route, and a production build. Both open on a page that links
+back into these docs, and both are a working starting point rather than a directory of
+things to delete.
+
+The scaffolder is `octane create`, and [the CLI guide](/docs/cli#create) documents its
+flags — including `--no-install`, which prints the dependency list instead of installing
+it.
+
+<aside className="doc-callout note">
+	<p className="doc-callout-title">Your editor and .tsrx</p>
+	<p>
+		{
+			'A scaffolded project builds, typechecks, and runs straight away. Making an editor understand .tsrx is separate: the extension is not published yet, so a .tsrx import may show as unresolved even while npm run typecheck passes. tsrx-tsc carries its own TypeScript and is the reliable answer on whether the project is type-correct.'
+		}
+	</p>
+</aside>
+
+<h2 id="install">Install into an existing project</h2>
+
+The rest of this page is the same work by hand, against a Vite project you already have.
+`pnpm dlx @octanejs/cli init` does all of it for you; the steps below are what it writes.
 
 Install the runtime and the recommended Vite integration:
 
