@@ -210,17 +210,22 @@ function registerIpcHandlers() {
 	ipcMain.handle('run_task', (event, args) => {
 		const taskId = String(args?.id ?? '');
 		const lines = LOGS[taskId] ?? [];
+		for (const timer of runTimers) clearTimeout(timer);
+		runTimers = [];
 		lines.forEach((text, index) => {
-			setTimeout(
-				() => {
-					event.sender.send('workbench:log', {
-						taskId,
-						seq: index + 1,
-						text,
-						done: index === lines.length - 1,
-					});
-				},
-				(index + 1) * LINE_INTERVAL_MS,
+			runTimers.push(
+				setTimeout(
+					() => {
+						if (event.sender.isDestroyed()) return;
+						event.sender.send('workbench:log', {
+							taskId,
+							seq: index + 1,
+							text,
+							done: index === lines.length - 1,
+						});
+					},
+					(index + 1) * LINE_INTERVAL_MS,
+				),
 			);
 		});
 		return null;
