@@ -320,22 +320,23 @@ function plan(project, mode, integration) {
 				apply: writeFile(at('src/server/health.ts'), healthRoute),
 			});
 		}
-		// The reset and theme tokens every scaffolded component reads. It follows
-		// the components rather than the shell: `init` keeps an `index.html` a
-		// project already has, so tokens written into the shell would be missing
-		// on exactly that path, leaving the page it did write reading properties
-		// nothing declares.
-		if ((writesApp || writesLayout) && !existsSync(at('src/styles.css'))) {
+		// The reset and theme tokens, which two separate things depend on: the
+		// shell links the file, and every scaffolded component reads the tokens in
+		// it. Either one alone is enough to need it, and they do not imply each
+		// other — this command writes pages without a shell when the project has
+		// its own `index.html`, and writes a shell without pages when the project
+		// has its own routing. Tying the stylesheet to just one of them leaves the
+		// other side broken: a page whose every colour, border and surface
+		// resolves to nothing, or a shell linking a file that was never created.
+		if ((writesShell || writesApp || writesLayout) && !existsSync(at('src/styles.css'))) {
 			changes.push({
 				file: 'src/styles.css',
 				summary: 'create the reset and the theme tokens',
 				apply: writeFile(at('src/styles.css'), globalStyles),
 			});
-			// The shell this command writes links that file. When the project
-			// brought its own, splicing a tag into it is the same guesswork as
-			// rewriting their bundler config, so state the line instead — otherwise
-			// the pages just written read theme tokens nothing declares, and the
-			// result is a page that renders with none of its colours.
+			// The shell this command writes carries the tag. When the project
+			// brought its own, splicing one into it is the same guesswork as
+			// rewriting their bundler config, so state the line instead.
 			if (!writesShell) {
 				manual.push(
 					'In index.html, add <link rel="stylesheet" href="/src/styles.css" />: the scaffolded pages read their theme tokens from it.',

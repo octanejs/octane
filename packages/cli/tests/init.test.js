@@ -125,7 +125,6 @@ describe('octane init', () => {
 			'src/Layout.tsrx',
 			'src/Counter.tsrx',
 			'src/server/health.ts',
-			'src/styles.css',
 		]) {
 			expect(existsSync(path.join(root, file)), file).toBe(false);
 		}
@@ -134,6 +133,42 @@ describe('octane init', () => {
 		// The parts that are correct whatever the routing looks like still land.
 		expect(read(root, 'vite.config.ts')).toContain('from "@octanejs/vite-plugin"');
 		expect(JSON.parse(read(root, 'package.json')).scripts.typecheck).toContain('tsrx-tsc');
+		// The shell is still written, because routing requires one — so the
+		// stylesheet it links has to be written with it. See the case below.
+		expect(read(root, 'index.html')).toContain('/src/styles.css');
+		expect(existsSync(path.join(root, 'src/styles.css'))).toBe(true);
+	});
+
+	// The shell always links the stylesheet, so writing one without the other
+	// leaves a tag pointing at a file that does not exist. The two paths that
+	// reach it write no page at all, which is why guarding the stylesheet on the
+	// pages alone is not enough.
+	it.each([
+		{
+			name: 'fullstack keeps the project’s routing',
+			mode: 'fullstack',
+			files: {
+				'octane.config.ts':
+					'import { defineConfig, RenderRoute } from "@octanejs/vite-plugin";\n\n' +
+					'export default defineConfig({\n' +
+					'  router: { routes: [new RenderRoute({ path: "/", entry: ["App", "/src/App.tsrx"] })] },\n' +
+					'});\n',
+			},
+		},
+		{
+			name: 'spa keeps the project’s entry component',
+			mode: 'spa',
+			files: { 'src/App.tsrx': 'export function App() @{\n  <main>theirs</main>\n}\n' },
+		},
+	])('writes the stylesheet its new shell links when $name', async ({ mode, files }) => {
+		const { root } = fixture(files);
+
+		await runCli(['init', '--cwd', root, '--mode', mode, '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(read(root, 'index.html')).toContain('/src/styles.css');
+		expect(read(root, 'src/styles.css')).toContain('--accent');
 	});
 
 	it('states the stylesheet tag to add when the project keeps its own page', async () => {
