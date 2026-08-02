@@ -232,12 +232,60 @@ surface.
 
 The same tiered port as Phase 1, over the primitives from Phase 2.
 
-### Phase 4 — Registry multi-base protocol
+### Phase 4 — Registry multi-base protocol — DONE
 
 `shadcn-port-plan.md` deliberately deferred the per-base registry namespace
 shape (`@octane/base-ui/select` versus a `base` field on the item) as
-speculative until a real consumer existed. Phase 1 creates that consumer, so the
-decision is made on evidence and then documented here.
+speculative until a real consumer existed. That consumer now exists, and the
+evidence pointed at NEITHER option.
+
+**The decision: neither. Use shadcn's own mechanism.** shadcn does not namespace
+its primitive bases at all. It folds base and visual style into the single
+`style` field of `components.json` and substitutes that into the registry URL.
+Its built-in registry is literally `<host>/styles/{style}/{name}.json`, and
+`{style}` and `{name}` are the only two placeholders the CLI substitutes —
+verified by reading `shadcn@4.14.1`'s bundle, not inferred from its docs. The
+CLI never parses or validates the style string, so a composite like `base-nova`
+is opaque to it and resolved entirely by the registry server.
+
+That is decisive, because it means the shape costs nothing to adopt and needs no
+octane-specific tooling: the stock CLI already speaks it. A namespace of our own
+(`@octane-base-ui/…`) would have made consumers configure three registries, and
+a `base` field on the item would have needed CLI support that does not exist.
+
+Emitted shape:
+
+```text
+registry/styles/<style>/<name>.json   one tree per base
+registry/<name>.json                  the default style, for a URL with no {style}
+registry/registry.json                the index
+```
+
+| `style` | Primitives | Families |
+| --- | --- | --- |
+| `base-nova` (default) | `@octanejs/base-ui` | 21 |
+| `radix-nova` | `@octanejs/radix` | 44 |
+| `aria-nova` | `@octanejs/aria` | 33 |
+
+Two consequences worth stating, because both are easy to get wrong:
+
+- **The base-agnostic items are emitted into every style tree.** `utils`,
+  `types`, `theme` and `use-mobile` are identical across bases, but
+  `registryDependencies: ["@octane/utils"]` resolves through the SAME templated
+  URL — so a style tree that omitted them would 404 on install.
+- **Bases legitimately ship different family counts.** Upstream is the same; its
+  CLI even carries notes like "only available for Base UI projects". A style
+  tree contains exactly the families that base supports, and the
+  subpath/registry consistency test asserts that per base rather than globally.
+
+Verified end to end against the real CLI: each style installs its own base's
+primitive, with consumer aliases rewritten, transitive registry dependencies
+pulled, and versions pinned.
+
+Still open: the registry is served locally by `registry:serve` (the port the
+playground's `components.json` always referenced but which nothing served until
+now). Hosting it at `https://octanejs.dev/r/…` is a website change and has not
+landed.
 
 ## Risks
 
