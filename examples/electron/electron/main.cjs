@@ -75,6 +75,8 @@ const LOGS = {
 };
 
 const LINE_INTERVAL_MS = 150;
+/** Timers for the in-flight run_task stream; cleared when a new run starts. */
+let runTimers = [];
 const C = {
 	appGetVersion: 'octane:app:getVersion',
 	appGetName: 'octane:app:getName',
