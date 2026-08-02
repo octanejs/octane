@@ -201,7 +201,7 @@ function trackWindow(win) {
 	}
 }
 
-function createWindow() {
+function registerIpcHandlers() {
 	registerDefaultBridge();
 	ipcMain.handle('list_tasks', () => TASKS);
 	ipcMain.handle('describe_task', (_event, args) => DETAILS[args?.id] ?? null);
@@ -223,7 +223,9 @@ function createWindow() {
 		});
 		return null;
 	});
+}
 
+function createWindow() {
 	const win = new BrowserWindow({
 		width: 1100,
 		height: 720,
@@ -236,20 +238,27 @@ function createWindow() {
 	});
 	trackWindow(win);
 
-	// Main-only Menu surface — same place a React Electron app would build it.
-	Menu.setApplicationMenu(
-		Menu.buildFromTemplate([
-			{ label: 'Electron Shell', submenu: [{ role: 'quit' }] },
-			{ label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }] },
-		]),
-	);
-
 	const devUrl = process.env.ELECTRON_START_URL;
 	if (devUrl) void win.loadURL(devUrl);
 	else void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 
+let ipcRegistered = false;
+
 app.whenReady().then(() => {
+	// Register once for the process. createWindow also runs on macOS activate
+	// after all windows close; re-calling ipcMain.handle for the same channel
+	// throws and leaves the dock unable to open a new window.
+	if (!ipcRegistered) {
+		registerIpcHandlers();
+		Menu.setApplicationMenu(
+			Menu.buildFromTemplate([
+				{ label: 'Electron Shell', submenu: [{ role: 'quit' }] },
+				{ label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }] },
+			]),
+		);
+		ipcRegistered = true;
+	}
 	createWindow();
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow();
