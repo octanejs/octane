@@ -106,14 +106,15 @@ their conformance tests land.
 
 ## Intentional divergences (pre-existing documented Octane designs)
 
-Eight ported cases directly assert divergences that are DOCUMENTED Octane-wide
-design decisions, not port workarounds: microtask-flush commit granularity vs
-React's macrotask coalescing (an extra committed render around async
-handleSubmit/notification continuations — 6 cases), the eager `Object.is`
-setState bailout (one fewer probe render than React — 1 case), and native-event
-delivery of a no-op input event React's synthetic value tracker swallows
-(1 case). They are ordinary passing tests with explicit divergence notes; the
-binding suite contains no skipped or expected-failure cases.
+The adapted suite's intentional differences are recorded bidirectionally:
+every `OCTANE DIVERGENCE[id]` marker resolves to the structured ledger in
+`packages/hook-form/audit/react-parity.json`, and every ledger entry must have
+a source/test marker plus executable case identities. The ledger covers native
+event delivery, scheduler batching, resolver notifications, async `act` flush
+boundaries, reset render counts, and eager equal-value bailout behavior. It
+also records classification, consumer impact, and migration guidance. These
+are ordinary passing tests; the binding suite contains no skipped or
+expected-failure cases.
 
 ## Release
 

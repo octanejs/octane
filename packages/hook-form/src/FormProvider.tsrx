@@ -3,9 +3,14 @@
 // methods to all children via context; the memoized value keeps context
 // identity stable across parent re-renders (same deps as upstream).
 import { useMemo } from 'octane';
+import type { Control, FieldValues, FormProviderProps, UseFormReturn } from './types';
 import { HookFormContext, HookFormControlContext } from './useFormControlContext.ts';
 
-export function FormProvider(props) @{
+export function FormProvider<
+	TFieldValues extends FieldValues,
+	TContext = any,
+	TTransformedValues = TFieldValues,
+>(props: FormProviderProps<TFieldValues, TContext, TTransformedValues>) @{
 	const {
 		children,
 		watch,
@@ -19,6 +24,7 @@ export function FormProvider(props) @{
 		formState,
 		resetField,
 		reset,
+		resetDefaultValues,
 		handleSubmit,
 		unregister,
 		control,
@@ -40,6 +46,7 @@ export function FormProvider(props) @{
 			formState,
 			resetField,
 			reset,
+			resetDefaultValues,
 			handleSubmit,
 			unregister,
 			control,
@@ -56,6 +63,7 @@ export function FormProvider(props) @{
 			handleSubmit,
 			register,
 			reset,
+			resetDefaultValues,
 			resetField,
 			setError,
 			setFocus,
@@ -68,9 +76,9 @@ export function FormProvider(props) @{
 		],
 	);
 
-	<HookFormContext.Provider value={memoizedValue}>
+	<HookFormContext.Provider value={memoizedValue as unknown as UseFormReturn}>
 		<HookFormControlContext.Provider
-			value={memoizedValue.control}
+			value={memoizedValue.control as Control}
 		>{children}</HookFormControlContext.Provider>
 	</HookFormContext.Provider>
 }
