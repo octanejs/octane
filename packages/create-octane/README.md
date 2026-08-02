@@ -35,6 +35,7 @@ tsconfig.json
 src/
   main.ts        mounts App into #root
   App.tsrx       the landing page
+  styles.css     the reset and the theme tokens
 ```
 
 `fullstack` adds `octane.config.ts` with routing, streaming SSR, hydration, and
@@ -51,14 +52,16 @@ src/
   App.tsrx            /
   Counter.tsrx        /counter — server-rendered, then hydrated
   Layout.tsrx         the frame both pages share
+  styles.css          the reset and the theme tokens
   server/health.ts    GET /api/health
 ```
 
 Both open on a page that links back into the documentation, and both are a
-working starting point rather than a directory of things to delete. Styling is
-scoped `<style>` inside each component, plus a reset and the light/dark theme
-tokens in `index.html` — no stylesheet, no CSS framework, and nothing to
-uninstall.
+working starting point rather than a directory of things to delete. The palette,
+typography and card styling are [octanejs.dev](https://octanejs.dev)'s own, so a
+new app and the documentation look like one thing; `src/styles.css` holds the
+tokens and both colour schemes, and each component carries its own scoped
+`<style>`. There is no CSS framework to uninstall.
 
 ## What it does
 

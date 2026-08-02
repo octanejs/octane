@@ -70,6 +70,11 @@ describe('octane create', () => {
 		// template has one page and so no shared frame to route through.
 		expect(read(app, 'src/App.tsrx')).toContain('https://octanejs.dev/docs/quick-start');
 		expect(read(app, 'src/App.tsrx')).not.toContain('Layout.tsrx');
+		// The theme tokens the page reads, and the shell tag that resolves them.
+		// Linked rather than imported: a CSS import is injected by JavaScript in
+		// dev, so the tokens would land after the markup that reads them.
+		expect(read(app, 'src/styles.css')).toContain('--accent');
+		expect(read(app, 'index.html')).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 		// The SSR files belong to the other template.
 		expect(existsSync(path.join(app, 'octane.config.ts'))).toBe(false);
 		expect(existsSync(path.join(app, 'src/Layout.tsrx'))).toBe(false);
@@ -119,6 +124,9 @@ describe('octane create', () => {
 		expect(read(app, 'src/Layout.tsrx')).toContain('export function Layout(');
 		expect(read(app, 'src/App.tsrx')).toContain('from "./Layout.tsrx"');
 		expect(read(app, 'src/Counter.tsrx')).toContain('from "./Layout.tsrx"');
+
+		expect(read(app, 'src/styles.css')).toContain('--accent');
+		expect(html).toContain('<link rel="stylesheet" href="/src/styles.css" />');
 	});
 
 	it('scaffolds inside a working tree that has unrelated changes', async () => {

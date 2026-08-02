@@ -128,6 +128,30 @@ describe('octane init', () => {
 		expect(existsSync(path.join(root, 'src/server/health.ts'))).toBe(false);
 	});
 
+	it('states the stylesheet tag to add when the project keeps its own page', async () => {
+		// fullstack writes its entry component whether or not it writes the shell,
+		// so on a project that already has an index.html the scaffolded page would
+		// otherwise read theme tokens that nothing declares — every colour, border
+		// and surface on it resolving to nothing. The stylesheet is still written;
+		// only the tag linking it is the project's own file to edit.
+		const { root } = fixture({
+			'index.html':
+				'<!doctype html>\n<html>\n\t<head>\n\t\t<!--ssr-head-->\n\t</head>\n' +
+				'\t<body>\n\t\t<div id="root"><!--ssr-body--></div>\n\t</body>\n</html>\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'fullstack', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(read(root, 'src/styles.css')).toContain('--accent');
+		expect(read(root, 'index.html')).not.toContain('stylesheet');
+		expect(result.json().manual.join(' ')).toContain(
+			'<link rel="stylesheet" href="/src/styles.css" />',
+		);
+	});
+
 	it('states the markers an existing page is missing instead of editing it', async () => {
 		const { root } = fixture({
 			'index.html':

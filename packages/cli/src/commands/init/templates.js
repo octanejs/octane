@@ -122,7 +122,11 @@ const LOGO = `<svg class="mark" viewBox="0 0 84 108" fill="none" aria-hidden="tr
         />
       </svg>`;
 
-/** The card styles the landing page uses for its documentation links. */
+/**
+ * The documentation cards, matching the card treatment on octanejs.dev: the
+ * same radius, the same subtle surface, and the same accent-tinted hover rather
+ * than a plain border swap.
+ */
 const LINK_STYLES = `      .links {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
@@ -135,30 +139,34 @@ const LINK_STYLES = `      .links {
       }
       .link {
         display: block;
-        padding: 0.9rem 1.1rem;
+        padding: 1rem;
         border: 1px solid var(--border);
-        border-radius: 0.75rem;
-        background: var(--panel);
-        color: inherit;
+        border-radius: 0.9rem;
+        background: var(--surface-subtle);
+        color: var(--text);
         text-align: left;
         text-decoration: none;
         transition:
+          background 0.15s,
           border-color 0.15s,
           transform 0.15s;
       }
       .link:hover {
-        border-color: var(--accent);
-        transform: translateY(-2px);
+        border-color: var(--card-hover-border);
+        background: var(--card-hover-bg);
+        transform: translateY(-1px);
       }
       .link-title {
         display: block;
+        font-size: 0.95rem;
         font-weight: 600;
       }
       .link-body {
         display: block;
         margin-top: 0.15rem;
-        color: var(--muted);
-        font-size: 0.875rem;
+        color: var(--text-secondary);
+        font-size: 0.82rem;
+        line-height: 1.4;
       }`;
 
 /** Where the landing page sends people next. */
@@ -236,13 +244,14 @@ export function App() @{
       .title {
         margin: 0;
         font-size: 3rem;
+        line-height: 1.1;
         letter-spacing: -0.03em;
       }
       .lede {
         max-width: 34rem;
         margin: 0;
-        color: var(--muted);
-        line-height: 1.6;
+        color: var(--text-secondary);
+        font-size: 1.25rem;
       }
 ${LINK_STYLES}
     </style>
@@ -288,13 +297,14 @@ export function App() @{
       .title {
         margin: 0;
         font-size: 3rem;
+        line-height: 1.1;
         letter-spacing: -0.03em;
       }
       .lede {
         max-width: 34rem;
         margin: 0;
-        color: var(--muted);
-        line-height: 1.6;
+        color: var(--text-secondary);
+        font-size: 1.25rem;
       }
 ${LINK_STYLES}
     </style>
@@ -317,7 +327,7 @@ export function Layout(props: LayoutProps) @{
     <nav class="nav">
       <a class="nav-link" href="/">Home</a>
       <a class="nav-link" href="/counter">Counter</a>
-      <a class="nav-link" href="/api/health">/api/health</a>
+      <a class={["nav-link", "nav-endpoint"]} href="/api/health">/api/health</a>
     </nav>
     <main class="main">{props.children}</main>
 
@@ -327,19 +337,33 @@ export function Layout(props: LayoutProps) @{
         min-height: 100dvh;
         flex-direction: column;
       }
+      /* The site's header treatment: sticky, translucent over the page, and
+         separated by a hairline rather than a block of colour. */
       .nav {
+        position: sticky;
+        top: 0;
+        z-index: 1;
         display: flex;
+        align-items: center;
         gap: 1.25rem;
-        padding: 1rem 1.5rem;
+        height: 60px;
+        padding: 0 1.5rem;
         border-bottom: 1px solid var(--border);
+        background: var(--header-bg);
+        backdrop-filter: blur(8px);
       }
       .nav-link {
-        color: var(--muted);
+        color: var(--text-secondary);
         font-size: 0.9rem;
-        text-decoration: none;
+        font-weight: 500;
       }
       .nav-link:hover {
-        color: var(--accent);
+        color: var(--accent-text);
+      }
+      .nav-endpoint {
+        font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas,
+          monospace;
+        font-size: 0.82rem;
       }
       .main {
         display: flex;
@@ -388,25 +412,29 @@ export function Counter() @{
         .title {
           margin: 0;
           font-size: 2rem;
+          line-height: 1.1;
           letter-spacing: -0.02em;
         }
         .lede {
           max-width: 34rem;
           margin: 0;
-          color: var(--muted);
-          line-height: 1.6;
+          color: var(--text-secondary);
+          font-size: 1.25rem;
         }
+        /* The site's primary action: an accent pill. */
         .button {
           padding: 0.7rem 1.4rem;
-          border: 1px solid var(--border);
-          border-radius: 0.6rem;
-          background: var(--panel);
-          color: inherit;
+          border: none;
+          border-radius: 9999px;
+          background: var(--accent);
+          color: var(--on-accent);
           font: inherit;
+          font-weight: 600;
           cursor: pointer;
+          transition: background 0.15s;
         }
         .button:hover {
-          border-color: var(--accent);
+          background: var(--accent-hover);
         }
       </style>
     </section>
@@ -431,43 +459,89 @@ export function health(): Response {
 `;
 
 /**
- * The reset and the theme tokens the components read.
+ * The reset and the theme tokens every component reads, taken from
+ * octanejs.dev so a scaffolded app and the documentation look like one thing.
  *
- * These live in the shell rather than in a component because a component's
- * `<style>` is scoped — the compiler appends a scope hash to its selectors — so
- * it can style that component's own markup but never `body`, and the custom
- * properties have to resolve for every component at once. Both colour schemes
- * are declared, so the page follows the operating system without any JavaScript.
+ * A stylesheet rather than a `<style>` in the shell. A component's own `<style>`
+ * is scoped — the compiler appends a scope hash to its selectors — so it can
+ * style that component's markup but never `body`, and these custom properties
+ * have to resolve for every component at once. Keeping them in a file the shell
+ * links, rather than inline in the shell, means `init` still has something to
+ * point at when the project brought its own `index.html` and kept it.
+ *
+ * Linked from the shell rather than imported by a component on purpose: a CSS
+ * import is injected by JavaScript in dev, so the tokens would arrive after the
+ * server-rendered markup that reads them and the first paint would flash.
  */
-const GLOBAL_STYLES = `      :root {
-        --bg: #ffffff;
-        --text: #14110f;
-        --muted: #6b6560;
-        --panel: #faf8f6;
-        --border: #e6e1dc;
-        --accent: #ff415a;
-        color-scheme: light dark;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #14110f;
-          --text: #f4eee8;
-          --muted: #9a938c;
-          --panel: #1c1917;
-          --border: #2e2a27;
-        }
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family:
-          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }`;
+export const globalStyles = `:root {
+  --bg: #23272f;
+  --panel: #2b3138;
+  --text: #f4eee8;
+  --text-secondary: #99a1b3;
+  --accent: #ff415a;
+  --accent-hover: #ff5d72;
+  --accent-text: #ff5d72;
+  --on-accent: #16181d;
+  --border: rgba(255, 255, 255, 0.1);
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-subtle: rgba(255, 255, 255, 0.03);
+  --header-bg: rgba(35, 39, 47, 0.85);
+  /* Accent tints for the card hover, the same in both themes. */
+  --card-hover-border: rgba(255, 93, 114, 0.4);
+  --card-hover-bg: rgba(255, 65, 90, 0.07);
+  color-scheme: dark;
+}
+/* octanejs.dev defaults to dark and offers a toggle. A scaffold has no
+   toggle to offer, so the same palette follows the operating system
+   instead — and the values on both sides are the site's own. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f5f7;
+    --text: #1c2027;
+    --text-secondary: #5c6473;
+    --accent-hover: #c81e37;
+    --accent-text: #d81f38;
+    --on-accent: #ffffff;
+    --border: rgba(0, 0, 0, 0.12);
+    --surface: rgba(0, 0, 0, 0.04);
+    --surface-subtle: rgba(0, 0, 0, 0.025);
+    --header-bg: rgba(255, 255, 255, 0.85);
+    color-scheme: light;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+code,
+pre,
+kbd,
+samp {
+  font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, Consolas,
+    monospace;
+}
+a {
+  color: var(--accent-text);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--accent-hover);
+}
+::selection {
+  background: rgba(255, 65, 90, 0.45);
+}
+`;
 
 const SPA_INDEX_HTML = `<!doctype html>
 <html lang="en">
@@ -475,9 +549,7 @@ const SPA_INDEX_HTML = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Octane app</title>
-    <style>
-${GLOBAL_STYLES}
-    </style>
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <div id="root"></div>
@@ -492,9 +564,7 @@ const SSR_INDEX_HTML = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Octane app</title>
-    <style>
-${GLOBAL_STYLES}
-    </style>
+    <link rel="stylesheet" href="/src/styles.css" />
     <!--ssr-head-->
   </head>
   <body>

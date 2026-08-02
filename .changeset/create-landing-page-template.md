@@ -19,9 +19,16 @@ the two pages share, and a `GET /api/health` `ServerRoute` — a handler returni
 a `Response` rather than a component, which is the half of the app layer `spa`
 has no equivalent for.
 
-Styling is scoped `<style>` inside each component, with a reset and light/dark
-theme tokens in `index.html`. No stylesheet, no CSS framework, nothing to
-uninstall.
+The palette, typography and card styling are octanejs.dev's own, so a scaffolded
+app and the documentation look like one thing. `src/styles.css` carries the
+tokens and both colour schemes and the shell links it; each component keeps its
+own scoped `<style>`. No CSS framework, nothing to uninstall.
+
+The stylesheet is linked from the shell rather than imported by a component,
+because a CSS import is injected by JavaScript in dev and the tokens would
+arrive after the server-rendered markup that reads them. When `init` runs
+against a project that kept its own `index.html`, it writes the stylesheet and
+states the `<link>` to add, the same way it already states the SSR markers.
 
 `tsconfig.json` now includes `octane.config.ts`, so a route entry naming an
 export that does not exist fails `typecheck` rather than at request time.

@@ -142,6 +142,7 @@ index.html
 vite.config.ts · tsconfig.json · .prettierrc
 src/main.ts     mounts App into #root
 src/App.tsrx    the landing page
+src/styles.css  the reset and the theme tokens
 ```
 
 `fullstack` uses the app layer rather than describing it — a second page that
@@ -155,12 +156,14 @@ vite.config.ts · tsconfig.json · .prettierrc
 src/App.tsrx          /
 src/Counter.tsrx      /counter — server-rendered, then hydrated
 src/Layout.tsrx       the frame both pages share
+src/styles.css        the reset and the theme tokens
 src/server/health.ts  GET /api/health
 ```
 
-Styling is scoped `<style>` inside each component, plus a reset and the
-light/dark theme tokens in `index.html`. There is no stylesheet and no CSS
-framework to uninstall.
+The palette, typography and card styling are this site's own, so a new app and
+these docs look like one thing. `src/styles.css` holds the tokens and both
+colour schemes, and each component carries its own scoped `<style>`. There is no
+CSS framework to uninstall.
 
 The directory has to be empty, though a repository with nothing committed to it
 is allowed, since `git init` before scaffolding is a common way to start.

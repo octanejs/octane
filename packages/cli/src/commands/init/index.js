@@ -13,6 +13,7 @@ import {
 	appComponent,
 	clientEntry,
 	counterComponent,
+	globalStyles,
 	healthRoute,
 	indexHtml,
 	integrationFor,
@@ -315,6 +316,28 @@ function plan(project, mode, integration) {
 				summary: 'create the handler for GET /api/health',
 				apply: writeFile(at('src/server/health.ts'), healthRoute),
 			});
+		}
+		// The reset and theme tokens every scaffolded component reads. It follows
+		// the components rather than the shell: `init` keeps an `index.html` a
+		// project already has, so tokens written into the shell would be missing
+		// on exactly that path, leaving the page it did write reading properties
+		// nothing declares.
+		if ((writesApp || writesLayout) && !existsSync(at('src/styles.css'))) {
+			changes.push({
+				file: 'src/styles.css',
+				summary: 'create the reset and the theme tokens',
+				apply: writeFile(at('src/styles.css'), globalStyles),
+			});
+			// The shell this command writes links that file. When the project
+			// brought its own, splicing a tag into it is the same guesswork as
+			// rewriting their bundler config, so state the line instead — otherwise
+			// the pages just written read theme tokens nothing declares, and the
+			// result is a page that renders with none of its colours.
+			if (!writesShell) {
+				manual.push(
+					'In index.html, add <link rel="stylesheet" href="/src/styles.css" />: the scaffolded pages read their theme tokens from it.',
+				);
+			}
 		}
 	}
 
