@@ -1,0 +1,28 @@
+{
+  "name": "electron-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "An Electron desktop task runner built with Octane, exercising the @octanejs/electron IPC hooks and process-split layout.",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host --port 5232 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host --port 5232 --strictPort",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
+    "electron": "electron ."
+  },
+  "dependencies": {
+    "@octanejs/electron": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "electron": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

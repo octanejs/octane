@@ -30,6 +30,7 @@ the delivery waves and the distinct regression responsibility of each app.
 | [Threadline](threadline) | A social timeline using Zustand, optimistic mutations, keyed prepends, and live composer state | Strict TypeScript support code, production TSRX build, and navigation, identity, rapid-interleaving, and rollback Playwright journeys |
 | [Wayfinder](wayfinder) | A streaming travel planner using parallel `use()`, out-of-order Suspense reveals, request aborts, and CSP-safe hydration | Strict TypeScript support code, production client/server builds, and SSR adoption, streaming, abort, CSP, and recovery Playwright journeys |
 | [Workbench](workbench) | A Tauri v2 desktop task runner using suspending IPC commands, command state with refetch, and a detachable event subscription | Strict TypeScript support code, production TSRX build, a Rust backend beside a mock IPC bridge, and streaming, isolation, and recovery Playwright journeys |
+| [Electron Shell](electron) | An Electron desktop task runner using `@octanejs/electron` IPC hooks, command state with refetch, a detachable event subscription, desktop helpers, and a main-process Menu | Strict TypeScript support code, production TSRX build, a mock IPC bridge for browser CI, an optional Electron shell, and streaming, isolation, desktop-helper, and recovery Playwright journeys |
 
 ## Repository commands
 

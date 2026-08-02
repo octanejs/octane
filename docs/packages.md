@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**66 publishable package(s), including 52 framework binding(s) and 3 framework integration(s).**
+**67 publishable package(s), including 53 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -25,6 +25,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.16` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.18` | 4 |
 | `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | framework integration | `0.0.7` | 8 |
+| `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.1` | 6 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.22` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.20` | 1 |
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.18` | 3 |

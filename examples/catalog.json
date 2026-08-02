@@ -231,6 +231,112 @@
       ]
     },
     {
+      "directory": "examples/electron",
+      "id": "electron",
+      "title": "Electron Shell",
+      "summary": "An Electron desktop task runner using suspending IPC channels, command state with refetch, and lifecycle-safe event subscriptions through @octanejs/electron.",
+      "status": "active",
+      "host": "octane",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/electron"],
+      "octaneFeatures": [
+        "async-recovery",
+        "effects",
+        "error-boundaries",
+        "error-routing",
+        "keyed-lists",
+        "native-events",
+        "realtime-subscriptions",
+        "suspense",
+        "tsrx-control-flow"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "boot-task-index",
+          "title": "Boot into the task index and report which IPC bridge answered",
+          "kind": "health",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "stream-one-run",
+          "title": "Read a task manifest and stream one run through to its completion line",
+          "kind": "golden",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "per-task-log-isolation",
+          "title": "Keep each task's streamed log to the selection that produced it",
+          "kind": "golden",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "recover-task-index",
+          "title": "Recover the suspended task index after its first command rejects",
+          "kind": "resilience",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "recover-task-manifest",
+          "title": "Recover a rejected task manifest through the command's own refetch",
+          "kind": "resilience",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "detached-log-watcher",
+          "title": "Drop every line emitted while the log subscription is detached, then resume cleanly",
+          "kind": "resilience",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "desktop-theme-window",
+          "title": "Reflect native theme and window state through the desktop hooks",
+          "kind": "golden",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "desktop-helpers",
+          "title": "Exercise app, dialog, clipboard, and shell helpers from the renderer",
+          "kind": "golden",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "recover-refused-run",
+          "title": "Surface a refused run_task without leaving the log running, then run again",
+          "kind": "resilience",
+          "spec": "e2e/electron.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "task-index-locked",
+          "description": "The fault=list URL rejects the first list_tasks call, routes it to the @catch fallback, and reloads the index when the boundary is reset."
+        },
+        {
+          "id": "manifest-unreadable",
+          "description": "The fault=describe URL rejects the first describe_task call, surfaces it as command state rather than a thrown boundary, and recovers on refetch."
+        },
+        {
+          "id": "detached-log-watcher",
+          "description": "Disabling the watcher mid-run unsubscribes the Electron IPC listener, so the remaining lines and the completion line are never delivered."
+        },
+        {
+          "id": "runner-refused",
+          "description": "The fault=run URL rejects the first run_task call, keeps the run panel Idle with an alert, and lets a second Run stream normally."
+        }
+      ]
+    },
+    {
       "directory": "examples/flowboard",
       "id": "flowboard",
       "title": "Flowboard",

@@ -121,7 +121,11 @@ export const KNOWN_BINDINGS = {
 // Octane-specific ecosystem packages that have no React import to rewrite.
 // Keep these out of KNOWN_BINDINGS so the React bridge never invents a source
 // package mapping for native tooling.
-export const KNOWN_NATIVE_BINDINGS = new Set(['@octanejs/devtools', '@octanejs/tauri']);
+export const KNOWN_NATIVE_BINDINGS = new Set([
+	'@octanejs/devtools',
+	'@octanejs/electron',
+	'@octanejs/tauri',
+]);
 
 // Workspace directory names for the maintained bindings. Keep this derived
 // from both catalogs so repository path routing cannot drift from the public

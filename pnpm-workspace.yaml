@@ -208,6 +208,7 @@ catalogs:
     '@wagmi/core': 3.6.4
     '@tauri-apps/api': 2.11.1
     '@tauri-apps/cli': 2.11.4
+    electron: 43.2.0
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.10
@@ -418,7 +419,7 @@ minimumReleaseAgeExclude:
   - 'shadcn@4.14.1'
   - 'tailwindcss@4.3.3'
   - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22
+  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

@@ -36,6 +36,16 @@ before any existing package is published. After bootstrapping, rerun the failed
 Publish workflow, or dispatch `publish.yml` with the ID of any successful CI
 push run on `main`.
 
+For `@octanejs/electron` after this package lands on `main`:
+
+```bash
+pnpm --filter @octanejs/electron publish --access public --no-git-checks
+npm trust github @octanejs/electron \
+  --file publish.yml \
+  --repo octanejs/octane \
+  --allow-publish
+```
+
 ## Recovery
 
 The Publish workflow accepts only successful CI push runs from
