@@ -107,7 +107,7 @@ describe('useInvokeState', () => {
 		expect(result.find('#status').textContent).toBe('success');
 		expect(result.find('#data').textContent).toBe('v1');
 
-		result.find('#refetch').click();
+		result.click('#refetch');
 		expect(result.find('#status').textContent).toBe('pending');
 		expect(result.find('#data').textContent).toBe('');
 		await flush();

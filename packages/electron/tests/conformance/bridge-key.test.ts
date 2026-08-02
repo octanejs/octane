@@ -13,7 +13,7 @@ import { exposeOctaneElectron } from '../../src/preload/index';
 
 function stubApi(label: string): OctaneElectronAPI {
 	return {
-		invoke: async () => label,
+		invoke: async <T = unknown>() => label as T,
 		on: () => () => {},
 		app: {
 			getVersion: async () => label,
