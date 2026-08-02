@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "kbd",
+  "type": "registry:ui",
+  "title": "Kbd",
+  "files": [
+    {
+      "path": "ui/kbd.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/kbd.tsrx",
+      "content": "// React Aria base kbd — structure from upstream `bases/aria/ui/kbd.tsx`, which\n// renders BOTH parts through RAC's Keyboard primitive (the Radix base uses a\n// plain <kbd> host for each; upstream likewise renders KbdGroup as a keyboard\n// element rather than a <div>). Class strings are the package's shipped\n// utilities-inlined flavor, matching the Radix base.\nimport { Keyboard as KbdPrimitive } from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport interface KbdProps extends HostProps<'kbd'> {}\n\nexport function Kbd({ className, ...props }: KbdProps) @{\n\t<KbdPrimitive\n\t\tdata-slot=\"kbd\"\n\t\tclassName={cn(\n\t\t\t'pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background dark:in-data-[slot=tooltip-content]:bg-background/10 [&_svg:not([class*=\\'size-\\'])]:size-3',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function KbdGroup({ className, ...props }: KbdProps) @{\n\t<KbdPrimitive\n\t\tdata-slot=\"kbd-group\"\n\t\tclassName={cn('inline-flex items-center gap-1', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "slider",
+  "type": "registry:ui",
+  "title": "Slider",
+  "files": [
+    {
+      "path": "ui/slider.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/slider.tsrx",
+      "content": "// OCTANE ADAPTATION: octane's renderable type is `OctaneNode = unknown`, and a\n// union containing `unknown` collapses to `unknown`, so RAC's children render\n// prop carries no inferable render values here. Annotating them restores the\n// upstream parameter types without weakening the binding.\nimport {\n\tSliderFill,\n\tSlider as SliderPrimitive,\n\tSliderThumb,\n\tSliderTrack,\n\ttype SliderProps as SliderPrimitiveProps,\n\ttype SliderRenderProps,\n} from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\n\ntype SliderValue = number | number[];\ntype SliderProps<T extends SliderValue = SliderValue> =\n\tOmit<SliderPrimitiveProps<T>, 'className'> & {\n\t\tclassName?: string;\n\t};\n\nexport function Slider<T extends SliderValue = SliderValue>({ className, ...props }: SliderProps<\n\tT\n>) {\n\treturn <SliderPrimitive\n\t\tclassName={cn(\n\t\t\t'group relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col',\n\t\t\tclassName,\n\t\t)}\n\t\tdata-slot=\"slider\"\n\t\t{...props}\n\t>\n\t\t{({ state }: SliderRenderProps) => {\n\t\t\treturn <>\n\t\t\t\t<SliderTrack\n\t\t\t\t\tdata-slot=\"slider-track\"\n\t\t\t\t\tclassName=\"relative grow overflow-hidden rounded-full bg-muted select-none data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1\"\n\t\t\t\t>\n\t\t\t\t\t<SliderFill\n\t\t\t\t\t\tdata-slot=\"slider-range\"\n\t\t\t\t\t\tclassName=\"absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full\"\n\t\t\t\t\t/>\n\t\t\t\t</SliderTrack>\n\t\t\t\t{state.values.map(\n\t\t\t\t\t(_: number, index: number) =>\n\t\t\t\t\t\t<SliderThumb\n\t\t\t\t\t\t\tdata-slot=\"slider-thumb\"\n\t\t\t\t\t\t\tkey={index}\n\t\t\t\t\t\t\tindex={index}\n\t\t\t\t\t\t\tclassName=\"relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none group-data-horizontal:top-[50%] group-data-vertical:left-[50%] after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50\"\n\t\t\t\t\t\t/>,\n\t\t\t\t)}\n\t\t\t</>;\n\t\t}}\n\t</SliderPrimitive>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

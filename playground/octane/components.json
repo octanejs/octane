@@ -17,6 +17,6 @@
     "hooks": "@/hooks"
   },
   "registries": {
-    "@octane": "http://localhost:4517/{name}.json"
+    "@octane": "http://localhost:4517/styles/{style}/{name}.json"
   }
 }
