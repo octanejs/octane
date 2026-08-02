@@ -1,4 +1,15 @@
-import { useInvoke, useInvokeState, useIpcEvent } from '@octanejs/electron';
+import {
+	app,
+	clipboard,
+	dialog,
+	shell,
+	useInvoke,
+	useInvokeState,
+	useIpcEvent,
+	useNativeTheme,
+	useWindowState,
+	windowControls,
+} from '@octanejs/electron';
 import { useEffect, useState } from 'octane';
 import type { BridgeMode } from './bridge';
 import type { LogLine, Task, TaskDetail } from './types';
@@ -127,6 +138,89 @@ function TaskList(props: {
 	</ul>
 }
 
+function HostPanel() @{
+	const dark = useNativeTheme();
+	const windowState = useWindowState();
+	const [version, setVersion] = useState('');
+	const [dialogResult, setDialogResult] = useState('');
+	const [clipboardValue, setClipboardValue] = useState('');
+	const [openedUrl, setOpenedUrl] = useState('');
+
+	<section class="pane" aria-label="Host">
+		<h2>Host</h2>
+		<dl class="facts" aria-label="Host state">
+			<dt>Theme</dt>
+			<dd id="host-theme">{(dark ? 'dark' : 'light') as string}</dd>
+			<dt>Window title</dt>
+			<dd id="host-title">{windowState.title as string}</dd>
+			<dt>Maximized</dt>
+			<dd id="host-maximized">{(windowState.isMaximized ? 'yes' : 'no') as string}</dd>
+		</dl>
+		<div class="host-actions">
+			<button type="button" onClick={() => void windowControls.maximize()}>
+				Maximize window
+			</button>
+			<button type="button" onClick={() => void windowControls.unmaximize()}>
+				Restore window
+			</button>
+			<button type="button" onClick={() => void windowControls.setTitle('Shell — working')}>
+				Set window title
+			</button>
+			<button
+				type="button"
+				onClick={() => {
+					void app.getVersion().then((next) => setVersion(next));
+				}}
+			>
+				Read app version
+			</button>
+			<button
+				type="button"
+				onClick={() => {
+					void dialog.showMessageBox({ message: 'hello from shell' }).then((result) => {
+						const response = (result as { response?: number }).response ?? -1;
+						setDialogResult(`response ${response}`);
+					});
+				}}
+			>
+				Show message
+			</button>
+			<button
+				type="button"
+				onClick={() => {
+					void (async () => {
+						await clipboard.writeText('shell-clipboard');
+						setClipboardValue(await clipboard.readText());
+					})();
+				}}
+			>
+				Round-trip clipboard
+			</button>
+			<button
+				type="button"
+				onClick={() => {
+					void (async () => {
+						await shell.openExternal('https://octanejs.dev');
+						setOpenedUrl('https://octanejs.dev');
+					})();
+				}}
+			>
+				Open docs
+			</button>
+		</div>
+		<dl class="facts" aria-label="Host action results">
+			<dt>App version</dt>
+			<dd id="host-version">{(version === '' ? '—' : version) as string}</dd>
+			<dt>Dialog</dt>
+			<dd id="host-dialog">{(dialogResult === '' ? '—' : dialogResult) as string}</dd>
+			<dt>Clipboard</dt>
+			<dd id="host-clipboard">{(clipboardValue === '' ? '—' : clipboardValue) as string}</dd>
+			<dt>Opened</dt>
+			<dd id="host-opened">{(openedUrl === '' ? '—' : openedUrl) as string}</dd>
+		</dl>
+	</section>
+}
+
 export function App(props: {
 	mode: BridgeMode;
 	runTask: (id: string) => Promise<void>;
@@ -171,6 +265,9 @@ export function App(props: {
 					<TaskDetailPane taskId={selectedId} runTask={props.runTask} />
 				}
 			</section>
+		</div>
+		<div class="host-row">
+			<HostPanel />
 		</div>
 	</main>
 }

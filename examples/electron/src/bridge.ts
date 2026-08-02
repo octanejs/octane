@@ -1,5 +1,5 @@
 import { hasElectronHost, installElectronBridge } from '@octanejs/electron';
-import type { OctaneElectronAPI } from '@octanejs/electron';
+import type { OctaneElectronAPI, WindowState } from '@octanejs/electron';
 import { TASKS, describeTask, logScript } from './fixtures';
 import type { LogLine } from './types';
 
@@ -26,6 +26,13 @@ export function installBrowserBridge(): BridgeMode {
 	const spentFaults = new Set<string>();
 	const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 	let runTimers: number[] = [];
+	let clipboardText = '';
+	let windowState: WindowState = {
+		isMaximized: false,
+		isMinimized: false,
+		isFullScreen: false,
+		title: 'Electron Shell',
+	};
 
 	const failOnce = (scenario: string, message: string): Promise<never> | null => {
 		if (fault !== scenario || spentFaults.has(scenario)) return null;
@@ -35,6 +42,10 @@ export function installBrowserBridge(): BridgeMode {
 
 	const emit = (channel: string, ...args: unknown[]) => {
 		for (const listener of [...(listeners.get(channel) ?? [])]) listener(...args);
+	};
+
+	const pushWindowState = () => {
+		emit('octane:window:stateChanged', { ...windowState });
 	};
 
 	const startRun = (taskId: string) => {
@@ -63,9 +74,12 @@ export function installBrowserBridge(): BridgeMode {
 				case 'describe_task':
 					return (failOnce('describe', 'the task manifest could not be read') ??
 						describeTask(String(payload.id))) as T;
-				case 'run_task':
+				case 'run_task': {
+					const failure = failOnce('run', 'the runner refused to start');
+					if (failure !== null) return failure as T;
 					startRun(String(payload.id));
 					return null as T;
+				}
 				default:
 					throw new Error(`unknown channel: ${channel}`);
 			}
@@ -83,19 +97,27 @@ export function installBrowserBridge(): BridgeMode {
 			quit: async () => {},
 		},
 		window: {
-			minimize: async () => {},
-			maximize: async () => {},
-			unmaximize: async () => {},
+			minimize: async () => {
+				windowState = { ...windowState, isMinimized: true };
+				pushWindowState();
+			},
+			maximize: async () => {
+				windowState = { ...windowState, isMaximized: true, isMinimized: false };
+				pushWindowState();
+			},
+			unmaximize: async () => {
+				windowState = { ...windowState, isMaximized: false };
+				pushWindowState();
+			},
 			close: async () => {},
-			isMaximized: async () => false,
-			setTitle: async () => {},
-			getState: async () => ({
-				isMaximized: false,
-				isMinimized: false,
-				isFullScreen: false,
-				title: 'Electron Shell',
-			}),
-			onStateChange: (listener) => api.on('octane:window:stateChanged', (s) => listener(s as any)),
+			isMaximized: async () => windowState.isMaximized,
+			setTitle: async (title) => {
+				windowState = { ...windowState, title };
+				pushWindowState();
+			},
+			getState: async () => ({ ...windowState }),
+			onStateChange: (listener) =>
+				api.on('octane:window:stateChanged', (state) => listener(state as WindowState)),
 		},
 		dialog: {
 			showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
@@ -108,8 +130,10 @@ export function installBrowserBridge(): BridgeMode {
 			openPath: async () => '',
 		},
 		clipboard: {
-			readText: async () => '',
-			writeText: async () => {},
+			readText: async () => clipboardText,
+			writeText: async (text) => {
+				clipboardText = text;
+			},
 		},
 		nativeTheme: {
 			shouldUseDarkColors: async () => window.matchMedia('(prefers-color-scheme: dark)').matches,

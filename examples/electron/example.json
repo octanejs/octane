@@ -66,6 +66,27 @@
       "kind": "resilience",
       "spec": "e2e/electron.spec.ts",
       "critical": true
+    },
+    {
+      "id": "desktop-theme-window",
+      "title": "Reflect native theme and window state through the desktop hooks",
+      "kind": "golden",
+      "spec": "e2e/electron.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "desktop-helpers",
+      "title": "Exercise app, dialog, clipboard, and shell helpers from the renderer",
+      "kind": "golden",
+      "spec": "e2e/electron.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "recover-refused-run",
+      "title": "Surface a refused run_task without leaving the log running, then run again",
+      "kind": "resilience",
+      "spec": "e2e/electron.spec.ts",
+      "critical": true
     }
   ],
   "faultScenarios": [
@@ -80,6 +101,10 @@
     {
       "id": "detached-log-watcher",
       "description": "Disabling the watcher mid-run unsubscribes the Electron IPC listener, so the remaining lines and the completion line are never delivered."
+    },
+    {
+      "id": "runner-refused",
+      "description": "The fault=run URL rejects the first run_task call, keeps the run panel Idle with an alert, and lets a second Run stream normally."
     }
   ]
 }

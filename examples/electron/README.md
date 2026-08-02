@@ -11,6 +11,9 @@ task manifest, runs one, and streams its log back from the host.
 - **`useInvokeState`** reads the selected task's manifest without suspending.
 - **`useIpcEvent`** subscribes to `workbench:log`. Detaching mid-run proves the
   subscription is torn down: remaining lines never arrive.
+- **`useNativeTheme` / `useWindowState`** and the `app` / `dialog` / `clipboard` /
+  `shell` / `windowControls` helpers — the Host panel exercises the same renderer
+  desktop surface a React Electron app would use under contextIsolation.
 - **Main-only APIs** — the Electron shell builds an application `Menu` from
   `@octanejs/electron/main/native` (intentional main-process surface).
 
@@ -33,3 +36,4 @@ the committed suite. The header badge reports which host answered.
 | --- | --- |
 | `/?fault=list` | The first `list_tasks` rejects; `@catch` offers a retry. |
 | `/?fault=describe` | The first `describe_task` rejects; detail recovers via `refetch()`. |
+| `/?fault=run` | The first `run_task` rejects; the run panel stays Idle with an alert. |

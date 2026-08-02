@@ -128,3 +128,53 @@ test('drops every line emitted while the log watcher is detached', async ({ page
 	await expect(logEntries(page)).toHaveCount(LOG_LINE_COUNT);
 	await expect(runStatus(page)).toHaveText('Finished');
 });
+
+test('reflects native theme and window state through the desktop hooks', async ({ page }) => {
+	await page.emulateMedia({ colorScheme: 'light' });
+	await page.goto(appUrl());
+	await expect(page.locator('#host-theme')).toHaveText('light');
+	await expect(page.locator('#host-title')).toHaveText('Electron Shell');
+	await expect(page.locator('#host-maximized')).toHaveText('no');
+
+	await page.emulateMedia({ colorScheme: 'dark' });
+	await expect(page.locator('#host-theme')).toHaveText('dark');
+
+	await page.getByRole('button', { name: 'Maximize window' }).click();
+	await expect(page.locator('#host-maximized')).toHaveText('yes');
+
+	await page.getByRole('button', { name: 'Set window title' }).click();
+	await expect(page.locator('#host-title')).toHaveText('Shell — working');
+
+	await page.getByRole('button', { name: 'Restore window' }).click();
+	await expect(page.locator('#host-maximized')).toHaveText('no');
+});
+
+test('exercises app, dialog, clipboard, and shell helpers from the renderer', async ({ page }) => {
+	await page.goto(appUrl());
+
+	await page.getByRole('button', { name: 'Read app version' }).click();
+	await expect(page.locator('#host-version')).toHaveText('0.0.0-browser');
+
+	await page.getByRole('button', { name: 'Show message' }).click();
+	await expect(page.locator('#host-dialog')).toHaveText('response 0');
+
+	await page.getByRole('button', { name: 'Round-trip clipboard' }).click();
+	await expect(page.locator('#host-clipboard')).toHaveText('shell-clipboard');
+
+	await page.getByRole('button', { name: 'Open docs' }).click();
+	await expect(page.locator('#host-opened')).toHaveText('https://octanejs.dev');
+});
+
+test('surfaces a refused run without leaving the task log running', async ({ page }) => {
+	await page.goto(appUrl({ fault: 'run' }));
+	await openTask(page, 'Typecheck');
+
+	await page.getByRole('button', { name: 'Run task' }).click();
+	await expect(page.getByRole('alert')).toContainText('the runner refused to start');
+	await expect(runStatus(page)).toHaveText('Idle');
+	await expect(logEntries(page)).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Run task' }).click();
+	await expect(logEntries(page)).toHaveCount(LOG_LINE_COUNT);
+	await expect(runStatus(page)).toHaveText('Finished');
+});

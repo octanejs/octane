@@ -213,3 +213,27 @@ button {
 	font-size: 0.84rem;
 	min-height: 1.4rem;
 }
+
+.host-row {
+	margin-top: 1.25rem;
+}
+
+.host-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0.75rem 0;
+}
+
+.host-actions button {
+	background: transparent;
+	color: inherit;
+	border: 1px solid var(--line);
+	border-radius: 0.4rem;
+	padding: 0.35rem 0.7rem;
+	cursor: pointer;
+}
+
+.host-actions button:hover {
+	border-color: var(--accent);
+}
