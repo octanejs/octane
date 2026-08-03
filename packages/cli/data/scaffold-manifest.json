@@ -1,0 +1,27 @@
+{
+  "templates": {
+    "spa": [
+      ".prettierrc",
+      "index.html",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "src/App.tsrx",
+      "src/main.ts",
+      "src/styles.css"
+    ],
+    "fullstack": [
+      ".prettierrc",
+      "index.html",
+      "octane.config.ts",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "src/App.tsrx",
+      "src/Counter.tsrx",
+      "src/Layout.tsrx",
+      "src/styles.css",
+      "src/server/health.ts"
+    ]
+  }
+}
