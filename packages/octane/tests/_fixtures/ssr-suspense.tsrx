@@ -122,6 +122,22 @@ export function Boundary(props) @{
 	</div>
 }
 
+// Plain async components return a fresh Promise on every server replay. The
+// surrounding boundary must render their eventual descriptor or catch their
+// rejection without leaving a superseded Promise unobserved.
+export function AsyncComponentBoundary(props) @{
+	<div id="async-component-box">
+		@try {
+			<props.component />
+		} @pending {
+			<span class="async-component-loading">{'loading'}</span>
+		} @catch (error) {
+			props.onCatch?.(error);
+			<span class="async-component-error">{error.message as string}</span>
+		}
+	</div>
+}
+
 // Rejection hydration fidelity probe. The catch arm observes both the original
 // reason type and custom fields, so streamed hydration cannot silently replace
 // a primitive/plain-object reason with a generic Error.
