@@ -469,3 +469,12 @@ export function FieldErrorEmptyCase() @{
 		<FieldError errors={[]} />
 	</div>
 }
+
+// Base UI accepts a scalar for a single-value slider; the thumb count must follow the value shape.
+export function SliderScalarCase() @{
+	<Slider defaultValue={30} />
+}
+
+export function SliderScalarZeroCase() @{
+	<Slider value={0} />
+}

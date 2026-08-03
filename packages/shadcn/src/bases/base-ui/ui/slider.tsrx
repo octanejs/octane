@@ -46,10 +46,26 @@ export function Slider({
 	max = 100,
 	...props
 }: SliderProps) {
-	const _values = useMemo(
-		() => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
-		[value, defaultValue, min, max],
-	);
+	// This drives HOW MANY THUMBS get rendered, so a value shape it fails to recognise is a visible
+	// bug rather than a type nicety.
+	//
+	// DEPARTS FROM THE TRANSCRIBED SOURCE, deliberately. Upstream only tests `Array.isArray` and
+	// otherwise falls back to `[min, max]` — but Base UI's Slider accepts a SCALAR for a
+	// single-value slider, and upstream types these props as `SliderPrimitive.Root.Props`, which
+	// permits one. So `defaultValue={30}` renders two thumbs against a one-value slider: the range
+	// fallback fires, and the second thumb has no value behind it.
+	const _values = useMemo(() => {
+		// A controlled `value` wins when present; `??` rather than `||` so a legitimate 0 counts.
+		const provided = value ?? defaultValue;
+		if (Array.isArray(provided)) {
+			return provided;
+		}
+		if (typeof provided === 'number') {
+			return [provided];
+		}
+		// Neither given: upstream's range-across-the-track default, kept as-is in both bases.
+		return [min, max];
+	}, [value, defaultValue, min, max]);
 
 	return createElement(
 		SliderPrimitive.Root,

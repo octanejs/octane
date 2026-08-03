@@ -725,6 +725,20 @@ describe('@octanejs/shadcn — Base UI slider is transcribed onto a different pa
 		}
 	});
 
+	it('renders ONE thumb for a scalar value, not the range fallback', () => {
+		// Base UI accepts a scalar for a single-value slider. Testing only `Array.isArray` — which
+		// is what the transcribed source does — drops a scalar through to the `[min, max]` range
+		// default, rendering two thumbs against a one-value slider with nothing behind the second.
+		for (const Case of [F.SliderScalarCase, F.SliderScalarZeroCase]) {
+			const m = mount(Case as never);
+			try {
+				expect(m.container.querySelectorAll('[data-slot="slider-thumb"]')).toHaveLength(1);
+			} finally {
+				m.unmount();
+			}
+		}
+	});
+
 	// NOT ASSERTED HERE, deliberately: where the thumbs and the fill actually sit. `thumbAlignment`
 	// is forwarded as `"edge"` (upstream's value), which switches the primitive to an inset mode
 	// that derives both from `getBoundingClientRect()` in a layout effect. Every rect is 0 in jsdom,
