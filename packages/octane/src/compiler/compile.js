@@ -16713,12 +16713,10 @@ function planJsx(
 			ctx.runtimeNeeded.add('queueRefDetach'); // unmount-detach of a spread-supplied ref
 		}
 		if (b.kind === 'ref') {
-			ctx.runtimeNeeded.add('attachRef');
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred mount attach (commit-phase timing)
 			ctx.runtimeNeeded.add('queueRefDetach'); // deferred unmount detach (same phasing)
 		}
 		if (b.kind === 'fragmentRef') {
-			ctx.runtimeNeeded.add('attachRef');
 			ctx.runtimeNeeded.add('mountFragmentRef');
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred update re-attach
 			ctx.runtimeNeeded.add('queueRefDetach'); // deferred update/unmount detach
@@ -18286,18 +18284,18 @@ function emitBindingMount(bind, elVar, bag) {
 			// bound element rides along as the cleanup target, so a callback ref
 			// shared across elements (ref={registerItem} on every @for row)
 			// releases ITS row's React-19 cleanup, not another row's.
-			// Both deferred closures read through the captured `_b` (committed by the
-			// time attach/cleanup run); `_ref$` must be a LIVE read — updates re-point it.
+			// Both deferred operations retain the bound element. `_ref$` must be a LIVE
+			// cleanup read because updates re-point it. Assigning both bag locals inside
+			// the queue call evaluates each mount value once while avoiding throwaway
+			// temporaries; Suspense still receives the exact ref/target pair.
 			return st(
 				b.block([
-					b.const('_r', bind.expr),
-					b.stmt(b.assignment('=', local(`_ref$${bind.id}`), b.id('_r'))),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
 					b.stmt(
 						b.call(
 							'_$queueRefAttach',
 							b.id('__s'),
-							b.arrow([], b.call('_$attachRef', b.id('_r'), bagFieldNode(bag, `_el$${bind.id}`))),
+							b.assignment('=', local(`_ref$${bind.id}`), bind.expr),
+							b.assignment('=', local(`_el$${bind.id}`), el()),
 						),
 					),
 					cleanupsPush(
@@ -18321,22 +18319,13 @@ function emitBindingMount(bind, elVar, bag) {
 			// the user's ref, and registers a single cleanup that detaches
 			// the ref + destroys the instance on unmount.
 			return st(
-				b.block([
-					b.const('_r', bind.expr),
-					b.stmt(
-						b.assignment(
-							'=',
-							local(`_fi$${bind.id}`),
-							b.call(
-								'_$mountFragmentRef',
-								b.id('__s'),
-								el(),
-								hostVarNode(bind.endElVar),
-								b.id('_r'),
-							),
-						),
+				b.stmt(
+					b.assignment(
+						'=',
+						local(`_fi$${bind.id}`),
+						b.call('_$mountFragmentRef', b.id('__s'), el(), hostVarNode(bind.endElVar), bind.expr),
 					),
-				]),
+				),
 			);
 		}
 	}
@@ -18596,13 +18585,7 @@ function emitBindingUpdate(bind, bag) {
 							),
 							b.if(
 								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(
-									b.call(
-										'_$queueRefAttach',
-										b.id('__s'),
-										b.arrow([], b.call('_$attachRef', b.id('_r'), F('_el'))),
-									),
-								),
+								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), F('_el'))),
 								null,
 							),
 							b.stmt(b.assignment('=', F('_ref'), b.id('_r'))),
@@ -18635,13 +18618,7 @@ function emitBindingUpdate(bind, bag) {
 							),
 							b.if(
 								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(
-									b.call(
-										'_$queueRefAttach',
-										b.id('__s'),
-										b.arrow([], b.call('_$attachRef', b.id('_r'), fi())),
-									),
-								),
+								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), fi())),
 								null,
 							),
 							b.stmt(b.assignment('=', cur(), b.id('_r'))),
