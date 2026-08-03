@@ -115,6 +115,20 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
+A one-level method call tracks the value that can change between renders. The
+compiled array selects that value on each render, based on where the method
+lives:
+
+- An own function property tracks itself: `props.onChange(...)` tracks
+  `props.onChange`.
+- An inherited method tracks its receiver: `count.toFixed(2)` tracks `count`,
+  because `Number.prototype.toFixed` is one function for every number.
+- An absent handler in an optional call tracks a stable `undefined`:
+  `props.onReady?.()` does not re-run its hook until a handler is passed.
+
+Deeper calls such as `cart.items.push(x)` track their receiver path
+(`cart.items`), unchanged.
+
 ### Calls to custom wrappers
 
 Inferring a missing dependency argument at a **call to a custom wrapper** is a

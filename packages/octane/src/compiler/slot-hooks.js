@@ -16,7 +16,7 @@
 
 import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
-import { annotateHookCalls } from './hook-deps.js';
+import { METHOD_DEP_IMPORT, annotateHookCalls } from './hook-deps.js';
 import { assertStrongMode } from './strong-mode.js';
 
 // Build a cheap import-presence gate. Precise call identity is annotated by the
@@ -940,9 +940,16 @@ function walk(node, owner, st) {
 				// The dependency callback is already the final user argument. Insert
 				// both the generated array and slot in one edit so equal-position edit
 				// ordering cannot reverse them. Dependency nodes retain original source
-				// offsets, preserving arbitrary TS syntax byte-for-byte.
+				// offsets, preserving arbitrary TS syntax byte-for-byte. Method-call
+				// dependencies are the one synthesized form: the helper call's root is
+				// a bare identifier and its name a JSON string, so no arbitrary TS
+				// syntax needs reprinting there either.
 				const deps = inferred.dependencies
-					.map((dependency) => st.source.slice(dependency.node.start, dependency.node.end))
+					.map((dependency) =>
+						dependency.method
+							? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${dependency.method.root.name}, ${JSON.stringify(dependency.method.name)})`
+							: st.source.slice(dependency.node.start, dependency.node.end),
+					)
 					.join(', ');
 				st.edits.push({
 					pos: node.arguments[node.arguments.length - 1].end,
