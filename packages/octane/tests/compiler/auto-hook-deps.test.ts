@@ -179,6 +179,87 @@ describe('automatic hook dependencies — full compiler', () => {
 		expect(code).toMatch(/import \{[^}]*__methodDep[^}]*\} from ['"]octane\/server['"]/);
 	});
 
+	it('tracks only root captures inside opaque-execution directive closures', () => {
+		// The TypeGPU shape from issue #542: `.$` is only legal inside shader
+		// code, so a `'use gpu'` closure contributes its root bindings and the
+		// dependency array performs no property read on them at render time.
+		const code = c(`
+      import { useMemo, useState } from 'octane';
+      import { fullScreenTriangle } from './common';
+      export function App(props) @{
+        const [tick] = useState(0);
+        const timeUniform = useMemo(() => props.root.createUniform(tick));
+        const pipeline = useMemo(() => {
+          return props.root.createRenderPipeline({
+            vertex: fullScreenTriangle,
+            fragment: () => {
+              'use gpu';
+              return timeUniform.$ + props.scale.factor;
+            },
+          });
+        });
+        <div>{tick as string}</div>
+      }
+    `);
+
+		// props.root from the (render-time) method call; roots only from the
+		// shader closure — timeUniform without .$, props without .scale.factor.
+		expect(code).toMatch(/\[props\.root, timeUniform, props\],\s*\d+\s*\)/);
+	});
+
+	it('applies the same opaque-closure rule to the worklet directive', () => {
+		const code = c(`
+      import { useEffect } from 'octane';
+      export function App(props) @{
+        useEffect(() => {
+          props.schedule(() => {
+            'worklet';
+            props.shared.value = props.shared.value + 1;
+          });
+        });
+        <div />
+      }
+    `);
+
+		expect(code).toMatch(/\[_\$__methodDep\(props, "schedule"\), props\],\s*\d+\s*\)/);
+	});
+
+	it('does not truncate closures with same-context or unknown directives', () => {
+		const code = c(`
+      import { useMemo } from 'octane';
+      export function App(props) @{
+        const strict = useMemo(() => {
+          const pick = () => {
+            'use strict';
+            return props.name;
+          };
+          return pick();
+        });
+        const hinted = useMemo(() => {
+          const pick = () => {
+            'use no memo';
+            return props.email;
+          };
+          return pick();
+        });
+        const unknown = useMemo(() => {
+          const pick = () => {
+            'use whatever';
+            return props.id;
+          };
+          return pick();
+        });
+        <div>{strict as string}{hinted as string}{unknown as string}</div>
+      }
+    `);
+
+		// Member paths survive: only allowlisted directives mark another
+		// execution context. A truncating regression would emit [props] here.
+		expect(code).toMatch(/\[props\.name\],\s*\d+\s*\)/);
+		expect(code).toMatch(/\[props\.email\],\s*\d+\s*\)/);
+		expect(code).toMatch(/\[props\.id\],\s*\d+\s*\)/);
+	});
+
 	it('compiles method-call deps inside custom hooks for the server print', () => {
 		// The shape that first tripped OCTANE_COMPILE_ASSERT_LOC (set for every
 		// vitest compile): a method call inside a hook callback of a module-level
@@ -492,6 +573,22 @@ export function useFixed(count: number) {
 			/useMemo\(\(\) => count\.toFixed\(2\), \[[\w$]+\(count, ["']toFixed["']\)\], _h\$\d+\)/,
 		);
 		expect(code).toMatch(/import \{[^}]*__methodDep[^}]*\} from ['"]octane['"]/);
+	});
+
+	it('tracks roots only for worklet closures in plain TypeScript', () => {
+		const source = `
+import { useEffect } from 'octane';
+export function useWorklet(shared: { value: number }, schedule: (fn: () => void) => void) {
+  useEffect(() => {
+    schedule(() => {
+      'worklet';
+      shared.value = shared.value + 1;
+    });
+  });
+}
+`;
+		const code = slotHooks(source, 'use-worklet.ts')!.code;
+		expect(code).toMatch(/, \[schedule, shared\], _h\$\d+\)/);
 	});
 
 	it('preserves complete referenced callback paths', () => {

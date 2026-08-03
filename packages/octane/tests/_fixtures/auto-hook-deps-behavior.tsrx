@@ -254,6 +254,45 @@ export function EffectFromOptionalMethodCall(props) @{
 	<span>{props.noise as string}</span>
 }
 
+// Issue #542, problem 2: a resource whose getter is only legal inside an
+// explicit context, mimicking TypeGPU's `.$`. Reading it during render throws.
+let shaderContext = false;
+
+export function withShaderContext(run) {
+	shaderContext = true;
+	try {
+		return run();
+	} finally {
+		shaderContext = false;
+	}
+}
+
+function createGpuResource(seed) {
+	return {
+		get $() {
+			if (!shaderContext) throw new Error('resource.$ read outside shader context');
+			return seed;
+		},
+	};
+}
+
+// A `'use gpu'` closure runs in another context, so inference tracks only its
+// root captures — the dependency array must never read `resource.$` at render.
+export function MemoFromOpaqueDirectiveClosure(props) @{
+	const resource = useMemo(() => createGpuResource(props.seed));
+	const pipeline = useMemo(() => {
+		const shader = () => {
+			'use gpu';
+			return resource.$;
+		};
+		return props.build(shader);
+	});
+	<div>
+		<span class="value">{pipeline as string}</span>
+		<span class="noise">{props.noise as string}</span>
+	</div>
+}
+
 // Issue #542: `count.toFixed` lives on Number.prototype, so its identity never
 // changes — the receiver's value is what the memo actually depends on.
 export function MemoFromPrototypeMethodCall() @{

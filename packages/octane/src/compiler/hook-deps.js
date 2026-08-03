@@ -824,6 +824,44 @@ function staticMemberInfo(node) {
 	};
 }
 
+// Directive prologues that declare "this body executes in another context, not
+// during render" — a nested function carrying one contributes only its ROOT
+// captures to an inferred dependency array, because hoisting its member reads
+// to render time would run getters in a context where they may be illegal
+// (issue #542: TypeGPU's `.$` is only readable inside `'use gpu'` shader code)
+// and at a moment the program never performs them.
+//
+// This is a deliberate ALLOWLIST, not "any directive": directives that mark
+// same-context compiler hints (`'use strict'`, React Compiler's `'use memo'` /
+// `'use no memo'`, `'use signals'`) or reserved module/function markers with
+// their own semantics (`'use server'`, `'use client'`, `'use cache'`,
+// `'use workflow'`/`'use step'`) must NOT truncate. Extend the set as more
+// other-context directives appear in the ecosystem.
+//
+//   'use gpu'  — TypeGPU shader functions (transpiled, run on the GPU).
+//   'worklet'  — react-native-reanimated / react-native-worklets-core bodies,
+//                serialized and executed on a separate UI-thread runtime.
+const OPAQUE_EXECUTION_DIRECTIVES = new Set(['use gpu', 'worklet']);
+
+// A directive prologue is the run of leading string-literal expression
+// statements. Parsers implementing ESTree stamp `directive` on those
+// statements; fall back to the literal value where they don't.
+function hasOpaqueExecutionDirective(fn) {
+	if (fn.body?.type !== 'BlockStatement') return false;
+	for (const statement of fn.body.body || []) {
+		if (statement.type !== 'ExpressionStatement') return false;
+		const expression = unwrapValue(statement.expression);
+		const value =
+			statement.directive ??
+			(expression?.type === 'Literal' && typeof expression.value === 'string'
+				? expression.value
+				: null);
+		if (value === null) return false;
+		if (OPAQUE_EXECUTION_DIRECTIVES.has(value)) return true;
+	}
+	return false;
+}
+
 // The `octane` runtime export inferred method-call dependencies compile to.
 // Both emitters alias it: the full compiler through `ctx.runtimeNeeded` (its
 // `_$`-prefixed rtAlias convention is baked into methodDepNode below) and the
@@ -927,6 +965,14 @@ function collectDependencies(expression, callbackScope, analysis) {
 		}
 	}
 
+	// Depth of enclosing functions whose directive prologue declares another
+	// execution context (see OPAQUE_EXECUTION_DIRECTIVES). Inside one, member
+	// chains truncate to their root bindings: the body's property reads happen
+	// in that other context, so hoisting them into a render-time dependency
+	// array would evaluate getters in a context where they may be illegal
+	// (TypeGPU's `.$`) and at a time the program never reads them.
+	let opaqueDepth = 0;
+
 	function walk(node) {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
@@ -943,6 +989,14 @@ function collectDependencies(expression, callbackScope, analysis) {
 				addIdentifier(node);
 				return;
 			case 'CallExpression': {
+				if (opaqueDepth > 0) {
+					// Roots only: the callee's receiver chain collapses through the
+					// MemberExpression case below; no method-pair dependency either,
+					// since it would read the member at render.
+					walk(node.callee);
+					walk(node.arguments);
+					return;
+				}
 				// Optional spellings land here too: `a?.b(x)` and `a.b?.(x)` are a
 				// CallExpression under a ChainExpression whose callee is a bare
 				// (possibly optional) MemberExpression, which staticMemberInfo accepts.
@@ -957,12 +1011,21 @@ function collectDependencies(expression, callbackScope, analysis) {
 				return;
 			}
 			case 'ChainExpression': {
+				if (opaqueDepth > 0) {
+					walk(node.expression);
+					return;
+				}
 				const info = staticMemberInfo(node);
 				if (info) addStaticMember(info);
 				else walk(node.expression);
 				return;
 			}
 			case 'MemberExpression': {
+				if (opaqueDepth > 0) {
+					walk(node.object);
+					if (node.computed) walk(node.property);
+					return;
+				}
 				const info = staticMemberInfo(node);
 				if (info) addStaticMember(info);
 				else {
@@ -991,10 +1054,14 @@ function collectDependencies(expression, callbackScope, analysis) {
 				return;
 			case 'FunctionDeclaration':
 			case 'FunctionExpression':
-			case 'ArrowFunctionExpression':
+			case 'ArrowFunctionExpression': {
+				const opaque = hasOpaqueExecutionDirective(node);
+				if (opaque) opaqueDepth++;
 				for (const param of node.params || []) walkPatternExpression(param);
 				walk(node.body);
+				if (opaque) opaqueDepth--;
 				return;
+			}
 			case 'ImportDeclaration':
 			case 'ExportAllDeclaration':
 			case 'MetaProperty':
