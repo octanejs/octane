@@ -44,6 +44,229 @@ function deferred<T>() {
 }
 
 describe('SSR Phase 4 — render() awaits use(promise)', () => {
+	it('renders fulfilled plain async components after replay', async () => {
+		const out = await prerender(m.AsyncComponentBoundary, {
+			component: async () => RT.createElement('span', { className: 'async-component-ok' }, 'ready'),
+		});
+
+		expect(out.html).toContain('<span class="async-component-ok">ready</span>');
+		expect(out.html).not.toContain('async-component-loading');
+	});
+
+	it('routes plain async component rejection to @catch without an unhandled replay rejection', async () => {
+		const reason = new Error('async-component-nope');
+		const caught: unknown[] = [];
+		const unhandled: unknown[] = [];
+		const onUnhandledRejection = (error: unknown) => unhandled.push(error);
+		process.on('unhandledRejection', onUnhandledRejection);
+		try {
+			const out = await prerender(m.AsyncComponentBoundary, {
+				onCatch: (error: unknown) => caught.push(error),
+				component: async () => {
+					throw reason;
+				},
+			});
+
+			expect(out.html).toContain('<span class="async-component-error">async-component-nope</span>');
+			expect(caught).toEqual([reason]);
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			process.off('unhandledRejection', onUnhandledRejection);
+		}
+	});
+
+	it('does not re-observe the settled thenable when replay keeps its identity', async () => {
+		const redundantObservation = new Error('stable-thenable-was-observed-again');
+		const unhandled: unknown[] = [];
+		const onUnhandledRejection = (error: unknown) => unhandled.push(error);
+		process.on('unhandledRejection', onUnhandledRejection);
+		let componentCalls = 0;
+		const value = RT.createElement('span', { className: 'stable-thenable' }, 'stable');
+		// React's trackUsedThenable only observes the replay value when its identity
+		// differs from the settled value. Make a same-identity subscription during
+		// replay externally visible as an otherwise-unhandled child rejection.
+		const stableThenable: any = Promise.resolve(value);
+		const nativeThen = stableThenable.then.bind(stableThenable);
+		stableThenable.then = (onFulfilled?: (value: unknown) => unknown, onRejected?: unknown) => {
+			if (componentCalls > 1) return Promise.reject(redundantObservation);
+			return nativeThen(onFulfilled, onRejected);
+		};
+		try {
+			const out = await prerender(m.AsyncComponentBoundary, {
+				component: () => {
+					componentCalls++;
+					return stableThenable;
+				},
+			});
+
+			expect(out.html).toContain('<span class="stable-thenable">stable</span>');
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			process.off('unhandledRejection', onUnhandledRejection);
+		}
+	});
+
+	it('keeps repeated and concurrent plain async component renders isolated', async () => {
+		const component = (value: string) => async () =>
+			RT.createElement('span', { className: 'async-component-value' }, value);
+
+		const [left, right] = await Promise.all([
+			prerender(m.AsyncComponentBoundary, { component: component('left') }),
+			prerender(m.AsyncComponentBoundary, { component: component('right') }),
+		]);
+		const repeated = await prerender(m.AsyncComponentBoundary, {
+			component: component('again'),
+		});
+
+		expect(left.html).toContain('<span class="async-component-value">left</span>');
+		expect(left.html).not.toContain('right');
+		expect(right.html).toContain('<span class="async-component-value">right</span>');
+		expect(right.html).not.toContain('left');
+		expect(repeated.html).toContain('<span class="async-component-value">again</span>');
+		expect(repeated.html).not.toContain('left');
+		expect(repeated.html).not.toContain('right');
+	});
+
+	it('isolates concurrent fulfilled and rejected plain async components', async () => {
+		const rejectedReason = new Error('mixed-rejected');
+		const caught: unknown[] = [];
+		const unhandled: unknown[] = [];
+		const onUnhandledRejection = (error: unknown) => unhandled.push(error);
+		process.on('unhandledRejection', onUnhandledRejection);
+		try {
+			const [fulfilled, rejected] = await Promise.all([
+				prerender(m.AsyncComponentBoundary, {
+					component: async () =>
+						RT.createElement('span', { className: 'mixed-ok' }, 'mixed-fulfilled'),
+				}),
+				prerender(m.AsyncComponentBoundary, {
+					onCatch: (error: unknown) => caught.push(error),
+					component: async () => {
+						throw rejectedReason;
+					},
+				}),
+			]);
+
+			expect(fulfilled.html).toContain('<span class="mixed-ok">mixed-fulfilled</span>');
+			expect(fulfilled.html).not.toContain('mixed-rejected');
+			expect(rejected.html).toContain('<span class="async-component-error">mixed-rejected</span>');
+			expect(rejected.html).not.toContain('mixed-fulfilled');
+			expect(caught).toEqual([rejectedReason]);
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			process.off('unhandledRejection', onUnhandledRejection);
+		}
+	});
+
+	it('isolates simultaneous rejected plain async components and their original reasons', async () => {
+		const leftReason = new Error('left-rejected');
+		const rightReason = new Error('right-rejected');
+		const leftCaught: unknown[] = [];
+		const rightCaught: unknown[] = [];
+		const unhandled: unknown[] = [];
+		const onUnhandledRejection = (error: unknown) => unhandled.push(error);
+		process.on('unhandledRejection', onUnhandledRejection);
+		try {
+			const [left, right] = await Promise.all([
+				prerender(m.AsyncComponentBoundary, {
+					onCatch: (error: unknown) => leftCaught.push(error),
+					component: async () => {
+						throw leftReason;
+					},
+				}),
+				prerender(m.AsyncComponentBoundary, {
+					onCatch: (error: unknown) => rightCaught.push(error),
+					component: async () => {
+						throw rightReason;
+					},
+				}),
+			]);
+
+			expect(left.html).toContain('<span class="async-component-error">left-rejected</span>');
+			expect(left.html).not.toContain('right-rejected');
+			expect(right.html).toContain('<span class="async-component-error">right-rejected</span>');
+			expect(right.html).not.toContain('left-rejected');
+			expect(leftCaught).toEqual([leftReason]);
+			expect(rightCaught).toEqual([rightReason]);
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			process.off('unhandledRejection', onUnhandledRejection);
+		}
+	});
+
+	it('keeps cached replay outcomes authoritative over custom thenable behavior', async () => {
+		const unhandled: unknown[] = [];
+		const onUnhandledRejection = (error: unknown) => unhandled.push(error);
+		process.on('unhandledRejection', onUnhandledRejection);
+		const replayThenable = (
+			observe: (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => void,
+		) => ({
+			then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
+				observe(resolve, reject);
+			},
+		});
+		const replaying = (first: PromiseLike<unknown>, replay: PromiseLike<unknown>) => {
+			let initial = true;
+			return () => {
+				if (initial) {
+					initial = false;
+					return first;
+				}
+				return replay;
+			};
+		};
+		try {
+			const originalReason = new Error('cached-rejection');
+			const caught: unknown[] = [];
+
+			const fulfilled = await prerender(m.AsyncComponentBoundary, {
+				component: replaying(
+					Promise.resolve(RT.createElement('span', { className: 'cached-ok' }, 'cached-value')),
+					replayThenable((resolve) => resolve('fresh-value')),
+				),
+			});
+			const rejected = await prerender(m.AsyncComponentBoundary, {
+				onCatch: (error: unknown) => caught.push(error),
+				component: replaying(
+					Promise.reject(originalReason),
+					replayThenable((_resolve, reject) => reject(new Error('fresh-rejection'))),
+				),
+			});
+			const throwsAfterContinuation = await prerender(m.AsyncComponentBoundary, {
+				component: replaying(
+					Promise.resolve(
+						RT.createElement('span', { className: 'cached-after-throw' }, 'cached-after-throw'),
+					),
+					replayThenable((resolve) => {
+						resolve('fresh-before-throw');
+						throw new Error('observer-threw');
+					}),
+				),
+			});
+
+			expect(fulfilled.html).toContain('<span class="cached-ok">cached-value</span>');
+			expect(fulfilled.html).not.toContain('fresh-value');
+			expect(rejected.html).toContain(
+				'<span class="async-component-error">cached-rejection</span>',
+			);
+			expect(rejected.html).not.toContain('fresh-rejection');
+			expect(caught).toEqual([originalReason]);
+			expect(throwsAfterContinuation.html).toContain(
+				'<span class="cached-after-throw">cached-after-throw</span>',
+			);
+			expect(throwsAfterContinuation.html).not.toContain('fresh-before-throw');
+			expect(throwsAfterContinuation.html).not.toContain('observer-threw');
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			process.off('unhandledRejection', onUnhandledRejection);
+		}
+	});
+
 	it('@try awaits use(promise) and renders the resolved success arm + seed', async () => {
 		const out = await prerender(m.Boundary, { promise: Promise.resolve('hi') });
 		// Nested ranges: outer = try-slot, inner = the resolved success arm.
