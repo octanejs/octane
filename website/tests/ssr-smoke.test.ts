@@ -97,7 +97,7 @@ describe('built Start server', () => {
 		const allJavaScript = readJavaScriptFiles(path.join(staticRoot, 'assets')).join('\n');
 		const routeOnlySentinels = [
 			'This link contains shared code.',
-			'Every suite at a glance',
+			'Octane vs the field',
 			'Configure Vite, Rspack, or Rsbuild for Octane apps.',
 			'Objects are not valid as an Octane child (found: %s).',
 		];

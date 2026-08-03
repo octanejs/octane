@@ -10,12 +10,13 @@ export function Explorer() @{
 	<section class="explorer" aria-labelledby="explorer-heading">
 		<div class="explorer-head">
 			<div class="explorer-titlerow">
-				<h2 id="explorer-heading" class="explorer-title">Measured, not vibes</h2>
+				<h2 id="explorer-heading" class="explorer-title">How Octane compares</h2>
 				<Link to="/benchmarks" class="explorer-all">All suites →</Link>
 			</div>
 			<p class="explorer-sub">
-				Pick the frameworks and suite for the bar chart, or scan the whole grid — every cell is a
-				geometric mean of that suite’s per-operation scores relative to Octane. Lower is better.
+				Choose a suite and a few frameworks for the bar chart, or scan the full grid. Each cell
+				shows the geometric mean of that framework’s per-operation scores relative to Octane. Lower
+				is better.
 			</p>
 		</div>
 		<BenchmarkExplorer card={HOME_SUMMARY} />

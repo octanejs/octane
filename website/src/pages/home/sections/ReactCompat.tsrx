@@ -24,23 +24,23 @@ export function ReactCompat() @{
 		<div class="compat-body">
 			<div class="compat-copy">
 				<h2 id="compat-heading" class="compat-title">
-					{'Incrementally migrate. '}
-					<span class="compat-accent">With OctaneCompat.</span>
+					{'Add Octane to a React app. '}
+					<span class="compat-accent">One component at a time.</span>
 				</h2>
 				<p class="compat-lead">
-					{'Already have a React 19 app? Drop compiled Octane islands into it with a ' +
-						'single component. Events stay native and delegated, islands read your real ' +
-						'React context with plain '}
+					{'OctaneCompat lets a React 19 app render compiled Octane components. Events ' +
+						'inside each island stay native and delegated. Octane components can read your ' +
+						'React context with '}
 					<code>use()</code>
-					{', and they render on the server and hydrate on the client. Migrate one ' +
-						'component at a time — no rewrite, no big bang.'}
+					{', and they render on the server and hydrate in the browser. You can migrate ' +
+						'one component at a time instead of rewriting the app.'}
 				</p>
 				<p class="compat-note">
-					{'The one thing that doesn’t cross over: React Server Components. Everything ' +
-						'else — hooks, Suspense, context, SSR — comes along.'}
+					{'React Server Components are the one exception. Hooks, Suspense, context and ' +
+						'SSR carry over.'}
 				</p>
 				<Link to="/docs/$slug" params={{ slug: 'react-compat' }} class="compat-link">
-					Read the OctaneCompat guide →
+					See how OctaneCompat works →
 				</Link>
 			</div>
 

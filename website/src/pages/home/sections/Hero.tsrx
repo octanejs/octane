@@ -30,10 +30,7 @@ export function Hero() @{
 					target="_blank"
 					rel="noreferrer"
 				>{'Inferno'}</a>
-				{', carrying its performance-first goal forward: React’s hooks, Suspense ' +
-					'and actions, compiled ahead of time. No virtual DOM. No rules of hooks. ' +
-					'No hand-maintained dependency arrays — the compiler works out what your ' +
-					'code captures for you.'}
+				{', built around the same focus on performance. It brings React’s hooks, Suspense, and actions to a compiler-first architecture. No virtual DOM, rules of hooks, or dependency arrays you have to maintain yourself. The compiler tracks what your code uses automatically.'}
 			</p>
 			<div class="hero-actions">
 				<Link to="/docs/$slug" params={{ slug: 'quick-start' }} class="btn-primary">

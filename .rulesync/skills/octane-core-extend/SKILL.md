@@ -99,7 +99,6 @@ rather than in a correctness test.
   using the same environment, warmup, iterations, and semantic controls.
 - `pnpm format:files <path...>` while iterating and
   `pnpm format:files:check <path...>` for a scoped check.
-- `pnpm format:check` as the final repo-wide formatting gate.
 
 ## Risk checks
 
