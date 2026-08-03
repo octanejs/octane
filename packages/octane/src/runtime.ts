@@ -3396,6 +3396,23 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 	return false;
 }
 
+function discardSubtreeRefAttachesFrom(queue: RefAttach[], root: Block): void {
+	let write = 0;
+	for (let read = 0; read < queue.length; read++) {
+		const entry = queue[read];
+		const owner = entry.block;
+		if (owner === root || (owner !== null && blockIsAncestorOf(root, owner))) continue;
+		queue[write++] = entry;
+	}
+	queue.length = write;
+}
+
+/** Drop commit-phase attaches owned by a primary that has just become hidden. */
+function discardSubtreeRefAttaches(root: Block): void {
+	discardSubtreeRefAttachesFrom(refAttachQueue, root);
+	if (WIP_CAPTURE !== null) discardSubtreeRefAttachesFrom(WIP_CAPTURE.refs, root);
+}
+
 function commitEffects(): void {
 	// No-work fast path: every commit queue the drains below consume is empty —
 	// the common case for a hydration adoption or an effect-free app's flush.
@@ -10191,6 +10208,21 @@ function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean
 // keep the `ref(null)` detach contract.
 const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
 const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
+// `refCleanups` is also the commit witness for cleanup-return callbacks. Legacy
+// callbacks need the same per-target witness so Suspense does not manufacture
+// `ref(null)` when a later sibling suspends before their queued attach commits.
+// Weak keys and targets ensure the witness cannot retain application objects.
+const attachedLegacyRefTargets = new WeakMap<(el: any) => unknown, WeakSet<object>>();
+
+function isRefTargetAttached(ref: any, target: Element | FragmentInstance): boolean {
+	if (typeof ref === 'function') {
+		return (
+			refCleanups.get(ref)?.has(target) === true ||
+			attachedLegacyRefTargets.get(ref)?.has(target) === true
+		);
+	}
+	return ref !== null && typeof ref === 'object' && ref.current === target;
+}
 
 export function attachRef(
 	ref: any,
@@ -10210,6 +10242,7 @@ export function attachRef(
 				if (refLastCleanupTarget.get(ref) === target) refLastCleanupTarget.delete(ref);
 				cleanup();
 			} else {
+				if (target != null) attachedLegacyRefTargets.get(ref)?.delete(target);
 				ref(null);
 			}
 		} else {
@@ -10219,6 +10252,10 @@ export function attachRef(
 				if (perTarget === undefined) refCleanups.set(ref, (perTarget = new WeakMap()));
 				perTarget.set(el, cleanup as () => void);
 				refLastCleanupTarget.set(ref, el);
+			} else {
+				let targets = attachedLegacyRefTargets.get(ref);
+				if (targets === undefined) attachedLegacyRefTargets.set(ref, (targets = new WeakSet()));
+				targets.add(el);
 			}
 		}
 		return;
@@ -10228,6 +10265,15 @@ export function attachRef(
 		return;
 	}
 	ref.current = el;
+}
+
+/** Detach only ref leaves whose commit-phase attach actually ran. */
+function detachAttachedRef(ref: any, target: Element | FragmentInstance): void {
+	if (Array.isArray(ref)) {
+		for (let i = 0; i < ref.length; i++) detachAttachedRef(ref[i], target);
+	} else if (isRefTargetAttached(ref, target)) {
+		attachRef(ref, null, target);
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19685,6 +19731,10 @@ function hideTryContentAndMountPending(
 	}
 	if (state.tryBlock) {
 		const persistent = state.tryBlock;
+		// A ref mounted before the suspending sibling queued an attach but has not
+		// reached the commit phase. The fallback commit must discard that work;
+		// reveal will enumerate the primary's current manifests and attach them.
+		discardSubtreeRefAttaches(persistent);
 		deactivateScope(persistent, false);
 		// Effect cleanups are user code and may synchronously replace/unmount this
 		// root. Never continue a half-finished fallback commit into detached markers.
@@ -19695,7 +19745,9 @@ function hideTryContentAndMountPending(
 			state.detachedRefs = [];
 			// Nested boundaries may already have detached their hidden primary refs.
 			// Visit only each nested boundary's visible arm here so an outer hide
-			// cannot detach the preserved inner primary a second time.
+			// cannot detach the preserved inner primary a second time. The attach
+			// witness checked by detachSubtreeRefs excludes refs that only reached the
+			// queue before this suspension; reveal attaches the current manifests.
 			detachSubtreeRefs(persistent, state.detachedRefs, true, false);
 		}
 		// Callback refs (and React-19 ref cleanups) are user code too. In particular,
@@ -22076,7 +22128,7 @@ function detachSubtreeRefs(
 					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
 					out.push({ ref, el, scope });
-					if (shouldDetach) attachRef(ref, null, el);
+					if (shouldDetach) detachAttachedRef(ref, el);
 				} else if (kind === 's') {
 					// Spread binding: the committed spread object may carry a ref.
 					const ref = bag[rm[j + 1]]?.ref;
@@ -22084,14 +22136,14 @@ function detachSubtreeRefs(
 					const el = bag[rm[j + 2]];
 					if (el == null) continue;
 					out.push({ ref, el, scope });
-					if (shouldDetach) attachRef(ref, null, el);
+					if (shouldDetach) detachAttachedRef(ref, el);
 				} else {
 					// 'f' — <Fragment ref>: detach the FragmentInstance's current ref;
 					// reveal re-attaches the same instance.
 					const fi = bag[rm[j + 1]];
 					if (fi == null || fi._currentRef == null) continue;
 					out.push({ ref: fi._currentRef, el: fi, scope });
-					if (shouldDetach) attachRef(fi._currentRef, null, fi);
+					if (shouldDetach) detachAttachedRef(fi._currentRef, fi);
 				}
 			}
 		}
@@ -22103,7 +22155,7 @@ function detachSubtreeRefs(
 		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
 		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
 			out.push({ ref: s.ref, el: s.el, scope });
-			if (shouldDetach) attachRef(s.ref, null, s.el);
+			if (shouldDetach) detachAttachedRef(s.ref, s.el);
 		}
 		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
 		if (s.__kind === 'childSlot' && s.hostNode != null) {
@@ -22140,7 +22192,7 @@ function detachDeoptTreeRefs(
 		if (out !== null) {
 			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
 			out.push({ ref, el: node as Element, scope: ownerScope! });
-			if (shouldDetach) attachRef(ref, null, node as Element);
+			if (shouldDetach) detachAttachedRef(ref, node as Element);
 		} else {
 			// Teardown: DEFER the detach to commit (drainRefDetaches), before the
 			// mount attaches. Teardown runs mid-render (reconcile/unmount), and a
