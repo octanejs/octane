@@ -33,7 +33,7 @@ component names stay identical.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 21/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 31/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -43,18 +43,18 @@ component names stay identical.
 | `alert` | ✅ | ✅ | ✅ |
 | `alert-dialog` | ✅ | ✅ | ✅ |
 | `aspect-ratio` | ✅ | ✅ | ✅ |
-| `avatar` | ✅ | ✅ | — |
+| `avatar` | ✅ | ✅ | ✅ |
 | `badge` | ✅ | ✅ | — |
 | `breadcrumb` | ✅ | ✅ | — |
 | `button` | ✅ | ✅ | ✅ |
 | `card` | ✅ | ✅ | ✅ |
 | `checkbox` | ✅ | ✅ | ✅ |
-| `collapsible` | ✅ | ✅ | — |
+| `collapsible` | ✅ | ✅ | ✅ |
 | `context-menu` | ✅ | ⛔ | — |
 | `dialog` | ✅ | ✅ | ✅ |
 | `dropdown-menu` | ✅ | ⛔ | — |
 | `empty` | ✅ | ✅ | ✅ |
-| `field` | ✅ | ✅ | — |
+| `field` | ✅ | ✅ | ✅ |
 | `hover-card` | ✅ | ⛔ | — |
 | `input` | ✅ | ✅ | ✅ |
 | `item` | ✅ | ✅ | — |
@@ -63,25 +63,25 @@ component names stay identical.
 | `menubar` | ✅ | ⛔ | — |
 | `native-select` | ✅ | ✅ | ✅ |
 | `navigation-menu` | ✅ | ⛔ | ⛔ |
-| `pagination` | ✅ | ✅ | — |
+| `pagination` | ✅ | ✅ | ✅ |
 | `popover` | ✅ | ✅ | ✅ |
-| `progress` | ✅ | ⛔ | — |
+| `progress` | ✅ | ⛔ | ✅ |
 | `radio-group` | ✅ | ✅ | ✅ |
 | `scroll-area` | ✅ | ✅ | ⛔ |
 | `select` | ✅ | ⛔ | ⛔ |
 | `separator` | ✅ | ✅ | ✅ |
-| `sheet` | ✅ | ✅ | — |
+| `sheet` | ✅ | ✅ | ✅ |
 | `sidebar` | ✅ | ⛔ | — |
 | `skeleton` | ✅ | ✅ | ✅ |
-| `slider` | ✅ | ✅ | — |
+| `slider` | ✅ | ✅ | ✅ |
 | `sonner` | ✅ | ⛔ | ⛔ |
 | `spinner` | ✅ | ✅ | ✅ |
 | `switch` | ✅ | ✅ | ✅ |
-| `table` | ✅ | ✅ | — |
+| `table` | ✅ | ✅ | ✅ |
 | `tabs` | ✅ | ✅ | ⛔ |
 | `textarea` | ✅ | ✅ | ✅ |
-| `toggle` | ✅ | ✅ | — |
-| `toggle-group` | ✅ | ⛔ | — |
+| `toggle` | ✅ | ✅ | ✅ |
+| `toggle-group` | ✅ | ⛔ | ✅ |
 | `tooltip` | ✅ | ⛔ | ✅ |
 
 **Blocked**

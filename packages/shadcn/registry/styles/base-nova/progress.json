@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "progress",
+  "type": "registry:ui",
+  "title": "Progress",
+  "files": [
+    {
+      "path": "ui/progress.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/progress.tsrx",
+      "content": "// Base UI base progress — runs on @octanejs/base-ui's Progress.\n//\n// TWO STRUCTURAL DIFFERENCES FROM THE RADIX BASE, both verified by rendering the primitive\n// rather than inferred:\n//\n//   1. THERE IS A TRACK PART. Radix goes Root > Indicator; Base UI goes Root > Track > Indicator,\n//      and the Track is what carries the rail. Rendering an Indicator directly under Root would\n//      put it outside the element the primitive sizes against.\n//\n//   2. THE INDICATOR SIZES ITSELF. Radix leaves the fill entirely to the consumer, which is why\n//      its base ships `style={{ transform: translateX(-${100 - value}%) }}`. Base UI's Indicator\n//      already emits `width: <value>%` inline. Carrying the radix transform across would shift a\n//      correctly-sized bar sideways by the same amount again — a double offset, worst at the\n//      midpoint and invisible at 0% and 100%.\n//\n// So `value` is forwarded to the Root (which owns the aria-valuenow/valuetext contract) and NOT\n// turned into a transform.\n//\n// UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than\n// transcribed from upstream's Base UI source; the rail/fill classes are split across Track and\n// Indicator to match the extra part.\nimport { Progress as ProgressPrimitive } from '@octanejs/base-ui/progress';\n\nimport { cn } from '@/lib/utils';\n\nexport interface ProgressProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvalue?: number | null;\n}\n\nexport function Progress({ className, value, ...props }: ProgressProps) @{\n\t// Base UI's Root types `value` as `number | null` where shadcn's prop is optional, and null is\n\t// its documented indeterminate state — so an omitted value maps to null rather than being\n\t// forwarded as undefined.\n\t<ProgressPrimitive.Root data-slot=\"progress\" value={value ?? null} {...props}>\n\t\t<ProgressPrimitive.Track\n\t\t\tdata-slot=\"progress-track\"\n\t\t\tclassName={cn('relative h-2 w-full overflow-hidden rounded-full bg-primary/20', className)}\n\t\t>\n\t\t\t<ProgressPrimitive.Indicator\n\t\t\t\tdata-slot=\"progress-indicator\"\n\t\t\t\tclassName=\"h-full bg-primary transition-all\"\n\t\t\t/>\n\t\t</ProgressPrimitive.Track>\n\t</ProgressPrimitive.Root>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/base-ui@0.1.21"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

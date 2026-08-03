@@ -133,6 +133,24 @@
       ]
     },
     {
+      "name": "avatar",
+      "type": "registry:ui",
+      "title": "Avatar",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/avatar.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/avatar.tsrx"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -187,6 +205,21 @@
       ]
     },
     {
+      "name": "collapsible",
+      "type": "registry:ui",
+      "title": "Collapsible",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "files": [
+        {
+          "path": "ui/collapsible.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/collapsible.tsrx"
+        }
+      ]
+    },
+    {
       "name": "dialog",
       "type": "registry:ui",
       "title": "Dialog",
@@ -222,6 +255,26 @@
           "path": "ui/empty.tsrx",
           "type": "registry:ui",
           "target": "components/ui/empty.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "field",
+      "type": "registry:ui",
+      "title": "Field",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/label",
+        "@octane/separator",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/field.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/field.tsrx"
         }
       ]
     },
@@ -295,6 +348,25 @@
       ]
     },
     {
+      "name": "pagination",
+      "type": "registry:ui",
+      "title": "Pagination",
+      "dependencies": [
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/button",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/pagination.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/pagination.tsrx"
+        }
+      ]
+    },
+    {
       "name": "popover",
       "type": "registry:ui",
       "title": "Popover",
@@ -309,6 +381,24 @@
           "path": "ui/popover.tsrx",
           "type": "registry:ui",
           "target": "components/ui/popover.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "progress",
+      "type": "registry:ui",
+      "title": "Progress",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/progress.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/progress.tsrx"
         }
       ]
     },
@@ -350,6 +440,26 @@
       ]
     },
     {
+      "name": "sheet",
+      "type": "registry:ui",
+      "title": "Sheet",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/button",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/sheet.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/sheet.tsrx"
+        }
+      ]
+    },
+    {
       "name": "skeleton",
       "type": "registry:ui",
       "title": "Skeleton",
@@ -362,6 +472,24 @@
           "path": "ui/skeleton.tsrx",
           "type": "registry:ui",
           "target": "components/ui/skeleton.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "slider",
+      "type": "registry:ui",
+      "title": "Slider",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/slider.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/slider.tsrx"
         }
       ]
     },
@@ -402,6 +530,21 @@
       ]
     },
     {
+      "name": "table",
+      "type": "registry:ui",
+      "title": "Table",
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/table.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/table.tsrx"
+        }
+      ]
+    },
+    {
       "name": "textarea",
       "type": "registry:ui",
       "title": "Textarea",
@@ -414,6 +557,45 @@
           "path": "ui/textarea.tsrx",
           "type": "registry:ui",
           "target": "components/ui/textarea.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "toggle-group",
+      "type": "registry:ui",
+      "title": "Toggle Group",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/toggle",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/toggle-group.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/toggle-group.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "toggle",
+      "type": "registry:ui",
+      "title": "Toggle",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/toggle.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/toggle.tsrx"
         }
       ]
     },

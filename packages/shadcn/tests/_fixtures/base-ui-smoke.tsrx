@@ -28,7 +28,53 @@ import {
 	AlertDialogTrigger,
 } from '@octanejs/shadcn/base-ui/AlertDialog';
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
+import {
+	Avatar,
+	AvatarFallback,
+	AvatarGroup,
+	AvatarGroupCount,
+} from '@octanejs/shadcn/base-ui/Avatar';
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSeparator,
+	FieldSet,
+	FieldTitle,
+} from '@octanejs/shadcn/base-ui/Field';
+import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from '@octanejs/shadcn/base-ui/Pagination';
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableFooter,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@octanejs/shadcn/base-ui/Table';
+import { Slider } from '@octanejs/shadcn/base-ui/Slider';
+import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
+import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
 import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@octanejs/shadcn/base-ui/Collapsible';
 import {
 	Dialog,
 	DialogContent,
@@ -81,6 +127,15 @@ import {
 	NativeSelectOption,
 } from '@octanejs/shadcn/base-ui/NativeSelect';
 import { Separator } from '@octanejs/shadcn/base-ui/Separator';
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
 import { Textarea } from '@octanejs/shadcn/base-ui/Textarea';
@@ -259,4 +314,167 @@ export function TooltipCase() @{
 			<TooltipContent>Tooltip body</TooltipContent>
 		</Tooltip>
 	</TooltipProvider>
+}
+
+export function CollapsibleCase() @{
+	<Collapsible defaultOpen>
+		<CollapsibleTrigger>Toggle</CollapsibleTrigger>
+		<CollapsibleContent>Collapsible body</CollapsibleContent>
+	</Collapsible>
+}
+
+// Rendered OPEN so the portalled tree exists; a closed sheet renders only its trigger.
+export function SheetCase() @{
+	<Sheet defaultOpen>
+		<SheetTrigger>Open sheet</SheetTrigger>
+		<SheetContent>
+			<SheetHeader>
+				<SheetTitle>Sheet title</SheetTitle>
+				<SheetDescription>Sheet description.</SheetDescription>
+			</SheetHeader>
+			<SheetFooter>Sheet footer</SheetFooter>
+		</SheetContent>
+	</Sheet>
+}
+
+export function SheetLeftCase() @{
+	<Sheet defaultOpen>
+		<SheetTrigger>Open left</SheetTrigger>
+		<SheetContent side="left">
+			<SheetTitle>Left sheet</SheetTitle>
+		</SheetContent>
+	</Sheet>
+}
+
+export function AvatarCase() @{
+	<Avatar>
+		<AvatarFallback>AB</AvatarFallback>
+	</Avatar>
+}
+
+export function AvatarGroupCase() @{
+	<AvatarGroup>
+		<Avatar size="lg">
+			<AvatarFallback>CD</AvatarFallback>
+		</Avatar>
+		<AvatarGroupCount>+2</AvatarGroupCount>
+	</AvatarGroup>
+}
+
+export function ProgressCase() @{
+	<Progress value={40} />
+}
+
+// Indeterminate: shadcn's `value` is optional, and Base UI's Root types it as `number | null`.
+export function ProgressNoValueCase() @{
+	<Progress />
+}
+
+export function SliderCase() @{
+	<Slider defaultValue={[30]} />
+}
+
+export function SliderRangeCase() @{
+	<Slider defaultValue={[20, 60]} />
+}
+
+export function TogglePressedCase() @{
+	<Toggle defaultPressed>Bold</Toggle>
+}
+
+export function ToggleGroupCase() @{
+	<ToggleGroup defaultValue={['b']}>
+		<ToggleGroupItem value="a">A</ToggleGroupItem>
+		<ToggleGroupItem value="b">B</ToggleGroupItem>
+	</ToggleGroup>
+}
+
+export function TableCase() @{
+	<Table>
+		<TableCaption>Recent invoices</TableCaption>
+		<TableHeader>
+			<TableRow>
+				<TableHead>Invoice</TableHead>
+				<TableHead>Amount</TableHead>
+			</TableRow>
+		</TableHeader>
+		<TableBody>
+			<TableRow data-state="selected">
+				<TableCell>INV-001</TableCell>
+				<TableCell>$250.00</TableCell>
+			</TableRow>
+		</TableBody>
+		<TableFooter>
+			<TableRow>
+				<TableCell>Total</TableCell>
+				<TableCell>$250.00</TableCell>
+			</TableRow>
+		</TableFooter>
+	</Table>
+}
+
+export function PaginationCase() @{
+	<Pagination>
+		<PaginationContent>
+			<PaginationItem>
+				<PaginationPrevious href="#prev" />
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationLink href="#1">1</PaginationLink>
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationLink href="#2" isActive>2</PaginationLink>
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationEllipsis />
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationNext href="#next" />
+			</PaginationItem>
+		</PaginationContent>
+	</Pagination>
+}
+
+// Standalone on purpose, like every case here: FieldLabel must not require a Field.Root ancestor.
+export function FieldCase() @{
+	<FieldSet>
+		<FieldLegend>Contact</FieldLegend>
+		<FieldGroup>
+			<Field>
+				<FieldLabel htmlFor="email-x">Email</FieldLabel>
+				<FieldDescription>We never share it.</FieldDescription>
+			</Field>
+			<FieldSeparator>or</FieldSeparator>
+			<Field orientation="horizontal" data-invalid="true">
+				<FieldContent>
+					<FieldTitle>Phone</FieldTitle>
+				</FieldContent>
+			</Field>
+		</FieldGroup>
+	</FieldSet>
+}
+
+export function FieldErrorsCase() @{
+	<FieldError
+		errors={[{ message: 'Required' }, { message: 'Required' }, { message: 'Too short' }]}
+	/>
+}
+
+export function FieldErrorSingleCase() @{
+	<FieldError errors={[{ message: 'Required' }, { message: 'Required' }]} />
+}
+
+export function FieldErrorEmptyCase() @{
+	<div data-slot="probe">
+		<FieldError errors={[]} />
+	</div>
+}
+
+// Base UI accepts a scalar for a single-value slider; the thumb count must follow the value shape.
+export function SliderScalarCase() @{
+	<Slider defaultValue={30} />
+}
+
+export function SliderScalarZeroCase() @{
+	<Slider value={0} />
 }

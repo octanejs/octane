@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "collapsible",
+  "type": "registry:ui",
+  "title": "Collapsible",
+  "files": [
+    {
+      "path": "ui/collapsible.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/collapsible.tsrx",
+      "content": "// Base UI base collapsible — runs on @octanejs/base-ui's Collapsible.\n//\n// PART MAPPING: shadcn names the content part `CollapsibleContent` while the Base UI part\n// underneath is `Collapsible.Panel` — the same rename this base already makes for `accordion`.\n// The exported names and all three `data-slot` values stay as shadcn defines them, so consumers\n// see no difference between bases.\n//\n// No class strings: upstream ships this family unstyled in every base, leaving layout to the\n// consumer. There is correspondingly no styling risk here, and nothing to verify against a\n// class-string source.\nimport { Collapsible as CollapsiblePrimitive } from '@octanejs/base-ui/collapsible';\n\ntype Props = Record<string, unknown>;\n\nexport function Collapsible(props: Props) @{\n\t<CollapsiblePrimitive.Root data-slot=\"collapsible\" {...props} />\n}\n\nexport function CollapsibleTrigger(props: Props) @{\n\t<CollapsiblePrimitive.Trigger data-slot=\"collapsible-trigger\" {...props} />\n}\n\nexport function CollapsibleContent(props: Props) @{\n\t<CollapsiblePrimitive.Panel data-slot=\"collapsible-content\" {...props} />\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/base-ui@0.1.21"
+  ]
+}
