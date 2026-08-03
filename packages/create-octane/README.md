@@ -27,10 +27,13 @@ drop it there.
 `spa` is a client-only app: the compiler plugin, an `index.html`, and an entry
 that mounts one component.
 
+<!-- scaffold:spa -->
+
 ```
 index.html
 vite.config.ts
 tsconfig.json
+package.json
 .prettierrc
 src/
   main.ts        mounts App into #root
@@ -38,15 +41,20 @@ src/
   styles.css     the reset and the theme tokens
 ```
 
+<!-- /scaffold:spa -->
+
 `fullstack` adds `octane.config.ts` with routing, streaming SSR, hydration, and
 a production build, and it uses that surface rather than describing it: a second
 page, and an endpoint that returns a `Response` instead of a component.
+
+<!-- scaffold:fullstack -->
 
 ```
 index.html            carries the <!--ssr-head--> / <!--ssr-body--> markers
 octane.config.ts      2 render routes + 1 server route
 vite.config.ts
 tsconfig.json
+package.json
 .prettierrc
 src/
   App.tsrx            /
@@ -55,6 +63,8 @@ src/
   styles.css          the reset and the theme tokens
   server/health.ts    GET /api/health
 ```
+
+<!-- /scaffold:fullstack -->
 
 Both open on a page that links back into the documentation, and both are a
 working starting point rather than a directory of things to delete. The palette,

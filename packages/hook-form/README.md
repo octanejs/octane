@@ -57,7 +57,11 @@ scheduling, render-bailout, and test-flush differences, including consumer
 impact and migration guidance. Differential tests also assert byte-identical
 DOM against the real react-hook-form. See
 [`UPSTREAM.md`](./UPSTREAM.md) for the pin,
-source inventory, export crosswalk, and test dispositions.
+source inventory, export crosswalk, and test dispositions. The root Vitest
+project declares upstream and differential files as `react-parity` execution
+group ownership; the generic sharded config derives the remaining local
+conformance suite according to the
+[React parity test-execution contract](../../docs/react-parity-testing.md).
 
 ## License
 

@@ -4,6 +4,7 @@ title: CLI
 
 import { PackageInstall } from '../../components/PackageInstall.tsrx';
 import { FileTree } from '../../components/FileTree.tsrx';
+import { spaFiles, fullstackFiles } from '../scaffold-files.ts';
 
 <div className="doc-hero">
 	<h1>CLI</h1>
@@ -138,38 +139,13 @@ Both templates open on a landing page that links back into these docs, and both
 are a working starting point rather than a directory of things to delete.
 `spa` mounts one component into an `index.html`:
 
-<FileTree
-	label="Files created by the spa template"
-	entries={[
-		{ path: 'index.html' },
-		{ path: 'vite.config.ts' },
-		{ path: 'tsconfig.json' },
-		{ path: '.prettierrc' },
-		{ path: 'src/main.ts' },
-		{ path: 'src/App.tsrx' },
-		{ path: 'src/styles.css' },
-	]}
-/>
+<FileTree label="Files created by the spa template" entries={spaFiles} />
 
 `fullstack` uses the app layer rather than describing it — a second page that
 arrives server-rendered and becomes interactive on hydration, and an endpoint
 that returns a `Response` instead of a component:
 
-<FileTree
-	label="Files created by the fullstack template"
-	entries={[
-		{ path: 'index.html', note: 'SSR markers' },
-		{ path: 'octane.config.ts', note: 'routes' },
-		{ path: 'vite.config.ts' },
-		{ path: 'tsconfig.json' },
-		{ path: '.prettierrc' },
-		{ path: 'src/App.tsrx' },
-		{ path: 'src/Counter.tsrx' },
-		{ path: 'src/Layout.tsrx' },
-		{ path: 'src/styles.css' },
-		{ path: 'src/server/health.ts', note: 'GET /api/health' },
-	]}
-/>
+<FileTree label="Files created by the fullstack template" entries={fullstackFiles} />
 
 The palette, typography and card styling are this site's own, so a new app and
 these docs look like one thing. `src/styles.css` holds the tokens and both

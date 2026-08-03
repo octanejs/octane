@@ -1,11 +1,26 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
+const shardedVitestConfigSource = readFileSync(
+	path.join(REPO, 'vitest.ci-sharded.config.js'),
+	'utf8',
+);
+const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
+const packageJson = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
+const reactParityHarness = readFileSync(
+	path.join(REPO, 'scripts/react-parity/harness.mjs'),
+	'utf8',
+);
+const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.config.js')));
+const { configureShardedProjects, default: shardedVitestConfig } = await import(
+	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
+);
 const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
 const draftWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/draft-agent-prs.yml'),
@@ -105,6 +120,7 @@ describe('CI workflow aggregation', () => {
 
 		for (const job of [
 			'test_shard',
+			'react_parity_checks',
 			'website_e2e',
 			'heavy_integration',
 			'typecheck_checks',
@@ -127,6 +143,129 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('test'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('examples'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);
+	});
+
+	test('keeps cheap parity validation universal and full execution on Node 24', () => {
+		const parity = jobSource('react_parity_checks');
+		const lint = jobSource('lint_checks');
+		assert.match(parity, /name: React parity checks/);
+		assert.match(parity, /node-version: 24/);
+		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
+		assert.match(parity, /pnpm react-parity:check/);
+		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
+		assert.match(lint, /pnpm react-parity:test/);
+		assert.match(lint, /pnpm react-parity:validate/);
+		assert.doesNotMatch(lint, /pnpm react-parity:check/);
+		assert.equal(
+			packageJson.scripts['react-parity:validate'],
+			'node scripts/react-parity/check.mjs --validate-only',
+		);
+		assert.doesNotMatch(workflow, /hook-form/);
+
+		assert.match(jobSource('release_change'), /"React parity checks"/);
+		assert.match(
+			jobSource('test_shard'),
+			/pnpm test\s+--config vitest\.ci-sharded\.config\.js\s+--shard=/,
+		);
+		assert.doesNotMatch(vitestConfig, /defineTestProjects|ciOwnedProject|ciOwner/);
+		assert.doesNotMatch(vitestConfig, /\bsharded\s*:/);
+		assert.match(
+			shardedVitestConfigSource,
+			/const \{ testExecution, \.\.\.vitestProject \} = project/,
+		);
+		const baseProjects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		const shardedProjects = new Map(
+			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
+		);
+		for (const project of [
+			'hook-form-pristine',
+			'hook-form',
+			'hook-form-differential',
+			'hook-form-server',
+		]) {
+			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
+		}
+		for (const project of ['hook-form', 'hook-form-server']) {
+			assert.equal(baseProjects.get(project).test.maxWorkers, undefined);
+			assert.equal(baseProjects.get(project).test.fileParallelism, undefined);
+		}
+		assert.equal(baseProjects.get('hook-form').test.globalSetup, undefined);
+		assert.deepEqual(baseProjects.get('hook-form-differential').test.include, [
+			'packages/hook-form/tests/differential/**/*.test.ts',
+			'packages/hook-form/tests/differential/**/*.test.tsx',
+		]);
+		assert.deepEqual(baseProjects.get('hook-form-differential').test.globalSetup, [
+			'packages/hook-form/tests/differential/_setup.ts',
+		]);
+		assert.equal(shardedProjects.has('hook-form-pristine'), false);
+		assert.equal(shardedProjects.has('hook-form-differential'), false);
+		assert.equal(shardedProjects.has('hook-form-server'), false);
+		assert.deepEqual(shardedProjects.get('hook-form').test.include, [
+			'packages/hook-form/tests/**/*.test.ts',
+			'packages/hook-form/tests/**/*.test.tsx',
+		]);
+		for (const pattern of baseProjects.get('hook-form').testExecution.include) {
+			assert.equal(shardedProjects.get('hook-form').test.exclude.includes(pattern), true);
+		}
+		assert.equal(shardedProjects.get('hook-form').testExecution, undefined);
+
+		const aggregate = jobSource('test');
+		assert.match(
+			aggregate,
+			/needs: \[release_change, test_shard, react_parity_checks, website_e2e, heavy_integration\]/,
+		);
+		assert.match(aggregate, /REACT_PARITY_RESULT: \$\{\{ needs\.react_parity_checks\.result \}\}/);
+		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
+		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
+
+		// The manifest runner owns all required lanes in one process. Execution
+		// reports prove exact identities, so only explicit validation collects.
+		assert.match(
+			reactParityCheck,
+			/manifest\.provenance\.verification === 'verified' \? 'run-required' : 'validate'/,
+		);
+		assert.match(
+			reactParityCheck,
+			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
+		);
+		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
+		assert.doesNotMatch(reactParityCheck, /'--lane'/);
+		const executionMarker = "} else {\n\tif (action === 'run-required'";
+		const executionStart = reactParityHarness.indexOf(executionMarker);
+		assert.notEqual(executionStart, -1);
+		const executionBranch = reactParityHarness.slice(executionStart);
+		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
+	});
+
+	test('derives sharded projects generically from execution-group ownership', () => {
+		const projects = configureShardedProjects([
+			{ test: { name: 'ordinary', include: ['ordinary/**/*.test.ts'] } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: { name: 'fully-owned', include: ['alpha/**/*.test.ts'] },
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['beta/parity/**/*.test.ts'],
+				},
+				test: {
+					name: 'mixed',
+					include: ['beta/**/*.test.ts'],
+					exclude: ['beta/generated/**'],
+				},
+			},
+		]);
+
+		assert.deepEqual(
+			projects.map((project) => project.test.name),
+			['ordinary', 'mixed'],
+		);
+		assert.equal(projects[0].testExecution, undefined);
+		assert.deepEqual(projects[1].test.exclude, ['beta/generated/**', 'beta/parity/**/*.test.ts']);
+		assert.equal(projects[1].testExecution, undefined);
 	});
 });
 

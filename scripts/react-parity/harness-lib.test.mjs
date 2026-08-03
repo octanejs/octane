@@ -213,15 +213,40 @@ test('accepts distinct lane types and builds deterministic argv without a shell'
 	]);
 });
 
-test('rejects successful Vitest runs that skipped declared cases', () => {
+test('validates exact focused Vitest identities from the execution report', () => {
 	const lane = manifest().lanes[0];
+	const result = (
+		assertionResults,
+		file = '/repo/packages/hook-form/tests/upstream/example.test.ts',
+	) => JSON.stringify({ testResults: [{ name: file, assertionResults }] });
+	const declared = {
+		fullName: 'example suite does the thing',
+		status: 'passed',
+	};
 	assert.equal(
-		verifyLaneRunResult(lane, JSON.stringify({ numPassedTests: 1, numPendingTests: 5 })),
+		verifyLaneRunResult(
+			lane,
+			result([declared, { fullName: 'example suite unrelated', status: 'pending' }]),
+			'/repo',
+		),
 		true,
 	);
 	assert.throws(
-		() => verifyLaneRunResult(lane, JSON.stringify({ numPassedTests: 0, numPendingTests: 1 })),
-		/executed 0 of 1 declared tests/,
+		() => verifyLaneRunResult(lane, result([{ ...declared, status: 'pending' }]), '/repo'),
+		/did not execute every declared test identity exactly once/,
+	);
+	assert.throws(
+		() =>
+			verifyLaneRunResult(
+				lane,
+				result([declared], '/repo/packages/hook-form/tests/upstream/wrong.test.ts'),
+				'/repo',
+			),
+		/did not execute every declared test identity exactly once/,
+	);
+	assert.throws(
+		() => verifyLaneRunResult(lane, result([declared, declared]), '/repo'),
+		/did not execute every declared test identity exactly once/,
 	);
 });
 
@@ -907,7 +932,9 @@ test('rejects additional properties at every strict manifest level', () => {
 test('CLI validates, lists, and rejects malformed invocations', () => {
 	const cli = join(import.meta.dirname, 'harness.mjs');
 	const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
-	assert.equal(run('validate').status, 0);
+	// Exercise validation through a non-Vitest lane. Real project collection is
+	// integration work owned by the parity job, not a unit-test side effect.
+	assert.equal(run('validate', '--lane', 'hook-form-pristine-types').status, 0);
 	const listed = run('list');
 	assert.equal(listed.status, 0);
 	assert.match(listed.stdout, /hook-form-pristine-upstream.*verified/);
