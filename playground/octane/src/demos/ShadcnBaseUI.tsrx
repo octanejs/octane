@@ -37,7 +37,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 16 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 15 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -56,6 +56,16 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableFooter,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@octanejs/shadcn/base-ui/Table';
 import { Slider } from '@octanejs/shadcn/base-ui/Slider';
 import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
 import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
@@ -554,6 +564,46 @@ export function ShadcnBaseUIDemo() @{
 					<Skeleton class="h-4 w-[160px]" />
 				</div>
 			</div>
+		</Section>
+
+		<Section
+			title="Table"
+			note="Base-independent: no table primitive exists in either Radix or Base UI, so this is the radix file unchanged and a test asserts the two render identical DOM."
+		>
+			<Table>
+				<TableCaption>Recent invoices</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Invoice</TableHead>
+						<TableHead>Status</TableHead>
+						<TableHead>Amount</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					<TableRow>
+						<TableCell>INV-001</TableCell>
+						<TableCell>Paid</TableCell>
+						<TableCell>$250.00</TableCell>
+					</TableRow>
+					<TableRow data-state="selected">
+						<TableCell>INV-002</TableCell>
+						<TableCell>Pending</TableCell>
+						<TableCell>$150.00</TableCell>
+					</TableRow>
+					<TableRow>
+						<TableCell>INV-003</TableCell>
+						<TableCell>Unpaid</TableCell>
+						<TableCell>$350.00</TableCell>
+					</TableRow>
+				</TableBody>
+				<TableFooter>
+					<TableRow>
+						<TableCell>Total</TableCell>
+						<TableCell />
+						<TableCell>$750.00</TableCell>
+					</TableRow>
+				</TableFooter>
+			</Table>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

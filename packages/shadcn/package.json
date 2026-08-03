@@ -128,6 +128,7 @@
     "./base-ui/Slider": "./src/bases/base-ui/ui/slider.tsrx",
     "./base-ui/Spinner": "./src/bases/base-ui/ui/spinner.tsrx",
     "./base-ui/Switch": "./src/bases/base-ui/ui/switch.tsrx",
+    "./base-ui/Table": "./src/bases/base-ui/ui/table.tsrx",
     "./base-ui/Textarea": "./src/bases/base-ui/ui/textarea.tsrx",
     "./base-ui/Toggle": "./src/bases/base-ui/ui/toggle.tsrx",
     "./base-ui/ToggleGroup": "./src/bases/base-ui/ui/toggle-group.tsrx",

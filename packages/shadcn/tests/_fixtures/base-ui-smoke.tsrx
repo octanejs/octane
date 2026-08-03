@@ -35,6 +35,16 @@ import {
 	AvatarGroupCount,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableFooter,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@octanejs/shadcn/base-ui/Table';
 import { Slider } from '@octanejs/shadcn/base-ui/Slider';
 import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
 import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
@@ -356,4 +366,28 @@ export function ToggleGroupCase() @{
 		<ToggleGroupItem value="a">A</ToggleGroupItem>
 		<ToggleGroupItem value="b">B</ToggleGroupItem>
 	</ToggleGroup>
+}
+
+export function TableCase() @{
+	<Table>
+		<TableCaption>Recent invoices</TableCaption>
+		<TableHeader>
+			<TableRow>
+				<TableHead>Invoice</TableHead>
+				<TableHead>Amount</TableHead>
+			</TableRow>
+		</TableHeader>
+		<TableBody>
+			<TableRow data-state="selected">
+				<TableCell>INV-001</TableCell>
+				<TableCell>$250.00</TableCell>
+			</TableRow>
+		</TableBody>
+		<TableFooter>
+			<TableRow>
+				<TableCell>Total</TableCell>
+				<TableCell>$250.00</TableCell>
+			</TableRow>
+		</TableFooter>
+	</Table>
 }

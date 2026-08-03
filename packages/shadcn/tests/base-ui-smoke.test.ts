@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement, flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import * as F from './_fixtures/base-ui-smoke.tsrx';
+import * as TableParity from './_fixtures/base-ui-table-parity.tsrx';
 import {
 	Tooltip,
 	TooltipContent,
@@ -85,6 +86,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Slider (range)', F.SliderRangeCase, null],
 	['Toggle', F.TogglePressedCase, 'Bold'],
 	['ToggleGroup', F.ToggleGroupCase, 'B'],
+	['Table', F.TableCase, 'INV-001'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -738,6 +740,53 @@ describe('@octanejs/shadcn — Base UI avatar maps one-to-one and owns its own s
 			const avatar = m.container.querySelector('[data-slot="avatar"]')!;
 			expect(avatar.getAttribute('data-size')).toBe('lg');
 			expect(m.container.querySelector('[data-slot="avatar-fallback"]')!.textContent).toBe('CD');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI table is base-independent', () => {
+	it('renders DOM identical to the radix base', () => {
+		// Neither Radix nor Base UI publishes a table primitive, so upstream ships the same plain
+		// host elements in both and this base carries the radix file unchanged. Asserting that as
+		// behavior — rather than trusting a comment — is what catches the two drifting apart when
+		// one base's class strings are updated and the other is forgotten.
+		const a = mount(TableParity.BaseUiTable as never);
+		const b = mount(TableParity.RadixTable as never);
+		try {
+			expect(a.container.innerHTML).toBe(b.container.innerHTML);
+		} finally {
+			a.unmount();
+			b.unmount();
+		}
+	});
+
+	it('emits a real table element tree, not divs with table roles', () => {
+		// Guards the parity assertion above from passing vacuously if both bases broke the same way.
+		const m = mount(F.TableCase as never);
+		try {
+			expect(m.container.querySelector('[data-slot="table"]')!.tagName).toBe('TABLE');
+			expect(m.container.querySelector('[data-slot="table-head"]')!.tagName).toBe('TH');
+			expect(m.container.querySelector('[data-slot="table-cell"]')!.tagName).toBe('TD');
+			expect(m.container.querySelector('[data-slot="table-caption"]')!.tagName).toBe('CAPTION');
+			// The container wrapper is what makes a wide table scroll instead of the page.
+			const container = m.container.querySelector('[data-slot="table-container"]')!;
+			expect(container.className).toContain('overflow-x-auto');
+			expect(container.querySelector('[data-slot="table"]')).not.toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('leaves row selection to the consumer, since no primitive emits it here', () => {
+		// `data-[state=selected]` is written by a data-table library, not by anything underneath —
+		// so unlike checkbox or toggle it is not a Radix-ism that needed translating.
+		const m = mount(F.TableCase as never);
+		try {
+			const selected = m.container.querySelector('[data-slot="table-row"][data-state="selected"]');
+			expect(selected).not.toBe(null);
+			expect(selected!.className).toContain('data-[state=selected]:bg-muted');
 		} finally {
 			m.unmount();
 		}

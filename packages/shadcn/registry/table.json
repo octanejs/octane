@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "table",
+  "type": "registry:ui",
+  "title": "Table",
+  "files": [
+    {
+      "path": "ui/table.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/table.tsrx",
+      "content": "// Base UI base table — THIS FAMILY IS BASE-INDEPENDENT. Neither Radix nor Base UI publishes a\n// table primitive, so upstream ships the same plain host elements in both bases and this file is\n// the radix base's content unchanged. (The React Aria base is the odd one out: RAC does have a\n// table, so that base runs on real collection components with generic item types.)\n//\n// There is consequently no dialect to get wrong here and nothing to verify against a primitive:\n// `data-[state=selected]` on the row is written by the CONSUMER — a data-table library setting\n// selection state — not emitted by anything underneath, so unlike checkbox or toggle it is not a\n// Radix-ism that needs translating.\nimport { cn } from '@/lib/utils';\n\n// Multi-host family (div/table/thead/tbody/tr/th/td/caption): no single host\n// prop table applies, so the shared alias stays structural.\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function Table({ className, ...props }: Props) @{\n\t<div data-slot=\"table-container\" className=\"relative w-full overflow-x-auto\">\n\t\t<table\n\t\t\tdata-slot=\"table\"\n\t\t\tclassName={cn('w-full caption-bottom text-sm', className)}\n\t\t\t{...props}\n\t\t/>\n\t</div>\n}\n\nexport function TableHeader({ className, ...props }: Props) @{\n\t<thead data-slot=\"table-header\" className={cn('[&_tr]:border-b', className)} {...props} />\n}\n\nexport function TableBody({ className, ...props }: Props) @{\n\t<tbody\n\t\tdata-slot=\"table-body\"\n\t\tclassName={cn('[&_tr:last-child]:border-0', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function TableFooter({ className, ...props }: Props) @{\n\t<tfoot\n\t\tdata-slot=\"table-footer\"\n\t\tclassName={cn('bg-muted/50 border-t font-medium [&>tr]:last:border-b-0', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function TableRow({ className, ...props }: Props) @{\n\t<tr\n\t\tdata-slot=\"table-row\"\n\t\tclassName={cn(\n\t\t\t'border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function TableHead({ className, ...props }: Props) @{\n\t<th\n\t\tdata-slot=\"table-head\"\n\t\tclassName={cn(\n\t\t\t'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function TableCell({ className, ...props }: Props) @{\n\t<td\n\t\tdata-slot=\"table-cell\"\n\t\tclassName={cn(\n\t\t\t'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function TableCaption({ className, ...props }: Props) @{\n\t<caption\n\t\tdata-slot=\"table-caption\"\n\t\tclassName={cn('text-muted-foreground mt-4 text-sm', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

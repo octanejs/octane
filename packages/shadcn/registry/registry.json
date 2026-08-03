@@ -491,6 +491,21 @@
       ]
     },
     {
+      "name": "table",
+      "type": "registry:ui",
+      "title": "Table",
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/table.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/table.tsrx"
+        }
+      ]
+    },
+    {
       "name": "textarea",
       "type": "registry:ui",
       "title": "Textarea",
