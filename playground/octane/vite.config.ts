@@ -2,9 +2,19 @@ import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { octane } from 'octane/compiler/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { freshWorkspaceExports } from './vite-plugins/fresh-workspace-exports';
+
+// `@octanejs/shadcn` is consumed through per-family subpaths, and vite caches a package's exports
+// map for the life of the dev server — so each newly added family would otherwise 404 until a
+// restart. This resolves those subpaths against the same map, re-read from disk each time.
+const SHADCN_DIR = fileURLToPath(new URL('../../packages/shadcn', import.meta.url));
 
 export default defineConfig({
-	plugins: [octane(), tailwindcss()],
+	plugins: [
+		freshWorkspaceExports([{ name: '@octanejs/shadcn', dir: SHADCN_DIR }]),
+		octane(),
+		tailwindcss(),
+	],
 
 	resolve: {
 		// The shadcn CLI installs registry components importing via the `@/`
@@ -37,14 +47,12 @@ export default defineConfig({
 		// `@octanejs/shadcn` and `@octanejs/base-ui` belong here for the same
 		// raw-source reason as the rest.
 		//
-		// EXCLUDING THEM DOES NOT MAKE NEW SUBPATHS HOT-RESOLVE, and it was wrong to
-		// imply otherwise here. The shadcn package is consumed through PER-FAMILY
-		// SUBPATHS, and vite caches a package's resolved `exports` map for the life of
-		// the dev server — independently of pre-bundling. So adding a family still
-		// fails with "is not exported under the conditions ..." until the server is
-		// RESTARTED, even though the export is right there in package.json and
-		// `import.meta.resolve` finds it. Restart after adding a family; `--force`
-		// alone will not do it.
+		// EXCLUDING THEM DOES NOT MAKE NEW SUBPATHS HOT-RESOLVE — vite caches a
+		// package's resolved `exports` map for the life of the dev server,
+		// independently of pre-bundling, so a newly added family used to fail with
+		// "is not exported under the conditions ..." until a RESTART. That is what the
+		// `fresh-workspace-exports` plugin above now handles, by resolving those
+		// subpaths against the same map re-read from disk. No restart needed.
 		exclude: [
 			'octane',
 			'@octanejs/base-ui',
