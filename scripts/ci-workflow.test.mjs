@@ -11,6 +11,7 @@ const shardedVitestConfigSource = readFileSync(
 	'utf8',
 );
 const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
+const packageJson = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
 const reactParityHarness = readFileSync(
 	path.join(REPO, 'scripts/react-parity/harness.mjs'),
@@ -144,16 +145,23 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);
 	});
 
-	test('runs package parity once on Node 24 outside lint and the general shards', () => {
+	test('keeps cheap parity validation universal and full execution on Node 24', () => {
 		const parity = jobSource('react_parity_checks');
+		const lint = jobSource('lint_checks');
 		assert.match(parity, /name: React parity checks/);
 		assert.match(parity, /node-version: 24/);
 		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
-		assert.match(parity, /pnpm react-parity:test/);
 		assert.match(parity, /pnpm react-parity:check/);
+		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
+		assert.match(lint, /pnpm react-parity:test/);
+		assert.match(lint, /pnpm react-parity:validate/);
+		assert.doesNotMatch(lint, /pnpm react-parity:check/);
+		assert.equal(
+			packageJson.scripts['react-parity:validate'],
+			'node scripts/react-parity/check.mjs --validate-only',
+		);
 		assert.doesNotMatch(workflow, /hook-form/);
 
-		assert.doesNotMatch(jobSource('lint_checks'), /react-parity/);
 		assert.match(jobSource('release_change'), /"React parity checks"/);
 		assert.match(
 			jobSource('test_shard'),
@@ -217,6 +225,10 @@ describe('CI workflow aggregation', () => {
 		assert.match(
 			reactParityCheck,
 			/manifest\.provenance\.verification === 'verified' \? 'run-required' : 'validate'/,
+		);
+		assert.match(
+			reactParityCheck,
+			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
 		);
 		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
 		assert.doesNotMatch(reactParityCheck, /'--lane'/);

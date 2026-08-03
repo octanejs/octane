@@ -117,10 +117,22 @@ run again in the ordinary shards.
 
 ## CI execution
 
-The workflow has one generic `react_parity_checks` job on Node 24. It runs:
+The always-on lint job covers the cheap control plane, including lightweight
+documentation changes:
 
 ```bash
 pnpm react-parity:test
+pnpm react-parity:validate
+```
+
+`react-parity:validate` checks manifest schemas and hashes, inventories,
+generated coverage, environments, and public claims. It does not collect or
+execute Vitest, Jest, or type-test lanes.
+
+The generic `react_parity_checks` job runs the complete package suites on Node
+24:
+
+```bash
 pnpm react-parity:check
 ```
 
@@ -151,10 +163,11 @@ once. It does not run a separate Vitest collection pass before execution.
 
    ```bash
    pnpm vitest run --project <project> <representative-local-file>
-   pnpm vitest run --config vitest.ci-sharded.config.js --project <project>
-   node scripts/react-parity/harness.mjs validate --lane <full-runtime-lane>
-   pnpm react-parity:test
-   pnpm react-parity:check
+	pnpm vitest run --config vitest.ci-sharded.config.js --project <project>
+	node scripts/react-parity/harness.mjs validate --lane <full-runtime-lane>
+	pnpm react-parity:validate
+	pnpm react-parity:test
+	pnpm react-parity:check
    ```
 
 6. Run `pnpm ci:workflow:test`. Its regression coverage verifies that the

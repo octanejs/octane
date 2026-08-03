@@ -20,6 +20,11 @@ const AUDIT = path.join(REPO, 'packages/octane/audit');
 const UPSTREAMS_PATH = path.join(AUDIT, 'react-upstreams.json');
 const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
 const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--validate-only')) {
+	throw new Error('Usage: check.mjs [--validate-only]');
+}
+const validateOnly = args[0] === '--validate-only';
 const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTypes: true })
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => `packages/${entry.name}/audit/react-parity.json`)
@@ -123,11 +128,13 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
-		const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
-		execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
-			cwd: REPO,
-			stdio: 'inherit',
-		});
+		if (!validateOnly) {
+			const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
+			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
+				cwd: REPO,
+				stdio: 'inherit',
+			});
+		}
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);
 	}
@@ -139,7 +146,7 @@ if (errors.length) {
 }
 
 console.log(
-	`React parity audit is current (${loadedInventories
+	`React parity ${validateOnly ? 'metadata' : 'audit'} is current (${loadedInventories
 		.map((inventory) => `${inventory.baseline}: ${inventory.summary.concreteCases} cases`)
 		.join(', ')}).`,
 );

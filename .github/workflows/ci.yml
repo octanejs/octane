@@ -484,9 +484,7 @@ jobs:
       # runner's JSON report proves the exact identities without a separate
       # pre-execution Vitest collection pass.
       - name: Check React parity inventories and execute required lanes
-        run: |
-          pnpm react-parity:test
-          pnpm react-parity:check
+        run: pnpm react-parity:check
 
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
@@ -708,6 +706,14 @@ jobs:
       # remain at zero under the committed-test policy above.
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
+
+      # Keep metadata, generated coverage, public claims, and the parity
+      # tooling itself covered on lightweight changes. Full lane execution
+      # remains in the dedicated Node 24 job above.
+      - name: Validate React parity metadata and public claims
+        run: |
+          pnpm react-parity:test
+          pnpm react-parity:validate
 
       # Redact's issues, pull requests, and tests are mined at a pinned commit
       # into an authored contract ledger. This network-free gate validates its
