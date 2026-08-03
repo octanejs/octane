@@ -33,9 +33,18 @@ export default defineConfig({
 		// octane plugin has to compile, so they must not be pre-bundled either. That
 		// covers both the cmdk demo and the registry-installed shadcn components,
 		// which build on the raw-source radix and lucide bindings.
+		//
+		// `@octanejs/shadcn` and `@octanejs/base-ui` belong here for a second reason:
+		// the shadcn package is consumed through PER-FAMILY SUBPATHS, and pre-bundling
+		// snapshots its `exports` map when the dev server boots. Every newly added
+		// family then fails to resolve — "is not exported under the conditions ..." —
+		// until the server is restarted, even though the export is right there in
+		// package.json.
 		exclude: [
 			'octane',
+			'@octanejs/base-ui',
 			'@octanejs/cmdk',
+			'@octanejs/shadcn',
 			'@octanejs/radix',
 			'@octanejs/lucide',
 			'@octanejs/rainbowkit',
