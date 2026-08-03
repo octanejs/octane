@@ -747,6 +747,13 @@ jobs:
       - name: Check CLI data snapshot is current
         run: pnpm cli:data:check
 
+      # The CLI page's file trees and the create-octane README describe what
+      # `octane create` writes. The snapshot they are drawn from comes from
+      # running the command, so adding a file to a template without regenerating
+      # leaves both documents quietly describing the old project.
+      - name: Check scaffold file manifest is current
+        run: pnpm scaffold:manifest:check
+
       # docs/bindings-status.md is generated from the per-package status.json
       # blocks in the @octanejs/* binding packages. Changing a binding's scope
       # means updating its status.json and regenerating in the same change.
