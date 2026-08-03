@@ -87,6 +87,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Toggle', F.TogglePressedCase, 'Bold'],
 	['ToggleGroup', F.ToggleGroupCase, 'B'],
 	['Table', F.TableCase, 'INV-001'],
+	['Pagination', F.PaginationCase, 'Next'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -787,6 +788,82 @@ describe('@octanejs/shadcn — Base UI table is base-independent', () => {
 			const selected = m.container.querySelector('[data-slot="table-row"][data-state="selected"]');
 			expect(selected).not.toBe(null);
 			expect(selected!.className).toContain('data-[state=selected]:bg-muted');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI pagination composes its link through Button', () => {
+	const links = (root: Element) => [...root.querySelectorAll('[data-slot="pagination-link"]')];
+
+	it('renders an anchor carrying the Button styling', () => {
+		const m = mount(F.PaginationCase as never);
+		try {
+			for (const link of links(m.container)) {
+				expect(link.tagName).toBe('A');
+				expect(link.className).toContain('inline-flex');
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('takes the nativeButton={false} trade rather than emitting type="button"', () => {
+		// THE TWO BASES DIVERGE HERE, and upstream chose it. Base UI has no Slot, so its source
+		// composes `<Button nativeButton={false} render={<a/>}>`; that is what keeps keyboard
+		// activation working on a non-button element, at the cost of `role="button"` and a
+		// tabindex the radix base's plain anchor does not carry. `type="button"` on an anchor —
+		// what `render` alone would produce — is the thing being avoided.
+		const m = mount(F.PaginationCase as never);
+		try {
+			for (const link of links(m.container)) {
+				expect(link.getAttribute('type')).toBe(null);
+				expect(link.getAttribute('role')).toBe('button');
+				expect(link.getAttribute('tabindex')).toBe('0');
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('forwards href and children through the render element', () => {
+		// Octane routes children through its own channel rather than the props spread React uses,
+		// so this is the adaptation most likely to silently drop content.
+		const m = mount(F.PaginationCase as never);
+		try {
+			expect(links(m.container).map((l) => l.getAttribute('href'))).toEqual([
+				'#prev',
+				'#1',
+				'#2',
+				'#next',
+			]);
+			expect(links(m.container).map((l) => l.textContent)).toEqual(['Previous', '1', '2', 'Next']);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('marks the current page on the active link only', () => {
+		const m = mount(F.PaginationCase as never);
+		try {
+			const current = links(m.container).filter((l) => l.getAttribute('aria-current') === 'page');
+			expect(current).toHaveLength(1);
+			expect(current[0].getAttribute('data-active')).toBe('true');
+			expect(current[0].textContent).toBe('2');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('gives the nav and the ellipsis their accessible roles', () => {
+		const m = mount(F.PaginationCase as never);
+		try {
+			const nav = m.container.querySelector('[data-slot="pagination"]')!;
+			expect(nav.getAttribute('aria-label')).toBe('pagination');
+			const ellipsis = m.container.querySelector('[data-slot="pagination-ellipsis"]')!;
+			expect(ellipsis.getAttribute('aria-hidden')).toBe('true');
+			expect(ellipsis.textContent).toContain('More pages');
 		} finally {
 			m.unmount();
 		}

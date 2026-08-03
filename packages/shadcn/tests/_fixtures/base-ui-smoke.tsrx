@@ -36,6 +36,15 @@ import {
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
 import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from '@octanejs/shadcn/base-ui/Pagination';
+import {
 	Table,
 	TableBody,
 	TableCaption,
@@ -390,4 +399,26 @@ export function TableCase() @{
 			</TableRow>
 		</TableFooter>
 	</Table>
+}
+
+export function PaginationCase() @{
+	<Pagination>
+		<PaginationContent>
+			<PaginationItem>
+				<PaginationPrevious href="#prev" />
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationLink href="#1">1</PaginationLink>
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationLink href="#2" isActive>2</PaginationLink>
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationEllipsis />
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationNext href="#next" />
+			</PaginationItem>
+		</PaginationContent>
+	</Pagination>
 }

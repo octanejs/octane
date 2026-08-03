@@ -328,6 +328,25 @@
       ]
     },
     {
+      "name": "pagination",
+      "type": "registry:ui",
+      "title": "Pagination",
+      "dependencies": [
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/button",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/pagination.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/pagination.tsrx"
+        }
+      ]
+    },
+    {
       "name": "popover",
       "type": "registry:ui",
       "title": "Popover",

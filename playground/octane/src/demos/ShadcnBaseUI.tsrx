@@ -37,7 +37,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 15 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 14 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -55,6 +55,15 @@ import {
 	AvatarGroupCount,
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
+import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from '@octanejs/shadcn/base-ui/Pagination';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
 import {
 	Table,
@@ -604,6 +613,34 @@ export function ShadcnBaseUIDemo() @{
 					</TableRow>
 				</TableFooter>
 			</Table>
+		</Section>
+
+		<Section
+			title="Pagination"
+			note="Transcribed. Base UI has no Slot, so upstream composes the link as Button + nativeButton={false} + render — which means these links carry role=button and tabindex, unlike the Radix tab's plain anchors. Styling should still match Radix exactly, and page 2 must read as the current page."
+		>
+			<Pagination>
+				<PaginationContent>
+					<PaginationItem>
+						<PaginationPrevious href="#prev" />
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationLink href="#1">1</PaginationLink>
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationLink href="#2" isActive>2</PaginationLink>
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationLink href="#3">3</PaginationLink>
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationEllipsis />
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationNext href="#next" />
+					</PaginationItem>
+				</PaginationContent>
+			</Pagination>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

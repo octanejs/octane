@@ -224,6 +224,8 @@ import { ToggleGroupItem as X106 } from '@octanejs/shadcn/base-ui/ToggleGroup';
 type _106 = Assert<NotAny<typeof X106>>;
 import { TableCell as X107 } from '@octanejs/shadcn/base-ui/Table';
 type _107 = Assert<NotAny<typeof X107>>;
+import { PaginationLink as X108 } from '@octanejs/shadcn/base-ui/Pagination';
+type _108 = Assert<NotAny<typeof X108>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';
