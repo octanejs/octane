@@ -42,6 +42,9 @@ dedupe shim (native `change` on blur is simply not listened to).
 
 ## Test parity
 
+Current execution ownership and CI behavior follow the repository-wide
+[React parity test-execution contract](./react-parity-testing.md).
+
 Upstream `src/__tests__` ported near-verbatim into
 `packages/hook-form/tests/upstream/` (same file layout; header cites the
 source). Mechanical mapping: jest→vi, `@testing-library/react` →

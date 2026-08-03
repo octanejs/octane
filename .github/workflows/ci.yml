@@ -316,6 +316,7 @@ jobs:
 
               const requiredFullJobs = [
                 "website integration suite",
+                "React parity checks",
                 "typecheck",
                 "validate publishable packages",
                 ...["package-builds", "eval-corpus", "browser"].map(
@@ -438,6 +439,7 @@ jobs:
           OCTANE_EXCLUDE_WEBSITE_DOCS: "1"
         run: >-
           pnpm test
+          --config vitest.ci-sharded.config.js
           --shard=${{ matrix.shard }}
           --exclude "$WEBSITE_E2E_SPEC"
           --exclude "$WEBSITE_SSR_SPEC"
@@ -453,6 +455,37 @@ jobs:
           --exclude "packages/three/tests/browser/**/*.test.ts"
           --exclude "$ASTRO_E2E_SPEC"
 
+  react_parity_checks:
+    name: React parity checks
+    needs: release_change
+    # The complete package suite is intentionally Node 24-only. Like the
+    # general shards, an authenticated release or lightweight change inherits
+    # the last successful full run through CI provenance.
+    if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      # The manifest runner executes every required runtime and type lane. Each
+      # runner's JSON report proves the exact identities without a separate
+      # pre-execution Vitest collection pass.
+      - name: Check React parity inventories and execute required lanes
+        run: pnpm react-parity:check
+
   # Keep the existing required check names while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
   # folds the dedicated integration suites into the same merge and publishing
@@ -460,7 +493,7 @@ jobs:
   # every prerequisite.
   test:
     name: test (${{ matrix.required-context }})
-    needs: [release_change, test_shard, website_e2e, heavy_integration]
+    needs: [release_change, test_shard, react_parity_checks, website_e2e, heavy_integration]
     # The release PR does not need test contexts. The post-merge release run does:
     # publish.yml verifies these stable aggregate names before publishing.
     if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
@@ -477,15 +510,18 @@ jobs:
           FULL_CI: ${{ needs.release_change.outputs.full_ci }}
           IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_change.outputs.is_release_merge }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
+          REACT_PARITY_RESULT: ${{ needs.react_parity_checks.result }}
           WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
           HEAVY_INTEGRATION_RESULT: ${{ needs.heavy_integration.result }}
         run: |
           if [ "$IS_CHANGESET_RELEASE_MERGE" = true ] || [ "$FULL_CI" = false ]; then
             test "$SHARD_RESULT" = skipped
+            test "$REACT_PARITY_RESULT" = skipped
             test "$WEBSITE_E2E_RESULT" = skipped
             test "$HEAVY_INTEGRATION_RESULT" = skipped
           else
             test "$SHARD_RESULT" = success
+            test "$REACT_PARITY_RESULT" = success
             test "$WEBSITE_E2E_RESULT" = success
             test "$HEAVY_INTEGRATION_RESULT" = success
           fi
@@ -671,14 +707,13 @@ jobs:
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
 
-      # React's stable release and current main are inventoried separately at
-      # pinned commits. This network-free gate checks the extracted case IDs,
-      # ledger dispositions/evidence, and generated coverage report so public
-      # parity claims cannot drift away from their source data.
-      - name: Check React parity inventory and ledger
+      # Keep metadata, generated coverage, public claims, and the parity
+      # tooling itself covered on lightweight changes. Full lane execution
+      # remains in the dedicated Node 24 job above.
+      - name: Validate React parity metadata and public claims
         run: |
           pnpm react-parity:test
-          pnpm react-parity:check
+          pnpm react-parity:validate
 
       # Redact's issues, pull requests, and tests are mined at a pinned commit
       # into an authored contract ledger. This network-free gate validates its

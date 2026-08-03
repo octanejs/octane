@@ -13,19 +13,18 @@ import {
 import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
 import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
-import {
-	loadManifest,
-	requiredExecutableLanes,
-	verifyLaneEnvironment,
-	verifyManifestFiles,
-	verifyManifestTestSelections,
-} from './harness-lib.mjs';
+import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
 const UPSTREAMS_PATH = path.join(AUDIT, 'react-upstreams.json');
 const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
 const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--validate-only')) {
+	throw new Error('Usage: check.mjs [--validate-only]');
+}
+const validateOnly = args[0] === '--validate-only';
 const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTypes: true })
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => `packages/${entry.name}/audit/react-parity.json`)
@@ -129,15 +128,12 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
-		await verifyManifestTestSelections(manifest, REPO);
-		if (manifest.provenance.verification === 'verified') {
-			for (const lane of requiredExecutableLanes(manifest)) {
-				execFileSync(
-					process.execPath,
-					[HARNESS_PATH, 'run', '--manifest', relativeFile, '--lane', lane.id],
-					{ cwd: REPO, stdio: 'inherit' },
-				);
-			}
+		if (!validateOnly) {
+			const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
+			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
+				cwd: REPO,
+				stdio: 'inherit',
+			});
 		}
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);
@@ -150,7 +146,7 @@ if (errors.length) {
 }
 
 console.log(
-	`React parity audit is current (${loadedInventories
+	`React parity ${validateOnly ? 'metadata' : 'audit'} is current (${loadedInventories
 		.map((inventory) => `${inventory.baseline}: ${inventory.summary.concreteCases} cases`)
 		.join(', ')}).`,
 );

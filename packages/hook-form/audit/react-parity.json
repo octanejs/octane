@@ -259,7 +259,7 @@
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "hook-form",
+      "project": "hook-form-differential",
       "evidenceOrigin": "repo-authored",
       "notes": "The same fixture runs through Octane and real react-hook-form via the shared differential rig.",
       "files": [
@@ -303,7 +303,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "c7884de346bb8b94ae3d61187f73db23160951da10a1fd2a9a316814eb38a31b"
+          "sha256": "013b2c28051c93f60e066e59dd2f50931ac2d9a90ca7fbe0559cb527673aafdd"
         }
       ]
     }

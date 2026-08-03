@@ -62,6 +62,14 @@ unchanged.
      (`snapshotKeyed`/`diffIdentity`) — Octane's LIS reconciler moves a *different set*
      of nodes than React's `lastPlacedIndex` even at identical final DOM.
 
+Executable binding parity follows the repository-wide
+[React parity test-execution contract](./react-parity-testing.md). The complete
+local Vitest project declares parity ownership with `testExecution.group` and,
+for a mixed project, the parity-owned `testExecution.include` patterns. The
+generic Node 24 parity job discovers package manifests automatically; the
+ordinary sharded config derives and runs the non-parity complement. Package
+paths and package-specific parity jobs do not belong in `ci.yml`.
+
 ## 3. Ranked targets
 
 | # | Library | Effort | Why it's here | What passing proves |
