@@ -210,6 +210,8 @@ import { TooltipProvider as X99 } from '@octanejs/shadcn/base-ui/Tooltip';
 type _99 = Assert<NotAny<typeof X99>>;
 import { Collapsible as X100 } from '@octanejs/shadcn/base-ui/Collapsible';
 type _100 = Assert<NotAny<typeof X100>>;
+import { SheetTrigger as X101 } from '@octanejs/shadcn/base-ui/Sheet';
+type _101 = Assert<NotAny<typeof X101>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';

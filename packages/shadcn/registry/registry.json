@@ -365,6 +365,26 @@
       ]
     },
     {
+      "name": "sheet",
+      "type": "registry:ui",
+      "title": "Sheet",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/button",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/sheet.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/sheet.tsrx"
+        }
+      ]
+    },
+    {
       "name": "skeleton",
       "type": "registry:ui",
       "title": "Skeleton",

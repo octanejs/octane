@@ -110,6 +110,15 @@ import {
 	NativeSelectOptGroup,
 	NativeSelectOption,
 } from '@octanejs/shadcn/base-ui/NativeSelect';
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
 import { InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
@@ -129,7 +138,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 22 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 23 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
 				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
@@ -372,6 +381,46 @@ export function ShadcnBaseUIDemo() @{
 					data-slot.
 				</CollapsibleContent>
 			</Collapsible>
+		</Section>
+
+		<Section
+			title="Sheet"
+			note="A Dialog anchored to an edge. Open each side — the slide-in direction comes from data-side, which this component sets itself."
+		>
+			<div class="flex flex-wrap items-center gap-2">
+				<Sheet>
+					<SheetTrigger render={<Button variant="outline" />}>Right</SheetTrigger>
+					<SheetContent>
+						<SheetHeader>
+							<SheetTitle>Edit profile</SheetTitle>
+							<SheetDescription>Make changes here. Click save when you are done.</SheetDescription>
+						</SheetHeader>
+						<SheetFooter>
+							<Button>Save changes</Button>
+						</SheetFooter>
+					</SheetContent>
+				</Sheet>
+
+				<Sheet>
+					<SheetTrigger render={<Button variant="outline" />}>Left</SheetTrigger>
+					<SheetContent side="left">
+						<SheetHeader>
+							<SheetTitle>Navigation</SheetTitle>
+							<SheetDescription>Slides in from the left.</SheetDescription>
+						</SheetHeader>
+					</SheetContent>
+				</Sheet>
+
+				<Sheet>
+					<SheetTrigger render={<Button variant="outline" />}>Bottom</SheetTrigger>
+					<SheetContent side="bottom">
+						<SheetHeader>
+							<SheetTitle>Details</SheetTitle>
+							<SheetDescription>Slides up from the bottom.</SheetDescription>
+						</SheetHeader>
+					</SheetContent>
+				</Sheet>
+			</div>
 		</Section>
 
 		<Section title="Alert" note="Verified byte-identical to upstream.">

@@ -33,7 +33,7 @@ component names stay identical.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 22/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 23/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -70,7 +70,7 @@ component names stay identical.
 | `scroll-area` | ✅ | ✅ | ⛔ |
 | `select` | ✅ | ⛔ | ⛔ |
 | `separator` | ✅ | ✅ | ✅ |
-| `sheet` | ✅ | ✅ | — |
+| `sheet` | ✅ | ✅ | ✅ |
 | `sidebar` | ✅ | ⛔ | — |
 | `skeleton` | ✅ | ✅ | ✅ |
 | `slider` | ✅ | ✅ | — |

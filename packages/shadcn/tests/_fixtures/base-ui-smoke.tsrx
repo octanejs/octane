@@ -86,6 +86,15 @@ import {
 	NativeSelectOption,
 } from '@octanejs/shadcn/base-ui/NativeSelect';
 import { Separator } from '@octanejs/shadcn/base-ui/Separator';
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
 import { Textarea } from '@octanejs/shadcn/base-ui/Textarea';
@@ -271,4 +280,27 @@ export function CollapsibleCase() @{
 		<CollapsibleTrigger>Toggle</CollapsibleTrigger>
 		<CollapsibleContent>Collapsible body</CollapsibleContent>
 	</Collapsible>
+}
+
+// Rendered OPEN so the portalled tree exists; a closed sheet renders only its trigger.
+export function SheetCase() @{
+	<Sheet defaultOpen>
+		<SheetTrigger>Open sheet</SheetTrigger>
+		<SheetContent>
+			<SheetHeader>
+				<SheetTitle>Sheet title</SheetTitle>
+				<SheetDescription>Sheet description.</SheetDescription>
+			</SheetHeader>
+			<SheetFooter>Sheet footer</SheetFooter>
+		</SheetContent>
+	</Sheet>
+}
+
+export function SheetLeftCase() @{
+	<Sheet defaultOpen>
+		<SheetTrigger>Open left</SheetTrigger>
+		<SheetContent side="left">
+			<SheetTitle>Left sheet</SheetTitle>
+		</SheetContent>
+	</Sheet>
 }

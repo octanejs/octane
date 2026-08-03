@@ -121,6 +121,7 @@
     "./base-ui/Popover": "./src/bases/base-ui/ui/popover.tsrx",
     "./base-ui/RadioGroup": "./src/bases/base-ui/ui/radio-group.tsrx",
     "./base-ui/Separator": "./src/bases/base-ui/ui/separator.tsrx",
+    "./base-ui/Sheet": "./src/bases/base-ui/ui/sheet.tsrx",
     "./base-ui/Skeleton": "./src/bases/base-ui/ui/skeleton.tsrx",
     "./base-ui/Spinner": "./src/bases/base-ui/ui/spinner.tsrx",
     "./base-ui/Switch": "./src/bases/base-ui/ui/switch.tsrx",

@@ -73,6 +73,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['NativeSelect', F.NativeSelectCase, 'A'],
 	['Separator', F.SeparatorCase, null],
 	['Separator (vertical)', F.SeparatorVerticalCase, null],
+	['Sheet', F.SheetCase, 'Sheet title', true],
 	['Skeleton', F.SkeletonCase, null],
 	['Spinner', F.SpinnerCase, null],
 	['Textarea', F.TextareaCase, null],
@@ -399,6 +400,111 @@ describe('@octanejs/shadcn — Base UI collapsible maps Content to Panel, not Tr
 
 			expect(trigger.tagName).toBe('BUTTON');
 			expect(content.tagName).not.toBe('BUTTON');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+// Sheet's side variants are the one place in this base where the attribute the utilities key off
+// is set by the COMPONENT rather than emitted by the primitive. That makes it low-risk, but it
+// also means nothing else would notice if the attribute stopped being written — so assert it,
+// including that the default is `right` and an explicit side overrides it.
+describe('@octanejs/shadcn — Base UI sheet writes the side attribute its utilities target', () => {
+	it('defaults to side="right"', async () => {
+		const m = mount(F.SheetCase as never);
+		try {
+			await settle();
+			const content = document.body.querySelector('[data-slot="sheet-content"]')!;
+			expect(content.getAttribute('data-side')).toBe('right');
+			expect(content.className).toContain('data-[side=right]:');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('honours an explicit side', async () => {
+		const m = mount(F.SheetLeftCase as never);
+		try {
+			await settle();
+			const content = document.body.querySelector('[data-slot="sheet-content"]')!;
+			expect(content.getAttribute('data-side')).toBe('left');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('composes its close affordance as a Button via render', async () => {
+		const m = mount(F.SheetCase as never);
+		try {
+			await settle();
+			const close = document.body.querySelector('[data-slot="sheet-close"]') as HTMLElement;
+			expect(close).not.toBe(null);
+			// Close alone would never emit the Button cva output.
+			expect(close.className).toContain('inline-flex');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	// `data-slot` and `data-side` are set BY THIS COMPONENT, so they land on whatever part it
+	// renders — asserting them cannot tell Popup from Backdrop, and swapping the two passed every
+	// test above. These assert what the PRIMITIVE contributes: the popup is the labelled,
+	// focusable dialog; the backdrop is inert and aria-hidden.
+	it('renders SheetContent as the Popup, not the Backdrop', async () => {
+		const m = mount(F.SheetCase as never);
+		try {
+			await settle();
+			const content = document.body.querySelector('[data-slot="sheet-content"]')!;
+			const overlay = document.body.querySelector('[data-slot="sheet-overlay"]')!;
+
+			// Only the popup is labelled by its title and described by its description.
+			const title = document.body.querySelector('[data-slot="sheet-title"]')!;
+			expect(content.getAttribute('aria-labelledby')).toBe(title.getAttribute('id'));
+			expect(content.hasAttribute('aria-describedby')).toBe(true);
+			// ...and it is focusable, where the backdrop is explicitly hidden from a11y.
+			expect(content.hasAttribute('tabindex')).toBe(true);
+			expect(content.hasAttribute('aria-hidden')).toBe(false);
+
+			// NOT `aria-hidden` for the backdrop: Base UI inerts everything outside the active
+			// popup, so a second popup rendered in the overlay's place inherits aria-hidden too and
+			// the assertion would pass on a mispaired part. The labelling wiring is what only a
+			// Popup ever receives.
+			expect(overlay.hasAttribute('aria-labelledby')).toBe(false);
+			expect(overlay.hasAttribute('tabindex')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+// BASE UI ANIMATES WITH CSS TRANSITIONS, NOT KEYFRAMES. Its transitionStatusMapping publishes
+// `data-starting-style` and `data-ending-style`; it does NOT publish anything the radix base's
+// `data-open:animate-in` / `data-closed:animate-out` keyframe utilities can match.
+//
+// This was found visually, not by a test: a derived sheet carrying radix's keyframes JUMPED on
+// close, because the popup unmounts on its own schedule while an animate-out that never matches
+// does nothing. Nothing in the suite could see it — the parts, slots and side attribute were all
+// correct. Asserting the dialect is the only cheap oracle for it.
+describe('@octanejs/shadcn — Base UI overlays use the transition dialect, not radix keyframes', () => {
+	it('sheet drives motion from data-starting-style / data-ending-style', async () => {
+		const m = mount(F.SheetCase as never);
+		try {
+			await settle();
+			const content = document.body.querySelector('[data-slot="sheet-content"]')!;
+			const overlay = document.body.querySelector('[data-slot="sheet-overlay"]')!;
+
+			for (const el of [content, overlay]) {
+				expect(el.className).toContain('data-ending-style:');
+				expect(el.className).toContain('data-starting-style:');
+				// The radix keyframe dialect must not survive: it matches nothing Base UI emits.
+				expect(el.className).not.toContain('animate-in');
+				expect(el.className).not.toContain('animate-out');
+			}
+
+			// And the element must actually be transitioning, not keyframing.
+			expect(content.className).toContain('transition');
+			expect(overlay.className).toContain('transition-opacity');
 		} finally {
 			m.unmount();
 		}
