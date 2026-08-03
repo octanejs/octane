@@ -34,12 +34,17 @@ export default defineConfig({
 		// covers both the cmdk demo and the registry-installed shadcn components,
 		// which build on the raw-source radix and lucide bindings.
 		//
-		// `@octanejs/shadcn` and `@octanejs/base-ui` belong here for a second reason:
-		// the shadcn package is consumed through PER-FAMILY SUBPATHS, and pre-bundling
-		// snapshots its `exports` map when the dev server boots. Every newly added
-		// family then fails to resolve — "is not exported under the conditions ..." —
-		// until the server is restarted, even though the export is right there in
-		// package.json.
+		// `@octanejs/shadcn` and `@octanejs/base-ui` belong here for the same
+		// raw-source reason as the rest.
+		//
+		// EXCLUDING THEM DOES NOT MAKE NEW SUBPATHS HOT-RESOLVE, and it was wrong to
+		// imply otherwise here. The shadcn package is consumed through PER-FAMILY
+		// SUBPATHS, and vite caches a package's resolved `exports` map for the life of
+		// the dev server — independently of pre-bundling. So adding a family still
+		// fails with "is not exported under the conditions ..." until the server is
+		// RESTARTED, even though the export is right there in package.json and
+		// `import.meta.resolve` finds it. Restart after adding a family; `--force`
+		// alone will not do it.
 		exclude: [
 			'octane',
 			'@octanejs/base-ui',
