@@ -129,6 +129,27 @@ lives:
 Deeper calls such as `cart.items.push(x)` track their receiver path
 (`cart.items`), unchanged.
 
+Some closures declare that their body runs in another context, not during
+render. A directive from a known list marks them: `'use gpu'` (TypeGPU shader
+code) and `'worklet'` (Reanimated UI-thread code). Inside such a closure, the
+inferred array tracks only the root variables it captures and reads none of
+their properties:
+
+```tsx
+const pipeline = useMemo(() =>
+  root.createRenderPipeline({
+    fragment: () => {
+      'use gpu';
+      return timeUniform.$; // legal only in shader code — never read at render
+    },
+  }),
+); // Inferred: [root, timeUniform]
+```
+
+The list is deliberate. Same-context hints (`'use strict'`, React Compiler's
+`'use memo'`/`'use no memo'`) and markers with their own semantics
+(`'use server'`, `'use cache'`) do not truncate.
+
 ### Calls to custom wrappers
 
 Inferring a missing dependency argument at a **call to a custom wrapper** is a

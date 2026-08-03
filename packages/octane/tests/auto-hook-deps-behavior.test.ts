@@ -21,6 +21,7 @@ import {
 	MemoFromComputedPath,
 	MemoFromInstanceMethodCall,
 	MemoFromNestedScope,
+	MemoFromOpaqueDirectiveClosure,
 	MemoFromOptionalPath,
 	MemoFromProps,
 	MemoFromPrototypeMethodCall,
@@ -32,6 +33,7 @@ import {
 	StoreGetterInsideEffect,
 	StoreGetterSelectedEffect,
 	StoreSetterEffect,
+	withShaderContext,
 } from './_fixtures/auto-hook-deps-behavior.tsrx';
 
 function createStore(initial: string) {
@@ -513,6 +515,24 @@ describe('inferred useMemo dependencies — behavior', () => {
 		r.update(MemoWithManyDependencies, { ...initial, e: 6, noise: 2 });
 		expect(r.find('.value').textContent).toBe('1:2:3:4:6');
 		expect(compute).toHaveBeenCalledTimes(2);
+		r.unmount();
+	});
+
+	it('never reads context-bound getters captured by an opaque directive closure (issue #542)', () => {
+		// `resource.$` throws outside withShaderContext. The inferred array must
+		// track the root binding only, so plain renders perform no `.$` read.
+		const build = vi.fn((shader: () => number) => `p:${withShaderContext(shader)}`);
+		const r = mount(MemoFromOpaqueDirectiveClosure, { seed: 1, build, noise: 0 });
+		expect(r.find('.value').textContent).toBe('p:1');
+		expect(build).toHaveBeenCalledTimes(1);
+
+		r.update(MemoFromOpaqueDirectiveClosure, { seed: 1, build, noise: 1 });
+		expect(r.find('.value').textContent).toBe('p:1');
+		expect(build).toHaveBeenCalledTimes(1);
+
+		r.update(MemoFromOpaqueDirectiveClosure, { seed: 2, build, noise: 2 });
+		expect(r.find('.value').textContent).toBe('p:2');
+		expect(build).toHaveBeenCalledTimes(2);
 		r.unmount();
 	});
 
