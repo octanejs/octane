@@ -134,6 +134,9 @@
     "test": "vitest run",
     "registry:build": "node scripts/build-registry.mjs",
     "registry:check": "node scripts/build-registry.mjs --check",
+    "registry:serve": "node scripts/serve-registry.mjs",
+    "coverage:build": "node scripts/build-coverage-table.mjs",
+    "coverage:check": "node scripts/build-coverage-table.mjs --check",
     "typecheck": "node scripts/typecheck.mjs"
   },
   "dependencies": {

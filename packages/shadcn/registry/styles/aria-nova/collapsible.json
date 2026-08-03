@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "collapsible",
+  "type": "registry:ui",
+  "title": "Collapsible",
+  "files": [
+    {
+      "path": "ui/collapsible.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/collapsible.tsrx",
+      "content": "import {\n\tDisclosurePanel as CollapsibleContentPrimitive,\n\tDisclosure as CollapsiblePrimitive,\n\tButton as CollapsibleTriggerPrimitive,\n\ttype ButtonProps,\n\ttype DisclosurePanelProps,\n\ttype DisclosureProps,\n} from '@octanejs/aria/components';\n\nexport function Collapsible({ ...props }: DisclosureProps) {\n\treturn <CollapsiblePrimitive data-slot=\"collapsible\" {...props} />;\n}\n\nexport function CollapsibleTrigger({ ...props }: ButtonProps) {\n\treturn <CollapsibleTriggerPrimitive slot=\"trigger\" data-slot=\"collapsible-trigger\" {...props} />;\n}\n\nexport function CollapsibleContent({ ...props }: DisclosurePanelProps) {\n\treturn <CollapsibleContentPrimitive data-slot=\"collapsible-content\" {...props} />;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ]
+}

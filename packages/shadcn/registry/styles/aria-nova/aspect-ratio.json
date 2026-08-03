@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "aspect-ratio",
+  "type": "registry:ui",
+  "title": "Aspect Ratio",
+  "files": [
+    {
+      "path": "ui/aspect-ratio.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/aspect-ratio.tsrx",
+      "content": "import { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function AspectRatio({ ratio, className, ...props }: HostProps<'div'> & { ratio: number }) {\n\treturn <div\n\t\tdata-slot=\"aspect-ratio\"\n\t\tstyle={{\n\t\t\t'--ratio': ratio,\n\t\t} as Record<string, string | number>}\n\t\tclassName={cn('relative aspect-(--ratio)', className)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "dialog",
+  "type": "registry:ui",
+  "title": "Dialog",
+  "files": [
+    {
+      "path": "ui/dialog.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/dialog.tsrx",
+      "content": "import { type OctaneNode } from 'octane';\nimport {\n\tDialog as DialogPrimitive,\n\tDialogTrigger as DialogTriggerPrimitive,\n\tHeading,\n\tModalOverlay as ModalOverlayPrimitive,\n\tModal as ModalPrimitive,\n\ttype DialogProps as DialogPrimitiveProps,\n\ttype DialogTriggerProps as DialogTriggerPrimitiveProps,\n\ttype ModalOverlayProps as ModalOverlayPrimitiveProps,\n} from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\nimport { Button } from '@/components/ui/button';\nimport { XIcon } from '@octanejs/lucide';\n\nexport function DialogTrigger({ ...props }: DialogTriggerPrimitiveProps) {\n\treturn <DialogTriggerPrimitive data-slot=\"dialog-trigger\" {...props} />;\n}\n\nexport function DialogClose({ className, variant = 'outline', size = 'default', ...props }: Record<\n\tstring,\n\tany\n>) {\n\treturn <Button\n\t\tslot=\"close\"\n\t\tdata-slot=\"dialog-close\"\n\t\tvariant={variant}\n\t\tsize={size}\n\t\tclassName={cn(className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function DialogOverlay({ className, children, ...props }: Omit<\n\tModalOverlayPrimitiveProps,\n\t'className' | 'children'\n> & {\n\tclassName?: string;\n\tchildren: OctaneNode;\n}) {\n\treturn <ModalOverlayPrimitive\n\t\tdata-slot=\"dialog-overlay\"\n\t\tclassName={cn(\n\t\t\t'fixed inset-0 isolate z-50 bg-black/10 duration-100 data-entering:animate-in data-entering:fade-in-0 data-exiting:animate-out data-exiting:fade-out-0 supports-backdrop-filter:backdrop-blur-xs',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>{children}</ModalOverlayPrimitive>;\n}\n\nexport function Dialog({\n\tclassName,\n\tchildren,\n\tshowCloseButton = true,\n\tisDismissable = true,\n\t...props\n}: Omit<ModalOverlayPrimitiveProps, 'className' | 'children'> & Pick<\n\tRecord<string, any>,\n\t'isDismissable'\n> & {\n\tclassName?: string;\n\tchildren: OctaneNode;\n\tshowCloseButton?: boolean;\n}) {\n\treturn <DialogOverlay isDismissable={isDismissable} {...props}>\n\t\t<ModalPrimitive\n\t\t\tdata-slot=\"dialog-content\"\n\t\t\tclassName={cn(\n\t\t\t\t'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-sm',\n\t\t\t\tclassName,\n\t\t\t)}\n\t\t>\n\t\t\t<DialogPrimitive data-slot=\"dialog\" className=\"[display:inherit] [gap:inherit] outline-none\">\n\t\t\t\t{children}\n\t\t\t\t{showCloseButton &&\n\t\t\t\t\t<DialogClose variant=\"ghost\" className=\"absolute top-2 right-2\" size=\"icon-sm\">\n\t\t\t\t\t\t<XIcon />\n\t\t\t\t\t\t<span className=\"sr-only\">Close</span>\n\t\t\t\t\t</DialogClose>}\n\t\t\t</DialogPrimitive>\n\t\t</ModalPrimitive>\n\t</DialogOverlay>;\n}\n\nexport function DialogHeader({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"dialog-header\"\n\t\tclassName={cn('flex flex-col gap-2', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function DialogFooter({ className, showCloseButton = false, children, ...props }: HostProps<\n\t'div'\n> & {\n\tshowCloseButton?: boolean;\n}) {\n\treturn <div\n\t\tdata-slot=\"dialog-footer\"\n\t\tclassName={cn(\n\t\t\t'-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t{children}\n\t\t{showCloseButton && <DialogClose variant=\"outline\">Close</DialogClose>}\n\t</div>;\n}\n\nexport function DialogTitle({ className, ...props }: Omit<Record<string, any>, 'slot'>) {\n\treturn <Heading\n\t\tslot=\"title\"\n\t\tdata-slot=\"dialog-title\"\n\t\tclassName={cn('text-base leading-none font-medium', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function DialogDescription({ className, ...props }: Omit<HostProps<'div'>, 'slot'>) {\n\treturn <div\n\t\tdata-slot=\"dialog-description\"\n\t\tclassName={cn(\n\t\t\t'text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17",
+    "@octanejs/lucide@0.1.18"
+  ],
+  "registryDependencies": [
+    "@octane/button",
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

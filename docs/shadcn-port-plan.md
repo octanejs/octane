@@ -375,9 +375,12 @@ whole base), then the 12 Base UI modules. `packages/base-ui/status.json` and
 `packages/aria/status.json` both understate current coverage; refresh them in
 the PR that moves each surface, not here.
 
-Deferred until at least one alternate base exists: the registry namespace shape
-for per-base variants (`@octane/base-ui/select` vs a `base` field on the item).
-Designing it now would be speculative — the first real consumer decides it.
+RESOLVED — the registry namespace shape for per-base variants turned out to be
+neither option considered here (`@octane/base-ui/select` nor a `base` field on
+the item). shadcn does not namespace its bases: it folds base and visual style
+into `components.json`'s single `style` field and substitutes that into the
+registry URL, which the stock CLI already supports. See "Phase 4" in
+`shadcn-multi-base-plan.md` for the decision and its evidence.
 
 ## Follow-up
 

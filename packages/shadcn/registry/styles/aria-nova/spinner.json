@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "spinner",
+  "type": "registry:ui",
+  "title": "Spinner",
+  "files": [
+    {
+      "path": "ui/spinner.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/spinner.tsrx",
+      "content": "// React Aria base spinner. Upstream's aria spinner is presentational — it uses\n// no RAC primitive — so this matches the Radix base apart from its own class\n// string.\n//\n// OCTANE DIVERGENCE: upstream's IconPlaceholder (the CLI-resolved iconLibrary\n// axis) is resolved at port time to the default library, lucide, via\n// @octanejs/lucide. Other icon libraries are a registry-emit concern.\n//\n// The props are a permissive record rather than HostProps<'svg'>: these are\n// forwarded to a lucide component, not applied to a host element, so the host\n// SVG attribute types do not describe them.\nimport { Loader2Icon } from '@octanejs/lucide';\n\nimport { cn } from '@/lib/utils';\n\nexport interface SpinnerProps extends Record<string, unknown> {\n\tclassName?: string;\n}\n\nexport function Spinner({ className, ...props }: SpinnerProps) @{\n\t<Loader2Icon\n\t\tdata-slot=\"spinner\"\n\t\trole=\"status\"\n\t\taria-label=\"Loading\"\n\t\tclassName={cn('size-4 animate-spin', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.18"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

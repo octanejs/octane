@@ -1,10 +1,33 @@
-// Emits the @octane shadcn registry from the package sources: one
-// registry-item JSON per src/ui component (type registry:ui), a `utils`
-// registry:lib item for cn(), and a `theme` registry:file item for the token
-// CSS — conforming to https://ui.shadcn.com/schema/registry-item.json so the
-// UPSTREAM shadcn CLI can install from it via a namespaced registry
-// (`"@octane": "<host>/r/{name}.json"`). The registry is generated output:
-// edit the sources and re-run, never hand-edit registry/.
+// Emits the @octane shadcn registry from the package sources, conforming to
+// https://ui.shadcn.com/schema/registry-item.json so the UPSTREAM shadcn CLI can install from it.
+//
+// MULTI-BASE, THE WAY SHADCN ITSELF DOES IT. shadcn does not namespace its primitive bases; it
+// folds base and visual style into the single `style` field of components.json and puts that in
+// the registry URL. Its own built-in registry is literally `<host>/styles/{style}/{name}.json`,
+// and `{style}`/`{name}` are the only two placeholders the CLI substitutes — verified in
+// shadcn@4.14.1's bundle. The CLI never parses or validates the style string, so a composite like
+// `radix-nova` is opaque to it and resolved entirely by the registry server.
+//
+// This emits the same shape:
+//
+//   registry/styles/<style>/<name>.json   one tree per base
+//   registry/<name>.json                  the DEFAULT style, for a URL with no {style} segment
+//   registry/registry.json                the index
+//
+// so a consumer configures ONE registry and picks a base with `style`:
+//
+//   "registries": { "@octane": "<host>/r/styles/{style}/{name}.json" }
+//   "style": "base-nova"        // or radix-nova, aria-nova
+//
+// The base-agnostic items (utils, types, theme, hooks) are emitted into EVERY style tree. They
+// have to be: `registryDependencies: ["@octane/utils"]` resolves through the same templated URL,
+// so it would 404 under any style that omitted them.
+//
+// Bases legitimately differ in which families they ship (radix 44, react-aria 33, base-ui 21) —
+// upstream is the same, which is why its CLI carries notes like "only available for Base UI
+// projects". A style tree therefore contains exactly the families that base has.
+//
+// The registry is generated output: edit the sources and re-run, never hand-edit registry/.
 //
 // Usage: node scripts/build-registry.mjs [--check]
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -13,7 +36,19 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SRC_UI = join(PKG_ROOT, 'src', 'bases', 'radix', 'ui');
+// `style` is the consumer-facing name that lands in components.json and the URL; `dir` is the
+// source tree. The style names keep upstream's <base>-<visual> composite and its short base
+// spellings (`aria`, not `react-aria`), matching the `radix-nova` this repo's playground already
+// uses and the `aria-nova` the React Aria base was transcribed from.
+const BASES = [
+	{ style: 'base-nova', dir: 'base-ui' },
+	{ style: 'radix-nova', dir: 'radix' },
+	{ style: 'aria-nova', dir: 'react-aria' },
+];
+
+// Served at the un-styled path for a consumer whose registry URL has no {style} segment.
+const DEFAULT_STYLE = 'base-nova';
+
 const OUT_DIR = join(PKG_ROOT, 'registry');
 const SCHEMA = 'https://ui.shadcn.com/schema/registry-item.json';
 
@@ -64,7 +99,14 @@ function collectDeps(source) {
 	const registry = new Set();
 	for (const match of source.matchAll(/from '([^']+)'/g)) {
 		const spec = match[1];
-		if (spec in DEP_SPECS) npm.add(DEP_SPECS[spec]);
+		// A dependency is declared by PACKAGE, but imported by subpath: the radix base reaches for
+		// bare `@octanejs/radix` while the base-ui and react-aria bases use deep entry points like
+		// `@octanejs/base-ui/accordion` and `@octanejs/aria/components`. Resolve the package root
+		// before looking the spec up, or every subpath import reads as undeclared.
+		const pkgName = spec.startsWith('@')
+			? spec.split('/').slice(0, 2).join('/')
+			: spec.split('/')[0];
+		if (pkgName in DEP_SPECS) npm.add(DEP_SPECS[pkgName]);
 		else if (spec.startsWith('@octanejs/') && spec !== 'octane') {
 			// An import the package does not declare cannot be installed by the
 			// CLI — fail the build instead of shipping a broken item.
@@ -80,7 +122,7 @@ function collectDeps(source) {
 	return { npm: [...npm].sort(), registry: [...registry].sort() };
 }
 
-async function buildItems() {
+async function buildItems(srcUi) {
 	const items = [];
 
 	const utilsSource = await readFile(join(PKG_ROOT, 'src', 'lib', 'utils.ts'), 'utf8');
@@ -148,10 +190,10 @@ async function buildItems() {
 		}
 	}
 
-	for (const entry of (await readdir(SRC_UI)).sort()) {
+	for (const entry of (await readdir(srcUi)).sort()) {
 		if (!entry.endsWith('.tsrx')) continue;
 		const name = entry.replace(/\.tsrx$/, '');
-		const source = await readFile(join(SRC_UI, entry), 'utf8');
+		const source = await readFile(join(srcUi, entry), 'utf8');
 		const { npm, registry } = collectDeps(source);
 		const item = {
 			$schema: SCHEMA,
@@ -185,19 +227,55 @@ async function buildItems() {
 	return items;
 }
 
-const items = await buildItems();
-const registryIndex = {
-	$schema: 'https://ui.shadcn.com/schema/registry.json',
-	name: 'octane',
-	homepage: 'https://octanejs.dev',
-	items: items.map(({ $schema, files, ...meta }) => ({
-		...meta,
-		files: files.map(({ content, ...file }) => file),
-	})),
-};
+const rendered = new Map();
+const styleItemCounts = [];
 
-const rendered = new Map([['registry.json', JSON.stringify(registryIndex, null, 2) + '\n']]);
-for (const item of items) rendered.set(`${item.name}.json`, JSON.stringify(item, null, 2) + '\n');
+for (const { style, dir } of BASES) {
+	const items = await buildItems(join(PKG_ROOT, 'src', 'bases', dir, 'ui'));
+	styleItemCounts.push(`${style}: ${items.length}`);
+
+	for (const item of items) {
+		const json = JSON.stringify(item, null, 2) + '\n';
+		rendered.set(`styles/${style}/${item.name}.json`, json);
+		// The un-styled path mirrors the default style, so a registry URL without a {style}
+		// segment still resolves rather than 404ing.
+		if (style === DEFAULT_STYLE) rendered.set(`${item.name}.json`, json);
+	}
+
+	if (style === DEFAULT_STYLE) {
+		rendered.set(
+			'registry.json',
+			JSON.stringify(
+				{
+					$schema: 'https://ui.shadcn.com/schema/registry.json',
+					name: 'octane',
+					homepage: 'https://octanejs.dev',
+					items: items.map(({ $schema, files, ...meta }) => ({
+						...meta,
+						files: files.map(({ content, ...file }) => file),
+					})),
+				},
+				null,
+				2,
+			) + '\n',
+		);
+	}
+}
+
+// Recursive: the tree is nested now, so a flat readdir would report every styles/ entry as
+// orphaned and miss stale files inside it.
+async function listFiles(dir, prefix = '') {
+	if (!existsSync(dir)) return [];
+	const out = [];
+	for (const entry of await readdir(dir, { withFileTypes: true })) {
+		const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+		if (entry.isDirectory()) out.push(...(await listFiles(join(dir, entry.name), rel)));
+		else out.push(rel);
+	}
+	return out;
+}
+
+const summary = `${rendered.size} file(s); ${styleItemCounts.join(', ')}`;
 
 if (process.argv.includes('--check')) {
 	let stale = false;
@@ -209,8 +287,7 @@ if (process.argv.includes('--check')) {
 			stale = true;
 		}
 	}
-	const existing = existsSync(OUT_DIR) ? await readdir(OUT_DIR) : [];
-	for (const file of existing) {
+	for (const file of await listFiles(OUT_DIR)) {
 		if (!rendered.has(file)) {
 			console.error(`orphaned: registry/${file}`);
 			stale = true;
@@ -220,10 +297,13 @@ if (process.argv.includes('--check')) {
 		console.error('registry is stale — run: node scripts/build-registry.mjs');
 		process.exit(1);
 	}
-	console.log(`registry is current (${items.length} item(s)).`);
+	console.log(`registry is current (${summary}).`);
 } else {
 	await rm(OUT_DIR, { recursive: true, force: true });
-	await mkdir(OUT_DIR, { recursive: true });
-	for (const [file, content] of rendered) await writeFile(join(OUT_DIR, file), content);
-	console.log(`wrote registry/ (${items.length} item(s)).`);
+	for (const [file, content] of rendered) {
+		const path = join(OUT_DIR, file);
+		await mkdir(dirname(path), { recursive: true });
+		await writeFile(path, content);
+	}
+	console.log(`wrote registry/ (${summary}).`);
 }

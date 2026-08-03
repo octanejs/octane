@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "empty",
+  "type": "registry:ui",
+  "title": "Empty",
+  "files": [
+    {
+      "path": "ui/empty.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/empty.tsrx",
+      "content": "import { cva, type VariantProps } from 'class-variance-authority';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function Empty({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"empty\"\n\t\tclassName={cn(\n\t\t\t'flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-xl border-dashed p-6 text-center text-balance',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function EmptyHeader({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"empty-header\"\n\t\tclassName={cn('flex max-w-sm flex-col items-center gap-2', className)}\n\t\t{...props}\n\t/>;\n}\n\nconst emptyMediaVariants = cva(\n\t'mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'bg-transparent',\n\t\t\t\ticon: 'flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground [&_svg:not([class*=\\'size-\\'])]:size-4',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t},\n\t},\n);\n\nexport function EmptyMedia({ className, variant = 'default', ...props }: HostProps<\n\t'div'\n> & VariantProps<typeof emptyMediaVariants>) {\n\treturn <div\n\t\tdata-slot=\"empty-icon\"\n\t\tdata-variant={variant}\n\t\tclassName={cn(emptyMediaVariants({ variant, className }))}\n\t\t{...props}\n\t/>;\n}\n\nexport function EmptyTitle({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"empty-title\"\n\t\tclassName={cn('text-sm font-medium tracking-tight', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function EmptyDescription({ className, ...props }: HostProps<'p'>) {\n\treturn <div\n\t\tdata-slot=\"empty-description\"\n\t\tclassName={cn(\n\t\t\t'text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function EmptyContent({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"empty-content\"\n\t\tclassName={cn(\n\t\t\t'flex w-full max-w-sm min-w-0 flex-col items-center gap-2.5 text-sm text-balance',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

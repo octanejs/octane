@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "accordion",
+  "type": "registry:ui",
+  "title": "Accordion",
+  "files": [
+    {
+      "path": "ui/accordion.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/accordion.tsrx",
+      "content": "import { type OctaneNode } from 'octane';\nimport {\n\tDisclosurePanel as AccordionContentPrimitive,\n\tHeading as AccordionHeaderPrimitive,\n\tDisclosure as AccordionItemPrimitive,\n\tDisclosureGroup as AccordionPrimitive,\n\tButton as AccordionTriggerPrimitive,\n\ttype ButtonProps,\n\ttype DisclosureGroupProps,\n\ttype DisclosurePanelProps,\n\ttype DisclosureProps,\n} from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\nimport { ChevronDownIcon, ChevronUpIcon } from '@octanejs/lucide';\n\nexport function Accordion({ className, ...props }: DisclosureGroupProps) {\n\treturn <AccordionPrimitive\n\t\tdata-slot=\"accordion\"\n\t\tclassName={cn('flex w-full flex-col', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function AccordionItem({ className, ...props }: DisclosureProps) {\n\treturn <AccordionItemPrimitive\n\t\tdata-slot=\"accordion-item\"\n\t\tclassName={cn('not-last:border-b', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function AccordionTrigger({ className, children, ...props }: Omit<\n\tButtonProps,\n\t'children'\n> & { children: OctaneNode }) {\n\treturn <AccordionHeaderPrimitive className=\"flex\">\n\t\t<AccordionTriggerPrimitive\n\t\t\tslot=\"trigger\"\n\t\t\tdata-slot=\"accordion-trigger\"\n\t\t\tclassName={cn(\n\t\t\t\t'group/accordion-trigger relative flex flex-1 items-start justify-between rounded-lg border border-transparent py-2.5 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:after:border-ring disabled:pointer-events-none disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground',\n\t\t\t\tclassName,\n\t\t\t)}\n\t\t\t{...props}\n\t\t>\n\t\t\t{children}\n\t\t\t<ChevronDownIcon\n\t\t\t\tdata-slot=\"accordion-trigger-icon\"\n\t\t\t\tclassName=\"pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden\"\n\t\t\t/>\n\t\t\t<ChevronUpIcon\n\t\t\t\tdata-slot=\"accordion-trigger-icon\"\n\t\t\t\tclassName=\"pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline\"\n\t\t\t/>\n\t\t</AccordionTriggerPrimitive>\n\t</AccordionHeaderPrimitive>;\n}\n\nexport function AccordionContent({ className, children, ...props }: DisclosurePanelProps) {\n\treturn <AccordionContentPrimitive\n\t\tdata-slot=\"accordion-content\"\n\t\tclassName=\"h-(--disclosure-panel-height) overflow-clip text-sm transition-[height] data-open:animate-accordion-down data-closed:animate-accordion-up\"\n\t\t{...props}\n\t>\n\t\t<div\n\t\t\tclassName={cn(\n\t\t\t\t'pt-0 pb-2.5 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4',\n\t\t\t\tclassName,\n\t\t\t)}\n\t\t>{children}</div>\n\t</AccordionContentPrimitive>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17",
+    "@octanejs/lucide@0.1.18"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

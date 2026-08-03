@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "radio-group",
+  "type": "registry:ui",
+  "title": "Radio Group",
+  "files": [
+    {
+      "path": "ui/radio-group.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/radio-group.tsrx",
+      "content": "// OCTANE ADAPTATION: octane's renderable type is `OctaneNode = unknown`, and a\n// union containing `unknown` collapses to `unknown` — so RAC's\n// `ChildrenOrFunction` cannot keep its render-prop arm distinguishable the way\n// React's precise `ReactNode` union does, and composeRenderProps has nothing to\n// infer its render values from. Annotating them here restores the upstream\n// parameter types without weakening the binding.\nimport {\n\tcomposeRenderProps,\n\tRadioGroup as RadioGroupPrimitive,\n\tRadio as RadioPrimitive,\n\ttype RadioGroupProps,\n\ttype RadioRenderProps,\n\ttype RadioProps,\n} from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\n\nexport function RadioGroup({ className, ...props }: RadioGroupProps) {\n\treturn <RadioGroupPrimitive\n\t\tdata-slot=\"radio-group\"\n\t\tclassName={cn('grid w-full gap-2', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function RadioGroupItem({ className, children, ...props }: RadioProps) {\n\treturn <RadioPrimitive\n\t\tdata-slot=\"radio-group-item\"\n\t\tclassName={cn(\n\t\t\t'group/radio-group-item peer relative flex aspect-square size-4 shrink-0 rounded-full border border-input outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary data-focus-visible:border-ring data-focus-visible:ring-3 data-focus-visible:ring-ring/50 data-invalid:border-destructive data-invalid:ring-3 data-invalid:ring-destructive/20 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:data-invalid:border-destructive/50 dark:data-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary data-selected:border-primary data-selected:bg-primary data-selected:text-primary-foreground data-invalid:data-selected:border-primary dark:data-selected:bg-primary',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>{composeRenderProps(\n\t\tchildren,\n\t\t(children, { isSelected }: RadioRenderProps) => <>\n\t\t\t<span data-slot=\"radio-group-indicator\" className=\"flex size-4 items-center justify-center\">\n\t\t\t\t{isSelected &&\n\t\t\t\t\t<span\n\t\t\t\t\t\tclassName=\"absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-foreground\"\n\t\t\t\t\t/>}\n\t\t\t</span>\n\t\t\t{children}\n\t\t</>,\n\t)}</RadioPrimitive>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

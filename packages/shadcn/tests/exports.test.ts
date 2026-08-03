@@ -65,17 +65,26 @@ describe('@octanejs/shadcn — published surface', () => {
 		});
 	}
 
-	it('keeps the subpath families and the registry items in step', () => {
-		// Radix is the default base, so its families are the ones the registry
-		// currently emits; the other bases get their own registry namespaces.
-		const registryItems = new Set(
-			readdirSync(join(PKG_ROOT, 'registry'))
-				.filter((f) => f.endsWith('.json') && f !== 'registry.json')
-				.map((f) => f.replace(/\.json$/, '')),
-		);
-		const uncovered = baseFiles('radix')
-			.map((f) => f.replace(/\.tsrx$/, ''))
-			.filter((name) => !registryItems.has(name));
-		expect(uncovered, 'radix families with no registry item').toEqual([]);
-	});
+	// The registry now emits a tree per base, so this checks ALL of them rather than only the
+	// default: a family that exists as a subpath export but not as a registry item is installable
+	// one way and not the other, which is the drift worth catching.
+	const REGISTRY_STYLES: Array<[base: string, style: string]> = [
+		['radix', 'radix-nova'],
+		['react-aria', 'aria-nova'],
+		['base-ui', 'base-nova'],
+	];
+
+	for (const [base, style] of REGISTRY_STYLES) {
+		it(`keeps the ${base} subpath families and its registry items in step`, () => {
+			const registryItems = new Set(
+				readdirSync(join(PKG_ROOT, 'registry', 'styles', style))
+					.filter((f) => f.endsWith('.json'))
+					.map((f) => f.replace(/\.json$/, '')),
+			);
+			const uncovered = baseFiles(base)
+				.map((f) => f.replace(/\.tsrx$/, ''))
+				.filter((name) => !registryItems.has(name));
+			expect(uncovered, `${base} families with no ${style} registry item`).toEqual([]);
+		});
+	}
 });

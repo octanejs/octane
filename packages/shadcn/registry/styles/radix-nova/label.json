@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "label",
+  "type": "registry:ui",
+  "title": "Label",
+  "files": [
+    {
+      "path": "ui/label.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/label.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/label.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis).\nimport { Label as LabelPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport interface LabelProps extends Record<string, unknown> {\n\tclassName?: string;\n}\n\nexport function Label({ className, ...props }: LabelProps) @{\n\t<LabelPrimitive.Root\n\t\tdata-slot=\"label\"\n\t\tclassName={cn(\n\t\t\t'flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.22"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

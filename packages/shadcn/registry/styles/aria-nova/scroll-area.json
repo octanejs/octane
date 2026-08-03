@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "scroll-area",
+  "type": "registry:ui",
+  "title": "Scroll Area",
+  "files": [
+    {
+      "path": "ui/scroll-area.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/scroll-area.tsrx",
+      "content": "import { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function ScrollArea({ className, children, ...props }: HostProps<'div'>) {\n\t// Use native scrollbar-width and scrollbar-color to customize the scrollbar.\n\treturn <div\n\t\tdata-slot=\"scroll-area\"\n\t\tclassName={cn(\n\t\t\t'relative [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] overflow-auto outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>{children}</div>;\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

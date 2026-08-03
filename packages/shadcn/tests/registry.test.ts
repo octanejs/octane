@@ -5,6 +5,25 @@ import { join } from 'node:path';
 
 const PKG_ROOT = join(__dirname, '..');
 const REGISTRY = join(PKG_ROOT, 'registry');
+const STYLES = join(REGISTRY, 'styles');
+
+// Every registry item across every style tree. The registry serves one tree per primitive base,
+// so a check that only walked the default style would leave two thirds of what ships unasserted.
+function allItems(): Array<{
+	name: string;
+	files: Array<Record<string, unknown>>;
+	[k: string]: any;
+}> {
+	const items = [];
+	for (const style of readdirSync(STYLES).sort()) {
+		for (const file of readdirSync(join(STYLES, style)).sort()) {
+			if (!file.endsWith('.json')) continue;
+			const parsed = JSON.parse(readFileSync(join(STYLES, style, file), 'utf8'));
+			items.push({ ...parsed, name: `${style}/${parsed.name}` });
+		}
+	}
+	return items;
+}
 
 describe('@octanejs/shadcn — registry emit', () => {
 	it('is current with the sources (build --check)', () => {
@@ -72,13 +91,19 @@ describe('@octanejs/shadcn — registry emit', () => {
 	it('every @octanejs import in emitted content is a declared, pinned dependency', () => {
 		// The guard that catches an item shipping code whose runtime the CLI
 		// would never install (the sonner regression).
-		const files = readdirSync(REGISTRY).filter((file) => file.endsWith('.json'));
-		for (const file of files) {
-			if (file === 'registry.json') continue;
-			const item = JSON.parse(readFileSync(join(REGISTRY, file), 'utf8'));
+		//
+		// Covers EVERY style tree, not just the default: each base imports a different primitive,
+		// so a missing pin in one base is invisible from another. Dependencies are declared per
+		// PACKAGE while components import by SUBPATH (`@octanejs/base-ui/accordion`,
+		// `@octanejs/aria/components`), so the spec is reduced to its package root before lookup —
+		// comparing the raw spec would report every deep import as unpinned.
+		const packageRoot = (spec: string) => spec.split('/').slice(0, 2).join('/');
+
+		for (const item of allItems()) {
 			for (const entry of item.files) {
 				for (const match of String(entry.content).matchAll(/from '(@octanejs\/[^']+)'/g)) {
-					const dep = (item.dependencies ?? []).find((d: string) => d.startsWith(match[1] + '@'));
+					const pkg = packageRoot(match[1]);
+					const dep = (item.dependencies ?? []).find((d: string) => d.startsWith(pkg + '@'));
 					expect(dep, `${item.name} imports ${match[1]} without a pinned dependency`).toBeTruthy();
 				}
 			}
@@ -93,10 +118,23 @@ describe('@octanejs/shadcn — registry emit', () => {
 		const versionOf = (name: string) =>
 			JSON.parse(readFileSync(join(PKG_ROOT, '..', name, 'package.json'), 'utf8')).version;
 
-		const button = JSON.parse(readFileSync(join(REGISTRY, 'button.json'), 'utf8'));
-		expect(button.dependencies).toContain(`@octanejs/radix@${versionOf('radix')}`);
-		const spinner = JSON.parse(readFileSync(join(REGISTRY, 'spinner.json'), 'utf8'));
-		expect(spinner.dependencies).toContain(`@octanejs/lucide@${versionOf('lucide')}`);
+		// Asserted per style, because the pin that matters differs by base — the point is that
+		// whichever primitive a style is built on arrives with a concrete version.
+		const styleItem = (style: string, name: string) =>
+			JSON.parse(readFileSync(join(REGISTRY, 'styles', style, `${name}.json`), 'utf8'));
+
+		expect(styleItem('radix-nova', 'button').dependencies).toContain(
+			`@octanejs/radix@${versionOf('radix')}`,
+		);
+		expect(styleItem('base-nova', 'button').dependencies).toContain(
+			`@octanejs/base-ui@${versionOf('base-ui')}`,
+		);
+		expect(styleItem('aria-nova', 'button').dependencies).toContain(
+			`@octanejs/aria@${versionOf('aria')}`,
+		);
+		expect(styleItem('radix-nova', 'spinner').dependencies).toContain(
+			`@octanejs/lucide@${versionOf('lucide')}`,
+		);
 	});
 
 	it('never emits an uninstallable local protocol', () => {

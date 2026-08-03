@@ -63,8 +63,8 @@
       "type": "registry:ui",
       "title": "Accordion",
       "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -82,10 +82,11 @@
       "type": "registry:ui",
       "title": "Alert Dialog",
       "dependencies": [
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21"
       ],
       "registryDependencies": [
         "@octane/button",
+        "@octane/types",
         "@octane/utils"
       ],
       "files": [
@@ -119,8 +120,9 @@
       "name": "aspect-ratio",
       "type": "registry:ui",
       "title": "Aspect Ratio",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
+      "registryDependencies": [
+        "@octane/types",
+        "@octane/utils"
       ],
       "files": [
         {
@@ -131,72 +133,14 @@
       ]
     },
     {
-      "name": "avatar",
-      "type": "registry:ui",
-      "title": "Avatar",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/avatar.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/avatar.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "badge",
-      "type": "registry:ui",
-      "title": "Badge",
-      "dependencies": [
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/badge.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/badge.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "breadcrumb",
-      "type": "registry:ui",
-      "title": "Breadcrumb",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/breadcrumb.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/breadcrumb.tsrx"
-        }
-      ]
-    },
-    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
       "dependencies": [
-        "@octanejs/radix@0.1.22",
+        "@octanejs/base-ui@0.1.21",
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "@octane/types",
         "@octane/utils"
       ],
       "files": [
@@ -228,8 +172,8 @@
       "type": "registry:ui",
       "title": "Checkbox",
       "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -243,46 +187,12 @@
       ]
     },
     {
-      "name": "collapsible",
-      "type": "registry:ui",
-      "title": "Collapsible",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
-      "files": [
-        {
-          "path": "ui/collapsible.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/collapsible.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "context-menu",
-      "type": "registry:ui",
-      "title": "Context Menu",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/context-menu.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/context-menu.tsrx"
-        }
-      ]
-    },
-    {
       "name": "dialog",
       "type": "registry:ui",
       "title": "Dialog",
       "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -297,25 +207,6 @@
       ]
     },
     {
-      "name": "dropdown-menu",
-      "type": "registry:ui",
-      "title": "Dropdown Menu",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/dropdown-menu.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/dropdown-menu.tsrx"
-        }
-      ]
-    },
-    {
       "name": "empty",
       "type": "registry:ui",
       "title": "Empty",
@@ -323,6 +214,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
+        "@octane/types",
         "@octane/utils"
       ],
       "files": [
@@ -334,49 +226,13 @@
       ]
     },
     {
-      "name": "field",
-      "type": "registry:ui",
-      "title": "Field",
-      "dependencies": [
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/label",
-        "@octane/separator",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/field.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/field.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "hover-card",
-      "type": "registry:ui",
-      "title": "Hover Card",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/hover-card.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/hover-card.tsrx"
-        }
-      ]
-    },
-    {
       "name": "input",
       "type": "registry:ui",
       "title": "Input",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
       "registryDependencies": [
-        "@octane/types",
         "@octane/utils"
       ],
       "files": [
@@ -384,26 +240,6 @@
           "path": "ui/input.tsrx",
           "type": "registry:ui",
           "target": "components/ui/input.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "item",
-      "type": "registry:ui",
-      "title": "Item",
-      "dependencies": [
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/separator",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/item.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/item.tsrx"
         }
       ]
     },
@@ -427,10 +263,8 @@
       "name": "label",
       "type": "registry:ui",
       "title": "Label",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
       "registryDependencies": [
+        "@octane/types",
         "@octane/utils"
       ],
       "files": [
@@ -442,25 +276,6 @@
       ]
     },
     {
-      "name": "menubar",
-      "type": "registry:ui",
-      "title": "Menubar",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/menubar.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/menubar.tsrx"
-        }
-      ]
-    },
-    {
       "name": "native-select",
       "type": "registry:ui",
       "title": "Native Select",
@@ -468,6 +283,7 @@
         "@octanejs/lucide@0.1.18"
       ],
       "registryDependencies": [
+        "@octane/types",
         "@octane/utils"
       ],
       "files": [
@@ -479,50 +295,11 @@
       ]
     },
     {
-      "name": "navigation-menu",
-      "type": "registry:ui",
-      "title": "Navigation Menu",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/navigation-menu.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/navigation-menu.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "pagination",
-      "type": "registry:ui",
-      "title": "Pagination",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18"
-      ],
-      "registryDependencies": [
-        "@octane/button",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/pagination.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/pagination.tsrx"
-        }
-      ]
-    },
-    {
       "name": "popover",
       "type": "registry:ui",
       "title": "Popover",
       "dependencies": [
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -536,30 +313,12 @@
       ]
     },
     {
-      "name": "progress",
-      "type": "registry:ui",
-      "title": "Progress",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/progress.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/progress.tsrx"
-        }
-      ]
-    },
-    {
       "name": "radio-group",
       "type": "registry:ui",
       "title": "Radio Group",
       "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -573,48 +332,11 @@
       ]
     },
     {
-      "name": "scroll-area",
-      "type": "registry:ui",
-      "title": "Scroll Area",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/scroll-area.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/scroll-area.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "select",
-      "type": "registry:ui",
-      "title": "Select",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/select.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/select.tsrx"
-        }
-      ]
-    },
-    {
       "name": "separator",
       "type": "registry:ui",
       "title": "Separator",
       "dependencies": [
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -624,53 +346,6 @@
           "path": "ui/separator.tsrx",
           "type": "registry:ui",
           "target": "components/ui/separator.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "sheet",
-      "type": "registry:ui",
-      "title": "Sheet",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/button",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/sheet.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/sheet.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "sidebar",
-      "type": "registry:ui",
-      "title": "Sidebar",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/button",
-        "@octane/input",
-        "@octane/separator",
-        "@octane/sheet",
-        "@octane/skeleton",
-        "@octane/tooltip",
-        "@octane/use-mobile",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/sidebar.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/sidebar.tsrx"
         }
       ]
     },
@@ -687,40 +362,6 @@
           "path": "ui/skeleton.tsrx",
           "type": "registry:ui",
           "target": "components/ui/skeleton.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "slider",
-      "type": "registry:ui",
-      "title": "Slider",
-      "dependencies": [
-        "@octanejs/radix@0.1.22"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/slider.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/slider.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "sonner",
-      "type": "registry:ui",
-      "title": "Sonner",
-      "dependencies": [
-        "@octanejs/lucide@0.1.18",
-        "@octanejs/sonner@0.1.18"
-      ],
-      "files": [
-        {
-          "path": "ui/sonner.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/sonner.tsrx"
         }
       ]
     },
@@ -747,7 +388,7 @@
       "type": "registry:ui",
       "title": "Switch",
       "dependencies": [
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -757,40 +398,6 @@
           "path": "ui/switch.tsrx",
           "type": "registry:ui",
           "target": "components/ui/switch.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "table",
-      "type": "registry:ui",
-      "title": "Table",
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/table.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/table.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "tabs",
-      "type": "registry:ui",
-      "title": "Tabs",
-      "dependencies": [
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/tabs.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/tabs.tsrx"
         }
       ]
     },
@@ -811,50 +418,11 @@
       ]
     },
     {
-      "name": "toggle-group",
-      "type": "registry:ui",
-      "title": "Toggle Group",
-      "dependencies": [
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/toggle",
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/toggle-group.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/toggle-group.tsrx"
-        }
-      ]
-    },
-    {
-      "name": "toggle",
-      "type": "registry:ui",
-      "title": "Toggle",
-      "dependencies": [
-        "@octanejs/radix@0.1.22",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
-      ],
-      "files": [
-        {
-          "path": "ui/toggle.tsrx",
-          "type": "registry:ui",
-          "target": "components/ui/toggle.tsrx"
-        }
-      ]
-    },
-    {
       "name": "tooltip",
       "type": "registry:ui",
       "title": "Tooltip",
       "dependencies": [
-        "@octanejs/radix@0.1.22"
+        "@octanejs/base-ui@0.1.21"
       ],
       "registryDependencies": [
         "@octane/utils"

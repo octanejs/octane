@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "avatar",
+  "type": "registry:ui",
+  "title": "Avatar",
+  "files": [
+    {
+      "path": "ui/avatar.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/avatar.tsrx",
+      "content": "import { useState } from 'octane';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function Avatar({ className, size = 'default', ...props }: HostProps<'div'> & {\n\tsize?: 'default' | 'sm' | 'lg';\n}) {\n\treturn <div\n\t\tdata-slot=\"avatar\"\n\t\tdata-size={size}\n\t\tclassName={cn(\n\t\t\t'group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\ntype ImageState = 'loading' | 'loaded' | 'error';\n\nexport function AvatarImage({ className, ...props }: HostProps<'img'>) {\n\tconst [state, setState] = useState<ImageState>(props.src ? 'loading' : 'error');\n\treturn <img\n\t\tdata-slot=\"avatar-image\"\n\t\talt={props.alt || ''}\n\t\tdata-state={state}\n\t\tonLoad={() => setState('loaded')}\n\t\tonError={() => setState('error')}\n\t\tclassName={cn(\n\t\t\t'peer aspect-square size-full rounded-full object-cover data-[state=error]:hidden',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function AvatarFallback({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"avatar-fallback\"\n\t\tclassName={cn(\n\t\t\t'flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs peer-data-[state=error]:flex peer-[*]:hidden',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function AvatarBadge({ className, ...props }: HostProps<'span'>) {\n\treturn <span\n\t\tdata-slot=\"avatar-badge\"\n\t\tclassName={cn(\n\t\t\t'absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground bg-blend-color ring-2 ring-background select-none',\n\t\t\t'group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden',\n\t\t\t'group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2',\n\t\t\t'group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function AvatarGroup({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"avatar-group\"\n\t\tclassName={cn(\n\t\t\t'group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function AvatarGroupCount({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"avatar-group-count\"\n\t\tclassName={cn(\n\t\t\t'relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

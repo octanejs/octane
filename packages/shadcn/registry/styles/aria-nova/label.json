@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "label",
+  "type": "registry:ui",
+  "title": "Label",
+  "files": [
+    {
+      "path": "ui/label.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/label.tsrx",
+      "content": "import { LabelContext, Label as LabelPrimitive, type LabelProps } from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\n\nexport function Label({ className, htmlFor, slot, ...props }: LabelProps) {\n\tconst label = <LabelPrimitive\n\t\tdata-slot=\"label\"\n\t\tclassName={cn(\n\t\t\t'flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 peer-data-disabled:opacity-50',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t\thtmlFor={htmlFor}\n\t\tslot={slot}\n\t/>;\n\n\tif (htmlFor && slot === undefined) {\n\t\treturn <LabelContext.Provider value={null}>{label}</LabelContext.Provider>;\n\t}\n\n\treturn label;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

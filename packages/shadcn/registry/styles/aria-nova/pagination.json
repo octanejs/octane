@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "pagination",
+  "type": "registry:ui",
+  "title": "Pagination",
+  "files": [
+    {
+      "path": "ui/pagination.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/pagination.tsrx",
+      "content": "import { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\nimport { LinkButton } from '@/components/ui/button';\nimport { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';\n\nexport function Pagination({ className, ...props }: HostProps<'nav'>) {\n\treturn <nav\n\t\trole=\"navigation\"\n\t\taria-label=\"pagination\"\n\t\tdata-slot=\"pagination\"\n\t\tclassName={cn('mx-auto flex w-full justify-center', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function PaginationContent({ className, ...props }: HostProps<'ul'>) {\n\treturn <ul\n\t\tdata-slot=\"pagination-content\"\n\t\tclassName={cn('flex items-center gap-0.5', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function PaginationItem({ ...props }: HostProps<'li'>) {\n\treturn <li data-slot=\"pagination-item\" {...props} />;\n}\n\ntype PaginationLinkProps =\n\t{\n\t\tisActive?: boolean;\n\t} & Omit<Record<string, any>, 'variant'>;\n\nexport function PaginationLink({\n\tclassName,\n\tisActive,\n\tsize = 'icon',\n\t...props\n}: PaginationLinkProps) {\n\treturn <LinkButton\n\t\tvariant={isActive ? 'outline' : 'ghost'}\n\t\tsize={size}\n\t\tclassName={cn(className)}\n\t\taria-current={isActive ? 'page' : undefined}\n\t\tdata-slot=\"pagination-link\"\n\t\tdata-active={isActive}\n\t\t{...props}\n\t/>;\n}\n\nexport function PaginationPrevious({ className, text = 'Previous', ...props }: Record<\n\tstring,\n\tany\n> & { text?: string }) {\n\treturn <PaginationLink\n\t\taria-label=\"Go to previous page\"\n\t\tsize=\"default\"\n\t\tclassName={cn('pl-1.5!', className)}\n\t\t{...props}\n\t>\n\t\t<ChevronLeftIcon data-icon=\"inline-start\" />\n\t\t<span className=\"hidden sm:block\">{text}</span>\n\t</PaginationLink>;\n}\n\nexport function PaginationNext({ className, text = 'Next', ...props }: Record<string, any> & {\n\ttext?: string;\n}) {\n\treturn <PaginationLink\n\t\taria-label=\"Go to next page\"\n\t\tsize=\"default\"\n\t\tclassName={cn('pr-1.5!', className)}\n\t\t{...props}\n\t>\n\t\t<span className=\"hidden sm:block\">{text}</span>\n\t\t<ChevronRightIcon data-icon=\"inline-end\" />\n\t</PaginationLink>;\n}\n\nexport function PaginationEllipsis({ className, ...props }: HostProps<'span'>) {\n\treturn <span\n\t\taria-hidden\n\t\tdata-slot=\"pagination-ellipsis\"\n\t\tclassName={cn(\n\t\t\t'flex size-8 items-center justify-center [&_svg:not([class*=\\'size-\\'])]:size-4',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t<MoreHorizontalIcon />\n\t\t<span className=\"sr-only\">More pages</span>\n\t</span>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.18"
+  ],
+  "registryDependencies": [
+    "@octane/button",
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

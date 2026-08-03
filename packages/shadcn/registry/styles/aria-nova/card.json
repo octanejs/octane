@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "card",
+  "type": "registry:ui",
+  "title": "Card",
+  "files": [
+    {
+      "path": "ui/card.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/card.tsrx",
+      "content": "import { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function Card({ className, size = 'default', ...props }: HostProps<'div'> & {\n\tsize?: 'default' | 'sm';\n}) {\n\treturn <div\n\t\tdata-slot=\"card\"\n\t\tdata-size={size}\n\t\tclassName={cn(\n\t\t\t'group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function CardHeader({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"card-header\"\n\t\tclassName={cn(\n\t\t\t'group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function CardTitle({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"card-title\"\n\t\tclassName={cn(\n\t\t\t'text-base leading-snug font-medium group-data-[size=sm]/card:text-sm',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function CardDescription({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"card-description\"\n\t\tclassName={cn('text-sm text-muted-foreground', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function CardAction({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"card-action\"\n\t\tclassName={cn('col-start-2 row-span-2 row-start-1 self-start justify-self-end', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function CardContent({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"card-content\"\n\t\tclassName={cn('px-(--card-spacing)', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function CardFooter({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"card-footer\"\n\t\tclassName={cn(\n\t\t\t'flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

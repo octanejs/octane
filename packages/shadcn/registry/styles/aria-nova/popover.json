@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "popover",
+  "type": "registry:ui",
+  "title": "Popover",
+  "files": [
+    {
+      "path": "ui/popover.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/popover.tsrx",
+      "content": "import {\n\tDialogTrigger,\n\tHeading,\n\tPopover as PopoverPrimitive,\n\ttype DialogTriggerProps,\n\ttype PopoverProps as PopoverPrimitiveProps,\n} from '@octanejs/aria/components';\nimport type { HeadingProps } from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function PopoverTrigger({ children, ...props }: DialogTriggerProps) {\n\treturn <DialogTrigger data-slot=\"popover-trigger\" {...props}>{children}</DialogTrigger>;\n}\n\nexport function Popover({\n\tclassName,\n\tplacement = 'bottom',\n\toffset = 4,\n\tcrossOffset = 0,\n\t...props\n}: Omit<PopoverPrimitiveProps, 'className'> & {\n\tclassName?: string;\n}) {\n\treturn <PopoverPrimitive\n\t\tdata-slot=\"popover-content\"\n\t\tplacement={placement}\n\t\toffset={offset}\n\t\tcrossOffset={crossOffset}\n\t\tclassName={cn(\n\t\t\t'z-50 flex w-72 origin-(--trigger-anchor-point) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function PopoverHeader({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"popover-header\"\n\t\tclassName={cn('flex flex-col gap-0.5 text-sm', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function PopoverTitle({ className, ...props }: HeadingProps) {\n\treturn <Heading data-slot=\"popover-title\" className={cn('font-medium', className)} {...props} />;\n}\n\nexport function PopoverDescription({ className, ...props }: HostProps<'div'>) {\n\treturn <div\n\t\tdata-slot=\"popover-description\"\n\t\tclassName={cn('text-muted-foreground', className)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}
