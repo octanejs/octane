@@ -1,33 +1,30 @@
-// Base UI base slider — runs on @octanejs/base-ui's Slider.
+// Base UI base slider — TRANSCRIBED from upstream's `bases/base-ui/ui/slider.tsx`
+// (maintainer-supplied). Structure, part tree and class strings follow that source.
 //
-// THE PART TREE IS NOT THE RADIX ONE. Verified by rendering the primitive:
+// THE PART TREE IS NOT THE RADIX ONE:
 //
-//     radix     Root > Track > Range,  Thumb as a SIBLING of Track
-//     Base UI   Root > Control > Track > Indicator + Thumb   (thumbs INSIDE the track)
+//     radix     Root >           Track > Range,       Thumb a SIBLING of Track (under Root)
+//     Base UI   Root > Control > Track > Indicator,   Thumb a SIBLING of Track (under Control)
 //
-// Two consequences the class strings have to follow:
+// The thumb sits OUTSIDE the track in both. That matters: the track carries `overflow-hidden` —
+// which is what gives the fill its rounded ends — and is only `h-1` tall, so a round thumb nested
+// inside it is clipped to a 4px sliver that reads as a missing thumb. Base UI positions the thumb
+// from slider context rather than from its DOM parent (`inset-inline-start: <pct>` plus a
+// centering `translate`), so Control is the box those percentages resolve against.
 //
-//   1. ROOT IS NOT THE INTERACTIVE BOX. Base UI's Root renders a bare `role="group"` wrapper and
-//      `Control` is the element that spans the rail and takes the pointer. So the radix base's
-//      `relative flex w-full touch-none items-center select-none` layout moves off Root and onto
-//      Control; leaving it on Root would style a wrapper that does not contain the pointer target.
+// ONE DEPARTURE FROM THE SOURCE, AND IT IS DELIBERATE: upstream writes its orientation variants as
+// `data-horizontal:` / `data-vertical:`. No primitive in @octanejs/base-ui emits those attributes —
+// this one publishes `data-orientation="horizontal" | "vertical"` on Root, Control, Track,
+// Indicator and Thumb (verified by rendering it), so the variants are written as
+// `data-[orientation=…]:` instead. Copied verbatim, upstream's spelling would match nothing and the
+// track would render with no height at all: an invisible rail. Whether the primitive should be
+// emitting the newer attribute names is a question about @octanejs/base-ui, not about this file.
 //
-//   2. THE INDICATOR POSITIONS ITSELF. Base UI emits `position: relative; height: inherit;
-//      inset-inline-start: …; width: …%` inline on the Indicator, where radix leaves the fill to
-//      the consumer and its base therefore ships `absolute`. Carrying `absolute` across would
-//      fight the primitive's own inline `position: relative` — so it is dropped and only the
-//      paint (`bg-primary`) is kept.
-//
-// `data-orientation` is the shared dialect here: unlike separator, Base UI's slider does emit it
-// on Root/Control/Track/Indicator/Thumb, so the radix base's `data-[orientation=…]` variants
-// carry over unchanged. That was checked against the rendered output, not assumed.
+// `thumbAlignment="edge"` is forwarded as upstream does: it insets the thumb so the two extremes
+// sit flush with the ends of the track instead of overhanging them.
 //
 // Thumbs are composed with createElement for the same reason as the radix base: one per entry of
 // `_values`, and mapped descriptors are octane's channel for computed children.
-//
-// UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than
-// transcribed from upstream's Base UI source; the redistribution across Root/Control and the
-// dropped `absolute` are the adaptations described above.
 import { createElement, useMemo } from 'octane';
 import { Slider as SliderPrimitive } from '@octanejs/base-ui/slider';
 
@@ -57,38 +54,41 @@ export function Slider({
 	return createElement(
 		SliderPrimitive.Root,
 		{
+			className: cn(
+				'data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full',
+				className,
+			),
 			'data-slot': 'slider',
 			defaultValue,
 			value,
 			min,
 			max,
-			className: cn('data-[disabled]:opacity-50', className),
+			thumbAlignment: 'edge',
 			...props,
 		},
 		createElement(
 			SliderPrimitive.Control,
 			{
-				'data-slot': 'slider-control',
-				className: 'relative flex w-full touch-none items-center select-none data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
+				className: 'relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
 			},
 			createElement(
 				SliderPrimitive.Track,
 				{
 					'data-slot': 'slider-track',
-					className: 'relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5',
+					className: 'relative grow overflow-hidden rounded-full bg-muted select-none data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1',
 				},
 				createElement(SliderPrimitive.Indicator, {
 					'data-slot': 'slider-range',
-					className: 'bg-primary',
+					className: 'bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',
 				}),
-				...Array.from(
-					{ length: _values.length },
-					(_, index) => createElement(SliderPrimitive.Thumb, {
-						'data-slot': 'slider-thumb',
-						key: index,
-						className: 'block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50',
-					}),
-				),
+			),
+			...Array.from(
+				{ length: _values.length },
+				(_, index) => createElement(SliderPrimitive.Thumb, {
+					'data-slot': 'slider-thumb',
+					key: index,
+					className: 'relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50',
+				}),
 			),
 		),
 	);

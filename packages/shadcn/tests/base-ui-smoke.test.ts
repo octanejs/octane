@@ -625,19 +625,37 @@ describe('@octanejs/shadcn — Base UI progress fills by width, not a radix tran
 	});
 });
 
-describe('@octanejs/shadcn — Base UI slider styles the Control, not the Root wrapper', () => {
-	it('nests Root > Control > Track > Indicator + Thumb', () => {
+describe('@octanejs/shadcn — Base UI slider is transcribed onto a different part tree', () => {
+	// `Control` carries no `data-slot` — upstream's source does not give it one, and this base
+	// follows it — so it is addressed as Root's only element child.
+	const controlOf = (root: Element) => root.firstElementChild!;
+
+	it('nests Root > Control > Track > Indicator, with the thumb beside the track', () => {
 		const m = mount(F.SliderCase as never);
 		try {
-			const control = m.container.querySelector(
-				'[data-slot="slider"] > [data-slot="slider-control"]',
-			);
-			expect(control).not.toBe(null);
-			const track = control!.querySelector('[data-slot="slider-track"]');
+			const root = m.container.querySelector('[data-slot="slider"]')!;
+			const control = controlOf(root);
+			const track = control.querySelector('[data-slot="slider-track"]');
 			expect(track).not.toBe(null);
-			// Base UI puts the thumb INSIDE the track; radix makes it a sibling of it.
 			expect(track!.querySelector('[data-slot="slider-range"]')).not.toBe(null);
-			expect(track!.querySelector('[data-slot="slider-thumb"]')).not.toBe(null);
+			expect(control.querySelector('[data-slot="slider-thumb"]')).not.toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps the thumb out of the overflow-hidden track, so it is not clipped to a sliver', () => {
+		// The reported bug. Nested inside the track, a round `size-3` thumb is clipped by
+		// `overflow-hidden` down to the track's own `h-1`, leaving a ~4px rectangle that reads as a
+		// missing thumb. jsdom does no layout, so the oracle is the containment relationship that
+		// causes the clip rather than a measured box.
+		const m = mount(F.SliderCase as never);
+		try {
+			const track = m.container.querySelector('[data-slot="slider-track"]')!;
+			const thumb = m.container.querySelector('[data-slot="slider-thumb"]')!;
+			expect(track.className).toContain('overflow-hidden');
+			expect(thumb.className).toContain('rounded-full');
+			expect(track.contains(thumb)).toBe(false);
 		} finally {
 			m.unmount();
 		}
@@ -647,9 +665,8 @@ describe('@octanejs/shadcn — Base UI slider styles the Control, not the Root w
 		const m = mount(F.SliderCase as never);
 		try {
 			const root = m.container.querySelector('[data-slot="slider"]')!;
-			const control = m.container.querySelector('[data-slot="slider-control"]')!;
-			expect(control.className).toContain('touch-none');
-			expect(control.className).toContain('items-center');
+			expect(controlOf(root).className).toContain('touch-none');
+			expect(controlOf(root).className).toContain('items-center');
 			// Styling the wrapper instead would decorate an element that is not the pointer target.
 			expect(root.className).not.toContain('touch-none');
 		} finally {
@@ -657,30 +674,39 @@ describe('@octanejs/shadcn — Base UI slider styles the Control, not the Root w
 		}
 	});
 
-	it('lets the primitive position the indicator instead of forcing radix absolute', () => {
+	it('writes orientation variants in the dialect the primitive actually emits', () => {
+		// THE one departure from the transcribed source, and the only part of this file that can go
+		// silently wrong. Upstream spells these `data-horizontal:` / `data-vertical:`; no
+		// @octanejs/base-ui primitive emits those attributes — this one emits
+		// `data-orientation="horizontal"`. Copied verbatim, the track would match no height rule and
+		// render as an invisible rail.
 		const m = mount(F.SliderCase as never);
 		try {
-			const range = m.container.querySelector<HTMLElement>('[data-slot="slider-range"]')!;
-			expect(range.style.width).toBe('30%');
-			// The primitive writes `position: relative` inline; an `absolute` class copied from the
-			// radix base would fight it.
-			expect(range.className).not.toContain('absolute');
-		} finally {
-			m.unmount();
-		}
-	});
-
-	it('keeps data-orientation, which this family really does emit', () => {
-		// Unlike separator — where Base UI emits aria-orientation and the data-* variants had to be
-		// rewritten — the slider parts do emit data-orientation, so those variants carry over.
-		const m = mount(F.SliderCase as never);
-		try {
-			for (const slot of ['slider', 'slider-control', 'slider-track', 'slider-thumb']) {
+			const root = m.container.querySelector('[data-slot="slider"]')!;
+			const track = m.container.querySelector('[data-slot="slider-track"]')!;
+			for (const el of [root, controlOf(root), track]) {
+				expect(el.className).not.toMatch(/\bdata-(horizontal|vertical):/);
+			}
+			expect(track.className).toContain('data-[orientation=horizontal]:h-1');
+			for (const slot of ['slider', 'slider-track', 'slider-range', 'slider-thumb']) {
 				expect(
 					m.container.querySelector(`[data-slot="${slot}"]`)!.getAttribute('data-orientation'),
 					slot,
 				).toBe('horizontal');
 			}
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('does not carry the radix range positioning the Base UI indicator supplies itself', () => {
+		const m = mount(F.SliderCase as never);
+		try {
+			const range = m.container.querySelector<HTMLElement>('[data-slot="slider-range"]')!;
+			// The primitive owns the fill geometry via inline style; an `absolute` class copied from
+			// the radix base would fight the `position: relative` it writes.
+			expect(range.className).not.toContain('absolute');
+			expect(range.style.position).toBe('relative');
 		} finally {
 			m.unmount();
 		}
@@ -694,6 +720,13 @@ describe('@octanejs/shadcn — Base UI slider styles the Control, not the Root w
 			m.unmount();
 		}
 	});
+
+	// NOT ASSERTED HERE, deliberately: where the thumbs and the fill actually sit. `thumbAlignment`
+	// is forwarded as `"edge"` (upstream's value), which switches the primitive to an inset mode
+	// that derives both from `getBoundingClientRect()` in a layout effect. Every rect is 0 in jsdom,
+	// so the primitive keeps them `visibility: hidden` and there is no geometry to observe. That is
+	// browser-only behavior and belongs in a real-browser suite; until one exists for this package
+	// it is covered by the playground demo.
 });
 
 describe('@octanejs/shadcn — Base UI avatar maps one-to-one and owns its own size attribute', () => {

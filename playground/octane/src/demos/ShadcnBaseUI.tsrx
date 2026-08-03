@@ -20,14 +20,16 @@
 //   Alert — transcribed and verified byte-identical to upstream's source. Should
 //     need no scrutiny.
 //
-//   Avatar, Progress, Slider, Toggle, ToggleGroup — class strings derived, but
+//   Avatar, Progress, Toggle, ToggleGroup — class strings derived, but
 //     each ADAPTED to a part tree or attribute that Base UI genuinely differs on,
 //     checked against the primitive's real output rather than assumed. What to
 //     look at: a pressed Toggle / ToggleGroup item must actually shade (Base UI
 //     emits `data-pressed`, not Radix's `data-[state=on]`); the Progress and
-//     Slider fills must sit flush against the left edge of their rails and stop
-//     at the right percentage — a fill offset sideways from where the number says
-//     it should be is the double-offset bug those two were adapted to avoid.
+//     Progress fill must sit flush against the left edge of its rail and stop at
+//     the right percentage — a fill offset sideways from where the number says it
+//     should be is the double-offset bug it was adapted to avoid. Slider is
+//     transcribed rather than derived, and is the one family here whose geometry
+//     no test can reach: check every thumb is visible and round.
 //
 //   Everything else — DERIVED from this package's React Aria base, not
 //     transcribed. Compare against the React Aria tab: they should look
@@ -592,7 +594,7 @@ export function ShadcnBaseUIDemo() @{
 
 		<Section
 			title="Slider"
-			note="Root > Control > Track > Indicator + Thumb. Drag a thumb: the fill should track it exactly, and the range slider's two thumbs must not cross-render."
+			note="Transcribed. Thumbs sit OUTSIDE the track (nested, they get clipped to a sliver by its overflow-hidden). thumbAlignment='edge' measures with getBoundingClientRect, so thumbs and fill are hidden until laid out — jsdom cannot see this, only a browser can. Every thumb must be visible and round, the end thumbs flush with the rail ends, and the fill must track a drag exactly."
 		>
 			<div class="flex max-w-md flex-col gap-8">
 				<Slider defaultValue={[50]} />
