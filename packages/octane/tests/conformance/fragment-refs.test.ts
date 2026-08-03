@@ -11,6 +11,8 @@ import { FragmentInstance } from '../../src/index.js';
 import {
 	FragmentObjectRef,
 	FragmentCallbackRef,
+	FragmentChangingCallbackRef,
+	FragmentRenderPhaseCallbackRef,
 	FragmentEffectVisibility,
 } from './_fixtures/fragment-refs.tsrx';
 
@@ -34,7 +36,8 @@ describe('Fragment refs — basic attach (React enableFragmentRefs parity)', () 
 	it('accepts a callback ref and fires it with the FragmentInstance', () => {
 		let captured: FragmentInstance | null | undefined;
 		const log: Array<FragmentInstance | null> = [];
-		const cb = (fi: FragmentInstance | null) => {
+		const cb = (value: unknown) => {
+			const fi = value as FragmentInstance | null;
 			captured = fi;
 			log.push(fi);
 		};
@@ -49,17 +52,60 @@ describe('Fragment refs — basic attach (React enableFragmentRefs parity)', () 
 		expect(log[log.length - 1]).toBeNull();
 	});
 
+	it('detaches a changed callback before attaching its replacement to the same instance', () => {
+		const log: string[] = [];
+		let firstInstance: FragmentInstance | null = null;
+		let secondInstance: FragmentInstance | null = null;
+		const first = (value: unknown) => {
+			const instance = value as FragmentInstance | null;
+			log.push(instance === null ? 'first:detach' : 'first:attach');
+			if (instance !== null) firstInstance = instance;
+		};
+		const second = (value: unknown) => {
+			const instance = value as FragmentInstance | null;
+			log.push(instance === null ? 'second:detach' : 'second:attach');
+			if (instance !== null) secondInstance = instance;
+		};
+		const r = mount(FragmentChangingCallbackRef, { cb: first });
+
+		r.update(FragmentChangingCallbackRef, { cb: second });
+		expect(log).toEqual(['first:attach', 'first:detach', 'second:attach']);
+		expect(secondInstance).toBe(firstInstance);
+
+		r.unmount();
+		expect(log).toEqual(['first:attach', 'first:detach', 'second:attach', 'second:detach']);
+	});
+
+	it('does not attach a Fragment ref discarded by a render-phase replay', () => {
+		const discardedAttachments: unknown[] = [];
+		const committedAttachments: unknown[] = [];
+		const r = mount(FragmentRenderPhaseCallbackRef, {
+			first: (value: unknown) => {
+				if (value !== null) discardedAttachments.push(value);
+			},
+			second: (value: unknown) => {
+				if (value !== null) committedAttachments.push(value);
+			},
+		});
+
+		expect(discardedAttachments).toEqual([]);
+		expect(committedAttachments.length).toBeGreaterThan(0);
+		expect(new Set(committedAttachments).size).toBe(1);
+		expect(committedAttachments[0]).toBeInstanceOf(FragmentInstance);
+		r.unmount();
+	});
+
 	it('is populated by the time useLayoutEffect AND useEffect run', () => {
 		const fragRef: { current: FragmentInstance | null } = { current: null };
 		let layoutSeen: FragmentInstance | null | undefined;
 		let passiveSeen: FragmentInstance | null | undefined;
 		const r = mount(FragmentEffectVisibility, {
 			fragRef,
-			onLayout: (v: FragmentInstance | null) => {
-				layoutSeen = v;
+			onLayout: (value: unknown) => {
+				layoutSeen = value as FragmentInstance | null;
 			},
-			onPassive: (v: FragmentInstance | null) => {
-				passiveSeen = v;
+			onPassive: (value: unknown) => {
+				passiveSeen = value as FragmentInstance | null;
 			},
 		});
 		// useLayoutEffect is sync at commit, so layoutSeen is already populated.

@@ -2453,7 +2453,9 @@ const storeSyncQueue: StoreInst<any>[] = [];
 // callback refs see a connected node and ref.current is populated by the time a
 // layout effect runs — matching React's commit-phase ref attachment.
 interface RefAttach {
-	fn: () => void;
+	/** Exact queued ref; initial Fragment mounts use the live-ref trampoline below. */
+	ref: any;
+	el: Element | FragmentInstance;
 	/** Enqueue sequence (DFS pre-order) — see commitSeq / comparePostOrder. */
 	seq: number;
 	block: Block | null;
@@ -2466,6 +2468,13 @@ interface SuspenseRefEntry {
 	scope: Scope;
 }
 const refAttachQueue: RefAttach[] = [];
+// A Fragment can re-point its ref during a render-phase replay before the mount
+// commit drains. Preserve that existing live-read contract with a shared callback
+// trampoline. The common drain remains branch-free, and Fragment instances do not
+// allocate a getter closure.
+function attachLiveFragmentRef(instance: FragmentInstance): void {
+	attachRef(instance._currentRef, instance);
+}
 
 // Off-screen (WIP) effect capture. While a transition swaps in a NEW subtree that
 // may suspend, that subtree is rendered "off-screen" (its DOM kept out of the slot's
@@ -3261,9 +3270,10 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * commit every detach drains before every attach — a ref hopping between
  * elements never ends null, whichever binding updates first.
  */
-export function queueRefAttach(scope: Scope, fn: () => void): void {
+export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
-		fn,
+		ref,
+		el,
 		seq: commitSeq++,
 		block: scope.block,
 	});
@@ -3373,7 +3383,7 @@ function drainRefAttaches(): void {
 		try {
 			REF_CALLBACK_DEPTH++;
 			try {
-				r.fn();
+				attachRef(r.ref, r.el);
 			} finally {
 				REF_CALLBACK_DEPTH--;
 			}
@@ -3396,21 +3406,44 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 	return false;
 }
 
-function discardSubtreeRefAttachesFrom(queue: RefAttach[], root: Block): void {
+type UncommittedRefAttaches = Map<Element | FragmentInstance, Set<any>>;
+
+function discardSubtreeRefAttachesFrom(
+	queue: RefAttach[],
+	root: Block,
+	uncommitted: UncommittedRefAttaches,
+): void {
 	let write = 0;
 	for (let read = 0; read < queue.length; read++) {
 		const entry = queue[read];
 		const owner = entry.block;
-		if (owner === root || (owner !== null && blockIsAncestorOf(root, owner))) continue;
+		if (owner === root || (owner !== null && blockIsAncestorOf(root, owner))) {
+			let refs = uncommitted.get(entry.el);
+			if (refs === undefined) uncommitted.set(entry.el, (refs = new Set()));
+			refs.add(
+				entry.ref === attachLiveFragmentRef
+					? (entry.el as FragmentInstance)._currentRef
+					: entry.ref,
+			);
+			continue;
+		}
 		queue[write++] = entry;
 	}
 	queue.length = write;
 }
 
-/** Drop commit-phase attaches owned by a primary that has just become hidden. */
-function discardSubtreeRefAttaches(root: Block): void {
-	discardSubtreeRefAttachesFrom(refAttachQueue, root);
-	if (WIP_CAPTURE !== null) discardSubtreeRefAttachesFrom(WIP_CAPTURE.refs, root);
+/**
+ * Drop commit-phase attaches owned by a primary that has just become hidden and
+ * index their exact ref/target pairs. The hide walk uses this cold-path index to
+ * distinguish a ref that committed earlier from one that only reached the queue.
+ */
+function discardSubtreeRefAttaches(
+	root: Block,
+	uncommitted: UncommittedRefAttaches = new Map(),
+): UncommittedRefAttaches {
+	discardSubtreeRefAttachesFrom(refAttachQueue, root, uncommitted);
+	if (WIP_CAPTURE !== null) discardSubtreeRefAttachesFrom(WIP_CAPTURE.refs, root, uncommitted);
+	return uncommitted;
 }
 
 function commitEffects(): void {
@@ -10208,21 +10241,6 @@ function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean
 // keep the `ref(null)` detach contract.
 const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
 const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
-// `refCleanups` is also the commit witness for cleanup-return callbacks. Legacy
-// callbacks need the same per-target witness so Suspense does not manufacture
-// `ref(null)` when a later sibling suspends before their queued attach commits.
-// Weak keys and targets ensure the witness cannot retain application objects.
-const attachedLegacyRefTargets = new WeakMap<(el: any) => unknown, WeakSet<object>>();
-
-function isRefTargetAttached(ref: any, target: Element | FragmentInstance): boolean {
-	if (typeof ref === 'function') {
-		return (
-			refCleanups.get(ref)?.has(target) === true ||
-			attachedLegacyRefTargets.get(ref)?.has(target) === true
-		);
-	}
-	return ref !== null && typeof ref === 'object' && ref.current === target;
-}
 
 export function attachRef(
 	ref: any,
@@ -10242,7 +10260,6 @@ export function attachRef(
 				if (refLastCleanupTarget.get(ref) === target) refLastCleanupTarget.delete(ref);
 				cleanup();
 			} else {
-				if (target != null) attachedLegacyRefTargets.get(ref)?.delete(target);
 				ref(null);
 			}
 		} else {
@@ -10252,10 +10269,6 @@ export function attachRef(
 				if (perTarget === undefined) refCleanups.set(ref, (perTarget = new WeakMap()));
 				perTarget.set(el, cleanup as () => void);
 				refLastCleanupTarget.set(ref, el);
-			} else {
-				let targets = attachedLegacyRefTargets.get(ref);
-				if (targets === undefined) attachedLegacyRefTargets.set(ref, (targets = new WeakSet()));
-				targets.add(el);
 			}
 		}
 		return;
@@ -10266,16 +10279,6 @@ export function attachRef(
 	}
 	ref.current = el;
 }
-
-/** Detach only ref leaves whose commit-phase attach actually ran. */
-function detachAttachedRef(ref: any, target: Element | FragmentInstance): void {
-	if (Array.isArray(ref)) {
-		for (let i = 0; i < ref.length; i++) detachAttachedRef(ref[i], target);
-	} else if (isRefTargetAttached(ref, target)) {
-		attachRef(ref, null, target);
-	}
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Fragment refs (React canary `enableFragmentRefs` parity).
 //
@@ -10770,10 +10773,11 @@ export function mountFragmentRef(
 	fi._currentRef = ref;
 	// Defer the attach to commit (after DOM insertion, before layout effects) so
 	// the fragment's markers/children are connected when a callback ref fires —
-	// same React-19 timing as element refs. Read `_currentRef` (not the captured
-	// `ref`) so a ref the compiler re-points via the update path is honored, and
-	// so the detach cleanup always releases whatever ref is current on unmount.
-	queueRefAttach(scope, () => attachRef(fi._currentRef, fi));
+	// same React-19 timing as element refs. A render-phase replay may re-point the
+	// Fragment before this mount commit drains, so the shared trampoline resolves
+	// `_currentRef` at drain/cancellation time. The structured target still lets a
+	// Suspense hide distinguish this uncommitted attach from an older committed ref.
+	queueRefAttach(scope, attachLiveFragmentRef, fi);
 	(scope.cleanups ??= []).push(() => {
 		// Detach at commit, not inline (queueRefDetach) — unmount cleanups run
 		// mid-render, and a state-setter ref firing null synchronously can render
@@ -11764,7 +11768,7 @@ export function setSpread(
 			// across elements. Compiled callers pass their scope on BOTH mount and
 			// update so the attach lands at commit (connected node, ordered after
 			// all detaches); the scope-less inline fallback serves external callers.
-			if (mountScope) queueRefAttach(mountScope, () => attachRef(v, el));
+			if (mountScope) queueRefAttach(mountScope, v, el);
 			else attachRef(v, el);
 			continue;
 		}
@@ -15931,7 +15935,7 @@ export function positionalChildren(children: any[]): any[] {
 // setAttribute + `$$type` delegated-event slots + deferred ref attach).
 function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
 	if (name === 'ref') {
-		if (v != null) queueRefAttach(ownerBlock, () => attachRef(v, el));
+		if (v != null) queueRefAttach(ownerBlock, v, el);
 	} else if (name === 'className' || name === 'class') {
 		setDeoptClass(el, v);
 	} else if (name === 'style') {
@@ -16157,7 +16161,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 				// regardless of which element's props apply first (React's
 				// mutation→layout phasing; see queueRefDetach).
 				if (state.ref != null) queueRefDetach(state.ref, el);
-				if (v != null) queueRefAttach(scope, () => attachRef(v, el));
+				if (v != null) queueRefAttach(scope, v, el);
 				state.ref = v;
 			}
 		} else if (name === 'className' || name === 'class') {
@@ -19733,8 +19737,10 @@ function hideTryContentAndMountPending(
 		const persistent = state.tryBlock;
 		// A ref mounted before the suspending sibling queued an attach but has not
 		// reached the commit phase. The fallback commit must discard that work;
-		// reveal will enumerate the primary's current manifests and attach them.
-		discardSubtreeRefAttaches(persistent);
+		// reveal will enumerate the primary's current manifests and attach them. The
+		// exact canceled pairs also tell the detach walk which current refs never
+		// committed, without retaining a witness for every callback ref in the app.
+		const uncommittedRefs = discardSubtreeRefAttaches(persistent);
 		deactivateScope(persistent, false);
 		// Effect cleanups are user code and may synchronously replace/unmount this
 		// root. Never continue a half-finished fallback commit into detached markers.
@@ -19745,16 +19751,20 @@ function hideTryContentAndMountPending(
 			state.detachedRefs = [];
 			// Nested boundaries may already have detached their hidden primary refs.
 			// Visit only each nested boundary's visible arm here so an outer hide
-			// cannot detach the preserved inner primary a second time. The attach
-			// witness checked by detachSubtreeRefs excludes refs that only reached the
-			// queue before this suspension; reveal attaches the current manifests.
-			detachSubtreeRefs(persistent, state.detachedRefs, true, false);
+			// cannot detach the preserved inner primary a second time. The canceled
+			// pair index excludes refs that only reached the queue before this
+			// suspension; reveal attaches the current manifests.
+			detachSubtreeRefs(persistent, state.detachedRefs, true, false, uncommittedRefs);
 		}
 		// Callback refs (and React-19 ref cleanups) are user code too. In particular,
 		// ref(null) may synchronously unmount an independent or owning root.
 		if (state.parentBlock.disposed || persistent.disposed || state.tryBlock !== persistent) {
 			return false;
 		}
+		// Ref callbacks can synchronously render. Any fresh attaches they queued for
+		// this still-hidden primary are uncommitted work too; do not publish them at
+		// the fallback commit.
+		discardSubtreeRefAttaches(persistent, uncommittedRefs);
 		persistent.inactive = true;
 	}
 	if (!mountPendingBody(state)) return false;
@@ -20192,7 +20202,7 @@ function queueCurrentHiddenRefs(state: TrySlot): void {
 	collectVisibleSubtreeRefs(state.tryBlock, refs);
 	for (let i = 0; i < refs.length; i++) {
 		const entry = refs[i];
-		queueRefAttach(entry.scope, () => attachRef(entry.ref, entry.el));
+		queueRefAttach(entry.scope, entry.ref, entry.el);
 	}
 }
 
@@ -22110,12 +22120,13 @@ function detachSubtreeRefs(
 	out: SuspenseRefEntry[],
 	shouldDetach: boolean = true,
 	includeHiddenTry: boolean = true,
+	uncommitted: UncommittedRefAttaches | null = null,
 ): void {
 	// A block managing a de-opt host subtree (deoptItemBody / pure-host items):
 	// every node the de-opt reconciler built carries its descriptor (DEOPT_DESC),
 	// whose props may hold a ref — walk the DOM subtree for them.
 	const deoptRoot = (scope as any).deoptNode as Node | null | undefined;
-	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out, shouldDetach, scope);
+	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out, shouldDetach, scope, uncommitted);
 	const rm = scope.refFields;
 	if (rm !== null) {
 		const bag = scope.slots[0];
@@ -22128,7 +22139,9 @@ function detachSubtreeRefs(
 					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
 					out.push({ ref, el, scope });
-					if (shouldDetach) detachAttachedRef(ref, el);
+					if (shouldDetach && uncommitted?.get(el)?.has(ref) !== true) {
+						attachRef(ref, null, el);
+					}
 				} else if (kind === 's') {
 					// Spread binding: the committed spread object may carry a ref.
 					const ref = bag[rm[j + 1]]?.ref;
@@ -22136,14 +22149,18 @@ function detachSubtreeRefs(
 					const el = bag[rm[j + 2]];
 					if (el == null) continue;
 					out.push({ ref, el, scope });
-					if (shouldDetach) detachAttachedRef(ref, el);
+					if (shouldDetach && uncommitted?.get(el)?.has(ref) !== true) {
+						attachRef(ref, null, el);
+					}
 				} else {
 					// 'f' — <Fragment ref>: detach the FragmentInstance's current ref;
 					// reveal re-attaches the same instance.
 					const fi = bag[rm[j + 1]];
 					if (fi == null || fi._currentRef == null) continue;
 					out.push({ ref: fi._currentRef, el: fi, scope });
-					if (shouldDetach) detachAttachedRef(fi._currentRef, fi);
+					if (shouldDetach && uncommitted?.get(fi)?.has(fi._currentRef) !== true) {
+						attachRef(fi._currentRef, null, fi);
+					}
 				}
 			}
 		}
@@ -22155,16 +22172,18 @@ function detachSubtreeRefs(
 		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
 		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
 			out.push({ ref: s.ref, el: s.el, scope });
-			if (shouldDetach) detachAttachedRef(s.ref, s.el);
+			if (shouldDetach && uncommitted?.get(s.el)?.has(s.ref) !== true) {
+				attachRef(s.ref, null, s.el);
+			}
 		}
 		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
 		if (s.__kind === 'childSlot' && s.hostNode != null) {
-			detachDeoptTreeRefs(s.hostNode, out, shouldDetach, scope);
+			detachDeoptTreeRefs(s.hostNode, out, shouldDetach, scope, uncommitted);
 		}
 	}
 	forEachSubtreeChild(
 		scope,
-		(child) => detachSubtreeRefs(child, out, shouldDetach, includeHiddenTry),
+		(child) => detachSubtreeRefs(child, out, shouldDetach, includeHiddenTry, uncommitted),
 		includeHiddenTry,
 	);
 }
@@ -22186,13 +22205,16 @@ function detachDeoptTreeRefs(
 	out: SuspenseRefEntry[] | null,
 	shouldDetach: boolean = true,
 	ownerScope?: Scope,
+	uncommitted: UncommittedRefAttaches | null = null,
 ): void {
 	const ref = getDeoptDesc(node)?.props?.ref;
 	if (ref != null) {
 		if (out !== null) {
 			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
 			out.push({ ref, el: node as Element, scope: ownerScope! });
-			if (shouldDetach) detachAttachedRef(ref, node as Element);
+			if (shouldDetach && uncommitted?.get(node as Element)?.has(ref) !== true) {
+				attachRef(ref, null, node as Element);
+			}
 		} else {
 			// Teardown: DEFER the detach to commit (drainRefDetaches), before the
 			// mount attaches. Teardown runs mid-render (reconcile/unmount), and a
@@ -22215,7 +22237,7 @@ function detachDeoptTreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope);
+		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted);
 		c = c.nextSibling;
 	}
 }
