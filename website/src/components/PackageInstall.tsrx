@@ -27,13 +27,32 @@ const PACK_DRY_RUN: Record<PackageManager, string> = {
 	bun: 'bun pm pack --dry-run',
 };
 
+// Scaffolding a new app. Every manager has a `create` verb that resolves
+// `create-octane`; npm carries the version tag so a stale cached copy is not
+// what runs.
+//
+// Deliberately no flags: how a flag reaches the scaffolder differs per manager
+// (npm consumes a bare `--` and forwards the rest, while pnpm and yarn forward
+// flags already and reject the `--`), so a tab strip that rewrote one command
+// into four would be asserting that difference for every manager here. Docs
+// pass `--template` in a prose fence instead, at the one spelling the CLI's own
+// usage error sanctions.
+const CREATE: Record<PackageManager, string> = {
+	npm: 'npm create octane@latest',
+	pnpm: 'pnpm create octane',
+	yarn: 'yarn create octane',
+	bun: 'bun create octane',
+};
+
 interface PackageInstallProps {
 	/** Runtime packages, space-separated — rendered first. */
 	packages?: string;
 	/** Dev packages, space-separated — rendered as the -D line. */
 	dev?: string;
 	/** A package-manager-specific command recipe instead of an install command. */
-	command?: 'pack-dry-run';
+	command?: 'pack-dry-run' | 'create';
+	/** `create` only: the directory to scaffold into. Defaults to `my-app`. */
+	directory?: string;
 }
 
 // One rendered span in the code block. Newlines between command lines are their
@@ -75,6 +94,8 @@ export function PackageInstall(props: PackageInstallProps) @{
 	const lines: string[] = [];
 	if (props.command === 'pack-dry-run') {
 		lines.push(PACK_DRY_RUN[manager]);
+	} else if (props.command === 'create') {
+		lines.push(CREATE[manager] + ' ' + (props.directory ?? 'my-app'));
 	} else {
 		if (props.packages) lines.push(INSTALL[manager].add + ' ' + props.packages);
 		if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);

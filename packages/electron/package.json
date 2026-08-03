@@ -1,0 +1,56 @@
+{
+  "name": "@octanejs/electron",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src/renderer"
+      ]
+    }
+  },
+  "description": "Electron bindings for the octane renderer — process-split main/preload/renderer helpers and Octane hooks over Electron's IPC and desktop bridge APIs.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/electron"
+  },
+  "main": "src/renderer/index.ts",
+  "module": "src/renderer/index.ts",
+  "types": "src/renderer/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/renderer/index.ts",
+    "./renderer": "./src/renderer/index.ts",
+    "./preload": "./src/preload/index.ts",
+    "./main": "./src/main/index.ts",
+    "./main/native": "./src/main/electron-apis.ts",
+    "./common": "./src/common/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "electron": ">=33.0.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "catalog:default",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

@@ -84,8 +84,8 @@
   },
   {
     "title": "Desktop",
-    "description": "Tauri v2 commands and events for desktop applications.",
-    "packages": ["@octanejs/tauri"]
+    "description": "Tauri v2 and Electron desktop bindings for Octane applications.",
+    "packages": ["@octanejs/tauri", "@octanejs/electron"]
   },
   {
     "title": "Styling, tests, and devtools",
