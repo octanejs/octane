@@ -42,6 +42,30 @@ it('does not publish a host ref from a suspended initial mount', async () => {
 	r.unmount();
 });
 
+it('keeps every member of an array ref unpublished until a suspended mount reveals', async () => {
+	const pending = deferred<string>();
+	const calls: string[] = [];
+	const first = (element: Element | null) => {
+		calls.push(`first:${element ? 'attach' : 'detach'}`);
+	};
+	const second = (element: Element | null) => {
+		calls.push(`second:${element ? 'attach' : 'detach'}`);
+	};
+	const r = mount(SuspendedInitialHostRef as any, {
+		innerRef: [first, second],
+		promise: pending.promise,
+	});
+
+	expect(r.find('.initial-fallback').textContent).toBe('loading');
+	expect(calls).toEqual([]);
+
+	await act(() => pending.resolve('ready'));
+	expect(calls).toEqual(['first:attach', 'second:attach']);
+
+	r.unmount();
+	expect(calls).toEqual(['first:attach', 'second:attach', 'first:detach', 'second:detach']);
+});
+
 it('does not detach a replacement ref from a suspended update before it attaches', async () => {
 	const pending = deferred<string>();
 	const calls: string[] = [];

@@ -2391,9 +2391,8 @@ const effectEventQueue: PendingEffectEvent[] = [];
 // transaction below, so an aborted enclosing render drops them.
 const effectEventCommitActions: Array<() => void> = [];
 let passiveScheduled = false;
-// Monotonic enqueue counter — tags each PendingEffect AND deferred ref attach with its
-// DFS pre-order position so the commit drains them in React's post-order (see
-// PendingEffect.seq / comparePostOrder). Shared so refs and effects sequence consistently.
+// Monotonic enqueue counter — tags each PendingEffect with its DFS pre-order position
+// so the effect drains can reconstruct React's post-order (see comparePostOrder).
 let commitSeq = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2456,8 +2455,6 @@ interface RefAttach {
 	/** Exact queued ref; initial Fragment mounts use the live-ref trampoline below. */
 	ref: any;
 	el: Element | FragmentInstance;
-	/** Enqueue sequence (DFS pre-order) — see commitSeq / comparePostOrder. */
-	seq: number;
 	block: Block | null;
 }
 
@@ -3263,18 +3260,16 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * Compiler-emitted on a host element's ref MOUNT. Defers the attach until commit
  * (drainRefAttaches) so the node is connected when a callback ref fires and
  * ref.current is set before layout effects run. Each entry records its owning
- * `block` plus an enqueue-order `seq`; drainRefAttaches sorts with
- * comparePostOrder (post-order via the parentBlock chain, seq as tiebreak) for
- * child-before-parent ordering, matching effect ordering. Ref identity UPDATES
- * queue here too (paired with a queueRefDetach of the old ref), so within one
- * commit every detach drains before every attach — a ref hopping between
- * elements never ends null, whichever binding updates first.
+ * `block`; drainRefAttaches preserves enqueue order for disjoint subtrees and
+ * only reorders ancestor/descendant pairs for child-before-parent ordering.
+ * Ref identity UPDATES queue here too (paired with a queueRefDetach of the old
+ * ref), so within one commit every detach drains before every attach — a ref
+ * hopping between elements never ends null, whichever binding updates first.
  */
 export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
 		ref,
 		el,
-		seq: commitSeq++,
 		block: scope.block,
 	});
 }
@@ -3371,8 +3366,9 @@ function drainRefDetaches(): void {
 function drainRefAttaches(): void {
 	if (refAttachQueue.length === 0) return;
 	const q = refAttachQueue.splice(0);
-	// Post-order, same as effects (refs attach child-first, siblings in tree order).
-	q.sort((a, b) => comparePostOrder(a.block, a.seq, b.block, b.seq));
+	// ES stable sort preserves the queue's DFS/source order for disjoint subtrees;
+	// comparePostOrder moves only descendants ahead of their queued ancestors.
+	q.sort((a, b) => comparePostOrder(a.block, 0, b.block, 0));
 	for (const r of q) {
 		// Skip attaches whose owning subtree was unmounted earlier in THIS flush
 		// (e.g. a try boundary caught a mount-time throw and ran unmountBlock +
@@ -3406,7 +3402,19 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 	return false;
 }
 
-type UncommittedRefAttaches = Map<Element | FragmentInstance, Set<any>>;
+// A target has one effective ref binding; array refs remain one composite value.
+// If render-phase replays queue several identities for the same target, the last
+// canceled attach is the manifest's current ref and therefore the only one the
+// hide walk can attempt to detach.
+type UncommittedRefAttaches = Map<Element | FragmentInstance, any>;
+
+function refAttachWasDiscarded(
+	uncommitted: UncommittedRefAttaches | null,
+	el: Element | FragmentInstance,
+	ref: any,
+): boolean {
+	return uncommitted !== null && uncommitted.get(el) === ref;
+}
 
 function discardSubtreeRefAttachesFrom(
 	queue: RefAttach[],
@@ -3418,9 +3426,8 @@ function discardSubtreeRefAttachesFrom(
 		const entry = queue[read];
 		const owner = entry.block;
 		if (owner === root || (owner !== null && blockIsAncestorOf(root, owner))) {
-			let refs = uncommitted.get(entry.el);
-			if (refs === undefined) uncommitted.set(entry.el, (refs = new Set()));
-			refs.add(
+			uncommitted.set(
+				entry.el,
 				entry.ref === attachLiveFragmentRef
 					? (entry.el as FragmentInstance)._currentRef
 					: entry.ref,
@@ -3686,10 +3693,11 @@ function blockIsAncestorOf(anc: Block, node: Block): boolean {
 // and disjoint subtrees fire in tree order. We reconstruct that from the flat queues:
 // descendant-before-ancestor via the parentBlock chain; everything else (disjoint
 // subtrees, and multiple entries on the SAME block) falls back to enqueue order, which
-// IS tree order because rendering is top-down DFS pre-order. This is correct where a
-// plain depth sort was not — a shallow node in an earlier sibling subtree must fire
-// before a deeper node in a LATER sibling subtree, which depth alone gets backwards.
-// Shared by the effect queues AND the deferred ref-attach queue so both commit in order.
+// IS tree order because rendering is top-down DFS pre-order. Effects pass their explicit
+// sequence; refs pass equal sequence values and rely on ES stable sort to retain their
+// queue order. This is correct where a plain depth sort was not — a shallow node in an
+// earlier sibling subtree must fire before a deeper node in a LATER sibling subtree,
+// which depth alone gets backwards.
 function comparePostOrder(
 	aBlock: Block | null,
 	aSeq: number,
@@ -20384,15 +20392,13 @@ function compareStagedRevealDomOrder(a: TrySlot, b: TrySlot): number {
 	return 0;
 }
 
-/** Rebase speculative enqueue order onto final source/tree commit order. */
-function rebaseOffscreenCaptureSeq(capture: OffscreenCapture): void {
+/** Rebase speculative effect enqueue order onto final source/tree commit order. */
+function rebaseOffscreenEffectSeq(capture: OffscreenCapture): void {
 	const effects = capture.effects[INSERTION].concat(
 		capture.effects[LAYOUT],
 		capture.effects[PASSIVE],
 	).sort((a, b) => a.seq - b.seq);
 	for (let i = 0; i < effects.length; i++) effects[i].seq = commitSeq++;
-	const refs = capture.refs.slice().sort((a, b) => a.seq - b.seq);
-	for (let i = 0; i < refs.length; i++) refs[i].seq = commitSeq++;
 }
 
 function flushStagedReveals(): void {
@@ -20428,10 +20434,10 @@ function flushStagedReveals(): void {
 			const deferEffects = batch.every((state) => state.stagedCapture !== null);
 			if (deferEffects) {
 				// Promise resolution order is not source order. Commit left-to-right and
-				// rebase each capture's enqueue sequence so the shared effect/ref drain
-				// preserves sibling tree order even when the right boundary readies first.
+				// rebase each capture's effect sequence. Ref captures splice in this same
+				// sorted order and retain it through their stable post-order sort.
 				batch.sort(compareStagedRevealDomOrder);
-				for (const state of batch) rebaseOffscreenCaptureSeq(state.stagedCapture!);
+				for (const state of batch) rebaseOffscreenEffectSeq(state.stagedCapture!);
 			}
 			const previousDeferral = deferringStagedRevealEffects;
 			deferringStagedRevealEffects = deferEffects;
@@ -22139,7 +22145,7 @@ function detachSubtreeRefs(
 					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
 					out.push({ ref, el, scope });
-					if (shouldDetach && uncommitted?.get(el)?.has(ref) !== true) {
+					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
 						attachRef(ref, null, el);
 					}
 				} else if (kind === 's') {
@@ -22149,7 +22155,7 @@ function detachSubtreeRefs(
 					const el = bag[rm[j + 2]];
 					if (el == null) continue;
 					out.push({ ref, el, scope });
-					if (shouldDetach && uncommitted?.get(el)?.has(ref) !== true) {
+					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
 						attachRef(ref, null, el);
 					}
 				} else {
@@ -22158,7 +22164,7 @@ function detachSubtreeRefs(
 					const fi = bag[rm[j + 1]];
 					if (fi == null || fi._currentRef == null) continue;
 					out.push({ ref: fi._currentRef, el: fi, scope });
-					if (shouldDetach && uncommitted?.get(fi)?.has(fi._currentRef) !== true) {
+					if (shouldDetach && !refAttachWasDiscarded(uncommitted, fi, fi._currentRef)) {
 						attachRef(fi._currentRef, null, fi);
 					}
 				}
@@ -22172,7 +22178,7 @@ function detachSubtreeRefs(
 		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
 		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
 			out.push({ ref: s.ref, el: s.el, scope });
-			if (shouldDetach && uncommitted?.get(s.el)?.has(s.ref) !== true) {
+			if (shouldDetach && !refAttachWasDiscarded(uncommitted, s.el, s.ref)) {
 				attachRef(s.ref, null, s.el);
 			}
 		}
@@ -22212,7 +22218,7 @@ function detachDeoptTreeRefs(
 		if (out !== null) {
 			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
 			out.push({ ref, el: node as Element, scope: ownerScope! });
-			if (shouldDetach && uncommitted?.get(node as Element)?.has(ref) !== true) {
+			if (shouldDetach && !refAttachWasDiscarded(uncommitted, node as Element, ref)) {
 				attachRef(ref, null, node as Element);
 			}
 		} else {
