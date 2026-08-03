@@ -17,9 +17,9 @@ const SUMMARY_SERIES: SeriesDef[] = [
 
 export const HOME_SUMMARY: BenchCard = {
 	id: 'home-summary',
-	title: 'Every suite, normalized',
+	title: 'Every suite at a glance',
 	description:
-		'Geometric mean of per-operation benchmark scores, relative to Octane. Lower is better.',
+		'Geometric mean of each suite’s per-operation scores, relative to Octane. Lower is better.',
 	series: SUMMARY_SERIES,
 	rows: [
 		{
