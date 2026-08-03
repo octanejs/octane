@@ -23,6 +23,11 @@
 
 export { executeServerFunction } from './rpc.js';
 
+// Semi-public compiler target for inferred method-call dependencies — the
+// same helper the client entry ships, because inferred dependency arrays are
+// compiled identically for SSR (see applyHookDependencies' server call site).
+export { __methodDep } from '../method-dep.js';
+
 export {
 	// Entry — React `react-dom/server` parity (buffered; streaming lands in a
 	// later phase). `renderToString` is a single sync pass (fallbacks for

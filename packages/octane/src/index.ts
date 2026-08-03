@@ -254,3 +254,6 @@ export type {
 
 // Semi-public compiler target for `module server` browser stubs.
 export { __serverRpc } from './server-rpc-client.js';
+
+// Semi-public compiler target for inferred method-call dependencies.
+export { __methodDep } from './method-dep.js';

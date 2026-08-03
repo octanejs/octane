@@ -242,3 +242,43 @@ export function StoreGetterSelectedEffect(props) @{
 	useEffect(() => props.log(value));
 	<span class="value">{value}</span>
 }
+
+// An optional call on a handler that is not provided must contribute a stable
+// dependency (`undefined`), not the per-render props container — the effect
+// stays inert until the handler appears.
+export function EffectFromOptionalMethodCall(props) @{
+	useEffect(() => {
+		props.log('run');
+		props.onPing?.();
+	});
+	<span>{props.noise as string}</span>
+}
+
+// Issue #542: `count.toFixed` lives on Number.prototype, so its identity never
+// changes — the receiver's value is what the memo actually depends on.
+export function MemoFromPrototypeMethodCall() @{
+	const [count, setCount] = useState(0);
+	const fixed = useMemo(() => count.toFixed(2));
+	<button class="step" onClick={() => setCount(count + 0.25)}>{fixed as string}</button>
+}
+
+class PrefixFormatter {
+	prefix;
+	constructor(prefix) {
+		this.prefix = prefix;
+	}
+	format(value) {
+		return `${this.prefix}:${value}`;
+	}
+}
+
+// The object flavor of the same contract: `formatter.format` is a shared
+// prototype method, so a replaced instance must still recompute the memo.
+export function MemoFromInstanceMethodCall(props) @{
+	const formatter = useMemo(() => new PrefixFormatter(props.prefix));
+	const label = useMemo(() => formatter.format(props.value));
+	<div>
+		<span class="value">{label as string}</span>
+		<span class="noise">{props.noise as string}</span>
+	</div>
+}

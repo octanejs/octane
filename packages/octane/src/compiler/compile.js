@@ -41,7 +41,12 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
-import { analyzeHookDependencies, applyHookDependencies, isInvariantLiteral } from './hook-deps.js';
+import {
+	METHOD_DEP_IMPORT,
+	analyzeHookDependencies,
+	applyHookDependencies,
+	isInvariantLiteral,
+} from './hook-deps.js';
 import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
 import {
 	expandDomRendererRegionsAst,
@@ -6064,12 +6069,16 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			rendererBoundaryPreparation?.universalUnits,
 		),
 	});
+	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(
 			options,
 			rendererBoundaryPreparation?.universalUnits,
 		),
+		onRuntimeHelper: () => {
+			hookDepHelperNeeded = true;
+		},
 	});
 	const hmrOption = options && options.hmr;
 	const hmrDialect = hmrOption === true ? 'vite' : hmrOption || false;
@@ -6202,6 +6211,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// single module print must carry a loc (OCTANE_COMPILE_ASSERT_LOC).
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
+	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
@@ -7122,9 +7132,13 @@ function compileServer(source, filename, options, analyzedAst = null) {
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
+	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(options),
+		onRuntimeHelper: () => {
+			hookDepHelperNeeded = true;
+		},
 	});
 	const ctx = {
 		filename,
@@ -7168,6 +7182,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		// Scaffolding without a more precise authored construct maps here.
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
+	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;

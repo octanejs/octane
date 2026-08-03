@@ -149,8 +149,16 @@ describe('useLinkedState compiler integration', () => {
 			inlineHookMemo: false,
 		}).code;
 		const effect = callsTo(code, importedLocal(code, 'useEffect')!)[0];
+		// `props.observe(...)` is a method call, so its dependency compiles to the
+		// own-property discriminator helper (see auto-hook-deps.test.ts).
 		expect(effect?.arguments[1]?.elements).toMatchObject([
-			{ type: 'MemberExpression', property: { name: 'observe' } },
+			{
+				type: 'CallExpression',
+				arguments: [
+					{ type: 'Identifier', name: 'props' },
+					{ type: 'Literal', value: 'observe' },
+				],
+			},
 			{ type: 'Identifier', name: 'value' },
 		]);
 	});
