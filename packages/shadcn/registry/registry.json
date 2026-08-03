@@ -133,6 +133,24 @@
       ]
     },
     {
+      "name": "avatar",
+      "type": "registry:ui",
+      "title": "Avatar",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/avatar.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/avatar.tsrx"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -328,6 +346,24 @@
       ]
     },
     {
+      "name": "progress",
+      "type": "registry:ui",
+      "title": "Progress",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/progress.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/progress.tsrx"
+        }
+      ]
+    },
+    {
       "name": "radio-group",
       "type": "registry:ui",
       "title": "Radio Group",
@@ -401,6 +437,24 @@
       ]
     },
     {
+      "name": "slider",
+      "type": "registry:ui",
+      "title": "Slider",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/slider.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/slider.tsrx"
+        }
+      ]
+    },
+    {
       "name": "spinner",
       "type": "registry:ui",
       "title": "Spinner",
@@ -449,6 +503,45 @@
           "path": "ui/textarea.tsrx",
           "type": "registry:ui",
           "target": "components/ui/textarea.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "toggle-group",
+      "type": "registry:ui",
+      "title": "Toggle Group",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/toggle",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/toggle-group.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/toggle-group.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "toggle",
+      "type": "registry:ui",
+      "title": "Toggle",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/toggle.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/toggle.tsrx"
         }
       ]
     },

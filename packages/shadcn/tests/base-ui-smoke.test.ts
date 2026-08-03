@@ -77,6 +77,14 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Skeleton', F.SkeletonCase, null],
 	['Spinner', F.SpinnerCase, null],
 	['Textarea', F.TextareaCase, null],
+	['Avatar', F.AvatarCase, 'AB'],
+	['AvatarGroup', F.AvatarGroupCase, '+2'],
+	['Progress', F.ProgressCase, null],
+	['Progress (indeterminate)', F.ProgressNoValueCase, null],
+	['Slider', F.SliderCase, null],
+	['Slider (range)', F.SliderRangeCase, null],
+	['Toggle', F.TogglePressedCase, 'Bold'],
+	['ToggleGroup', F.ToggleGroupCase, 'B'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -505,6 +513,198 @@ describe('@octanejs/shadcn — Base UI overlays use the transition dialect, not 
 			// And the element must actually be transitioning, not keyframing.
 			expect(content.className).toContain('transition');
 			expect(overlay.className).toContain('transition-opacity');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+// The five families ported without a transcribed upstream source. Each was adapted from the radix
+// base against the primitive's REAL rendered output, and each assertion below pins one of those
+// adaptations — so a version that had simply copied radix across fails here rather than shipping
+// silently broken styling, which is exactly how the sheet's motion dialect got through.
+describe('@octanejs/shadcn — Base UI toggles use the pressed dialect, not radix state', () => {
+	it('Toggle emits data-pressed rather than data-state=on', () => {
+		const m = mount(F.TogglePressedCase as never);
+		try {
+			const toggle = m.container.querySelector('[data-slot="toggle"]');
+			expect(toggle).not.toBe(null);
+			// The class strings key off `data-pressed:`; radix's `data-[state=on]` never matches
+			// here, so a pressed toggle would render with no pressed styling at all.
+			expect(toggle!.hasAttribute('data-pressed')).toBe(true);
+			expect(toggle!.getAttribute('data-state')).toBe(null);
+			expect(toggle!.className).toContain('data-pressed:bg-accent');
+			expect(toggle!.className).not.toContain('data-[state=on]');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('Toggle renders a real button, so the disabled: variants can match', () => {
+		// Unlike checkbox/switch/radio — whose Base UI Roots are spans, forcing `data-disabled:` —
+		// Toggle is a button, which is why `disabled:` is kept in toggleVariants.
+		const m = mount(F.TogglePressedCase as never);
+		try {
+			expect(m.container.querySelector('[data-slot="toggle"]')!.tagName).toBe('BUTTON');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('ToggleGroup items are Toggles, and the selected one carries data-pressed', () => {
+		const m = mount(F.ToggleGroupCase as never);
+		try {
+			const items = [...m.container.querySelectorAll('[data-slot="toggle-group-item"]')];
+			expect(items).toHaveLength(2);
+			// Base UI has no ToggleGroup.Item part; selection state still has to reach the item.
+			expect(items.map((el) => el.hasAttribute('data-pressed'))).toEqual([false, true]);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('ToggleGroup shares toggleVariants with Toggle, so the bases cannot drift', () => {
+		const m = mount(F.ToggleGroupCase as never);
+		try {
+			const item = m.container.querySelector('[data-slot="toggle-group-item"]')!;
+			expect(item.className).toContain('data-pressed:bg-accent');
+			expect(item.className).not.toContain('data-[state=on]');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI progress fills by width, not a radix transform', () => {
+	it('renders the Track part radix does not have', () => {
+		const m = mount(F.ProgressCase as never);
+		try {
+			// Root > Track > Indicator. An Indicator hung directly off Root would sit outside the
+			// element the primitive sizes against.
+			const track = m.container.querySelector('[data-slot="progress-track"]');
+			expect(track).not.toBe(null);
+			expect(track!.querySelector('[data-slot="progress-indicator"]')).not.toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('lets the primitive size the indicator, and adds no transform of its own', () => {
+		const m = mount(F.ProgressCase as never);
+		try {
+			const indicator = m.container.querySelector<HTMLElement>('[data-slot="progress-indicator"]')!;
+			expect(indicator.style.width).toBe('40%');
+			// radix's base ships `transform: translateX(-(100 - value)%)` because radix leaves the
+			// fill to the consumer. Applied on top of Base UI's own width it would offset a
+			// correctly-sized bar again — worst at the midpoint, invisible at 0% and 100%.
+			expect(indicator.style.transform).toBe('');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('forwards the value to the Root that owns the aria contract', () => {
+		const m = mount(F.ProgressCase as never);
+		try {
+			const root = m.container.querySelector('[data-slot="progress"]')!;
+			expect(root.getAttribute('aria-valuenow')).toBe('40');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('treats an omitted value as indeterminate rather than forwarding undefined', () => {
+		const m = mount(F.ProgressNoValueCase as never);
+		try {
+			const root = m.container.querySelector('[data-slot="progress"]')!;
+			expect(root).not.toBe(null);
+			expect(root.getAttribute('aria-valuenow')).toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI slider styles the Control, not the Root wrapper', () => {
+	it('nests Root > Control > Track > Indicator + Thumb', () => {
+		const m = mount(F.SliderCase as never);
+		try {
+			const control = m.container.querySelector(
+				'[data-slot="slider"] > [data-slot="slider-control"]',
+			);
+			expect(control).not.toBe(null);
+			const track = control!.querySelector('[data-slot="slider-track"]');
+			expect(track).not.toBe(null);
+			// Base UI puts the thumb INSIDE the track; radix makes it a sibling of it.
+			expect(track!.querySelector('[data-slot="slider-range"]')).not.toBe(null);
+			expect(track!.querySelector('[data-slot="slider-thumb"]')).not.toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('puts the pointer layout on Control, since Root is only a role=group wrapper', () => {
+		const m = mount(F.SliderCase as never);
+		try {
+			const root = m.container.querySelector('[data-slot="slider"]')!;
+			const control = m.container.querySelector('[data-slot="slider-control"]')!;
+			expect(control.className).toContain('touch-none');
+			expect(control.className).toContain('items-center');
+			// Styling the wrapper instead would decorate an element that is not the pointer target.
+			expect(root.className).not.toContain('touch-none');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('lets the primitive position the indicator instead of forcing radix absolute', () => {
+		const m = mount(F.SliderCase as never);
+		try {
+			const range = m.container.querySelector<HTMLElement>('[data-slot="slider-range"]')!;
+			expect(range.style.width).toBe('30%');
+			// The primitive writes `position: relative` inline; an `absolute` class copied from the
+			// radix base would fight it.
+			expect(range.className).not.toContain('absolute');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps data-orientation, which this family really does emit', () => {
+		// Unlike separator — where Base UI emits aria-orientation and the data-* variants had to be
+		// rewritten — the slider parts do emit data-orientation, so those variants carry over.
+		const m = mount(F.SliderCase as never);
+		try {
+			for (const slot of ['slider', 'slider-control', 'slider-track', 'slider-thumb']) {
+				expect(
+					m.container.querySelector(`[data-slot="${slot}"]`)!.getAttribute('data-orientation'),
+					slot,
+				).toBe('horizontal');
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders one thumb per value', () => {
+		const m = mount(F.SliderRangeCase as never);
+		try {
+			expect(m.container.querySelectorAll('[data-slot="slider-thumb"]')).toHaveLength(2);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI avatar maps one-to-one and owns its own size attribute', () => {
+	it('writes the data-size its own variants read', () => {
+		// Nothing here depends on a primitive-emitted attribute: `data-[size=…]` reads what this
+		// component sets, which is why avatar carried no dialect risk.
+		const m = mount(F.AvatarGroupCase as never);
+		try {
+			const avatar = m.container.querySelector('[data-slot="avatar"]')!;
+			expect(avatar.getAttribute('data-size')).toBe('lg');
+			expect(m.container.querySelector('[data-slot="avatar-fallback"]')!.textContent).toBe('CD');
 		} finally {
 			m.unmount();
 		}

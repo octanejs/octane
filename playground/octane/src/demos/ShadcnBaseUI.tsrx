@@ -20,13 +20,22 @@
 //   Alert — transcribed and verified byte-identical to upstream's source. Should
 //     need no scrutiny.
 //
+//   Avatar, Progress, Slider, Toggle, ToggleGroup — class strings derived, but
+//     each ADAPTED to a part tree or attribute that Base UI genuinely differs on,
+//     checked against the primitive's real output rather than assumed. What to
+//     look at: a pressed Toggle / ToggleGroup item must actually shade (Base UI
+//     emits `data-pressed`, not Radix's `data-[state=on]`); the Progress and
+//     Slider fills must sit flush against the left edge of their rails and stop
+//     at the right percentage — a fill offset sideways from where the number says
+//     it should be is the double-offset bug those two were adapted to avoid.
+//
 //   Everything else — DERIVED from this package's React Aria base, not
 //     transcribed. Compare against the React Aria tab: they should look
 //     identical, and any difference is a porting bug worth reporting.
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 22 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 16 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -37,6 +46,17 @@ import {
 	AccordionTrigger,
 } from '@octanejs/shadcn/base-ui/Accordion';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/base-ui/Alert';
+import {
+	Avatar,
+	AvatarFallback,
+	AvatarGroup,
+	AvatarGroupCount,
+	AvatarImage,
+} from '@octanejs/shadcn/base-ui/Avatar';
+import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import { Slider } from '@octanejs/shadcn/base-ui/Slider';
+import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
+import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -531,6 +551,86 @@ export function ShadcnBaseUIDemo() @{
 					<Skeleton class="h-4 w-[220px]" />
 					<Skeleton class="h-4 w-[160px]" />
 				</div>
+			</div>
+		</Section>
+
+		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">
+			<div class="flex items-center gap-6">
+				<Avatar>
+					<AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+					<AvatarFallback>CN</AvatarFallback>
+				</Avatar>
+				<Avatar size="sm">
+					<AvatarFallback>SM</AvatarFallback>
+				</Avatar>
+				<Avatar size="lg">
+					<AvatarFallback>LG</AvatarFallback>
+				</Avatar>
+				<AvatarGroup>
+					<Avatar>
+						<AvatarFallback>A</AvatarFallback>
+					</Avatar>
+					<Avatar>
+						<AvatarFallback>B</AvatarFallback>
+					</Avatar>
+					<AvatarGroupCount>+3</AvatarGroupCount>
+				</AvatarGroup>
+			</div>
+		</Section>
+
+		<Section
+			title="Progress"
+			note="Base UI adds a Track part and sizes the fill by width — each bar's fill should start flush left and end at its labelled percentage."
+		>
+			<div class="flex max-w-md flex-col gap-4">
+				<Progress value={0} />
+				<Progress value={25} />
+				<Progress value={50} />
+				<Progress value={100} />
+			</div>
+		</Section>
+
+		<Section
+			title="Slider"
+			note="Root > Control > Track > Indicator + Thumb. Drag a thumb: the fill should track it exactly, and the range slider's two thumbs must not cross-render."
+		>
+			<div class="flex max-w-md flex-col gap-8">
+				<Slider defaultValue={[50]} />
+				<Slider defaultValue={[25, 75]} />
+				<Slider defaultValue={[40]} step={10} />
+				<Slider defaultValue={[30]} disabled />
+			</div>
+		</Section>
+
+		<Section
+			title="Toggle"
+			note="Pressed state rides on `data-pressed`, not Radix's `data-[state=on]` — a pressed toggle that does not shade is that dialect being wrong."
+		>
+			<div class="flex items-center gap-3">
+				<Toggle>Default</Toggle>
+				<Toggle defaultPressed>Pressed</Toggle>
+				<Toggle variant="outline">Outline</Toggle>
+				<Toggle size="sm">Small</Toggle>
+				<Toggle size="lg">Large</Toggle>
+				<Toggle disabled>Disabled</Toggle>
+			</div>
+		</Section>
+
+		<Section
+			title="ToggleGroup"
+			note="Base UI has no ToggleGroup.Item — items are plain Toggles. Values are always arrays here, in single mode too."
+		>
+			<div class="flex flex-col items-start gap-4">
+				<ToggleGroup defaultValue={['b']}>
+					<ToggleGroupItem value="a">A</ToggleGroupItem>
+					<ToggleGroupItem value="b">B</ToggleGroupItem>
+					<ToggleGroupItem value="c">C</ToggleGroupItem>
+				</ToggleGroup>
+				<ToggleGroup type="multiple" variant="outline" defaultValue={['bold', 'italic']}>
+					<ToggleGroupItem value="bold">Bold</ToggleGroupItem>
+					<ToggleGroupItem value="italic">Italic</ToggleGroupItem>
+					<ToggleGroupItem value="underline">Underline</ToggleGroupItem>
+				</ToggleGroup>
 			</div>
 		</Section>
 

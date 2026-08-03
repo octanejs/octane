@@ -33,7 +33,7 @@ component names stay identical.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 23/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 28/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -43,7 +43,7 @@ component names stay identical.
 | `alert` | ✅ | ✅ | ✅ |
 | `alert-dialog` | ✅ | ✅ | ✅ |
 | `aspect-ratio` | ✅ | ✅ | ✅ |
-| `avatar` | ✅ | ✅ | — |
+| `avatar` | ✅ | ✅ | ✅ |
 | `badge` | ✅ | ✅ | — |
 | `breadcrumb` | ✅ | ✅ | — |
 | `button` | ✅ | ✅ | ✅ |
@@ -65,7 +65,7 @@ component names stay identical.
 | `navigation-menu` | ✅ | ⛔ | ⛔ |
 | `pagination` | ✅ | ✅ | — |
 | `popover` | ✅ | ✅ | ✅ |
-| `progress` | ✅ | ⛔ | — |
+| `progress` | ✅ | ⛔ | ✅ |
 | `radio-group` | ✅ | ✅ | ✅ |
 | `scroll-area` | ✅ | ✅ | ⛔ |
 | `select` | ✅ | ⛔ | ⛔ |
@@ -73,15 +73,15 @@ component names stay identical.
 | `sheet` | ✅ | ✅ | ✅ |
 | `sidebar` | ✅ | ⛔ | — |
 | `skeleton` | ✅ | ✅ | ✅ |
-| `slider` | ✅ | ✅ | — |
+| `slider` | ✅ | ✅ | ✅ |
 | `sonner` | ✅ | ⛔ | ⛔ |
 | `spinner` | ✅ | ✅ | ✅ |
 | `switch` | ✅ | ✅ | ✅ |
 | `table` | ✅ | ✅ | — |
 | `tabs` | ✅ | ✅ | ⛔ |
 | `textarea` | ✅ | ✅ | ✅ |
-| `toggle` | ✅ | ✅ | — |
-| `toggle-group` | ✅ | ⛔ | — |
+| `toggle` | ✅ | ✅ | ✅ |
+| `toggle-group` | ✅ | ⛔ | ✅ |
 | `tooltip` | ✅ | ⛔ | ✅ |
 
 **Blocked**

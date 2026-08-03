@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "avatar",
+  "type": "registry:ui",
+  "title": "Avatar",
+  "files": [
+    {
+      "path": "ui/avatar.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/avatar.tsrx",
+      "content": "// Base UI base avatar — runs on @octanejs/base-ui's Avatar (Root/Image/Fallback), a direct\n// one-to-one mapping with the radix base.\n//\n// `AvatarBadge`, `AvatarGroup` and `AvatarGroupCount` are plain host elements in every base —\n// upstream defines no primitive for them — so they are unchanged from the radix source.\n//\n// Nothing here keys off a primitive-emitted attribute: the `data-[size=…]` variants read the\n// `data-size` this component writes itself, and the primitive emits no state attributes at all\n// (verified by rendering it — Root and Fallback are bare spans). So unlike the overlays and the\n// form controls, there is no dialect to get wrong.\n//\n// UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than\n// transcribed from upstream's Base UI source.\nimport { Avatar as AvatarPrimitive } from '@octanejs/base-ui/avatar';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport interface AvatarProps extends Props {\n\tsize?: 'default' | 'sm' | 'lg';\n}\n\nexport function Avatar({ className, size = 'default', ...props }: AvatarProps) @{\n\t<AvatarPrimitive.Root\n\t\tdata-slot=\"avatar\"\n\t\tdata-size={size}\n\t\tclassName={cn(\n\t\t\t'group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function AvatarImage({ className, ...props }: Props) @{\n\t<AvatarPrimitive.Image\n\t\tdata-slot=\"avatar-image\"\n\t\tclassName={cn('aspect-square size-full rounded-full object-cover', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function AvatarFallback({ className, ...props }: Props) @{\n\t<AvatarPrimitive.Fallback\n\t\tdata-slot=\"avatar-fallback\"\n\t\tclassName={cn(\n\t\t\t'flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function AvatarBadge({ className, ...props }: Props) @{\n\t<span\n\t\tdata-slot=\"avatar-badge\"\n\t\tclassName={cn(\n\t\t\t'absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground bg-blend-color ring-2 ring-background select-none',\n\t\t\t'group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden',\n\t\t\t'group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2',\n\t\t\t'group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function AvatarGroup({ className, ...props }: Props) @{\n\t<div\n\t\tdata-slot=\"avatar-group\"\n\t\tclassName={cn(\n\t\t\t'group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function AvatarGroupCount({ className, ...props }: Props) @{\n\t<div\n\t\tdata-slot=\"avatar-group-count\"\n\t\tclassName={cn(\n\t\t\t'relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/base-ui@0.1.21"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

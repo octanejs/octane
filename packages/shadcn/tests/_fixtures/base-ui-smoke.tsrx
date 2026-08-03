@@ -28,6 +28,16 @@ import {
 	AlertDialogTrigger,
 } from '@octanejs/shadcn/base-ui/AlertDialog';
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
+import {
+	Avatar,
+	AvatarFallback,
+	AvatarGroup,
+	AvatarGroupCount,
+} from '@octanejs/shadcn/base-ui/Avatar';
+import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import { Slider } from '@octanejs/shadcn/base-ui/Slider';
+import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
+import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
 import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
 import {
 	Collapsible,
@@ -303,4 +313,47 @@ export function SheetLeftCase() @{
 			<SheetTitle>Left sheet</SheetTitle>
 		</SheetContent>
 	</Sheet>
+}
+
+export function AvatarCase() @{
+	<Avatar>
+		<AvatarFallback>AB</AvatarFallback>
+	</Avatar>
+}
+
+export function AvatarGroupCase() @{
+	<AvatarGroup>
+		<Avatar size="lg">
+			<AvatarFallback>CD</AvatarFallback>
+		</Avatar>
+		<AvatarGroupCount>+2</AvatarGroupCount>
+	</AvatarGroup>
+}
+
+export function ProgressCase() @{
+	<Progress value={40} />
+}
+
+// Indeterminate: shadcn's `value` is optional, and Base UI's Root types it as `number | null`.
+export function ProgressNoValueCase() @{
+	<Progress />
+}
+
+export function SliderCase() @{
+	<Slider defaultValue={[30]} />
+}
+
+export function SliderRangeCase() @{
+	<Slider defaultValue={[20, 60]} />
+}
+
+export function TogglePressedCase() @{
+	<Toggle defaultPressed>Bold</Toggle>
+}
+
+export function ToggleGroupCase() @{
+	<ToggleGroup defaultValue={['b']}>
+		<ToggleGroupItem value="a">A</ToggleGroupItem>
+		<ToggleGroupItem value="b">B</ToggleGroupItem>
+	</ToggleGroup>
 }
