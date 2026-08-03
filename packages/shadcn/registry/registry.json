@@ -259,6 +259,26 @@
       ]
     },
     {
+      "name": "field",
+      "type": "registry:ui",
+      "title": "Field",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/label",
+        "@octane/separator",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/field.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/field.tsrx"
+        }
+      ]
+    },
+    {
       "name": "input",
       "type": "registry:ui",
       "title": "Input",

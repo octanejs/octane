@@ -226,6 +226,8 @@ import { TableCell as X107 } from '@octanejs/shadcn/base-ui/Table';
 type _107 = Assert<NotAny<typeof X107>>;
 import { PaginationLink as X108 } from '@octanejs/shadcn/base-ui/Pagination';
 type _108 = Assert<NotAny<typeof X108>>;
+import { FieldLabel as X109 } from '@octanejs/shadcn/base-ui/Field';
+type _109 = Assert<NotAny<typeof X109>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';

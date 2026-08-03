@@ -34,6 +34,18 @@ import {
 	AvatarGroup,
 	AvatarGroupCount,
 } from '@octanejs/shadcn/base-ui/Avatar';
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSeparator,
+	FieldSet,
+	FieldTitle,
+} from '@octanejs/shadcn/base-ui/Field';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
 import {
 	Pagination,
@@ -421,4 +433,39 @@ export function PaginationCase() @{
 			</PaginationItem>
 		</PaginationContent>
 	</Pagination>
+}
+
+// Standalone on purpose, like every case here: FieldLabel must not require a Field.Root ancestor.
+export function FieldCase() @{
+	<FieldSet>
+		<FieldLegend>Contact</FieldLegend>
+		<FieldGroup>
+			<Field>
+				<FieldLabel htmlFor="email-x">Email</FieldLabel>
+				<FieldDescription>We never share it.</FieldDescription>
+			</Field>
+			<FieldSeparator>or</FieldSeparator>
+			<Field orientation="horizontal" data-invalid="true">
+				<FieldContent>
+					<FieldTitle>Phone</FieldTitle>
+				</FieldContent>
+			</Field>
+		</FieldGroup>
+	</FieldSet>
+}
+
+export function FieldErrorsCase() @{
+	<FieldError
+		errors={[{ message: 'Required' }, { message: 'Required' }, { message: 'Too short' }]}
+	/>
+}
+
+export function FieldErrorSingleCase() @{
+	<FieldError errors={[{ message: 'Required' }, { message: 'Required' }]} />
+}
+
+export function FieldErrorEmptyCase() @{
+	<div data-slot="probe">
+		<FieldError errors={[]} />
+	</div>
 }

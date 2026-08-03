@@ -88,6 +88,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['ToggleGroup', F.ToggleGroupCase, 'B'],
 	['Table', F.TableCase, 'INV-001'],
 	['Pagination', F.PaginationCase, 'Next'],
+	['Field', F.FieldCase, 'We never share it.'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -864,6 +865,89 @@ describe('@octanejs/shadcn — Base UI pagination composes its link through Butt
 			const ellipsis = m.container.querySelector('[data-slot="pagination-ellipsis"]')!;
 			expect(ellipsis.getAttribute('aria-hidden')).toBe('true');
 			expect(ellipsis.textContent).toContain('More pages');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI field does not route through the Field primitive', () => {
+	it('keeps FieldLabel usable with no Field.Root ancestor', () => {
+		// The crash this base already hit once. Base UI's `Field.Label` calls
+		// useFieldRootContext(false) and throws "FieldRootContext is missing" outside a
+		// `<Field.Root>`; upstream's field.tsx uses this base's plain `<label>` instead, so every
+		// standalone use stays a plain render rather than a runtime error.
+		const m = mount(F.FieldCase as never);
+		try {
+			const label = m.container.querySelector('[data-slot="field-label"]')!;
+			expect(label.tagName).toBe('LABEL');
+			expect(label.textContent).toBe('Email');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('reads consumer-written validity, not a primitive state attribute', () => {
+		// Why `data-[invalid=true]:` is correct here and NOT the bare-attribute dialect. Nothing
+		// underneath emits validity state — the consumer sets `data-invalid="true"` — so the
+		// variant matches as written. Routed through `Field.Root` the primitive would emit bare
+		// `data-invalid=""` and every one of these variants would silently match nothing.
+		const m = mount(F.FieldCase as never);
+		try {
+			const invalid = m.container.querySelector('[data-slot="field"][data-invalid="true"]')!;
+			expect(invalid).not.toBe(null);
+			expect(invalid.className).toContain('data-[invalid=true]:text-destructive');
+			expect(invalid.getAttribute('role')).toBe('group');
+			expect(invalid.getAttribute('data-orientation')).toBe('horizontal');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders the separator rule alongside its optional content', () => {
+		const m = mount(F.FieldCase as never);
+		try {
+			const sep = m.container.querySelector('[data-slot="field-separator"]')!;
+			expect(sep.getAttribute('data-content')).toBe('true');
+			expect(sep.querySelector('[data-slot="field-separator-content"]')!.textContent).toBe('or');
+			// The rule itself is this base's Separator, which speaks aria-orientation.
+			expect(sep.querySelector('[data-slot="separator"]')).not.toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI field errors dedupe and collapse', () => {
+	it('renders a list when several distinct messages survive dedupe', () => {
+		const m = mount(F.FieldErrorsCase as never);
+		try {
+			const alert = m.container.querySelector('[role="alert"][data-slot="field-error"]')!;
+			const items = [...alert.querySelectorAll('li')].map((li) => li.textContent);
+			// Three errors in, two distinct out.
+			expect(items).toEqual(['Required', 'Too short']);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('collapses to bare text when dedupe leaves exactly one message', () => {
+		const m = mount(F.FieldErrorSingleCase as never);
+		try {
+			const alert = m.container.querySelector('[role="alert"][data-slot="field-error"]')!;
+			expect(alert.querySelector('ul')).toBe(null);
+			expect(alert.textContent).toBe('Required');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders nothing at all when there are no errors', () => {
+		// Returns null rather than an empty alert region, which a screen reader would announce.
+		const m = mount(F.FieldErrorEmptyCase as never);
+		try {
+			expect(m.container.querySelector('[data-slot="probe"]')!.children).toHaveLength(0);
+			expect(m.container.querySelector('[data-slot="field-error"]')).toBe(null);
 		} finally {
 			m.unmount();
 		}

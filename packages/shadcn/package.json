@@ -115,6 +115,7 @@
     "./base-ui/Collapsible": "./src/bases/base-ui/ui/collapsible.tsrx",
     "./base-ui/Dialog": "./src/bases/base-ui/ui/dialog.tsrx",
     "./base-ui/Empty": "./src/bases/base-ui/ui/empty.tsrx",
+    "./base-ui/Field": "./src/bases/base-ui/ui/field.tsrx",
     "./base-ui/Input": "./src/bases/base-ui/ui/input.tsrx",
     "./base-ui/Kbd": "./src/bases/base-ui/ui/kbd.tsrx",
     "./base-ui/Label": "./src/bases/base-ui/ui/label.tsrx",

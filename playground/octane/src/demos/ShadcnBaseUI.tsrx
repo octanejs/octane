@@ -37,7 +37,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 14 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 13 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -55,6 +55,18 @@ import {
 	AvatarGroupCount,
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSeparator,
+	FieldSet,
+	FieldTitle,
+} from '@octanejs/shadcn/base-ui/Field';
 import {
 	Pagination,
 	PaginationContent,
@@ -641,6 +653,35 @@ export function ShadcnBaseUIDemo() @{
 					</PaginationItem>
 				</PaginationContent>
 			</Pagination>
+		</Section>
+
+		<Section
+			title="Field"
+			note="Transcribed. Upstream does NOT route this through Base UI's Field primitive — it is host elements plus this base's Label and Separator — so data-invalid stays consumer-written. The invalid row must go red, and the separator must show a rule with 'or' centred on it."
+		>
+			<FieldSet>
+				<FieldLegend>Contact details</FieldLegend>
+				<FieldGroup>
+					<Field>
+						<FieldLabel htmlFor="field-email">Email</FieldLabel>
+						<Input id="field-email" type="email" placeholder="you@example.com" />
+						<FieldDescription>We will never share your address.</FieldDescription>
+					</Field>
+					<FieldSeparator>or</FieldSeparator>
+					<Field data-invalid="true">
+						<FieldLabel htmlFor="field-phone">Phone</FieldLabel>
+						<Input id="field-phone" aria-invalid="true" placeholder="+1 555 0100" />
+						<FieldError errors={[{ message: 'Enter a valid number' }]} />
+					</Field>
+					<Field orientation="horizontal">
+						<Checkbox id="field-tos" />
+						<FieldContent>
+							<FieldTitle>Accept terms</FieldTitle>
+							<FieldDescription>Required before continuing.</FieldDescription>
+						</FieldContent>
+					</Field>
+				</FieldGroup>
+			</FieldSet>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">
