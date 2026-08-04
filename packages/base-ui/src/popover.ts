@@ -879,15 +879,18 @@ function PopoverPositioner(componentProps: any): any {
 
 	return createElement(PopoverPositionerContext.Provider, {
 		value: positioning as unknown as PopoverPositionerContextValue,
+		// Octane reconciles an ARRAY child as a keyed list, so both slots carry a key. Only the
+		// modal path renders the backdrop, which is why a non-modal popover never warned.
 		children: [
 			mounted && modal === true && openReason !== REASONS.triggerHover
 				? createElement(InternalBackdrop, {
+						key: 'internal-backdrop',
 						ref: store.context.internalBackdropRef,
 						inert: inertValue(!open),
 						cutout: triggerElement,
 					})
 				: null,
-			createElement(FloatingNode, { id: nodeId, children: element }),
+			createElement(FloatingNode, { key: 'floating-node', id: nodeId, children: element }),
 		],
 	});
 }

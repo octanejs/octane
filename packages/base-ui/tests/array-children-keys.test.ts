@@ -3,6 +3,7 @@ import { createElement, flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import { Checkbox } from '../src/checkbox';
 import { Dialog } from '../src/dialog';
+import { Popover } from '../src/popover';
 import { Progress } from '../src/progress';
 import { Radio } from '../src/radio';
 import { RadioGroup } from '../src/radio-group';
@@ -25,6 +26,28 @@ function keyWarningsWhileRendering(node: () => unknown): string[] {
 	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 	const m = mount(node as never);
 	try {
+		return [...warn.mock.calls, ...error.mock.calls]
+			.map((args) => String(args[0]))
+			.filter((message) => message.includes('unique "key"'));
+	} finally {
+		warn.mockRestore();
+		error.mockRestore();
+		m.unmount();
+	}
+}
+
+// Same, but lets effects settle first. Some slots — a modal backdrop, a portal subtree — only
+// mount after an effect, so reading warnings synchronously misses them entirely.
+async function keyWarningsAfterSettling(node: () => unknown): Promise<string[]> {
+	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	const m = mount(node as never);
+	try {
+		for (let i = 0; i < 5; i += 1) {
+			flushEffects();
+			flushSync(() => {});
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		}
 		return [...warn.mock.calls, ...error.mock.calls]
 			.map((args) => String(args[0]))
 			.filter((message) => message.includes('unique "key"'));
@@ -83,6 +106,27 @@ describe('@octanejs/base-ui — primitives key the array children they compose',
 			expect(keyWarningsWhileRendering(node)).toEqual([]);
 		});
 	}
+
+	it('a MODAL popover keys its backdrop too', async () => {
+		// The backdrop only renders on the modal path, so a non-modal popover never exercised this
+		// array and the first pass at this fix missed it. Asserted separately for that reason.
+		const warnings = await keyWarningsAfterSettling(() =>
+			createElement(
+				Popover.Root,
+				{ defaultOpen: true, modal: true },
+				createElement(
+					Popover.Portal,
+					null,
+					createElement(
+						Popover.Positioner,
+						{ key: 'positioner' },
+						createElement(Popover.Popup, { key: 'popup' }, 'body'),
+					),
+				),
+			),
+		);
+		expect(warnings).toEqual([]);
+	});
 
 	it('still renders the hidden input a form control needs', () => {
 		// Guards the assertions above from passing because a slot silently stopped rendering.

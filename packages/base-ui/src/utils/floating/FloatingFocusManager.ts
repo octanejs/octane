@@ -4,7 +4,7 @@
 // every hook threads an explicit slot; returns `[beforeGuard?, children, afterGuard?]`. Traps focus
 // inside the popup, hides the rest of the page from assistive tech (`markOthers`), restores focus on
 // close. Emits `data-base-ui-*` attributes for parity with Base UI.
-import { createElement, useState, useRef, useEffect, useLayoutEffect } from 'octane';
+import { createElement, Fragment, useState, useRef, useEffect, useLayoutEffect } from 'octane';
 import { getNodeName, isHTMLElement } from '@floating-ui/utils/dom';
 
 import { S, subSlot } from '../../internal';
@@ -786,9 +786,12 @@ export function FloatingFocusManager(props: {
 	const shouldRenderGuards =
 		!disabled && (modal ? !isUntrappedTypeableCombobox : true) && (isInsidePortal || modal);
 
+	// Octane reconciles an ARRAY child as a keyed list, so each slot carries a stable key; the
+	// consumer's children go through a keyed Fragment, matching popover's trigger guards.
 	return [
 		shouldRenderGuards
 			? createElement(FocusGuard, {
+					key: 'guard-inside-before',
 					'data-type': 'inside',
 					ref: mergedBeforeGuardRef,
 					onFocus(event: any) {
@@ -807,9 +810,10 @@ export function FloatingFocusManager(props: {
 					},
 				})
 			: null,
-		children,
+		createElement(Fragment, { key: 'children', children }),
 		shouldRenderGuards
 			? createElement(FocusGuard, {
+					key: 'guard-inside-after',
 					'data-type': 'inside',
 					ref: mergedAfterGuardRef,
 					onFocus(event: any) {
