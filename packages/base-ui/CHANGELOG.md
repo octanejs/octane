@@ -1,5 +1,44 @@
 # @octanejs/base-ui
 
+## 0.1.22
+
+### Patch Changes
+
+- ab807ba: Key the array children the primitives compose, so rendering them stops emitting Octane's
+  missing-key warning.
+
+  Several primitives hand Octane an ARRAY child to place a fixed set of siblings — a rendered root
+  beside a visually-hidden input, a focus guard beside a portal. Octane reconciles an array as a keyed
+  list, so every entry needs a key; without one it warns in development and can rematch the wrong node
+  on reorder. The warning fired for every overlay and form control: dialog, sheet, alert-dialog,
+  popover, checkbox, switch, radio and slider.
+
+  Fixed in `checkbox`, `switch`, `radio`, `number-field`, `meter`, `progress`, `slider`, `dialog`,
+  `utils/FloatingPortalLite` and `utils/floating/FloatingPortal`. These arrays are positional and
+  fixed-arity, so a literal key per slot is correct; values that cannot be keyed in place — a
+  consumer's `children`, an already-built descriptor — go through a keyed Fragment, the pattern `menu`,
+  `popover` and `toast` already used.
+
+- ab807ba: Key two array-children sites the previous pass missed, both on the modal popup path.
+
+  `Popover`'s positioner composes its internal backdrop beside the floating node, and
+  `FloatingFocusManager` composes its inside focus guards around the consumer's children. Neither
+  array was keyed, so a MODAL popover, dialog or menu still emitted Octane's missing-key warning. Only
+  the modal path renders a backdrop and guards, which is why the non-modal fixtures used to verify the
+  first pass stayed silent.
+
+  The regression test now settles effects before collecting warnings. Reading them synchronously
+  missed both, because these slots only mount from an effect — the first version of that test passed
+  with the keys removed.
+
+- Updated dependencies [ec77602]
+- Updated dependencies [29c5bdb]
+- Updated dependencies [9b032d8]
+- Updated dependencies [f9b2731]
+- Updated dependencies [6714914]
+  - octane@0.1.24
+  - @octanejs/floating-ui@0.1.23
+
 ## 0.1.21
 
 ### Patch Changes

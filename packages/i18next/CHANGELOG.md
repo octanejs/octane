@@ -1,5 +1,16 @@
 # @octanejs/i18next
 
+## 0.1.19
+
+### Patch Changes
+
+- Updated dependencies [ec77602]
+- Updated dependencies [29c5bdb]
+- Updated dependencies [9b032d8]
+- Updated dependencies [f9b2731]
+- Updated dependencies [6714914]
+  - octane@0.1.24
+
 ## 0.1.18
 
 ### Patch Changes

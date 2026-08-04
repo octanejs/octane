@@ -1,5 +1,229 @@
 # @octanejs/shadcn
 
+## 0.0.9
+
+### Patch Changes
+
+- ab807ba: Type `asChild` as `never` on the Base UI base's `badge`, `breadcrumb` and `item`.
+
+  Those families ship without the escape hatch, but their props spread accepted anything, so markup
+  carried over from the Radix base type-checked and the prop was silently dropped — rendering the
+  wrapper AND its child. For `BreadcrumbLink` that means an anchor nested inside an anchor: invalid
+  markup, produced silently. It is now a compile error that points at the header explaining why.
+
+- ab807ba: Add `badge` to the Base UI base, at `@octanejs/shadcn/base-ui/Badge`. That base now covers 32 of 44
+  families.
+
+  No primitive is involved in any base — badge is a `<span>` carrying cva classes — so the variants
+  are shared verbatim, and a test asserts they render identically to the Radix base for every variant
+  so the two cannot drift.
+
+  The `asChild` / `render` escape hatch is deliberately absent. Upstream's other bases each expose one
+  and each does it differently (Radix swaps in `Slot`; React Aria takes a `render` function), Base UI
+  has no `Slot`, and nothing available here settles which shape its badge exposes or whether it
+  exposes one. Adding it later is additive; shipping the wrong shape would be breaking. Consumers
+  needing a different element can apply `badgeVariants({ variant })` directly.
+
+- ab807ba: Add `breadcrumb` to the Base UI base, at `@octanejs/shadcn/base-ui/Breadcrumb`. That base now covers
+  33 of 44 families.
+
+  Every part is a plain host element with no primitive underneath, so the class strings carry across
+  from the Radix source verbatim and there is no state-attribute dialect to translate.
+
+  `BreadcrumbLink` ships without its `asChild` escape hatch. Radix swaps in `Slot`; React Aria routes
+  through RAC's own `Link` primitive; Base UI has neither, and nothing available settles whether
+  upstream's Base UI breadcrumb implements a `render` prop itself. Adding it later is additive,
+  shipping the wrong spelling would be breaking. A router link still works by carrying the classes
+  itself — it only loses the `data-slot="breadcrumb-link"` hook.
+
+- 404c514: Add `collapsible` to the Base UI base, at `@octanejs/shadcn/base-ui/Collapsible`.
+
+  Runs on `@octanejs/base-ui`'s Collapsible. `CollapsibleContent` maps to Base UI's
+  `Collapsible.Panel` — the same part rename this base already makes for `accordion` — while the
+  exported names and all three `data-slot` values stay as shadcn defines them.
+
+  The family carries no class strings in any base, so there is no styling to verify.
+
+- 404c514: Add `avatar`, `progress`, `slider`, `toggle` and `toggle-group` to the Base UI base, at
+  `@octanejs/shadcn/base-ui/<Family>`. That base now covers 28 of 44 families.
+
+  Each was adapted against the primitive's real rendered output rather than copied from the Radix
+  base, because three of the five differ structurally:
+
+  - `progress` sizes its fill by an inline `width` percentage that the primitive writes itself. Radix
+    leaves the fill to the consumer, so its base ships a compensating `translateX(-(100 - value)%)`;
+    applied on top of Base UI's own width that offsets a correctly sized bar a second time. It also
+    gains a `Track` part Radix lacks.
+  - `slider` is transcribed from upstream's Base UI source rather than derived. It runs on a
+    different part tree — `Root > Control > Track > Indicator`, with the thumbs as siblings of the
+    track — and forwards `thumbAlignment="edge"`. Nesting a thumb inside the track clips it to a
+    sliver against the track's `overflow-hidden` and `h-1`, which reads as a missing thumb.
+
+    One departure from that source: upstream writes its orientation variants as `data-horizontal:` /
+    `data-vertical:`, and no `@octanejs/base-ui` primitive emits those attributes — the slider emits
+    `data-orientation="horizontal" | "vertical"`. They are written as `data-[orientation=…]:` here;
+    verbatim, the track would match no height rule and render as an invisible rail. Whether the
+    primitives should be emitting the newer attribute names is a separate question about
+    `@octanejs/base-ui`.
+
+  - `toggle` and `toggle-group` publish a bare `data-pressed` attribute where Radix publishes
+    `data-state="on"`, and Base UI has no `ToggleGroup.Item` part at all: its items are ordinary
+    `Toggle`s carrying a `value`.
+  - `avatar` maps one-to-one and depends on no primitive-emitted attribute.
+
+  `ToggleGroup` translates shadcn's `type="single" | "multiple"` to Base UI's `multiple` boolean, so
+  existing markup keeps working. Its `value`, `defaultValue` and `onValueChange` speak `string[]` in
+  both modes, matching the primitive, where the Radix base's single mode speaks a bare string.
+
+- ab807ba: Add `dropdown-menu` to the Base UI base, at `@octanejs/shadcn/base-ui/DropdownMenu`. That base now
+  covers 35 of 44 families.
+
+  Runs on `@octanejs/base-ui`'s `Menu`, with positioning split out the way this base's `popover`
+  already does: `Root > Portal > Positioner > Popup`, where the Positioner owns align and sideOffset.
+
+  Three differences were verified against the rendered DOM rather than inferred:
+
+  - Three CSS variables are renamed. Radix publishes per-component names, Base UI's Positioner
+    publishes generic ones — `--available-height`, `--anchor-width` and `--transform-origin`. A
+    utility pointing at a variable nothing sets does nothing, silently.
+  - The submenu trigger marks itself open with `data-popup-open`, not the `data-open` the popup
+    carries, so Radix's `data-open:bg-accent` would leave an open submenu's parent row unhighlighted.
+  - `Label` and `Separator` are plain host elements. `Menu.GroupLabel` throws
+    "MenuGroupContext is missing" outside a `Menu.Group` while shadcn's label is used standalone, and
+    the `Menu` namespace ships no Separator part at all.
+
+  Radix's `focus:` highlight utilities carry over unchanged: Base UI moves real DOM focus onto the
+  highlighted item as well as publishing `data-highlighted`.
+
+- 404c514: Add `field` to the Base UI base, at `@octanejs/shadcn/base-ui/Field`. That base now covers 31 of 44
+  families. Transcribed from upstream's Base UI source, class strings verbatim.
+
+  Upstream does not route this family through Base UI's `Field` primitive, even though one exists
+  whose parts line up exactly. It is host elements plus this base's own `Label` and `Separator`, so
+  the component is the Radix one apart from those two imports.
+
+  That is what makes the class strings correct as written: `data-invalid` and `data-disabled` here are
+  set by the consumer, so `data-[invalid=true]:text-destructive` and
+  `group-data-[disabled=true]/field:opacity-50` match. Routed through `Field.Root`, the primitive
+  would emit bare `data-invalid=""` and every one of those variants would silently match nothing.
+
+  It also keeps `FieldLabel` usable standalone: it renders the plain `<label>`, not `Field.Label`,
+  which hard-requires a `<Field.Root>` ancestor and throws without one.
+
+- ab807ba: Add `item` to the Base UI base, at `@octanejs/shadcn/base-ui/Item`. That base now covers 34 of 44
+  families.
+
+  Ten of the eleven parts are plain host elements; the eleventh, `ItemSeparator`, delegates to this
+  base's own `Separator` and so picks up Base UI's `aria-orientation` dialect rather than Radix's
+  `data-orientation`. The `data-[size=…]` and `data-[variant=…]` utilities look like the ones that
+  caught `toggle` and `slider`, but they read attributes the component writes itself, so they carry
+  across unchanged.
+
+  `Item` ships without its `asChild` escape hatch, matching `badge` and `breadcrumb` in this base:
+  Radix swaps in `Slot`, React Aria takes a `render` function, and Base UI has neither plus no
+  primitive here to borrow a `render` prop from. Consumers needing a different element can apply
+  `itemVariants({ variant, size })` directly.
+
+- 404c514: Add `pagination` to the Base UI base, at `@octanejs/shadcn/base-ui/Pagination`. That base now covers
+  30 of 44 families. Transcribed from upstream's Base UI source, class strings verbatim.
+
+  The link composes through `Button` with `nativeButton={false}` and `render={<a/>}`. The Radix base
+  writes `<Button asChild><a/></Button>`, where Slot is a pure prop-merger; Base UI has no Slot, and
+  `nativeButton={false}` is its documented escape for a Button that is not a native `<button>`.
+
+  The two bases therefore diverge observably, and that is upstream's choice rather than a porting
+  artifact: these links carry `role="button"` and `tabindex="0"` where the Radix base's plain anchor
+  carries neither. That is the trade that keeps keyboard activation working on a non-button element.
+
+  Children are passed explicitly rather than riding along in the props spread, since octane routes
+  them through its own channel where React's `ComponentProps<"a">` carries them.
+
+- ab807ba: Route positioning props to the Positioner in the Base UI base's `dropdown-menu`, `popover` and
+  `tooltip`.
+
+  Radix exposes one `Content` element that accepts every positioning prop; Base UI splits positioning
+  into its own layer, and these components only forwarded `align` and `sideOffset` to it. Everything
+  else — `side`, `alignOffset`, `collisionPadding`, `sticky` and the rest — was swept onto `Popup` by
+  the rest spread, where it is inert: `side="top"` silently left the overlay on its default side, and
+  the prop also reached the DOM as an invalid attribute.
+
+  They are now destructured and forwarded explicitly. `dropdown-menu`'s sub-content had the same split
+  and is fixed with it.
+
+- ab807ba: Fix the Base UI `radio-group` item rendering as a thin vertical bar instead of a circle.
+
+  Base UI's `Radio.Root` renders a `<span role="radio">` where Radix's renders a `<button>`. A
+  `<button>` is `display: inline-block`, so Radix's class string never needed a display utility and
+  `size-4` worked; a bare `<span>` is `display: inline`, where width and height are ignored. The box
+  collapsed and only `border` painted, leaving a sliver beside each label. The React Aria base, whose
+  root is also not a button, already carries `relative flex` for this reason.
+
+  The indicator is now `size-full` rather than `relative`, so the dot — positioned with `absolute` and
+  a `-translate-1/2` pair — anchors to the root's box and centres, matching the React Aria base.
+  Left `relative`, it resolved against a zero-sized flex item.
+
+  Covered by a test that requires every span-rooted control in this base (checkbox, switch, radio) to
+  declare a display, since the same mistake is available to each of them.
+
+- 404c514: Add `sheet` to the Base UI base, at `@octanejs/shadcn/base-ui/Sheet`.
+
+  Runs on `@octanejs/base-ui`'s Dialog, mapping Overlay to Backdrop and Content to Popup, with the
+  close affordance composed through Base UI's render-as-element contract. The title drops upstream's
+  `cn-font-heading`, matching this base's dialog and alert-dialog.
+
+  The `data-[side=…]` variants carry no dialect risk: that attribute is written by the component
+  rather than emitted by the primitive.
+
+- 404c514: Fix the Base UI `slider` rendering two thumbs for a scalar value.
+
+  `value` and `defaultValue` are typed `number | number[]`, because Base UI's Slider accepts a scalar
+  for a single-value slider. The thumb count was derived with `Array.isArray` alone, so a scalar fell
+  through to the `[min, max]` range fallback: `defaultValue={30}` rendered two thumbs against a
+  one-value slider, the second with no value behind it. An omitted value still falls back to the range
+  default, which is upstream's behavior in both bases.
+
+- 404c514: Add `table` to the Base UI base, at `@octanejs/shadcn/base-ui/Table`. That base now covers 29 of 44
+  families.
+
+  This family is base-independent: neither Radix nor Base UI publishes a table primitive, so upstream
+  ships the same plain host elements in both and this file carries the Radix one unchanged. A
+  differential test renders the same markup through both bases and asserts identical DOM, so the two
+  cannot drift apart unnoticed. (The React Aria base is the exception — RAC does have a table, so it
+  runs on real collection components with generic item types.)
+
+  `data-[state=selected]` on the row is written by the consumer rather than emitted by a primitive,
+  so unlike `checkbox` or `toggle` it needed no dialect translation.
+
+- 0e4e1a0: Serve all three primitive bases from the registry, selected the way shadcn selects its own.
+
+  Base and visual style compose into `components.json`'s single `style` field, which the CLI
+  substitutes into the registry URL — `{style}` and `{name}` are the only placeholders it
+  substitutes, and it never parses the style string. The registry now emits
+  `registry/styles/<style>/<name>.json` for `base-nova` (the default, on `@octanejs/base-ui`),
+  `radix-nova` and `aria-nova`, plus an un-styled copy of the default so a URL without a `{style}`
+  segment still resolves.
+
+  Adds `registry:serve`, which serves the registry over HTTP for local development — the port the
+  playground's `components.json` has always pointed at but which nothing in the repo served, so
+  `npx shadcn add @octane/…` could not previously work for anyone.
+
+  Verified end to end against the real shadcn CLI: each style installs its own base's primitive
+  with correctly pinned dependencies and rewritten consumer aliases.
+
+- Updated dependencies [ab807ba]
+- Updated dependencies [ab807ba]
+- Updated dependencies [ec77602]
+- Updated dependencies [29c5bdb]
+- Updated dependencies [9b032d8]
+- Updated dependencies [f9b2731]
+- Updated dependencies [6714914]
+  - @octanejs/base-ui@0.1.22
+  - octane@0.1.24
+  - @octanejs/aria@0.0.18
+  - @octanejs/lucide@0.1.19
+  - @octanejs/radix@0.1.23
+  - @octanejs/sonner@0.1.19
+
 ## 0.0.8
 
 ### Patch Changes
