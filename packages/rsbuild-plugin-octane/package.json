@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@rsbuild/core": "catalog:default",
+    "@rsbuild/plugin-react": "catalog:default",
     "@rspack/core": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",

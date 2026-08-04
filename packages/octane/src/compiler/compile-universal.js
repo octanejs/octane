@@ -3182,8 +3182,12 @@ function buildUniversalHmrBlocksAst(state, origin) {
 		return { prelude: [], tail: [] };
 	}
 	if (state.hmrDialect === 'webpack') {
-		const hot = importMetaMember('webpackHot', origin);
-		const prelude = [];
+		// Rspack only guarantees that the `import.meta.webpackHot` root is lowered.
+		// Keep `.data` and the HMR methods on an ordinary local so Rsbuild's React
+		// transform cannot turn a deeper meta-property chain into `undefined`.
+		const hotName = allocName(state, '__octaneWebpackHot');
+		const hot = generatedIdentifier(hotName, origin);
+		const prelude = [generatedConst(hotName, importMetaMember('webpackHot', origin), origin)];
 		const tail = [];
 		if (disposals.length === 0) {
 			const data = generatedIdentifier('data', origin);

@@ -287,9 +287,11 @@ describe('hmr — runtime wrapper', () => {
 		expect(third.exports.default[HMR].fn).not.toBe(secondDefaultBody);
 
 		const output = compileVersion(3);
-		expect(output).toContain('import.meta.webpackHot.data?.__octaneComponents?.Named');
-		expect(output).toContain('import.meta.webpackHot.dispose');
-		expect(output).toContain('import.meta.webpackHot.accept();');
+		expect(output).toContain('const _$webpackHot = import.meta.webpackHot;');
+		expect(output).toContain('_$webpackHot.data?.__octaneComponents?.Named');
+		expect(output).toContain('_$webpackHot.dispose');
+		expect(output).toContain('_$webpackHot.accept();');
+		expect(output).not.toContain('import.meta.webpackHot.data');
 		expect(output).not.toContain('import.meta.hot');
 	});
 
@@ -306,7 +308,7 @@ describe('hmr — runtime wrapper', () => {
 		const webpack = compile(source, 'file.tsx', { hmr: 'webpack' }).code;
 		expect(webpack).toContain('export { Named };');
 		expect(webpack).toContain('export { Default as default };');
-		expect(webpack).toContain('import.meta.webpackHot.dispose');
+		expect(webpack).toContain('_$webpackHot.dispose');
 	});
 
 	it('hmr option off → no wrapping, no accept block', async () => {
