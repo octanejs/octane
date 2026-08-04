@@ -1,6 +1,6 @@
 // Adapted from @rocicorp/zero 1.8.0 under Apache-2.0.
 import { resolver } from '@rocicorp/resolver';
-import { use, useSyncExternalStore } from 'octane';
+import { use, useRef, useSyncExternalStore } from 'octane';
 import {
 	type Immutable,
 	addContextToQuery,
@@ -8,6 +8,7 @@ import {
 	DEFAULT_TTL_MS,
 } from '@rocicorp/zero/bindings';
 import { useZero } from './zero-provider.tsrx';
+import { subSlot } from './internal.ts';
 import type {
 	AnyMutatorRegistry,
 	BaseDefaultContext,
@@ -128,7 +129,7 @@ export function useQuery<
 		view?.subscribeReactInternals ?? disabledSubscriber,
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
-		slot,
+		subSlot(slot, 'query:store'),
 	);
 }
 
@@ -194,20 +195,65 @@ export function useSuspenseQuery<
 		view?.subscribeReactInternals ?? disabledSubscriber,
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
-		slot,
+		subSlot(slot, 'suspense:store'),
 	);
 
-	if (view && enabled) {
-		if (suspendUntil === 'complete' && !view.complete) {
-			use(view.waitForComplete());
-		}
-
-		if (suspendUntil === 'partial' && !view.nonEmpty) {
-			use(view.waitForNonEmpty());
-		}
-	}
+	useSuspensePromise(view, enabled, suspendUntil, subSlot(slot, 'suspense:promise'));
 
 	return snapshot;
+}
+
+type SuspensePromise = PromiseLike<void> & {
+	status?: 'pending' | 'fulfilled' | 'rejected';
+};
+
+type SuspenseView = {
+	complete: boolean;
+	nonEmpty: boolean;
+	waitForComplete: () => Promise<void>;
+	waitForNonEmpty: () => Promise<void>;
+};
+
+type SuspensePromiseCache = {
+	view: SuspenseView | undefined;
+	suspendUntil: 'complete' | 'partial';
+	promise: SuspensePromise | undefined;
+};
+
+/**
+ * Keep one dynamic use() position for each query hook call site.
+ * The settled promise stays in the sequence so a later query cannot reuse it.
+ */
+function useSuspensePromise(
+	view: SuspenseView | undefined,
+	enabled: boolean,
+	suspendUntil: 'complete' | 'partial',
+	slot: symbol | undefined,
+): void {
+	const cache = useRef<SuspensePromiseCache>(
+		{ view: undefined, suspendUntil, promise: undefined },
+		slot,
+	).current;
+	const shouldSuspend =
+		view !== undefined &&
+		enabled &&
+		(suspendUntil === 'complete' ? !view.complete : !view.nonEmpty);
+
+	if (
+		shouldSuspend &&
+		(cache.promise === undefined ||
+			cache.view !== view ||
+			cache.suspendUntil !== suspendUntil ||
+			cache.promise.status !== 'pending')
+	) {
+		cache.view = view;
+		cache.suspendUntil = suspendUntil;
+		cache.promise = (
+			suspendUntil === 'complete' ? view.waitForComplete() : view.waitForNonEmpty()
+		) as SuspensePromise;
+	}
+
+	if (cache.promise !== undefined) use(cache.promise);
 }
 
 const emptyArray: unknown[] = [];

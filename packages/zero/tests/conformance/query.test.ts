@@ -4,6 +4,7 @@ import type { Query, ResultType, Schema, Zero } from '@rocicorp/zero';
 import {
 	PartialSuspenseQueryBinding,
 	QueryBinding,
+	SequentialSuspenseQueryBinding,
 	SuspenseQueryBinding,
 } from '../_fixtures/binding.tsrx';
 import { mount, nextPaint } from '../_helpers.ts';
@@ -11,10 +12,10 @@ import { mount, nextPaint } from '../_helpers.ts';
 type Row = { id: string; name: string };
 type Listener = (rows: readonly Row[], resultType: ResultType) => void;
 
-function createQuery(): Query<string, Schema, readonly Row[]> {
+function createQuery(hash = 'query-binding'): Query<string, Schema, readonly Row[]> {
 	return {
 		[queryInternalsTag]: true,
-		hash: () => 'query-binding',
+		hash: () => hash,
 		format: { singular: false },
 	} as unknown as QueryImpl<string, Schema, readonly Row[]>;
 }
@@ -109,6 +110,59 @@ describe('useQuery', () => {
 		await nextPaint();
 
 		expect(result.find('#partial-suspense-query-values').textContent).toBe('1/unknown');
+		result.unmount();
+	});
+
+	test('keeps sequential queries suspended until both results are complete', async () => {
+		const listenerSets = [new Set<Listener>(), new Set<Listener>()];
+		let materialization = 0;
+		const materialize = vi.fn(() => {
+			const listeners = listenerSets[materialization++];
+			if (listeners === undefined) throw new Error('unexpected materialization');
+			return {
+				addListener(listener: Listener) {
+					listeners.add(listener);
+					return () => listeners.delete(listener);
+				},
+				destroy: vi.fn(),
+				updateTTL: vi.fn(),
+			};
+		});
+		const zero = {
+			clientID: 'sequential-suspense-client',
+			context: {},
+			materialize,
+		} as unknown as Zero<Schema>;
+		const result = mount(SequentialSuspenseQueryBinding, {
+			zero,
+			queryA: createQuery('query-a'),
+			queryB: createQuery('query-b'),
+		});
+
+		expect(result.find('#sequential-suspense-query-pending').textContent).toBe('pending');
+		await nextPaint();
+		for (const listener of listenerSets[0]) {
+			listener([{ id: 'a', name: 'Ada' }], 'complete');
+		}
+		await Promise.resolve();
+		await nextPaint();
+
+		expect(result.findAll('#sequential-suspense-query-pending')).toHaveLength(1);
+		expect(result.findAll('#sequential-suspense-query-values')).toHaveLength(0);
+		expect(result.findAll('#sequential-suspense-query-error')).toHaveLength(0);
+		expect(materialize).toHaveBeenCalledTimes(2);
+
+		for (const listener of listenerSets[1]) {
+			listener([{ id: 'b', name: 'Babbage' }], 'complete');
+		}
+		await Promise.resolve();
+		await nextPaint();
+
+		expect(result.find('#sequential-suspense-query-values').textContent).toBe(
+			'1/complete/1/complete',
+		);
+		expect(result.findAll('#sequential-suspense-query-pending')).toHaveLength(0);
+		expect(result.findAll('#sequential-suspense-query-error')).toHaveLength(0);
 		result.unmount();
 	});
 });

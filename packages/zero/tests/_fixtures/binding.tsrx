@@ -103,3 +103,30 @@ export function PartialSuspenseQueryBinding(props: QueryProps) @{
 		<PartialSuspenseQueryBoundary query={props.query} />
 	</ZeroProvider>
 }
+
+function SequentialSuspenseQueryValues(props: {
+	queryA: Query<string, Schema, readonly Row[]>;
+	queryB: Query<string, Schema, readonly Row[]>;
+}) @{
+	const [rowsA, detailsA] = useSuspenseQuery(props.queryA, { suspendUntil: 'complete' });
+	const [rowsB, detailsB] = useSuspenseQuery(props.queryB, { suspendUntil: 'complete' });
+	<output id="sequential-suspense-query-values">
+		{rowsA.length + '/' + detailsA.type + '/' + rowsB.length + '/' + detailsB.type}
+	</output>
+}
+
+export function SequentialSuspenseQueryBinding(props: {
+	zero: Zero<Schema>;
+	queryA: Query<string, Schema, readonly Row[]>;
+	queryB: Query<string, Schema, readonly Row[]>;
+}) @{
+	<ZeroProvider zero={props.zero}>
+		@try {
+			<SequentialSuspenseQueryValues queryA={props.queryA} queryB={props.queryB} />
+		} @pending {
+			<output id="sequential-suspense-query-pending">pending</output>
+		} @catch (error) {
+			<output id="sequential-suspense-query-error">{String(error)}</output>
+		}
+	</ZeroProvider>
+}
