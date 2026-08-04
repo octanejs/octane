@@ -42,6 +42,8 @@ export const badgeVariants = cva(
 
 export interface BadgeProps extends HostProps<'span'> {
 	variant?: VariantProps<typeof badgeVariants>['variant'];
+	/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
+	asChild?: never;
 }
 
 export function Badge({ className, variant = 'default', ...props }: BadgeProps) @{

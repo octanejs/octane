@@ -63,6 +63,8 @@ export const itemVariants = cva(
 
 export interface ItemProps extends Record<string, unknown> {
 	className?: string;
+	/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
+	asChild?: never;
 	variant?: VariantProps<typeof itemVariants>['variant'];
 	size?: VariantProps<typeof itemVariants>['size'];
 }
