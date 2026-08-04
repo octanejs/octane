@@ -32,6 +32,11 @@
 //     routinely used standalone. Same trap as `Field.Label`, which already shipped as a crash once.
 //   - `Separator` is a `<div>`, because the Menu namespace has no Separator part at all (its
 //     sibling ContextMenu does). The radix classes are pure styling, so nothing is lost.
+// POSITIONING PROPS BELONG TO THE POSITIONER, NOT THE POPUP. Radix has one `Content` element that
+// takes them all; Base UI splits positioning into its own layer, so anything forwarded to `Popup`
+// instead is inert — `side="top"` silently leaves the menu on the default side, and both `side` and
+// `alignOffset` land on the DOM as invalid attributes. They are therefore destructured and routed
+// explicitly rather than swept up by the rest spread.
 import { type OctaneNode } from 'octane';
 import { Menu as MenuPrimitive } from '@octanejs/base-ui/menu';
 import { CheckIcon, ChevronRightIcon } from '@octanejs/lucide';
@@ -52,19 +57,55 @@ export function DropdownMenuTrigger(props: Record<string, unknown>) @{
 	<MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
-export interface DropdownMenuContentProps extends Props {
-	align?: 'start' | 'center' | 'end';
+export interface BaseUiPositioningProps {
+	/** Forwarded to the Positioner; see the note at the top of this file. */
+	side?: 'top' | 'right' | 'bottom' | 'left';
 	sideOffset?: number;
+	align?: 'start' | 'center' | 'end';
+	alignOffset?: number;
+	anchor?: unknown;
+	positionMethod?: 'absolute' | 'fixed';
+	collisionBoundary?: unknown;
+	collisionPadding?: unknown;
+	collisionAvoidance?: unknown;
+	arrowPadding?: number;
+	sticky?: boolean;
+	disableAnchorTracking?: boolean;
 }
+
+export interface DropdownMenuContentProps extends Props, BaseUiPositioningProps {}
 
 export function DropdownMenuContent({
 	className,
 	align = 'start',
 	sideOffset = 4,
+	side,
+	alignOffset,
+	anchor,
+	positionMethod,
+	collisionBoundary,
+	collisionPadding,
+	collisionAvoidance,
+	arrowPadding,
+	sticky,
+	disableAnchorTracking,
 	...props
 }: DropdownMenuContentProps) @{
 	<MenuPrimitive.Portal>
-		<MenuPrimitive.Positioner align={align} sideOffset={sideOffset}>
+		<MenuPrimitive.Positioner
+			side={side}
+			sideOffset={sideOffset}
+			align={align}
+			alignOffset={alignOffset}
+			anchor={anchor}
+			positionMethod={positionMethod}
+			collisionBoundary={collisionBoundary}
+			collisionPadding={collisionPadding}
+			collisionAvoidance={collisionAvoidance}
+			arrowPadding={arrowPadding}
+			sticky={sticky}
+			disableAnchorTracking={disableAnchorTracking}
+		>
 			<MenuPrimitive.Popup
 				data-slot="dropdown-menu-content"
 				className={cn(
@@ -207,9 +248,37 @@ export function DropdownMenuSubTrigger(props: Props & { inset?: boolean }) @{
 	</MenuPrimitive.SubmenuTrigger>
 }
 
-export function DropdownMenuSubContent({ className, ...props }: Props) @{
+export function DropdownMenuSubContent({
+	className,
+	align,
+	sideOffset,
+	side,
+	alignOffset,
+	anchor,
+	positionMethod,
+	collisionBoundary,
+	collisionPadding,
+	collisionAvoidance,
+	arrowPadding,
+	sticky,
+	disableAnchorTracking,
+	...props
+}: Props & BaseUiPositioningProps) @{
 	<MenuPrimitive.Portal>
-		<MenuPrimitive.Positioner>
+		<MenuPrimitive.Positioner
+			side={side}
+			sideOffset={sideOffset}
+			align={align}
+			alignOffset={alignOffset}
+			anchor={anchor}
+			positionMethod={positionMethod}
+			collisionBoundary={collisionBoundary}
+			collisionPadding={collisionPadding}
+			collisionAvoidance={collisionAvoidance}
+			arrowPadding={arrowPadding}
+			sticky={sticky}
+			disableAnchorTracking={disableAnchorTracking}
+		>
 			<MenuPrimitive.Popup
 				data-slot="dropdown-menu-sub-content"
 				className={cn(

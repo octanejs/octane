@@ -1277,3 +1277,34 @@ describe('@octanejs/shadcn — Base UI dropdown-menu maps onto the Menu primitiv
 		}
 	});
 });
+
+describe('@octanejs/shadcn — Base UI overlays route positioning to the Positioner', () => {
+	// Radix has one `Content` element that takes every positioning prop; Base UI splits positioning
+	// into its own layer. A prop swept onto `Popup` by a rest spread is INERT — the overlay silently
+	// stays on its default side — and it also lands on the DOM as an invalid attribute. Nothing about
+	// the rendered structure looks wrong, which is why this needs asserting directly.
+	it('dropdown-menu honours side and does not leak the prop to the DOM', async () => {
+		const m = mount(F.DropdownMenuSideCase as never);
+		await settle();
+		try {
+			const popup = document.querySelector('[data-slot="dropdown-menu-content"]')!;
+			expect(popup.getAttribute('data-side')).toBe('top');
+			expect(popup.hasAttribute('side')).toBe(false);
+			expect(popup.hasAttribute('alignoffset')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('popover honours side too', async () => {
+		const m = mount(F.PopoverSideCase as never);
+		await settle();
+		try {
+			const popup = document.querySelector('[data-slot="popover-content"]')!;
+			expect(popup.getAttribute('data-side')).toBe('right');
+			expect(popup.hasAttribute('side')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+});

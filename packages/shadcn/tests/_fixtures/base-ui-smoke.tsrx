@@ -591,3 +591,20 @@ export function DropdownMenuCase() @{
 		</DropdownMenuContent>
 	</DropdownMenu>
 }
+
+// side/alignOffset must reach the Positioner, not be swept onto the Popup where they are inert.
+export function DropdownMenuSideCase() @{
+	<DropdownMenu defaultOpen>
+		<DropdownMenuTrigger>Open</DropdownMenuTrigger>
+		<DropdownMenuContent side="top" alignOffset={12}>
+			<DropdownMenuItem>One</DropdownMenuItem>
+		</DropdownMenuContent>
+	</DropdownMenu>
+}
+
+export function PopoverSideCase() @{
+	<Popover defaultOpen>
+		<PopoverTrigger>Open</PopoverTrigger>
+		<PopoverContent side="right">Popover body</PopoverContent>
+	</Popover>
+}
