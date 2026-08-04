@@ -613,6 +613,12 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			).toContain(keyword);
 		}
 		await outputSelector.selectOption('client');
+		await page.evaluate(() => {
+			const scroller = document
+				.querySelectorAll('.pg-editor .cm-content')[1]
+				?.closest('.cm-scroller');
+			if (scroller) scroller.scrollTop = 0;
+		});
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(

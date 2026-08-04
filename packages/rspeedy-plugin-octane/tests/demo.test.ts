@@ -1,5 +1,6 @@
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { get } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -36,6 +37,26 @@ function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+function request(url: string, timeoutMs?: number): Promise<{ body: Buffer; ok: boolean }> {
+	return new Promise((resolveRequest, reject) => {
+		const req = get(url, (response) => {
+			const chunks: Buffer[] = [];
+			response.on('data', (chunk: Buffer) => chunks.push(chunk));
+			response.once('error', reject);
+			response.once('end', () => {
+				const status = response.statusCode ?? 0;
+				resolveRequest({ body: Buffer.concat(chunks), ok: status >= 200 && status < 300 });
+			});
+		});
+		if (timeoutMs !== undefined) {
+			req.setTimeout(timeoutMs, () =>
+				req.destroy(new Error(`Request timed out after ${timeoutMs}ms.`)),
+			);
+		}
+		req.once('error', reject);
+	});
+}
+
 async function waitForBundle(
 	child: ChildProcess,
 	url: string,
@@ -48,13 +69,13 @@ async function waitForBundle(
 			throw new Error(`Lynx demo exited before serving ${url}.\n${output()}`);
 		}
 		try {
-			const response = await fetch(url);
+			const response = await request(url);
 			if (response.ok) {
 				await delay(50);
 				if (child.exitCode !== null || child.signalCode !== null) {
 					throw new Error(`Lynx demo exited while serving ${url}.\n${output()}`);
 				}
-				return Buffer.from(await response.arrayBuffer());
+				return response.body;
 			}
 		} catch (error) {
 			if (error instanceof Error && error.message.startsWith('Lynx demo exited')) throw error;
@@ -107,7 +128,7 @@ async function waitForServerStop(url: string, timeoutMs: number): Promise<void> 
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() <= deadline) {
 		try {
-			await fetch(url, { signal: AbortSignal.timeout(500) });
+			await request(url, 500);
 		} catch {
 			return;
 		}

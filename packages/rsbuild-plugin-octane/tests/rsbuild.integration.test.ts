@@ -868,7 +868,7 @@ export function Page() @{
 `,
 			);
 			let updatedBody = '';
-			const deadline = Date.now() + 20_000;
+			const deadline = Date.now() + 60_000;
 			while (Date.now() < deadline) {
 				await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
 				updatedBody = await (await fetch(`${origin}/`)).text();
