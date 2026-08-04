@@ -10,6 +10,8 @@ import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework
 export interface DocSection {
 	id: string;
 	title: string;
+	/** Metadata-only aliases that should land on this exact indexed `<h2>` in search. */
+	searchTerms?: readonly string[];
 	// Heading depth for the "On this page" tree: 2 for a top-level `<h2>` section
 	// (the default), 3 for an `<h2>` subsection anchored by an `<h3>`. Only the
 	// table of contents reads this; the search index is built from `<h2>` anchors.
@@ -44,9 +46,13 @@ export const docsMeta: DocMeta[] = [
 		sections: [
 			{ id: 'scaffold', title: 'Create a new app' },
 			{ id: 'install', title: 'Install into an existing project' },
-			{ id: 'first-component', title: 'Your first component' },
+			{ id: 'first-component', title: 'Build your first component' },
 			{ id: 'mount', title: 'Connect it to the page' },
-			{ id: 'tsrx-at-a-glance', title: 'TSRX at a glance' },
+			{
+				id: 'tsrx-at-a-glance',
+				title: 'TSRX at a glance',
+				searchTerms: ['VSCode', 'VSCode extension', 'TSRX VSCode'],
+			},
 			{ id: 'next', title: 'Next' },
 		],
 	},
@@ -61,10 +67,10 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'rspack', title: 'Rspack' },
 			{ id: 'rsbuild', title: 'Rsbuild' },
 			{ id: 'strong-mode', title: 'Strong mode' },
+			{ id: 'mixed-toolchains', title: 'Mixed toolchains and file ownership' },
 			{ id: 'full-app-configuration', title: 'Full app configuration' },
 			{ id: 'production-and-preview', title: 'Production and preview' },
 			{ id: 'renderer-targets', title: 'Renderer targets' },
-			{ id: 'mixed-toolchains', title: 'Mixed toolchains and file ownership' },
 		],
 	},
 	{
@@ -142,22 +148,42 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'mental-model', title: 'The mental model' },
 			{ id: 'components-and-props', title: 'Components and props' },
 			{ id: 'state-and-events', title: 'State and events' },
-			{ id: 'use-linked-state', title: 'useLinkedState', level: 3 },
-			{ id: 'strong-mode', title: 'Strong mode', level: 3 },
+			{
+				id: 'use-linked-state',
+				title: 'Keep editable state in sync with useLinkedState',
+				level: 3,
+			},
+			{ id: 'strong-mode', title: 'Catch state mistakes with Strong mode', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
-			{ id: 'context', title: 'Sharing data' },
+			{ id: 'context', title: 'Sharing data with context' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
-			{ id: 'use-sync-external-store', title: 'useSyncExternalStore', level: 3 },
+			{
+				id: 'use-sync-external-store',
+				title: 'Subscribe to external state with useSyncExternalStore',
+				level: 3,
+			},
 			{ id: 'async-ui', title: 'Loading data and code' },
 			{ id: 'deferred-hydration', title: 'Deferred hydration' },
-			{ id: 'responsive-updates', title: 'Responsive updates' },
-			{ id: 'use-transition', title: 'useTransition', level: 3 },
-			{ id: 'use-deferred-value', title: 'useDeferredValue', level: 3 },
-			{ id: 'view-transitions', title: 'ViewTransition', level: 3 },
+			{ id: 'responsive-updates', title: 'Responsive updates and actions' },
+			{
+				id: 'use-transition',
+				title: 'Keep the current screen with useTransition',
+				level: 3,
+			},
+			{
+				id: 'use-deferred-value',
+				title: 'Let a slow view lag with useDeferredValue',
+				level: 3,
+			},
+			{
+				id: 'view-transitions',
+				title: 'Animate visual changes with ViewTransition',
+				level: 3,
+			},
 			{ id: 'roots-and-rendering', title: 'Roots and rendering' },
-			{ id: 'create-portal', title: 'createPortal', level: 3 },
-			{ id: 'server-rendering', title: 'Server rendering' },
-			{ id: 'api-index', title: 'API index' },
+			{ id: 'create-portal', title: 'Render an overlay with createPortal', level: 3 },
+			{ id: 'server-rendering', title: 'Server and static rendering' },
+			{ id: 'api-index', title: 'API index by job' },
 			{ id: 'practice', title: 'Practice' },
 			{ id: 'next-steps', title: 'Next steps' },
 		],
@@ -169,9 +195,14 @@ export const docsMeta: DocMeta[] = [
 		group: 'Learn Octane',
 		sections: [
 			{ id: 'which-should-i-use', title: 'Which should I use?' },
-			{ id: 'component-bodies', title: 'Component bodies' },
-			{ id: 'rendered-control-flow', title: 'Rendered control flow' },
-			{ id: 'text-holes', title: 'Text holes' },
+			{ id: 'component-bodies', title: 'The same component, with less ceremony' },
+			{ id: 'rendered-control-flow', title: 'Branches and lists that read top to bottom' },
+			{ id: 'text-holes', title: 'Text holes make the output explicit' },
+			{
+				id: 'editor-support',
+				title: 'Editor support',
+				searchTerms: ['VSCode', 'VSCode extension', 'TSRX VSCode'],
+			},
 			{ id: 'next', title: 'Next' },
 		],
 	},
@@ -181,12 +212,12 @@ export const docsMeta: DocMeta[] = [
 		description: 'The deliberate divergences — everything else matching React is the point.',
 		group: 'Explore',
 		sections: [
-			{ id: 'hooks', title: 'Hooks' },
-			{ id: 'strong-mode', title: 'Strong mode' },
-			{ id: 'events-and-dom', title: 'Events and the DOM' },
-			{ id: 'async-work', title: 'Async work' },
+			{ id: 'hooks', title: 'Hooks fit the code' },
+			{ id: 'strong-mode', title: 'Strong mode is optional' },
+			{ id: 'events-and-dom', title: 'Events come from the browser' },
+			{ id: 'async-work', title: 'Transitions without time slicing' },
 			{ id: 'errors-and-server', title: 'Errors and server rendering' },
-			{ id: 'not-supported', title: 'APIs left out' },
+			{ id: 'not-supported', title: 'APIs Octane leaves out' },
 		],
 	},
 	{
@@ -239,10 +270,10 @@ export const docsMeta: DocMeta[] = [
 		],
 		sections: [
 			{ id: 'source-package-contract', title: 'The source-package contract' },
-			{ id: 'package-the-source', title: 'Package the source' },
+			{ id: 'package-the-source', title: 'Package the complete source graph' },
 			{ id: 'authoring-and-types', title: 'Authoring and types' },
-			{ id: 'package-metadata', title: 'Package metadata' },
-			{ id: 'verify-the-package', title: 'Verify the package' },
+			{ id: 'package-metadata', title: 'Use package metadata only for real exceptions' },
+			{ id: 'verify-the-package', title: 'Verify what users receive' },
 		],
 	},
 	{
@@ -256,9 +287,9 @@ export const docsMeta: DocMeta[] = [
 			...category.packages,
 		]),
 		sections: [
-			{ id: 'find-a-binding', title: 'Find a binding' },
-			{ id: 'install-and-use', title: 'Install and use' },
-			{ id: 'check-support', title: 'Check support' },
+			{ id: 'find-a-binding', title: 'Pick by the job' },
+			{ id: 'install-and-use', title: 'Install it, then change the import' },
+			{ id: 'check-support', title: 'Check the part you plan to use' },
 		],
 	},
 ];

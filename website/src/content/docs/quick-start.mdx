@@ -166,13 +166,15 @@ export function TodoList(props) @{
 <aside className="doc-callout tip">
 	<p className="doc-callout-title">Make .tsrx feel native in VS Code</p>
 	<p>
-		Install{' '}
+		{
+			'For syntax highlighting, diagnostics, navigation, completions, and TypeScript-aware editor support in '
+		}
+		<code>.tsrx</code>
+		{' files, install '}
 		<a href="https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin">
-			TSRX for VS Code
-		</a>{' '}
-		for syntax highlighting, diagnostics, navigation, completions, and TypeScript-aware editor
-		support. Pair it with the official Prettier extension for format on save. Your project's{' '}
-		<code>tsrx-tsc</code> typecheck remains the command-line and CI check.
+			{'TSRX for VS Code'}
+		</a>
+		{'.'}
 	</p>
 </aside>
 

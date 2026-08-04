@@ -346,6 +346,27 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose pre.shiki code')).toBeTruthy();
 	});
 
+	it.each([
+		{
+			path: '/docs/quick-start',
+			title: 'Make .tsrx feel native in VS Code',
+		},
+		{
+			path: '/docs/tsrx-vs-tsx',
+			title: 'The file extension does not change the framework',
+		},
+	])('$path keeps inline callout prose and links inline', async ({ path, title }) => {
+		const { container } = await renderRoute(path);
+		const callout = Array.from(container.querySelectorAll<HTMLElement>('.doc-callout')).find(
+			(candidate) => candidate.querySelector('.doc-callout-title')?.textContent === title,
+		);
+
+		expect(callout).toBeTruthy();
+		expect(callout!.querySelector('p p')).toBeNull();
+		expect(callout!.querySelector('a p')).toBeNull();
+		expect(callout!.querySelector('a')?.textContent).toBe('TSRX for VS Code');
+	});
+
 	it('/docs/publishing-libraries renders the package-manager dry-run selector', async () => {
 		const { container } = await renderRoute('/docs/publishing-libraries');
 		const firstSection = container.querySelector<HTMLElement>('h2#source-package-contract')!;
