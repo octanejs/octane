@@ -1,0 +1,264 @@
+name: Vercel preview
+
+# A preview is a maintainer-requested snapshot, not a side effect of every
+# commit. Removing and reapplying `deploy-preview` runs this again for the pull
+# request's current head. Each Vercel project independently reuses a usable
+# deployment for that SHA or creates the missing preview.
+on:
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  deploy:
+    name: deploy website previews
+    if: github.event.label.name == 'deploy-preview'
+    # Keep concurrency below the label guard. Workflow-level concurrency also
+    # admits skipped jobs, so an unrelated label event could otherwise replace
+    # a pending preview run in GitHub's single pending slot.
+    concurrency:
+      # Do not cancel a run after it has asked Vercel to build. A following run
+      # is serialized and will reuse the deployment if the SHA is still current.
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Pull requests are issues to GitHub's comment API. The workflow only reads
+    # PR state and writes its one marker-owned comment; it never reads or writes
+    # repository contents.
+    permissions:
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Resolve or create Vercel previews
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_WEBSITE_PROJECT_ID: ${{ vars.VERCEL_WEBSITE_PROJECT_ID }}
+          VERCEL_MCP_PROJECT_ID: ${{ vars.VERCEL_MCP_PROJECT_ID }}
+        with:
+          script: |
+            const LABEL = "deploy-preview";
+            const COMMENT_MARKER = "<!-- octane-vercel-preview -->";
+            const ACTIVE_STATES = new Set(["READY", "BUILDING", "INITIALIZING", "QUEUED"]);
+            const TERMINAL_STATES = new Set(["READY", "ERROR", "CANCELED", "BLOCKED"]);
+            const projects = [
+              { label: "Website", id: process.env.VERCEL_WEBSITE_PROJECT_ID },
+              { label: "MCP website", id: process.env.VERCEL_MCP_PROJECT_ID },
+            ];
+
+            const required = {
+              VERCEL_TOKEN: process.env.VERCEL_TOKEN,
+              VERCEL_ORG_ID: process.env.VERCEL_ORG_ID,
+              VERCEL_WEBSITE_PROJECT_ID: process.env.VERCEL_WEBSITE_PROJECT_ID,
+              VERCEL_MCP_PROJECT_ID: process.env.VERCEL_MCP_PROJECT_ID,
+            };
+            const missing = Object.entries(required)
+              .filter(([, value]) => !value)
+              .map(([name]) => name);
+            if (missing.length > 0) {
+              core.setFailed(`Missing GitHub Actions configuration: ${missing.join(", ")}`);
+              return;
+            }
+            core.setSecret(required.VERCEL_TOKEN);
+
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+            // The event payload may have waited behind another label run. The
+            // API response is the source of truth for the open PR, current
+            // label, and latest head SHA that the maintainer requested.
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            if (pull.state !== "open" || !pull.labels.some((label) => label.name === LABEL)) {
+              core.notice(`Skipping #${number}: ${LABEL} is no longer applied to an open pull request.`);
+              return;
+            }
+            if (!pull.head?.repo?.id || !pull.head.ref || !pull.head.sha) {
+              core.setFailed(`Pull request #${number} has no deployable GitHub head.`);
+              return;
+            }
+
+            const teamId = required.VERCEL_ORG_ID;
+            const token = required.VERCEL_TOKEN;
+            const api = async (path, options = {}) => {
+              const response = await fetch(`https://api.vercel.com${path}`, {
+                ...options,
+                headers: {
+                  Accept: "application/json",
+                  Authorization: `Bearer ${token}`,
+                  ...(options.body ? { "Content-Type": "application/json" } : {}),
+                  ...options.headers,
+                },
+              });
+              if (!response.ok) {
+                const detail = (await response.text()).slice(0, 1000);
+                throw new Error(
+                  `Vercel ${options.method ?? "GET"} ${path} failed (${response.status})${detail ? `: ${detail}` : ""}`,
+                );
+              }
+              return response.json();
+            };
+            const stateOf = (deployment) => deployment.readyState ?? deployment.state ?? "QUEUED";
+            const deploymentIdOf = (deployment) => deployment.uid ?? deployment.id;
+            const deploymentUrlOf = (deployment) => {
+              if (!deployment.url) return null;
+              return deployment.url.startsWith("http") ? deployment.url : `https://${deployment.url}`;
+            };
+
+            const resolveProject = async (project) => {
+              const query = new URLSearchParams({
+                projectId: project.id,
+                sha: pull.head.sha,
+                target: "preview",
+                limit: "20",
+                teamId,
+              });
+              const listed = await api(`/v7/deployments?${query}`);
+              const deployments = listed.deployments ?? [];
+              const existing = deployments.find((deployment) =>
+                ACTIVE_STATES.has(stateOf(deployment)),
+              );
+              if (existing) {
+                return { ...project, deployment: existing, reused: true };
+              }
+
+              const projectInfo = await api(
+                `/v9/projects/${encodeURIComponent(project.id)}?${new URLSearchParams({ teamId })}`,
+              );
+              const createQuery = new URLSearchParams({ teamId });
+              // A previous terminal failure for this SHA must not win Vercel's
+              // normal deduplication. Successful and active deployments were
+              // returned above and are never forcibly rebuilt.
+              if (deployments.length > 0) createQuery.set("forceNew", "1");
+              const deployment = await api(`/v13/deployments?${createQuery}`, {
+                method: "POST",
+                body: JSON.stringify({
+                  name: projectInfo.name,
+                  project: project.id,
+                  gitSource: {
+                    type: "github",
+                    repoId: pull.head.repo.id,
+                    ref: pull.head.ref,
+                    sha: pull.head.sha,
+                  },
+                  meta: {
+                    githubCommitSha: pull.head.sha,
+                    githubCommitRef: pull.head.ref,
+                    githubCommitRepoId: String(pull.head.repo.id),
+                    githubPrId: String(number),
+                  },
+                }),
+              });
+              return { ...project, deployment, reused: false };
+            };
+
+            const commentBody = (results) => {
+              const rows = results.map((result) => {
+                if (result.error) {
+                  return `| ${result.label} | Request failed; see the workflow log | ❌ |`;
+                }
+                const state = stateOf(result.deployment);
+                const url = deploymentUrlOf(result.deployment);
+                const source = result.reused ? "reused" : "requested";
+                const preview = url ? `[Open preview](${url})` : "URL pending";
+                return `| ${result.label} | ${preview} | ${state} (${source}) |`;
+              });
+              return [
+                COMMENT_MARKER,
+                `Vercel previews for \`${pull.head.sha.slice(0, 7)}\`:`,
+                "",
+                "| Project | Preview | Status |",
+                "| --- | --- | --- |",
+                ...rows,
+              ].join("\n");
+            };
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            let comment = comments.find(
+              (candidate) =>
+                candidate.user?.login === "github-actions[bot]" &&
+                candidate.body?.includes(COMMENT_MARKER),
+            );
+            const writeComment = async (results) => {
+              const body = commentBody(results);
+              if (comment) {
+                const response = await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: comment.id,
+                  body,
+                });
+                comment = response.data;
+              } else {
+                const response = await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: number,
+                  body,
+                });
+                comment = response.data;
+              }
+            };
+
+            const resolved = await Promise.all(
+              projects.map(async (project) => {
+                try {
+                  return await resolveProject(project);
+                } catch (error) {
+                  core.warning(`${project.label}: ${error.message}`);
+                  return { ...project, error };
+                }
+              }),
+            );
+            // Publish URLs as soon as Vercel accepts the requests. A slow build
+            // therefore still leaves the requested preview discoverable.
+            await writeComment(resolved);
+
+            const waitForTerminalState = async (result) => {
+              if (result.error || TERMINAL_STATES.has(stateOf(result.deployment))) return result;
+              const id = deploymentIdOf(result.deployment);
+              if (!id) {
+                return { ...result, error: new Error("Vercel returned a deployment without an ID.") };
+              }
+              const deadline = Date.now() + 12 * 60 * 1000;
+              while (Date.now() < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+                try {
+                  result.deployment = await api(
+                    `/v13/deployments/${encodeURIComponent(id)}?${new URLSearchParams({ teamId })}`,
+                  );
+                } catch (error) {
+                  return { ...result, error };
+                }
+                if (TERMINAL_STATES.has(stateOf(result.deployment))) return result;
+              }
+              return { ...result, error: new Error(`Timed out waiting for Vercel deployment ${id}.`) };
+            };
+
+            const needsPolling = resolved.some(
+              (result) => !result.error && !TERMINAL_STATES.has(stateOf(result.deployment)),
+            );
+            const completed = await Promise.all(resolved.map(waitForTerminalState));
+            if (needsPolling) await writeComment(completed);
+
+            const failures = completed.filter(
+              (result) => result.error || stateOf(result.deployment) !== "READY",
+            );
+            if (failures.length > 0) {
+              core.setFailed(
+                failures
+                  .map((result) =>
+                    `${result.label}: ${result.error?.message ?? stateOf(result.deployment)}`,
+                  )
+                  .join("\n"),
+              );
+            }
