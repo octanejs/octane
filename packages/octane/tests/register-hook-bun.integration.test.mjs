@@ -17,3 +17,15 @@ test('Bun prerenders an extensionless TypeScript component through the public pr
 	assert.equal(result.status, 0);
 	assert.equal(result.stdout, '<main>Hello, Octane!</main>');
 });
+
+test('Bun targets the server runtime inside pass-through manual-slot packages', () => {
+	assert.ok(bun, 'BUN_BINARY must name the Bun executable used for this integration test');
+	const result = spawnSync(bun, ['--preload', 'octane/compiler/register', 'entry-manual.ts'], {
+		cwd: fixtureDirectory,
+		encoding: 'utf8',
+	});
+
+	assert.equal(result.stderr, '');
+	assert.equal(result.status, 0);
+	assert.equal(result.stdout, '<main>Hello from a package, Octane!</main>');
+});

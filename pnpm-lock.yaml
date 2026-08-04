@@ -4630,6 +4630,9 @@ importers:
       devalue:
         specifier: catalog:default
         version: 5.8.2
+      es-module-lexer:
+        specifier: catalog:default
+        version: 1.7.0
       esrap:
         specifier: ^2.3.0
         version: 2.3.0

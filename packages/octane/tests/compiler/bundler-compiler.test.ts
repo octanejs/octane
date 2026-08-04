@@ -1035,6 +1035,36 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 		expect(resolveOctaneRuntimeRequest('octane/server', 'server')).toBeNull();
 	});
 
+	it('targets runtime requests independently of hook slotting', () => {
+		const source = [
+			`// octane-no-slot`,
+			`import { createContext } from 'octane';`,
+			`export { createRoot } from "octane";`,
+			`export type { OctaneNode } from 'octane';`,
+			`const runtime = import('octane');`,
+			`const untouched = 'octane';`,
+		].join('\n');
+		const compiler = createOctaneCompiler({ root: '/project' });
+
+		expect(
+			compiler.transform(source, '/project/src/runtime.ts', {
+				environment: 'client',
+				explicitRuntimeRequests: true,
+			}),
+		).toBeNull();
+		const server = compiler.transform(source, '/project/src/runtime.ts', {
+			environment: 'server',
+			explicitRuntimeRequests: true,
+		});
+
+		expect(server?.kind).toBe('runtime-requests');
+		expect(server?.code).toContain(`import { createContext } from 'octane/server';`);
+		expect(server?.code).toContain(`export { createRoot } from "octane/server";`);
+		expect(server?.code).toContain(`export type { OctaneNode } from 'octane';`);
+		expect(server?.code).toContain(`const runtime = import('octane/server');`);
+		expect(server?.code).toContain(`const untouched = 'octane';`);
+	});
+
 	it('returns manifest watch metadata for transforms and pass-through decisions', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-bundler-transform-'));
 		try {
@@ -1062,6 +1092,22 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 			const manual = compiler.transform(HOOK, join(packageRoot, 'src/manual/useCount.ts'));
 			expect(manual).toMatchObject({ kind: 'none', code: HOOK, map: null });
 			expect(manual?.dependencies).toContain(manifest);
+			const manualServer = compiler.transform(HOOK, join(packageRoot, 'src/manual/useCount.ts'), {
+				environment: 'server',
+				explicitRuntimeRequests: true,
+			});
+			expect(manualServer).toMatchObject({
+				kind: 'runtime-requests',
+				code: HOOK.replace("from 'octane'", "from 'octane/server'"),
+				map: null,
+			});
+			expect(manualServer?.dependencies).toContain(manifest);
+			const automaticServer = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'), {
+				environment: 'server',
+				explicitRuntimeRequests: true,
+			});
+			expect(automaticServer?.kind).toBe('slots');
+			expect(automaticServer?.code).toContain("from 'octane/server'");
 
 			const unrelatedRoot = join(root, 'node_modules/unrelated');
 			mkdirSync(join(unrelatedRoot, 'src'), { recursive: true });

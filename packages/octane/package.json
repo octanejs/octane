@@ -135,6 +135,7 @@
     "@tsrx/core": "catalog:default",
     "@types/react": "catalog:default",
     "devalue": "catalog:default",
+    "es-module-lexer": "catalog:default",
     "esrap": "catalog:default"
   },
   "peerDependencies": {

@@ -133,7 +133,7 @@ function registerBunPlugin() {
 				if (result === null || result.kind === 'none') return { contents: source, loader };
 				return {
 					contents: result.code,
-					loader: result.kind === 'slots' ? loader : 'js',
+					loader: result.kind === 'slots' || result.kind === 'runtime-requests' ? loader : 'js',
 				};
 			});
 		},
