@@ -8,16 +8,18 @@ on:
   pull_request_target:
     types: [labeled]
 
-concurrency:
-  # Do not cancel a run after it has asked Vercel to build. A following run is
-  # serialized and will reuse the deployment if the SHA is still current.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   deploy:
     name: deploy website previews
     if: github.event.label.name == 'deploy-preview'
+    # Keep concurrency below the label guard. Workflow-level concurrency also
+    # admits skipped jobs, so an unrelated label event could otherwise replace
+    # a pending preview run in GitHub's single pending slot.
+    concurrency:
+      # Do not cancel a run after it has asked Vercel to build. A following run
+      # is serialized and will reuse the deployment if the SHA is still current.
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Pull requests are issues to GitHub's comment API. The workflow only reads

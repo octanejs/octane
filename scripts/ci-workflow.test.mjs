@@ -962,6 +962,19 @@ describe('Vercel preview workflow', () => {
 		assert.match(notices.join('\n'), /deploy-preview is no longer applied/);
 	});
 
+	test('keeps unrelated label events out of the preview concurrency queue', () => {
+		assert.doesNotMatch(vercelPreviewWorkflow, /^concurrency:/m);
+		assert.match(
+			vercelPreviewWorkflow,
+			/jobs:\n {2}deploy:\n(?:.*\n)*? {4}if: github\.event\.label\.name == 'deploy-preview'\n(?:.*\n)*? {4}concurrency:\n {6}# Do not cancel/,
+		);
+		assert.match(
+			vercelPreviewWorkflow,
+			/^ {6}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \}\}$/m,
+		);
+		assert.match(vercelPreviewWorkflow, /^ {6}cancel-in-progress: false$/m);
+	});
+
 	test('keeps production automatic and makes the privileged workflow API-only', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
 			assert.deepEqual(config.git.deploymentEnabled, {
