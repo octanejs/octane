@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "The complete Airbnb Visx 4 visualization toolkit ported to Octane, with native events and deterministic SSR/hydration.",
   "author": {

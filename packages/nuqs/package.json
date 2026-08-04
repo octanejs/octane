@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "nuqs for the octane renderer — the nuqs 2.9.1 source ported onto octane's hooks: type-safe search params state (useQueryState/useQueryStates), the framework-agnostic parsers/serializer/loader reused verbatim, plus the React, custom and testing adapters.",
   "author": {

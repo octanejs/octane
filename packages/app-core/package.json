@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Bundler-neutral app runtime, configuration, routing, and code generation for Octane integrations",
   "author": {

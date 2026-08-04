@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "TanStack Pacer bindings for Octane — debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
   "author": {

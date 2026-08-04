@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "TanStack Devtools bindings for Octane — reuses @tanstack/devtools and ports the React adapter's TanStackDevtools component.",
   "author": {

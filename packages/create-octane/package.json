@@ -3,7 +3,7 @@
   "version": "0.0.4",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Create an Octane app: npm create octane my-app",
   "license": "MIT",

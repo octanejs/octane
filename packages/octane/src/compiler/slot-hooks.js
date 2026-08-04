@@ -27,6 +27,13 @@ function octaneHookLocals(ast) {
 	let importsHook = false;
 	let hasOctaneImport = false;
 	for (const node of ast.body || []) {
+		if (
+			(node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') &&
+			node.source?.value === 'octane'
+		) {
+			hasOctaneImport = true;
+			continue;
+		}
 		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
 		hasOctaneImport = true;
 		for (const sp of node.specifiers || []) {
@@ -991,6 +998,25 @@ function walk(node, owner, st) {
 	}
 }
 
+function collectServerRuntimeRequestEdits(ast, st) {
+	for (const node of ast.body || []) {
+		if (
+			(node.type !== 'ImportDeclaration' &&
+				node.type !== 'ExportNamedDeclaration' &&
+				node.type !== 'ExportAllDeclaration') ||
+			node.source?.value !== 'octane'
+		) {
+			continue;
+		}
+		const quote = st.source[node.source.start];
+		st.edits.push({
+			pos: node.source.start,
+			end: node.source.end,
+			text: `${quote}octane/server${quote}`,
+		});
+	}
+}
+
 /**
  * Inject per-call-site hook slots into octane BASE hook calls in a plain
  * `.ts`/`.js` module. Returns `null` (pass through unchanged) when the module
@@ -998,7 +1024,7 @@ function walk(node, owner, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ environment?: 'client' | 'server', strong?: boolean, hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ environment?: 'client' | 'server', explicitRuntimeRequests?: boolean, strong?: boolean, hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (ordinary prod builds and SSR) emits
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
@@ -1025,7 +1051,15 @@ export function slotHooks(source, id, options) {
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
-	if (!importInfo.importsHook && !canSpecializeRoot) return null;
+	const rewriteServerRuntime =
+		environment === 'server' && options?.explicitRuntimeRequests === true;
+	if (
+		!importInfo.importsHook &&
+		!canSpecializeRoot &&
+		!(rewriteServerRuntime && importInfo.hasOctaneImport)
+	) {
+		return null;
+	}
 	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
 	// module whose hook calls carry their `_octane*` props (start/end offsets are
 	// preserved, so the text edits below stay valid), with the dependency
@@ -1067,6 +1101,11 @@ export function slotHooks(source, id, options) {
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
 	}
+	// Full server compilation emits explicit `octane/server` requests. Keep the
+	// surgical plain-TS/JS path self-contained too: not every runtime loader can
+	// intercept a bare package request after onLoad has returned transformed
+	// source (Bun's runtime plugin is one example).
+	if (rewriteServerRuntime) collectServerRuntimeRequestEdits(ast, st);
 	if (st.edits.length === 0) return null;
 
 	// Apply insertions right-to-left so earlier offsets stay valid.
@@ -1100,7 +1139,7 @@ export function slotHooks(source, id, options) {
 	const helperImport =
 		helperSpecifiers.length === 0
 			? ''
-			: `import { ${helperSpecifiers.join(', ')} } from 'octane';\n`;
+			: `import { ${helperSpecifiers.join(', ')} } from '${rewriteServerRuntime ? 'octane/server' : 'octane'}';\n`;
 	const serverHelperSpecifiers = [...st.parallelHelpers.values()]
 		.filter((helper) => helper.request === 'octane/server')
 		.map((helper) => `${helper.imported} as ${helper.local}`);

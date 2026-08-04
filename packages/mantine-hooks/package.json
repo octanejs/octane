@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Mantine hooks for Octane, ported from @mantine/hooks with Octane-native lifecycle and state hooks.",
   "author": {

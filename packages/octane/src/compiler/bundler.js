@@ -1015,6 +1015,7 @@ class OctaneBundlerCompiler {
 				environment === 'client' && hmr === false && dev === false && profile === false;
 			const out = slotHooks(code, filename, {
 				environment,
+				...(options.explicitRuntimeRequests === true ? { explicitRuntimeRequests: true } : null),
 				hmr: !!hmr,
 				profile,
 				profileFilename,

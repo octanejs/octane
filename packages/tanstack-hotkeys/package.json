@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "TanStack Hotkeys bindings for Octane — reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
   "author": {

@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "TanStack Table v9 bindings for the octane renderer — reuses the framework-agnostic @tanstack/table-core (atom-based reactivity, tree-shakeable features) and ports the adapter (useTable, Subscribe, FlexRender, createTableHook) onto octane.",
   "author": {

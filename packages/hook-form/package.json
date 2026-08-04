@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "React Hook Form for the octane renderer — the full react-hook-form 7.81.0 source ported onto octane's hooks: performant, flexible forms with native-event validation (onInput), field arrays, and schema resolvers.",
   "author": {

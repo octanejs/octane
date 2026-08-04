@@ -11,7 +11,7 @@
     }
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Evidence-scoped usehooks-ts bindings for Octane.",
   "publishConfig": {

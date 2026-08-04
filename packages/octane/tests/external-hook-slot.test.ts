@@ -130,6 +130,32 @@ describe('slotHooks surgical pass', () => {
 		).toBeNull(); // imported but never called
 	});
 
+	it('targets the server runtime only for server hook modules', () => {
+		const source = `import { useMemo } from 'octane';\nexport const useValue = (value: string) => useMemo(() => value);`;
+		const client = slotHooks(source, 'runtime-target.ts', { environment: 'client' });
+		const server = slotHooks(source, 'runtime-target.ts', {
+			environment: 'server',
+			explicitRuntimeRequests: true,
+		});
+
+		expect(client?.code).toContain("from 'octane'");
+		expect(client?.code).not.toContain("from 'octane/server'");
+		expect(server?.code).toContain("from 'octane/server'");
+		expect(server?.code).not.toContain("from 'octane'");
+	});
+
+	it('targets the server runtime for hook-free server helpers too', () => {
+		const source = `import { createContext } from 'octane';\nexport const Context = createContext('value');`;
+
+		expect(slotHooks(source, 'context.ts', { environment: 'client' })).toBeNull();
+		expect(
+			slotHooks(source, 'context.ts', {
+				environment: 'server',
+				explicitRuntimeRequests: true,
+			})?.code,
+		).toContain("from 'octane/server'");
+	});
+
 	it('keeps nested hooks on the render path instead of memoizing around them', () => {
 		const sources = [
 			`import { use } from 'octane';

@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Recharts for the octane renderer — reuses recharts' framework-agnostic core (Redux Toolkit state, reselect, d3 via victory-vendor) and swaps the React layer for octane's hooks.",
   "author": {
