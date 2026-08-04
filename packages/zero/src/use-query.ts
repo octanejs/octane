@@ -215,6 +215,7 @@ type SuspenseView = {
 };
 
 type SuspensePromiseCache = {
+	cancel: (() => void) | undefined;
 	view: SuspenseView | undefined;
 	suspendUntil: 'complete' | 'partial';
 	promise: SuspensePromise | undefined;
@@ -223,6 +224,7 @@ type SuspensePromiseCache = {
 /**
  * Keep one dynamic use() position for each query hook call site.
  * The settled promise stays in the sequence so a later query cannot reuse it.
+ * A local cancellation promise releases the position when its query stops suspending.
  */
 function useSuspensePromise(
 	view: SuspenseView | undefined,
@@ -231,26 +233,33 @@ function useSuspensePromise(
 	slot: symbol | undefined,
 ): void {
 	const cache = useRef<SuspensePromiseCache>(
-		{ view: undefined, suspendUntil, promise: undefined },
+		{ cancel: undefined, view: undefined, suspendUntil, promise: undefined },
 		slot,
 	).current;
 	const shouldSuspend =
 		view !== undefined &&
 		enabled &&
 		(suspendUntil === 'complete' ? !view.complete : !view.nonEmpty);
+	const sourceChanged = cache.view !== view || cache.suspendUntil !== suspendUntil;
+
+	if (cache.promise?.status === 'pending' && (!shouldSuspend || sourceChanged)) {
+		cache.cancel?.();
+	}
 
 	if (
 		shouldSuspend &&
-		(cache.promise === undefined ||
-			cache.view !== view ||
-			cache.suspendUntil !== suspendUntil ||
-			cache.promise.status !== 'pending')
+		(cache.promise === undefined || sourceChanged || cache.promise.status !== 'pending')
 	) {
+		let cancel = () => {};
+		const cancellation = new Promise<void>((resolve) => {
+			cancel = resolve;
+		});
+		const source = suspendUntil === 'complete' ? view.waitForComplete() : view.waitForNonEmpty();
+
+		cache.cancel = cancel;
 		cache.view = view;
 		cache.suspendUntil = suspendUntil;
-		cache.promise = (
-			suspendUntil === 'complete' ? view.waitForComplete() : view.waitForNonEmpty()
-		) as SuspensePromise;
+		cache.promise = Promise.race([source, cancellation]) as SuspensePromise;
 	}
 
 	if (cache.promise !== undefined) use(cache.promise);

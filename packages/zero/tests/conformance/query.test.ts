@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { queryInternalsTag, type QueryImpl } from '@rocicorp/zero/bindings';
 import type { Query, ResultType, Schema, Zero } from '@rocicorp/zero';
 import {
+	CancellableSuspenseQueryBinding,
 	PartialSuspenseQueryBinding,
 	QueryBinding,
 	SequentialSuspenseQueryBinding,
@@ -165,4 +166,39 @@ describe('useQuery', () => {
 		expect(result.findAll('#sequential-suspense-query-error')).toHaveLength(0);
 		result.unmount();
 	});
+
+	test.each([
+		['disabled', '#disable-suspense-query', '0/unknown'],
+		['cleared', '#clear-suspense-query', 'undefined/unknown'],
+	] as const)(
+		'releases a pending suspense query when it is %s',
+		async (_state, control, expected) => {
+			const materialize = vi.fn(() => ({
+				addListener() {
+					return () => {};
+				},
+				destroy: vi.fn(),
+				updateTTL: vi.fn(),
+			}));
+			const zero = {
+				clientID: `cancellable-suspense-${_state}`,
+				context: {},
+				materialize,
+			} as unknown as Zero<Schema>;
+			const result = mount(CancellableSuspenseQueryBinding, {
+				zero,
+				query: createQuery(`cancellable-query-${_state}`),
+			});
+
+			expect(result.find('#cancellable-suspense-query-pending').textContent).toBe('pending');
+			result.click(control);
+			await Promise.resolve();
+			await nextPaint();
+
+			expect(result.find('#cancellable-suspense-query-values').textContent).toBe(expected);
+			expect(result.findAll('#cancellable-suspense-query-pending')).toHaveLength(0);
+			expect(result.findAll('#cancellable-suspense-query-error')).toHaveLength(0);
+			result.unmount();
+		},
+	);
 });

@@ -6,6 +6,7 @@ import {
 	useZero,
 	useZeroOnline,
 } from '@octanejs/zero';
+import { useState } from 'octane';
 import type { Query, Schema, Zero, ZeroOptions } from '@rocicorp/zero';
 
 type Props = {
@@ -127,6 +128,36 @@ export function SequentialSuspenseQueryBinding(props: {
 			<output id="sequential-suspense-query-pending">pending</output>
 		} @catch (error) {
 			<output id="sequential-suspense-query-error">{String(error)}</output>
+		}
+	</ZeroProvider>
+}
+
+function CancellableSuspenseQueryValues(props: {
+	enabled: boolean;
+	query: Query<string, Schema, readonly Row[]> | false;
+}) @{
+	const [rows, details] = useSuspenseQuery(props.query, {
+		enabled: props.enabled,
+		suspendUntil: 'complete',
+	});
+	<output id="cancellable-suspense-query-values">
+		{String(rows?.length) + '/' + details.type}
+	</output>
+}
+
+export function CancellableSuspenseQueryBinding(props: QueryProps) @{
+	const [enabled, setEnabled] = useState(true);
+	const [query, setQuery] = useState<Query<string, Schema, readonly Row[]> | false>(props.query);
+
+	<ZeroProvider zero={props.zero}>
+		<button id="disable-suspense-query" onClick={() => setEnabled(false)}>disable</button>
+		<button id="clear-suspense-query" onClick={() => setQuery(false)}>clear</button>
+		@try {
+			<CancellableSuspenseQueryValues enabled={enabled} query={query} />
+		} @pending {
+			<output id="cancellable-suspense-query-pending">pending</output>
+		} @catch (error) {
+			<output id="cancellable-suspense-query-error">{String(error)}</output>
 		}
 	</ZeroProvider>
 }
