@@ -14,6 +14,7 @@ import deferredHydrationMd from '../../../docs/deferred-hydration.md?raw';
 export interface McpDocSection {
 	id: string;
 	title: string;
+	searchTerms?: readonly string[];
 }
 
 export interface McpDoc {

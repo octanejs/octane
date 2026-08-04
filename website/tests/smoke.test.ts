@@ -346,6 +346,36 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose pre.shiki code')).toBeTruthy();
 	});
 
+	it('/docs/quick-start keeps inline callout prose and links inline', async () => {
+		const { container } = await renderRoute('/docs/quick-start');
+		const callout = Array.from(container.querySelectorAll<HTMLElement>('.doc-callout')).find(
+			(candidate) =>
+				candidate.querySelector('.doc-callout-title')?.textContent ===
+				'Make .tsrx feel native in VS Code',
+		);
+
+		expect(callout).toBeTruthy();
+		expect(callout!.querySelector('p p')).toBeNull();
+		expect(callout!.querySelector('a p')).toBeNull();
+		expect(callout!.querySelector('a')?.textContent).toBe('TSRX for VS Code');
+	});
+
+	it('/docs/tsrx-vs-tsx keeps the editor-support link inline', async () => {
+		const { container } = await renderRoute('/docs/tsrx-vs-tsx');
+		const heading = container.querySelector('h2#editor-support')!;
+		let element = heading.nextElementSibling;
+		let link: HTMLAnchorElement | null = null;
+
+		while (element && element.tagName !== 'H2') {
+			if (element instanceof HTMLAnchorElement) link = element;
+			else link ??= element.querySelector('a');
+			element = element.nextElementSibling;
+		}
+
+		expect(link?.textContent).toBe('TSRX for VS Code');
+		expect(link?.querySelector('p')).toBeNull();
+	});
+
 	it('/docs/publishing-libraries renders the package-manager dry-run selector', async () => {
 		const { container } = await renderRoute('/docs/publishing-libraries');
 		const firstSection = container.querySelector<HTMLElement>('h2#source-package-contract')!;

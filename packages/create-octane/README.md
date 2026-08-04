@@ -91,8 +91,9 @@ to install by hand is printed instead.
 
 ## Editor support
 
-An Octane project builds, typechecks, and runs from the scaffold alone. Making
-an editor understand `.tsrx` is separate: the extension is not published yet, so
-until it is, a `.tsrx` import may show as unresolved even though `npm run
-typecheck` passes. `tsrx-tsc` carries its own TypeScript and is the reliable
-answer on whether the project is type-correct.
+An Octane project builds, typechecks, and runs from the scaffold alone. Install
+[TSRX for VS Code](https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin)
+for syntax highlighting, diagnostics, navigation, completions, and TypeScript-aware
+editor support in `.tsrx` files. Pair it with the official Prettier extension for
+format on save. The scaffold's `tsrx-tsc` typecheck remains the command-line and
+CI check.

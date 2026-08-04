@@ -38,4 +38,10 @@ describe('docs search over the snapshot', () => {
 	it('finds bindings via package-name search terms', () => {
 		expect(slugsFor('zustand')).toContain('bindings');
 	});
+
+	it('finds section-specific aliases at their exact documentation anchor', () => {
+		const [top] = search('vscode');
+		expect(top.slug).toBe('quick-start');
+		expect(top.id).toBe('tsrx-at-a-glance');
+	});
 });

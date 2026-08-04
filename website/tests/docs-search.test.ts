@@ -5,7 +5,23 @@ import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
-import { loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
+import { headingsFor, loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
+
+const rawDocs = import.meta.glob('../src/content/docs/*.mdx', {
+	query: '?raw',
+	import: 'default',
+	eager: true,
+}) as Record<string, string>;
+
+function rawDoc(slug: string): string {
+	const entry = Object.entries(rawDocs).find(([path]) => path.endsWith(`/${slug}.mdx`));
+	if (!entry) throw new Error(`missing raw doc for ${slug}`);
+	return entry[1];
+}
+
+function frontmatterTitle(source: string): string | undefined {
+	return source.match(/^---\s*$([\s\S]*?)^---\s*$/m)?.[1].match(/^title:\s*(.+)$/m)?.[1];
+}
 
 afterEach(cleanup);
 
@@ -20,6 +36,29 @@ async function renderRoute(url: string) {
 }
 
 describe('docs search index', () => {
+	it('keeps page and section metadata aligned with the authored headings', () => {
+		for (const doc of docs) {
+			const source = rawDoc(doc.slug);
+			const headings = headingsFor(source);
+
+			expect(frontmatterTitle(source), `${doc.slug} page title`).toBe(doc.title);
+			for (const section of doc.sections ?? []) {
+				const heading = headings.find((candidate) => candidate.id === section.id);
+				expect(heading, `${doc.slug}#${section.id}`).toEqual({
+					id: section.id,
+					title: section.title,
+					level: section.level ?? 2,
+				});
+			}
+
+			// Every top-level authored section belongs in the registry, in page order.
+			expect(
+				(doc.sections ?? []).filter((section) => (section.level ?? 2) === 2).map(({ id }) => id),
+				`${doc.slug} top-level sections`,
+			).toEqual(headings.filter(({ level }) => level === 2).map(({ id }) => id));
+		}
+	});
+
 	it('indexes every document, and every section anchor the registry advertises', async () => {
 		const index = await loadSearchIndex();
 
@@ -124,6 +163,20 @@ describe('docs search ranking', () => {
 
 		expect(top.slug).toBe('framework-integrations');
 		expect(top.id).toBe('astro');
+	});
+
+	it('deep links compact and spaced VS Code searches to the TSRX editor guidance', async () => {
+		const index = await loadSearchIndex();
+		const expected = [
+			{ query: 'vscode', slug: 'quick-start', id: 'tsrx-at-a-glance' },
+			{ query: 'vs code', slug: 'tsrx-vs-tsx', id: 'editor-support' },
+		];
+
+		for (const { query, slug, id } of expected) {
+			const [top] = searchDocs(index, query);
+			expect(top.slug, query).toBe(slug);
+			expect(top.id, query).toBe(id);
+		}
 	});
 
 	it('requires every term to match, and ignores queries shorter than two characters', async () => {
