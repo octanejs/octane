@@ -18,9 +18,11 @@ export function Spin() @{
 					{'Three.js, '}
 					<span class="spin-accent">on Octane.</span>
 				</h2>
-				<p
-					class="spin-lead"
-				>{'Octane supports Three.js through @octanejs/three – a technical-preview port of React Three Fiber.'}</p>
+				<p class="spin-lead">
+					{'This flame is a live Three.js scene rendered by @octanejs/three, a ' +
+						'technical-preview port of React Three Fiber. It loads only when you scroll ' +
+						'near it. Drag it to give it a spin.'}
+				</p>
 				<Link to="/docs/$slug" params={{ slug: 'bindings' }} class="spin-link">
 					Browse all the bindings →
 				</Link>

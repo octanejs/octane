@@ -57,8 +57,10 @@ describe('docs search index', () => {
 		const snippets = result.lines.map((line) => line.parts.map((part) => part.text).join(''));
 
 		expect(result.slug).toBe('quick-start');
+		// Spans a sentence boundary on purpose: the prose has to come through
+		// whole, not cut at the first full stop inside the expression.
 		expect(snippets.join(' ')).toContain(
-			'requires Node.js 22 or newer. Octane is currently alpha software',
+			'You need Node.js 22 or newer. Octane is currently alpha software',
 		);
 		expect(snippets.join(' ')).not.toMatch(/[{}]/);
 	});
@@ -114,6 +116,14 @@ describe('docs search ranking', () => {
 		expect(top.slug).toBe('bindings');
 		expect(top.id).toBe('find-a-binding');
 		expect(snippets.join(' ')).toContain('@octanejs/dexie');
+	});
+
+	it('finds Astro in the framework integrations guide', async () => {
+		const index = await loadSearchIndex();
+		const [top] = searchDocs(index, '@octanejs/astro');
+
+		expect(top.slug).toBe('framework-integrations');
+		expect(top.id).toBe('astro');
 	});
 
 	it('requires every term to match, and ignores queries shorter than two characters', async () => {

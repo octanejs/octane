@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "table",
+  "type": "registry:ui",
+  "title": "Table",
+  "files": [
+    {
+      "path": "ui/table.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/table.tsrx",
+      "content": "// OCTANE ADAPTATION: RAC's collection props are generic over the item type, and\n// its JSX signatures fix that parameter at `object`. The wrappers therefore\n// carry the same `T extends object` constraint upstream's collection types\n// assume, so a caller's item type flows through instead of widening.\nimport {\n\tCell as CellPrimitive,\n\tColumn as ColumnPrimitive,\n\tRow as RowPrimitive,\n\tTableBody as TableBodyPrimitive,\n\tTableFooter as TableFooterPrimitive,\n\tTableHeader as TableHeaderPrimitive,\n\tTable as TablePrimitive,\n\ttype CellProps,\n\ttype ColumnProps,\n\ttype RowProps,\n\ttype TableBodyProps,\n\ttype TableFooterProps,\n\ttype TableHeaderProps,\n\ttype TableProps,\n} from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport function Table({ className, ...props }: TableProps) {\n\treturn <div data-slot=\"table-container\" className=\"relative w-full overflow-x-auto\">\n\t\t<TablePrimitive\n\t\t\tdata-slot=\"table\"\n\t\t\tclassName={cn('w-full caption-bottom text-sm', className)}\n\t\t\t{...props}\n\t\t/>\n\t</div>;\n}\n\nexport function TableHeader<T extends object>({ className, ...props }: TableHeaderProps<T>) {\n\treturn <TableHeaderPrimitive\n\t\tdata-slot=\"table-header\"\n\t\tclassName={cn('[&_tr]:border-b', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function TableBody<T extends object>({ className, ...props }: TableBodyProps<T>) {\n\treturn <TableBodyPrimitive\n\t\tdata-slot=\"table-body\"\n\t\tclassName={cn('data-empty:h-24 data-empty:text-center [&_tr:last-child]:border-0', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function TableFooter<T extends object>({ className, ...props }: TableFooterProps<T>) {\n\treturn <TableFooterPrimitive\n\t\tdata-slot=\"table-footer\"\n\t\tclassName={cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function TableRow<T extends object>({ className, ...props }: RowProps<T>) {\n\treturn <RowPrimitive\n\t\tdata-slot=\"table-row\"\n\t\tclassName={cn(\n\t\t\t'border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted data-selected:bg-muted',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function TableHead({ className, ...props }: ColumnProps) {\n\treturn <ColumnPrimitive\n\t\tdata-slot=\"table-head\"\n\t\tclassName={cn(\n\t\t\t'h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([data-slot=checkbox])]:pr-0 [&:has([role=checkbox])]:pr-0',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function TableCell({ className, ...props }: CellProps) {\n\treturn <CellPrimitive\n\t\tdata-slot=\"table-cell\"\n\t\tclassName={cn(\n\t\t\t'p-2 align-middle whitespace-nowrap [&:has([data-slot=checkbox])]:pr-0 [&:has([role=checkbox])]:pr-0',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function TableCaption({ className, ...props }: HostProps<'figcaption'>) {\n\treturn <figcaption\n\t\tdata-slot=\"table-caption\"\n\t\tclassName={cn('mt-4 text-center text-sm text-muted-foreground', className)}\n\t\t{...props}\n\t/>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

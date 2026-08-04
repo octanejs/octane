@@ -100,6 +100,10 @@ The short version:
 
 - Pin an immutable upstream release and record it in `packages/<name>/UPSTREAM.md`
   (package, version, tag commit, advertised range, oracle versions).
+- Inspect both the published package and the canonical repository at that tag.
+  Do not assume the registry tarball contains the release's source, tests,
+  fixtures, snapshots, or runner configuration; fetch missing evidence from the
+  tagged repository and record which artifact supplied it.
 - Vendor that release's React-facing source under `packages/<name>/upstream/`,
   byte-exact and unpublished, and lay `src/` out to mirror it so each Octane
   module sits where the upstream module it replaces does.
@@ -135,6 +139,30 @@ own implementation will not think to check.
   Octane's behavior with an `// OCTANE DIVERGENCE:` rationale. Skipped and todo
   markers are not a tracking mechanism here: `pnpm test:markers:check` rejects
   them, so an unported case lives in the crosswalk instead.
+- Add negative controls for the parity harness itself: removing, renaming,
+  skipping, or failing to execute a recorded case, and changing pinned evidence,
+  must make validation fail. The tests need tests too; otherwise a green harness
+  can be a stale evidence collector.
+
+### Configure parity execution
+
+Follow [the React parity test-execution contract](./docs/react-parity-testing.md)
+when a binding adds executable parity lanes. Keep the complete local project in
+`vitest.config.js`, then declare which work belongs to the generic parity runner:
+
+```js
+testExecution: {
+	group: 'react-parity',
+	include: ['packages/example/tests/upstream/**/*.test.ts'],
+}
+```
+
+Omit `testExecution.include` when the runner owns the complete project. When it
+is present, it contains parity-owned patterns only;
+`vitest.ci-sharded.config.js` derives the complement for ordinary shards. Do not
+put package paths in `ci.yml`, create package-specific parity jobs, or encode
+shard/Node/job details in the base project metadata. Package manifests under
+`packages/*/audit/react-parity.json` are discovered automatically.
 
 Fill the remaining gaps (DOM output over event sequences, render counts, effect
 ordering, ref lifecycle, keyed reorder identity) with differential and
@@ -227,8 +255,10 @@ Octane is 0.x, so every changeset stays on the `patch` track. `major` and
 - The pull request body should say what changed, why, and what you ran to
   validate it. Call out anything you deliberately left unverified.
 - Every pull request carries exactly one type label: `feat`, `fix`, `docs`,
-  `test`, `perf`, `refactor`, `chore`, or `ci`, matching the title. `bug` and
-  `enhancement` belong to issues.
+  `test`, `perf`, `refactor`, `chore`, or `ci`. You do not apply it;
+  `.github/workflows/label-pr.yml` reads it off the title, so a
+  conventional-commit title is all it takes. `bug` and `enhancement` belong to
+  issues.
 
 CI intentionally runs nothing while a pull request is a draft and starts on the
 `ready_for_review` event. From there it runs the sharded test suite on Node 22 and
@@ -236,15 +266,55 @@ CI intentionally runs nothing while a pull request is a draft and starts on the
 integration lanes, the example browser journeys, and the website integration
 suite. Documentation-only changes take a lighter path.
 
+Green checks are necessary but not sufficient readiness evidence. Before a PR
+leaves draft, separately confirm that all actionable review threads are
+resolved on the current head, the head contains the live base branch, and GitHub
+reports the PR mergeable without conflicts or a branch-currency blocker. Repeat
+those checks after the final push; a review fix or a moving base can invalidate
+an earlier clean result. Agents leave drafts alone unless explicitly authorized
+to mark one ready, and that authorization never authorizes merging.
+
+Because Actions starts on `ready_for_review`, the initial authorized transition
+is the bootstrap that creates the required checks. It may happen only after the
+non-CI gates above and relevant local validation pass. Keep the PR ready while
+CI runs, but do not call it fully ready or merge-ready until every required
+check is terminal and successful.
+
 ## AI-assisted contributions
 
-Agent-written changes are welcome, with one rule: label the pull request
-`agent-authored` whenever an agent produced the diff, no matter which account
-pushes it. An agent commits under a human's credentials, so the author field
-cannot show it and the label is the only signal that separates the two.
-`.github/workflows/draft-agent-prs.yml` converts an `agent-authored` pull request
-back to draft if it was opened ready, and a maintainer marks it ready for review
+Agent-written changes are welcome, with one rule: tick the provenance box in the
+pull request template whenever an agent produced the diff, no matter which
+account pushes it.
+
+```md
+- [x] An agent produced this diff (`agent-authored`)
+```
+
+An agent commits under a human's credentials, so the author field cannot show
+this and the box is the only signal that separates the two. Leaving it clear or
+omitting the section is a positive claim that a human wrote the diff.
+
+`.github/workflows/label-pr.yml` reads the box and applies the `agent-authored`
+label for you. It runs with the repository's own token rather than yours, so this
+works identically from a fork and needs nothing from a maintainer. The same
+workflow converts the pull request back to draft if it was opened ready, because
+a label added by the repository token cannot trigger another workflow. The
+separate `draft-agent-prs.yml` workflow remains a fallback for labels applied by
+a maintainer or GitHub App. A maintainer marks the pull request ready for review
 once it has been looked at.
+
+Only a checked box means agent-authored. An empty box or missing section is
+treated as human-authored, removes a stale `agent-authored` label, and leaves the
+label check successful. Agents must therefore keep and tick the section;
+`gh pr create --fill` drops the template and would make an agent-produced diff
+look human-authored, so use `--body-file` instead.
+
+When an agent updates an existing pull request body, it must merge its changes
+into the current body rather than replace it from a template. Bot-managed
+regions are opaque and must be preserved byte-for-byte, including Cursor
+Bugbot's `<!-- CURSOR_SUMMARY -->` through `<!-- /CURSOR_SUMMARY -->` block.
+The agent refetches immediately before the edit and verifies the body afterward
+so a concurrent bot update is not silently lost.
 
 The repository ships its own agent context: `AGENTS.md` (and its per-tool
 siblings) plus task skills for branching, issues, bug hunting, core changes,

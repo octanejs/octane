@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "separator",
+  "type": "registry:ui",
+  "title": "Separator",
+  "files": [
+    {
+      "path": "ui/separator.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/separator.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/separator.tsx (the `\"use client\"` directive\n// is dropped — octane has no RSC axis).\nimport { Separator as SeparatorPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport interface SeparatorProps extends Record<string, unknown> {\n\tclassName?: string;\n\torientation?: 'horizontal' | 'vertical';\n\tdecorative?: boolean;\n}\n\nexport function Separator({\n\tclassName,\n\torientation = 'horizontal',\n\tdecorative = true,\n\t...props\n}: SeparatorProps) @{\n\t<SeparatorPrimitive.Root\n\t\tdata-slot=\"separator\"\n\t\tdecorative={decorative}\n\t\torientation={orientation}\n\t\tclassName={cn(\n\t\t\t'shrink-0 bg-border data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.22"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

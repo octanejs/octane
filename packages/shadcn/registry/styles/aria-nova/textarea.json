@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "textarea",
+  "type": "registry:ui",
+  "title": "Textarea",
+  "files": [
+    {
+      "path": "ui/textarea.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/textarea.tsrx",
+      "content": "// React Aria base textarea — structure from upstream `bases/aria/ui/textarea.tsx`\n// (RAC TextArea, className through composeRenderProps). Class strings are the\n// package's shipped utilities-inlined flavor, matching the Radix base.\n//\n// OCTANE DIVERGENCE: per-keystroke handling is the native `onInput` event, not\n// a synthetic `onChange`; native `change` keeps its commit-on-blur meaning.\nimport { composeRenderProps, TextArea as TextareaPrimitive } from '@octanejs/aria/components';\nimport type { TextAreaProps as TextareaPrimitiveProps } from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\n\nexport interface TextareaProps extends TextareaPrimitiveProps {}\n\nexport function Textarea({ className, ...props }: TextareaProps) @{\n\t<TextareaPrimitive\n\t\tdata-slot=\"textarea\"\n\t\tclassName={composeRenderProps(\n\t\t\tclassName,\n\t\t\t(resolved: string | undefined) => cn(\n\t\t\t\t'flex field-sizing-content min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',\n\t\t\t\tresolved,\n\t\t\t),\n\t\t)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

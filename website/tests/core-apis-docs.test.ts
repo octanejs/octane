@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
+import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs } from '../src/content/docs.ts';
 
 afterEach(cleanup);
@@ -49,6 +50,10 @@ describe('Core APIs documentation', () => {
 			const tag = section.level === 3 ? 'h3' : 'h2';
 			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
+		// This guide is excluded from the generic smoke sweep, so it carries the
+		// heading→registry direction itself: an `<h2>` no entry names is missing
+		// from this table of contents and from what the MCP server serves.
+		expectRegisteredHeadings(container, coreDoc);
 
 		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(7);
 		expect(container.querySelectorAll('[data-demo]')).toHaveLength(9);

@@ -221,7 +221,7 @@ describe('useWatch', () => {
 		expect(submitData).toEqual({});
 	});
 
-	// OCTANE DIVERGENCE: upstream fires an input event whose value equals the current value
+	// OCTANE DIVERGENCE[hook-form-native-noop-input][runtime:4ca89a396197cd2e]: upstream fires an input event whose value equals the current value
 	// ('test' → 'test'). React's synthetic-event value tracker swallows that no-op
 	// event entirely (RHF's onChange never runs → 6 renders); octane events are
 	// native, so the `input` event is delivered, RHF notifies its values
@@ -522,7 +522,7 @@ describe('useWatch', () => {
 	});
 
 	describe('update', () => {
-		// OCTANE DIVERGENCE: after handleSubmit, RHF emits two state notifications in SEPARATE
+		// OCTANE DIVERGENCE[hook-form-microtask-batching][runtime:41cfb7f1f622474d]: after handleSubmit, RHF emits two state notifications in SEPARATE
 		// microtasks ({ errors: {} } before `await onValid`, then the final
 		// submitted state). React 18+ coalesces both into ONE committed render
 		// (render work is scheduled on a macrotask after the microtask queue
@@ -595,7 +595,7 @@ describe('useWatch', () => {
 			expect(childCount).toBe(1);
 		});
 
-		// OCTANE DIVERGENCE: same microtask-flush behavior as 'should partial re-render' above —
+		// OCTANE DIVERGENCE[hook-form-microtask-batching][runtime:afb225847a57b345]: same microtask-flush behavior as 'should partial re-render' above —
 		// handleSubmit's two microtask-spaced notifications commit as 2 parent
 		// renders under octane where React coalesces them into 1.
 		it('should partial re-render with array name and exact option', async () => {
@@ -1942,7 +1942,7 @@ describe('useWatch', () => {
 	});
 
 	describe('compute ', () => {
-		// OCTANE DIVERGENCE: on the first input ('' → '12') compute yields `false`, equal to the
+		// OCTANE DIVERGENCE[hook-form-eager-equal-bailout][runtime:c01c86279535b2d5]: on the first input ('' → '12') compute yields `false`, equal to the
 		// current useWatch state — React still re-enters the render phase once more
 		// before bailing out on an Object.is-equal setState (fiber double-buffering
 		// probe render), so upstream counts that phantom render (renderCount 4).

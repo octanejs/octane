@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "tooltip",
+  "type": "registry:ui",
+  "title": "Tooltip",
+  "files": [
+    {
+      "path": "ui/tooltip.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/tooltip.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/tooltip.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis).\n//\n// TooltipContent renders Portal > Content + Arrow: the Portal's child must be\n// a real element DESCRIPTOR (radix portals cannot enumerate opaque compiled\n// .tsrx children), so the pair is composed with createElement. The consumer's\n// children flow into the Content primitive through the ordinary props.children\n// channel.\nimport { createElement, type OctaneNode } from 'octane';\nimport { Tooltip as TooltipPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport interface TooltipProviderProps extends Record<string, unknown> {\n\tdelayDuration?: number;\n}\n\nexport function TooltipProvider({ delayDuration = 0, ...props }: TooltipProviderProps) @{\n\t<TooltipPrimitive.Provider\n\t\tdata-slot=\"tooltip-provider\"\n\t\tdelayDuration={delayDuration}\n\t\t{...props}\n\t/>\n}\n\nexport function Tooltip(props: Record<string, unknown>) @{\n\t<TooltipPrimitive.Root data-slot=\"tooltip\" {...props} />\n}\n\nexport function TooltipTrigger(props: Record<string, unknown>) @{\n\t<TooltipPrimitive.Trigger data-slot=\"tooltip-trigger\" {...props} />\n}\n\nexport interface TooltipContentProps extends Record<string, unknown> {\n\tclassName?: string;\n\tsideOffset?: number;\n\tchildren?: OctaneNode;\n}\n\nexport function TooltipContent({\n\tclassName,\n\tsideOffset = 0,\n\tchildren,\n\t...props\n}: TooltipContentProps) {\n\treturn createElement(TooltipPrimitive.Portal, {\n\t\tchildren: createElement(TooltipPrimitive.Content, {\n\t\t\t'data-slot': 'tooltip-content',\n\t\t\tsideOffset,\n\t\t\tclassName: cn(\n\t\t\t\t'z-50 inline-flex w-fit max-w-xs origin-(--radix-tooltip-content-transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',\n\t\t\t\tclassName,\n\t\t\t),\n\t\t\t...props,\n\t\t\tchildren: [\n\t\t\t\tchildren,\n\t\t\t\tcreateElement(TooltipPrimitive.Arrow, {\n\t\t\t\t\tkey: 'arrow',\n\t\t\t\t\tclassName: 'z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground',\n\t\t\t\t}),\n\t\t\t],\n\t\t}),\n\t});\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.22"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

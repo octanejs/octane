@@ -10,6 +10,9 @@ coverage
 .vite
 *.log
 
+# Project-local scoped-typecheck configs can remain after an interrupted run.
+**/.typecheck-files-*/
+
 # Example-app browser and TSRX tooling outputs
 **/test-results/
 **/playwright-report/

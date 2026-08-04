@@ -15,50 +15,48 @@ import { LIBRARY_ICONS } from './library-icons.ts';
 export function Why() @{
 	<section class="why" aria-labelledby="why-heading">
 		<h2 id="why-heading" class="why-title">
-			{'Fast should be how your app feels. '}
-			<span class="why-accent">Not a new way you have to think.</span>
+			{'Your app should feel fast. '}
+			<span class="why-accent">Your code should still feel familiar.</span>
 		</h2>
 
 		<div class="why-body">
 			<div class="why-main">
 				<div class="why-grid">
 					<div class="why-row">
-						<h3 class="why-question">Why would I move my app to Octane?</h3>
+						<h3 class="why-question">What does moving a React app to Octane look like?</h3>
 						<div class="why-answers">
 							<p class="why-answer">
-								{'Octane components are the components you already write. They are plain ' +
-									'functions with hooks, props, and context. If you know React, you know ' +
-									'Octane. Your instincts about where state lives and how data flows carry ' +
-									'over on day one.'}
+								{'An Octane component is still a plain function with props, hooks and context. ' +
+									'State lives where you expect it to, and data still flows from parent to ' +
+									'child. If you know React, most of Octane will already make sense.'}
 							</p>
 							<p class="why-answer">
-								{'You don’t have to rewrite your app to adopt it. Keep your existing TSX, ' +
-									'move components to TSRX one at a time, and ship the whole way. Components ' +
-									'keep their shape along the way, so AI agents can migrate an app too, ' +
-									'without redesigning it around a new reactive model.'}
+								{'Keep your existing TSX and convert components to TSRX as you go. The ' +
+									'component model stays the same, so the migration does not require a ' +
+									'redesign. The work is easy to review, whether you do it by hand or with a ' +
+									'coding agent.'}
 							</p>
 						</div>
 					</div>
 
 					<div class="why-row">
-						<h3 class="why-question">Why isn't Octane built on signals?</h3>
+						<h3 class="why-question">Why not build Octane on signals?</h3>
 						<div class="why-answers">
 							<p class="why-answer">
-								{'Signals are a good tool, and you can still use them in an Octane app when ' +
-									'they fit. But a framework built on signals makes every app represent and ' +
-									'read state the signals way. Octane keeps components as plain functions ' +
-									'that read from top to bottom. The compiler does the extra work, so your ' +
-									'code doesn’t have to.'}
+								{'Signals are useful, and you can use them in an Octane app when they fit. ' +
+									'Octane does not make them the foundation because that would change how ' +
+									'every component reads state. Components stay as plain functions that run ' +
+									'from top to bottom. The compiler handles the bookkeeping.'}
 							</p>
 						</div>
 					</div>
 				</div>
 
 				<blockquote class="why-coda">
-					<strong>The trade holds up.</strong>
-					{' Signals still win the workloads built for them. Across the checked-in ' +
-						'suites below, Octane keeps pace without asking you to rewire how you ' +
-						'think. '}
+					<strong>The benchmarks show the trade-off.</strong>
+					{' Signal-based frameworks lead in workloads designed around signals. Across ' +
+						'the suites below, Octane stays competitive without changing the way you ' +
+						'structure components. '}
 					<Link to="/docs/$slug" params={{ slug: 'tsrx-vs-tsx' }}>
 						See what TSRX adds →
 					</Link>

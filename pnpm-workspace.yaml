@@ -54,8 +54,12 @@ packages:
   - website-mcp
 
 allowBuilds:
+  # The pinned react-hook-form suite uses its upstream SWC/Jest transform.
+  '@swc/core': true
   esbuild: true
   playwright: true
+  # Jest's resolver ships a native binary selected by its install script.
+  unrs-resolver: true
   # Miniflare's local Cloudflare runtime binary; required by the adapter's
   # committed workerd integration test, with no project code generation.
   workerd: true
@@ -70,7 +74,6 @@ allowBuilds:
   # Docusaurus pulls core-js transitively. Its postinstall only prints funding
   # information and is not required for the shipped polyfill modules.
   core-js: false
-
 # Variables
 esrap_common: &esrap_common ^2.3.0
 
@@ -207,6 +210,7 @@ catalogs:
     '@wagmi/core': 3.6.4
     '@tauri-apps/api': 2.11.1
     '@tauri-apps/cli': 2.11.4
+    electron: 43.2.0
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.10
@@ -377,6 +381,7 @@ catalogs:
     typescript: ^5.9.3
     valtio: ^2.3.2
     vite: ^8.1.5
+    astro: ^5.16.0
     vite-plugin-solid: '3.0.0-next.5'
     # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with
     # vapor; pinned to a 3.6 prerelease like solid-js's 2.0 beta. The fixtures
@@ -417,7 +422,7 @@ minimumReleaseAgeExclude:
   - 'shadcn@4.14.1'
   - 'tailwindcss@4.3.3'
   - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.18 || 0.1.19 || 0.1.21
+  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

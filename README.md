@@ -100,6 +100,27 @@ they are written down in
 
 Octane's published packages need Node.js 22 or newer.
 
+Scaffold a project that already runs:
+
+```bash
+npm create octane my-app
+cd my-app
+npm run dev
+```
+
+`--template spa` is a client-only app and `--template fullstack` adds routing,
+streaming SSR, hydration, and a production build; leave the flag off and it
+asks.
+
+In a project you already have, let the CLI wire it up instead, including the
+TypeScript settings `.tsrx` needs:
+
+```bash
+pnpm dlx @octanejs/cli init
+```
+
+Or do it by hand:
+
 ```bash
 pnpm add octane @octanejs/vite-plugin
 ```
@@ -121,12 +142,6 @@ import { App } from './App.tsrx';
 
 const root = createRoot(document.getElementById('root')!);
 root.render(App, { title: 'Hello world!' });
-```
-
-Or let the CLI wire it up, including the TypeScript settings `.tsrx` needs:
-
-```bash
-pnpm dlx @octanejs/cli init
 ```
 
 Rspack and Rsbuild are supported too. [Getting started](./docs/getting-started.md)
@@ -159,8 +174,13 @@ Octane itself. Good places to start:
   each dialect and what TSRX unlocks.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): the
   deliberate divergences, and why everything else matching React is the point.
+- [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): package
+  all importable authored code so applications compile libraries against their
+  own Octane runtime.
 - [Bindings](https://octanejs.dev/docs/bindings): the `@octanejs/*` ports of the
   React ecosystem.
+- [Framework integrations](https://octanejs.dev/docs/framework-integrations):
+  use Octane with Astro, Docusaurus, or TanStack Start.
 
 In this repository:
 
@@ -193,9 +213,12 @@ generated inventory; the shape of it is:
   [`adapter-cloudflare`](./packages/adapter-cloudflare) deploy the output;
   [`@octanejs/tanstack-start`](./packages/tanstack-start) is the TanStack Start
   integration.
-- Tooling: [`@octanejs/cli`](./packages/cli) (`init`, `doctor`, `add`, `explain`,
-  `mcp add`) and [`@octanejs/mcp-server`](./packages/octane-mcp-server), which
-  exposes Octane docs and compile tooling to AI agents over MCP.
+- Tooling: [`@octanejs/cli`](./packages/cli) (`create`, `init`, `doctor`,
+  `analyze`, `add`, `explain`, `mcp add`),
+  [`create-octane`](./packages/create-octane), the `npm create octane` entry
+  point onto `octane create`, and
+  [`@octanejs/mcp-server`](./packages/octane-mcp-server), which exposes Octane
+  docs and compile tooling to AI agents over MCP.
 - The `@octanejs/*` bindings, each an Octane port of a React library: state
   (zustand, jotai, valtio, mobx, redux, redux-toolkit, tanstack-store), data and
   routing (tanstack-query, apollo-client, tanstack-router, remix-router), UI

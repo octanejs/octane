@@ -123,6 +123,13 @@ export function DocPage() @{
 				border-top: 1px solid var(--border);
 				scroll-margin-top: 5.5rem;
 			}
+			/* The hero already ends with a divider. When a document opens directly
+			   with a section heading, do not draw the normal section divider again. */
+			.prose :global(.doc-hero + h2) {
+				margin-top: 0;
+				padding-top: 0;
+				border-top: none;
+			}
 			.prose :global(h3) {
 				font-size: 1.2rem;
 				letter-spacing: -0.01em;

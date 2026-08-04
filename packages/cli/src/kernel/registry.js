@@ -10,6 +10,11 @@
  */
 export const COMMANDS = [
 	{
+		name: 'create',
+		summary: 'Create an Octane app in a new directory.',
+		load: () => import('../commands/create.js'),
+	},
+	{
 		name: 'init',
 		summary: 'Wire Octane into the project in this directory.',
 		load: () => import('../commands/init/index.js'),

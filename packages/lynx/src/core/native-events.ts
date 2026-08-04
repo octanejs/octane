@@ -162,7 +162,7 @@ export interface LynxNativeEventPayloadRecord {
 }
 
 export interface LynxNativeEventTargetSnapshot extends LynxNativeEventPayloadRecord {
-	readonly id: string;
+	readonly id: string | null;
 	readonly uid: number;
 	readonly dataset: LynxNativeEventPayloadRecord;
 }
@@ -252,10 +252,19 @@ function snapshotEventTarget(
 	seen.add(value);
 	try {
 		const target = value as Record<string, unknown>;
-		const id = target.id;
+		// An element with no author-assigned id reaches the boundary as `id: null`
+		// (this is how @lynx-js/web-core reports it) or `id: undefined` (a plain host
+		// object that never set the field). Both mean "no id": normalize to null and
+		// preserve it. The PAPI models the field as `string | null`
+		// (`__SetID(node, id: string | null)`), so carrying null keeps "no id"
+		// distinct from an author-assigned empty-string id.
+		const rawId = target.id;
+		const id = rawId === undefined ? null : rawId;
 		const uid = target.uid === undefined ? target.$$uiSign : target.uid;
 		const rawDataset = target.dataset;
-		if (typeof id !== 'string') throw payloadError(`${path}.id`, 'must be a string.');
+		if (id !== null && typeof id !== 'string') {
+			throw payloadError(`${path}.id`, 'must be a string or null.');
+		}
 		if (typeof uid !== 'number' || !Number.isFinite(uid) || uid <= 0) {
 			throw payloadError(`${path}.uid`, 'must be a positive finite number.');
 		}

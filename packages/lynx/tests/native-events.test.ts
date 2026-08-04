@@ -225,6 +225,26 @@ describe('Lynx native event boundary', () => {
 		expect(Object.getPrototypeOf(snapshot.currentTarget as object)).toBeNull();
 	});
 
+	it('snapshots an element with no author id to a null target id, from either host convention', () => {
+		// @lynx-js/web-core delivers `id: null` for an element with no id attribute;
+		// a plain host object simply omits the field (`id: undefined`). Both mean
+		// "no id" and must snapshot to null, not throw and not coerce to '' — the
+		// null keeps "no author id" distinct from an author-assigned empty id.
+		const fromWebCore = snapshotLynxNativeEventPayload({
+			type: 'tap',
+			target: { id: null, uid: 7, dataset: { role: 'row' } },
+			currentTarget: { id: null, $$uiSign: 8, dataset: {} },
+		});
+		expect(fromWebCore.target).toEqual({ id: null, uid: 7, dataset: { role: 'row' } });
+		expect(fromWebCore.currentTarget).toEqual({ id: null, uid: 8, dataset: {} });
+
+		const fromOmittedField = snapshotLynxNativeEventPayload({
+			type: 'tap',
+			target: { uid: 9, dataset: { role: 'cell' } },
+		});
+		expect(fromOmittedField.target).toEqual({ id: null, uid: 9, dataset: { role: 'cell' } });
+	});
+
 	it('strips non-data array entries without shifting native payload indexes', () => {
 		expect(
 			snapshotLynxNativeEventPayload({

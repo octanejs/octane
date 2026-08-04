@@ -819,7 +819,75 @@ function staticMemberInfo(node) {
 	return {
 		node: dependencyNode,
 		root,
+		name: current.property.name,
 		path: `${current.optional ? '?' : ''}.${current.property.name}`,
+	};
+}
+
+// Directive prologues that declare "this body executes in another context, not
+// during render" — a nested function carrying one contributes only its ROOT
+// captures to an inferred dependency array, because hoisting its member reads
+// to render time would run getters in a context where they may be illegal
+// (issue #542: TypeGPU's `.$` is only readable inside `'use gpu'` shader code)
+// and at a moment the program never performs them.
+//
+// This is a deliberate ALLOWLIST, not "any directive": directives that mark
+// same-context compiler hints (`'use strict'`, React Compiler's `'use memo'` /
+// `'use no memo'`, `'use signals'`) or reserved module/function markers with
+// their own semantics (`'use server'`, `'use client'`, `'use cache'`,
+// `'use workflow'`/`'use step'`) must NOT truncate. Extend the set as more
+// other-context directives appear in the ecosystem.
+//
+//   'use gpu'  — TypeGPU shader functions (transpiled, run on the GPU).
+//   'worklet'  — react-native-reanimated / react-native-worklets-core bodies,
+//                serialized and executed on a separate UI-thread runtime.
+const OPAQUE_EXECUTION_DIRECTIVES = new Set(['use gpu', 'worklet']);
+
+// A directive prologue is the run of leading string-literal expression
+// statements. Parsers implementing ESTree stamp `directive` on those
+// statements; fall back to the literal value where they don't.
+function hasOpaqueExecutionDirective(fn) {
+	if (fn.body?.type !== 'BlockStatement') return false;
+	for (const statement of fn.body.body || []) {
+		if (statement.type !== 'ExpressionStatement') return false;
+		const expression = unwrapValue(statement.expression);
+		const value =
+			statement.directive ??
+			(expression?.type === 'Literal' && typeof expression.value === 'string'
+				? expression.value
+				: null);
+		if (value === null) return false;
+		if (OPAQUE_EXECUTION_DIRECTIVES.has(value)) return true;
+	}
+	return false;
+}
+
+// The `octane` runtime export inferred method-call dependencies compile to.
+// Both emitters alias it: the full compiler through `ctx.runtimeNeeded` (its
+// `_$`-prefixed rtAlias convention is baked into methodDepNode below) and the
+// surgical pass through its own helper-import allocator.
+export const METHOD_DEP_IMPORT = '__methodDep';
+
+// The emitted dependency expression for a one-level method call:
+// `_$__methodDep(root, 'name')` — own property ? member value : receiver (see
+// the runtime helper's contract in src/method-dep.ts). The call node carries
+// the authored member's source range so source maps and the surgical pass's
+// offset expectations stay anchored to the authored expression, while the
+// cloned root identifier keeps its own authored position.
+function methodDepNode(dependency) {
+	// Every synthesized node is stamped with the authored member's origin — the
+	// bundler print path asserts a loc on each printed node, including the
+	// helper's callee identifier.
+	const call = b.call(
+		b.id(`_$${METHOD_DEP_IMPORT}`, dependency.node),
+		{ ...dependency.method.root },
+		b.literal(dependency.method.name, JSON.stringify(dependency.method.name), dependency.node),
+	);
+	return {
+		...call,
+		start: dependency.node.start,
+		end: dependency.node.end,
+		loc: dependency.node.loc,
 	};
 }
 
@@ -863,6 +931,48 @@ function collectDependencies(expression, callbackScope, analysis) {
 		}
 	}
 
+	// A one-level member CALLED as a method. The member value alone cannot
+	// witness a changed receiver when the method is inherited (issue #542:
+	// `count.toFixed` is `Number.prototype.toFixed` on every render), and the
+	// receiver alone would defeat memoization for own function properties on
+	// per-render containers (`props.onChange(...)`). Record the pair and let the
+	// emitted `__methodDep(root, 'name')` helper pick the comparable value at
+	// runtime. Deeper callees (`a.b.c(...)`) never reach here: their receiver
+	// path is recorded by the ordinary member walk, which cannot capture the
+	// method itself, so they were never exposed to the stale-method hazard.
+	function addMethodCall(info) {
+		const scope = analysis.nodeScopes.get(info.root);
+		const binding = scope ? resolveBinding(scope, info.root.name) : null;
+		if (
+			binding === null ||
+			binding.imported ||
+			binding.dependencyInvariant ||
+			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
+		) {
+			return;
+		}
+		// Distinct from the plain-read key: `x.m` read as a value elsewhere in the
+		// callback still contributes its own member dependency.
+		const key = `b${binding.id}${info.path}()`;
+		if (!seen.has(key)) {
+			seen.add(key);
+			dependencies.push({
+				node: info.node,
+				key,
+				binding,
+				method: { root: info.root, name: info.name },
+			});
+		}
+	}
+
+	// Depth of enclosing functions whose directive prologue declares another
+	// execution context (see OPAQUE_EXECUTION_DIRECTIVES). Inside one, member
+	// chains truncate to their root bindings: the body's property reads happen
+	// in that other context, so hoisting them into a render-time dependency
+	// array would evaluate getters in a context where they may be illegal
+	// (TypeGPU's `.$`) and at a time the program never reads them.
+	let opaqueDepth = 0;
+
 	function walk(node) {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
@@ -878,13 +988,44 @@ function collectDependencies(expression, callbackScope, analysis) {
 			case 'Identifier':
 				addIdentifier(node);
 				return;
+			case 'CallExpression': {
+				if (opaqueDepth > 0) {
+					// Roots only: the callee's receiver chain collapses through the
+					// MemberExpression case below; no method-pair dependency either,
+					// since it would read the member at render.
+					walk(node.callee);
+					walk(node.arguments);
+					return;
+				}
+				// Optional spellings land here too: `a?.b(x)` and `a.b?.(x)` are a
+				// CallExpression under a ChainExpression whose callee is a bare
+				// (possibly optional) MemberExpression, which staticMemberInfo accepts.
+				const callee = unwrapValue(node.callee);
+				const info =
+					callee?.type === 'MemberExpression' || callee?.type === 'ChainExpression'
+						? staticMemberInfo(callee)
+						: null;
+				if (info) addMethodCall(info);
+				else walk(node.callee);
+				walk(node.arguments);
+				return;
+			}
 			case 'ChainExpression': {
+				if (opaqueDepth > 0) {
+					walk(node.expression);
+					return;
+				}
 				const info = staticMemberInfo(node);
 				if (info) addStaticMember(info);
 				else walk(node.expression);
 				return;
 			}
 			case 'MemberExpression': {
+				if (opaqueDepth > 0) {
+					walk(node.object);
+					if (node.computed) walk(node.property);
+					return;
+				}
 				const info = staticMemberInfo(node);
 				if (info) addStaticMember(info);
 				else {
@@ -913,10 +1054,14 @@ function collectDependencies(expression, callbackScope, analysis) {
 				return;
 			case 'FunctionDeclaration':
 			case 'FunctionExpression':
-			case 'ArrowFunctionExpression':
+			case 'ArrowFunctionExpression': {
+				const opaque = hasOpaqueExecutionDirective(node);
+				if (opaque) opaqueDepth++;
 				for (const param of node.params || []) walkPatternExpression(param);
 				walk(node.body);
+				if (opaque) opaqueDepth--;
 				return;
+			}
 			case 'ImportDeclaration':
 			case 'ExportAllDeclaration':
 			case 'MetaProperty':
@@ -1163,7 +1308,7 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
 					args.splice(result.depsIndex, 0, {
 						...b.array(
 							result.dependencies.map((/** @type {any} */ dependency) =>
-								cloneDependency(dependency.node),
+								dependency.method ? methodDepNode(dependency) : cloneDependency(dependency.node),
 							),
 						),
 						start: node.start,
@@ -1197,8 +1342,22 @@ export function annotateHookCalls(ast, options = {}) {
  * dependency arrays inserted at each candidate call. Copy-on-write — the input
  * AST is never modified; callers must use the returned module.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => void }} [options] */
 export function applyHookDependencies(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
+	// The inserted `_$__methodDep(...)` calls need their aliased runtime import;
+	// the caller owns import assembly, so report the requirement rather than
+	// splicing an ImportDeclaration into a module whose runtime request
+	// ('octane' vs 'octane/server') this pass cannot know.
+	if (options.onRuntimeHelper !== undefined) {
+		outer: for (const result of inferred.values()) {
+			for (const dependency of result.dependencies) {
+				if (dependency.method) {
+					options.onRuntimeHelper(METHOD_DEP_IMPORT);
+					break outer;
+				}
+			}
+		}
+	}
 	return rebuildWithHookMetadata(ast, analysis, inferred, true).ast;
 }
