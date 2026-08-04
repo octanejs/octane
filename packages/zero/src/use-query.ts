@@ -215,16 +215,19 @@ type SuspenseView = {
 };
 
 type SuspensePromiseCache = {
-	cancel: (() => void) | undefined;
 	view: SuspenseView | undefined;
 	suspendUntil: 'complete' | 'partial';
 	promise: SuspensePromise | undefined;
 };
 
+const settledSuspensePromise = Object.assign(Promise.resolve(), {
+	status: 'fulfilled' as const,
+}) as SuspensePromise;
+
 /**
  * Keep one dynamic use() position for each query hook call site.
  * The settled promise stays in the sequence so a later query cannot reuse it.
- * A local cancellation promise releases the position when its query stops suspending.
+ * A fulfilled sentinel reserves the position while the query does not suspend.
  */
 function useSuspensePromise(
 	view: SuspenseView | undefined,
@@ -233,7 +236,7 @@ function useSuspensePromise(
 	slot: symbol | undefined,
 ): void {
 	const cache = useRef<SuspensePromiseCache>(
-		{ cancel: undefined, view: undefined, suspendUntil, promise: undefined },
+		{ view: undefined, suspendUntil, promise: undefined },
 		slot,
 	).current;
 	const shouldSuspend =
@@ -242,27 +245,22 @@ function useSuspensePromise(
 		(suspendUntil === 'complete' ? !view.complete : !view.nonEmpty);
 	const sourceChanged = cache.view !== view || cache.suspendUntil !== suspendUntil;
 
-	if (cache.promise?.status === 'pending' && (!shouldSuspend || sourceChanged)) {
-		cache.cancel?.();
-	}
-
-	if (
+	if (!shouldSuspend) {
+		cache.view = view;
+		cache.suspendUntil = suspendUntil;
+		if (cache.promise?.status !== 'fulfilled') cache.promise = settledSuspensePromise;
+	} else if (
 		shouldSuspend &&
 		(cache.promise === undefined || sourceChanged || cache.promise.status !== 'pending')
 	) {
-		let cancel = () => {};
-		const cancellation = new Promise<void>((resolve) => {
-			cancel = resolve;
-		});
-		const source = suspendUntil === 'complete' ? view.waitForComplete() : view.waitForNonEmpty();
-
-		cache.cancel = cancel;
 		cache.view = view;
 		cache.suspendUntil = suspendUntil;
-		cache.promise = Promise.race([source, cancellation]) as SuspensePromise;
+		cache.promise = (
+			suspendUntil === 'complete' ? view.waitForComplete() : view.waitForNonEmpty()
+		) as SuspensePromise;
 	}
 
-	if (cache.promise !== undefined) use(cache.promise);
+	use(cache.promise ?? settledSuspensePromise);
 }
 
 const emptyArray: unknown[] = [];

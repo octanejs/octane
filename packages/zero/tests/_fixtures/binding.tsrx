@@ -152,6 +152,15 @@ export function CancellableSuspenseQueryBinding(props: QueryProps) @{
 	<ZeroProvider zero={props.zero}>
 		<button id="disable-suspense-query" onClick={() => setEnabled(false)}>disable</button>
 		<button id="clear-suspense-query" onClick={() => setQuery(false)}>clear</button>
+		<button
+			id="restart-suspense-query"
+			onClick={() => {
+				setEnabled(false);
+				queueMicrotask(() => setEnabled(true));
+			}}
+		>
+			restart
+		</button>
 		@try {
 			<CancellableSuspenseQueryValues enabled={enabled} query={query} />
 		} @pending {

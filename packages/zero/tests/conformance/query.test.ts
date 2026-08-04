@@ -201,4 +201,44 @@ describe('useQuery', () => {
 			result.unmount();
 		},
 	);
+
+	test('resuspends when a disabled query is enabled before its replay', async () => {
+		const listeners = new Set<Listener>();
+		const materialize = vi.fn(() => ({
+			addListener(listener: Listener) {
+				listeners.add(listener);
+				return () => listeners.delete(listener);
+			},
+			destroy: vi.fn(),
+			updateTTL: vi.fn(),
+		}));
+		const zero = {
+			clientID: 'restarted-suspense',
+			context: {},
+			materialize,
+		} as unknown as Zero<Schema>;
+		const result = mount(CancellableSuspenseQueryBinding, {
+			zero,
+			query: createQuery('restarted-query'),
+		});
+
+		result.click('#restart-suspense-query');
+		await Promise.resolve();
+		await Promise.resolve();
+		await nextPaint();
+
+		expect(result.findAll('#cancellable-suspense-query-pending')).toHaveLength(1);
+		expect(result.findAll('#cancellable-suspense-query-error')).toHaveLength(0);
+
+		for (const listener of listeners) {
+			listener([{ id: '1', name: 'Restarted' }], 'complete');
+		}
+		await Promise.resolve();
+		await nextPaint();
+
+		expect(
+			result.findAll('#cancellable-suspense-query-values').map((node) => node.textContent),
+		).toContain('1/complete');
+		result.unmount();
+	});
 });
