@@ -115,6 +115,7 @@
     "./base-ui/Card": "./src/bases/base-ui/ui/card.tsrx",
     "./base-ui/Checkbox": "./src/bases/base-ui/ui/checkbox.tsrx",
     "./base-ui/Collapsible": "./src/bases/base-ui/ui/collapsible.tsrx",
+    "./base-ui/ContextMenu": "./src/bases/base-ui/ui/context-menu.tsrx",
     "./base-ui/Dialog": "./src/bases/base-ui/ui/dialog.tsrx",
     "./base-ui/DropdownMenu": "./src/bases/base-ui/ui/dropdown-menu.tsrx",
     "./base-ui/Empty": "./src/bases/base-ui/ui/empty.tsrx",

@@ -44,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 9 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 8 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -63,6 +63,19 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@octanejs/shadcn/base-ui/ContextMenu';
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -234,7 +247,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 23 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 36 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
 				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
@@ -830,6 +843,41 @@ export function ShadcnBaseUIDemo() @{
 					</DropdownMenuSub>
 				</DropdownMenuContent>
 			</DropdownMenu>
+		</Section>
+
+		<Section
+			title="ContextMenu"
+			note="Right-click the dashed box. Unlike DropdownMenu this family has a real Separator part. Check the submenu row stays highlighted while open, and that the menu opens at the pointer."
+		>
+			<ContextMenu>
+				<ContextMenuTrigger
+					class="flex h-32 w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground"
+				>
+					Right click here
+				</ContextMenuTrigger>
+				<ContextMenuContent>
+					<ContextMenuLabel>Actions</ContextMenuLabel>
+					<ContextMenuSeparator />
+					<ContextMenuItem>
+						Back
+						<ContextMenuShortcut>⌘[</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuItem>
+						Forward
+						<ContextMenuShortcut>⌘]</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuSeparator />
+					<ContextMenuCheckboxItem checked>Show grid</ContextMenuCheckboxItem>
+					<ContextMenuSeparator />
+					<ContextMenuSub>
+						<ContextMenuSubTrigger>More tools</ContextMenuSubTrigger>
+						<ContextMenuSubContent>
+							<ContextMenuItem>Save page</ContextMenuItem>
+							<ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+						</ContextMenuSubContent>
+					</ContextMenuSub>
+				</ContextMenuContent>
+			</ContextMenu>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

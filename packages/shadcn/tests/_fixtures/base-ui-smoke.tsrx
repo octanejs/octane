@@ -48,6 +48,19 @@ import {
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
 import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@octanejs/shadcn/base-ui/ContextMenu';
+import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
@@ -607,4 +620,27 @@ export function PopoverSideCase() @{
 		<PopoverTrigger>Open</PopoverTrigger>
 		<PopoverContent side="right">Popover body</PopoverContent>
 	</Popover>
+}
+
+// Standalone: the label must not require a Group ancestor.
+export function ContextMenuCase() @{
+	<ContextMenu>
+		<ContextMenuTrigger>Right click here</ContextMenuTrigger>
+		<ContextMenuContent>
+			<ContextMenuLabel>Actions</ContextMenuLabel>
+			<ContextMenuSeparator />
+			<ContextMenuItem>
+				Back
+				<ContextMenuShortcut>⌘[</ContextMenuShortcut>
+			</ContextMenuItem>
+			<ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+			<ContextMenuCheckboxItem checked>Show grid</ContextMenuCheckboxItem>
+			<ContextMenuSub>
+				<ContextMenuSubTrigger>More</ContextMenuSubTrigger>
+				<ContextMenuSubContent>
+					<ContextMenuItem>Nested</ContextMenuItem>
+				</ContextMenuSubContent>
+			</ContextMenuSub>
+		</ContextMenuContent>
+	</ContextMenu>
 }

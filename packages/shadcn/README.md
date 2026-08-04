@@ -33,7 +33,7 @@ component names stay identical.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 35/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 36/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -50,7 +50,7 @@ component names stay identical.
 | `card` | ✅ | ✅ | ✅ |
 | `checkbox` | ✅ | ✅ | ✅ |
 | `collapsible` | ✅ | ✅ | ✅ |
-| `context-menu` | ✅ | ⛔ | — |
+| `context-menu` | ✅ | ⛔ | ✅ |
 | `dialog` | ✅ | ✅ | ✅ |
 | `dropdown-menu` | ✅ | ⛔ | ✅ |
 | `empty` | ✅ | ✅ | ✅ |

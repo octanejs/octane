@@ -1308,3 +1308,67 @@ describe('@octanejs/shadcn — Base UI overlays route positioning to the Positio
 		}
 	});
 });
+
+describe('@octanejs/shadcn — Base UI context-menu reuses the menu dialects', () => {
+	// Opened with a real contextmenu event, since there is no trigger to click.
+	const open = async () => {
+		const m = mount(F.ContextMenuCase as never);
+		await settle();
+		m.container
+			.querySelector('[data-slot="context-menu-trigger"]')!
+			.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+		await settle();
+		return m;
+	};
+
+	it('opens on contextmenu and reads the Base UI css vars', async () => {
+		const m = await open();
+		try {
+			const content = document.querySelector('[data-slot="context-menu-content"]')!;
+			expect(content).not.toBe(null);
+			expect(content.getAttribute('role')).toBe('menu');
+			for (const v of ['--available-height', '--transform-origin']) {
+				expect(content.className, v).toContain(v);
+			}
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('uses the real Separator part, which Menu does not have', async () => {
+		// The one place this family differs from dropdown-menu: ContextMenu ships a Separator, so it
+		// is the primitive here rather than a plain div, and it carries the a11y roles for free.
+		const m = await open();
+		try {
+			const sep = document.querySelector('[data-slot="context-menu-separator"]')!;
+			expect(sep).not.toBe(null);
+			expect(sep.getAttribute('role')).toBe('separator');
+			expect(sep.getAttribute('aria-orientation')).toBe('horizontal');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders the label standalone, without a Group ancestor', async () => {
+		const m = await open();
+		try {
+			const label = document.querySelector('[data-slot="context-menu-label"]')!;
+			expect(label.tagName).toBe('DIV');
+			expect(label.textContent).toBe('Actions');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('uses the trigger open dialect on the submenu trigger', async () => {
+		const m = await open();
+		try {
+			const sub = document.querySelector('[data-slot="context-menu-sub-trigger"]')!;
+			expect(sub.className).toContain('data-popup-open:bg-accent');
+			expect(sub.className).not.toMatch(/(?:^|\s)data-open:/);
+		} finally {
+			m.unmount();
+		}
+	});
+});
