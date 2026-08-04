@@ -8,7 +8,15 @@
 // are CONTROLLED exactly like React's (property-driven, reasserted on every commit and after
 // discrete events; only the INITIAL checked reflects to the attribute). Field/Form
 // integration is inert when standalone (default contexts).
-import { createContext, createElement, useContext, useLayoutEffect, useMemo, useRef } from 'octane';
+import {
+	createContext,
+	createElement,
+	Fragment,
+	useContext,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+} from 'octane';
 
 import { S, subSlot } from './internal';
 import { useRenderElement, type RenderProp } from './utils/useRenderElement';
@@ -322,7 +330,13 @@ function SwitchRoot(props: SwitchRootProps): any {
 
 	return createElement(SwitchRootContext.Provider, {
 		value: state,
-		children: [element, hiddenValueInput, createElement('input', inputProps)],
+		// Octane reconciles an ARRAY child as a keyed list, so each slot carries a stable key;
+		// values that cannot be keyed in place go through a keyed Fragment.
+		children: [
+			createElement(Fragment, { key: 'element', children: element }),
+			createElement(Fragment, { key: 'hidden-value', children: hiddenValueInput }),
+			createElement('input', { key: 'input', ...inputProps }),
+		],
 	});
 }
 

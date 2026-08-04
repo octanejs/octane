@@ -12,6 +12,7 @@
 import {
 	createContext,
 	createElement,
+	Fragment,
 	useContext,
 	useEffect,
 	useLayoutEffect,
@@ -499,7 +500,13 @@ function CheckboxRoot(props: CheckboxRootProps): any {
 
 	return createElement(CheckboxRootContext.Provider, {
 		value: state,
-		children: [element, hiddenValueInput, createElement('input', inputProps)],
+		// Octane reconciles an ARRAY child as a keyed list, so each slot carries a stable key;
+		// values that cannot be keyed in place go through a keyed Fragment.
+		children: [
+			createElement(Fragment, { key: 'element', children: element }),
+			createElement(Fragment, { key: 'hidden-value', children: hiddenValueInput }),
+			createElement('input', { key: 'input', ...inputProps }),
+		],
 	});
 }
 

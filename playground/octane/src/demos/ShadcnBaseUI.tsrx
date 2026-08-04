@@ -20,6 +20,13 @@
 //   Alert — transcribed and verified byte-identical to upstream's source. Should
 //     need no scrutiny.
 //
+//   Dialog, AlertDialog, Popover, Tooltip — still carry the radix KEYFRAME motion utilities
+//     (`data-open:animate-in` / `data-closed:animate-out`) rather than the transition pair the
+//     transcribed sheet uses. Base UI does emit both `data-open` and `data-closed`, so those
+//     utilities are not dead — but the sheet's derived version jumped on close and these have not
+//     been checked against upstream sources. OPEN AND CLOSE EACH ONE: a snap on close is the
+//     thing to report.
+//
 //   Avatar, Progress, Toggle, ToggleGroup — class strings derived, but
 //     each ADAPTED to a part tree or attribute that Base UI genuinely differs on,
 //     checked against the primitive's real output rather than assumed. What to
@@ -37,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 13 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 9 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -55,6 +62,42 @@ import {
 	AvatarGroupCount,
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
+import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from '@octanejs/shadcn/base-ui/DropdownMenu';
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from '@octanejs/shadcn/base-ui/Item';
+import {
+	Breadcrumb,
+	BreadcrumbEllipsis,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from '@octanejs/shadcn/base-ui/Breadcrumb';
 import {
 	Field,
 	FieldContent,
@@ -174,7 +217,7 @@ import {
 } from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
-import { InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
+import { BellIcon, InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
 
 function Section({ title, note, children }: { title: string; note?: string; children?: unknown }) @{
 	<section class="space-y-3">
@@ -682,6 +725,111 @@ export function ShadcnBaseUIDemo() @{
 					</Field>
 				</FieldGroup>
 			</FieldSet>
+		</Section>
+
+		<Section
+			title="Badge"
+			note="No primitive in any base — a plain span. The cva strings are shared with Radix and a test asserts they stay identical, so this should look exactly like the Radix tab. No asChild/render escape here yet: see the file header."
+		>
+			<div class="flex flex-wrap items-center gap-2">
+				<Badge>Default</Badge>
+				<Badge variant="secondary">Secondary</Badge>
+				<Badge variant="destructive">Destructive</Badge>
+				<Badge variant="outline">Outline</Badge>
+				<Badge variant="ghost">Ghost</Badge>
+				<Badge variant="link">Link</Badge>
+			</div>
+		</Section>
+
+		<Section
+			title="Breadcrumb"
+			note="Host elements throughout, class strings from the Radix source — should match the Radix tab exactly. BreadcrumbLink has no asChild here yet: see the file header."
+		>
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink href="#home">Home</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbEllipsis />
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbLink href="#components">Components</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>Breadcrumb</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+		</Section>
+
+		<Section
+			title="Item"
+			note="Host elements plus this base's Separator. The data-variant/data-size utilities read attributes the component writes itself, so no primitive dialect is involved — this should match the Radix tab. Item has no asChild here yet: see the file header."
+		>
+			<ItemGroup class="max-w-md">
+				<Item variant="outline">
+					<ItemMedia variant="icon">
+						<BellIcon />
+					</ItemMedia>
+					<ItemContent>
+						<ItemTitle>Notifications</ItemTitle>
+						<ItemDescription>Choose what you want to be notified about.</ItemDescription>
+					</ItemContent>
+					<ItemActions>
+						<Switch />
+					</ItemActions>
+				</Item>
+				<ItemSeparator />
+				<Item variant="muted" size="sm">
+					<ItemContent>
+						<ItemTitle>Compact row</ItemTitle>
+						<ItemDescription>Uses the sm size.</ItemDescription>
+					</ItemContent>
+				</Item>
+			</ItemGroup>
+		</Section>
+
+		<Section
+			title="DropdownMenu"
+			note="Runs on the Base UI Menu primitive: Portal > Positioner > Popup. Open it and check the submenu — hovering 'More' must keep that row highlighted (it uses data-popup-open, not data-open), the checkbox and radio ticks must appear, and arrow keys must move the highlight."
+		>
+			<DropdownMenu>
+				<DropdownMenuTrigger render={<Button variant="outline" />}>Open menu</DropdownMenuTrigger>
+				<DropdownMenuContent>
+					<DropdownMenuLabel>My account</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<DropdownMenuItem>
+							Profile
+							<DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+						</DropdownMenuItem>
+						<DropdownMenuItem>
+							Billing
+							<DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+						</DropdownMenuItem>
+						<DropdownMenuItem disabled>Unavailable</DropdownMenuItem>
+					</DropdownMenuGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuCheckboxItem checked>Show sidebar</DropdownMenuCheckboxItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuRadioGroup value="light">
+						<DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+						<DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+					</DropdownMenuRadioGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger>More options</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent>
+							<DropdownMenuItem>Nested item</DropdownMenuItem>
+							<DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

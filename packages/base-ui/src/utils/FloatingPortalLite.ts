@@ -24,6 +24,11 @@ export function FloatingPortalLite(componentProps: any): any {
 	}
 
 	return createElement(Fragment, {
-		children: [portalSubtree, portalNode ? createPortal(children, portalNode) : null],
+		children: [
+			createElement(Fragment, { key: 'subtree', children: portalSubtree }),
+			portalNode
+				? createElement(Fragment, { key: 'portal', children: createPortal(children, portalNode) })
+				: null,
+		],
 	});
 }

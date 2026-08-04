@@ -5,6 +5,7 @@
 import {
 	createContext,
 	createElement,
+	Fragment,
 	createPortal,
 	useContext,
 	useState,
@@ -219,13 +220,17 @@ export function FloatingPortal(componentProps: any): any {
 		subSlot(slot, 'ctx'),
 	);
 
+	// Octane reconciles an ARRAY child as a keyed list, so every entry below carries a stable key.
+	// The slots are positional and fixed, so literal keys are correct here.
 	return [
-		portalSubtree,
+		createElement(Fragment, { key: 'portal-subtree', children: portalSubtree }),
 		createElement(PortalContext.Provider, {
+			key: 'portal-context',
 			value: portalContextValue,
 			children: [
 				shouldRenderGuards && portalNode
 					? createElement(FocusGuard, {
+							key: 'guard-before',
 							'data-type': 'outside',
 							ref: beforeOutsideRef,
 							onFocus(event: any) {
@@ -239,11 +244,18 @@ export function FloatingPortal(componentProps: any): any {
 						})
 					: null,
 				shouldRenderGuards && portalNode
-					? createElement('span', { 'aria-owns': portalNode.id, style: ownerVisuallyHidden })
+					? createElement('span', {
+							key: 'aria-owns',
+							'aria-owns': portalNode.id,
+							style: ownerVisuallyHidden,
+						})
 					: null,
-				portalNode ? createPortal(children, portalNode) : null,
+				portalNode
+					? createElement(Fragment, { key: 'portal', children: createPortal(children, portalNode) })
+					: null,
 				shouldRenderGuards && portalNode
 					? createElement(FocusGuard, {
+							key: 'guard-after',
 							'data-type': 'outside',
 							ref: afterOutsideRef,
 							onFocus(event: any) {

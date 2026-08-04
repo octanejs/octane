@@ -5,7 +5,7 @@
 // A meter visualizes a value within a known range. `Meter.Root` (`role="meter"`) owns
 // the range math and screen-reader aria; `Track`/`Indicator` draw the bar; `Value`/`Label`
 // render text. Base UI uses a PLAIN React context — ported as a plain octane createContext.
-import { createContext, createElement, useContext, useMemo, useState } from 'octane';
+import { createContext, createElement, Fragment, useContext, useMemo, useState } from 'octane';
 
 import { S, subSlot } from './internal';
 import { useRenderElement, type RenderProp } from './utils/useRenderElement';
@@ -98,10 +98,17 @@ function MeterRoot(props: MeterRootProps): any {
 		'aria-valuenow': clampedValue,
 		'aria-valuetext': ariaValuetext,
 		role: 'meter',
+		// Octane reconciles an ARRAY child as a keyed list, so each slot carries a stable key;
+		// values that cannot be keyed in place go through a keyed Fragment.
 		children: [
-			children,
+			createElement(Fragment, { key: 'children', children }),
 			// force NVDA to read the label (mui/base-ui#4184)
-			createElement('span', { role: 'presentation', style: visuallyHidden, children: 'x' }),
+			createElement('span', {
+				key: 'sr-hint',
+				role: 'presentation',
+				style: visuallyHidden,
+				children: 'x',
+			}),
 		],
 	};
 

@@ -151,6 +151,43 @@
       ]
     },
     {
+      "name": "badge",
+      "type": "registry:ui",
+      "title": "Badge",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/types",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/badge.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/badge.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "breadcrumb",
+      "type": "registry:ui",
+      "title": "Breadcrumb",
+      "dependencies": [
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/breadcrumb.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/breadcrumb.tsrx"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -240,6 +277,25 @@
       ]
     },
     {
+      "name": "dropdown-menu",
+      "type": "registry:ui",
+      "title": "Dropdown Menu",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/dropdown-menu.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/dropdown-menu.tsrx"
+        }
+      ]
+    },
+    {
       "name": "empty",
       "type": "registry:ui",
       "title": "Empty",
@@ -293,6 +349,25 @@
           "path": "ui/input.tsrx",
           "type": "registry:ui",
           "target": "components/ui/input.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "item",
+      "type": "registry:ui",
+      "title": "Item",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/separator",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/item.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/item.tsrx"
         }
       ]
     },

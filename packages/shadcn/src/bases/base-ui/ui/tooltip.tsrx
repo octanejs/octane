@@ -39,15 +39,53 @@ export interface TooltipContentProps extends Record<string, unknown> {
 	children?: OctaneNode;
 }
 
+export interface BaseUiPositioningProps {
+	/** Forwarded to the Positioner; see the note at the top of this file. */
+	side?: 'top' | 'right' | 'bottom' | 'left';
+	sideOffset?: number;
+	align?: 'start' | 'center' | 'end';
+	alignOffset?: number;
+	anchor?: unknown;
+	positionMethod?: 'absolute' | 'fixed';
+	collisionBoundary?: unknown;
+	collisionPadding?: unknown;
+	collisionAvoidance?: unknown;
+	arrowPadding?: number;
+	sticky?: boolean;
+	disableAnchorTracking?: boolean;
+}
+
 export function TooltipContent({
 	className,
 	sideOffset = 0,
+	align,
+	side,
+	alignOffset,
+	anchor,
+	positionMethod,
+	collisionBoundary,
+	collisionPadding,
+	collisionAvoidance,
+	arrowPadding,
+	sticky,
+	disableAnchorTracking,
 	children,
 	...props
-}: TooltipContentProps) {
+}: TooltipContentProps & BaseUiPositioningProps) {
 	return createElement(TooltipPrimitive.Portal, {
 		children: createElement(TooltipPrimitive.Positioner, {
+			side,
 			sideOffset,
+			align,
+			alignOffset,
+			anchor,
+			positionMethod,
+			collisionBoundary,
+			collisionPadding,
+			collisionAvoidance,
+			arrowPadding,
+			sticky,
+			disableAnchorTracking,
 			children: createElement(TooltipPrimitive.Popup, {
 				'data-slot': 'tooltip-content',
 				className: cn(

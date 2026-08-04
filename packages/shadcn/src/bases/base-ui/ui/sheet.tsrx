@@ -2,13 +2,16 @@
 // (maintainer-supplied), class strings verbatim. Runs on @octanejs/base-ui's Dialog:
 // Overlay -> Backdrop, Content -> Popup.
 //
-// BASE UI ANIMATES WITH CSS TRANSITIONS, NOT KEYFRAMES, and that is the whole reason this file
-// had to be transcribed rather than derived. The radix base drives entry/exit with
-// `data-open:animate-in` / `data-closed:animate-out` keyframe utilities; Base UI publishes
-// `data-starting-style` and `data-ending-style` (from its transitionStatusMapping) and expects a
-// plain `transition` that interpolates between them. A derived copy carrying radix's keyframes
-// produces a visible JUMP on close: the popup unmounts on its own schedule while an
-// animate-out keyframe that never matches the emitted attributes does nothing.
+// UPSTREAM ANIMATES THIS WITH CSS TRANSITIONS, NOT KEYFRAMES, which is why the file is transcribed
+// rather than derived. Base UI publishes `data-starting-style` and `data-ending-style` (see
+// utils/popupStateMapping.ts) and this source drives motion off them with a plain `transition`,
+// where the radix base uses `animate-in` / `animate-out` keyframe utilities.
+//
+// A derived version of this file did jump visibly on close, which is what prompted the
+// transcription. Do NOT infer from that a general rule that keyframes cannot work on Base UI: the
+// same mapping also emits `data-open` and `data-closed`, so `data-closed:animate-out` does match,
+// and the precise cause of that jump was never isolated. What is established here is only what
+// upstream ships, which is this.
 //
 // So the motion here reads: `transition duration-200` plus per-side
 // `data-starting-style:translate-*` / `data-ending-style:translate-*` and an opacity pair —

@@ -17,6 +17,7 @@
 import {
 	createContext,
 	createElement,
+	Fragment,
 	useContext,
 	useEffect,
 	useLayoutEffect,
@@ -1460,7 +1461,7 @@ function SliderThumb(componentProps: any): any {
 		subSlot(slot, 'inputRefs'),
 	);
 
-	const inputElement = createElement('input', { ...inputProps, ref: mergedInputRef });
+	const inputElement = createElement('input', { key: 'input', ...inputProps, ref: mergedInputRef });
 
 	return useRenderElement(
 		'div',
@@ -1471,7 +1472,12 @@ function SliderThumb(componentProps: any): any {
 			props: [
 				{
 					['data-index']: index,
-					children: [childrenProp, inputElement],
+					// Keyed for the same reason as dialog and progress: octane reconciles an array
+					// child as a keyed list, and the consumer's children cannot be keyed in place.
+					children: [
+						createElement(Fragment, { key: 'children', children: childrenProp }),
+						inputElement,
+					],
 					id,
 					onBlur: onBlurProp,
 					onFocus: onFocusProp,
