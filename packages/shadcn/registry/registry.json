@@ -334,6 +334,25 @@
       ]
     },
     {
+      "name": "item",
+      "type": "registry:ui",
+      "title": "Item",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/separator",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/item.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/item.tsrx"
+        }
+      ]
+    },
+    {
       "name": "kbd",
       "type": "registry:ui",
       "title": "Kbd",

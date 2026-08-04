@@ -93,6 +93,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Field', F.FieldCase, 'We never share it.'],
 	['Badge', F.BadgeCase, 'Secondary'],
 	['Breadcrumb', F.BreadcrumbCase, 'Current'],
+	['Item', F.ItemCase, 'Item description text.'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -1074,6 +1075,52 @@ describe('@octanejs/shadcn — Base UI breadcrumb is host elements throughout', 
 			const link = m.container.querySelector('[data-slot="breadcrumb-link"]')!;
 			expect(link.tagName).toBe('A');
 			expect(link.getAttribute('href')).toBe('/');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI item writes the attributes its own variants read', () => {
+	it('sets data-variant and data-size itself, with no primitive involved', () => {
+		// These look like the variants that caught toggle and slider, but they read what this
+		// component writes rather than state emitted by a primitive — so they carry across from the
+		// radix source unchanged, and that is the thing worth pinning.
+		const m = mount(F.ItemCase as never);
+		try {
+			const items = [...m.container.querySelectorAll('[data-slot="item"]')];
+			expect(items.map((i) => i.getAttribute('data-variant'))).toEqual(['default', 'outline']);
+			expect(items.map((i) => i.getAttribute('data-size'))).toEqual(['default', 'sm']);
+			expect(items[1].className).toContain('border-border');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('groups items as a list and nests content under the item', () => {
+		const m = mount(F.ItemCase as never);
+		try {
+			const group = m.container.querySelector('[data-slot="item-group"]')!;
+			expect(group.getAttribute('role')).toBe('list');
+			const item = group.querySelector('[data-slot="item"]')!;
+			expect(item.querySelector('[data-slot="item-title"]')!.textContent).toBe('Item title');
+			expect(item.querySelector('[data-slot="item-media"]')!.getAttribute('data-variant')).toBe(
+				'icon',
+			);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('routes ItemSeparator through this base Separator, aria-orientation and all', () => {
+		// The one part with a primitive under it. Base UI emits aria-orientation where radix emits
+		// data-orientation, so this is the only place in the family a dialect could go wrong.
+		const m = mount(F.ItemCase as never);
+		try {
+			const sep = m.container.querySelector('[data-slot="item-separator"]')!;
+			expect(sep).not.toBe(null);
+			expect(sep.getAttribute('aria-orientation')).toBe('horizontal');
+			expect(sep.className).toContain('my-2');
 		} finally {
 			m.unmount();
 		}

@@ -37,7 +37,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 11 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 10 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -56,6 +56,16 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from '@octanejs/shadcn/base-ui/Item';
 import {
 	Breadcrumb,
 	BreadcrumbEllipsis,
@@ -184,7 +194,7 @@ import {
 } from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
-import { InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
+import { BellIcon, InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
 
 function Section({ title, note, children }: { title: string; note?: string; children?: unknown }) @{
 	<section class="space-y-3">
@@ -731,6 +741,33 @@ export function ShadcnBaseUIDemo() @{
 					</BreadcrumbItem>
 				</BreadcrumbList>
 			</Breadcrumb>
+		</Section>
+
+		<Section
+			title="Item"
+			note="Host elements plus this base's Separator. The data-variant/data-size utilities read attributes the component writes itself, so no primitive dialect is involved — this should match the Radix tab. Item has no asChild here yet: see the file header."
+		>
+			<ItemGroup class="max-w-md">
+				<Item variant="outline">
+					<ItemMedia variant="icon">
+						<BellIcon />
+					</ItemMedia>
+					<ItemContent>
+						<ItemTitle>Notifications</ItemTitle>
+						<ItemDescription>Choose what you want to be notified about.</ItemDescription>
+					</ItemContent>
+					<ItemActions>
+						<Switch />
+					</ItemActions>
+				</Item>
+				<ItemSeparator />
+				<Item variant="muted" size="sm">
+					<ItemContent>
+						<ItemTitle>Compact row</ItemTitle>
+						<ItemDescription>Uses the sm size.</ItemDescription>
+					</ItemContent>
+				</Item>
+			</ItemGroup>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

@@ -48,6 +48,16 @@ import {
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
 import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from '@octanejs/shadcn/base-ui/Item';
+import {
 	Breadcrumb,
 	BreadcrumbEllipsis,
 	BreadcrumbItem,
@@ -514,4 +524,23 @@ export function BreadcrumbCase() @{
 			</BreadcrumbItem>
 		</BreadcrumbList>
 	</Breadcrumb>
+}
+
+export function ItemCase() @{
+	<ItemGroup>
+		<Item>
+			<ItemMedia variant="icon" />
+			<ItemContent>
+				<ItemTitle>Item title</ItemTitle>
+				<ItemDescription>Item description text.</ItemDescription>
+			</ItemContent>
+			<ItemActions>Act</ItemActions>
+		</Item>
+		<ItemSeparator />
+		<Item variant="outline" size="sm">
+			<ItemContent>
+				<ItemTitle>Second</ItemTitle>
+			</ItemContent>
+		</Item>
+	</ItemGroup>
 }
