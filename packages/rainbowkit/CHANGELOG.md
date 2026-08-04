@@ -1,5 +1,22 @@
 # @octanejs/rainbowkit
 
+## 0.0.5
+
+### Patch Changes
+
+- bd8bb1b: Require Node.js 22.22.2 or newer across Octane's published packages.
+
+  Add the `octane/compiler/register` preload for running server and SSG scripts
+  directly with Node or Bun. It compiles imported `.tsrx`/`.tsx` modules and
+  plain TypeScript custom hooks in server mode without a Vite build. Bun also
+  targets bare `octane` imports at `octane/server` in pass-through authored source
+  dependencies, including packages that manage their hook slots manually.
+
+- Updated dependencies [bd8bb1b]
+  - octane@0.1.25
+  - @octanejs/tanstack-query@0.1.24
+  - @octanejs/wagmi@0.0.5
+
 ## 0.0.4
 
 ### Patch Changes
