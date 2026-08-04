@@ -1126,3 +1126,51 @@ describe('@octanejs/shadcn — Base UI item writes the attributes its own varian
 		}
 	});
 });
+
+describe('@octanejs/shadcn — Base UI span-rooted controls carry their own display', () => {
+	// A REGRESSION CLASS, not a one-off. Base UI renders checkbox, switch and radio roots as
+	// `<span role="…">` where Radix uses `<button>`. A `<button>` is `display: inline-block`, so
+	// Radix's class strings never needed a display utility and `size-4` simply worked; a bare
+	// `<span>` is `display: inline`, which IGNORES width and height. Copying a Radix string onto one
+	// collapses the control to a thin vertical bar showing only its border — which is exactly how
+	// the radio group shipped, and nothing in jsdom or a smoke test noticed.
+	//
+	// jsdom does no layout and loads no Tailwind, so the oracle is the class string: a span-rooted
+	// control that expects a box must also declare a display.
+	const DISPLAY = /(?:^|\s)(?:inline-flex|inline-block|inline-grid|flex|grid|block|table)(?:\s|$)/;
+
+	for (const [name, Case, slot] of [
+		['Checkbox', F.CheckboxCase, 'checkbox'],
+		['Switch', F.SwitchCase, 'switch'],
+		['RadioGroupItem', F.RadioGroupCase, 'radio-group-item'],
+	] as Array<[string, unknown, string]>) {
+		it(`${name} declares a display alongside its size`, () => {
+			const m = mount(Case as never);
+			try {
+				const el = m.container.querySelector(`[data-slot="${slot}"]`)!;
+				expect(el, slot).not.toBe(null);
+				expect(el.tagName, `${name} is expected to be span-rooted`).toBe('SPAN');
+				const cls = el.getAttribute('class') ?? '';
+				expect(
+					DISPLAY.test(cls),
+					`${name} gives a <span> a box but declares no display, so width/height are ignored`,
+				).toBe(true);
+			} finally {
+				m.unmount();
+			}
+		});
+	}
+
+	it('anchors the radio dot to the root box, not a zero-sized indicator', () => {
+		const m = mount(F.RadioGroupCase as never);
+		try {
+			const indicator = m.container.querySelector('[data-slot="radio-group-indicator"]')!;
+			// `relative` here would make the absolutely-positioned dot resolve against a flex item
+			// with no size of its own, putting it off-centre.
+			expect(indicator.className).not.toMatch(/(?:^|\s)relative(?:\s|$)/);
+			expect(indicator.className).toContain('size-full');
+		} finally {
+			m.unmount();
+		}
+	});
+});
