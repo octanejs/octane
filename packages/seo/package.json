@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "SEO metadata for Octane, declarative <Title>/<Meta>/<Link>/<JsonLd> with last-wins merging, server-rendered into <head> and adopted on hydration.",
   "author": {

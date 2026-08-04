@@ -18,7 +18,7 @@ Docusaurus does not publish the `server/site` loader as a stable public entry,
 so accepting an untested minor would turn an internal upstream refactor into a
 silent route-data corruption. The loader checks both the package version and
 Docusaurus's Node `>=20.0` runtime requirement before importing that seam. This
-package retains Octane's repository-wide Node `>=22` baseline.
+package retains Octane's repository-wide Node `>=22.22.2` baseline.
 
 `allowUnsupportedVersion: true` is available only for explicit compatibility
 experiments.

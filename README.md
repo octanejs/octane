@@ -101,7 +101,7 @@ they are written down in
 
 ## Install
 
-Octane's published packages need Node.js 22 or newer.
+Octane's published packages need Node.js 22.22.2 or newer.
 
 Scaffold a project that already runs:
 

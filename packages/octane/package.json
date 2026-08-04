@@ -5,7 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "A fast, modern UI framework and the successor to Inferno",
   "author": {
@@ -42,6 +42,7 @@
     "./universal/native": "./src/universal-native.ts",
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
+    "./compiler/register": "./src/compiler/register.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
     "./compiler/vite": {
       "types": "./src/compiler/vite.d.ts",
@@ -115,6 +116,7 @@
       },
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",
+      "./compiler/register": "./dist/compiler/register.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
       "./compiler/vite": {
         "types": "./dist/compiler/vite.d.ts",
@@ -133,6 +135,7 @@
     "@tsrx/core": "catalog:default",
     "@types/react": "catalog:default",
     "devalue": "catalog:default",
+    "es-module-lexer": "catalog:default",
     "esrap": "catalog:default"
   },
   "peerDependencies": {

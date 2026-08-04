@@ -81,7 +81,7 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) 
 		name: 'octane-packed-tsrx-source-consumer',
 		private: true,
 		type: 'module',
-		engines: { node: '>=22' },
+		engines: { node: '>=22.22.2' },
 		dependencies,
 		devDependencies: {
 			'@tsrx/typescript-plugin': toolingVersions.tsrxTypeScriptPlugin,

@@ -8,7 +8,7 @@ privatizing a package updates every package-wide check together.
 
 **67 publishable package(s), including 53 framework binding(s) and 3 framework integration(s).**
 
-All publishable packages share the enforced Node.js engine baseline `>=22`.
+All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
 | Package | Directory | Role | Version | Exported entry points |
 | --- | --- | --- | --- | --- |
@@ -78,7 +78,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.4` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.23` | 5 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.4` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.24` | 20 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.24` | 21 |
 
 ## Private packages
 

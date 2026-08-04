@@ -5,7 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Redux Toolkit for the octane renderer — reuses Redux Toolkit and RTK Query core unchanged and ports the React hook adapters onto octane.",
   "author": {

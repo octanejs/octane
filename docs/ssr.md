@@ -36,6 +36,37 @@ The server build must compile components with the Octane compiler in
 `mode: 'server'` (`@octanejs/vite-plugin` handles this automatically; SSR module
 loading through Vite picks the server transform automatically).
 
+### Run an SSG script directly
+
+When a server or SSG entry runs outside Vite, preload Octane's compiler before
+the entry point:
+
+**Node**
+
+```sh
+node --import octane/compiler/register entry-server.ts
+```
+
+**Bun**
+
+```sh
+bun --preload octane/compiler/register entry-server.ts
+```
+
+The preload is a server-only compiler pipeline. It compiles imported `.tsrx`
+and `.tsx` components, assigns hook slots in imported plain `.ts`/`.js` custom
+hooks, and resolves extensionless local imports such as `./App` under Node. Node
+uses synchronous `node:module.registerHooks`; Bun uses an equivalent native
+runtime plugin. Node 22.22.2 or newer is required, and Bun 1.3.14 is covered by
+the integration suite.
+
+Every bare `octane` runtime import in the loaded server graph targets
+`octane/server`, including authored source dependencies that keep their manual
+hook slots and otherwise pass through unchanged.
+
+Do not use this preload for a browser entry: Vite, Rsbuild, or another Octane
+build integration must produce the client compilation and bundle instead.
+
 ## API
 
 The three buffered renderers return `RenderResult = { html, css }`:

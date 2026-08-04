@@ -28,7 +28,7 @@ larger than a contained fix, open an issue and agree on the approach first.
 
 ## Setup
 
-Node.js 22 or newer (CI runs the suite on 22 and 24) and pnpm 11. The repo pins
+Node.js 22.22.2 or newer (CI runs the suite on 22.22.2 and 24) and pnpm 11. The repo pins
 its pnpm version in `package.json`, so `corepack enable` is the easiest way to
 get the right one.
 

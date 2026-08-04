@@ -6,7 +6,7 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Private Milestone 11 Octane Lynx renderer with a pinned macOS Explorer first-paint lane; native release gates remain blocked.",
   "author": {

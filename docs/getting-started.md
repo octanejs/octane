@@ -7,7 +7,7 @@ The hosted version of this material, with more prose around it, lives at
 
 ## Install
 
-Octane's published packages require Node.js 22 or newer.
+Octane's published packages require Node.js 22.22.2 or newer.
 
 Starting from nothing, one command writes a project that runs and installs it:
 
@@ -152,6 +152,12 @@ export async function renderApp() {
 	return { html, css };
 }
 ```
+
+If this entry runs directly instead of through Vite, start it with
+`node --import octane/compiler/register entry-server.ts` or
+`bun --preload octane/compiler/register entry-server.ts`. The preload compiles
+the imported component graph in server mode; the [SSR guide](./ssr.md#run-an-ssg-script-directly)
+describes the supported boundary.
 
 | API | Module | Await | Suspense boundary that suspends |
 | --- | --- | --- | --- |

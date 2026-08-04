@@ -7,8 +7,8 @@
 //      structure and version.ts's
 //      `import … from '../package.json' with { type: 'json' }` attribute both survive
 //      intact for a plain Node ESM consumer.
-//   2. The compiler is already plain `.js` (its only deps are `@tsrx/core` + `esrap`) — copy
-//      it verbatim.
+//   2. The compiler is already plain `.js` (its only deps are `@tsrx/core`,
+//      `es-module-lexer`, and `esrap`) — copy it verbatim.
 //   3. Type declarations (`tsc --emitDeclarationOnly`) alongside the JS.
 //
 // Entry points are GLOBBED from `src/`, not hand-listed — a hand-maintained list

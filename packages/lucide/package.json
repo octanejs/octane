@@ -4,7 +4,7 @@
   "license": "ISC",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Lucide icons for Octane, with the lucide-react API and framework-neutral icon data.",
   "author": {

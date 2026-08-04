@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "shadcn/ui for the octane renderer — the Radix-base shadcn component distribution ported onto octane: cva-variant components preserving the upstream data-slot/class contract, built on @octanejs/radix, published as importable source with a shadcn-CLI-compatible registry planned.",
   "author": {

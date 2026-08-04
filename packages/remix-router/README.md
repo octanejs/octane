@@ -70,7 +70,7 @@ function User() @{
   `future.v8_trailingSlashAwareDataRequests` flags are gone.
 - The internal `hasErrorBoundary` route property is gone. Use `ErrorBoundary`
   or `errorElement`.
-- The package follows Octane's repository-wide Node.js 22 or newer runtime
+- The package follows Octane's repository-wide Node.js 22.22.2 or newer runtime
   contract.
 
 ## How it works

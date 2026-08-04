@@ -6,7 +6,7 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Private Milestone 11 dual-thread Rspeedy integration and checksum-pinned macOS Explorer runner for Octane Lynx.",
   "repository": {

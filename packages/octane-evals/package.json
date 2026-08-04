@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Standalone Octane app training tasks, behavioral graders, and reproducible evaluation tooling.",
   "license": "MIT",

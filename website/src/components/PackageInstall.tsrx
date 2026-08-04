@@ -1,16 +1,19 @@
-// A package-manager command with npm / pnpm / yarn / bun tabs (pnpm is the
-// default) over one terminal panel. Install commands are derived from one
-// package list, while named recipes cover commands whose shape differs by
-// manager. It owns its own frame + copy button (rather than wrapping CodeBlock)
-// so the tab bar attaches seamlessly to the code as one panel.
+// A tabbed command selector over one terminal panel. Package recipes use
+// npm / pnpm / yarn / bun (pnpm by default); the server-entry recipe narrows
+// the choices to Node / Bun. It owns its own frame + copy button (rather than
+// wrapping CodeBlock) so the tab bar attaches seamlessly to the code as one
+// panel.
 import { useId, useRef, useState } from 'octane';
 import { useCopyToClipboard } from '../hooks/use-copy.ts';
 import copyUrl from '../assets/copy.svg';
 import checkUrl from '../assets/check.svg';
 
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
+type Runtime = 'node' | 'bun';
+type CommandChoice = PackageManager | Runtime;
 
 const MANAGERS: PackageManager[] = ['npm', 'pnpm', 'yarn', 'bun'];
+const RUNTIMES: Runtime[] = ['node', 'bun'];
 
 // Each manager's install verb and dev-dependency flag (bun documents `-d`).
 const INSTALL: Record<PackageManager, { add: string; dev: string }> = {
@@ -44,13 +47,18 @@ const CREATE: Record<PackageManager, string> = {
 	bun: 'bun create octane',
 };
 
+const SERVER_ENTRY: Record<Runtime, string> = {
+	node: 'node --import octane/compiler/register entry-server.ts',
+	bun: 'bun --preload octane/compiler/register entry-server.ts',
+};
+
 interface PackageInstallProps {
 	/** Runtime packages, space-separated — rendered first. */
 	packages?: string;
 	/** Dev packages, space-separated — rendered as the -D line. */
 	dev?: string;
-	/** A package-manager-specific command recipe instead of an install command. */
-	command?: 'pack-dry-run' | 'create';
+	/** A named command recipe instead of an install command. */
+	command?: 'pack-dry-run' | 'create' | 'server-entry';
 	/** `create` only: the directory to scaffold into. Defaults to `my-app`. */
 	directory?: string;
 }
@@ -84,19 +92,29 @@ function toTokens(lines: string[]): Token[] {
 }
 
 export function PackageInstall(props: PackageInstallProps) @{
-	const [manager, setManager] = useState<PackageManager>('pnpm');
+	const [selection, setSelection] = useState<CommandChoice>('pnpm');
 	const { copied, copy } = useCopyToClipboard();
 	const codeEl = useRef<HTMLElement | null>(null);
 	// Unique per instance — build-tools renders three of these on one page, so
 	// the tab/panel ids must not collide.
 	const id = useId();
+	const choices: CommandChoice[] =
+		props.command === 'server-entry' ? RUNTIMES : MANAGERS;
+	// The component normally defaults to pnpm. A runtime recipe instead falls
+	// back to its first choice (Node) without needing a second stateful widget.
+	const selected = choices.includes(selection) ? selection : choices[0];
 
 	const lines: string[] = [];
-	if (props.command === 'pack-dry-run') {
+	if (props.command === 'server-entry') {
+		lines.push(SERVER_ENTRY[selected as Runtime]);
+	} else if (props.command === 'pack-dry-run') {
+		const manager = selected as PackageManager;
 		lines.push(PACK_DRY_RUN[manager]);
 	} else if (props.command === 'create') {
+		const manager = selected as PackageManager;
 		lines.push(CREATE[manager] + ' ' + (props.directory ?? 'my-app'));
 	} else {
+		const manager = selected as PackageManager;
 		if (props.packages) lines.push(INSTALL[manager].add + ' ' + props.packages);
 		if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);
 	}
@@ -110,17 +128,17 @@ export function PackageInstall(props: PackageInstallProps) @{
 	// The WAI-ARIA tabs pattern: arrow keys move selection (focus follows),
 	// Home/End jump to the ends, and only the active tab is in the tab order.
 	const onTablistKeyDown = (event: KeyboardEvent) => {
-		const index = MANAGERS.indexOf(manager);
+		const index = choices.indexOf(selected);
 		let next: number;
-		if (event.key === 'ArrowRight') next = (index + 1) % MANAGERS.length;
-		else if (event.key === 'ArrowLeft') next = (index + MANAGERS.length - 1) % MANAGERS.length;
+		if (event.key === 'ArrowRight') next = (index + 1) % choices.length;
+		else if (event.key === 'ArrowLeft') next = (index + choices.length - 1) % choices.length;
 		else if (event.key === 'Home') next = 0;
-		else if (event.key === 'End') next = MANAGERS.length - 1;
+		else if (event.key === 'End') next = choices.length - 1;
 		else return;
 		event.preventDefault();
-		const pm = MANAGERS[next];
-		setManager(pm);
-		document.getElementById(id + '-tab-' + pm)?.focus();
+		const choice = choices[next];
+		setSelection(choice);
+		document.getElementById(id + '-tab-' + choice)?.focus();
 	};
 
 	<div class="pkg">
@@ -128,20 +146,20 @@ export function PackageInstall(props: PackageInstallProps) @{
 			<div
 				class="pkg-tabs"
 				role="tablist"
-				aria-label="Package manager"
+				aria-label={props.command === 'server-entry' ? 'JavaScript runtime' : 'Package manager'}
 				onKeyDown={onTablistKeyDown}
 			>
-				@for (const pm of MANAGERS; key pm) {
+				@for (const choice of choices; key choice) {
 					<button
 						type="button"
 						role="tab"
-						id={id + '-tab-' + pm}
-						aria-selected={manager === pm}
+						id={id + '-tab-' + choice}
+						aria-selected={selected === choice}
 						aria-controls={id + '-panel'}
-						tabIndex={manager === pm ? 0 : -1}
-						class={['pkg-tab', manager === pm && 'pkg-tab-active']}
-						onClick={() => setManager(pm)}
-					>{pm as string}</button>
+						tabIndex={selected === choice ? 0 : -1}
+						class={['pkg-tab', selected === choice && 'pkg-tab-active']}
+						onClick={() => setSelection(choice)}
+					>{choice as string}</button>
 				}
 			</div>
 			<button
@@ -164,7 +182,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 			class="pkg-pre"
 			id={id + '-panel'}
 			role="tabpanel"
-			aria-labelledby={id + '-tab-' + manager}
+			aria-labelledby={id + '-tab-' + selected}
 		>
 			<code class="pkg-code" ref={codeEl}>
 				@for (const tok of tokens; key tok.id) {
@@ -299,4 +317,5 @@ export function PackageInstall(props: PackageInstallProps) @{
 
 // New docs should use the general name for non-install recipes. Keep the
 // original export because install snippets already use it throughout the site.
+export const CommandSelector = PackageInstall;
 export const PackageManagerCommand = PackageInstall;

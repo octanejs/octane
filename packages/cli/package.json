@@ -3,7 +3,7 @@
   "version": "0.0.4",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "The Octane command line: diagnose, configure, and extend an Octane project.",
   "license": "MIT",
