@@ -27,10 +27,11 @@ Read first:
 
 1. `AGENTS.md`
 2. `docs/react-library-compat-plan.md`
-3. `docs/differences-from-react.md`
-4. Existing closest binding in `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/`
-5. `packages/three/UPSTREAM.md` for the pin, source-boundary, and crosswalk format
-6. `vitest.config.js` aliases/exclusions for existing binding packages
+3. `docs/react-parity-testing.md`
+4. `docs/differences-from-react.md`
+5. Existing closest binding in `packages/{zustand,query,motion,stylex,router,lexical,floating-ui,radix}/`
+6. `packages/three/UPSTREAM.md` for the pin, source-boundary, and crosswalk format
+7. `vitest.config.js` aliases/exclusions for existing binding packages
 
 ## Workflow
 
@@ -51,6 +52,16 @@ Read first:
    - New ports belong under `packages/<name>/` with `package.json`, `src/`, `tests/`, `tsconfig.json`, `UPSTREAM.md`, and README.
    - Public package should normally be `@octanejs/<name>`.
    - Add workspace/test aliases in `vitest.config.js` following existing packages.
+   - Configure parity ownership declaratively as described in
+     `docs/react-parity-testing.md`: use
+     `testExecution: { group: 'react-parity' }` when the dedicated runner owns
+     the complete project, or add `testExecution.include` containing only the
+     parity-owned patterns when ordinary package tests share that project. The
+     base `test.include` remains the complete local project.
+   - Never add a binding name/path to `ci.yml`, a package-specific parity job or
+     exclusion environment variable, or shard/Node/job details to
+     `testExecution`. `vitest.ci-sharded.config.js` derives the ordinary-shard
+     complement from the ownership metadata.
    - Add catalog dependencies to `pnpm-workspace.yaml` only when needed.
 
 4. **Reuse core, reimplement binding**
@@ -78,7 +89,15 @@ Read first:
    - Every port-authored test used to support a React-parity claim must run the same observable scenario against the pinned React implementation or cite the pinned upstream test that covers it. Octane-only divergence and framework-contract tests must say why they are unpaired and must not be counted as React-parity evidence.
    - Treat upstream type tests as executable parity evidence, not merely inspiration. Run the vendored suite unchanged with its original compiler and pinned React type dependencies, run a one-for-one adapted suite with the Octane compiler configuration, and require equivalent accept/reject results except for explicit divergences.
    - Inventory and hash both type suites at file and assertion-group granularity. Record the exact allowed transformations (for example import roots, `.tsx`/`.tsrx` component paths, or a documented event-name mapping), reject every other structural change, and add negative controls for a skipped file, deleted assertion, and removed `@ts-expect-error`.
-   - Register pristine and adapted runtime and type lanes with `react-parity:check` and the package's CI entry point. A locally runnable helper that CI never invokes is not parity evidence.
+   - Register pristine and adapted runtime and type lanes in
+     `packages/<name>/audit/react-parity.json`. `react-parity:check` discovers
+     package manifests automatically; do not create a package-specific CI entry
+     point. A locally runnable helper that the generic React parity job never
+     invokes is not parity evidence.
+   - Make every Vitest-backed `lane.project` match a project name in
+     `vitest.config.js`. Keep parity lane files inside `testExecution.include`
+     for a mixed project, and keep Octane-only conformance/framework-contract
+     files outside it so the general shards still execute them.
 
 7. **Build test strategy for what upstream does not cover**
    - DOM output over event sequences: use differential tests where the same `.tsrx` fixture runs in Octane and React.
@@ -106,6 +125,9 @@ Read first:
 
 9. **Validate**
    - Run package-specific tests first.
+   - Run the local and sharded views of every mixed parity project as described
+     in `docs/react-parity-testing.md`; the latter must execute only the
+     non-parity complement.
    - Run affected core tests if touching `packages/octane`.
    - Run `pnpm typecheck` for API/package changes.
    - Run `pnpm react-parity:check` for binding work and confirm every required manifest lane executes rather than only validates metadata.
@@ -128,7 +150,8 @@ Read first:
   recorded divergence pinned by a test.
 - Pristine and adapted type suites, hashed assertion inventories, permitted
   transformation ledger, negative controls, and exhaustive port-test
-  classifications wired into `react-parity:check` and package CI.
+  classifications wired into `react-parity:check` and the generic React parity
+  execution group.
 - README with compatibility status and intentional differences.
 - Changeset if user-facing package behavior changed.
 - Optional update to `docs/react-library-compat-plan.md` scorecard.

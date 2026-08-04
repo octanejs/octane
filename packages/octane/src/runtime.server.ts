@@ -3942,6 +3942,16 @@ export function use<T>(
 	const resolved = RESOLVED;
 	if (resolved !== null && resolved.has(key)) {
 		const entry = resolved.get(key)!;
+		const thenable = usable as PromiseLike<unknown>;
+		// Keep the settled result authoritative when a replay recreates this
+		// thenable, but observe the abandoned replacement so a later rejection is
+		// handled. The original thenable was already observed on the suspending pass
+		// and must not pay for another subscription on every replay.
+		if (entry.thenable !== thenable) {
+			try {
+				thenable.then(NOOP, NOOP);
+			} catch {}
+		}
 		// Rejected on a prior pass → throw so the enclosing @try renders @catch.
 		// Serialize a typed rejection seed first so hydration takes the same catch
 		// arm even when the client receives a fresh, still-pending thenable.
@@ -5139,7 +5149,11 @@ function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
  * resolved value is appended as an inline data `<script>` for the client to seed.
  */
 type SuspendedList = { promise: PromiseLike<unknown>; key: string }[];
-type SuspenseOutcome = { value: unknown } | { reason: unknown };
+type SuspenseResult = { value: unknown } | { reason: unknown };
+type SuspenseOutcome = SuspenseResult & {
+	/** Thenable whose settlement produced this string-keyed cached result. */
+	thenable: PromiseLike<unknown>;
+};
 // The render-local suspense cache. `pu` carries the SSR parallel-use mirror's
 // state (docs/suspense-parallel-use-plan.md Phase 5), hung off the SAME object
 // so every existing threading path — pass functions, discovery rounds, both
@@ -5164,7 +5178,7 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 			string,
 			{ deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
 		>;
-		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
+		resolvedT: Map<PromiseLike<unknown>, SuspenseResult>;
 		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
 		// a value is adoptable once, while its retained tombstone prevents a later
 		// dependency stratum from speculatively recreating the same request.
@@ -5534,11 +5548,11 @@ async function settleSuspended(
 			// occurrence-keyed semantics are untouched by the mirror.
 			const isPu = key.charCodeAt(0) === 124 /* '|' */ && key.startsWith('|pu#');
 			try {
-				const outcome = { value: await promise };
+				const outcome = { value: await promise, thenable: promise };
 				resolved.set(key, outcome);
 				if (isPu) pu.resolvedT.set(promise, outcome);
 			} catch (reason) {
-				const outcome = { reason };
+				const outcome = { reason, thenable: promise };
 				resolved.set(key, outcome);
 				if (isPu) pu.resolvedT.set(promise, outcome);
 			}
@@ -5582,11 +5596,13 @@ async function settleFirstOfWave(
 			(async () => {
 				try {
 					const value = await promise;
-					if (!resolved.has(key)) resolved.set(key, { value });
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { value });
+					const outcome = { value, thenable: promise };
+					if (!resolved.has(key)) resolved.set(key, outcome);
+					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
 				} catch (reason) {
-					if (!resolved.has(key)) resolved.set(key, { reason });
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { reason });
+					const outcome = { reason, thenable: promise };
+					if (!resolved.has(key)) resolved.set(key, outcome);
+					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
 				}
 			})(),
 		);
@@ -5901,11 +5917,13 @@ function recordHostedStratum(
 			const isPu = key.startsWith('|pu#');
 			try {
 				const value = await promise;
-				if (!resolved.has(key)) resolved.set(key, { value });
-				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { value });
+				const outcome = { value, thenable: promise };
+				if (!resolved.has(key)) resolved.set(key, outcome);
+				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
 			} catch (reason) {
-				if (!resolved.has(key)) resolved.set(key, { reason });
-				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { reason });
+				const outcome = { reason, thenable: promise };
+				if (!resolved.has(key)) resolved.set(key, outcome);
+				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
 			}
 		})(),
 	);

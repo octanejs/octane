@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
 	buildLaneArgv,
 	loadManifest,
+	requiredExecutableLanes,
 	verifyLaneEnvironment,
 	verifyManifestFiles,
 	verifyManifestTestSelections,
@@ -27,19 +28,23 @@ for (let index = 0; index < args.length; index += 2) {
 		throw new Error('Invalid or missing flag value');
 }
 
-if (!['validate', 'list', 'run'].includes(action)) {
-	throw new Error('Usage: harness.mjs <validate|list|run> [--lane ID] [--manifest PATH]');
+if (!['validate', 'list', 'run', 'run-required'].includes(action)) {
+	throw new Error(
+		'Usage: harness.mjs <validate|list|run|run-required> [--lane ID] [--manifest PATH]',
+	);
 }
 
 const manifest = await loadManifest(manifestPath);
 await verifyManifestFiles(manifest, root);
 
 if (action === 'validate') {
+	const selected = laneId ? manifest.lanes.filter((lane) => lane.id === laneId) : manifest.lanes;
+	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
-	for (const lane of manifest.lanes) {
+	for (const lane of selected) {
 		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
 	}
-	await verifyManifestTestSelections(manifest, root);
+	await verifyManifestTestSelections({ ...manifest, lanes: selected }, root);
 	console.log(`valid: ${manifestPath}`);
 } else if (action === 'list') {
 	for (const lane of manifest.lanes) {
@@ -49,10 +54,17 @@ if (action === 'validate') {
 		);
 	}
 } else {
-	const selected = laneId ? manifest.lanes.filter((lane) => lane.id === laneId) : manifest.lanes;
+	if (action === 'run-required' && laneId) {
+		throw new Error('run-required does not accept --lane');
+	}
+	const selected =
+		action === 'run-required'
+			? requiredExecutableLanes(manifest)
+			: laneId
+				? manifest.lanes.filter((lane) => lane.id === laneId)
+				: manifest.lanes;
 	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
-	await verifyManifestTestSelections({ ...manifest, lanes: selected }, root);
 	for (const lane of selected) {
 		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
 		const [command, ...commandArgs] = buildLaneArgv(lane, root);

@@ -115,6 +115,41 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
+A one-level method call tracks the value that can change between renders. The
+compiled array selects that value on each render, based on where the method
+lives:
+
+- An own function property tracks itself: `props.onChange(...)` tracks
+  `props.onChange`.
+- An inherited method tracks its receiver: `count.toFixed(2)` tracks `count`,
+  because `Number.prototype.toFixed` is one function for every number.
+- An absent handler in an optional call tracks a stable `undefined`:
+  `props.onReady?.()` does not re-run its hook until a handler is passed.
+
+Deeper calls such as `cart.items.push(x)` track their receiver path
+(`cart.items`), unchanged.
+
+Some closures declare that their body runs in another context, not during
+render. A directive from a known list marks them: `'use gpu'` (TypeGPU shader
+code) and `'worklet'` (Reanimated UI-thread code). Inside such a closure, the
+inferred array tracks only the root variables it captures and reads none of
+their properties:
+
+```tsx
+const pipeline = useMemo(() =>
+  root.createRenderPipeline({
+    fragment: () => {
+      'use gpu';
+      return timeUniform.$; // legal only in shader code — never read at render
+    },
+  }),
+); // Inferred: [root, timeUniform]
+```
+
+The list is deliberate. Same-context hints (`'use strict'`, React Compiler's
+`'use memo'`/`'use no memo'`) and markers with their own semantics
+(`'use server'`, `'use cache'`) do not truncate.
+
 ### Calls to custom wrappers
 
 Inferring a missing dependency argument at a **call to a custom wrapper** is a

@@ -129,7 +129,9 @@ describe('website routes', () => {
 		// The redesign uses one full-width top bar across every route (no docs-only width).
 		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
-		expect(container.textContent).toContain('No hand-maintained dependency arrays');
+		expect(container.textContent).toContain(
+			'No virtual DOM, rules of hooks, or dependency arrays you have to maintain yourself.',
+		);
 		const heroActions = container.querySelector('.hero-actions')!;
 		expect(findLink(heroActions, '/docs/quick-start')).toBeTruthy();
 		expect(findLink(heroActions, '/docs/differences-from-react')).toBeTruthy();
@@ -168,21 +170,21 @@ describe('website routes', () => {
 		const why = container.querySelector<HTMLElement>('section.why[aria-labelledby="why-heading"]')!;
 		expect(why).toBeTruthy();
 		expect(why.querySelector('#why-heading')?.textContent?.trim()).toBe(
-			'Fast should be how your app feels. Not a new way you have to think.',
+			'Your app should feel fast. Your code should still feel familiar.',
 		);
 		const whyQuestions = Array.from(why.querySelectorAll('.why-question')).map((question) =>
 			question.textContent?.trim(),
 		);
 		expect(whyQuestions).toEqual([
-			'Why would I move my app to Octane?',
-			"Why isn't Octane built on signals?",
+			'What does moving a React app to Octane look like?',
+			'Why not build Octane on signals?',
 		]);
 		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// cli, compat, spin, explorer. (Each section carries a compiler-added scoped
-		// class after its semantic one.)
+		// compat, spin, explorer. (Each section carries a compiler-added scoped class
+		// after its semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
 		);
@@ -191,7 +193,6 @@ describe('website routes', () => {
 			'features',
 			'proven',
 			'why',
-			'cli',
 			'compat',
 			'spin',
 			'explorer',
