@@ -44,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 10 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 9 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -63,6 +63,22 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from '@octanejs/shadcn/base-ui/DropdownMenu';
 import {
 	Item,
 	ItemActions,
@@ -775,6 +791,45 @@ export function ShadcnBaseUIDemo() @{
 					</ItemContent>
 				</Item>
 			</ItemGroup>
+		</Section>
+
+		<Section
+			title="DropdownMenu"
+			note="Runs on the Base UI Menu primitive: Portal > Positioner > Popup. Open it and check the submenu — hovering 'More' must keep that row highlighted (it uses data-popup-open, not data-open), the checkbox and radio ticks must appear, and arrow keys must move the highlight."
+		>
+			<DropdownMenu>
+				<DropdownMenuTrigger render={<Button variant="outline" />}>Open menu</DropdownMenuTrigger>
+				<DropdownMenuContent>
+					<DropdownMenuLabel>My account</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<DropdownMenuItem>
+							Profile
+							<DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+						</DropdownMenuItem>
+						<DropdownMenuItem>
+							Billing
+							<DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+						</DropdownMenuItem>
+						<DropdownMenuItem disabled>Unavailable</DropdownMenuItem>
+					</DropdownMenuGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuCheckboxItem checked>Show sidebar</DropdownMenuCheckboxItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuRadioGroup value="light">
+						<DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+						<DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+					</DropdownMenuRadioGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger>More options</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent>
+							<DropdownMenuItem>Nested item</DropdownMenuItem>
+							<DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

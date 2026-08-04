@@ -277,6 +277,25 @@
       ]
     },
     {
+      "name": "dropdown-menu",
+      "type": "registry:ui",
+      "title": "Dropdown Menu",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "@octanejs/lucide@0.1.18"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/dropdown-menu.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/dropdown-menu.tsrx"
+        }
+      ]
+    },
+    {
       "name": "empty",
       "type": "registry:ui",
       "title": "Empty",

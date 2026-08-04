@@ -48,6 +48,22 @@ import {
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
 import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from '@octanejs/shadcn/base-ui/DropdownMenu';
+import {
 	Item,
 	ItemActions,
 	ItemContent,
@@ -543,4 +559,35 @@ export function ItemCase() @{
 			</ItemContent>
 		</Item>
 	</ItemGroup>
+}
+
+// Open so the portalled tree exists. Standalone: the label must not need a Group ancestor.
+export function DropdownMenuCase() @{
+	<DropdownMenu defaultOpen>
+		<DropdownMenuTrigger>Open menu</DropdownMenuTrigger>
+		<DropdownMenuContent>
+			<DropdownMenuLabel>My account</DropdownMenuLabel>
+			<DropdownMenuSeparator />
+			<DropdownMenuGroup>
+				<DropdownMenuItem>
+					Profile
+					<DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+				</DropdownMenuItem>
+				<DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+				<DropdownMenuItem disabled>Unavailable</DropdownMenuItem>
+			</DropdownMenuGroup>
+			<DropdownMenuSeparator />
+			<DropdownMenuCheckboxItem checked>Show sidebar</DropdownMenuCheckboxItem>
+			<DropdownMenuRadioGroup value="light">
+				<DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+				<DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+			</DropdownMenuRadioGroup>
+			<DropdownMenuSub>
+				<DropdownMenuSubTrigger>More</DropdownMenuSubTrigger>
+				<DropdownMenuSubContent>
+					<DropdownMenuItem>Nested</DropdownMenuItem>
+				</DropdownMenuSubContent>
+			</DropdownMenuSub>
+		</DropdownMenuContent>
+	</DropdownMenu>
 }

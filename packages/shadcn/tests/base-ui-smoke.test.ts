@@ -94,6 +94,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Badge', F.BadgeCase, 'Secondary'],
 	['Breadcrumb', F.BreadcrumbCase, 'Current'],
 	['Item', F.ItemCase, 'Item description text.'],
+	['DropdownMenu', F.DropdownMenuCase, 'Profile', true],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -1169,6 +1170,108 @@ describe('@octanejs/shadcn — Base UI span-rooted controls carry their own disp
 			// with no size of its own, putting it off-centre.
 			expect(indicator.className).not.toMatch(/(?:^|\s)relative(?:\s|$)/);
 			expect(indicator.className).toContain('size-full');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI dropdown-menu maps onto the Menu primitive', () => {
+	const open = async () => {
+		const m = mount(F.DropdownMenuCase as never);
+		await settle();
+		return m;
+	};
+
+	it('renders the label standalone, without a Group ancestor', async () => {
+		// `Menu.GroupLabel` calls useMenuGroupRootContext and THROWS "MenuGroupContext is missing"
+		// outside a `Menu.Group`, while shadcn's label is routinely used on its own. Routing it
+		// through the primitive would make the ordinary case a runtime crash — the same trap
+		// `Field.Label` already shipped once.
+		const m = await open();
+		try {
+			const label = document.querySelector('[data-slot="dropdown-menu-label"]')!;
+			expect(label).not.toBe(null);
+			expect(label.tagName).toBe('DIV');
+			expect(label.textContent).toBe('My account');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('positions through Positioner and reads the Base UI css vars', async () => {
+		// Radix publishes per-component variable names; Base UI's Positioner publishes generic
+		// ones. A utility pointing at a variable nothing sets silently does nothing, which is
+		// invisible to any structural assertion.
+		const m = await open();
+		try {
+			const content = document.querySelector('[data-slot="dropdown-menu-content"]')!;
+			expect(content.getAttribute('role')).toBe('menu');
+			for (const v of ['--available-height', '--anchor-width', '--transform-origin']) {
+				expect(content.className, v).toContain(v);
+			}
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('uses the trigger open dialect on the submenu trigger, not the popup one', async () => {
+		// Base UI marks an open TRIGGER with `data-popup-open`; `data-open` belongs to the popup.
+		// Radix's `data-open:bg-accent` here would never match, so an open submenu's parent row
+		// would lose its highlight.
+		const m = await open();
+		try {
+			const subTrigger = document.querySelector('[data-slot="dropdown-menu-sub-trigger"]')!;
+			expect(subTrigger.className).toContain('data-popup-open:bg-accent');
+			expect(subTrigger.className).not.toMatch(/(?:^|\s)data-open:/);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('emits the menu roles and the disabled dialect on items', async () => {
+		const m = await open();
+		try {
+			expect(document.querySelectorAll('[role="menuitem"]').length).toBeGreaterThanOrEqual(3);
+			expect(document.querySelector('[role="menuitemcheckbox"]')).not.toBe(null);
+			expect(document.querySelector('[role="menuitemradio"]')).not.toBe(null);
+			const disabled = [...document.querySelectorAll('[role="menuitem"]')].find(
+				(el) => el.textContent === 'Unavailable',
+			)!;
+			expect(disabled.hasAttribute('data-disabled')).toBe(true);
+			expect(disabled.className).toContain('data-disabled:opacity-50');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps radix focus: utilities, which work because Base UI moves real focus', async () => {
+		// Recorded because it looks like it should NOT carry over: Base UI publishes
+		// `data-highlighted`, but it also moves DOM focus onto the highlighted item, so radix's
+		// `focus:bg-accent` matches as written. Verified by driving ArrowDown and reading
+		// document.activeElement.
+		const m = await open();
+		try {
+			const item = document.querySelector('[role="menuitem"]')!;
+			expect(item.className).toContain('focus:bg-accent');
+			const popup = document.querySelector('[role="menu"]') as HTMLElement;
+			popup.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+			await settle();
+			const highlighted = document.querySelector('[role="menuitem"][data-highlighted]');
+			expect(highlighted).not.toBe(null);
+			expect(document.activeElement).toBe(highlighted);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders a separator even though Menu has no Separator part', async () => {
+		const m = await open();
+		try {
+			const seps = document.querySelectorAll('[data-slot="dropdown-menu-separator"]');
+			expect(seps.length).toBe(2);
+			expect(seps[0].getAttribute('role')).toBe('separator');
 		} finally {
 			m.unmount();
 		}
