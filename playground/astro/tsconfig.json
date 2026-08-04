@@ -1,0 +1,9 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "octane"
+  },
+  "include": ["src/**/*", ".astro/types.d.ts"],
+  "exclude": ["dist"]
+}

@@ -1,0 +1,167 @@
+---
+title: Publishing libraries
+---
+
+import { PackageManagerCommand } from '../../components/PackageInstall.tsrx';
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Ship source, compile with the app</p>
+	<h1>Publishing libraries</h1>
+	<p className="doc-lede">
+		{
+			'Publish all importable code in the form it was authored. The consuming application compiles it with its own Octane toolchain so generated code and the installed runtime always agree.'
+		}
+	</p>
+</div>
+
+<h2 id="source-package-contract">The source-package contract</h2>
+
+An Octane library is a **source package**. Its public exports resolve to authored
+source, not to JavaScript previously emitted by the Octane compiler. The application’s
+Vite, Rspack, or Rsbuild integration compiles that source alongside the application.
+
+This is required because compiled Octane output is coupled to the compiler/runtime
+contract and to the build target. Compiling in the application gives the library the
+same Octane version, client or server runtime selection, production settings, and
+development behavior as the code importing it.
+
+<aside className="doc-callout note">
+	<p className="doc-callout-title">
+		Do not publish precompiled Octane output as the implementation
+	</p>
+	<p>
+		{
+			'A library build produced by one Octane compiler may not match the runtime installed by the consuming application. Point package exports at the authored source and let the application compile it.'
+		}
+	</p>
+</aside>
+
+<h2 id="package-the-source">Package the complete source graph</h2>
+
+Publish every file consumers can import through the package exports, plus every module
+and runtime asset those entry points transitively import. Preserve each file’s extension
+and relative path. That includes all `.tsrx`, `.tsx`, `.ts`, and `.js` modules in the
+importable graph, plus imported CSS, JSON, WebAssembly, or other runtime assets. Do not
+replace `.tsrx` or `.tsx` modules with compiler output during release packaging.
+
+“Complete source” means the importable graph consumers can execute. Tests, fixtures,
+benchmarks, examples, and repository-only tooling are outside that graph and should not
+be published unless the package intentionally exposes them.
+
+A simple package whose `src` directory contains only importable code can whitelist that
+whole directory:
+
+```text
+my-octane-library/
+├── package.json
+├── README.md
+└── src/
+    ├── index.ts
+    ├── Button.tsrx
+    ├── Icon.tsx
+    ├── useButton.ts
+    └── compatibility.js
+```
+
+```json
+{
+	"name": "@acme/octane-library",
+	"version": "1.0.0",
+	"type": "module",
+	"files": ["src", "README.md"],
+	"main": "./src/index.ts",
+	"module": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"peerDependencies": {
+		"octane": "^0.1.0"
+	}
+}
+```
+
+Choose the peer range you actually test and support. The important parts of the
+example are that `files` includes the complete source graph, `exports` resolves to raw
+source, and `octane` is a runtime peer rather than only a development dependency.
+
+For multiple public entry points, map every subpath to its source entry:
+
+```json
+{
+	"exports": {
+		".": "./src/index.ts",
+		"./button": "./src/Button.tsrx",
+		"./server": "./src/server.ts"
+	}
+}
+```
+
+The consuming application must declare your package in its dependencies. Octane’s
+bundler integrations discover installed source packages that depend on or peer-depend
+on `octane`, follow their runtime dependencies recursively, and keep them in the
+compiler pipeline. Applications do not need package-specific build aliases or
+`node_modules` include rules.
+
+<h2 id="authoring-and-types">Authoring and types</h2>
+
+Keep the original extensions because they tell the toolchain how to handle each module:
+
+- `.tsrx` and Octane-owned `.tsx` receive full compilation.
+- Plain `.ts` and `.js` remain source modules; when they define Octane custom hooks,
+  the compiler assigns the hook slots they need.
+- A `.tsx` file should start with `/** @jsxImportSource octane */` so TypeScript uses
+  Octane’s JSX types. Installed-package ownership still comes from the package manifest.
+
+Raw `.ts` entry points can also supply the public types, as in the manifest above. If a
+direct `.tsrx` export needs a generated declaration, ship its corresponding `.d.ts` and
+use a `types` export condition, but keep the `default` condition pointed at the raw
+`.tsrx` implementation. Declaration files supplement source; they do not replace it.
+
+Never add an ambient `declare module '*.tsrx'`. It hides real resolution errors and
+turns every matching import into `any`. Type-check a package containing `.tsrx` with
+`tsrx-tsc --noEmit`.
+
+<h2 id="package-metadata">Use package metadata only for real exceptions</h2>
+
+Most libraries need no top-level `octane` configuration object; declaring the runtime
+dependency is enough. In particular, do not copy this setting from another binding:
+
+```json
+{
+	"octane": {
+		"hookSlots": {
+			"manual": ["src"]
+		}
+	}
+}
+```
+
+`hookSlots.manual` disables automatic hook slotting under those directories. It is only
+for a library that deliberately implements and verifies slot forwarding itself. Leaving
+it out is the correct default for normal `.ts` and `.js` custom hooks.
+
+The Vite-specific `octane.vite.optimizeDeps.exclude` metadata is similarly narrow: use
+it only when an identity-sensitive dependency must stay outside Vite’s dependency
+optimizer. See [Build tools](/docs/build-tools#vite) for that escape hatch.
+
+<h2 id="verify-the-package">Verify what users receive</h2>
+
+Inspect the release tarball before publishing:
+
+<PackageManagerCommand command="pack-dry-run" />
+
+Confirm that:
+
+1. Every exported path exists in the tarball.
+2. Every relative import from those entries resolves to another included source file or
+   asset.
+3. Every `.tsrx`, `.tsx`, `.ts`, and `.js` file in the importable graph retains its
+   authored contents and extension.
+4. `octane` is present in `peerDependencies`, not only `devDependencies`.
+5. A fixture application can install the packed tarball, type-check with `tsrx-tsc`, and
+   build through one of Octane’s supported integrations.
+
+That packed-consumer test is the useful boundary: it catches missing `files` entries,
+incorrect export maps, undeclared runtime dependencies, and release steps that silently
+swap source for stale compiled output.

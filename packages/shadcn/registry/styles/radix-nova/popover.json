@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "popover",
+  "type": "registry:ui",
+  "title": "Popover",
+  "files": [
+    {
+      "path": "ui/popover.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/popover.tsrx",
+      "content": "// Popover — maintainer-supplied default-Tailwind flavor, class strings\n// verbatim. Octane adaptations: \"use client\" dropped, radix-ui →\n// @octanejs/radix.\n//\n// PopoverContent renders Portal > Content: the Portal's child must be a real\n// element DESCRIPTOR (radix portals cannot enumerate opaque compiled .tsrx\n// children), so the pair is composed with createElement; the consumer's\n// children flow into the Content primitive through the ordinary props.children\n// channel.\nimport { createElement } from 'octane';\nimport { Popover as PopoverPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function Popover(props: Record<string, unknown>) @{\n\t<PopoverPrimitive.Root data-slot=\"popover\" {...props} />\n}\n\nexport function PopoverTrigger(props: Record<string, unknown>) @{\n\t<PopoverPrimitive.Trigger data-slot=\"popover-trigger\" {...props} />\n}\n\nexport interface PopoverContentProps extends Record<string, unknown> {\n\tclassName?: string;\n\talign?: 'start' | 'center' | 'end';\n\tsideOffset?: number;\n}\n\nexport function PopoverContent({\n\tclassName,\n\talign = 'center',\n\tsideOffset = 4,\n\t...props\n}: PopoverContentProps) {\n\treturn createElement(PopoverPrimitive.Portal, {\n\t\tchildren: createElement(PopoverPrimitive.Content, {\n\t\t\t'data-slot': 'popover-content',\n\t\t\talign,\n\t\t\tsideOffset,\n\t\t\tclassName: cn(\n\t\t\t\t'z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',\n\t\t\t\tclassName,\n\t\t\t),\n\t\t\t...props,\n\t\t}),\n\t});\n}\n\nexport function PopoverAnchor(props: Record<string, unknown>) @{\n\t<PopoverPrimitive.Anchor data-slot=\"popover-anchor\" {...props} />\n}\n\nexport function PopoverHeader({ className, ...props }: Props) @{\n\t<div\n\t\tdata-slot=\"popover-header\"\n\t\tclassName={cn('flex flex-col gap-0.5 text-sm', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function PopoverTitle({ className, ...props }: Props) @{\n\t<div data-slot=\"popover-title\" className={cn('font-medium', className)} {...props} />\n}\n\nexport function PopoverDescription({ className, ...props }: Props) @{\n\t<p\n\t\tdata-slot=\"popover-description\"\n\t\tclassName={cn('text-muted-foreground', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.22"
+  ],
+  "registryDependencies": [
+    "@octane/utils"
+  ]
+}

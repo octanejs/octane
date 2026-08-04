@@ -624,6 +624,55 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'electron',
+					include: [
+						'packages/electron/tests/conformance/**/*.test.ts',
+						'packages/electron/tests/preload/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/electron$/,
+							replacement: resolve(import.meta.dirname, 'packages/electron/src/renderer/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'electron-main',
+					include: ['packages/electron/tests/main/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'electron-ssr',
+					include: ['packages/electron/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/electron$/,
+							replacement: resolve(import.meta.dirname, 'packages/electron/src/renderer/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -1547,17 +1596,37 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-pristine',
+					include: ['packages/hook-form/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/hook-form/tests/upstream/**/*.test.ts',
+						'packages/hook-form/tests/upstream/**/*.test.tsx',
+					],
+				},
 				test: {
 					name: 'hook-form',
 					include: [
 						'packages/hook-form/tests/**/*.test.ts',
 						'packages/hook-form/tests/**/*.test.tsx',
 					],
-					exclude: [...configDefaults.exclude, 'packages/hook-form/tests/**/*.server.test.tsx'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/hook-form/tests/**/*.server.test.tsx',
+						'packages/hook-form/tests/upstream-original.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.tsx',
+					],
 					environment: 'jsdom',
-					// Differential precompile: rewrites `@octanejs/hook-form` →
-					// `react-hook-form` so the React side runs the real binding.
-					globalSetup: ['packages/hook-form/tests/differential/_setup.ts'],
 					// The ported upstream suite uses @testing-library/jest-dom matchers
 					// (toBeVisible, toBeInTheDocument, …) — same as react-hook-form's own
 					// jest setup. clear/reset/restore mirror upstream's jest config so
@@ -1595,6 +1664,43 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-differential',
+					include: [
+						'packages/hook-form/tests/differential/**/*.test.ts',
+						'packages/hook-form/tests/differential/**/*.test.tsx',
+					],
+					environment: 'jsdom',
+					// Rewrites the fixture imports so the React side runs the real binding.
+					globalSetup: ['packages/hook-form/tests/differential/_setup.ts'],
+					setupFiles: ['packages/hook-form/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/hook-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hook-form\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/hook-form/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				// react-hook-form's own jest config runs `*.server.test.tsx` in a
 				// node environment; same split here — node transform mode also makes
 				// the octane plugin compile in `mode: 'server'`, which the server
@@ -2587,6 +2693,11 @@ export default defineConfig({
 					name: 'testing-library',
 					include: ['packages/testing-library/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					// hydrate.test.ts renders its server markup through the shared
+					// hydration harness, which boots a real Vite SSR server in beforeAll —
+					// the same reason the other harness-using projects lift the 5s default.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				// The binding's `.ts` sources call hooks with EXPLICIT slot symbols
@@ -2704,6 +2815,47 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'astro',
+					include: ['packages/astro/tests/**/*.test.ts'],
+					exclude: ['packages/astro/tests/**/*.e2e.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^astro:octane:opts$/,
+							replacement: resolve(import.meta.dirname, 'packages/astro/tests/_fixtures/opts.js'),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/compiler\/vite$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/compiler/vite.js'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'astro-e2e',
+					include: ['packages/astro/tests/astro.e2e.test.ts'],
+					environment: 'node',
+					globals: false,
+					hookTimeout: 320_000,
+					testTimeout: 60_000,
+					fileParallelism: false,
+					...(process.env.CI ? { maxWorkers: 1 } : {}),
+				},
+			},
+			{
+				test: {
 					name: 'octane-mcp-server',
 					include: ['packages/octane-mcp-server/src/**/*.test.js'],
 					environment: 'node',
@@ -2714,6 +2866,14 @@ export default defineConfig({
 				test: {
 					name: 'cli',
 					include: ['packages/cli/tests/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'create-octane',
+					include: ['packages/create-octane/tests/**/*.test.js'],
 					environment: 'node',
 					globals: false,
 				},

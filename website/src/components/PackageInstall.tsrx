@@ -1,10 +1,8 @@
-// An install snippet with a package-manager switcher: npm / pnpm / yarn / bun
-// tabs (pnpm is the default) over one terminal panel whose command is derived
-// per manager from the SAME package list — so a doc can never show a pnpm line
-// the npm tab contradicts. Docs use it for install fences only; script-running
-// fences (pnpm rsbuild dev, vite build …) stay ordinary code blocks. It owns
-// its own frame + copy button (rather than wrapping CodeBlock) so the tab bar
-// attaches seamlessly to the code as one panel.
+// A package-manager command with npm / pnpm / yarn / bun tabs (pnpm is the
+// default) over one terminal panel. Install commands are derived from one
+// package list, while named recipes cover commands whose shape differs by
+// manager. It owns its own frame + copy button (rather than wrapping CodeBlock)
+// so the tab bar attaches seamlessly to the code as one panel.
 import { useId, useRef, useState } from 'octane';
 import { useCopyToClipboard } from '../hooks/use-copy.ts';
 import copyUrl from '../assets/copy.svg';
@@ -22,11 +20,39 @@ const INSTALL: Record<PackageManager, { add: string; dev: string }> = {
 	bun: { add: 'bun add', dev: 'bun add -d' },
 };
 
+const PACK_DRY_RUN: Record<PackageManager, string> = {
+	npm: 'npm pack --dry-run',
+	pnpm: 'pnpm pack --dry-run',
+	yarn: 'yarn pack --dry-run',
+	bun: 'bun pm pack --dry-run',
+};
+
+// Scaffolding a new app. Every manager has a `create` verb that resolves
+// `create-octane`; npm carries the version tag so a stale cached copy is not
+// what runs.
+//
+// Deliberately no flags: how a flag reaches the scaffolder differs per manager
+// (npm consumes a bare `--` and forwards the rest, while pnpm and yarn forward
+// flags already and reject the `--`), so a tab strip that rewrote one command
+// into four would be asserting that difference for every manager here. Docs
+// pass `--template` in a prose fence instead, at the one spelling the CLI's own
+// usage error sanctions.
+const CREATE: Record<PackageManager, string> = {
+	npm: 'npm create octane@latest',
+	pnpm: 'pnpm create octane',
+	yarn: 'yarn create octane',
+	bun: 'bun create octane',
+};
+
 interface PackageInstallProps {
 	/** Runtime packages, space-separated — rendered first. */
 	packages?: string;
 	/** Dev packages, space-separated — rendered as the -D line. */
 	dev?: string;
+	/** A package-manager-specific command recipe instead of an install command. */
+	command?: 'pack-dry-run' | 'create';
+	/** `create` only: the directory to scaffold into. Defaults to `my-app`. */
+	directory?: string;
 }
 
 // One rendered span in the code block. Newlines between command lines are their
@@ -66,8 +92,14 @@ export function PackageInstall(props: PackageInstallProps) @{
 	const id = useId();
 
 	const lines: string[] = [];
-	if (props.packages) lines.push(INSTALL[manager].add + ' ' + props.packages);
-	if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);
+	if (props.command === 'pack-dry-run') {
+		lines.push(PACK_DRY_RUN[manager]);
+	} else if (props.command === 'create') {
+		lines.push(CREATE[manager] + ' ' + (props.directory ?? 'my-app'));
+	} else {
+		if (props.packages) lines.push(INSTALL[manager].add + ' ' + props.packages);
+		if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);
+	}
 	const tokens = toTokens(lines);
 
 	// textContent, not innerText: the element holds only our own token spans and a
@@ -264,3 +296,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 		</style>
 	</div>
 }
+
+// New docs should use the general name for non-install recipes. Keep the
+// original export because install snippets already use it throughout the site.
+export const PackageManagerCommand = PackageInstall;

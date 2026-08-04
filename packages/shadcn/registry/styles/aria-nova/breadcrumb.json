@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "breadcrumb",
+  "type": "registry:ui",
+  "title": "Breadcrumb",
+  "files": [
+    {
+      "path": "ui/breadcrumb.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/breadcrumb.tsrx",
+      "content": "// OCTANE ADAPTATION: octane's renderable type is `OctaneNode = unknown`, and a\n// union containing `unknown` collapses to `unknown` — so RAC's\n// `ChildrenOrFunction` cannot keep its render-prop arm distinguishable the way\n// React's precise `ReactNode` union does, and composeRenderProps has nothing to\n// infer its render values from. Annotating them here restores the upstream\n// parameter types without weakening the binding.\nimport {\n\tBreadcrumb as BreadcrumbPrimitive,\n\tBreadcrumbs as BreadcrumbsPrimitive,\n\tcomposeRenderProps,\n\tLink as LinkPrimitive,\n\ttype BreadcrumbProps,\n\ttype BreadcrumbRenderProps,\n\ttype BreadcrumbsProps,\n\ttype LinkProps,\n} from '@octanejs/aria/components';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\nimport { ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';\n\nexport function Breadcrumb({ className, ...props }: HostProps<'nav'>) {\n\treturn <nav\n\t\taria-label=\"breadcrumb\"\n\t\tdata-slot=\"breadcrumb\"\n\t\tclassName={cn(className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function BreadcrumbList<T extends object>({ className, ...props }: BreadcrumbsProps<T>) {\n\treturn <BreadcrumbsPrimitive\n\t\tdata-slot=\"breadcrumb-list\"\n\t\tclassName={cn(\n\t\t\t'flex flex-wrap items-center gap-1.5 text-sm wrap-break-word text-muted-foreground',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>;\n}\n\nexport function BreadcrumbItem({\n\tclassName,\n\tchildren,\n\tseparatorClassName,\n\t...props\n}: BreadcrumbProps & { separatorClassName?: string }) {\n\treturn <BreadcrumbPrimitive\n\t\tdata-slot=\"breadcrumb-item\"\n\t\tclassName={cn('inline-flex items-center gap-1', className)}\n\t\t{...props}\n\t>{composeRenderProps(\n\t\tchildren,\n\t\t(children, { isCurrent }: BreadcrumbRenderProps) => <>\n\t\t\t{children}\n\t\t\t{!isCurrent &&\n\t\t\t\t<span\n\t\t\t\t\tdata-slot=\"breadcrumb-separator\"\n\t\t\t\t\trole=\"presentation\"\n\t\t\t\t\taria-hidden=\"true\"\n\t\t\t\t\tclassName={cn('[&>svg]:size-3.5', separatorClassName)}\n\t\t\t\t>\n\t\t\t\t\t<ChevronRightIcon />\n\t\t\t\t</span>}\n\t\t</>,\n\t)}</BreadcrumbPrimitive>;\n}\n\nexport function BreadcrumbLink({ className, render, ...props }: LinkProps) {\n\treturn <LinkPrimitive\n\t\tdata-slot=\"breadcrumb-link\"\n\t\tclassName={cn('transition-colors hover:text-foreground', className)}\n\t\trender={render}\n\t\t{...props}\n\t/>;\n}\n\nexport function BreadcrumbPage({ className, ...props }: HostProps<'span'>) {\n\treturn <span\n\t\tdata-slot=\"breadcrumb-page\"\n\t\trole=\"link\"\n\t\taria-disabled=\"true\"\n\t\taria-current=\"page\"\n\t\tclassName={cn('font-normal text-foreground', className)}\n\t\t{...props}\n\t/>;\n}\n\nexport function BreadcrumbEllipsis({ className, ...props }: HostProps<'span'>) {\n\treturn <span\n\t\tdata-slot=\"breadcrumb-ellipsis\"\n\t\trole=\"presentation\"\n\t\taria-hidden=\"true\"\n\t\tclassName={cn('flex size-5 items-center justify-center [&>svg]:size-4', className)}\n\t\t{...props}\n\t>\n\t\t<MoreHorizontalIcon />\n\t\t<span className=\"sr-only\">More</span>\n\t</span>;\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/aria@0.0.17",
+    "@octanejs/lucide@0.1.18"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}

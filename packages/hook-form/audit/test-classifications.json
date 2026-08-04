@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/hook-form/tests/conformance/events.test.tsx",
+      "disposition": "octane-only-divergence",
+      "reason": "Exercises Octane's intentional native onInput event contract and commit-phase ref lifecycle rather than React synthetic events.",
+      "divergenceId": "hook-form-native-input-handler"
+    },
+    {
+      "path": "packages/hook-form/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane package namespace and verifies that the published binding does not leak a React runtime dependency."
+    },
+    {
+      "path": "packages/hook-form/tests/conformance/field-array-canary.test.tsx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Guards Octane compiler list lowering, DOM identity, focus, and native form behavior; it is not used as React-parity evidence."
+    },
+    {
+      "path": "packages/hook-form/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs every declared scenario against pinned react-hook-form and @octanejs/hook-form through the shared differential rig."
+    },
+    {
+      "path": "packages/hook-form/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs all 1,193 pinned upstream Jest tests byte-exact against React."
+    }
+  ]
+}

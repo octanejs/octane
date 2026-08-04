@@ -37,6 +37,14 @@ trigger first arises, even if it is a later step you chose:
 - `authoring-tsrx`: writing a new `.tsrx` file.
 - `triage`: the owning area is unclear.
 
+Each skill is `.rulesync/skills/<name>/SKILL.md`, with a generated per-tool copy;
+read that path directly if your tool cannot load a skill by name.
+
+Without `create-a-pr`: keep and tick provenance for agent work (clear or missing
+asserts human); never apply PR labels. Existing PR body edits must merge,
+preserve `<!-- CURSOR_SUMMARY -->` through `<!-- /CURSOR_SUMMARY -->`
+byte-for-byte, refetch before writing, and verify after.
+
 ## Your React instincts are the main failure mode here
 
 Octane looks like React but differs deliberately. Check
@@ -98,11 +106,18 @@ Typecheck any program containing `.tsrx` with `tsrx-tsc --noEmit`, never plain
 `tsc`. Octane-owned `.tsx` files carry a leading `/** @jsxImportSource octane */`
 pragma. Use `OctaneNode` for renderables, never `React.ReactNode`.
 
+## Published packages
+
+Ship every importable `.tsrx`, `.tsx`, `.ts`, and `.js` module as authored and
+point package exports at that source. Never publish Octane compiler output; the
+consuming application compiles the source with its own toolchain.
+
 ## Working here
 
 ```bash
 pnpm test          # full Vitest run
 pnpm typecheck
+pnpm typecheck:files [path...]     # defaults to staged and unstaged files
 pnpm sync
 pnpm format:files [path...]        # defaults to staged and unstaged files
 pnpm format:files:check [path...]  # defaults to staged and unstaged files
@@ -111,15 +126,17 @@ pnpm format:check                  # optional repo-wide gate
 
 Before any push, run `pnpm sync` and commit its generated changes.
 
-Scoped Prettier commands default to staged and unstaged Git diffs; explicit
-paths override that default. `format:files` writes and `format:files:check` is
-read-only. Use repo-wide `format:check` only when needed.
+Scoped typecheck and Prettier commands default to staged and unstaged Git diffs;
+explicit files or directories override that default. `format:files` writes and
+`format:files:check` is read-only. Use repo-wide checks only when needed.
 
 `pnpm test` runs package prechecks, then one root Vitest invocation for every
 project in `vitest.config.js`; it does not fan out through package `test`
 scripts. Root config uses `silent: true`. While diagnosing, pass
 `--silent=false` for all console output or `--silent=passed-only` for failing
 tests. CLI options override the config.
+
+For binding parity test setup, follow `docs/react-parity-testing.md` and the `react-library-port` skill.
 
 Add a changeset for user-facing package changes; stay on the `patch` track while
 Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build

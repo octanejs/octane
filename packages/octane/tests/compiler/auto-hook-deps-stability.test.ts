@@ -32,9 +32,16 @@ const c = (source: string, options?: { mode?: 'client' | 'server'; filename?: st
 // The inferred array, read back from the emitted hook call. The trailing slot
 // argument is a numeric index in `.tsrx` output and a Symbol alias in `.tsx`
 // output; both forms anchor the match without being asserted themselves.
+// One-level method calls compile their dependency to a helper call (the
+// own-property discriminator — auto-hook-deps.test.ts pins that emission);
+// normalize it back to the authored member spelling because this suite's
+// subject is WHICH captures are tracked or omitted, not the comparison form.
 const depsOf = (code: string): string[] =>
 	[...code.matchAll(/\[([^[\]]*)\],\s*(?:\d+|_h\$\d+)\s*\)/g)].map((match) =>
-		match[1].replace(/\s+/g, ' ').trim(),
+		match[1]
+			.replace(/[\w$]*__methodDep[\w$]*\((\w+), "([^"]+)"\)/g, '$1.$2')
+			.replace(/\s+/g, ' ')
+			.trim(),
 	);
 
 describe('dependency stability — module-scope immutable identities', () => {

@@ -19,6 +19,7 @@ pnpm dlx @octanejs/cli doctor
 
 | Command | What it does |
 | --- | --- |
+| `octane create [dir]` | Create an Octane app in a new directory. This is what `npm create octane` runs. |
 | `octane init` | Wire Octane into the project in this directory: bundler plugin, tsconfig, scripts, dependencies. |
 | `octane doctor` | Check the project for the mistakes that break Octane quietly. `--fix` repairs the mechanical ones. |
 | `octane analyze` | Compile the project and report every Octane compiler diagnostic, with its code and suggested edit. |

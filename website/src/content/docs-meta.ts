@@ -3,8 +3,9 @@
 // compiled MDX component. docs.ts zips this with the MDX imports for the
 // site; the remote MCP server (mcp/) imports only this file plus the raw
 // .mdx sources, so it never pulls compiled components into its bundle.
-// Its import chain must stay MDX-free (bindings.ts is JSON-only).
+// Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
 import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
+import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
 	id: string;
@@ -28,13 +29,25 @@ export const docsMeta: DocMeta[] = [
 	{
 		slug: 'quick-start',
 		title: 'Quick start',
-		description: 'Install octane, mount a component, and learn the .tsrx essentials.',
+		description:
+			'Scaffold a new Octane app, or add Octane to an existing project, and learn the .tsrx essentials.',
 		group: 'Start here',
+		searchTerms: [
+			'npm create octane',
+			'create-octane',
+			'scaffold',
+			'new project',
+			'--template',
+			'spa',
+			'fullstack',
+		],
 		sections: [
-			{ id: 'install', title: 'Install and configure' },
+			{ id: 'scaffold', title: 'Create a new app' },
+			{ id: 'install', title: 'Install into an existing project' },
 			{ id: 'first-component', title: 'Your first component' },
 			{ id: 'mount', title: 'Connect it to the page' },
 			{ id: 'tsrx-at-a-glance', title: 'TSRX at a glance' },
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -51,6 +64,33 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'full-app-configuration', title: 'Full app configuration' },
 			{ id: 'production-and-preview', title: 'Production and preview' },
 			{ id: 'renderer-targets', title: 'Renderer targets' },
+			{ id: 'mixed-toolchains', title: 'Mixed toolchains and file ownership' },
+		],
+	},
+	{
+		slug: 'framework-integrations',
+		title: 'Framework integrations',
+		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} app frameworks through first-party integrations.`,
+		group: 'Start here',
+		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
+			integration.title,
+			integration.packageName,
+			integration.model,
+			integration.description,
+			...(integration.packageName === '@octanejs/tanstack-start'
+				? [
+						'@octanejs/tanstack-router',
+						'@octanejs/tanstack-query',
+						'@octanejs/tanstack-form',
+						'TanStack bindings',
+					]
+				: []),
+		]),
+		sections: [
+			{ id: 'choose-a-framework', title: 'Find the right integration' },
+			{ id: 'astro', title: 'Astro islands' },
+			{ id: 'docusaurus', title: 'Docusaurus content sites' },
+			{ id: 'tanstack-start', title: 'TanStack Start applications' },
 		],
 	},
 	{
@@ -61,6 +101,15 @@ export const docsMeta: DocMeta[] = [
 		group: 'Start here',
 		searchTerms: [
 			'octane doctor',
+			'octane analyze',
+			'octane create',
+			'npm create octane',
+			'create-octane',
+			'scaffold',
+			'new project',
+			'--template',
+			'spa',
+			'fullstack',
 			'octane init',
 			'octane add',
 			'octane explain',
@@ -76,6 +125,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'doctor', title: 'octane doctor' },
 			{ id: 'fixing', title: 'Fixing what it finds', level: 3 },
 			{ id: 'analyze', title: 'octane analyze' },
+			{ id: 'create', title: 'octane create' },
 			{ id: 'init', title: 'octane init' },
 			{ id: 'bindings', title: 'Bindings and errors' },
 			{ id: 'mcp', title: 'octane mcp' },
@@ -122,6 +172,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'component-bodies', title: 'Component bodies' },
 			{ id: 'rendered-control-flow', title: 'Rendered control flow' },
 			{ id: 'text-holes', title: 'Text holes' },
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -151,6 +202,8 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'react-context', title: 'Share React context' },
 			{ id: 'server-rendering', title: 'Server rendering and hydration' },
 			{ id: 'not-supported', title: "What isn't supported" },
+			{ id: 'editor-and-type-checking', title: 'Editor and type checking' },
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -166,6 +219,30 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'reading-the-data', title: 'Reading the data' },
 			{ id: 'render-causes', title: 'Render causes' },
 			{ id: 'cost-and-privacy', title: 'Cost and privacy' },
+		],
+	},
+	{
+		slug: 'publishing-libraries',
+		title: 'Publishing libraries',
+		description:
+			'Ship complete importable Octane source so each application compiles libraries against its installed runtime.',
+		group: 'Explore',
+		searchTerms: [
+			'library author',
+			'package author',
+			'raw source',
+			'npm publish',
+			'npm pack',
+			'peerDependencies',
+			'package exports',
+			'hookSlots',
+		],
+		sections: [
+			{ id: 'source-package-contract', title: 'The source-package contract' },
+			{ id: 'package-the-source', title: 'Package the source' },
+			{ id: 'authoring-and-types', title: 'Authoring and types' },
+			{ id: 'package-metadata', title: 'Package metadata' },
+			{ id: 'verify-the-package', title: 'Verify the package' },
 		],
 	},
 	{

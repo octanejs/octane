@@ -284,6 +284,7 @@ function literalFromRange(tokens, range) {
 }
 
 function staticArrayRows(tokens, start, end, pairs) {
+	if (tokens[end - 2]?.value === 'as' && tokens[end - 1]?.value === 'const') end -= 2;
 	if (tokens[start]?.value !== '[' || pairs.get(start) !== end - 1) return null;
 	if (start + 1 === end - 1) return 0;
 	let rows = 1;
@@ -337,6 +338,7 @@ function staticValue(tokens, start, end, pairs) {
 }
 
 function staticArrayValues(tokens, start, end, pairs) {
+	if (tokens[end - 2]?.value === 'as' && tokens[end - 1]?.value === 'const') end -= 2;
 	if (tokens[start]?.value !== '[' || pairs.get(start) !== end - 1) return null;
 	const values = splitElements(tokens, start + 1, end - 1).map(([itemStart, itemEnd]) =>
 		staticValue(tokens, itemStart, itemEnd, pairs),

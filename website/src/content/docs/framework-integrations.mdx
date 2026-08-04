@@ -1,0 +1,143 @@
+---
+title: Framework integrations
+---
+
+import { FrameworkIntegrationsDirectory } from '../../components/FrameworkIntegrationsDirectory.tsrx';
+import { FRAMEWORK_INTEGRATION_COUNT } from '../framework-integrations.ts';
+import { PackageInstall } from '../../components/PackageInstall.tsrx';
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">
+		{FRAMEWORK_INTEGRATION_COUNT + ' first-party framework integrations'}
+	</p>
+	<h1>Framework integrations</h1>
+	<p className="doc-lede">
+		{
+			'Use Octane with the framework that already runs your app. Each integration takes care of the framework-specific setup.'
+		}
+	</p>
+</div>
+
+<h2 id="choose-a-framework">Find the right integration</h2>
+
+Choose the package for the framework that runs your app. It covers more than
+compilation, including routes, server rendering, hydration, and content. If you only
+need compiler support, see [Build tools](/docs/build-tools). For React library ports,
+see [Bindings](/docs/bindings).
+
+<FrameworkIntegrationsDirectory />
+
+<aside className="doc-callout note">
+	<p className="doc-callout-title">Already have a React app?</p>
+	<p>
+		{
+			'React isn’t in the list above because it’s a UI library, not a full app framework. If you already have a React 19 app, '
+		}
+		<code>octane/react</code>
+		{' lets you add compiled Octane components one at a time. '}
+		<a href="/docs/react-compat">Read the React compatibility guide</a>
+		{'.'}
+	</p>
+</aside>
+
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">Don’t see your framework?</p>
+	<p>
+		<a href="https://github.com/octanejs/octane/issues/new/choose">Open an issue</a>
+		{
+			' to suggest an integration and agree on the approach. If you’d like to help build it, check the '
+		}
+		<a href="https://github.com/octanejs/octane/pulls">open pull requests</a>
+		{', then send one of your own.'}
+	</p>
+</aside>
+
+<h2 id="astro">Astro islands</h2>
+
+Use `@octanejs/astro` when most of the page belongs to Astro and you want to add Octane
+islands. The integration compiles every `.tsrx` file and any `.tsx` files you assign to
+Octane. It renders those components on the server and connects them to Astro’s `client:*`
+directives.
+
+<PackageInstall packages="octane @octanejs/astro" />
+
+```js
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import octane from '@octanejs/astro';
+
+export default defineConfig({
+	integrations: [octane()],
+});
+```
+
+```astro
+---
+import { Counter } from '../components/Counter.tsrx';
+---
+
+<Counter client:load start={0} />
+```
+
+Astro still decides when each island hydrates. You can use Octane’s deferred hydration
+for work inside an island. The
+[`@octanejs/astro` package guide](https://github.com/octanejs/octane/tree/main/packages/astro)
+covers client-only islands, mixed JSX frameworks, ownership filters, and the available
+options.
+
+<h2 id="docusaurus">Docusaurus content sites</h2>
+
+Use `@octanejs/docusaurus` to keep Docusaurus’s configuration, plugins, routes, generated
+data, and MDX while rendering the site with Octane. The package includes an Octane router,
+static rendering, hydration helpers, and a starter documentation theme.
+
+<PackageInstall packages="octane @octanejs/docusaurus @docusaurus/core@3.10.1" />
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+import { docusaurus } from '@octanejs/docusaurus/vite';
+
+export default defineConfig({
+	plugins: [...docusaurus(), octane()],
+});
+```
+
+This package is a technical preview. React themes and swizzles need changes, and the full
+`start` and `build` workflow isn’t ready yet. Check the
+[`@octanejs/docusaurus` package guide](https://github.com/octanejs/octane/tree/main/packages/docusaurus)
+for the pinned Docusaurus version, theme setup, and current scope.
+
+<h2 id="tanstack-start">TanStack Start applications</h2>
+
+Use `@octanejs/tanstack-start` for a full-stack Octane app built on TanStack Start. It
+includes file-based routing, route splitting, server functions, streaming SSR, hydration,
+and the Vite setup for development and production. This website uses it.
+
+<PackageInstall packages="octane @octanejs/tanstack-start @octanejs/tanstack-router" dev="vite" />
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
+
+export default defineConfig({
+	plugins: [tanstackStart()],
+});
+```
+
+Import server and app APIs from the Start package. Import route APIs from the router
+binding:
+
+```ts
+import { createServerFn } from '@octanejs/tanstack-start';
+import { createFileRoute } from '@octanejs/tanstack-router';
+```
+
+See the
+[`@octanejs/tanstack-start` package guide](https://github.com/octanejs/octane/tree/main/packages/tanstack-start)
+for the client, server, RPC, hydration, and Vite entry points. TanStack Start is the
+framework. Query, Form, Store, Table, Virtual, Router, and the other TanStack packages are
+libraries; you’ll find their Octane ports in the
+[TanStack bindings directory](/docs/bindings#find-a-binding).

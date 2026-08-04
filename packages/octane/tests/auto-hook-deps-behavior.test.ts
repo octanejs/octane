@@ -9,6 +9,7 @@ import {
 	EffectFromDeferredWork,
 	EffectFromDestructuring,
 	EffectFromModuleScopeHelpers,
+	EffectFromOptionalMethodCall,
 	EffectFromProps,
 	EffectFromReferencedCallback,
 	EffectFromState,
@@ -18,9 +19,12 @@ import {
 	EffectWithFreshObject,
 	ExternalHookDependencies,
 	MemoFromComputedPath,
+	MemoFromInstanceMethodCall,
 	MemoFromNestedScope,
+	MemoFromOpaqueDirectiveClosure,
 	MemoFromOptionalPath,
 	MemoFromProps,
+	MemoFromPrototypeMethodCall,
 	MemoFromReferencedFactory,
 	MemoFromState,
 	MemoWithManyDependencies,
@@ -29,6 +33,7 @@ import {
 	StoreGetterInsideEffect,
 	StoreGetterSelectedEffect,
 	StoreSetterEffect,
+	withShaderContext,
 } from './_fixtures/auto-hook-deps-behavior.tsrx';
 
 function createStore(initial: string) {
@@ -94,6 +99,32 @@ describe('inferred useEffect dependencies — behavior', () => {
 		r.unmount();
 		flushEffects();
 		expect(next).toEqual(['run:a', 'cleanup:a']);
+	});
+
+	it('stays inert across renders while an optionally called handler is absent', () => {
+		const entries: string[] = [];
+		const log = (entry: string) => entries.push(entry);
+		const r = mount(EffectFromOptionalMethodCall, { log, noise: 0 });
+		flushEffects();
+		expect(entries).toEqual(['run']);
+
+		// No handler on either render: the inferred dependency must be as stable
+		// as the plain `props.onPing` read it replaces, not the fresh props bag.
+		r.update(EffectFromOptionalMethodCall, { log, noise: 1 });
+		flushEffects();
+		expect(entries).toEqual(['run']);
+
+		const onPing = vi.fn();
+		r.update(EffectFromOptionalMethodCall, { log, onPing, noise: 2 });
+		flushEffects();
+		expect(entries).toEqual(['run', 'run']);
+		expect(onPing).toHaveBeenCalledTimes(1);
+
+		r.update(EffectFromOptionalMethodCall, { log, onPing, noise: 3 });
+		flushEffects();
+		expect(entries).toEqual(['run', 'run']);
+		expect(onPing).toHaveBeenCalledTimes(1);
+		r.unmount();
 	});
 
 	it('reacts to captured state but not sibling state', () => {
@@ -484,6 +515,51 @@ describe('inferred useMemo dependencies — behavior', () => {
 		r.update(MemoWithManyDependencies, { ...initial, e: 6, noise: 2 });
 		expect(r.find('.value').textContent).toBe('1:2:3:4:6');
 		expect(compute).toHaveBeenCalledTimes(2);
+		r.unmount();
+	});
+
+	it('never reads context-bound getters captured by an opaque directive closure (issue #542)', () => {
+		// `resource.$` throws outside withShaderContext. The inferred array must
+		// track the root binding only, so plain renders perform no `.$` read.
+		const build = vi.fn((shader: () => number) => `p:${withShaderContext(shader)}`);
+		const r = mount(MemoFromOpaqueDirectiveClosure, { seed: 1, build, noise: 0 });
+		expect(r.find('.value').textContent).toBe('p:1');
+		expect(build).toHaveBeenCalledTimes(1);
+
+		r.update(MemoFromOpaqueDirectiveClosure, { seed: 1, build, noise: 1 });
+		expect(r.find('.value').textContent).toBe('p:1');
+		expect(build).toHaveBeenCalledTimes(1);
+
+		r.update(MemoFromOpaqueDirectiveClosure, { seed: 2, build, noise: 2 });
+		expect(r.find('.value').textContent).toBe('p:2');
+		expect(build).toHaveBeenCalledTimes(2);
+		r.unmount();
+	});
+
+	it('recomputes a prototype-method call when its receiver value changes (issue #542)', () => {
+		const r = mount(MemoFromPrototypeMethodCall);
+		expect(r.find('.step').textContent).toBe('0.00');
+
+		r.click('.step');
+		expect(r.find('.step').textContent).toBe('0.25');
+
+		r.click('.step');
+		expect(r.find('.step').textContent).toBe('0.50');
+		r.unmount();
+	});
+
+	it('recomputes a prototype-method call when the receiver instance is replaced', () => {
+		const r = mount(MemoFromInstanceMethodCall, { prefix: 'a', value: 'x', noise: 0 });
+		expect(r.find('.value').textContent).toBe('a:x');
+
+		r.update(MemoFromInstanceMethodCall, { prefix: 'a', value: 'x', noise: 1 });
+		expect(r.find('.value').textContent).toBe('a:x');
+
+		r.update(MemoFromInstanceMethodCall, { prefix: 'b', value: 'x', noise: 2 });
+		expect(r.find('.value').textContent).toBe('b:x');
+
+		r.update(MemoFromInstanceMethodCall, { prefix: 'b', value: 'y', noise: 3 });
+		expect(r.find('.value').textContent).toBe('b:y');
 		r.unmount();
 	});
 

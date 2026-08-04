@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -9,13 +10,43 @@ import {
 	validateLedger,
 	validateUpstreams,
 } from './inventory-lib.mjs';
+import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
+import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
+import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
+import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
 const UPSTREAMS_PATH = path.join(AUDIT, 'react-upstreams.json');
 const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
 const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--validate-only')) {
+	throw new Error('Usage: check.mjs [--validate-only]');
+}
+const validateOnly = args[0] === '--validate-only';
+const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTypes: true })
+	.filter((entry) => entry.isDirectory())
+	.map((entry) => `packages/${entry.name}/audit/react-parity.json`)
+	.filter((manifest) => existsSync(path.join(REPO, manifest)))
+	.sort();
+const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
 const errors = [];
+try {
+	verifyHookFormUpstream(REPO);
+} catch (error) {
+	errors.push(`react-hook-form upstream evidence is invalid: ${error.message}`);
+}
+try {
+	verifyHookFormTypes(REPO);
+} catch (error) {
+	errors.push(`react-hook-form type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyPortTestClassifications(REPO);
+} catch (error) {
+	errors.push(`react-hook-form test classifications are invalid: ${error.message}`);
+}
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components
 // (BenchmarkExplorer, BenchBars, …). Scan both trees so a misleading claim can't
@@ -89,6 +120,25 @@ for (const relativeFile of CLAIM_FILES) {
 			errors.push(`${relativeFile} contains a misleading React-port count claim (${pattern}).`);
 	}
 }
+for (const relativeFile of BINDING_MANIFESTS) {
+	try {
+		const manifest = await loadManifest(path.join(REPO, relativeFile));
+		await verifyManifestFiles(manifest, REPO);
+		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
+		for (const lane of manifest.lanes) {
+			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
+		}
+		if (!validateOnly) {
+			const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
+			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
+				cwd: REPO,
+				stdio: 'inherit',
+			});
+		}
+	} catch (error) {
+		errors.push(`${relativeFile} is invalid: ${error.message}`);
+	}
+}
 
 if (errors.length) {
 	console.error(`React parity audit failed:\n  - ${errors.join('\n  - ')}`);
@@ -96,7 +146,7 @@ if (errors.length) {
 }
 
 console.log(
-	`React parity audit is current (${loadedInventories
+	`React parity ${validateOnly ? 'metadata' : 'audit'} is current (${loadedInventories
 		.map((inventory) => `${inventory.baseline}: ${inventory.summary.concreteCases} cases`)
 		.join(', ')}).`,
 );
