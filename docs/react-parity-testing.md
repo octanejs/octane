@@ -158,7 +158,9 @@ once. It does not run a separate Vitest collection pass before execution.
    project is mixed.
 3. Add or update `packages/<name>/audit/react-parity.json`; do not add the
    package to the workflow.
-4. Refresh hashes and inventories with the package's parity tooling.
+4. Refresh hashes and inventories with the package's parity tooling. Run
+   `pnpm react-parity:lockfiles:generate` after an intentional lockfile change;
+   the root `pnpm sync` command also runs this generator.
 5. Prove both views:
 
    ```bash
