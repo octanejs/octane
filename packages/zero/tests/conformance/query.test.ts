@@ -1,7 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 import { queryInternalsTag, type QueryImpl } from '@rocicorp/zero/bindings';
 import type { Query, ResultType, Schema, Zero } from '@rocicorp/zero';
-import { QueryBinding, SuspenseQueryBinding } from '../_fixtures/binding.tsrx';
+import {
+	PartialSuspenseQueryBinding,
+	QueryBinding,
+	SuspenseQueryBinding,
+} from '../_fixtures/binding.tsrx';
 import { mount, nextPaint } from '../_helpers.ts';
 
 type Row = { id: string; name: string };
@@ -75,6 +79,36 @@ describe('useQuery', () => {
 
 		expect(result.find('#suspense-query-values').textContent).toBe('1/complete');
 		expect(materialize).toHaveBeenCalledTimes(1);
+		result.unmount();
+	});
+
+	// Adapted from use-query.test.tsx at @rocicorp/zero 1.8.0.
+	test('uses partial results as the default suspense threshold', async () => {
+		const listeners = new Set<Listener>();
+		const materialize = vi.fn(() => ({
+			addListener(listener: Listener) {
+				listeners.add(listener);
+				return () => listeners.delete(listener);
+			},
+			destroy: vi.fn(),
+			updateTTL: vi.fn(),
+		}));
+		const zero = {
+			clientID: 'partial-suspense-client',
+			context: {},
+			materialize,
+		} as unknown as Zero<Schema>;
+		const result = mount(PartialSuspenseQueryBinding, { zero, query: createQuery() });
+
+		expect(result.find('#partial-suspense-query-pending').textContent).toBe('pending');
+		await nextPaint();
+		for (const listener of listeners) {
+			listener([{ id: '1', name: 'Lin' }], 'unknown');
+		}
+		await Promise.resolve();
+		await nextPaint();
+
+		expect(result.find('#partial-suspense-query-values').textContent).toBe('1/unknown');
 		result.unmount();
 	});
 });

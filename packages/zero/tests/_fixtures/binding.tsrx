@@ -67,6 +67,11 @@ function SuspenseQueryValues(props: { query: Query<string, Schema, readonly Row[
 	<output id="suspense-query-values">{rows.length + '/' + details.type}</output>
 }
 
+function PartialSuspenseQueryValues(props: { query: Query<string, Schema, readonly Row[]> }) @{
+	const [rows, details] = useSuspenseQuery(props.query);
+	<output id="partial-suspense-query-values">{rows.length + '/' + details.type}</output>
+}
+
 function SuspenseQueryBoundary(props: { query: Query<string, Schema, readonly Row[]> }) @{
 	@try {
 		<SuspenseQueryValues query={props.query} />
@@ -80,5 +85,21 @@ function SuspenseQueryBoundary(props: { query: Query<string, Schema, readonly Ro
 export function SuspenseQueryBinding(props: QueryProps) @{
 	<ZeroProvider zero={props.zero}>
 		<SuspenseQueryBoundary query={props.query} />
+	</ZeroProvider>
+}
+
+function PartialSuspenseQueryBoundary(props: { query: Query<string, Schema, readonly Row[]> }) @{
+	@try {
+		<PartialSuspenseQueryValues query={props.query} />
+	} @pending {
+		<output id="partial-suspense-query-pending">pending</output>
+	} @catch (error) {
+		<output id="partial-suspense-query-error">{String(error)}</output>
+	}
+}
+
+export function PartialSuspenseQueryBinding(props: QueryProps) @{
+	<ZeroProvider zero={props.zero}>
+		<PartialSuspenseQueryBoundary query={props.query} />
 	</ZeroProvider>
 }

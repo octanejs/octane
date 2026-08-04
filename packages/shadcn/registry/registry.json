@@ -63,8 +63,8 @@
       "type": "registry:ui",
       "title": "Accordion",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -82,7 +82,7 @@
       "type": "registry:ui",
       "title": "Alert Dialog",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -137,7 +137,7 @@
       "type": "registry:ui",
       "title": "Avatar",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -174,7 +174,7 @@
       "type": "registry:ui",
       "title": "Breadcrumb",
       "dependencies": [
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -192,7 +192,7 @@
       "type": "registry:ui",
       "title": "Button",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
+        "@octanejs/base-ui@0.1.23",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -227,8 +227,8 @@
       "type": "registry:ui",
       "title": "Checkbox",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -246,7 +246,7 @@
       "type": "registry:ui",
       "title": "Collapsible",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "files": [
         {
@@ -261,8 +261,8 @@
       "type": "registry:ui",
       "title": "Dialog",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -281,8 +281,8 @@
       "type": "registry:ui",
       "title": "Dropdown Menu",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -339,7 +339,7 @@
       "type": "registry:ui",
       "title": "Input",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -408,7 +408,7 @@
       "type": "registry:ui",
       "title": "Native Select",
       "dependencies": [
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/types",
@@ -427,7 +427,7 @@
       "type": "registry:ui",
       "title": "Pagination",
       "dependencies": [
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -446,7 +446,7 @@
       "type": "registry:ui",
       "title": "Popover",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -464,7 +464,7 @@
       "type": "registry:ui",
       "title": "Progress",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -482,8 +482,8 @@
       "type": "registry:ui",
       "title": "Radio Group",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -501,7 +501,7 @@
       "type": "registry:ui",
       "title": "Separator",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -519,8 +519,8 @@
       "type": "registry:ui",
       "title": "Sheet",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -555,7 +555,7 @@
       "type": "registry:ui",
       "title": "Slider",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -573,7 +573,7 @@
       "type": "registry:ui",
       "title": "Spinner",
       "dependencies": [
-        "@octanejs/lucide@0.1.19"
+        "@octanejs/lucide@0.1.20"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -591,7 +591,7 @@
       "type": "registry:ui",
       "title": "Switch",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"
@@ -640,7 +640,7 @@
       "type": "registry:ui",
       "title": "Toggle Group",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
+        "@octanejs/base-ui@0.1.23",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -660,7 +660,7 @@
       "type": "registry:ui",
       "title": "Toggle",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22",
+        "@octanejs/base-ui@0.1.23",
         "class-variance-authority"
       ],
       "registryDependencies": [
@@ -679,7 +679,7 @@
       "type": "registry:ui",
       "title": "Tooltip",
       "dependencies": [
-        "@octanejs/base-ui@0.1.22"
+        "@octanejs/base-ui@0.1.23"
       ],
       "registryDependencies": [
         "@octane/utils"

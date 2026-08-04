@@ -27,6 +27,13 @@ function octaneHookLocals(ast) {
 	let importsHook = false;
 	let hasOctaneImport = false;
 	for (const node of ast.body || []) {
+		if (
+			(node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') &&
+			node.source?.value === 'octane'
+		) {
+			hasOctaneImport = true;
+			continue;
+		}
 		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
 		hasOctaneImport = true;
 		for (const sp of node.specifiers || []) {
@@ -1025,7 +1032,9 @@ export function slotHooks(source, id, options) {
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
-	if (!importInfo.importsHook && !canSpecializeRoot) return null;
+	if (!importInfo.importsHook && !canSpecializeRoot) {
+		return null;
+	}
 	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
 	// module whose hook calls carry their `_octane*` props (start/end offsets are
 	// preserved, so the text edits below stay valid), with the dependency
@@ -1072,8 +1081,11 @@ export function slotHooks(source, id, options) {
 	// Apply insertions right-to-left so earlier offsets stay valid.
 	st.edits.sort((a, b) => b.pos - a.pos);
 	let code = source;
-	for (const e of st.edits) {
-		code = code.slice(0, e.pos) + e.text + code.slice(e.end === undefined ? e.pos : e.end);
+	for (const edit of st.edits) {
+		code =
+			code.slice(0, edit.pos) +
+			edit.text +
+			code.slice(edit.end === undefined ? edit.pos : edit.end);
 	}
 
 	// APPEND the slot consts (rather than prepend) so every original line number

@@ -1,11 +1,11 @@
 {
   "name": "@octanejs/apollo-client",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Apollo Client bindings for the octane renderer — reuses Apollo's framework-neutral core and ports its React adapter onto octane.",
   "author": {

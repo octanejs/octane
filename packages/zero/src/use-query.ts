@@ -103,8 +103,11 @@ export function useQuery<
 	TContext extends BaseDefaultContext = DefaultContext,
 >(
 	query: QueryOrQueryRequest<TTable, TInput, TOutput, TSchema, TReturn, TContext> | Falsy,
-	options?: UseQueryOptions | boolean,
+	optionsOrSlot?: UseQueryOptions | boolean | symbol,
+	maybeSlot?: symbol,
 ): QueryResult<TReturn> | MaybeQueryResult<TReturn> {
+	const slot = typeof optionsOrSlot === 'symbol' ? optionsOrSlot : maybeSlot;
+	const options = typeof optionsOrSlot === 'symbol' ? undefined : optionsOrSlot;
 	let enabled = true;
 	let ttl: TTL = DEFAULT_TTL_MS;
 	if (typeof options === 'boolean') {
@@ -125,6 +128,7 @@ export function useQuery<
 		view?.subscribeReactInternals ?? disabledSubscriber,
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
+		slot,
 	);
 }
 
@@ -164,8 +168,11 @@ export function useSuspenseQuery<
 	TContext extends BaseDefaultContext = DefaultContext,
 >(
 	query: QueryOrQueryRequest<TTable, TInput, TOutput, TSchema, TReturn, TContext> | Falsy,
-	options?: UseSuspenseQueryOptions | boolean,
+	optionsOrSlot?: UseSuspenseQueryOptions | boolean | symbol,
+	maybeSlot?: symbol,
 ): QueryResult<TReturn> | MaybeQueryResult<TReturn> {
+	const slot = typeof optionsOrSlot === 'symbol' ? optionsOrSlot : maybeSlot;
+	const options = typeof optionsOrSlot === 'symbol' ? undefined : optionsOrSlot;
 	let enabled = true;
 	let ttl: TTL = DEFAULT_TTL_MS;
 	let suspendUntil: 'complete' | 'partial' = 'partial';
@@ -187,6 +194,7 @@ export function useSuspenseQuery<
 		view?.subscribeReactInternals ?? disabledSubscriber,
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
 		view?.getSnapshot ?? (getDisabledSnapshot as () => MaybeQueryResult<TReturn>),
+		slot,
 	);
 
 	if (view && enabled) {
