@@ -47,6 +47,7 @@ import {
 	FieldTitle,
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
 import {
 	Menubar,
 	MenubarCheckboxItem,
@@ -686,4 +687,18 @@ export function MenubarCase() @{
 			</MenubarContent>
 		</MenubarMenu>
 	</Menubar>
+}
+
+export function HoverCardCase() @{
+	<HoverCard defaultOpen>
+		<HoverCardTrigger>@octane</HoverCardTrigger>
+		<HoverCardContent>Hover card body</HoverCardContent>
+	</HoverCard>
+}
+
+export function HoverCardSideCase() @{
+	<HoverCard defaultOpen>
+		<HoverCardTrigger>@octane</HoverCardTrigger>
+		<HoverCardContent side="top">Positioned body</HoverCardContent>
+	</HoverCard>
 }

@@ -120,6 +120,7 @@
     "./base-ui/DropdownMenu": "./src/bases/base-ui/ui/dropdown-menu.tsrx",
     "./base-ui/Empty": "./src/bases/base-ui/ui/empty.tsrx",
     "./base-ui/Field": "./src/bases/base-ui/ui/field.tsrx",
+    "./base-ui/HoverCard": "./src/bases/base-ui/ui/hover-card.tsrx",
     "./base-ui/Input": "./src/bases/base-ui/ui/input.tsrx",
     "./base-ui/Item": "./src/bases/base-ui/ui/item.tsrx",
     "./base-ui/Kbd": "./src/bases/base-ui/ui/kbd.tsrx",

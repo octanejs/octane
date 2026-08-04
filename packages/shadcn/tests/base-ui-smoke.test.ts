@@ -1431,3 +1431,50 @@ describe('@octanejs/shadcn — Base UI menubar composes the bar with Menu', () =
 		}
 	});
 });
+
+describe('@octanejs/shadcn — Base UI hover-card rewrites the state dialect', () => {
+	it('drives motion off data-open/data-closed, since data-state does not exist', async () => {
+		// THE ONE THAT WOULD HAVE FAILED SILENTLY AND COMPLETELY. This family's radix source uses the
+		// older `data-[state=open]:` / `data-[state=closed]:` spelling rather than the `data-open:`
+		// the other menu families use. Base UI publishes NO `data-state` attribute at all, so those
+		// utilities would match nothing and the card would pop in and out unanimated.
+		const m = mount(F.HoverCardCase as never);
+		await settle();
+		try {
+			const content = document.querySelector('[data-slot="hover-card-content"]')!;
+			expect(content).not.toBe(null);
+			expect(content.hasAttribute('data-open')).toBe(true);
+			// Nothing in the tree publishes data-state, which is what makes the rewrite necessary.
+			expect(document.querySelector('[data-state]')).toBe(null);
+			expect(content.className).toContain('data-open:animate-in');
+			expect(content.className).toContain('data-closed:animate-out');
+			expect(content.className).not.toContain('data-[state=');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('reads the Base UI transform-origin var', async () => {
+		const m = mount(F.HoverCardCase as never);
+		await settle();
+		try {
+			const content = document.querySelector('[data-slot="hover-card-content"]')!;
+			expect(content.className).toContain('origin-(--transform-origin)');
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('routes side to the Positioner rather than the Popup', async () => {
+		const m = mount(F.HoverCardSideCase as never);
+		await settle();
+		try {
+			const content = document.querySelector('[data-slot="hover-card-content"]')!;
+			expect(content.getAttribute('data-side')).toBe('top');
+			expect(content.hasAttribute('side')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+});

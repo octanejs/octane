@@ -44,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 7 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 6 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -63,6 +63,7 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
 import {
 	Menubar,
 	MenubarCheckboxItem,
@@ -261,7 +262,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 37 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 38 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
 				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
@@ -940,6 +941,30 @@ export function ShadcnBaseUIDemo() @{
 					</MenubarContent>
 				</MenubarMenu>
 			</Menubar>
+		</Section>
+
+		<Section
+			title="HoverCard"
+			note="Runs on Base UI's PreviewCard. Hover the link and wait — the card must FADE AND SCALE in, not pop. This family's radix source used data-[state=open]:, which Base UI never emits, so an unrewritten copy would animate not at all."
+		>
+			<HoverCard>
+				<HoverCardTrigger class="text-sm font-medium underline underline-offset-4">
+					@octanejs
+				</HoverCardTrigger>
+				<HoverCardContent>
+					<div class="flex gap-3">
+						<Avatar>
+							<AvatarFallback>OC</AvatarFallback>
+						</Avatar>
+						<div class="space-y-1">
+							<p class="text-sm font-medium">@octanejs</p>
+							<p class="text-sm text-muted-foreground">
+								A React-shaped UI framework compiled ahead of time.
+							</p>
+						</div>
+					</div>
+				</HoverCardContent>
+			</HoverCard>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

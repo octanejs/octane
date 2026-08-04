@@ -354,6 +354,24 @@
       ]
     },
     {
+      "name": "hover-card",
+      "type": "registry:ui",
+      "title": "Hover Card",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/hover-card.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/hover-card.tsrx"
+        }
+      ]
+    },
+    {
       "name": "input",
       "type": "registry:ui",
       "title": "Input",
