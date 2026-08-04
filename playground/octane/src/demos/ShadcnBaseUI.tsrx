@@ -20,6 +20,13 @@
 //   Alert — transcribed and verified byte-identical to upstream's source. Should
 //     need no scrutiny.
 //
+//   Dialog, AlertDialog, Popover, Tooltip — still carry the radix KEYFRAME motion utilities
+//     (`data-open:animate-in` / `data-closed:animate-out`) rather than the transition pair the
+//     transcribed sheet uses. Base UI does emit both `data-open` and `data-closed`, so those
+//     utilities are not dead — but the sheet's derived version jumped on close and these have not
+//     been checked against upstream sources. OPEN AND CLOSE EACH ONE: a snap on close is the
+//     thing to report.
+//
 //   Avatar, Progress, Toggle, ToggleGroup — class strings derived, but
 //     each ADAPTED to a part tree or attribute that Base UI genuinely differs on,
 //     checked against the primitive's real output rather than assumed. What to
