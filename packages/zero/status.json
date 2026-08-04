@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "@rocicorp/zero",
+    "version": "1.8.0"
+  },
+  "surface": "Complete port of the public @rocicorp/zero/react 1.8.0 runtime and type surface. The framework-neutral Zero client is reused from @rocicorp/zero.",
+  "divergences": [
+    "useSuspenseQuery suspends through Octane's use() implementation instead of React's use() implementation details.",
+    "Octane does not perform React StrictMode's development-only double mount; Zero's delayed view cleanup remains compatible with rapid unmount and remount cycles."
+  ],
+  "ssr": "Matches upstream 1.8.0: externally supplied clients can provide context during SSR, while providers constructed from options create Zero only in a client-side passive effect. Zero query data loading during SSR is not claimed.",
+  "verified": "2026-08-04"
+}

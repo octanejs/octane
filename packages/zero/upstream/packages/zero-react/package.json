@@ -1,0 +1,44 @@
+{
+  "name": "zero-react",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "module": "true",
+  "scripts": {
+    "check-types": "tsc",
+    "check-types:watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:chromium": "VITEST_BROWSER=chromium vitest run",
+    "test:chromium:watch": "VITEST_BROWSER=chromium vitest",
+    "test:firefox": "VITEST_BROWSER=firefox vitest run",
+    "test:firefox:watch": "VITEST_BROWSER=firefox vitest",
+    "test:webkit": "VITEST_BROWSER=webkit vitest run",
+    "test:webkit:watch": "VITEST_BROWSER=webkit vitest",
+    "format": "oxfmt .",
+    "check-format": "oxfmt --check .",
+    "lint": "oxlint --quiet --config ../../oxlint.config.ts",
+    "fmt": "oxfmt .",
+    "check-fmt": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@rocicorp/resolver": "^1.0.2"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "oxfmt": "^0.45.0",
+    "react": "^19.2.6",
+    "shared": "workspace:*",
+    "vitest": "^4.1.6",
+    "zero-client": "workspace:*",
+    "zero-schema": "workspace:*",
+    "zql": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "packageManager": "pnpm@11.5.3"
+}

@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["../src", "./public-api.test-d.ts"],
+  "exclude": ["../upstream"]
+}

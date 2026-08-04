@@ -18,6 +18,7 @@ export const KNOWN_BINDINGS = {
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
+	'@rocicorp/zero/react': '@octanejs/zero',
 	wagmi: '@octanejs/wagmi',
 	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
@@ -138,6 +139,7 @@ export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
 
 export const KNOWN_VANILLA_CORES = {
 	'@apollo/client': '@apollo/client',
+	'@rocicorp/zero/react': '@rocicorp/zero',
 	'@tanstack/react-query': '@tanstack/query-core',
 	wagmi: '@wagmi/core',
 	'@tanstack/react-table': '@tanstack/table-core',

@@ -253,6 +253,15 @@ describe('bridgeReportFromSource', () => {
 		expect(report.plan[0]).toContain('@octanejs/tanstack-query');
 	});
 
+	it('surfaces the Zero binding and its framework-neutral client', () => {
+		const report = bridgeReportFromSource(`export {};`, {
+			packageName: '@rocicorp/zero/react',
+		});
+		expect(report.existingBinding).toBe('@octanejs/zero');
+		expect(report.vanillaCore).toBe('@rocicorp/zero');
+		expect(report.plan.join('\n')).toContain("Reuse the framework-agnostic core '@rocicorp/zero'");
+	});
+
 	it('same-name hook usage stays bridgeable', () => {
 		const report = bridgeReportFromSource(`
 			import { useSyncExternalStore } from 'react';

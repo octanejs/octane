@@ -1,0 +1,54 @@
+{
+  "name": "@octanejs/zero",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Rocicorp Zero bindings for Octane. Reuses the Zero client and ports its React hooks and provider to Octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/zero"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rocicorp/resolver": "catalog:default"
+  },
+  "peerDependencies": {
+    "@rocicorp/zero": "1.8.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@rocicorp/zero": "catalog:default",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

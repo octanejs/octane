@@ -63,6 +63,10 @@ allowBuilds:
   # Miniflare's local Cloudflare runtime binary; required by the adapter's
   # committed workerd integration test, with no project code generation.
   workerd: true
+  # Zero's browser client does not use the optional native SQLite package.
+  '@rocicorp/zero-sqlite3': false
+  # Zero consumes protobufjs's shipped runtime; its install-time banner is not required.
+  protobufjs: false
   # Miniflare can optionally transform image bindings through sharp. The
   # Cloudflare adapter runtime test exercises Workers/SSR only, so no native
   # sharp install step is needed.
@@ -120,6 +124,8 @@ catalogs:
     '@rspack/core': 2.1.3
     typescript: 5.9.3
   default:
+    '@rocicorp/resolver': 1.0.2
+    '@rocicorp/zero': 1.8.0
     '@react-rxjs/core': 0.10.8
     '@react-rxjs/utils': 0.9.7
     '@rx-state/core': 0.1.4
@@ -420,7 +426,7 @@ minimumReleaseAgeExclude:
   - 'shadcn@4.14.1'
   - 'tailwindcss@4.3.3'
   - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23
+  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23 || 0.1.24
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

@@ -1393,6 +1393,23 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'zero',
+					include: ['packages/zero/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/zero$/,
+							replacement: resolve(import.meta.dirname, 'packages/zero/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'apollo-client',
 					include: [
 						'packages/apollo-client/tests/**/*.test.ts',
