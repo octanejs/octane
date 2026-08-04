@@ -3,6 +3,8 @@ import { createElement, flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import * as F from './_fixtures/base-ui-smoke.tsrx';
 import * as TableParity from './_fixtures/base-ui-table-parity.tsrx';
+import { badgeVariants as radixBadgeVariants } from '@octanejs/shadcn/Badge';
+import { badgeVariants as baseUiBadgeVariants } from '@octanejs/shadcn/base-ui/Badge';
 import {
 	Tooltip,
 	TooltipContent,
@@ -89,6 +91,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Table', F.TableCase, 'INV-001'],
 	['Pagination', F.PaginationCase, 'Next'],
 	['Field', F.FieldCase, 'We never share it.'],
+	['Badge', F.BadgeCase, 'Secondary'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -964,6 +967,54 @@ describe('@octanejs/shadcn — Base UI field errors dedupe and collapse', () => 
 			expect(m.container.querySelector('[data-slot="field-error"]')).toBe(null);
 		} finally {
 			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI badge is a plain span with the shared variants', () => {
+	it('writes the variant it was given, which its own utilities read', () => {
+		const m = mount(F.BadgeCase as never);
+		try {
+			const badges = [...m.container.querySelectorAll('[data-slot="badge"]')];
+			expect(badges.map((b) => b.tagName)).toEqual(['SPAN', 'SPAN', 'SPAN', 'SPAN']);
+			expect(badges.map((b) => b.getAttribute('data-variant'))).toEqual([
+				'default',
+				'secondary',
+				'destructive',
+				'outline',
+			]);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('applies the variant class, not just the attribute', () => {
+		// `data-variant` is written for consumers to target; the visual difference comes from cva.
+		const m = mount(F.BadgeCase as never);
+		try {
+			const [def, secondary] = m.container.querySelectorAll('[data-slot="badge"]');
+			expect(def.className).toContain('bg-primary');
+			expect(secondary.className).toContain('bg-secondary');
+			expect(def.className).not.toContain('bg-secondary');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — badge variants stay shared across bases', () => {
+	it('produces the same classes as the radix base for every variant', () => {
+		// badge has no primitive in any base, so the cva strings are supposed to be identical.
+		// Asserting it keeps the two from drifting when one base's flavor is updated alone.
+		for (const variant of [
+			'default',
+			'secondary',
+			'destructive',
+			'outline',
+			'ghost',
+			'link',
+		] as const) {
+			expect(baseUiBadgeVariants({ variant }), variant).toBe(radixBadgeVariants({ variant }));
 		}
 	});
 });

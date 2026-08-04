@@ -151,6 +151,25 @@
       ]
     },
     {
+      "name": "badge",
+      "type": "registry:ui",
+      "title": "Badge",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/types",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/badge.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/badge.tsrx"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",

@@ -46,6 +46,7 @@ import {
 	FieldSet,
 	FieldTitle,
 } from '@octanejs/shadcn/base-ui/Field';
+import { Badge } from '@octanejs/shadcn/base-ui/Badge';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
 import {
 	Pagination,
@@ -477,4 +478,13 @@ export function SliderScalarCase() @{
 
 export function SliderScalarZeroCase() @{
 	<Slider value={0} />
+}
+
+export function BadgeCase() @{
+	<div>
+		<Badge>Default</Badge>
+		<Badge variant="secondary">Secondary</Badge>
+		<Badge variant="destructive">Destructive</Badge>
+		<Badge variant="outline">Outline</Badge>
+	</div>
 }

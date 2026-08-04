@@ -37,7 +37,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 13 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 12 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -55,6 +55,7 @@ import {
 	AvatarGroupCount,
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
+import { Badge } from '@octanejs/shadcn/base-ui/Badge';
 import {
 	Field,
 	FieldContent,
@@ -682,6 +683,20 @@ export function ShadcnBaseUIDemo() @{
 					</Field>
 				</FieldGroup>
 			</FieldSet>
+		</Section>
+
+		<Section
+			title="Badge"
+			note="No primitive in any base — a plain span. The cva strings are shared with Radix and a test asserts they stay identical, so this should look exactly like the Radix tab. No asChild/render escape here yet: see the file header."
+		>
+			<div class="flex flex-wrap items-center gap-2">
+				<Badge>Default</Badge>
+				<Badge variant="secondary">Secondary</Badge>
+				<Badge variant="destructive">Destructive</Badge>
+				<Badge variant="outline">Outline</Badge>
+				<Badge variant="ghost">Ghost</Badge>
+				<Badge variant="link">Link</Badge>
+			</div>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">
