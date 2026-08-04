@@ -238,6 +238,8 @@ import { DropdownMenuItem as X113 } from '@octanejs/shadcn/base-ui/DropdownMenu'
 type _113 = Assert<NotAny<typeof X113>>;
 import { ContextMenuItem as X114 } from '@octanejs/shadcn/base-ui/ContextMenu';
 type _114 = Assert<NotAny<typeof X114>>;
+import { MenubarItem as X115 } from '@octanejs/shadcn/base-ui/Menubar';
+type _115 = Assert<NotAny<typeof X115>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';

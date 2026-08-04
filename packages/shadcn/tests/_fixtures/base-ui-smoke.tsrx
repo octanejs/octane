@@ -48,6 +48,20 @@ import {
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
 import {
+	Menubar,
+	MenubarCheckboxItem,
+	MenubarContent,
+	MenubarItem,
+	MenubarLabel,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarSub,
+	MenubarSubContent,
+	MenubarSubTrigger,
+	MenubarTrigger,
+} from '@octanejs/shadcn/base-ui/Menubar';
+import {
 	ContextMenu,
 	ContextMenuCheckboxItem,
 	ContextMenuContent,
@@ -643,4 +657,33 @@ export function ContextMenuCase() @{
 			</ContextMenuSub>
 		</ContextMenuContent>
 	</ContextMenu>
+}
+
+export function MenubarCase() @{
+	<Menubar>
+		<MenubarMenu defaultOpen>
+			<MenubarTrigger>File</MenubarTrigger>
+			<MenubarContent>
+				<MenubarLabel>Document</MenubarLabel>
+				<MenubarSeparator />
+				<MenubarItem>
+					New tab
+					<MenubarShortcut>⌘T</MenubarShortcut>
+				</MenubarItem>
+				<MenubarCheckboxItem checked>Autosave</MenubarCheckboxItem>
+				<MenubarSub>
+					<MenubarSubTrigger>Share</MenubarSubTrigger>
+					<MenubarSubContent>
+						<MenubarItem>Email link</MenubarItem>
+					</MenubarSubContent>
+				</MenubarSub>
+			</MenubarContent>
+		</MenubarMenu>
+		<MenubarMenu>
+			<MenubarTrigger>Edit</MenubarTrigger>
+			<MenubarContent>
+				<MenubarItem>Undo</MenubarItem>
+			</MenubarContent>
+		</MenubarMenu>
+	</Menubar>
 }

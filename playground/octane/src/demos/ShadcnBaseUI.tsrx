@@ -44,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 8 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 7 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -63,6 +63,20 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	Menubar,
+	MenubarCheckboxItem,
+	MenubarContent,
+	MenubarItem,
+	MenubarLabel,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarSub,
+	MenubarSubContent,
+	MenubarSubTrigger,
+	MenubarTrigger,
+} from '@octanejs/shadcn/base-ui/Menubar';
 import {
 	ContextMenu,
 	ContextMenuCheckboxItem,
@@ -247,7 +261,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 36 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 37 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
 				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
@@ -878,6 +892,54 @@ export function ShadcnBaseUIDemo() @{
 					</ContextMenuSub>
 				</ContextMenuContent>
 			</ContextMenu>
+		</Section>
+
+		<Section
+			title="Menubar"
+			note="The bar is Base UI's Menubar; each menu is the same Menu primitive DropdownMenu uses. Open File, then arrow across to Edit without closing — that hand-off is the bar's job. The open bar trigger should stay shaded (it keys off aria-expanded, not a data attribute)."
+		>
+			<Menubar>
+				<MenubarMenu>
+					<MenubarTrigger>File</MenubarTrigger>
+					<MenubarContent>
+						<MenubarLabel>Document</MenubarLabel>
+						<MenubarSeparator />
+						<MenubarItem>
+							New tab
+							<MenubarShortcut>⌘T</MenubarShortcut>
+						</MenubarItem>
+						<MenubarItem>
+							New window
+							<MenubarShortcut>⌘N</MenubarShortcut>
+						</MenubarItem>
+						<MenubarSeparator />
+						<MenubarCheckboxItem checked>Autosave</MenubarCheckboxItem>
+						<MenubarSub>
+							<MenubarSubTrigger>Share</MenubarSubTrigger>
+							<MenubarSubContent>
+								<MenubarItem>Email link</MenubarItem>
+								<MenubarItem>Copy link</MenubarItem>
+							</MenubarSubContent>
+						</MenubarSub>
+					</MenubarContent>
+				</MenubarMenu>
+				<MenubarMenu>
+					<MenubarTrigger>Edit</MenubarTrigger>
+					<MenubarContent>
+						<MenubarItem>
+							Undo
+							<MenubarShortcut>⌘Z</MenubarShortcut>
+						</MenubarItem>
+						<MenubarItem variant="destructive">Delete</MenubarItem>
+					</MenubarContent>
+				</MenubarMenu>
+				<MenubarMenu>
+					<MenubarTrigger>View</MenubarTrigger>
+					<MenubarContent>
+						<MenubarItem>Reload</MenubarItem>
+					</MenubarContent>
+				</MenubarMenu>
+			</Menubar>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

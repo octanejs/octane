@@ -1372,3 +1372,62 @@ describe('@octanejs/shadcn — Base UI context-menu reuses the menu dialects', (
 		}
 	});
 });
+
+describe('@octanejs/shadcn — Base UI menubar composes the bar with Menu', () => {
+	const open = async () => {
+		const m = mount(F.MenubarCase as never);
+		await settle();
+		return m;
+	};
+
+	it('renders the bar as a menubar with menuitem triggers', async () => {
+		const m = await open();
+		try {
+			const bar = m.container.querySelector('[data-slot="menubar"]')!;
+			expect(bar.getAttribute('role')).toBe('menubar');
+			const triggers = [...m.container.querySelectorAll('[data-slot="menubar-trigger"]')];
+			expect(triggers).toHaveLength(2);
+			// Base UI gives bar triggers the menubar item role, not plain buttons in a row.
+			expect(triggers[0].getAttribute('role')).toBe('menuitem');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps aria-expanded on the BAR trigger, which is what its class targets', async () => {
+		// The one place this family departs from dropdown-menu. Radix styles the bar trigger with
+		// `aria-expanded:bg-muted` rather than a data attribute, and Base UI publishes
+		// `aria-expanded="true"` — so unlike the SUBMENU trigger, this one needed no rewrite.
+		const m = await open();
+		try {
+			const trigger = m.container.querySelector('[data-slot="menubar-trigger"]')!;
+			expect(trigger.getAttribute('aria-expanded')).toBe('true');
+			expect(trigger.className).toContain('aria-expanded:bg-muted');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('rewrites only the submenu trigger to the popup-open dialect', async () => {
+		const m = await open();
+		try {
+			const sub = document.querySelector('[data-slot="menubar-sub-trigger"]')!;
+			expect(sub.className).toContain('data-popup-open:bg-accent');
+			expect(sub.className).not.toMatch(/(?:^|\s)data-open:/);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('reads the Base UI transform-origin var, not the radix one', async () => {
+		const m = await open();
+		try {
+			const content = document.querySelector('[data-slot="menubar-content"]')!;
+			expect(content.getAttribute('role')).toBe('menu');
+			expect(content.className).toContain('origin-(--transform-origin)');
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+});

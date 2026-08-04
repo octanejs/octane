@@ -124,6 +124,7 @@
     "./base-ui/Item": "./src/bases/base-ui/ui/item.tsrx",
     "./base-ui/Kbd": "./src/bases/base-ui/ui/kbd.tsrx",
     "./base-ui/Label": "./src/bases/base-ui/ui/label.tsrx",
+    "./base-ui/Menubar": "./src/bases/base-ui/ui/menubar.tsrx",
     "./base-ui/NativeSelect": "./src/bases/base-ui/ui/native-select.tsrx",
     "./base-ui/Pagination": "./src/bases/base-ui/ui/pagination.tsrx",
     "./base-ui/Popover": "./src/bases/base-ui/ui/popover.tsrx",
