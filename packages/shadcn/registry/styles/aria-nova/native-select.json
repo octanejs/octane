@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.18"
+    "@octanejs/lucide@0.1.19"
   ],
   "registryDependencies": [
     "@octane/types",
