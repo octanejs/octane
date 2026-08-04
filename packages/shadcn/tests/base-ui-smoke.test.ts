@@ -92,6 +92,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Pagination', F.PaginationCase, 'Next'],
 	['Field', F.FieldCase, 'We never share it.'],
 	['Badge', F.BadgeCase, 'Secondary'],
+	['Breadcrumb', F.BreadcrumbCase, 'Current'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -1015,6 +1016,66 @@ describe('@octanejs/shadcn — badge variants stay shared across bases', () => {
 			'link',
 		] as const) {
 			expect(baseUiBadgeVariants({ variant }), variant).toBe(radixBadgeVariants({ variant }));
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI breadcrumb is host elements throughout', () => {
+	it('emits the accessible landmark and list structure', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const nav = m.container.querySelector('[data-slot="breadcrumb"]')!;
+			expect(nav.tagName).toBe('NAV');
+			expect(nav.getAttribute('aria-label')).toBe('breadcrumb');
+			expect(m.container.querySelector('[data-slot="breadcrumb-list"]')!.tagName).toBe('OL');
+			expect(m.container.querySelectorAll('[data-slot="breadcrumb-item"]')).toHaveLength(3);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('marks the current page and hides the decorative parts', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const page = m.container.querySelector('[data-slot="breadcrumb-page"]')!;
+			expect(page.getAttribute('aria-current')).toBe('page');
+			expect(page.getAttribute('aria-disabled')).toBe('true');
+			for (const slot of ['breadcrumb-separator', 'breadcrumb-ellipsis']) {
+				for (const el of m.container.querySelectorAll(`[data-slot="${slot}"]`)) {
+					expect(el.getAttribute('aria-hidden'), slot).toBe('true');
+					expect(el.getAttribute('role'), slot).toBe('presentation');
+				}
+			}
+			// The ellipsis still names itself for assistive tech behind the aria-hidden icon.
+			expect(m.container.querySelector('[data-slot="breadcrumb-ellipsis"]')!.textContent).toContain(
+				'More',
+			);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('lets a separator override the default chevron', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const seps = [...m.container.querySelectorAll('[data-slot="breadcrumb-separator"]')];
+			expect(seps).toHaveLength(2);
+			// First takes the default icon, second the supplied text.
+			expect(seps[0].querySelector('svg')).not.toBe(null);
+			expect(seps[1].textContent).toBe('/');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders the link as a real anchor that keeps its href', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const link = m.container.querySelector('[data-slot="breadcrumb-link"]')!;
+			expect(link.tagName).toBe('A');
+			expect(link.getAttribute('href')).toBe('/');
+		} finally {
+			m.unmount();
 		}
 	});
 });

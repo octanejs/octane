@@ -33,7 +33,7 @@ component names stay identical.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 32/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 33/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -45,7 +45,7 @@ component names stay identical.
 | `aspect-ratio` | ✅ | ✅ | ✅ |
 | `avatar` | ✅ | ✅ | ✅ |
 | `badge` | ✅ | ✅ | ✅ |
-| `breadcrumb` | ✅ | ✅ | — |
+| `breadcrumb` | ✅ | ✅ | ✅ |
 | `button` | ✅ | ✅ | ✅ |
 | `card` | ✅ | ✅ | ✅ |
 | `checkbox` | ✅ | ✅ | ✅ |

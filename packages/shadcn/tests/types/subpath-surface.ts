@@ -230,6 +230,8 @@ import { FieldLabel as X109 } from '@octanejs/shadcn/base-ui/Field';
 type _109 = Assert<NotAny<typeof X109>>;
 import { Badge as X110 } from '@octanejs/shadcn/base-ui/Badge';
 type _110 = Assert<NotAny<typeof X110>>;
+import { BreadcrumbLink as X111 } from '@octanejs/shadcn/base-ui/Breadcrumb';
+type _111 = Assert<NotAny<typeof X111>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';

@@ -47,6 +47,15 @@ import {
 	FieldTitle,
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	Breadcrumb,
+	BreadcrumbEllipsis,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from '@octanejs/shadcn/base-ui/Breadcrumb';
 import { Progress } from '@octanejs/shadcn/base-ui/Progress';
 import {
 	Pagination,
@@ -487,4 +496,22 @@ export function BadgeCase() @{
 		<Badge variant="destructive">Destructive</Badge>
 		<Badge variant="outline">Outline</Badge>
 	</div>
+}
+
+export function BreadcrumbCase() @{
+	<Breadcrumb>
+		<BreadcrumbList>
+			<BreadcrumbItem>
+				<BreadcrumbLink href="/">Home</BreadcrumbLink>
+			</BreadcrumbItem>
+			<BreadcrumbSeparator />
+			<BreadcrumbItem>
+				<BreadcrumbEllipsis />
+			</BreadcrumbItem>
+			<BreadcrumbSeparator>/</BreadcrumbSeparator>
+			<BreadcrumbItem>
+				<BreadcrumbPage>Current</BreadcrumbPage>
+			</BreadcrumbItem>
+		</BreadcrumbList>
+	</Breadcrumb>
 }
