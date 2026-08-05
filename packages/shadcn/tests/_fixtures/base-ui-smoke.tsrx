@@ -47,6 +47,18 @@ import {
 	FieldTitle,
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarGroup,
+	SidebarGroupLabel,
+	SidebarHeader,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarProvider,
+	SidebarTrigger,
+} from '@octanejs/shadcn/base-ui/Sidebar';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
 import {
 	Menubar,
@@ -701,4 +713,26 @@ export function HoverCardSideCase() @{
 		<HoverCardTrigger>@octane</HoverCardTrigger>
 		<HoverCardContent side="top">Positioned body</HoverCardContent>
 	</HoverCard>
+}
+
+export function SidebarCase() @{
+	<SidebarProvider>
+		<Sidebar>
+			<SidebarHeader>Project</SidebarHeader>
+			<SidebarContent>
+				<SidebarGroup>
+					<SidebarGroupLabel>Navigation</SidebarGroupLabel>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton isActive>Dashboard</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton tooltip="Settings">Settings</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroup>
+			</SidebarContent>
+		</Sidebar>
+		<SidebarTrigger />
+	</SidebarProvider>
 }

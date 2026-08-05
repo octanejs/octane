@@ -1478,3 +1478,58 @@ describe('@octanejs/shadcn — Base UI hover-card rewrites the state dialect', (
 		}
 	});
 });
+
+describe('@octanejs/shadcn — Base UI sidebar composes this base own families', () => {
+	it('mounts the provider tree and exposes its parts', async () => {
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			expect(m.container.querySelector('[data-slot="sidebar-wrapper"]')).not.toBe(null);
+			expect(m.container.querySelector('[data-slot="sidebar-menu-button"]')).not.toBe(null);
+			expect(m.container.querySelector('[data-slot="sidebar-group-label"]')!.textContent).toBe(
+				'Navigation',
+			);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('marks the active menu button, which its classes target', async () => {
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			const active = m.container.querySelector(
+				'[data-slot="sidebar-menu-button"][data-active="true"]',
+			)!;
+			expect(active).not.toBe(null);
+			expect(active.tagName).toBe('BUTTON');
+			expect(active.className).toContain('data-active:bg-sidebar-accent');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('composes the tooltip through render, so no button nests inside another', async () => {
+		// The composition that made this family portable at all. Radix wraps the menu button in
+		// `<TooltipTrigger asChild>`, where Slot MERGES the trigger onto its child; Base UI has no
+		// Slot and its Tooltip.Trigger takes a `render` element, which merges the same way.
+		//
+		// Passing the button as CHILDREN instead is the trap: the trigger then renders its own
+		// `<button>` and the menu button lands INSIDE it. Two buttons still exist and both still
+		// carry their text, so a count or text assertion passes — but nested interactive elements
+		// are invalid HTML and break click and focus behaviour. The nesting is the oracle.
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			const buttons = [...m.container.querySelectorAll('[data-slot="sidebar-menu-button"]')];
+			expect(buttons).toHaveLength(2);
+			expect(buttons.map((b) => b.textContent)).toEqual(['Dashboard', 'Settings']);
+			for (const button of buttons) {
+				expect(button.tagName).toBe('BUTTON');
+				expect(button.closest('button:not([data-slot="sidebar-menu-button"])')).toBe(null);
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+});

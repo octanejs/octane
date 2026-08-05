@@ -591,6 +591,32 @@
       ]
     },
     {
+      "name": "sidebar",
+      "type": "registry:ui",
+      "title": "Sidebar",
+      "dependencies": [
+        "@octanejs/lucide@0.1.18",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/button",
+        "@octane/input",
+        "@octane/separator",
+        "@octane/sheet",
+        "@octane/skeleton",
+        "@octane/tooltip",
+        "@octane/use-mobile",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/sidebar.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar.tsrx"
+        }
+      ]
+    },
+    {
       "name": "skeleton",
       "type": "registry:ui",
       "title": "Skeleton",

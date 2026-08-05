@@ -133,6 +133,7 @@
     "./base-ui/RadioGroup": "./src/bases/base-ui/ui/radio-group.tsrx",
     "./base-ui/Separator": "./src/bases/base-ui/ui/separator.tsrx",
     "./base-ui/Sheet": "./src/bases/base-ui/ui/sheet.tsrx",
+    "./base-ui/Sidebar": "./src/bases/base-ui/ui/sidebar.tsrx",
     "./base-ui/Skeleton": "./src/bases/base-ui/ui/skeleton.tsrx",
     "./base-ui/Slider": "./src/bases/base-ui/ui/slider.tsrx",
     "./base-ui/Spinner": "./src/bases/base-ui/ui/spinner.tsrx",

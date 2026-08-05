@@ -242,6 +242,8 @@ import { MenubarItem as X115 } from '@octanejs/shadcn/base-ui/Menubar';
 type _115 = Assert<NotAny<typeof X115>>;
 import { HoverCardContent as X116 } from '@octanejs/shadcn/base-ui/HoverCard';
 type _116 = Assert<NotAny<typeof X116>>;
+import { SidebarMenuButton as X117 } from '@octanejs/shadcn/base-ui/Sidebar';
+type _117 = Assert<NotAny<typeof X117>>;
 import { cn as X77 } from '@octanejs/shadcn/cn';
 type _77 = Assert<NotAny<typeof X77>>;
 import { useIsMobile as X78 } from '@octanejs/shadcn/hooks/use-mobile';
