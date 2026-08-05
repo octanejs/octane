@@ -1,4 +1,4 @@
-import { Activity, useState, useEffect, useLayoutEffect, useInsertionEffect } from 'octane';
+import { Activity, use, useState, useEffect, useLayoutEffect, useInsertionEffect } from 'octane';
 
 // Child logs render + effect mount/unmount, exposes its setState so the test can
 // bump state, and renders its count so state preservation is observable.
@@ -21,6 +21,60 @@ export function ActivityHost(props) @{
 	<div id="host">
 		<Activity mode={props.mode}>
 			<Child log={props.log} expose={props.expose} />
+		</Activity>
+	</div>
+}
+
+// The child owns a structural root that can be replaced independently of the
+// Activity's render. A hidden Activity must hide the replacement too, then
+// restore its authored display when the boundary reveals.
+function ReplacingRoot(props) @{
+	const [before, setBefore] = useState(true);
+	props.expose(setBefore);
+	@if (before) {
+		<b id="activity-before">{'before'}</b>
+	} @else {
+		<i id="activity-after">{'after'}</i>
+	}
+}
+
+export function ReplacingRootActivity(props) @{
+	<div id="host">
+		<Activity mode={props.mode}>
+			<ReplacingRoot expose={props.expose} />
+		</Activity>
+	</div>
+}
+
+export function NestedReplacingRootActivity(props) @{
+	<div id="host">
+		<Activity mode={props.outer}>
+			<Activity mode={props.inner}>
+				<ReplacingRoot expose={props.expose} />
+			</Activity>
+		</Activity>
+	</div>
+}
+
+function ActivitySuspender(props) @{
+	const [status, setStatus] = useState('ready');
+	props.expose(setStatus);
+	if (status === 'pending') use(props.promise);
+	@if (status === 'other') {
+		<strong id="activity-other">{'other'}</strong>
+	} @else {
+		<span id="activity-ready">{'ready'}</span>
+	}
+}
+
+export function SuspenseInActivity(props) @{
+	<div id="host">
+		<Activity mode={props.mode}>
+			@try {
+				<ActivitySuspender expose={props.expose} promise={props.promise} />
+			} @pending {
+				<em id="activity-pending">{'loading'}</em>
+			}
 		</Activity>
 	</div>
 }

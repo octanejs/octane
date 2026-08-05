@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { mount, flushEffects } from './_helpers';
 import { flushSync } from '../src/index.js';
-import { ActivityHost, NestedActivity, TextActivityHost } from './_fixtures/activity.tsrx';
+import {
+	ActivityHost,
+	InsertionActivityHost,
+	NestedActivity,
+	NestedReplacingRootActivity,
+	NestedRevealActivity,
+	OrderActivity,
+	ReplacingRootActivity,
+	SuspenseInActivity,
+	TextActivityHost,
+} from './_fixtures/activity.tsrx';
 
 // Parity with React 19 <Activity mode="hidden"|"visible"> — the portable subset
 // of React's Activity-test.js / ReactDOMActivity-test.js (DOM + effect lifecycle
@@ -138,6 +148,24 @@ describe('<Activity> — toggling visibility', () => {
 		expect(t.log).toEqual(['render']); // re-rendered, still no effects
 		t.r.unmount();
 	});
+
+	it('re-hides a root independently replaced by descendant state, then restores it', () => {
+		let setBefore!: (value: boolean) => void;
+		const expose = (setter: typeof setBefore) => (setBefore = setter);
+		const r = mount(ReplacingRootActivity, { mode: 'hidden', expose });
+		flushEffects();
+		expect((r.find('#activity-before') as HTMLElement).style.display).toBe('none');
+
+		flushSync(() => setBefore(false));
+		flushEffects();
+		expect(r.container.querySelector('#activity-before')).toBeNull();
+		expect((r.find('#activity-after') as HTMLElement).style.display).toBe('none');
+
+		r.update(ReplacingRootActivity, { mode: 'visible', expose });
+		flushEffects();
+		expect((r.find('#activity-after') as HTMLElement).style.display).toBe('');
+		r.unmount();
+	});
 });
 
 describe('<Activity> — nested', () => {
@@ -156,6 +184,55 @@ describe('<Activity> — nested', () => {
 		flushEffects();
 		expect(log).toEqual(['render inner', 'mount inner']);
 		expect((r.container.querySelector('#inner') as HTMLElement).style.display).toBe('');
+		r.unmount();
+	});
+
+	it('keeps a replacement hidden until both nested Activities reveal', () => {
+		let setBefore!: (value: boolean) => void;
+		const expose = (setter: typeof setBefore) => (setBefore = setter);
+		const props = { outer: 'hidden', inner: 'hidden', expose };
+		const r = mount(NestedReplacingRootActivity, props);
+		flushEffects();
+
+		flushSync(() => setBefore(false));
+		flushEffects();
+		expect((r.find('#activity-after') as HTMLElement).style.display).toBe('none');
+
+		r.update(NestedReplacingRootActivity, { ...props, outer: 'visible' });
+		flushEffects();
+		expect((r.find('#activity-after') as HTMLElement).style.display).toBe('none');
+
+		r.update(NestedReplacingRootActivity, {
+			...props,
+			outer: 'visible',
+			inner: 'visible',
+		});
+		flushEffects();
+		expect((r.find('#activity-after') as HTMLElement).style.display).toBe('');
+		r.unmount();
+	});
+
+	it('retains Activity hiding across a nested Suspense retry', () => {
+		let setStatus!: (value: string) => void;
+		const expose = (setter: typeof setStatus) => (setStatus = setter);
+		const props = { mode: 'hidden', expose, promise: new Promise<string>(() => {}) };
+		const r = mount(SuspenseInActivity, props);
+		flushEffects();
+
+		flushSync(() => setStatus('pending'));
+		flushEffects();
+		expect((r.find('#activity-pending') as HTMLElement).style.display).toBe('none');
+
+		// The never-resolving promise does not settle. State inside the hidden
+		// primary instead makes the next retry complete and reveal that primary.
+		flushSync(() => setStatus('other'));
+		flushEffects();
+		expect(r.container.querySelector('#activity-pending')).toBeNull();
+		expect((r.find('#activity-other') as HTMLElement).style.display).toBe('none');
+
+		r.update(SuspenseInActivity, { ...props, mode: 'visible' });
+		flushEffects();
+		expect((r.find('#activity-other') as HTMLElement).style.display).toBe('');
 		r.unmount();
 	});
 });
@@ -193,8 +270,6 @@ describe('<Activity> — bare text child', () => {
 	});
 });
 
-import { NestedRevealActivity } from './_fixtures/activity.tsrx';
-
 describe('<Activity> — nested reveal (conformance)', () => {
 	// Per Activity-test.js:1362 "reveal an outer Activity boundary without revealing an
 	// inner one". Both hidden → reveal the outer while the inner stays hidden → only the
@@ -219,8 +294,6 @@ describe('<Activity> — nested reveal (conformance)', () => {
 	});
 });
 
-import { OrderActivity } from './_fixtures/activity.tsrx';
-
 describe('<Activity> — effect cleanup order on hide (conformance)', () => {
 	// Per Activity-test.js "passive effects are unmounted on hide in the same order as
 	// during a deletion: parent before child" (and child-first on mount/reveal).
@@ -238,8 +311,6 @@ describe('<Activity> — effect cleanup order on hide (conformance)', () => {
 		r.unmount();
 	});
 });
-
-import { InsertionActivityHost } from './_fixtures/activity.tsrx';
 
 describe('<Activity> — insertion effects stay connected while hidden (conformance)', () => {
 	function setupInsertion() {

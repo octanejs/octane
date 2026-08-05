@@ -2804,6 +2804,18 @@ function drainQueue(): { err: any } | null {
 		}
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
+		const hiddenOwner = findHiddenRenderOwner(block, true);
+		let hiddenActivity: ActivitySlot | null = null;
+		let hiddenTry: TrySlot | null = null;
+		if (hiddenOwner !== null) {
+			if ('__kind' in hiddenOwner) {
+				if (hiddenOwner.__kind === 'trySlotSlot') hiddenTry = hiddenOwner;
+				else hiddenActivity = hiddenOwner;
+			} else {
+				hiddenTry = hiddenOwner.suspense;
+				hiddenActivity = hiddenOwner.activity;
+			}
+		}
 		try {
 			if (block.nestedUpdateError) {
 				block.nestedUpdateError = false;
@@ -2815,7 +2827,6 @@ function drainQueue(): { err: any } | null {
 			// one transaction. React parity: setState on a suspended component
 			// retries the render; if it no longer suspends (an external store flipped
 			// before the suspending promise resolved), the boundary reveals now.
-			const hiddenTry = findSuspenseHiddenTry(block);
 			if (hiddenTry !== null) {
 				attemptHiddenReveal(hiddenTry, block.pendingMode ?? 'urgent');
 				continue;
@@ -2864,6 +2875,11 @@ function drainQueue(): { err: any } | null {
 				while (root.parentBlock !== null) root = root.parentBlock;
 				if (root.kind === 'root' && !root.disposed) unmountBlock(root);
 			}
+		} finally {
+			// A descendant render can replace an Activity's direct host root. The
+			// Activity itself did not render, so reapply its visual hide after the
+			// complete attempt (including a captured error or Suspense retry).
+			if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
 		}
 	}
 	QUEUE.length = 0;
@@ -20178,20 +20194,56 @@ function commitResumeInner(state: TrySlot): void {
 	}
 }
 
+interface HiddenRenderOwners {
+	suspense: TrySlot;
+	activity: ActivitySlot;
+}
+
+type HiddenRenderOwner = TrySlot | ActivitySlot | HiddenRenderOwners;
+
+function findHiddenRenderOwner(block: Block | null, includeActivity: false): TrySlot | null;
+function findHiddenRenderOwner(
+	block: Block | null,
+	includeActivity: true,
+): HiddenRenderOwner | null;
 /**
- * Nearest enclosing SUSPENSE-HIDDEN boundary: a tryBlock ancestor whose slot
- * has its committed try content recorded in `hiddenDom` (fallback showing). The
- * pending arm's own block also carries `__trySlot`, but only the TRY block
- * matches `slot.tryBlock === p`, so updates inside the fallback render
- * normally. <Activity>-hidden subtrees (also `inactive`) are untouched — their
- * DOM stays connected, but retries still belong to the whole boundary transaction.
+ * Find the boundary that owns an independently scheduled render under hidden
+ * content. A SUSPENSE-HIDDEN boundary owns the whole retry transaction and
+ * therefore wins over Activity. When both are present, retain the nearest
+ * hidden Activity too so it can restore visual hiding after that transaction.
+ * The common path is one allocation-free ancestor walk; only the rare combined
+ * Suspense + Activity case returns a pair.
+ *
+ * The pending arm's own block also carries `__trySlot`, but only the TRY block
+ * matches `slot.tryBlock === p`, so updates inside the fallback render normally.
  */
-function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
+function findHiddenRenderOwner(
+	block: Block | null,
+	includeActivity: boolean,
+): HiddenRenderOwner | null {
+	let activity: ActivitySlot | null = null;
+	let suspense: TrySlot | null = null;
 	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
+		if (includeActivity && activity === null && p.inactive) {
+			const candidate = (p as any).__activitySlot as ActivitySlot | undefined;
+			if (candidate !== undefined && candidate.block === p && candidate.hidden) {
+				activity = candidate;
+				if (suspense !== null) return { suspense, activity };
+			}
+		}
 		const slot = (p as any).__trySlot as TrySlot | undefined;
-		if (slot !== undefined && slot.tryBlock === p && slot.hiddenDom !== null) return slot;
+		if (suspense === null && slot !== undefined && slot.tryBlock === p && slot.hiddenDom !== null) {
+			if (!includeActivity) return slot;
+			suspense = slot;
+			if (activity !== null) return { suspense, activity };
+		}
 	}
-	return null;
+	return suspense ?? activity;
+}
+
+/** Nearest enclosing SUSPENSE-HIDDEN boundary, if one owns this render. */
+function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
+	return findHiddenRenderOwner(block, false);
 }
 
 /**
@@ -22041,6 +22093,15 @@ interface ActivitySlot {
 function hideActivityRange(state: ActivitySlot): void {
 	const b = state.block;
 	if (!b) return;
+	// Branch switches and HMR can replace direct roots while the Activity stays
+	// hidden. Drop detached entries now so a long-hidden, frequently updated
+	// boundary does not retain every outgoing host node until it reveals.
+	for (const el of state.savedDisplay.keys()) {
+		if (el.parentNode !== b.parentNode) state.savedDisplay.delete(el);
+	}
+	for (const text of state.savedText.keys()) {
+		if (text.parentNode !== b.parentNode) state.savedText.delete(text);
+	}
 	let node: ChildNode | null = (b.startMarker as Comment).nextSibling;
 	while (node && node !== b.endMarker) {
 		if (node.nodeType === 1) {
@@ -22054,6 +22115,14 @@ function hideActivityRange(state: ActivitySlot): void {
 		}
 		node = node.nextSibling;
 	}
+}
+
+function rehideActivityAfterDescendantRender(state: ActivitySlot): void {
+	const b = state.block;
+	if (b === null || !state.hidden || state.deactivationPending || blockSubtreeDisposed(b)) return;
+	// A pending visible→hidden commit intentionally keeps the DOM visible until
+	// effect cleanup; its queued commit action will hide the latest range.
+	hideActivityRange(state);
 }
 
 /** Restore the inline `display` / text content we saved on hide. */
@@ -22138,6 +22207,9 @@ export function activityBlock(
 			savedDisplay: new Map(),
 			savedText: new Map(),
 		};
+		// Activity is a rare boundary, so keep this back-reference off the
+		// monomorphic Block shape (matching the existing Suspense __trySlot tag).
+		(b as any).__activitySlot = state;
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 		const adopted = open !== null;
