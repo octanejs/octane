@@ -79,6 +79,48 @@ export function SuspenseInActivity(props) @{
 	</div>
 }
 
+function LateSuspender(props) @{
+	const value =
+		props.suspend ? use(props.promise) : 'late';
+	@if (props.suspend) {
+		<>
+			<small id="activity-resolved-display" style="display: block">{value as string}</small>
+			{'resolved text'}
+		</>
+	} @else {
+		<small id="activity-late">{'late'}</small>
+	}
+}
+
+function SuspenseHideOwnershipChild(props) @{
+	const [stage, setStage] = useState('ready');
+	props.expose(setStage);
+	<>
+		<strong id="activity-stable-display" style="display: inline-grid">{'stable'}</strong>
+		@if (stage === 'ready') {
+			<span id="activity-owner-ready">{'ready'}</span>
+		} @else {
+			<>
+				<strong id="activity-owned-display" style="display: inline-flex">{'new'}</strong>
+				{'authored text'}
+			</>
+		}
+		<LateSuspender suspend={stage === 'pending'} promise={props.promise} />
+	</>
+}
+
+export function SuspenseHideOwnershipActivity(props) @{
+	<div id="host">
+		<Activity mode={props.mode}>
+			@try {
+				<SuspenseHideOwnershipChild expose={props.expose} promise={props.promise} />
+			} @pending {
+				<em id="activity-owner-pending">{'loading'}</em>
+			}
+		</Activity>
+	</div>
+}
+
 // Insertion + layout effects side by side, with bumpable state so the test can
 // UPDATE the child while hidden. React keeps insertion effects CONNECTED across
 // visibility changes (they own injected styles): hide runs no insertion cleanup,

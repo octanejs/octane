@@ -9,6 +9,7 @@ import {
 	NestedRevealActivity,
 	OrderActivity,
 	ReplacingRootActivity,
+	SuspenseHideOwnershipActivity,
 	SuspenseInActivity,
 	TextActivityHost,
 } from './_fixtures/activity.tsrx';
@@ -43,6 +44,13 @@ function setup(initialMode: string) {
 		display: () => child()?.style.display ?? null,
 		present: () => child() != null,
 	};
+}
+
+function directTextContent(element: Element): string {
+	return Array.from(element.childNodes)
+		.filter((node): node is Text => node.nodeType === 3)
+		.map((text) => text.data)
+		.join('');
 }
 
 describe('<Activity> — visible', () => {
@@ -233,6 +241,87 @@ describe('<Activity> — nested', () => {
 		r.update(SuspenseInActivity, { ...props, mode: 'visible' });
 		flushEffects();
 		expect((r.find('#activity-other') as HTMLElement).style.display).toBe('');
+		r.unmount();
+	});
+
+	it('restores authored display and text after Activity and Suspense reveal', () => {
+		let setStage!: (value: string) => void;
+		const expose = (setter: typeof setStage) => (setStage = setter);
+		const props = { mode: 'hidden', expose, promise: new Promise<string>(() => {}) };
+		const r = mount(SuspenseHideOwnershipActivity, props);
+		flushEffects();
+
+		// This render inserts the styled element and text before a later sibling
+		// suspends. Suspense hides them before Activity's post-render hide sees them.
+		flushSync(() => setStage('pending'));
+		flushEffects();
+		expect((r.find('#activity-owner-pending') as HTMLElement).style.display).toBe('none');
+
+		// Retry without resolving the promise. Suspense reveals its primary, but
+		// Activity remains an owner and must keep it hidden.
+		flushSync(() => setStage('other'));
+		flushEffects();
+		const owned = r.find('#activity-owned-display') as HTMLElement;
+		expect(owned.style.display).toBe('none');
+		expect(directTextContent(r.find('#host'))).toBe('');
+
+		r.update(SuspenseHideOwnershipActivity, { ...props, mode: 'visible' });
+		flushEffects();
+		expect(owned.style.display).toBe('inline-flex');
+		expect(directTextContent(r.find('#host'))).toBe('authored text');
+		expect((r.find('#activity-stable-display') as HTMLElement).style.display).toBe('inline-grid');
+		r.unmount();
+	});
+
+	it('keeps Suspense content hidden when Activity reveals first', () => {
+		let setStage!: (value: string) => void;
+		const expose = (setter: typeof setStage) => (setStage = setter);
+		const props = { mode: 'hidden', expose, promise: new Promise<string>(() => {}) };
+		const r = mount(SuspenseHideOwnershipActivity, props);
+		flushEffects();
+
+		flushSync(() => setStage('pending'));
+		flushEffects();
+		r.update(SuspenseHideOwnershipActivity, { ...props, mode: 'visible' });
+		flushEffects();
+
+		// Activity released first: the fallback is visible, but Suspense still owns
+		// the connected primary and must keep its stable host hidden.
+		expect((r.find('#activity-owner-pending') as HTMLElement).style.display).toBe('');
+		const stable = r.find('#activity-stable-display') as HTMLElement;
+		expect(stable.style.display).toBe('none');
+
+		flushSync(() => setStage('other'));
+		flushEffects();
+		expect(r.container.querySelector('#activity-owner-pending')).toBeNull();
+		expect(stable.style.display).toBe('inline-grid');
+		expect((r.find('#activity-owned-display') as HTMLElement).style.display).toBe('inline-flex');
+		r.unmount();
+	});
+
+	it('re-hides output introduced by an async Suspense resume', async () => {
+		let setStage!: (value: string) => void;
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => (resolve = done));
+		const expose = (setter: typeof setStage) => (setStage = setter);
+		const props = { mode: 'hidden', expose, promise };
+		const r = mount(SuspenseHideOwnershipActivity, props);
+		flushEffects();
+
+		flushSync(() => setStage('pending'));
+		flushEffects();
+		resolve('resolved');
+		await Promise.resolve();
+		flushEffects();
+
+		const resolved = r.find('#activity-resolved-display') as HTMLElement;
+		expect(resolved.style.display).toBe('none');
+		expect(directTextContent(r.find('#host'))).toBe('');
+
+		r.update(SuspenseHideOwnershipActivity, { ...props, mode: 'visible' });
+		flushEffects();
+		expect(resolved.style.display).toBe('block');
+		expect(directTextContent(r.find('#host'))).toBe('authored textresolved text');
 		r.unmount();
 	});
 });

@@ -817,9 +817,12 @@ discards the edited component's committed render state and remounts it in place:
   the ones the edit did not touch.
 
 A remount inside a hidden `<Activity>` remains hidden. Independently scheduled
-descendant renders reapply the nearest Activity's hide pass to any replacement
-elements or text, including output rebuilt by HMR, and reveal restores the
-authored display and text values.
+descendant renders and Suspense resumes reapply the nearest Activity's hide pass
+to any replacement elements or text, including output rebuilt by HMR, and reveal
+restores the authored display and text values. Activity and Suspense share hide
+ownership for overlapping DOM, so either boundary can reveal first without
+exposing the other boundary's content or capturing its temporary hidden styles
+as authored state.
 
 Octane declines a refresh when the old and new compiler bodies use incompatible
 direct-template and returned-output layouts, or when a live block has no coherent,

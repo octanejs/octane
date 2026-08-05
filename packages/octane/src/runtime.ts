@@ -2808,13 +2808,8 @@ function drainQueue(): { err: any } | null {
 		let hiddenActivity: ActivitySlot | null = null;
 		let hiddenTry: TrySlot | null = null;
 		if (hiddenOwner !== null) {
-			if ('__kind' in hiddenOwner) {
-				if (hiddenOwner.__kind === 'trySlotSlot') hiddenTry = hiddenOwner;
-				else hiddenActivity = hiddenOwner;
-			} else {
-				hiddenTry = hiddenOwner.suspense;
-				hiddenActivity = hiddenOwner.activity;
-			}
+			if (hiddenOwner.__kind === 'trySlotSlot') hiddenTry = hiddenOwner;
+			else hiddenActivity = hiddenOwner;
 		}
 		try {
 			if (block.nestedUpdateError) {
@@ -19021,14 +19016,15 @@ export function getTransitionFallbackTimeout(): number {
 	return TRANSITION_FALLBACK_TIMEOUT_MS;
 }
 
-interface SuspenseHiddenDisplay {
+interface HiddenDisplay {
 	owners: number;
+	importantOwners: number;
 	value: string;
 	priority: string;
 	hadStyle: boolean;
 }
 
-interface SuspenseHiddenText {
+interface HiddenText {
 	owners: number;
 	data: string;
 }
@@ -19038,10 +19034,72 @@ interface SuspenseHiddenDom {
 	texts: Set<Text>;
 }
 
-// Nested Suspense boundaries can own the same physical host (notably a portal
-// range). Restore it only after the last hidden ancestor reveals.
-const SUSPENSE_HIDDEN_DISPLAYS = new WeakMap<HTMLElement, SuspenseHiddenDisplay>();
-const SUSPENSE_HIDDEN_TEXTS = new WeakMap<Text, SuspenseHiddenText>();
+// Activity and nested Suspense boundaries can own the same physical host
+// (notably a portal range). Capture authored state only for the first owner and
+// restore it only after the last owner reveals, independent of hide/reveal order.
+const HIDDEN_DISPLAYS = new WeakMap<HTMLElement, HiddenDisplay>();
+const HIDDEN_TEXTS = new WeakMap<Text, HiddenText>();
+
+function enforceHiddenDisplay(el: HTMLElement): void {
+	const hidden = HIDDEN_DISPLAYS.get(el);
+	el.style.setProperty(
+		'display',
+		'none',
+		hidden !== undefined && hidden.importantOwners > 0 ? 'important' : '',
+	);
+}
+
+function retainHiddenDisplay(el: HTMLElement, important: boolean): void {
+	const existing = HIDDEN_DISPLAYS.get(el);
+	if (existing === undefined) {
+		HIDDEN_DISPLAYS.set(el, {
+			owners: 1,
+			importantOwners: important ? 1 : 0,
+			value: el.style.getPropertyValue('display'),
+			priority: el.style.getPropertyPriority('display'),
+			hadStyle: el.hasAttribute('style'),
+		});
+	} else {
+		existing.owners++;
+		if (important) existing.importantOwners++;
+	}
+	enforceHiddenDisplay(el);
+}
+
+function releaseHiddenDisplay(el: HTMLElement, important: boolean): void {
+	const display = HIDDEN_DISPLAYS.get(el);
+	if (display === undefined) return;
+	if (important) display.importantOwners--;
+	if (--display.owners === 0) {
+		HIDDEN_DISPLAYS.delete(el);
+		if (display.value === '') el.style.removeProperty('display');
+		else el.style.setProperty('display', display.value, display.priority);
+		if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
+	} else {
+		enforceHiddenDisplay(el);
+	}
+}
+
+function enforceHiddenText(text: Text): void {
+	if (text.data !== '') text.data = '';
+}
+
+function retainHiddenText(text: Text): void {
+	const existing = HIDDEN_TEXTS.get(text);
+	if (existing === undefined) HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
+	else existing.owners++;
+}
+
+function releaseHiddenText(text: Text): void {
+	const saved = HIDDEN_TEXTS.get(text);
+	if (saved === undefined) return;
+	if (--saved.owners === 0) {
+		HIDDEN_TEXTS.delete(text);
+		text.data = saved.data;
+	} else {
+		enforceHiddenText(text);
+	}
+}
 
 interface TrySlot {
 	__kind: 'trySlotSlot';
@@ -19603,31 +19661,17 @@ function hideBlockHostRange(block: Block, hidden: SuspenseHiddenDom): void {
 			const el = node as HTMLElement;
 			if (!hidden.displays.has(el)) {
 				hidden.displays.add(el);
-				const existing = SUSPENSE_HIDDEN_DISPLAYS.get(el);
-				if (existing === undefined) {
-					SUSPENSE_HIDDEN_DISPLAYS.set(el, {
-						owners: 1,
-						value: el.style.getPropertyValue('display'),
-						priority: el.style.getPropertyPriority('display'),
-						hadStyle: el.hasAttribute('style'),
-					});
-				} else {
-					existing.owners++;
-				}
+				retainHiddenDisplay(el, true);
+			} else {
+				enforceHiddenDisplay(el);
 			}
-			el.style.setProperty('display', 'none', 'important');
 		} else if (node.nodeType === 3) {
 			const text = node as Text;
 			if (!hidden.texts.has(text)) {
 				hidden.texts.add(text);
-				const existing = SUSPENSE_HIDDEN_TEXTS.get(text);
-				if (existing === undefined) {
-					SUSPENSE_HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
-				} else {
-					existing.owners++;
-				}
+				retainHiddenText(text);
 			}
-			if (text.data !== '') text.data = '';
+			enforceHiddenText(text);
 		}
 		node = node.nextSibling as ChildNode | null;
 	}
@@ -19659,26 +19703,10 @@ function showTryBlock(state: TrySlot): void {
 	if (hidden === null) return;
 	state.hiddenDom = null;
 	for (const el of hidden.displays) {
-		const display = SUSPENSE_HIDDEN_DISPLAYS.get(el);
-		if (display === undefined) continue;
-		if (--display.owners === 0) {
-			SUSPENSE_HIDDEN_DISPLAYS.delete(el);
-			if (display.value === '') el.style.removeProperty('display');
-			else el.style.setProperty('display', display.value, display.priority);
-			if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
-		} else {
-			el.style.setProperty('display', 'none', 'important');
-		}
+		releaseHiddenDisplay(el, true);
 	}
 	for (const text of hidden.texts) {
-		const saved = SUSPENSE_HIDDEN_TEXTS.get(text);
-		if (saved === undefined) continue;
-		if (--saved.owners === 0) {
-			SUSPENSE_HIDDEN_TEXTS.delete(text);
-			text.data = saved.data;
-		} else if (text.data !== '') {
-			text.data = '';
-		}
+		releaseHiddenText(text);
 	}
 }
 
@@ -20055,6 +20083,7 @@ function commitResume(state: TrySlot): void {
 
 function commitResumeInner(state: TrySlot): void {
 	if (state.parentBlock.disposed) return;
+	const hiddenActivity = findHiddenActivity(state.tryBlock);
 	const wasHeld = state.transitionHeld;
 	if (wasHeld) state.transitionHeld = false;
 	// Leave the coordination sets — this boundary is committing now (a re-suspend
@@ -20190,16 +20219,12 @@ function commitResumeInner(state: TrySlot): void {
 		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
 		if (!deferringStagedRevealEffects) commitEffects();
 	} finally {
+		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
 		if (wasHeld) tickTransitionCount(-1);
 	}
 }
 
-interface HiddenRenderOwners {
-	suspense: TrySlot;
-	activity: ActivitySlot;
-}
-
-type HiddenRenderOwner = TrySlot | ActivitySlot | HiddenRenderOwners;
+type HiddenRenderOwner = TrySlot | ActivitySlot;
 
 function findHiddenRenderOwner(block: Block | null, includeActivity: false): TrySlot | null;
 function findHiddenRenderOwner(
@@ -20209,10 +20234,9 @@ function findHiddenRenderOwner(
 /**
  * Find the boundary that owns an independently scheduled render under hidden
  * content. A SUSPENSE-HIDDEN boundary owns the whole retry transaction and
- * therefore wins over Activity. When both are present, retain the nearest
- * hidden Activity too so it can restore visual hiding after that transaction.
- * The common path is one allocation-free ancestor walk; only the rare combined
- * Suspense + Activity case returns a pair.
+ * therefore wins over Activity and reapplies any Activity ownership around its
+ * own retry transaction. The scheduler's common path stays one allocation-free
+ * ancestor walk.
  *
  * The pending arm's own block also carries `__trySlot`, but only the TRY block
  * matches `slot.tryBlock === p`, so updates inside the fallback render normally.
@@ -20222,28 +20246,32 @@ function findHiddenRenderOwner(
 	includeActivity: boolean,
 ): HiddenRenderOwner | null {
 	let activity: ActivitySlot | null = null;
-	let suspense: TrySlot | null = null;
 	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
 		if (includeActivity && activity === null && p.inactive) {
 			const candidate = (p as any).__activitySlot as ActivitySlot | undefined;
 			if (candidate !== undefined && candidate.block === p && candidate.hidden) {
 				activity = candidate;
-				if (suspense !== null) return { suspense, activity };
 			}
 		}
 		const slot = (p as any).__trySlot as TrySlot | undefined;
-		if (suspense === null && slot !== undefined && slot.tryBlock === p && slot.hiddenDom !== null) {
-			if (!includeActivity) return slot;
-			suspense = slot;
-			if (activity !== null) return { suspense, activity };
-		}
+		if (slot !== undefined && slot.tryBlock === p && slot.hiddenDom !== null) return slot;
 	}
-	return suspense ?? activity;
+	return activity;
 }
 
 /** Nearest enclosing SUSPENSE-HIDDEN boundary, if one owns this render. */
 function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
 	return findHiddenRenderOwner(block, false);
+}
+
+/** Nearest hidden Activity that owns connected DOM in this block's ancestry. */
+function findHiddenActivity(block: Block | null): ActivitySlot | null {
+	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
+		if (!p.inactive) continue;
+		const candidate = (p as any).__activitySlot as ActivitySlot | undefined;
+		if (candidate !== undefined && candidate.block === p && candidate.hidden) return candidate;
+	}
+	return null;
 }
 
 /**
@@ -20418,6 +20446,15 @@ function queueCurrentHiddenRefs(state: TrySlot): void {
 }
 
 function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transition'): void {
+	const hiddenActivity = findHiddenActivity(state.tryBlock);
+	try {
+		attemptHiddenRevealInner(state, scheduledMode);
+	} finally {
+		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
+	}
+}
+
+function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'transition'): void {
 	const tryBlock = state.tryBlock;
 	if (tryBlock === null || tryBlock.disposed || state.hiddenDom === null) return;
 	// A nested boundary cannot reveal independently through an ancestor's hidden
@@ -20425,7 +20462,7 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 	// and either reveal both atomically or keep the whole subtree hidden.
 	const hiddenAncestor = findSuspenseHiddenTry(tryBlock.parentBlock);
 	if (hiddenAncestor !== null) {
-		attemptHiddenReveal(hiddenAncestor, scheduledMode);
+		attemptHiddenRevealInner(hiddenAncestor, scheduledMode);
 		return;
 	}
 	// A fresh retry invalidates any readiness proved by an earlier attempt even
@@ -22074,14 +22111,14 @@ interface ActivitySlot {
 	commitVersion: number;
 	/** The visible effects still need their commit-phase deactivation. */
 	deactivationPending: boolean;
-	/** Direct child elements we hid → their prior inline `display`, for restore. */
-	savedDisplay: Map<HTMLElement, string>;
+	/** Direct child elements for which this Activity owns one shared hide. */
+	hiddenDisplays: Set<HTMLElement>;
 	/**
-	 * Direct child TEXT nodes we hid → their prior `data`, for restore. Text nodes
-	 * have no box and can't take `display:none`, so a bare-text Activity child
+	 * Direct child TEXT nodes for which this Activity owns one shared hide. Text
+	 * nodes have no box and can't take `display:none`, so a bare-text Activity child
 	 * (`<Activity mode="hidden">{'…'}</Activity>`) is hidden by blanking its data.
 	 */
-	savedText: Map<Text, string>;
+	hiddenTexts: Set<Text>;
 }
 
 /**
@@ -22096,22 +22133,35 @@ function hideActivityRange(state: ActivitySlot): void {
 	// Branch switches and HMR can replace direct roots while the Activity stays
 	// hidden. Drop detached entries now so a long-hidden, frequently updated
 	// boundary does not retain every outgoing host node until it reveals.
-	for (const el of state.savedDisplay.keys()) {
-		if (el.parentNode !== b.parentNode) state.savedDisplay.delete(el);
+	for (const el of state.hiddenDisplays) {
+		if (el.parentNode !== b.parentNode) {
+			state.hiddenDisplays.delete(el);
+			releaseHiddenDisplay(el, false);
+		}
 	}
-	for (const text of state.savedText.keys()) {
-		if (text.parentNode !== b.parentNode) state.savedText.delete(text);
+	for (const text of state.hiddenTexts) {
+		if (text.parentNode !== b.parentNode) {
+			state.hiddenTexts.delete(text);
+			releaseHiddenText(text);
+		}
 	}
 	let node: ChildNode | null = (b.startMarker as Comment).nextSibling;
 	while (node && node !== b.endMarker) {
 		if (node.nodeType === 1) {
 			const el = node as HTMLElement;
-			if (!state.savedDisplay.has(el)) state.savedDisplay.set(el, el.style.display);
-			el.style.display = 'none';
+			if (!state.hiddenDisplays.has(el)) {
+				state.hiddenDisplays.add(el);
+				retainHiddenDisplay(el, false);
+			} else {
+				enforceHiddenDisplay(el);
+			}
 		} else if (node.nodeType === 3) {
 			const t = node as Text;
-			if (!state.savedText.has(t)) state.savedText.set(t, t.nodeValue ?? '');
-			if (t.nodeValue !== '') t.nodeValue = '';
+			if (!state.hiddenTexts.has(t)) {
+				state.hiddenTexts.add(t);
+				retainHiddenText(t);
+			}
+			enforceHiddenText(t);
 		}
 		node = node.nextSibling;
 	}
@@ -22125,12 +22175,12 @@ function rehideActivityAfterDescendantRender(state: ActivitySlot): void {
 	hideActivityRange(state);
 }
 
-/** Restore the inline `display` / text content we saved on hide. */
+/** Release this Activity's hide ownership, restoring nodes with no other owner. */
 function showActivityRange(state: ActivitySlot): void {
-	for (const [el, display] of state.savedDisplay) el.style.display = display;
-	state.savedDisplay.clear();
-	for (const [t, data] of state.savedText) t.nodeValue = data;
-	state.savedText.clear();
+	for (const el of state.hiddenDisplays) releaseHiddenDisplay(el, false);
+	state.hiddenDisplays.clear();
+	for (const text of state.hiddenTexts) releaseHiddenText(text);
+	state.hiddenTexts.clear();
 }
 
 function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVersion: number): void {
@@ -22204,8 +22254,8 @@ export function activityBlock(
 			hidden: false,
 			commitVersion: 0,
 			deactivationPending: false,
-			savedDisplay: new Map(),
-			savedText: new Map(),
+			hiddenDisplays: new Set(),
+			hiddenTexts: new Set(),
 		};
 		// Activity is a rare boundary, so keep this back-reference off the
 		// monomorphic Block shape (matching the existing Suspense __trySlot tag).
