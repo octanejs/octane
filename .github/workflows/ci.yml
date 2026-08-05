@@ -447,6 +447,7 @@ jobs:
           --exclude "packages/octane-evals/tests/user-app-corpus.test.ts"
           --exclude "packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts"
           --exclude "packages/rspeedy-plugin-octane/tests/demo.test.ts"
+          --exclude "packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts"
           --exclude "packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts"
           --exclude "packages/vite-plugin-octane/tests/production.test.ts"
           --exclude "packages/octane/tests/browser/**/*.test.ts"
@@ -586,6 +587,7 @@ jobs:
               website-mcp/tests/built-handler.e2e.test.ts
               packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts
               packages/rspeedy-plugin-octane/tests/demo.test.ts
+              packages/rspeedy-plugin-octane/tests/browser/web-host.test.ts
               packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts
               packages/vite-plugin-octane/tests/production.test.ts
           - lane: eval-corpus

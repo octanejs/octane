@@ -3047,9 +3047,23 @@ export default defineConfig({
 			{
 				test: {
 					name: 'rspeedy-plugin',
-					include: ['packages/rspeedy-plugin-octane/tests/**/*.test.ts'],
+					include: [
+						'packages/rspeedy-plugin-octane/tests/**/*.test.ts',
+						'!packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts',
+					],
 					environment: 'node',
 					globals: false,
+				},
+				resolve: { alias: LYNX_ALIASES },
+			},
+			{
+				test: {
+					name: 'rspeedy-plugin-browser',
+					include: ['packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 90_000,
+					hookTimeout: 60_000,
 				},
 				resolve: { alias: LYNX_ALIASES },
 			},

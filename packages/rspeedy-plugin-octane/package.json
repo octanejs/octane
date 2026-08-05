@@ -59,6 +59,7 @@
     "@lynx-js/qrcode-rsbuild-plugin": "catalog:lynx",
     "@lynx-js/rspeedy": "catalog:lynx",
     "@lynx-js/tasm": "catalog:lynx",
+    "@lynx-js/web-core": "catalog:lynx",
     "@octanejs/lynx": "workspace:*",
     "@octanejs/rspack-plugin": "workspace:*",
     "@rsbuild/core": "catalog:lynx",
@@ -66,6 +67,7 @@
     "@tsrx/typescript-plugin": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "typescript": "catalog:lynx",
     "vitest": "catalog:default"
   }
