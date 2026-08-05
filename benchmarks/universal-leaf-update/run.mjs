@@ -78,8 +78,20 @@ try {
 	}
 	fs.writeFileSync(path.join(tempDir, 'app.mjs'), compiled.code);
 
-	const { createObjectContainer, createObjectDriver, createUniversalRoot, flushUniversalSync } =
-		await import(runtimeUrl);
+	const {
+		createObjectContainer,
+		createObjectDriver,
+		createUniversalRoot,
+		defineUniversalComponent,
+		flushUniversalSync,
+		universalComponent,
+		universalFor,
+		universalPlan,
+		universalProps,
+		universalTry,
+		universalValue,
+		useState,
+	} = await import(runtimeUrl);
 	const { default: App } = await import(pathToFileURL(path.join(tempDir, 'app.mjs')).href);
 
 	const findCounter = (children) => {
@@ -154,6 +166,178 @@ try {
 		root.unmount();
 	}
 
+	// Runtime-API scenarios covering the scoped-update paths beyond the plain
+	// compiled leaf: state in keyed @for items (hoisted to the list component),
+	// a leaf under an idle try boundary, a leaf whose update inserts/removes a
+	// host, and compact leaf rows driven by list-component selection state.
+	// Each measures one press beside 0 and 4,000 unrelated component siblings.
+	const pressPlan = universalPlan('object', { kind: 'host', type: 'presser', propsSlot: 0 });
+	const textPlan = universalPlan('object', {
+		kind: 'host',
+		type: 'text',
+		bindings: [['label', 0]],
+	});
+	const Leaf = defineUniversalComponent('object', ({ index }) =>
+		universalValue(textPlan, [`leaf-${index}`]),
+	);
+	const leafSiblings = (size) =>
+		Array.from({ length: size }, (_, index) =>
+			universalComponent('object', Leaf, { index }, `leaf-${index}`),
+		);
+	const presser = (label, onPress) =>
+		universalValue(pressPlan, [
+			universalProps([
+				['set', 'label', label],
+				['set', 'onPress', onPress],
+			]),
+		]);
+
+	const LIST_ITEMS = 20;
+	const ListScene = defineUniversalComponent('object', ({ ids }) =>
+		universalFor(
+			ids,
+			(id) => id,
+			(id) => {
+				const [count, setCount] = useState(0, 'count');
+				return presser(`item-${id}-${count}`, () => setCount((value) => value + 1));
+			},
+		),
+	);
+	const BoundaryCounter = defineUniversalComponent('object', () => {
+		const [count, setCount] = useState(0, 'count');
+		return presser(`count-${count}`, () => setCount((value) => value + 1));
+	});
+	const StructuralCounter = defineUniversalComponent('object', () => {
+		const [count, setCount] = useState(0, 'count');
+		return [
+			presser(`count-${count}`, () => setCount((value) => value + 1)),
+			count % 2 === 1 ? universalValue(textPlan, ['extra']) : null,
+		];
+	});
+	const COMPACT_ROWS = 100;
+	const CompactList = defineUniversalComponent('object', ({ ids }) => {
+		const [selected, setSelected] = useState(0, 'selected');
+		return [
+			presser(`sel-${selected}`, () => setSelected((value) => (value + 1) % ids.length)),
+			universalFor(
+				ids,
+				(id) => id,
+				(id) => universalValue(textPlan, [id === selected ? `${id}*` : `${id}`]),
+				null,
+				true,
+				true,
+			),
+		];
+	});
+
+	const scenarios = [
+		{
+			name: 'list-item',
+			note: 'keyed @for item state hoisted to its list component',
+			shell: ({ size }) => [
+				universalComponent(
+					'object',
+					ListScene,
+					{ ids: Array.from({ length: LIST_ITEMS }, (_, index) => index) },
+					'list',
+				),
+				...leafSiblings(size),
+			],
+			expectedLabel: (presses) => `item-0-${presses}`,
+		},
+		{
+			name: 'boundary',
+			note: 'leaf state under an idle try boundary',
+			shell: ({ size }) => [
+				universalTry(
+					() => universalComponent('object', BoundaryCounter),
+					null,
+					() => null,
+				),
+				...leafSiblings(size),
+			],
+			expectedLabel: (presses) => `count-${presses}`,
+		},
+		{
+			name: 'structural',
+			note: 'leaf update that inserts or removes a host each press',
+			shell: ({ size }) => [universalComponent('object', StructuralCounter), ...leafSiblings(size)],
+			expectedLabel: (presses) => `count-${presses}`,
+		},
+		{
+			name: 'compact',
+			note: 'compact leaf rows driven by list selection state',
+			driver: () => {
+				const base = createObjectDriver('object');
+				return { ...base, capabilities: { ...base.capabilities, compilerLeafProps: true } };
+			},
+			shell: ({ size }) => [
+				universalComponent(
+					'object',
+					CompactList,
+					{ ids: Array.from({ length: COMPACT_ROWS }, (_, index) => index) },
+					'list',
+				),
+				...leafSiblings(size),
+			],
+			expectedLabel: (presses) => `sel-${presses % COMPACT_ROWS}`,
+		},
+	];
+
+	const findPresser = (children) => {
+		for (const child of children) {
+			if (child.type === 'presser') return child;
+			const nested = findPresser(child.children ?? []);
+			if (nested) return nested;
+		}
+		return null;
+	};
+
+	for (const scenario of scenarios) {
+		const Shell = defineUniversalComponent('object', scenario.shell);
+		for (const size of [0, 4_000]) {
+			const container = createObjectContainer('object');
+			const root = createUniversalRoot(
+				container,
+				scenario.driver?.() ?? createObjectDriver('object'),
+			);
+			flushUniversalSync(() => root.render(Shell, { size }));
+			const target = findPresser(container.children);
+			if (target === null) throw new Error(`${scenario.name}: presser instance missing.`);
+			const press = () =>
+				flushUniversalSync(() => container.dispatchEvent(target, 'press', Object.freeze({})));
+			for (let index = 0; index < warmupPresses; index++) press();
+
+			const samples = [];
+			for (let iteration = 0; iteration < iterations; iteration++) {
+				const start = performance.now();
+				for (let index = 0; index < pressesPerSample; index++) press();
+				samples.push((performance.now() - start) / pressesPerSample);
+			}
+
+			const presses = warmupPresses + iterations * pressesPerSample;
+			const expectedLabel = scenario.expectedLabel(presses);
+			const actualLabel = String(target.props?.label ?? '');
+			if (actualLabel !== expectedLabel) {
+				failures.push(`${scenario.name}-${size}: expected ${expectedLabel}, got ${actualLabel}`);
+			}
+			const stats = summarizeSamples(samples);
+			targets.push({
+				name: `${scenario.name}-siblings-${size}`,
+				ops: { leaf_update_ms: timingStatForJson(stats) },
+				meta: {
+					scenario: scenario.name,
+					note: scenario.note,
+					siblings: size,
+					hostInstances: container.instanceCount,
+					finalLabel: actualLabel,
+					presses,
+				},
+			});
+			root.unmount();
+		}
+	}
+
 	payload = {
 		suite: 'universal-leaf-update',
 		iterations,
@@ -161,11 +345,11 @@ try {
 		...(failures.length === 0 ? null : { failed: failures.join(' | ') }),
 	};
 
-	console.log('| stateless siblings | host instances | ms per leaf setState |');
-	console.log('| ---: | ---: | ---: |');
+	console.log('| target | siblings | host instances | ms per press |');
+	console.log('| --- | ---: | ---: | ---: |');
 	for (const target of targets) {
 		console.log(
-			`| ${target.meta.siblings} | ${target.meta.hostInstances} | ${target.ops.leaf_update_ms.score.toFixed(3)} |`,
+			`| ${target.name} | ${target.meta.siblings} | ${target.meta.hostInstances} | ${target.ops.leaf_update_ms.score.toFixed(3)} |`,
 		);
 	}
 	if (failures.length !== 0) {

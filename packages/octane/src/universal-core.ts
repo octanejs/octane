@@ -6604,6 +6604,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		props: any,
 	): UniversalPreparedAttempt | null {
 		const range = target.range;
+		// Transported and bridged roots stay on the full-root path: their commits
+		// are acknowledged (or invalidated) against a whole-tree version, so a
+		// scoped batch would need its own ACK/rollback protocol on the far side
+		// before it could be accepted independently.
 		if (
 			this.transport !== null ||
 			this.bridge !== null ||
@@ -6617,8 +6621,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		) {
 			return null;
 		}
+		// An idle ancestor boundary needs no coordination: a scoped render that
+		// suspends or throws below it falls back to the full-root attempt, where
+		// the boundary handles the episode exactly as it always has. Only an
+		// already-active episode keeps its subtree on the full-root path.
 		for (let ancestor = target.parent; ancestor !== null; ancestor = ancestor.parent) {
-			if (ancestor.isBoundary) return null;
+			if (
+				ancestor.isBoundary &&
+				(ancestor.hasBoundaryError || ancestor.boundaryThenable !== null)
+			) {
+				return null;
+			}
 		}
 		const unsupported = UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION;
 		const scopeFeatures = logicalTreeFeatures(range);
@@ -6670,6 +6683,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				UNIVERSAL_WARM_CACHES.delete(this);
 				return null;
 			}
+			// An error that escapes the scope can only be handled by a boundary
+			// above it. Fall back so the full-root attempt reaches that boundary's
+			// materialize-time handling; without one the error is the caller's.
+			for (let ancestor = target.parent; ancestor !== null; ancestor = ancestor.parent) {
+				if (ancestor.isBoundary) {
+					UNIVERSAL_WARM_CACHES.delete(this);
+					return null;
+				}
+			}
 			throw error;
 		} finally {
 			ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
@@ -6679,11 +6701,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			CURRENT_ATTEMPT = previousAttempt;
 			CURRENT_OWNER = previousOwner;
 		}
-		if (
-			attempt.retryThenables.size !== 0 ||
-			(attempt.treeFeatures & unsupported) !== 0 ||
-			!stableLogicalChildren(range.children, nodes)
-		) {
+		if (attempt.retryThenables.size !== 0 || (attempt.treeFeatures & unsupported) !== 0) {
 			this.discardDraftOwners(attempt.owners);
 			UNIVERSAL_WARM_CACHES.delete(this);
 			return null;
@@ -6695,6 +6713,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			owner: target,
 			children: nodes,
 		};
+		// Retained compact rows are ordinary expanded host records, so the scoped
+		// blueprint expands the same way before it is compared or reconciled.
+		this.expandCompactLeafLists(blueprint);
+		// Structural changes commit through a physical frame for the scope. A
+		// portal or detached ancestor has no such frame, so those scopes stay on
+		// the fast path only while their shape is unchanged.
+		const scopePlacement = this.scopePhysicalPlacement(range);
+		if (scopePlacement === null && !stableLogicalChildren(range.children, blueprint.children)) {
+			this.discardDraftOwners(attempt.owners);
+			UNIVERSAL_WARM_CACHES.delete(this);
+			return null;
+		}
 		try {
 			const transaction = this.createPreparedTransaction(
 				blueprint,
@@ -6704,6 +6734,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				new Set(),
 				range,
 				scopeFeatures,
+				scopePlacement,
 			);
 			this.pending = transaction;
 			return transaction;
@@ -6711,6 +6742,34 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			this.discardDraftOwners(attempt.owners);
 			throw error;
 		}
+	}
+
+	// The physical frame a scoped range commits into: its nearest host (or
+	// container) ancestor plus the first physical host that follows the scope
+	// inside that parent. Untouched siblings cannot move during a scoped commit,
+	// so both stay valid anchors for inserted or reordered scope content. A
+	// portal or detached ancestor owns a separate physical tree: no frame.
+	private scopePhysicalPlacement(
+		scope: LogicalRecord,
+	): { parent: number | null; endAnchor: number | null } | null {
+		let endAnchor: number | null = null;
+		let current = scope;
+		for (let parent = current.parent; parent !== null; current = parent, parent = current.parent) {
+			if (parent.kind === 'host') return { parent: parent.id, endAnchor };
+			if (parent.kind !== 'range') return null;
+			if (endAnchor === null) {
+				const siblings = parent.children;
+				for (let index = siblings.indexOf(current) + 1; index < siblings.length; index++) {
+					const found = physicalRecords([siblings[index]]);
+					if (found.length !== 0) {
+						endAnchor = found[0].id;
+						break;
+					}
+				}
+			}
+			if (parent === this.rootRecord) return { parent: null, endAnchor };
+		}
+		return null;
 	}
 
 	// A scheduled owner that cannot replay alone (an anonymous @for-item owner,
@@ -6721,15 +6780,40 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		let scope: UniversalOwnerRecord | null = null;
 		for (const owner of this.scheduledOwners) {
 			if (owner.disposed) continue;
+			// Retained-hidden content belongs to a boundary episode; only the
+			// full-root attempt coordinates its retention and reveal.
+			if (owner.visibility === 'suspense-hidden') return undefined;
 			scope = scope === null ? owner : commonOwnerAncestor(scope, owner);
 			if (scope === null) return undefined;
 		}
+		let target: UniversalOwnerRecord | null = null;
 		for (let current = scope; current !== null; current = current.parent) {
 			if (current.component !== null && current.componentProps !== null && current.range !== null) {
-				return current;
+				target = current;
+				break;
 			}
 		}
-		return undefined;
+		if (target === null) return undefined;
+		// Hoisting may carry the replay across boundaries the scheduled owner sits
+		// under. An idle boundary re-renders its body inline like any other owner,
+		// but an active episode (pending thenable or routed error) owns retained
+		// arms whose replay and reveal are coordinated from the root.
+		for (const owner of this.scheduledOwners) {
+			if (owner.disposed) continue;
+			for (
+				let current: UniversalOwnerRecord | null = owner;
+				current !== target;
+				current = current.parent
+			) {
+				if (
+					current === null ||
+					(current.isBoundary && (current.hasBoundaryError || current.boundaryThenable !== null))
+				) {
+					return undefined;
+				}
+			}
+		}
+		return target;
 	}
 
 	prepare(component: UniversalComponent<any>, props: any): UniversalPreparedAttempt {
@@ -7422,6 +7506,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		stagedPortalRegistrations: Set<UniversalPortalTargetRegistration>,
 		scopeRecord: LogicalRecord = this.rootRecord,
 		scopeFeatures = 0,
+		scopePlacement: { parent: number | null; endAnchor: number | null } | null = null,
 	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
 		const scoped = scopeRecord !== this.rootRecord;
@@ -7709,6 +7794,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			newDrafts: readonly DraftRecord[],
 			sourceParentId: UniversalHostParent = parentId,
 			forceMove = false,
+			endAnchor: number | null = null,
 		) => {
 			const oldPhysical = physicalRecords(oldRecords);
 			const newPhysical = physicalDrafts(newDrafts);
@@ -7727,7 +7813,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const id = draft.record.id;
 				if (current[index] === id) continue;
 				const currentIndex = current.indexOf(id);
-				const before = current[index] ?? null;
+				const before = current[index] ?? endAnchor;
 				if (currentIndex === -1) {
 					placements.push({
 						op: forceMove && previousIds.has(id) ? 'move' : 'insert',
@@ -7746,6 +7832,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			walkDraftPostOrder(draftRoot, (draft) => {
 				if (draft.record === this.rootRecord) {
 					planPlacements(null, this.rootRecord.children, draft.children);
+				} else if (scoped && draft === draftRoot && scopePlacement !== null) {
+					// The scope's own top-level hosts sit inside a physical parent that
+					// also holds untouched out-of-scope siblings; the precomputed frame
+					// anchors appends before the first host that follows the scope.
+					planPlacements(
+						scopePlacement.parent,
+						draft.record.children,
+						draft.children,
+						scopePlacement.parent,
+						false,
+						scopePlacement.endAnchor,
+					);
 				} else if (draft.record.kind === 'host') {
 					planPlacements(draft.record.id, draft.record.children, draft.children);
 				} else if (draft.record.kind === 'portal') {

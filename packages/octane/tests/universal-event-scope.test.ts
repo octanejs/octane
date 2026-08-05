@@ -11,7 +11,9 @@ import {
 	universalFor,
 	universalPlan,
 	universalProps,
+	universalTry,
 	universalValue,
+	use,
 	useContext,
 	useLayoutEffect,
 	useState,
@@ -397,6 +399,249 @@ describe('universal event scopes', () => {
 		root.unmount();
 		expect(log.filter((entry) => entry === 'counter:detach:1')).toHaveLength(1);
 		expect(log.filter((entry) => entry === 'sibling:detach')).toHaveLength(1);
+	});
+
+	it('inserts, reorders, and removes scope hosts around retained out-of-scope siblings', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['label', 0]],
+		});
+		const headerPlan = universalPlan('object', { kind: 'host', type: 'header', propsSlot: 0 });
+		const siblingPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling',
+			bindings: [['value', 0]],
+		});
+		let apply!: (ids: string[]) => void;
+		const Rows = defineUniversalComponent('object', () => {
+			const [ids, setIds] = useState(['a', 'b'], 'ids');
+			apply = (next) => setIds(next);
+			return [
+				universalValue(headerPlan, [universalProps([['set', 'value', ids.join('')]])]),
+				...ids.map((id) => universalValue(rowPlan, [id], id)),
+			];
+		});
+		const Shell = defineUniversalComponent('object', () => [
+			universalComponent('object', Rows),
+			universalValue(siblingPlan, ['sib']),
+		]);
+
+		root.render(Shell, undefined);
+		expect(container.children.map((child) => child.type)).toEqual([
+			'header',
+			'row',
+			'row',
+			'sibling',
+		]);
+		const header = container.children[0];
+		const rowA = container.children[1];
+		const rowB = container.children[2];
+		const sibling = container.children[3];
+
+		// Reorder survivors and append a new row: everything stays anchored
+		// before the untouched out-of-scope sibling.
+		flushUniversalSync(() => apply(['b', 'a', 'c']));
+		expect(container.children[0]).toBe(header);
+		expect(header.props.value).toBe('bac');
+		expect(container.children[1]).toBe(rowB);
+		expect(container.children[2]).toBe(rowA);
+		expect(container.children[3].type).toBe('row');
+		expect(container.children[3].props.label).toBe('c');
+		const rowC = container.children[3];
+		expect(container.children[4]).toBe(sibling);
+
+		flushUniversalSync(() => apply(['c']));
+		expect(container.children.map((child) => child.type)).toEqual(['header', 'row', 'sibling']);
+		expect(container.children[1]).toBe(rowC);
+		expect(container.children[2]).toBe(sibling);
+		root.unmount();
+	});
+
+	it('updates compact leaf rows from list state without disturbing row identity', () => {
+		const container = createObjectContainer();
+		const base = createObjectDriver();
+		const driver = { ...base, capabilities: { ...base.capabilities, compilerLeafProps: true } };
+		const root = createUniversalRoot(container, driver);
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['label', 0]],
+		});
+		const headerPlan = universalPlan('object', { kind: 'host', type: 'header', propsSlot: 0 });
+		const siblingPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling',
+			bindings: [['value', 0]],
+		});
+		const List = defineUniversalComponent('object', ({ ids }: { ids: number[] }) => {
+			const [selected, setSelected] = useState(0, 'selected');
+			return [
+				universalValue(headerPlan, [
+					universalProps([
+						['set', 'value', selected],
+						['set', 'onPress', () => setSelected((value) => value + 1)],
+					]),
+				]),
+				universalFor(
+					ids,
+					(id) => id,
+					(id) => universalValue(rowPlan, [id === selected ? `${id}*` : `${id}`]),
+					null,
+					true,
+					true,
+				),
+			];
+		});
+		const Shell = defineUniversalComponent('object', ({ ids }: { ids: number[] }) => [
+			universalComponent('object', List, { ids }),
+			universalValue(siblingPlan, ['sib']),
+		]);
+
+		root.render(Shell, { ids: [0, 1, 2] });
+		const header = container.children[0];
+		const rows = container.children.slice(1, 4);
+		const sibling = container.children[4];
+		expect(rows.map((row) => row.props.label)).toEqual(['0*', '1', '2']);
+
+		flushUniversalSync(() => container.dispatchEvent(header, 'press', {}));
+		expect(container.children[0]).toBe(header);
+		expect(header.props.value).toBe(1);
+		expect(container.children.slice(1, 4)).toEqual(rows);
+		expect(rows.map((row) => row.props.label)).toEqual(['0', '1*', '2']);
+		expect(container.children[4]).toBe(sibling);
+
+		flushUniversalSync(() => container.dispatchEvent(header, 'press', {}));
+		expect(container.children.slice(1, 4)).toEqual(rows);
+		expect(rows.map((row) => row.props.label)).toEqual(['0', '1', '2*']);
+		root.unmount();
+	});
+
+	it('routes a scoped update render error to an enclosing idle try boundary', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const counterPlan = universalPlan('object', { kind: 'host', type: 'counter', propsSlot: 0 });
+		const caughtPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'caught',
+			bindings: [['message', 0]],
+		});
+		const siblingPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling',
+			bindings: [['value', 0]],
+		});
+		const Counter = defineUniversalComponent('object', () => {
+			const [count, setCount] = useState(0, 'count');
+			if (count === 2) throw new Error('counter exploded');
+			return universalValue(counterPlan, [
+				universalProps([
+					['set', 'value', count],
+					['set', 'onPress', () => setCount((value) => value + 1)],
+				]),
+			]);
+		});
+		const Shell = defineUniversalComponent('object', () => [
+			universalTry(
+				() => universalComponent('object', Counter),
+				null,
+				(error) => universalValue(caughtPlan, [(error as Error).message]),
+			),
+			universalValue(siblingPlan, ['sib']),
+		]);
+
+		root.render(Shell, undefined);
+		const counter = container.children[0];
+		const sibling = container.children[1];
+		expect(counter.props.value).toBe(0);
+
+		flushUniversalSync(() => container.dispatchEvent(counter, 'press', {}));
+		expect(container.children[0]).toBe(counter);
+		expect(counter.props.value).toBe(1);
+		expect(container.children[1]).toBe(sibling);
+
+		flushUniversalSync(() => container.dispatchEvent(counter, 'press', {}));
+		expect(container.children[0].type).toBe('caught');
+		expect(container.children[0].props.message).toBe('counter exploded');
+		expect(container.children[1]).toBe(sibling);
+		root.unmount();
+	});
+
+	it('applies updates around an active suspense episode and reveals queued hidden state', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const bodyPlan = universalPlan('object', { kind: 'host', type: 'primary', propsSlot: 0 });
+		const fallbackPlan = universalPlan('object', { kind: 'host', type: 'fallback', propsSlot: 0 });
+		const siblingPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling',
+			bindings: [['value', 0]],
+		});
+		let pending: Promise<string> | null = null;
+		let resolvePending!: (value: string) => void;
+		let bumpHidden!: () => void;
+		const Panel = defineUniversalComponent('object', () => [
+			universalTry(
+				() => {
+					const [n, setN] = useState(0, 'n');
+					bumpHidden = () => setN((value) => value + 1);
+					const value = pending === null ? 'ready' : use(pending);
+					return universalValue(bodyPlan, [universalProps([['set', 'value', `${value}:${n}`]])]);
+				},
+				() => {
+					const [ticks, setTicks] = useState(0, 'ticks');
+					return universalValue(fallbackPlan, [
+						universalProps([
+							['set', 'value', `pending:${ticks}`],
+							['set', 'onPress', () => setTicks((value) => value + 1)],
+						]),
+					]);
+				},
+			),
+			universalValue(siblingPlan, ['sib']),
+		]);
+		const Shell = defineUniversalComponent('object', () => universalComponent('object', Panel));
+
+		root.render(Shell, undefined);
+		const body = container.children[0];
+		const sibling = container.children[1];
+		expect(body.props.value).toBe('ready:0');
+
+		// Idle boundary between the stateful try body and its component: the
+		// update still lands and the sibling keeps identity.
+		flushUniversalSync(bumpHidden);
+		expect(container.children[0]).toBe(body);
+		expect(body.props.value).toBe('ready:1');
+
+		pending = new Promise<string>((resolve) => {
+			resolvePending = resolve;
+		});
+		flushUniversalSync(bumpHidden);
+		const fallback = container.children.find((child) => child.type === 'fallback')!;
+		expect(fallback).toBeDefined();
+		expect(fallback.props.value).toBe('pending:0');
+		expect(body.visible).toBe(false);
+		expect(container.children.includes(sibling)).toBe(true);
+
+		// The episode is active: another hidden-body update must not disturb the
+		// retained arm and stays queued for the reveal.
+		flushUniversalSync(bumpHidden);
+		expect(container.children.find((child) => child.type === 'fallback')).toBe(fallback);
+		expect(body.visible).toBe(false);
+
+		// Pending-arm state keeps working while the episode is active.
+		flushUniversalSync(() => container.dispatchEvent(fallback, 'press', {}));
+		expect(fallback.props.value).toBe('pending:1');
+
+		resolvePending('done');
+		for (let index = 0; index < 6; index++) await Promise.resolve();
+		const revealed = container.children.find((child) => child.type === 'primary')!;
+		expect(revealed.visible).toBe(true);
+		expect(revealed.props.value).toBe('done:3');
+		expect(container.children.includes(sibling)).toBe(true);
+		root.unmount();
 	});
 
 	it('rejects a nested priority change and still closes the outer scope', () => {
