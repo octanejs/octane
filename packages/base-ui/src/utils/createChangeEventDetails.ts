@@ -23,6 +23,9 @@ export const REASONS = {
 	trackPress: 'track-press',
 	drag: 'drag',
 	disabled: 'disabled',
+	// Automatic-consistency reasons (tabs): the selected item was never valid, or went away.
+	initial: 'initial',
+	missing: 'missing',
 	triggerHover: 'trigger-hover',
 	triggerFocus: 'trigger-focus',
 	outsidePress: 'outside-press',
