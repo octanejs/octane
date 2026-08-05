@@ -16,8 +16,8 @@
 //
 // THAT GAP IS LOAD-BEARING HERE, more than it was for badge: `<SidebarMenuButton asChild>` wrapping
 // a router link is the ordinary way to build a nav. Until the upstream source settles the spelling,
-// build the link inside the button, or apply `sidebarMenuButtonVariants({ variant, size })` to your
-// own element — that export exists for this.
+// build the link inside the button, or apply the exported `sidebarMenuButtonVariants({ variant, size })`
+// to your own element.
 //
 // Octane adaptations: "use client" dropped, lucide-react -> @octanejs/lucide; the provider/Sheet
 // trees compose with createElement where a child must be a real element descriptor, and CSS custom
@@ -451,7 +451,11 @@ export function SidebarMenuItem({ className, ...props }: Props) @{
 	/>
 }
 
-const sidebarMenuButtonVariants = cva(
+// EXPORTED, unlike the radix source it was ported from. This base drops `asChild`, and the header
+// above sends consumers here as the substitute for it — a helper they cannot import is not a
+// workaround. Every sibling family in this base already exports its cva map (badge, item, toggle),
+// so this also brings sidebar in line with them.
+export const sidebarMenuButtonVariants = cva(
 	'peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate',
 	{
 		variants: {

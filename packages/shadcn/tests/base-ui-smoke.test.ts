@@ -4,6 +4,7 @@ import { flushEffects, mount } from '../../octane/tests/_helpers';
 import * as F from './_fixtures/base-ui-smoke.tsrx';
 import * as TableParity from './_fixtures/base-ui-table-parity.tsrx';
 import { badgeVariants as radixBadgeVariants } from '@octanejs/shadcn/Badge';
+import { sidebarMenuButtonVariants } from '@octanejs/shadcn/base-ui/Sidebar';
 import { badgeVariants as baseUiBadgeVariants } from '@octanejs/shadcn/base-ui/Badge';
 import {
 	Tooltip,
@@ -1594,6 +1595,32 @@ describe('@octanejs/shadcn — Base UI tabs adapts the orientation dialect to th
 			expect(list.getAttribute('role')).toBe('tablist');
 			expect(list.getAttribute('aria-orientation')).toBe('vertical');
 			expect(list.getAttribute('data-variant')).toBe('line');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — the Base UI sidebar escape hatch is reachable', () => {
+	it('exports the variants the header sends consumers to', () => {
+		// This base drops `asChild` on SidebarMenuButton and documents this helper as the substitute.
+		// It was declared non-exported (faithful to the radix source, which does not need it because
+		// it HAS asChild), so the documented workaround could not be imported at all.
+		expect(typeof sidebarMenuButtonVariants).toBe('function');
+		expect(sidebarMenuButtonVariants({ variant: 'default', size: 'default' })).toBeTruthy();
+	});
+
+	it('produces the same classes the component applies, so the workaround really substitutes', async () => {
+		// A helper that exists but yields different classes would be a worse trap than no helper.
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			const button = m.container.querySelector('[data-slot="sidebar-menu-button"]')!;
+			for (const cls of sidebarMenuButtonVariants({ variant: 'default', size: 'default' }).split(
+				' ',
+			)) {
+				expect(button.className, cls).toContain(cls);
+			}
 		} finally {
 			m.unmount();
 		}
