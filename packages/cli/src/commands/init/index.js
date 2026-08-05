@@ -3,7 +3,7 @@ import path from 'node:path';
 import { defineCommand } from '../../kernel/command.js';
 import { setCompilerOption } from '../../kernel/edit.js';
 import { CliError, EXIT } from '../../kernel/errors.js';
-import { PACKAGE_MANAGERS, installPackages } from '../../kernel/install.js';
+import { PACKAGE_MANAGERS, PNPM_ALLOWED_BUILDS, installPackages } from '../../kernel/install.js';
 import {
 	MODES,
 	PRETTIER_CONFIG_FILES,
@@ -458,6 +458,11 @@ export async function applyInit(ctx, project, options) {
 
 	/** @type {string[]} */
 	const installed = [];
+	// Every install in this run hits the same blocked build script, and the same
+	// line three times reads like three problems.
+	const warn = (/** @type {string[]} */ lines) => {
+		for (const line of lines) if (!manual.includes(line)) manual.push(line);
+	};
 	if (options.install !== false && dependencies.length + devDependencies.length > 0) {
 		const spinner = ctx.ui.spinner(`Installing with ${installing.packageManager ?? 'npm'}`);
 		try {
@@ -466,9 +471,11 @@ export async function applyInit(ctx, project, options) {
 				[devDependencies, true],
 			]) {
 				if (/** @type {string[]} */ (names).length === 0) continue;
-				await installPackages(ctx, installing, /** @type {string[]} */ (names), {
+				const ran = await installPackages(ctx, installing, /** @type {string[]} */ (names), {
 					dev: Boolean(dev),
+					allowBuilds: PNPM_ALLOWED_BUILDS,
 				});
+				warn(ran.warnings);
 				installed.push(.../** @type {string[]} */ (names));
 			}
 
@@ -481,7 +488,11 @@ export async function applyInit(ctx, project, options) {
 				if (range === null) {
 					manual.push('Install typescript, at the range @tsrx/typescript-plugin declares.');
 				} else {
-					await installPackages(ctx, installing, [`typescript@${range}`], { dev: true });
+					const ran = await installPackages(ctx, installing, [`typescript@${range}`], {
+						dev: true,
+						allowBuilds: PNPM_ALLOWED_BUILDS,
+					});
+					warn(ran.warnings);
 					installed.push('typescript');
 				}
 			}
