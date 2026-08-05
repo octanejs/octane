@@ -1,4 +1,4 @@
-import { Activity, useEffect, useId, useState } from 'octane';
+import { Activity, use, useEffect, useId, useState } from 'octane';
 
 function StatefulChild(props) @{
 	const [count, setCount] = useState(0);
@@ -46,4 +46,18 @@ export function ActivityIdHydration() @{
 		</Activity>
 		<IdChild className="visible-id" />
 	</div>
+}
+
+export function ActivitySuspenseHydration(props) @{
+	<section id="activity-suspense-host">
+		<Activity mode={props.mode}>
+			@try {
+				const value =
+					props.suspend ? use(props.promise) : 'server';
+				<span id="activity-resumed-content">{value as string}</span>
+			} @pending {
+				<span id="activity-resume-pending">{'loading'}</span>
+			}
+		</Activity>
+	</section>
 }
