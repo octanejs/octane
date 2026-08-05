@@ -79,6 +79,7 @@ export const BENCHMARK_SUITES = [
 	'async-waterfall',
 	'async-composition',
 	'lynx-list',
+	'universal-leaf-update',
 	'lynx-render',
 	'lynx-bundle-size',
 	'codegen-size',

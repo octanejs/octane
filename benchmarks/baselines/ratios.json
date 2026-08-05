@@ -1,5 +1,45 @@
 [
   {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
+    "target": "siblings-4000",
+    "reference": "siblings-0",
+    "maxRatio": 8,
+    "note": "Same-run production universal leaf updates at 4,000 unrelated siblings versus none. The fixed scoped path measures near 1x; 8x leaves sub-millisecond timer/JIT headroom while rejecting both the former whole-root replay (hundreds of times slower) and the object-driver full-map clone (tens of times slower)."
+  },
+  {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
+    "target": "list-item-siblings-4000",
+    "reference": "list-item-siblings-0",
+    "maxRatio": 8,
+    "note": "One keyed @for item's setState hoists to its 20-item list component instead of replaying the root, so 4,000 out-of-scope siblings must not change its cost. Rejects the anonymous-owner bail that sent list-item state through a whole-root replay."
+  },
+  {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
+    "target": "boundary-siblings-4000",
+    "reference": "boundary-siblings-0",
+    "maxRatio": 8,
+    "note": "A leaf setState under an idle @try boundary stays scoped; only an active suspense or error episode may fall back to the root. Rejects the blanket ancestor-boundary bail that disabled scoped updates for any app with an error boundary near the root."
+  },
+  {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
+    "target": "structural-siblings-4000",
+    "reference": "structural-siblings-0",
+    "maxRatio": 8,
+    "note": "A leaf update that inserts or removes one host commits through the scope's physical frame (nearest host parent plus end anchor) instead of replaying the root. Rejects the shape-stability bail that sent every structural update through a whole-root replay."
+  },
+  {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
+    "target": "compact-siblings-4000",
+    "reference": "compact-siblings-0",
+    "maxRatio": 8,
+    "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
+  },
+  {
     "suite": "lifecycle-memory",
     "op": "cycle",
     "target": "octane-tsrx",
