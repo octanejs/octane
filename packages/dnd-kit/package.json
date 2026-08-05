@@ -41,7 +41,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --project dnd-kit-ssr",
-    "test:coverage": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --coverage.enabled --coverage.provider=v8 --coverage.include=packages/dnd-kit/src/** --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.statements=98 --coverage.thresholds.functions=98 --coverage.thresholds.branches=86"
+    "test:coverage": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --project dnd-kit-ssr --coverage.enabled --coverage.provider=v8 --coverage.include=packages/dnd-kit/src/** --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.statements=98 --coverage.thresholds.functions=98 --coverage.thresholds.branches=86"
   },
   "dependencies": {
     "@dnd-kit/abstract": "catalog:default",
