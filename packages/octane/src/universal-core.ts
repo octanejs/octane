@@ -3109,6 +3109,25 @@ function ownerTreeHasWarmPlan(owner: UniversalOwnerRecord): boolean {
 	return false;
 }
 
+function commonOwnerAncestor(
+	left: UniversalOwnerRecord,
+	right: UniversalOwnerRecord,
+): UniversalOwnerRecord | null {
+	let leftDepth = 0;
+	for (let current = left.parent; current !== null; current = current.parent) leftDepth++;
+	let rightDepth = 0;
+	for (let current = right.parent; current !== null; current = current.parent) rightDepth++;
+	let a: UniversalOwnerRecord | null = left;
+	let b: UniversalOwnerRecord | null = right;
+	for (; leftDepth > rightDepth; leftDepth--) a = a!.parent;
+	for (; rightDepth > leftDepth; rightDepth--) b = b!.parent;
+	while (a !== null && a !== b) {
+		a = a.parent;
+		b = b!.parent;
+	}
+	return a;
+}
+
 function stableLogicalChildren(
 	records: readonly LogicalRecord[],
 	blueprints: readonly BlueprintNode[],
@@ -6602,7 +6621,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			if (ancestor.isBoundary) return null;
 		}
 		const unsupported = UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION;
-		if ((logicalTreeFeatures(range) & unsupported) !== 0) return null;
+		const scopeFeatures = logicalTreeFeatures(range);
+		if ((scopeFeatures & unsupported) !== 0) return null;
 
 		this.flushPassivesBeforeRender();
 		this.pending?.abort();
@@ -6683,6 +6703,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				props,
 				new Set(),
 				range,
+				scopeFeatures,
 			);
 			this.pending = transaction;
 			return transaction;
@@ -6692,13 +6713,32 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}
 	}
 
+	// A scheduled owner that cannot replay alone (an anonymous @for-item owner,
+	// or several owners raised by one event scope) still has one smallest
+	// ancestor whose retained props and range can replay every queued update:
+	// the nearest enclosing component owner of their common ancestor.
+	private resolveScopedTarget(): UniversalOwnerRecord | undefined {
+		let scope: UniversalOwnerRecord | null = null;
+		for (const owner of this.scheduledOwners) {
+			if (owner.disposed) continue;
+			scope = scope === null ? owner : commonOwnerAncestor(scope, owner);
+			if (scope === null) return undefined;
+		}
+		for (let current = scope; current !== null; current = current.parent) {
+			if (current.component !== null && current.componentProps !== null && current.range !== null) {
+				return current;
+			}
+		}
+		return undefined;
+	}
+
 	prepare(component: UniversalComponent<any>, props: any): UniversalPreparedAttempt {
 		const ownedTarget =
 			this.scheduledPreparationDepth > 0 &&
 			this.scheduledUrgent &&
 			!this.scheduledFullRoot &&
-			this.scheduledOwners.size === 1
-				? this.scheduledOwners.values().next().value
+			this.scheduledOwners.size !== 0
+				? this.resolveScopedTarget()
 				: undefined;
 		const scheduledUrgent = this.scheduledUrgent || this.scheduledPreparationDepth === 0;
 		this.scheduledUrgent = false;
@@ -7381,11 +7421,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		props: any,
 		stagedPortalRegistrations: Set<UniversalPortalTargetRegistration>,
 		scopeRecord: LogicalRecord = this.rootRecord,
+		scopeFeatures = 0,
 	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
 		const scoped = scopeRecord !== this.rootRecord;
-		const treeFeatures =
-			(scoped ? logicalTreeFeatures(scopeRecord) : this.treeFeatures) | attempt.treeFeatures;
+		const treeFeatures = (scoped ? scopeFeatures : this.treeFeatures) | attempt.treeFeatures;
 		const used = new Set<LogicalRecord>([scopeRecord]);
 		const changedRangeOwners: DraftRecord[] = [];
 		let topologyChanged = false;
@@ -8174,7 +8214,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				if ((treeFeatures & UNIVERSAL_TREE_EVENT) !== 0) {
-					const handlers = scoped ? new Map(this.handlers) : new Map<number, CommittedEvent>();
+					// A scoped commit edits the accepted listener table in place: this
+					// closure is already the accept point (EVENT_DISPATCHERS mutates here
+					// either way), and cloning would cost every listener in the app for an
+					// update that replaced a handful.
+					const handlers = scoped ? this.handlers : new Map<number, CommittedEvent>();
 					const replacedListeners = scoped ? previousScopedEventListeners : this.publishedListeners;
 					for (const listener of replacedListeners) {
 						EVENT_DISPATCHERS.delete(listener);
@@ -8195,7 +8239,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				if ((treeFeatures & UNIVERSAL_TREE_LOCAL_CALLBACK) !== 0) {
 					const localCallbacks = scoped
-						? new Map(this.localCallbacks)
+						? this.localCallbacks
 						: new Map<number, CommittedHostCallback>();
 					for (const listener of previousScopedLocalCallbacks) {
 						localCallbacks.delete(listener);
