@@ -796,6 +796,35 @@ different static branches that share a tag may not be detected:
 Development performs the full static-structure and attribute comparison, warns,
 and rebuilds.
 
+## Hot module updates remount the edited component
+
+React Fast Refresh diffs the new element tree against the existing fiber tree, so
+an edit high in the tree can leave untouched descendants exactly where they were,
+DOM nodes and state included.
+
+Octane's compiled bodies clone a static template and address it through a
+compile-time slot layout, so there is no element tree to diff. A hot update
+discards the edited component's committed render state and remounts it in place:
+
+- The component's own `useState`, `useReducer`, `useRef`, and `useId` values
+  survive. Hook slots are keyed by
+  `Symbol.for('octane:<file>:<Component>.<hook>#<n>')`, and a re-imported module
+  produces the same Symbol identity.
+- Its memo and effect dependencies are invalidated, so an edited closure runs
+  again even when its authored dependency array did not change.
+- Everything it rendered is torn down and rebuilt: descendant components, their
+  state, their DOM identity, and uncontrolled input values. React would have kept
+  the ones the edit did not touch.
+
+Two cases decline the refresh, and the emitted accept block calls
+`import.meta.hot.invalidate()` for a full page reload. A component inside a hidden
+`<Activity>` has its DOM stamped `display: none` by a walk the remount cannot
+re-trigger. A block with no coherent DOM range has nothing to rebuild into.
+
+Hook slot ids are numbered per module in source order, so inserting or reordering
+a hook call shifts every later hook's key in that file and remaps its state. That
+is a known limitation, not a supported edit.
+
 ## Not implemented (by design)
 
 Octane does not implement:

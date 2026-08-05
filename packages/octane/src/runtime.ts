@@ -6385,6 +6385,13 @@ function hasResettableHmrRange(block: Block): boolean {
 	// range. Decline that handoff so the bundler reloads instead of mutating the
 	// parent Block through the lite scope's compatibility cast.
 	if (start === undefined || end === undefined) return false;
+	// A hidden <Activity> keeps its DOM connected and stamped `display: none` by
+	// hideActivityRange, a walk that only runs when the Activity slot re-renders.
+	// A remount would insert nodes that walk never revisits, so the edit would
+	// become VISIBLE inside a hidden tree. Decline and let the bundler reload.
+	// Any other inactive ancestor gets the same treatment: nothing below one is
+	// safe to rebuild without the owner's hide pass running again.
+	if (inInactiveSubtree(block)) return false;
 	if (start === null || end === null) {
 		return (
 			start === null && end === null && (block.kind === 'root' || block.exclusiveMarkers === true)
