@@ -460,6 +460,58 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('anchors structural scope changes before later siblings inside a host parent', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const framePlan = universalPlan('object', {
+			kind: 'host',
+			type: 'frame',
+			children: [
+				{ kind: 'slot', slot: 0 },
+				{ kind: 'host', type: 'footer', bindings: [['value', 1]] },
+			],
+		});
+		const pressPlan = universalPlan('object', { kind: 'host', type: 'presser', propsSlot: 0 });
+		const extraPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'extra',
+			bindings: [['value', 0]],
+		});
+		const Toggler = defineUniversalComponent('object', () => {
+			const [expanded, setExpanded] = useState(false, 'expanded');
+			return [
+				universalValue(pressPlan, [
+					universalProps([
+						['set', 'value', expanded],
+						['set', 'onPress', () => setExpanded((value) => !value)],
+					]),
+				]),
+				expanded ? universalValue(extraPlan, ['x']) : null,
+			];
+		});
+		const Shell = defineUniversalComponent('object', () =>
+			universalValue(framePlan, [universalComponent('object', Toggler), 'foot']),
+		);
+
+		root.render(Shell, undefined);
+		const frame = container.children[0];
+		const presser = frame.children[0];
+		const footer = frame.children[1];
+		expect(frame.children.map((child) => child.type)).toEqual(['presser', 'footer']);
+
+		// The inserted host must land between the presser and the footer, which is
+		// an out-of-scope sibling inside the same host parent.
+		flushUniversalSync(() => container.dispatchEvent(presser, 'press', {}));
+		expect(frame.children.map((child) => child.type)).toEqual(['presser', 'extra', 'footer']);
+		expect(frame.children[0]).toBe(presser);
+		expect(frame.children[2]).toBe(footer);
+
+		flushUniversalSync(() => container.dispatchEvent(presser, 'press', {}));
+		expect(frame.children.map((child) => child.type)).toEqual(['presser', 'footer']);
+		expect(frame.children[1]).toBe(footer);
+		root.unmount();
+	});
+
 	it('updates compact leaf rows from list state without disturbing row identity', () => {
 		const container = createObjectContainer();
 		const base = createObjectDriver();

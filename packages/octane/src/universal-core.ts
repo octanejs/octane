@@ -6717,13 +6717,16 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		// blueprint expands the same way before it is compared or reconciled.
 		this.expandCompactLeafLists(blueprint);
 		// Structural changes commit through a physical frame for the scope. A
-		// portal or detached ancestor has no such frame, so those scopes stay on
-		// the fast path only while their shape is unchanged.
-		const scopePlacement = this.scopePhysicalPlacement(range);
-		if (scopePlacement === null && !stableLogicalChildren(range.children, blueprint.children)) {
-			this.discardDraftOwners(attempt.owners);
-			UNIVERSAL_WARM_CACHES.delete(this);
-			return null;
+		// portal or detached ancestor has no such frame, so those scopes fall
+		// back once their shape changes; shape-stable updates need no frame.
+		let scopePlacement: { parent: number | null; endAnchor: number | null } | null = null;
+		if (!stableLogicalChildren(range.children, blueprint.children)) {
+			scopePlacement = this.scopePhysicalPlacement(range);
+			if (scopePlacement === null) {
+				this.discardDraftOwners(attempt.owners);
+				UNIVERSAL_WARM_CACHES.delete(this);
+				return null;
+			}
 		}
 		try {
 			const transaction = this.createPreparedTransaction(
@@ -6755,8 +6758,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		let endAnchor: number | null = null;
 		let current = scope;
 		for (let parent = current.parent; parent !== null; current = parent, parent = current.parent) {
-			if (parent.kind === 'host') return { parent: parent.id, endAnchor };
-			if (parent.kind !== 'range') return null;
+			if (parent.kind !== 'host' && parent.kind !== 'range') return null;
 			if (endAnchor === null) {
 				const siblings = parent.children;
 				for (let index = siblings.indexOf(current) + 1; index < siblings.length; index++) {
@@ -6767,6 +6769,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 			}
+			if (parent.kind === 'host') return { parent: parent.id, endAnchor };
 			if (parent === this.rootRecord) return { parent: null, endAnchor };
 		}
 		return null;
