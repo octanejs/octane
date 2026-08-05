@@ -2105,10 +2105,44 @@ export default defineConfig({
 					name: 'dnd-kit',
 					include: [
 						'packages/dnd-kit/tests/conformance/**/*.test.ts',
-						'packages/dnd-kit/tests/differential/**/*.test.ts',
 						'packages/dnd-kit/tests/hydration/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dnd-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/hooks$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/sortable$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/utilities$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dnd-kit-differential',
+					include: ['packages/dnd-kit/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					// The shared fixture mounts both adapters and drains both runtimes.
+					// Under full-suite contention this can exceed Vitest's 5s default
+					// even though the focused interaction completes in well under a second.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globalSetup: ['packages/dnd-kit/tests/differential/_setup.ts'],
 					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
 					globals: false,

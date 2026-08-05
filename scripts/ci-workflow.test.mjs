@@ -221,6 +221,20 @@ describe('CI workflow aggregation', () => {
 		}
 		assert.equal(shardedProjects.get('hook-form').testExecution, undefined);
 
+		assert.deepEqual(baseProjects.get('dnd-kit').test.include, [
+			'packages/dnd-kit/tests/conformance/**/*.test.ts',
+			'packages/dnd-kit/tests/hydration/**/*.test.ts',
+		]);
+		assert.equal(baseProjects.get('dnd-kit').test.globalSetup, undefined);
+		assert.deepEqual(baseProjects.get('dnd-kit-differential').test.include, [
+			'packages/dnd-kit/tests/differential/**/*.test.ts',
+		]);
+		assert.deepEqual(baseProjects.get('dnd-kit-differential').test.globalSetup, [
+			'packages/dnd-kit/tests/differential/_setup.ts',
+		]);
+		assert.equal(baseProjects.get('dnd-kit-differential').test.testTimeout, 30_000);
+		assert.equal(shardedProjects.has('dnd-kit-differential'), true);
+
 		const aggregate = jobSource('test');
 		assert.match(
 			aggregate,
@@ -978,6 +992,7 @@ describe('Vercel preview workflow', () => {
 	test('keeps production automatic and makes the privileged workflow API-only', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
 			assert.deepEqual(config.git.deploymentEnabled, {
+				'*': false,
 				'**': false,
 				main: true,
 			});
