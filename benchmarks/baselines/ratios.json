@@ -1,5 +1,13 @@
 [
   {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
+    "target": "siblings-4000",
+    "reference": "siblings-0",
+    "maxRatio": 8,
+    "note": "Same-run production universal leaf updates at 4,000 unrelated siblings versus none. The fixed scoped path measures near 1x; 8x leaves sub-millisecond timer/JIT headroom while rejecting both the former whole-root replay (hundreds of times slower) and the object-driver full-map clone (tens of times slower)."
+  },
+  {
     "suite": "lifecycle-memory",
     "op": "cycle",
     "target": "octane-tsrx",
