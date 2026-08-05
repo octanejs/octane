@@ -868,7 +868,10 @@ export function Page() @{
 `,
 			);
 			let updatedBody = '';
-			const deadline = Date.now() + 20_000;
+			// The rebuild takes ~1s on an idle machine, but this suite shares the
+			// box with the rest of the full run. Poll well inside the case budget
+			// so a saturated machine reports the real HTML rather than a stale one.
+			const deadline = Date.now() + 60_000;
 			while (Date.now() < deadline) {
 				await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
 				updatedBody = await (await fetch(`${origin}/`)).text();

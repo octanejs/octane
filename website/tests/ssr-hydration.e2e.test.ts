@@ -479,6 +479,18 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			);
 		};
 
+		// CodeMirror only mounts the lines around its scroll position, and the
+		// probes leave a pane deep in the document. Rewind it before waiting on
+		// text from the top of the file, which is otherwise never mounted.
+		// `0` is the source pane, `1` the output pane.
+		const rewindPane = (pane: 0 | 1) =>
+			page.evaluate((index) => {
+				const scroller = document
+					.querySelectorAll('.pg-editor .cm-content')
+					[index]?.closest('.cm-scroller');
+				if (scroller) scroller.scrollTop = 0;
+			}, pane);
+
 		for (const target of ['client', 'server']) {
 			await outputSelector.selectOption(target);
 			await page.waitForFunction(
@@ -570,15 +582,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		await outputSelector.selectOption('client');
-		// CodeMirror renders only the lines around its scroll position, and the
-		// clicks above left the output pane deep in the document. Rewind it, then
-		// wait on the import header at the top of the emit.
-		await page.evaluate(() => {
-			const scroller = document
-				.querySelectorAll('.pg-editor .cm-content')[1]
-				?.closest('.cm-scroller');
-			if (scroller) scroller.scrollTop = 0;
-		});
+		// The clicks above left the output pane deep in the document, so rewind
+		// it before waiting on the import header at the top of the emit.
+		await rewindPane(1);
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
@@ -613,6 +619,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			).toContain(keyword);
 		}
 		await outputSelector.selectOption('client');
+		// The types probes just above scrolled the output pane past the import
+		// header, and the switch back to `client` keeps that offset.
+		await rewindPane(1);
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
@@ -700,15 +709,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			null,
 			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
-		// The probes above left the SOURCE pane scrolled deep into another example,
-		// and CodeMirror renders only around its scroll position — rewind so the
-		// whole form is inside the rendered range.
-		await page.evaluate(() => {
-			const scroller = document
-				.querySelectorAll('.pg-editor .cm-content')[0]
-				?.closest('.cm-scroller');
-			if (scroller) scroller.scrollTop = 0;
-		});
+		// The probes above left the SOURCE pane scrolled deep into another example
+		// — rewind so the whole form is inside the rendered range.
+		await rewindPane(0);
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('defaultValue'),
