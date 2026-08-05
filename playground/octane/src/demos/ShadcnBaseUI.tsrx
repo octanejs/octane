@@ -44,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 6 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 5 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -63,6 +63,7 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@octanejs/shadcn/base-ui/Tabs';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
 import {
 	Menubar,
@@ -262,7 +263,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 38 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 40 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
 				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
@@ -965,6 +966,32 @@ export function ShadcnBaseUIDemo() @{
 					</div>
 				</HoverCardContent>
 			</HoverCard>
+		</Section>
+
+		<Section
+			title="Tabs"
+			note="Runs on the Tabs primitive ported into @octanejs/base-ui for this family. Arrow keys must move the highlight and Home/End jump to the ends. The pinned primitive emits data-orientation where current shadcn sources expect a bare data-horizontal, so the vertical variant is the one to check switches to a column."
+		>
+			<div class="flex flex-col gap-6">
+				<Tabs defaultValue="account">
+					<TabsList>
+						<TabsTrigger value="account">Account</TabsTrigger>
+						<TabsTrigger value="password">Password</TabsTrigger>
+						<TabsTrigger value="disabled" disabled>Disabled</TabsTrigger>
+					</TabsList>
+					<TabsContent value="account">Make changes to your account here.</TabsContent>
+					<TabsContent value="password">Change your password here.</TabsContent>
+				</Tabs>
+
+				<Tabs defaultValue="one" orientation="vertical">
+					<TabsList variant="line">
+						<TabsTrigger value="one">Vertical one</TabsTrigger>
+						<TabsTrigger value="two">Vertical two</TabsTrigger>
+					</TabsList>
+					<TabsContent value="one">First vertical panel.</TabsContent>
+					<TabsContent value="two">Second vertical panel.</TabsContent>
+				</Tabs>
+			</div>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">

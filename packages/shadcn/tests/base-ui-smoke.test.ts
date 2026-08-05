@@ -95,6 +95,7 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Breadcrumb', F.BreadcrumbCase, 'Current'],
 	['Item', F.ItemCase, 'Item description text.'],
 	['DropdownMenu', F.DropdownMenuCase, 'Profile', true],
+	['Tabs', F.TabsCase, 'Account panel'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -1528,6 +1529,71 @@ describe('@octanejs/shadcn — Base UI sidebar composes this base own families',
 				expect(button.tagName).toBe('BUTTON');
 				expect(button.closest('button:not([data-slot="sidebar-menu-button"])')).toBe(null);
 			}
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI tabs adapts the orientation dialect to the pin', () => {
+	it('switches panels on click, with aria wiring intact', async () => {
+		const m = mount(F.TabsCase as never);
+		await settle();
+		try {
+			const triggers = [...m.container.querySelectorAll<HTMLElement>('[data-slot="tabs-trigger"]')];
+			expect(triggers.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+			triggers[1].click();
+			await settle();
+			expect(triggers.map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+			expect(m.container.textContent).toContain('Password panel');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('targets data-[orientation=…], not the bare attributes upstream uses', async () => {
+		// The version skew this file exists to bridge. The pinned primitive emits
+		// `data-orientation="horizontal"`; upstream's source targets a bare `data-horizontal`, which
+		// would match nothing here — the root would never become a column and every
+		// `group-data-*/tabs` selector on the trigger would be dead.
+		const m = mount(F.TabsCase as never);
+		await settle();
+		try {
+			const root = m.container.querySelector('[data-slot="tabs"]')!;
+			expect(root.getAttribute('data-orientation')).toBe('horizontal');
+			expect(root.hasAttribute('data-horizontal')).toBe(false);
+			expect(root.className).toContain('data-[orientation=horizontal]:flex-col');
+			for (const el of m.container.querySelectorAll('[data-slot="tabs-trigger"]')) {
+				expect(el.className).not.toMatch(/group-data-(horizontal|vertical)\//);
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps data-active, which the pin emits exactly as the classes expect', async () => {
+		const m = mount(F.TabsCase as never);
+		await settle();
+		try {
+			const active = m.container.querySelector('[data-slot="tabs-trigger"][data-active]')!;
+			expect(active).not.toBe(null);
+			expect(active.textContent).toBe('Account');
+			expect(active.className).toContain('data-active:bg-background');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('carries orientation through to the list and its variants', async () => {
+		const m = mount(F.TabsVerticalCase as never);
+		await settle();
+		try {
+			const root = m.container.querySelector('[data-slot="tabs"]')!;
+			expect(root.getAttribute('data-orientation')).toBe('vertical');
+			const list = m.container.querySelector('[data-slot="tabs-list"]')!;
+			expect(list.getAttribute('role')).toBe('tablist');
+			expect(list.getAttribute('aria-orientation')).toBe('vertical');
+			expect(list.getAttribute('data-variant')).toBe('line');
 		} finally {
 			m.unmount();
 		}

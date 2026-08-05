@@ -702,6 +702,25 @@
       ]
     },
     {
+      "name": "tabs",
+      "type": "registry:ui",
+      "title": "Tabs",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.21",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/tabs.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/tabs.tsrx"
+        }
+      ]
+    },
+    {
       "name": "textarea",
       "type": "registry:ui",
       "title": "Textarea",

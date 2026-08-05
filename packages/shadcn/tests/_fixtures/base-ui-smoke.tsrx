@@ -47,6 +47,7 @@ import {
 	FieldTitle,
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@octanejs/shadcn/base-ui/Tabs';
 import {
 	Sidebar,
 	SidebarContent,
@@ -735,4 +736,25 @@ export function SidebarCase() @{
 		</Sidebar>
 		<SidebarTrigger />
 	</SidebarProvider>
+}
+
+export function TabsCase() @{
+	<Tabs defaultValue="account">
+		<TabsList>
+			<TabsTrigger value="account">Account</TabsTrigger>
+			<TabsTrigger value="password">Password</TabsTrigger>
+		</TabsList>
+		<TabsContent value="account">Account panel</TabsContent>
+		<TabsContent value="password">Password panel</TabsContent>
+	</Tabs>
+}
+
+export function TabsVerticalCase() @{
+	<Tabs defaultValue="a" orientation="vertical">
+		<TabsList variant="line">
+			<TabsTrigger value="a">A</TabsTrigger>
+			<TabsTrigger value="b">B</TabsTrigger>
+		</TabsList>
+		<TabsContent value="a">Vertical panel</TabsContent>
+	</Tabs>
 }
