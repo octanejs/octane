@@ -291,6 +291,53 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
+	it('keeps a refreshed child hidden until its Activity reveals', async () => {
+		const initialChild = await compileHmrComponent(
+			`
+				export function Child() @{
+					<p class="child">before</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const updatedChild = await compileHmrComponent(
+			`
+				export function Child() @{
+					<section class="child">after</section>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const App = await compileHmrComponent(
+			`
+				import { Activity } from 'octane';
+				import { Child } from './Child.tsrx';
+				export function App(props) @{
+					<Activity mode={props.mode}><Child /></Activity>
+				}
+			`,
+			'App',
+			'/src/App.tsrx',
+			{ './Child.tsrx': { Child: initialChild } },
+		);
+		const r = mount(App, { mode: 'hidden' });
+
+		flushSync(() => {
+			expect((initialChild as any)[HMR].update(updatedChild)).toBe(true);
+		});
+
+		expect(r.findAll('.child')).toHaveLength(1);
+		expect(r.find('.child').tagName).toBe('SECTION');
+		expect(r.find('.child').textContent).toBe('after');
+		expect((r.find('.child') as HTMLElement).style.display).toBe('none');
+
+		r.update(App, { mode: 'visible' });
+		expect((r.find('.child') as HTMLElement).style.display).toBe('');
+		r.unmount();
+	});
+
 	it.each([
 		{
 			construct: '@if branch',
