@@ -19,7 +19,7 @@ import {
 	SidebarMenuItem,
 	SidebarRail,
 	useSidebar,
-} from '@/components/ui/sidebar.tsrx';
+} from '@octanejs/shadcn/base-ui/Sidebar';
 
 interface DemoNavProps {
 	activeId: string;
