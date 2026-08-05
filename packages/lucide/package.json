@@ -44,7 +44,7 @@
   "scripts": {
     "generate": "node scripts/generate.mjs",
     "generate:check": "node scripts/generate.mjs --check",
-    "test": "vitest run --root ../.. --project lucide --project lucide-ssr"
+    "test": "vitest run --root ../.. --project lucide --project lucide-differential --project lucide-ssr"
   },
   "dependencies": {
     "@lucide/icons": "catalog:default"
