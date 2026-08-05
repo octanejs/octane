@@ -33,7 +33,7 @@ component names stay identical.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 35/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 40/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -50,17 +50,17 @@ component names stay identical.
 | `card` | ✅ | ✅ | ✅ |
 | `checkbox` | ✅ | ✅ | ✅ |
 | `collapsible` | ✅ | ✅ | ✅ |
-| `context-menu` | ✅ | ⛔ | — |
+| `context-menu` | ✅ | ⛔ | ✅ |
 | `dialog` | ✅ | ✅ | ✅ |
 | `dropdown-menu` | ✅ | ⛔ | ✅ |
 | `empty` | ✅ | ✅ | ✅ |
 | `field` | ✅ | ✅ | ✅ |
-| `hover-card` | ✅ | ⛔ | — |
+| `hover-card` | ✅ | ⛔ | ✅ |
 | `input` | ✅ | ✅ | ✅ |
 | `item` | ✅ | ✅ | ✅ |
 | `kbd` | ✅ | ✅ | ✅ |
 | `label` | ✅ | ✅ | ✅ |
-| `menubar` | ✅ | ⛔ | — |
+| `menubar` | ✅ | ⛔ | ✅ |
 | `native-select` | ✅ | ✅ | ✅ |
 | `navigation-menu` | ✅ | ⛔ | ⛔ |
 | `pagination` | ✅ | ✅ | ✅ |
@@ -71,14 +71,14 @@ component names stay identical.
 | `select` | ✅ | ⛔ | ⛔ |
 | `separator` | ✅ | ✅ | ✅ |
 | `sheet` | ✅ | ✅ | ✅ |
-| `sidebar` | ✅ | ⛔ | — |
+| `sidebar` | ✅ | ⛔ | ✅ |
 | `skeleton` | ✅ | ✅ | ✅ |
 | `slider` | ✅ | ✅ | ✅ |
 | `sonner` | ✅ | ⛔ | ⛔ |
 | `spinner` | ✅ | ✅ | ✅ |
 | `switch` | ✅ | ✅ | ✅ |
 | `table` | ✅ | ✅ | ✅ |
-| `tabs` | ✅ | ✅ | ⛔ |
+| `tabs` | ✅ | ✅ | ✅ |
 | `textarea` | ✅ | ✅ | ✅ |
 | `toggle` | ✅ | ✅ | ✅ |
 | `toggle-group` | ✅ | ⛔ | ✅ |
@@ -92,7 +92,6 @@ component names stay identical.
 | Base UI | `scroll-area` | @octanejs/base-ui has no scroll-area primitive |
 | Base UI | `select` | @octanejs/base-ui has no select primitive |
 | Base UI | `sonner` | needs next-themes, which has no octane binding |
-| Base UI | `tabs` | @octanejs/base-ui has no tabs primitive |
 | React Aria | `context-menu` | no counterpart in upstream’s aria base |
 | React Aria | `dropdown-menu` | no counterpart in upstream’s aria base |
 | React Aria | `hover-card` | no counterpart in upstream’s aria base |

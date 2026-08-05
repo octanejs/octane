@@ -257,6 +257,25 @@
       ]
     },
     {
+      "name": "context-menu",
+      "type": "registry:ui",
+      "title": "Context Menu",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/context-menu.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/context-menu.tsrx"
+        }
+      ]
+    },
+    {
       "name": "dialog",
       "type": "registry:ui",
       "title": "Dialog",
@@ -335,6 +354,24 @@
       ]
     },
     {
+      "name": "hover-card",
+      "type": "registry:ui",
+      "title": "Hover Card",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.23"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/hover-card.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/hover-card.tsrx"
+        }
+      ]
+    },
+    {
       "name": "input",
       "type": "registry:ui",
       "title": "Input",
@@ -400,6 +437,25 @@
           "path": "ui/label.tsrx",
           "type": "registry:ui",
           "target": "components/ui/label.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "menubar",
+      "type": "registry:ui",
+      "title": "Menubar",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.23",
+        "@octanejs/lucide@0.1.20"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/menubar.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/menubar.tsrx"
         }
       ]
     },
@@ -535,6 +591,32 @@
       ]
     },
     {
+      "name": "sidebar",
+      "type": "registry:ui",
+      "title": "Sidebar",
+      "dependencies": [
+        "@octanejs/lucide@0.1.20",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/button",
+        "@octane/input",
+        "@octane/separator",
+        "@octane/sheet",
+        "@octane/skeleton",
+        "@octane/tooltip",
+        "@octane/use-mobile",
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/sidebar.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar.tsrx"
+        }
+      ]
+    },
+    {
       "name": "skeleton",
       "type": "registry:ui",
       "title": "Skeleton",
@@ -616,6 +698,25 @@
           "path": "ui/table.tsrx",
           "type": "registry:ui",
           "target": "components/ui/table.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "tabs",
+      "type": "registry:ui",
+      "title": "Tabs",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.23",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/tabs.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/tabs.tsrx"
         }
       ]
     },

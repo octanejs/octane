@@ -47,6 +47,47 @@ import {
 	FieldTitle,
 } from '@octanejs/shadcn/base-ui/Field';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@octanejs/shadcn/base-ui/Tabs';
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarGroup,
+	SidebarGroupLabel,
+	SidebarHeader,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarProvider,
+	SidebarTrigger,
+} from '@octanejs/shadcn/base-ui/Sidebar';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
+import {
+	Menubar,
+	MenubarCheckboxItem,
+	MenubarContent,
+	MenubarItem,
+	MenubarLabel,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarSub,
+	MenubarSubContent,
+	MenubarSubTrigger,
+	MenubarTrigger,
+} from '@octanejs/shadcn/base-ui/Menubar';
+import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@octanejs/shadcn/base-ui/ContextMenu';
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -607,4 +648,113 @@ export function PopoverSideCase() @{
 		<PopoverTrigger>Open</PopoverTrigger>
 		<PopoverContent side="right">Popover body</PopoverContent>
 	</Popover>
+}
+
+// Standalone: the label must not require a Group ancestor.
+export function ContextMenuCase() @{
+	<ContextMenu>
+		<ContextMenuTrigger>Right click here</ContextMenuTrigger>
+		<ContextMenuContent>
+			<ContextMenuLabel>Actions</ContextMenuLabel>
+			<ContextMenuSeparator />
+			<ContextMenuItem>
+				Back
+				<ContextMenuShortcut>⌘[</ContextMenuShortcut>
+			</ContextMenuItem>
+			<ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+			<ContextMenuCheckboxItem checked>Show grid</ContextMenuCheckboxItem>
+			<ContextMenuSub>
+				<ContextMenuSubTrigger>More</ContextMenuSubTrigger>
+				<ContextMenuSubContent>
+					<ContextMenuItem>Nested</ContextMenuItem>
+				</ContextMenuSubContent>
+			</ContextMenuSub>
+		</ContextMenuContent>
+	</ContextMenu>
+}
+
+export function MenubarCase() @{
+	<Menubar>
+		<MenubarMenu defaultOpen>
+			<MenubarTrigger>File</MenubarTrigger>
+			<MenubarContent>
+				<MenubarLabel>Document</MenubarLabel>
+				<MenubarSeparator />
+				<MenubarItem>
+					New tab
+					<MenubarShortcut>⌘T</MenubarShortcut>
+				</MenubarItem>
+				<MenubarCheckboxItem checked>Autosave</MenubarCheckboxItem>
+				<MenubarSub>
+					<MenubarSubTrigger>Share</MenubarSubTrigger>
+					<MenubarSubContent>
+						<MenubarItem>Email link</MenubarItem>
+					</MenubarSubContent>
+				</MenubarSub>
+			</MenubarContent>
+		</MenubarMenu>
+		<MenubarMenu>
+			<MenubarTrigger>Edit</MenubarTrigger>
+			<MenubarContent>
+				<MenubarItem>Undo</MenubarItem>
+			</MenubarContent>
+		</MenubarMenu>
+	</Menubar>
+}
+
+export function HoverCardCase() @{
+	<HoverCard defaultOpen>
+		<HoverCardTrigger>@octane</HoverCardTrigger>
+		<HoverCardContent>Hover card body</HoverCardContent>
+	</HoverCard>
+}
+
+export function HoverCardSideCase() @{
+	<HoverCard defaultOpen>
+		<HoverCardTrigger>@octane</HoverCardTrigger>
+		<HoverCardContent side="top">Positioned body</HoverCardContent>
+	</HoverCard>
+}
+
+export function SidebarCase() @{
+	<SidebarProvider>
+		<Sidebar>
+			<SidebarHeader>Project</SidebarHeader>
+			<SidebarContent>
+				<SidebarGroup>
+					<SidebarGroupLabel>Navigation</SidebarGroupLabel>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton isActive>Dashboard</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton tooltip="Settings">Settings</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroup>
+			</SidebarContent>
+		</Sidebar>
+		<SidebarTrigger />
+	</SidebarProvider>
+}
+
+export function TabsCase() @{
+	<Tabs defaultValue="account">
+		<TabsList>
+			<TabsTrigger value="account">Account</TabsTrigger>
+			<TabsTrigger value="password">Password</TabsTrigger>
+		</TabsList>
+		<TabsContent value="account">Account panel</TabsContent>
+		<TabsContent value="password">Password panel</TabsContent>
+	</Tabs>
+}
+
+export function TabsVerticalCase() @{
+	<Tabs defaultValue="a" orientation="vertical">
+		<TabsList variant="line">
+			<TabsTrigger value="a">A</TabsTrigger>
+			<TabsTrigger value="b">B</TabsTrigger>
+		</TabsList>
+		<TabsContent value="a">Vertical panel</TabsContent>
+	</Tabs>
 }

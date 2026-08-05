@@ -50,7 +50,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.20` | 2 |
 | `@octanejs/rxjs` | [`packages/rxjs`](../packages/rxjs) | framework binding | `0.1.4` | 2 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.10` | 1 |
-| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.10` | 116 |
+| `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.10` | 121 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.20` | 2 |
 | `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.4` | 6 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.17` | 1 |

@@ -44,7 +44,7 @@
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: 9 of 44 families. Four are blocked on unported @octanejs/base-ui
+// Still absent: 5 of 44 families. Four are blocked on unported @octanejs/base-ui
 // primitives (navigation-menu, scroll-area, select, tabs) and sonner on
 // next-themes; the rest are simply not ported yet. The README carries the
 // generated per-base coverage table.
@@ -63,6 +63,35 @@ import {
 	AvatarImage,
 } from '@octanejs/shadcn/base-ui/Avatar';
 import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@octanejs/shadcn/base-ui/Tabs';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
+import {
+	Menubar,
+	MenubarCheckboxItem,
+	MenubarContent,
+	MenubarItem,
+	MenubarLabel,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarSub,
+	MenubarSubContent,
+	MenubarSubTrigger,
+	MenubarTrigger,
+} from '@octanejs/shadcn/base-ui/Menubar';
+import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@octanejs/shadcn/base-ui/ContextMenu';
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -234,7 +263,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 23 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 40 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
 				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
@@ -830,6 +859,139 @@ export function ShadcnBaseUIDemo() @{
 					</DropdownMenuSub>
 				</DropdownMenuContent>
 			</DropdownMenu>
+		</Section>
+
+		<Section
+			title="ContextMenu"
+			note="Right-click the dashed box. Unlike DropdownMenu this family has a real Separator part. Check the submenu row stays highlighted while open, and that the menu opens at the pointer."
+		>
+			<ContextMenu>
+				<ContextMenuTrigger
+					class="flex h-32 w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground"
+				>
+					Right click here
+				</ContextMenuTrigger>
+				<ContextMenuContent>
+					<ContextMenuLabel>Actions</ContextMenuLabel>
+					<ContextMenuSeparator />
+					<ContextMenuItem>
+						Back
+						<ContextMenuShortcut>⌘[</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuItem>
+						Forward
+						<ContextMenuShortcut>⌘]</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuSeparator />
+					<ContextMenuCheckboxItem checked>Show grid</ContextMenuCheckboxItem>
+					<ContextMenuSeparator />
+					<ContextMenuSub>
+						<ContextMenuSubTrigger>More tools</ContextMenuSubTrigger>
+						<ContextMenuSubContent>
+							<ContextMenuItem>Save page</ContextMenuItem>
+							<ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+						</ContextMenuSubContent>
+					</ContextMenuSub>
+				</ContextMenuContent>
+			</ContextMenu>
+		</Section>
+
+		<Section
+			title="Menubar"
+			note="The bar is Base UI's Menubar; each menu is the same Menu primitive DropdownMenu uses. Open File, then arrow across to Edit without closing — that hand-off is the bar's job. The open bar trigger should stay shaded (it keys off aria-expanded, not a data attribute)."
+		>
+			<Menubar>
+				<MenubarMenu>
+					<MenubarTrigger>File</MenubarTrigger>
+					<MenubarContent>
+						<MenubarLabel>Document</MenubarLabel>
+						<MenubarSeparator />
+						<MenubarItem>
+							New tab
+							<MenubarShortcut>⌘T</MenubarShortcut>
+						</MenubarItem>
+						<MenubarItem>
+							New window
+							<MenubarShortcut>⌘N</MenubarShortcut>
+						</MenubarItem>
+						<MenubarSeparator />
+						<MenubarCheckboxItem checked>Autosave</MenubarCheckboxItem>
+						<MenubarSub>
+							<MenubarSubTrigger>Share</MenubarSubTrigger>
+							<MenubarSubContent>
+								<MenubarItem>Email link</MenubarItem>
+								<MenubarItem>Copy link</MenubarItem>
+							</MenubarSubContent>
+						</MenubarSub>
+					</MenubarContent>
+				</MenubarMenu>
+				<MenubarMenu>
+					<MenubarTrigger>Edit</MenubarTrigger>
+					<MenubarContent>
+						<MenubarItem>
+							Undo
+							<MenubarShortcut>⌘Z</MenubarShortcut>
+						</MenubarItem>
+						<MenubarItem variant="destructive">Delete</MenubarItem>
+					</MenubarContent>
+				</MenubarMenu>
+				<MenubarMenu>
+					<MenubarTrigger>View</MenubarTrigger>
+					<MenubarContent>
+						<MenubarItem>Reload</MenubarItem>
+					</MenubarContent>
+				</MenubarMenu>
+			</Menubar>
+		</Section>
+
+		<Section
+			title="HoverCard"
+			note="Runs on Base UI's PreviewCard. Hover the link and wait — the card must FADE AND SCALE in, not pop. This family's radix source used data-[state=open]:, which Base UI never emits, so an unrewritten copy would animate not at all."
+		>
+			<HoverCard>
+				<HoverCardTrigger class="text-sm font-medium underline underline-offset-4">
+					@octanejs
+				</HoverCardTrigger>
+				<HoverCardContent>
+					<div class="flex gap-3">
+						<Avatar>
+							<AvatarFallback>OC</AvatarFallback>
+						</Avatar>
+						<div class="space-y-1">
+							<p class="text-sm font-medium">@octanejs</p>
+							<p class="text-sm text-muted-foreground">
+								A React-shaped UI framework compiled ahead of time.
+							</p>
+						</div>
+					</div>
+				</HoverCardContent>
+			</HoverCard>
+		</Section>
+
+		<Section
+			title="Tabs"
+			note="Runs on the Tabs primitive ported into @octanejs/base-ui for this family. Arrow keys must move the highlight and Home/End jump to the ends. The pinned primitive emits data-orientation where current shadcn sources expect a bare data-horizontal, so the vertical variant is the one to check switches to a column."
+		>
+			<div class="flex flex-col gap-6">
+				<Tabs defaultValue="account">
+					<TabsList>
+						<TabsTrigger value="account">Account</TabsTrigger>
+						<TabsTrigger value="password">Password</TabsTrigger>
+						<TabsTrigger value="disabled" disabled>Disabled</TabsTrigger>
+					</TabsList>
+					<TabsContent value="account">Make changes to your account here.</TabsContent>
+					<TabsContent value="password">Change your password here.</TabsContent>
+				</Tabs>
+
+				<Tabs defaultValue="one" orientation="vertical">
+					<TabsList variant="line">
+						<TabsTrigger value="one">Vertical one</TabsTrigger>
+						<TabsTrigger value="two">Vertical two</TabsTrigger>
+					</TabsList>
+					<TabsContent value="one">First vertical panel.</TabsContent>
+					<TabsContent value="two">Second vertical panel.</TabsContent>
+				</Tabs>
+			</div>
 		</Section>
 
 		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">
