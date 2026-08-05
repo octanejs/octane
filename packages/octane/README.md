@@ -17,6 +17,10 @@ wrapper is narrower: the wrapper must be locally declared in a fully compiled
 parameter to a supported hook. This package ships both the runtime and compiler,
 with the compiler exposed at `octane/compiler`.
 
+Direct Node or Bun server scripts can preload `octane/compiler/register` to
+compile imported Octane components without going through Vite. See the
+[SSR guide](https://github.com/octanejs/octane/blob/main/docs/ssr.md#run-an-ssg-script-directly).
+
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 

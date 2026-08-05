@@ -1,10 +1,10 @@
 {
   "name": "@octanejs/adapter-cloudflare",
-  "version": "0.0.13",
+  "version": "0.0.15",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Cloudflare Workers adapter for Octane apps",
   "author": {

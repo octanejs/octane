@@ -1,13 +1,13 @@
 {
   "name": "@octanejs/streamdown",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": [
     "./dist/styles.css"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Complete Streamdown 2.5 bindings for Octane, including code, math, Mermaid, and CJK plugin entry points.",
   "author": {

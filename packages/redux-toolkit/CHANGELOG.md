@@ -1,5 +1,33 @@
 # @octanejs/redux-toolkit
 
+## 0.1.20
+
+### Patch Changes
+
+- bd8bb1b: Require Node.js 22.22.2 or newer across Octane's published packages.
+
+  Add the `octane/compiler/register` preload for running server and SSG scripts
+  directly with Node or Bun. It compiles imported `.tsrx`/`.tsx` modules and
+  plain TypeScript custom hooks in server mode without a Vite build. Bun also
+  targets bare `octane` imports at `octane/server` in pass-through authored source
+  dependencies, including packages that manage their hook slots manually.
+
+- Updated dependencies [bd8bb1b]
+  - octane@0.1.25
+  - @octanejs/redux@0.1.22
+
+## 0.1.19
+
+### Patch Changes
+
+- Updated dependencies [ec77602]
+- Updated dependencies [29c5bdb]
+- Updated dependencies [9b032d8]
+- Updated dependencies [f9b2731]
+- Updated dependencies [6714914]
+  - octane@0.1.24
+  - @octanejs/redux@0.1.21
+
 ## 0.1.18
 
 ### Patch Changes

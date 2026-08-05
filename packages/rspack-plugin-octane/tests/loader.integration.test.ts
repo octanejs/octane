@@ -87,8 +87,9 @@ describe('loader with the neutral compiler', () => {
 		const source = `export function App() @{ <button>ready</button> }\n`;
 		const result = transform({ root, resourcePath, source, hot: true });
 		const code = String(result.content);
-		expect(code).toContain('import.meta.webpackHot');
-		expect(code).toContain('import.meta.webpackHot.dispose');
+		expect(code).toContain('const _$webpackHot = import.meta.webpackHot;');
+		expect(code).toContain('_$webpackHot.dispose');
+		expect(code).not.toContain('import.meta.webpackHot.data');
 		expect(code).not.toContain('import.meta.hot');
 		expect(result.map).toMatchObject({ version: 3, sources: ['App.tsrx'] });
 		expect(result.module.buildInfo.octane).toEqual({

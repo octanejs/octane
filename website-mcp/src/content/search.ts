@@ -2,6 +2,7 @@
 // website's ⌘K dialog uses (docs-search-core.ts), built eagerly at module scope
 // from the build-time snapshot instead of lazily in the browser.
 import {
+	addSearchTerms,
 	recordsFor,
 	searchDocs,
 	type SearchGroup,
@@ -38,14 +39,19 @@ export const SEARCH_INDEX: readonly SearchRecord[] = DOCS.flatMap((doc, order) =
 	const records = recordsFor(doc.slug, doc.title, order, source);
 	// Extra ranking hints (the bindings catalog names every package) attach to
 	// the doc's first section — mirrors the website's loadSearchIndex.
-	if (doc.searchTerms?.length) {
-		const target = records.find((record) => record.id === doc.sections[0]?.id) ?? records[0];
-		if (target) {
-			const block = { text: doc.searchTerms.join(' · '), code: false };
-			target.blocks.push(block);
-			target.text += ' ' + block.text;
-			target.haystack += ' ' + block.text.toLowerCase();
+	addSearchTerms(
+		records.find((record) => record.id === doc.sections[0]?.id) ?? records[0],
+		doc.searchTerms,
+	);
+	for (const section of doc.sections) {
+		if (!section.searchTerms?.length) continue;
+		const target = records.find((record) => record.id === section.id);
+		if (!target) {
+			throw new Error(
+				`Search terms for ${doc.slug}#${section.id} must target an indexed h2 section`,
+			);
 		}
+		addSearchTerms(target, section.searchTerms);
 	}
 	return records;
 });

@@ -6832,7 +6832,18 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// it. Persist that canonical identity again for the next update. This keeps
 			// working across any number of edits; accept callbacks in webpack are error
 			// handlers, not Vite-style callbacks carrying the new module namespace.
-			const webpackHot = () => b.member(importMeta(), 'webpackHot');
+			// Keep every access after the recognized `import.meta.webpackHot` root on a
+			// local. Rspack's React/Rsbuild transform pipeline otherwise treats deeper
+			// expressions such as `import.meta.webpackHot.data` as unsupported even
+			// though it lowers the root itself to `module.hot`.
+			const webpackHotName = allocCompilerName(ctx, '_$webpackHot');
+			const webpackHot = () => b.id(webpackHotName);
+			hmrNodes.push(
+				inheritOriginLoc(
+					b.const(webpackHotName, b.member(importMeta(), 'webpackHot')),
+					moduleOrigin,
+				),
+			);
 			const previousComponent = (name, optional) =>
 				b.member(
 					b.member(
