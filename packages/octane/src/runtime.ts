@@ -6393,6 +6393,11 @@ function hasResettableHmrRange(block: Block): boolean {
 	if (start !== end) {
 		return start.parentNode === block.parentNode && end.parentNode === block.parentNode;
 	}
+	// A sole-root control-flow or list-item ancestor can borrow this exact node.
+	// Promoting only the hot block would leave the borrowed boundary detached.
+	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
+		if (parent.startMarker === start && parent.endMarker === end) return false;
+	}
 	return start.parentNode === block.parentNode;
 }
 
@@ -18939,7 +18944,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// Rebuild every live block's compiler-owned output, then schedule the new
 			// body. The Block + hook map persist (stable Symbol.for-based keys), while
 			// template/binding/component slots start from their mount path so arbitrary
-			// source edits cannot read the previous compilation's layout.
+			// source edits cannot read the previous compilation's layout. An exclusively
+			// owned self-marked root is promoted to a private range during the reset.
 			const it = meta.liveBlocks.values();
 			for (let r = it.next(); !r.done; r = it.next()) {
 				const b = r.value;

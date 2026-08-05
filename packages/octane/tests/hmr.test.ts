@@ -291,6 +291,79 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
+	it.each([
+		{
+			construct: '@if branch',
+			setup: `const [value, setValue] = useState(true);`,
+			output: `@if (value) { <Child /> } @else { <span id="fallback">fallback</span> }`,
+			next: false,
+		},
+		{
+			construct: '@switch branch',
+			setup: `const [value, setValue] = useState('child');`,
+			output: `
+				@switch (value) {
+					@case 'child': { <Child /> }
+					@default: { <span id="fallback">fallback</span> }
+				}
+			`,
+			next: 'fallback',
+		},
+		{
+			construct: '@for item',
+			setup: `const [value, setValue] = useState([{ id: 'child' }]);`,
+			output: `
+				@for (const item of value; key item.id) { <Child /> }
+				@empty { <span id="fallback">fallback</span> }
+			`,
+			next: [],
+		},
+	])('falls back to reload when a hot child is the sole root of an $construct', async (test) => {
+		const initialChild = await compileHmrComponent(
+			`
+				export function Child() @{
+					<p id="child">before</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const updatedChild = await compileHmrComponent(
+			`
+				export function Child() @{
+					<p id="child">after</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const App = await compileHmrComponent(
+			`
+				import { useState } from 'octane';
+				import { Child } from './Child.tsrx';
+				export function App(props) @{
+					${test.setup}
+					props.expose(setValue);
+					<main>
+						${test.output}
+					</main>
+				}
+			`,
+			'App',
+			'/src/App.tsrx',
+			{ './Child.tsrx': { Child: initialChild } },
+		);
+		let setValue!: (value: unknown) => void;
+		const r = mount(App, { expose: (setter: typeof setValue) => (setValue = setter) });
+
+		expect((initialChild as any)[HMR].update(updatedChild)).toBe(false);
+		expect(r.find('#child').textContent).toBe('before');
+		expect(() => flushSync(() => setValue(test.next))).not.toThrow();
+		expect(r.find('#fallback').textContent).toBe('fallback');
+		expect(r.findAll('#child')).toHaveLength(0);
+		r.unmount();
+	});
+
 	it('refreshes a compiled child that borrows the root container range', async () => {
 		const initialChild = await compileHmrComponent(
 			`
