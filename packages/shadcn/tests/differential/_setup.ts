@@ -10,9 +10,9 @@
  *      `.tsx` and would octane-compile the React reference code.
  *   2. Every `.tsrx` fixture under `tests/_fixtures` is compiled through
  *      `@tsrx/react` + esbuild (same as octane's/radix's setup), then specifiers
- *      are rewritten so the React side runs against the vendored upstream:
- *      `@octanejs/shadcn` (and any relative `src/ui/*.tsrx` import) →
- *      `./upstream-index.js`, `octane` → `react`.
+ *      are rewritten so the React side runs against the matching vendored
+ *      upstream module. Aggregate and relative imports fall back to
+ *      `./upstream-index.js`; `octane` becomes `react`.
  *
  * The cache lives INSIDE this package so the compiled React modules resolve THIS
  * package's deps (react, react-dom, radix-ui, lucide-react). The differential
@@ -29,6 +29,13 @@ const __dirname = dirname(__filename);
 const FIXTURE_DIR = join(__dirname, '../_fixtures');
 const UPSTREAM_DIR = join(__dirname, 'upstream');
 const CACHE_DIR = join(__dirname, '.react-cache');
+const UPSTREAM_SUBPATHS: Record<string, string> = {
+	Badge: 'badge',
+	Button: 'button',
+	Dialog: 'dialog',
+	DropdownMenu: 'dropdown-menu',
+	Tabs: 'tabs',
+};
 
 // Must match the hash in octane's `_rig.ts` so the slug+hash file names line up.
 function hashString(s: string): string {
@@ -86,11 +93,15 @@ function compileFixture(srcPath: string): void {
 		return;
 	}
 	// `@octanejs/shadcn` → the vendored pinned upstream barrel (shadcn has no npm
-	// runtime package to rewrite to); relative `src/bases/<base>/ui/*.tsrx`
-	// imports → the same barrel; `octane` → `react`. The base segment is matched
-	// generically so a fixture pinned to any base rewrites to the one reference
-	// barrel — upstream ships a single component surface across its bases.
+	// runtime package to rewrite to). Subpath fixtures go straight to their
+	// matching upstream module so an isolated case does not load unrelated
+	// Dialog/Menu/Tabs graphs. Relative source imports still use the aggregate
+	// barrel as a fallback for any future multi-component fixture.
 	const rewritten = transformed.code
+		.replace(/from\s*["']@octanejs\/shadcn\/([\w-]+)["']/g, (_match, subpath: string) => {
+			const moduleName = UPSTREAM_SUBPATHS[subpath] ?? 'index';
+			return `from "./upstream-${moduleName}.js"`;
+		})
 		.replace(/from\s*["']@octanejs\/shadcn(?:\/[\w./-]+)?["']/g, 'from "./upstream-index.js"')
 		.replace(
 			/from\s*["'](?:\.\.\/)+src\/bases\/[\w-]+\/ui\/[\w-]+\.tsrx["']/g,
