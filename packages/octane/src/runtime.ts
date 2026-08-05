@@ -306,6 +306,18 @@ function ensureHooks(scope: Scope): Map<HookSlot, any> {
 	return scope.hooks ?? (scope.hooks = new Map());
 }
 
+// HMR retains hook cells, so tag their long-lived subscriptions/listeners with
+// the existing HMR symbol. A refresh can then run render-owned cleanups while
+// preserving these entries without adding a field to every Scope.
+function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
+	if (process.env.NODE_ENV !== 'production') {
+		if ((scope.block.body as any)[HMR] !== undefined) {
+			(cleanup as Cleanup & { [HMR]?: true })[HMR] = true;
+		}
+	}
+	(scope.cleanups ??= []).push(cleanup);
+}
+
 // Production helper/custom-hook ABI: reserve a disjoint numeric range for each
 // evaluated module that needs globally composable Symbol descriptions. Direct
 // sites in compiler-owned render Scopes use smaller local numbers and never call
@@ -4898,7 +4910,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // recursive teardown. A child may have finished rendering and queued an attach
 // before a later sibling aborts its parent; that child's attach never commits,
 // so its recursive cleanup must not manufacture a matching detach.
-function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
+function runScopeCleanups(scope: Scope): void {
 	const c = scope.cleanups;
 	if (c !== null)
 		for (let i = c.length - 1; i >= 0; i--) {
@@ -4912,6 +4924,17 @@ function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
 				reportTeardownError(err);
 			}
 		}
+}
+
+function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
+	runScopeCleanups(scope);
+	unmountScopeChildrenAndSlotsOnly(scope, detachDom);
+}
+
+// Split from the current scope's own cleanup list so HMR can preserve the
+// component's hook-owned subscriptions while fully deleting rendered children.
+// Ordinary unmount still calls both halves above in the established order.
+function unmountScopeChildrenAndSlotsOnly(scope: Scope, detachDom: boolean): void {
 	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
 	if (children !== null)
@@ -6147,7 +6170,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
 		const cell = s;
-		(scope.cleanups ??= []).push(() => {
+		registerHookCleanup(scope, () => {
 			cell.active = false;
 		});
 	} else {
@@ -6354,6 +6377,120 @@ function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
  * `slots` indices the two dialects contend over.
  */
 const CHILDREN_DIALECT_SLOT = Symbol('octane.childrenDialect') as HookSlot;
+
+function hasResettableHmrRange(block: Block): boolean {
+	const start = (block as { startMarker?: Node | null }).startMarker;
+	const end = (block as { endMarker?: Node | null }).endMarker;
+	// componentSlotLite exposes only an insertion context, not an owned Block
+	// range. Decline that handoff so the bundler reloads instead of mutating the
+	// parent Block through the lite scope's compatibility cast.
+	if (start === undefined || end === undefined) return false;
+	if (start === null || end === null) {
+		return (
+			start === null && end === null && (block.kind === 'root' || block.exclusiveMarkers === true)
+		);
+	}
+	if (start !== end) {
+		return start.parentNode === block.parentNode && end.parentNode === block.parentNode;
+	}
+	// A sole-root control-flow or list-item ancestor can borrow this exact node.
+	// Promoting only the hot block would leave the borrowed boundary detached.
+	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
+		if (parent.startMarker === start && parent.endMarker === end) return false;
+	}
+	return start.parentNode === block.parentNode;
+}
+
+function promoteHmrBlockRange(block: Block): void {
+	const root = block.startMarker;
+	if (root === null || root !== block.endMarker) return;
+	const parent = block.parentNode;
+	const rangeStart = document.createComment('hmr');
+	const rangeEnd = document.createComment('/hmr');
+	parent.insertBefore(rangeStart, root);
+	parent.insertBefore(rangeEnd, root.nextSibling);
+	block.startMarker = rangeStart;
+	block.endMarker = rangeEnd;
+	block.exclusiveMarkers = false;
+}
+
+/**
+ * Rebuild one hot component's compiled output without replacing its Block.
+ *
+ * Compiler bodies use `slots[0]` as their mount/update discriminator and cache
+ * the exact template/binding layout in that scope. A newly compiled body cannot
+ * safely read the old layout: static edits would never touch the DOM, while an
+ * added binding/component can read a bag field that did not exist. Hot refresh
+ * therefore tears down the rendered structure and hands the new body an empty
+ * slot array, while retaining the Block and its Symbol.for-keyed hook cells.
+ *
+ * Hook-owned subscriptions stay registered; render-owned cleanup entries are
+ * fired because their refs/head/fragment/host state belongs to the outgoing
+ * DOM. Effects and memo callbacks have their deps invalidated so edited
+ * closures publish on the refresh even when their authored dependency arrays
+ * are unchanged. This is called only from HMR.update(), never a normal render.
+ */
+function resetHmrBlock(block: Block): void {
+	if (TEARDOWN_DEPTH === 0) {
+		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+	}
+	TEARDOWN_DEPTH++;
+	let abortedRefs: SuspenseRefEntry[] | null = null;
+	if (!block.mounted) {
+		abortedRefs = [];
+		collectVisibleSubtreeRefs(block, abortedRefs);
+	}
+	try {
+		withRefDetachSuppression(abortedRefs, () => {
+			if (block.deoptNode !== null) detachDeoptTreeRefs(block.deoptNode, null);
+			const cleanups = block.cleanups;
+			let preserved: Cleanup[] | null = null;
+			if (cleanups !== null) {
+				for (let i = cleanups.length - 1; i >= 0; i--) {
+					const cleanup = cleanups[i] as Cleanup & { [HMR]?: true };
+					if (cleanup[HMR] === true) continue;
+					try {
+						runEffectLifecycleCallback(cleanup);
+					} catch (err) {
+						reportTeardownError(err);
+					}
+				}
+				for (let i = 0; i < cleanups.length; i++) {
+					const cleanup = cleanups[i] as Cleanup & { [HMR]?: true };
+					if (cleanup[HMR] === true) (preserved ??= []).push(cleanup);
+				}
+			}
+
+			unmountScopeChildrenAndSlotsOnly(block, true);
+			removeRange(
+				block.startMarker !== null ? block.startMarker.nextSibling : block.parentNode.firstChild,
+				block.endMarker,
+			);
+
+			block.children = null;
+			block.cleanups = preserved;
+			block._slots = null;
+			block.refFields = null;
+			block.slots = [];
+			block.deoptNode = null;
+		});
+
+		const hooks = block.hooks;
+		if (hooks !== null) {
+			for (const value of hooks.values()) {
+				if (
+					value !== null &&
+					typeof value === 'object' &&
+					Object.prototype.hasOwnProperty.call(value, 'deps')
+				) {
+					value.deps = undefined;
+				}
+			}
+		}
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
+	}
+}
 
 /**
  * Tear down everything a scope rendered and hand it back empty, so a caller can re-render it from
@@ -18749,11 +18886,11 @@ export function memo<P>(
 //   2. Tracks every live Block currently using this wrapper in a plain (strong)
 //      Set, pruned lazily: disposed blocks are retained until the next
 //      `update()` call deletes them (dev-only, so retention is bounded by edit
-//      frequency). On `update(newFn)` we mutate each
-//      block's `body` to point at the new fn and re-render — hook state is
-//      preserved because the compiler emits `Symbol.for(stableId)` for hook
-//      slots (re-imports get the same Symbol identity, so the existing
-//      hooks Map continues to work).
+//      frequency). On `update(newFn)` we clear each block's compiler-owned
+//      template/slot state, point its `body` at the new fn, and re-render. Hook
+//      state is preserved because the Block stays live and the compiler emits
+//      `Symbol.for(stableId)` for hook slots (re-imports get the same Symbol
+//      identity, so the existing hooks Map continues to work).
 //   3. Marks the wrapper IDENTITY-stable: HMR wrappers `Foo` and `Foo` (post-
 //      reload) are the same wrapper, so `componentSlot`'s identity check
 //      (`comp !== state.currentComp`) doesn't tear down on every edit.
@@ -18789,14 +18926,26 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// module instead of reusing a live scope with the incompatible layout.
 			if ((meta.fn as any).__octaneReturnedOutput !== (nextFn as any).__octaneReturnedOutput)
 				return false;
+			// A hot component may live in a single-element or inherited marker-elision
+			// regime. Reject only incoherent/detached ranges; the accepted path promotes
+			// a self-marked element to an HMR-owned comment range before removing it.
+			for (const b of meta.liveBlocks) {
+				if (b.disposed) {
+					meta.liveBlocks.delete(b);
+					continue;
+				}
+				if (!hasResettableHmrRange(b)) return false;
+			}
 			meta.fn = nextFn;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileComponentSource(wrapper, meta.fn);
 			// Keep the forwarded fetch plan in sync with the swapped body.
 			(wrapper as any).__warm = (meta.fn as any).__warm;
-			// Mutate every live block's body in place and schedule a re-render.
-			// The hook map persists (stable Symbol.for-based keys), so useState/
-			// useEffect/etc. pick up their existing slots on the next render.
+			// Rebuild every live block's compiler-owned output, then schedule the new
+			// body. The Block + hook map persist (stable Symbol.for-based keys), while
+			// template/binding/component slots start from their mount path so arbitrary
+			// source edits cannot read the previous compilation's layout. An exclusively
+			// owned self-marked root is promoted to a private range during the reset.
 			const it = meta.liveBlocks.values();
 			for (let r = it.next(); !r.done; r = it.next()) {
 				const b = r.value;
@@ -18807,6 +18956,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 				b.body = wrapper as unknown as ComponentBody<any>;
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileSchedule(b, 'hmr');
+				promoteHmrBlockRange(b);
+				resetHmrBlock(b);
 				scheduleRender(b);
 			}
 			return true;
@@ -20646,7 +20797,7 @@ export function useTransition(
 			}
 		};
 		TRANSITION_LISTENERS.add(listener);
-		(scope.cleanups ??= []).push(() => TRANSITION_LISTENERS.delete(listener));
+		registerHookCleanup(scope, () => TRANSITION_LISTENERS.delete(listener));
 	}
 	return [s.isPending, s.start];
 }
@@ -20816,7 +20967,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 		s = { form: null, listener: null };
 		const slotRef = s;
 		ensureHooks(scope).set(slot, slotRef);
-		(scope.cleanups ??= []).push(() => {
+		registerHookCleanup(scope, () => {
 			if (slotRef.form && slotRef.listener)
 				FORM_STATUS_LISTENERS.get(slotRef.form)?.delete(slotRef.listener);
 		});
@@ -20938,7 +21089,7 @@ export function useOptimistic<S, V = S>(
 			if (TRANSITION_PENDING_COUNT === 0 && slotRef.armed) clear();
 		};
 		TRANSITION_LISTENERS.add(listener);
-		(scope.cleanups ??= []).push(() => TRANSITION_LISTENERS.delete(listener));
+		registerHookCleanup(scope, () => TRANSITION_LISTENERS.delete(listener));
 	}
 	s.updateFn = updateFn;
 	let optimistic = passthrough;

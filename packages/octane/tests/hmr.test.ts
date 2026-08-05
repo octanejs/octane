@@ -1,13 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { hmr, HMR, useState, flushSync, type ComponentBody, type Scope } from '../src/index.js';
+import {
+	hmr,
+	HMR,
+	useState,
+	flushSync,
+	hydrateRoot,
+	type ComponentBody,
+	type Scope,
+} from '../src/index.js';
 import { mount } from './_helpers';
 
 /**
- * Direct runtime tests for the `hmr(...)` wrapper. We don't go through the
- * compiler emit here (the compiler's `import.meta.hot.accept` block needs
- * a real Vite dev server to fire); we exercise the wrapper itself by
- * calling `Foo[HMR].update(NewFoo)` manually, which is what the compiler-
- * emitted accept block does at dev time.
+ * Runtime tests for the `hmr(...)` wrapper. The focused unit cases use direct
+ * component bodies; the structural regressions evaluate real compiler output.
+ * In both cases we call `Foo[HMR].update(NewFoo)` manually, which is what the
+ * compiler-emitted accept block does after a dev server loads the new module.
  *
  * The component bodies here use the same `(props, scope, extra)` signature
  * the octane compiler emits. They follow the standard
@@ -32,6 +39,55 @@ function clearBlockRange(scope: Scope): void {
 	}
 }
 
+async function compileHmrComponent(
+	source: string,
+	exportName = 'App',
+	filename = '/src/App.tsrx',
+	modules: Record<string, Record<string, unknown>> = {},
+): Promise<ComponentBody<any>> {
+	const [{ compile }, runtime] = await Promise.all([
+		import('octane/compiler'),
+		import('../src/index.js'),
+	]);
+	const code = compile(source, filename, { hmr: 'webpack' }).code;
+	const transformed =
+		code
+			.replace(
+				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/m,
+				(_match: string, imports: string) => {
+					const properties = imports
+						.split(',')
+						.map((specifier) => specifier.trim().replace(/\s+as\s+/, ': '))
+						.join(', ');
+					return `const { ${properties} } = runtime;`;
+				},
+			)
+			.replace(
+				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])(\.\.?\/[^'"]+)\2;/gm,
+				(_match: string, imports: string, _quote: string, request: string) => {
+					const properties = imports
+						.split(',')
+						.map((specifier) => specifier.trim().replace(/\s+as\s+/, ': '))
+						.join(', ');
+					return `const { ${properties} } = modules[${JSON.stringify(request)}];`;
+				},
+			)
+			.replace(/\bexport let /g, 'let ')
+			.replaceAll('import.meta.webpackHot', 'hot') + `\nreturn ${exportName};`;
+	const hot = {
+		data: undefined,
+		dispose() {},
+		accept() {},
+		invalidate() {},
+	};
+	return Function(
+		'runtime',
+		'hot',
+		'modules',
+		transformed,
+	)(runtime, hot, modules) as ComponentBody<any>;
+}
+
 describe('hmr — runtime wrapper', () => {
 	it('renders the initial component body', () => {
 		const Foo = hmr(((_props: any, scope: Scope, _extra: any) => {
@@ -52,6 +108,21 @@ describe('hmr — runtime wrapper', () => {
 		expect(meta).toBeDefined();
 		expect(typeof meta.update).toBe('function');
 		expect(meta.liveBlocks instanceof Set).toBe(true);
+	});
+
+	it('declines a lite-scope handoff so the bundler can reload safely', () => {
+		const initialBody = (() => {}) as ComponentBody<any>;
+		const Foo = hmr(initialBody);
+		const parent = document.createElement('div');
+		const anchor = document.createComment('anchor');
+		parent.appendChild(anchor);
+		const liteScope = {
+			block: { parentNode: parent, endMarker: anchor, parentBlock: null },
+		} as unknown as Scope;
+		Foo({}, liteScope, undefined);
+
+		expect((Foo as any)[HMR].update(hmr((() => {}) as ComponentBody<any>))).toBe(false);
+		expect((Foo as any)[HMR].fn).toBe(initialBody);
 	});
 
 	it('update() swaps the body of live blocks + re-renders', () => {
@@ -84,6 +155,355 @@ describe('hmr — runtime wrapper', () => {
 		expect(r.find('.leaf').textContent).toBe('B');
 		expect(r.find('.leaf').classList.contains('v2')).toBe(true);
 
+		r.unmount();
+	});
+
+	it('replaces compiled static output while preserving hook state', async () => {
+		const initial = await compileHmrComponent(`
+			import { useState } from 'octane';
+			export function App(props) @{
+				const [count, setCount] = useState(0);
+				props.expose(setCount);
+				<main><p id="lede">before</p><output>{count as string}</output></main>
+			}
+		`);
+		const updated = await compileHmrComponent(`
+			import { useState } from 'octane';
+			export function App(props) @{
+				const [count, setCount] = useState(0);
+				props.expose(setCount);
+				<main><p id="lede">after</p><output>{count as string}</output></main>
+			}
+		`);
+		let setCount!: (value: number | ((current: number) => number)) => void;
+		const r = mount(initial, { expose: (setter: typeof setCount) => (setCount = setter) });
+		flushSync(() => setCount(7));
+
+		flushSync(() => {
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+
+		expect(r.find('#lede').textContent).toBe('after');
+		expect(r.find('output').textContent).toBe('7');
+		r.unmount();
+	});
+
+	it('replaces compiled static output after hydration', async () => {
+		const initial = await compileHmrComponent(`
+			export function App() @{
+				<main><p id="lede">before</p></main>
+			}
+		`);
+		const updated = await compileHmrComponent(`
+			export function App() @{
+				<main><p id="lede">after</p></main>
+			}
+		`);
+		const container = document.createElement('div');
+		container.innerHTML = '<main><p id="lede">before</p></main>';
+		document.body.appendChild(container);
+		const adopted = container.firstElementChild;
+		const root = hydrateRoot(container, initial);
+		flushSync(() => {});
+		expect(container.firstElementChild).toBe(adopted);
+
+		flushSync(() => {
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+
+		expect(container.querySelector('#lede')?.textContent).toBe('after');
+		root.unmount();
+		container.remove();
+	});
+
+	it('mounts a component call introduced by a compiled update', async () => {
+		const initial = await compileHmrComponent(`
+			export function App() @{
+				<main><h1>octane</h1></main>
+			}
+		`);
+		const updated = await compileHmrComponent(`
+			function Child() @{
+				<p id="child">CHILD ONE</p>
+			}
+			export function App() @{
+				<main><h1>octane</h1><Child /></main>
+			}
+		`);
+		const r = mount(initial);
+
+		expect(() => {
+			flushSync(() => {
+				expect((initial as any)[HMR].update(updated)).toBe(true);
+			});
+		}).not.toThrow();
+
+		expect(r.find('#child').textContent).toBe('CHILD ONE');
+		r.unmount();
+	});
+
+	it('refreshes a compiled child in place without duplicating its single root', async () => {
+		const initialChild = await compileHmrComponent(
+			`
+				import { useState } from 'octane';
+				export function Child(props) @{
+					const [count, setCount] = useState(0);
+					props.expose(setCount);
+					<p class="child">before:{count as string}</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const updatedChild = await compileHmrComponent(
+			`
+				import { useState } from 'octane';
+				export function Child(props) @{
+					const [count, setCount] = useState(0);
+					props.expose(setCount);
+					<p class="child">after:{count as string}</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const App = await compileHmrComponent(
+			`
+				import { Child } from './Child.tsrx';
+				export function App(props) @{
+					<main><Child expose={props.expose} /></main>
+				}
+			`,
+			'App',
+			'/src/App.tsrx',
+			{ './Child.tsrx': { Child: initialChild } },
+		);
+		let setCount!: (value: number | ((current: number) => number)) => void;
+		const r = mount(App, { expose: (setter: typeof setCount) => (setCount = setter) });
+		flushSync(() => setCount(3));
+
+		flushSync(() => {
+			expect((initialChild as any)[HMR].update(updatedChild)).toBe(true);
+		});
+
+		expect(r.findAll('.child')).toHaveLength(1);
+		expect(r.find('.child').textContent).toBe('after:3');
+		r.unmount();
+	});
+
+	it.each([
+		{
+			construct: '@if branch',
+			setup: `const [value, setValue] = useState(true);`,
+			output: `@if (value) { <Child /> } @else { <span id="fallback">fallback</span> }`,
+			next: false,
+		},
+		{
+			construct: '@switch branch',
+			setup: `const [value, setValue] = useState('child');`,
+			output: `
+				@switch (value) {
+					@case 'child': { <Child /> }
+					@default: { <span id="fallback">fallback</span> }
+				}
+			`,
+			next: 'fallback',
+		},
+		{
+			construct: '@for item',
+			setup: `const [value, setValue] = useState([{ id: 'child' }]);`,
+			output: `
+				@for (const item of value; key item.id) { <Child /> }
+				@empty { <span id="fallback">fallback</span> }
+			`,
+			next: [],
+		},
+	])('falls back to reload when a hot child is the sole root of an $construct', async (test) => {
+		const initialChild = await compileHmrComponent(
+			`
+				export function Child() @{
+					<p id="child">before</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const updatedChild = await compileHmrComponent(
+			`
+				export function Child() @{
+					<p id="child">after</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const App = await compileHmrComponent(
+			`
+				import { useState } from 'octane';
+				import { Child } from './Child.tsrx';
+				export function App(props) @{
+					${test.setup}
+					props.expose(setValue);
+					<main>
+						${test.output}
+					</main>
+				}
+			`,
+			'App',
+			'/src/App.tsrx',
+			{ './Child.tsrx': { Child: initialChild } },
+		);
+		let setValue!: (value: unknown) => void;
+		const r = mount(App, { expose: (setter: typeof setValue) => (setValue = setter) });
+
+		expect((initialChild as any)[HMR].update(updatedChild)).toBe(false);
+		expect(r.find('#child').textContent).toBe('before');
+		expect(() => flushSync(() => setValue(test.next))).not.toThrow();
+		expect(r.find('#fallback').textContent).toBe('fallback');
+		expect(r.findAll('#child')).toHaveLength(0);
+		r.unmount();
+	});
+
+	it('refreshes a compiled child that borrows the root container range', async () => {
+		const initialChild = await compileHmrComponent(
+			`
+				import { useState } from 'octane';
+				export function Child(props) @{
+					const [count, setCount] = useState(0);
+					props.expose(setCount);
+					<p>before:{count as string}</p>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const updatedChild = await compileHmrComponent(
+			`
+				import { useState } from 'octane';
+				export function Child(props) @{
+					const [count, setCount] = useState(0);
+					props.expose(setCount);
+					<section>after:{count as string}</section>
+				}
+			`,
+			'Child',
+			'/src/Child.tsrx',
+		);
+		const App = await compileHmrComponent(
+			`
+				import { Child } from './Child.tsrx';
+				export function App(props) @{
+					<Child expose={props.expose} />
+				}
+			`,
+			'App',
+			'/src/App.tsrx',
+			{ './Child.tsrx': { Child: initialChild } },
+		);
+		let setCount!: (value: number | ((current: number) => number)) => void;
+		const r = mount(App, { expose: (setter: typeof setCount) => (setCount = setter) });
+		flushSync(() => setCount(4));
+		const [block] = (initialChild as any)[HMR].liveBlocks as Set<Scope['block']>;
+		expect(block.startMarker).toBeNull();
+		expect(block.endMarker).toBeNull();
+		expect(block.exclusiveMarkers).toBe(true);
+
+		flushSync(() => {
+			expect((initialChild as any)[HMR].update(updatedChild)).toBe(true);
+		});
+
+		expect(r.find('section').textContent).toBe('after:4');
+		r.unmount();
+	});
+
+	it('publishes edited memo and effect closures during refresh', async () => {
+		const initial = await compileHmrComponent(`
+			import { useLayoutEffect, useMemo } from 'octane';
+			export function App(props) @{
+				const label = useMemo(() => 'memo before', []);
+				useLayoutEffect(() => {
+					props.log('mount before');
+					return () => props.log('cleanup before');
+				}, []);
+				<p>{label as string}</p>
+			}
+		`);
+		const updated = await compileHmrComponent(`
+			import { useLayoutEffect, useMemo } from 'octane';
+			export function App(props) @{
+				const label = useMemo(() => 'memo after', []);
+				useLayoutEffect(() => {
+					props.log('mount after');
+					return () => props.log('cleanup after');
+				}, []);
+				<p>{label as string}</p>
+			}
+		`);
+		const log: string[] = [];
+		const r = mount(initial, { log: (entry: string) => log.push(entry) });
+		expect(log.splice(0)).toEqual(['mount before']);
+
+		flushSync(() => {
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+
+		expect(r.find('p').textContent).toBe('memo after');
+		expect(log.splice(0)).toEqual(['cleanup before', 'mount after']);
+		r.unmount();
+	});
+
+	it('keeps hook-owned resources active while replacing render-owned output', async () => {
+		const initial = await compileHmrComponent(`
+			import { useEffectEvent } from 'octane';
+			export function App(props) @{
+				const record = useEffectEvent(() => props.log('before'));
+				<button onClick={record}>before</button>
+			}
+		`);
+		const updated = await compileHmrComponent(`
+			import { useEffectEvent } from 'octane';
+			export function App(props) @{
+				const record = useEffectEvent(() => props.log('after'));
+				<button onClick={record}>after</button>
+			}
+		`);
+		const log: string[] = [];
+		const r = mount(initial, { log: (entry: string) => log.push(entry) });
+		r.click('button');
+
+		flushSync(() => {
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+		r.click('button');
+
+		expect(r.find('button').textContent).toBe('after');
+		expect(log).toEqual(['before', 'after']);
+		r.unmount();
+	});
+
+	it('detaches outgoing refs before attaching refreshed output', async () => {
+		const initial = await compileHmrComponent(`
+			export function App(props) @{
+				<div ref={props.track}>before</div>
+			}
+		`);
+		const updated = await compileHmrComponent(`
+			export function App(props) @{
+				<span ref={props.track}>after</span>
+			}
+		`);
+		const seen: Array<string | null> = [];
+		const r = mount(initial, {
+			track: (node: Element | null) => seen.push(node?.tagName ?? null),
+		});
+		expect(seen.splice(0)).toEqual(['DIV']);
+
+		flushSync(() => {
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+
+		expect(r.find('span').textContent).toBe('after');
+		expect(seen.splice(0)).toEqual([null, 'SPAN']);
 		r.unmount();
 	});
 
