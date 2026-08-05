@@ -10,6 +10,6 @@ const easing = (x: number) => {
 
 export function App() @{
 	<Page>
-		<Swiper data={picsArr} easing={easing} />
+		<Swiper data={picsArr} duration={300} easing={easing} />
 	</Page>
 }
