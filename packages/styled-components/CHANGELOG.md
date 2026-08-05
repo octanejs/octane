@@ -1,5 +1,13 @@
 # @octanejs/styled-components
 
+## 0.1.18
+
+### Patch Changes
+
+- Updated dependencies [1f01b08]
+- Updated dependencies [48e2397]
+  - octane@0.1.26
+
 ## 0.1.17
 
 ### Patch Changes
