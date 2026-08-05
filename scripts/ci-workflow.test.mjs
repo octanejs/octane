@@ -978,6 +978,7 @@ describe('Vercel preview workflow', () => {
 	test('keeps production automatic and makes the privileged workflow API-only', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
 			assert.deepEqual(config.git.deploymentEnabled, {
+				'*': false,
 				'**': false,
 				main: true,
 			});

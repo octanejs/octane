@@ -3,6 +3,7 @@
   "buildCommand": "pnpm build",
   "git": {
     "deploymentEnabled": {
+      "*": false,
       "**": false,
       "main": true
     }
