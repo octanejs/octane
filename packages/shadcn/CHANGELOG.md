@@ -1,5 +1,18 @@
 # @octanejs/shadcn
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [46e1833]
+- Updated dependencies [5a8e807]
+  - octane@0.1.27
+  - @octanejs/aria@0.0.21
+  - @octanejs/base-ui@0.1.25
+  - @octanejs/lucide@0.1.22
+  - @octanejs/radix@0.1.26
+  - @octanejs/sonner@0.1.22
+
 ## 0.0.11
 
 ### Patch Changes
