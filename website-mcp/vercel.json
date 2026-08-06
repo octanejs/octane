@@ -5,7 +5,8 @@
     "deploymentEnabled": {
       "*": false,
       "**": false,
-      "main": true
+      "main": true,
+      "deploy-preview-pr-*": true
     }
   }
 }

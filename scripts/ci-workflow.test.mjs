@@ -817,32 +817,84 @@ describe('Vercel preview workflow', () => {
 		},
 	};
 
-	function jsonResponse(body, status = 200) {
-		return {
-			ok: status >= 200 && status < 300,
-			status,
-			json: async () => structuredClone(body),
-			text: async () => JSON.stringify(body),
-		};
-	}
-
 	async function runPreview({
+		action = 'labeled',
+		labelName = action === 'closed' ? undefined : 'deploy-preview',
 		pullResponse = pull,
 		comments = [],
-		handleFetch = () => {
-			throw new Error('unexpected Vercel request');
-		},
+		existingRef = null,
+		deploymentSnapshots = [],
 	} = {}) {
-		const requests = [];
+		const gitCalls = [];
+		const deploymentQueries = [];
 		const writtenComments = [];
 		const warnings = [];
 		const failures = [];
 		const notices = [];
-		const secrets = [];
+		let currentRef = existingRef;
+		let activeSnapshot = [];
+		let deploymentRead = 0;
 		let nextCommentId = 900;
+		let now = 0;
 		const github = {
 			rest: {
 				pulls: { get: async () => ({ data: structuredClone(pullResponse) }) },
+				git: {
+					getRef: async (input) => {
+						gitCalls.push({ operation: 'get', ...input });
+						if (currentRef === null) {
+							throw Object.assign(new Error('missing ref'), { status: 404 });
+						}
+						return { data: { object: { sha: currentRef } } };
+					},
+					createRef: async (input) => {
+						gitCalls.push({ operation: 'create', ...input });
+						currentRef = input.sha;
+						return { data: { ref: input.ref, object: { sha: input.sha } } };
+					},
+					updateRef: async (input) => {
+						gitCalls.push({ operation: 'update', ...input });
+						currentRef = input.sha;
+						return { data: { ref: input.ref, object: { sha: input.sha } } };
+					},
+					deleteRef: async (input) => {
+						gitCalls.push({ operation: 'delete', ...input });
+						if (currentRef === null) {
+							throw Object.assign(new Error('missing ref'), { status: 404 });
+						}
+						currentRef = null;
+					},
+				},
+				repos: {
+					listDeployments: async (input) => {
+						deploymentQueries.push({ operation: 'deployments', ...input });
+						activeSnapshot =
+							deploymentSnapshots[
+								Math.min(deploymentRead++, Math.max(deploymentSnapshots.length - 1, 0))
+							] ?? [];
+						return {
+							data: activeSnapshot.map(({ state: _state, url: _url, ...deployment }) =>
+								structuredClone(deployment),
+							),
+						};
+					},
+					listDeploymentStatuses: async (input) => {
+						deploymentQueries.push({ operation: 'statuses', ...input });
+						const deployment = activeSnapshot.find(
+							(candidate) => candidate.id === input.deployment_id,
+						);
+						return {
+							data: deployment
+								? [
+										{
+											state: deployment.state,
+											environment_url: deployment.url,
+										},
+									]
+								: [],
+						};
+					},
+				},
 				issues: {
 					listComments: async () => undefined,
 					createComment: async ({ body }) => {
@@ -871,42 +923,65 @@ describe('Vercel preview workflow', () => {
 			'github',
 			'context',
 			'core',
-			'process',
-			'fetch',
+			'Date',
 			'setTimeout',
-			stepScript(vercelPreviewWorkflow, 'Resolve or create Vercel previews'),
+			stepScript(vercelPreviewWorkflow, 'Publish preview branch and report Vercel deployments'),
 		);
 		await execute(
 			github,
 			{
 				repo: { owner: 'octanejs', repo: 'octane' },
-				payload: { pull_request: { number: pullResponse.number } },
+				payload: {
+					action,
+					label: labelName ? { name: labelName } : undefined,
+					pull_request: { number: pullResponse.number },
+				},
 			},
 			{
 				notice: (message) => notices.push(message),
 				setFailed: (message) => failures.push(message),
-				setSecret: (value) => secrets.push(value),
 				warning: (message) => warnings.push(message),
 			},
-			{
-				env: {
-					VERCEL_TOKEN: 'vercel-token',
-					VERCEL_ORG_ID: 'team_octane',
-					VERCEL_WEBSITE_PROJECT_ID: 'prj_website',
-					VERCEL_MCP_PROJECT_ID: 'prj_mcp',
-				},
+			class extends Date {
+				static now() {
+					return now;
+				}
 			},
-			async (url, options = {}) => {
-				requests.push({ url, options });
-				return handleFetch(new URL(url), options, jsonResponse);
+			(callback, delay) => {
+				now += delay;
+				callback();
 			},
-			(callback) => callback(),
 		);
-		return { requests, writtenComments, warnings, failures, notices, secrets };
+		return {
+			currentRef,
+			deploymentQueries,
+			gitCalls,
+			writtenComments,
+			warnings,
+			failures,
+			notices,
+		};
 	}
 
-	test('reuses both projects at the current SHA and refreshes the existing PR link', async () => {
-		const { requests, writtenComments, failures, secrets } = await runPreview({
+	const successfulDeployments = [
+		{
+			id: 101,
+			environment: 'Preview – octane-website',
+			creator: { login: 'vercel[bot]' },
+			state: 'success',
+			url: 'https://website-preview.vercel.app',
+		},
+		{
+			id: 102,
+			environment: 'Preview – octane-website-mcp',
+			creator: { login: 'vercel[bot]' },
+			state: 'success',
+			url: 'https://mcp-preview.vercel.app',
+		},
+	];
+
+	test('publishes the authorized SHA and refreshes the existing PR comment from GitHub deployments', async () => {
+		const { deploymentQueries, gitCalls, writtenComments, failures } = await runPreview({
 			comments: [
 				{
 					id: 71,
@@ -914,137 +989,150 @@ describe('Vercel preview workflow', () => {
 					user: { login: 'github-actions[bot]' },
 				},
 			],
-			handleFetch(url, options, response) {
-				assert.equal(options.method, undefined);
-				assert.equal(url.pathname, '/v7/deployments');
-				assert.equal(url.searchParams.get('sha'), sha);
-				assert.equal(url.searchParams.get('target'), 'preview');
-				assert.equal(url.searchParams.get('teamId'), 'team_octane');
-				const project = url.searchParams.get('projectId');
-				return response({
-					deployments: [
-						{
-							uid: `dpl_${project}`,
-							url: `${project}.vercel.app`,
-							readyState: 'READY',
-						},
-					],
-				});
-			},
+			deploymentSnapshots: [[], successfulDeployments],
 		});
 
-		assert.equal(requests.length, 2);
-		assert.ok(requests.every((request) => request.options.method === undefined));
+		assert.deepEqual(
+			gitCalls.filter((call) => call.operation === 'create'),
+			[
+				{
+					operation: 'create',
+					owner: 'octanejs',
+					repo: 'octane',
+					ref: 'refs/heads/deploy-preview-pr-612',
+					sha,
+				},
+			],
+		);
+		assert.ok(
+			deploymentQueries
+				.filter((query) => query.operation === 'deployments')
+				.every((query) => query.sha === sha && query.per_page === 100),
+		);
 		assert.ok(writtenComments.every((comment) => comment.operation === 'update'));
 		assert.ok(writtenComments.every((comment) => comment.id === 71));
-		assert.match(writtenComments.at(-1).body, /Vercel previews for `aaaaaaa`/);
-		assert.match(writtenComments.at(-1).body, /https:\/\/prj_website\.vercel\.app/);
-		assert.match(writtenComments.at(-1).body, /https:\/\/prj_mcp\.vercel\.app/);
-		assert.match(writtenComments.at(-1).body, /READY \(reused\)/);
+		assert.match(writtenComments.at(-1).body, /via `deploy-preview-pr-612`/);
+		assert.match(writtenComments.at(-1).body, /https:\/\/website-preview\.vercel\.app/);
+		assert.match(writtenComments.at(-1).body, /https:\/\/mcp-preview\.vercel\.app/);
+		assert.match(writtenComments.at(-1).body, /SUCCESS/);
 		assert.deepEqual(failures, []);
-		assert.deepEqual(secrets, ['vercel-token']);
 	});
 
-	test('creates only a missing project from the pull request head and publishes its URL', async () => {
-		let polled = false;
-		const { requests, writtenComments, failures } = await runPreview({
-			handleFetch(url, options, response) {
-				if (url.pathname === '/v7/deployments') {
-					const project = url.searchParams.get('projectId');
-					return response({
-						deployments:
-							project === 'prj_website'
-								? [
-										{
-											uid: 'dpl_website',
-											url: 'website-existing.vercel.app',
-											readyState: 'READY',
-										},
-									]
-								: [],
-					});
-				}
-				if (url.pathname === '/v9/projects/prj_mcp') {
-					return response({ name: 'octane-mcp' });
-				}
-				if (url.pathname === '/v13/deployments' && options.method === 'POST') {
-					assert.equal(url.searchParams.has('forceNew'), false);
-					const body = JSON.parse(options.body);
-					assert.equal(body.name, 'octane-mcp');
-					assert.equal(body.project, 'prj_mcp');
-					assert.deepEqual(body.gitSource, {
-						type: 'github',
-						repoId: 12345,
-						ref: 'feature/preview-this',
-						sha,
-					});
-					assert.equal(body.target, undefined);
-					return response({
-						uid: 'dpl_mcp',
-						url: 'mcp-requested.vercel.app',
-						readyState: 'QUEUED',
-					});
-				}
-				if (url.pathname === '/v13/deployments/dpl_mcp') {
-					polled = true;
-					return response({
-						uid: 'dpl_mcp',
-						url: 'mcp-requested.vercel.app',
-						readyState: 'READY',
-					});
-				}
-				throw new Error(`unexpected Vercel request: ${url}`);
-			},
+	test('moves an existing preview branch to the latest authorized SHA', async () => {
+		const previousSha = 'b'.repeat(40);
+		const { currentRef, gitCalls, failures } = await runPreview({
+			existingRef: previousSha,
+			deploymentSnapshots: [successfulDeployments],
 		});
 
-		assert.equal(requests.filter((request) => request.options.method === 'POST').length, 1);
-		assert.equal(polled, true);
-		assert.equal(writtenComments[0].operation, 'create');
-		assert.ok(writtenComments.slice(1).every((comment) => comment.operation === 'update'));
-		assert.match(writtenComments.at(-1).body, /website-existing\.vercel\.app/);
-		assert.match(writtenComments.at(-1).body, /mcp-requested\.vercel\.app/);
-		assert.match(writtenComments.at(-1).body, /READY \(requested\)/);
+		assert.equal(currentRef, sha);
+		assert.deepEqual(
+			gitCalls.filter((call) => call.operation === 'update'),
+			[
+				{
+					operation: 'update',
+					owner: 'octanejs',
+					repo: 'octane',
+					ref: 'heads/deploy-preview-pr-612',
+					sha,
+					force: true,
+				},
+			],
+		);
 		assert.deepEqual(failures, []);
 	});
 
-	test('does nothing if the label was removed before a queued run starts', async () => {
-		const { requests, writtenComments, notices } = await runPreview({
+	test('does not publish a ref if the label was removed before a queued run starts', async () => {
+		const { deploymentQueries, gitCalls, writtenComments, notices } = await runPreview({
 			pullResponse: { ...pull, labels: [] },
 		});
 
-		assert.deepEqual(requests, []);
+		assert.deepEqual(gitCalls, []);
+		assert.deepEqual(deploymentQueries, []);
 		assert.deepEqual(writtenComments, []);
 		assert.match(notices.join('\n'), /deploy-preview is no longer applied/);
 	});
 
-	test('keeps unrelated label events out of the preview concurrency queue', () => {
-		assert.doesNotMatch(vercelPreviewWorkflow, /^concurrency:/m);
-		assert.match(
-			vercelPreviewWorkflow,
-			/jobs:\n {2}deploy:\n(?:.*\n)*? {4}if: github\.event\.label\.name == 'deploy-preview'\n(?:.*\n)*? {4}concurrency:\n {6}# Do not cancel/,
+	test('deletes the temporary branch when preview authorization is removed', async () => {
+		const { currentRef, deploymentQueries, gitCalls, writtenComments, failures } = await runPreview(
+			{ action: 'unlabeled', existingRef: sha },
 		);
-		assert.match(
-			vercelPreviewWorkflow,
-			/^ {6}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \}\}$/m,
-		);
-		assert.match(vercelPreviewWorkflow, /^ {6}cancel-in-progress: false$/m);
+
+		assert.equal(currentRef, null);
+		assert.deepEqual(gitCalls, [
+			{
+				operation: 'delete',
+				owner: 'octanejs',
+				repo: 'octane',
+				ref: 'heads/deploy-preview-pr-612',
+			},
+		]);
+		assert.deepEqual(deploymentQueries, []);
+		assert.deepEqual(writtenComments, []);
+		assert.deepEqual(failures, []);
 	});
 
-	test('keeps production automatic and makes the privileged workflow API-only', () => {
+	test('treats cleanup after the pull request closes as idempotent', async () => {
+		const { gitCalls, failures, notices } = await runPreview({ action: 'closed' });
+
+		assert.equal(gitCalls.length, 1);
+		assert.equal(gitCalls[0].operation, 'delete');
+		assert.match(notices.join('\n'), /already absent/);
+		assert.deepEqual(failures, []);
+	});
+
+	test('reports a terminal Vercel failure on the pull request and workflow', async () => {
+		const failedDeployments = structuredClone(successfulDeployments);
+		failedDeployments[1].state = 'failure';
+		const { failures, writtenComments } = await runPreview({
+			deploymentSnapshots: [failedDeployments],
+		});
+
+		assert.match(failures.join('\n'), /MCP website: failure/);
+		assert.match(writtenComments.at(-1).body, /FAILURE/);
+	});
+
+	test('fails with a useful diagnostic when Vercel never reports either deployment', async () => {
+		const { failures, writtenComments } = await runPreview();
+
+		assert.match(failures.join('\n'), /Website: Vercel did not report a deployment/);
+		assert.match(failures.join('\n'), /MCP website: Vercel did not report a deployment/);
+		assert.match(writtenComments.at(-1).body, /URL pending/);
+	});
+
+	test('keeps production automatic and delegates labeled previews to the Vercel GitHub App', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
 			assert.deepEqual(config.git.deploymentEnabled, {
 				'*': false,
 				'**': false,
 				main: true,
+				'deploy-preview-pr-*': true,
 			});
 		}
 
-		assert.match(vercelPreviewWorkflow, /on:\n {2}pull_request_target:\n {4}types: \[labeled\]/);
-		assert.match(vercelPreviewWorkflow, /if: github\.event\.label\.name == 'deploy-preview'/);
+		assert.match(
+			vercelPreviewWorkflow,
+			/on:\n {2}pull_request_target:\n {4}types: \[labeled, unlabeled, closed\]/,
+		);
+		assert.match(
+			vercelPreviewWorkflow,
+			/if: github\.event\.action == 'closed' \|\| github\.event\.label\.name == 'deploy-preview'/,
+		);
+		assert.match(vercelPreviewWorkflow, /^ {6}contents: write$/m);
+		assert.match(vercelPreviewWorkflow, /^ {6}deployments: read$/m);
 		assert.match(vercelPreviewWorkflow, /^ {6}issues: write$/m);
 		assert.match(vercelPreviewWorkflow, /^ {6}pull-requests: read$/m);
+		assert.match(
+			vercelPreviewWorkflow,
+			/^ {6}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \}\}$/m,
+		);
+		assert.match(vercelPreviewWorkflow, /^ {6}cancel-in-progress: false$/m);
+		assert.match(vercelPreviewWorkflow, /BRANCH_PREFIX = "deploy-preview-pr-"/);
+		assert.match(vercelPreviewWorkflow, /github\.rest\.git\.createRef/);
+		assert.match(vercelPreviewWorkflow, /github\.rest\.repos\.listDeployments/);
 		assert.doesNotMatch(vercelPreviewWorkflow, /actions\/checkout/);
-		assert.doesNotMatch(vercelPreviewWorkflow, /^ {6}contents:/m);
+		assert.doesNotMatch(vercelPreviewWorkflow, /VERCEL_/);
+		assert.doesNotMatch(vercelPreviewWorkflow, /fetch\(/);
 		assert.doesNotMatch(vercelPreviewWorkflow, /^ {8}run:/m);
 	});
 });
