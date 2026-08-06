@@ -90,7 +90,7 @@ describe('CI workflow aggregation', () => {
 	test('runs only required-check reporters for draft pull requests', () => {
 		assert.match(
 			workflow,
-			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft\]$/m,
+			/^  pull_request:\n    branches: \[main\]\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, closed\]$/m,
 		);
 
 		const draftGuard =
@@ -111,6 +111,22 @@ describe('CI workflow aggregation', () => {
 			assert.match(source, /if:.*always\(\).*!\s*cancelled\(\)/);
 			assert.match(source, /IS_DRAFT:.*pull_request\.draft == true/);
 			assert.doesNotMatch(source, /actions\/checkout|pnpm install|pnpm typecheck/);
+		}
+	});
+
+	test('cancels closed pull request CI without replacing the merged main run', () => {
+		assert.match(
+			workflow,
+			/^  group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}$/m,
+		);
+		assert.match(workflow, /^  cancel-in-progress: true$/m);
+
+		for (const job of workflowJobs()) {
+			assert.match(
+				jobSource(job),
+				/if:.*github\.event\.action != 'closed'/,
+				`${job} must not start for the cancellation-only closed event`,
+			);
 		}
 	});
 
