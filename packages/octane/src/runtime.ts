@@ -22017,6 +22017,13 @@ function renderBranchSlot(
 			);
 		}
 	}
+	// Hydration consumed the whole outer control-flow slot, not only the active
+	// branch nested inside it. Park the shared cursor after that outer range so a
+	// following sibling @if/@switch adopts its own markers instead of seeing this
+	// slot's close marker and mounting fresh DOM at the enclosing anchor.
+	if (hydration !== null && !state.borrowed && state.end !== null) {
+		hydration.node = state.end.nextSibling;
+	}
 }
 
 interface IfSlot extends BranchSlot {

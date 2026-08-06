@@ -31,3 +31,60 @@ export function Pick(props) @{
 		}
 	</div>
 }
+
+function FragmentTags(props: {
+	provisional: boolean;
+	isLeg: boolean;
+	condition: 'sunny' | 'rainy' | 'none';
+}) @{
+	<>
+		@if (props.provisional) {
+			<span class="tag-confirm">{'confirm'}</span>
+		}
+		@if (props.isLeg) {
+			<span class="tag-mode">{'transit'}</span>
+		}
+		@if (props.condition === 'sunny') {
+			<span class="tag-weather">{'sunny'}</span>
+		}
+		@if (props.condition === 'rainy') {
+			<span class="tag-weather">{'rainy'}</span>
+		}
+	</>
+}
+
+function FragmentRow(props: {
+	name: string;
+	a: boolean;
+	b: boolean;
+	condition: 'sunny' | 'rainy' | 'none';
+}) @{
+	<>
+		<div class="time-row">
+			<span class="place">{props.name as string}</span>
+			<FragmentTags provisional={props.a} isLeg={props.b} condition={props.condition} />
+		</div>
+	</>
+}
+
+type FragmentRowData = {
+	id: string;
+	name: string;
+	a: boolean;
+	b: boolean;
+	condition: 'sunny' | 'rainy' | 'none';
+};
+
+export function FragmentIfRows() @{
+	const rows: FragmentRowData[] = [
+		{ id: 'r1', name: 'A', a: true, b: true, condition: 'none' },
+		{ id: 'r2', name: 'B', a: true, b: false, condition: 'sunny' },
+	];
+	<ol class="timeline">
+		@for (const row of rows; key row.id) {
+			<li>
+				<FragmentRow name={row.name} a={row.a} b={row.b} condition={row.condition} />
+			</li>
+		}
+	</ol>
+}
