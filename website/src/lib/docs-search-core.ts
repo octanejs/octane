@@ -30,6 +30,12 @@ export interface SearchRecord {
 	order: number;
 }
 
+export interface DocHeading {
+	id: string;
+	title: string;
+	level: 2 | 3;
+}
+
 /** One section of one document, with the lines inside it that matched. */
 export interface SearchGroup {
 	key: string;
@@ -108,6 +114,18 @@ function blocksFor(raw: string): SearchBlock[] {
 }
 
 const HEADING = /<h2\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g;
+const DOC_HEADING = /<h([23])\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g;
+
+/** Read the authored section anchors and their rendered titles from raw MDX. */
+export function headingsFor(source: string): DocHeading[] {
+	const body = source.replace(/^---[\s\S]*?---/, '');
+	DOC_HEADING.lastIndex = 0;
+	return Array.from(body.matchAll(DOC_HEADING), (match) => ({
+		level: Number(match[1]) as 2 | 3,
+		id: match[2],
+		title: cleanProse(match[3]),
+	}));
+}
 
 export function recordsFor(
 	slug: string,
@@ -145,6 +163,18 @@ export function recordsFor(
 		push(id, title, body.slice(start, match ? match.index : body.length));
 	}
 	return records;
+}
+
+/** Add metadata-only aliases to one section without putting them in rendered prose. */
+export function addSearchTerms(
+	record: SearchRecord | undefined,
+	terms: readonly string[] | undefined,
+): void {
+	if (!record || !terms?.length) return;
+	const block = { text: terms.join(' · '), code: false };
+	record.blocks.push(block);
+	record.text += ' ' + block.text;
+	record.haystack += ' ' + block.text.toLowerCase();
 }
 
 function escapeRegExp(term: string): string {

@@ -634,14 +634,18 @@ function DialogPortal(props: any): any {
 		value: keepMounted,
 		children: createElement(FloatingPortal, {
 			container,
+			// Octane reconciles an ARRAY child as a keyed list, so every entry needs a key —
+			// including the consumer's, which is why it goes through a keyed Fragment rather than
+			// being keyed in place. Same shape as the Popup path below.
 			children: [
 				mounted && modal === true
 					? createElement(InternalBackdrop, {
+							key: 'internal-backdrop',
 							ref: store.context.internalBackdropRef,
 							inert: inertValue(!open),
 						})
 					: null,
-				children,
+				createElement(Fragment, { key: 'children', children }),
 			],
 		}),
 	});

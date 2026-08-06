@@ -1,10 +1,10 @@
 {
   "name": "@octanejs/redux",
-  "version": "0.1.20",
+  "version": "0.1.25",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "React Redux for the octane renderer — the Provider/hooks binding layer reimplemented on octane's useSyncExternalStore; works with any Redux store (Redux Toolkit included) by changing the import.",
   "author": {

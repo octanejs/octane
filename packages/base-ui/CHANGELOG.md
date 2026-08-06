@@ -1,5 +1,135 @@
 # @octanejs/base-ui
 
+## 0.1.26
+
+### Patch Changes
+
+- Updated dependencies [2b98a33]
+  - octane@0.1.28
+  - @octanejs/floating-ui@0.1.27
+
+## 0.1.25
+
+### Patch Changes
+
+- Updated dependencies [46e1833]
+- Updated dependencies [5a8e807]
+  - octane@0.1.27
+  - @octanejs/floating-ui@0.1.26
+
+## 0.1.24
+
+### Patch Changes
+
+- 57b7751: Key the array children the primitives compose, so rendering them stops emitting Octane's
+  missing-key warning.
+
+  Several primitives hand Octane an ARRAY child to place a fixed set of siblings — a rendered root
+  beside a visually-hidden input, a focus guard beside a portal. Octane reconciles an array as a keyed
+  list, so every entry needs a key; without one it warns in development and can rematch the wrong node
+  on reorder. The warning fired for every overlay and form control: dialog, sheet, alert-dialog,
+  popover, checkbox, switch, radio and slider.
+
+  Fixed in `checkbox`, `switch`, `radio`, `number-field`, `meter`, `progress`, `slider`, `dialog`,
+  `utils/FloatingPortalLite` and `utils/floating/FloatingPortal`. These arrays are positional and
+  fixed-arity, so a literal key per slot is correct; values that cannot be keyed in place — a
+  consumer's `children`, an already-built descriptor — go through a keyed Fragment, the pattern `menu`,
+  `popover` and `toast` already used.
+
+- 57b7751: Key two array-children sites the previous pass missed, both on the modal popup path.
+
+  `Popover`'s positioner composes its internal backdrop beside the floating node, and
+  `FloatingFocusManager` composes its inside focus guards around the consumer's children. Neither
+  array was keyed, so a MODAL popover, dialog or menu still emitted Octane's missing-key warning. Only
+  the modal path renders a backdrop and guards, which is why the non-modal fixtures used to verify the
+  first pass stayed silent.
+
+  The regression test now settles effects before collecting warnings. Reading them synchronously
+  missed both, because these slots only mount from an effect — the first version of that test passed
+  with the keys removed.
+
+- 57b7751: Add the `Tabs` primitive, ported from the pinned upstream at `.base-ui/packages/react/src/tabs/`
+  (v1.6.0): `Root`, `List`, `Tab` and `Panel`.
+
+  It layers over the composite infrastructure this package already carries — `List` is a
+  `CompositeRoot` (roving focus, Home/End, loop), each `Tab` a `useCompositeItem`, and `Root` wraps
+  the tree in a `CompositeList` so panels register their own indices.
+
+  `Root` owns the controlled/uncontrolled value, the activation direction (computed during render so
+  children see it on their first render after a change rather than a commit late), an automatic
+  fallback policy for uncontrolled roots only, and the id registries that wire `aria-controls` on a
+  tab to its panel and `aria-labelledby` back.
+
+  `Tabs.Indicator` is not ported. It positions itself from measured tab geometry and ships a
+  pre-hydration script with its own SSR contract; adding it later is additive.
+
+  `REASONS` gains `initial` and `missing`, which the automatic fallback reports and which no
+  previously ported component used.
+
+  15 cases from upstream's own suite are ported as the parity oracle, each citing its source. Upstream
+  ships 84 across five files; the remainder are not ported yet, and most of the untouched ones
+  exercise the Indicator.
+
+- Updated dependencies [1f01b08]
+- Updated dependencies [48e2397]
+  - octane@0.1.26
+  - @octanejs/floating-ui@0.1.25
+
+## 0.1.23
+
+### Patch Changes
+
+- bd8bb1b: Require Node.js 22.22.2 or newer across Octane's published packages.
+
+  Add the `octane/compiler/register` preload for running server and SSG scripts
+  directly with Node or Bun. It compiles imported `.tsrx`/`.tsx` modules and
+  plain TypeScript custom hooks in server mode without a Vite build. Bun also
+  targets bare `octane` imports at `octane/server` in pass-through authored source
+  dependencies, including packages that manage their hook slots manually.
+
+- Updated dependencies [bd8bb1b]
+  - @octanejs/floating-ui@0.1.24
+  - octane@0.1.25
+
+## 0.1.22
+
+### Patch Changes
+
+- ab807ba: Key the array children the primitives compose, so rendering them stops emitting Octane's
+  missing-key warning.
+
+  Several primitives hand Octane an ARRAY child to place a fixed set of siblings — a rendered root
+  beside a visually-hidden input, a focus guard beside a portal. Octane reconciles an array as a keyed
+  list, so every entry needs a key; without one it warns in development and can rematch the wrong node
+  on reorder. The warning fired for every overlay and form control: dialog, sheet, alert-dialog,
+  popover, checkbox, switch, radio and slider.
+
+  Fixed in `checkbox`, `switch`, `radio`, `number-field`, `meter`, `progress`, `slider`, `dialog`,
+  `utils/FloatingPortalLite` and `utils/floating/FloatingPortal`. These arrays are positional and
+  fixed-arity, so a literal key per slot is correct; values that cannot be keyed in place — a
+  consumer's `children`, an already-built descriptor — go through a keyed Fragment, the pattern `menu`,
+  `popover` and `toast` already used.
+
+- ab807ba: Key two array-children sites the previous pass missed, both on the modal popup path.
+
+  `Popover`'s positioner composes its internal backdrop beside the floating node, and
+  `FloatingFocusManager` composes its inside focus guards around the consumer's children. Neither
+  array was keyed, so a MODAL popover, dialog or menu still emitted Octane's missing-key warning. Only
+  the modal path renders a backdrop and guards, which is why the non-modal fixtures used to verify the
+  first pass stayed silent.
+
+  The regression test now settles effects before collecting warnings. Reading them synchronously
+  missed both, because these slots only mount from an effect — the first version of that test passed
+  with the keys removed.
+
+- Updated dependencies [ec77602]
+- Updated dependencies [29c5bdb]
+- Updated dependencies [9b032d8]
+- Updated dependencies [f9b2731]
+- Updated dependencies [6714914]
+  - octane@0.1.24
+  - @octanejs/floating-ui@0.1.23
+
 ## 0.1.21
 
 ### Patch Changes

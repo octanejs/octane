@@ -12,8 +12,8 @@ original audit snapshot:
   framework bindings;
 - the core executable React-parity backlog is **0 pins**;
 - the binding executable backlog is **0 pins**;
-- Node 22 and 24 are the tested releases, and every publishable manifest
-  declares `engines.node: ">=22"`;
+- Node 22.22.2 and 24 are the tested releases, and every publishable manifest
+  declares `engines.node: ">=22.22.2"`;
 - package inventory, binding status, core/binding failure pins, generated agent
   rules, and publishable tarballs are checked in CI;
 - the playground execution boundary, website build serialization,
@@ -344,8 +344,8 @@ reviewed ratchet, not by weakening or deleting the gate without measurement.
 
 Status: **guarded around the supported baseline**.
 
-CI tests Node 22 and 24. The root and every publishable package declare a Node
-22 minimum, the website deploy target is Node 24, and the Vercel adapter accepts
+CI tests Node 22.22.2 and 24. The root and every publishable package declare a
+Node 22.22.2 minimum, the website deploy target is Node 24, and the Vercel adapter accepts
 only supported runtime names.
 
 `pnpm packages:pack:check` discovers and packs every publishable package,

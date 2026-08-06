@@ -21,6 +21,11 @@
 //
 // UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than
 // transcribed from upstream's Base UI source.
+// POSITIONING PROPS BELONG TO THE POSITIONER, NOT THE POPUP. Radix has one `Content` element that
+// takes them all; Base UI splits positioning into its own layer, so anything forwarded to `Popup`
+// instead is inert — `side="top"` silently leaves the popup on the default side, and the prop lands
+// on the DOM as an invalid attribute. They are destructured and routed explicitly.
+//
 import { createElement } from 'octane';
 import { Popover as PopoverPrimitive } from '@octanejs/base-ui/popover';
 
@@ -36,22 +41,56 @@ export function PopoverTrigger(props: Record<string, unknown>) @{
 	<PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
-export interface PopoverContentProps extends Record<string, unknown> {
-	className?: string;
-	align?: 'start' | 'center' | 'end';
+export interface BaseUiPositioningProps {
+	/** Forwarded to the Positioner; see the note at the top of this file. */
+	side?: 'top' | 'right' | 'bottom' | 'left';
 	sideOffset?: number;
+	align?: 'start' | 'center' | 'end';
+	alignOffset?: number;
+	anchor?: unknown;
+	positionMethod?: 'absolute' | 'fixed';
+	collisionBoundary?: unknown;
+	collisionPadding?: unknown;
+	collisionAvoidance?: unknown;
+	arrowPadding?: number;
+	sticky?: boolean;
+	disableAnchorTracking?: boolean;
+}
+
+export interface PopoverContentProps extends Record<string, unknown>, BaseUiPositioningProps {
+	className?: string;
 }
 
 export function PopoverContent({
 	className,
 	align = 'center',
 	sideOffset = 4,
+	side,
+	alignOffset,
+	anchor,
+	positionMethod,
+	collisionBoundary,
+	collisionPadding,
+	collisionAvoidance,
+	arrowPadding,
+	sticky,
+	disableAnchorTracking,
 	...props
 }: PopoverContentProps) {
 	return createElement(PopoverPrimitive.Portal, {
 		children: createElement(PopoverPrimitive.Positioner, {
-			align,
+			side,
 			sideOffset,
+			align,
+			alignOffset,
+			anchor,
+			positionMethod,
+			collisionBoundary,
+			collisionPadding,
+			collisionAvoidance,
+			arrowPadding,
+			sticky,
+			disableAnchorTracking,
 			children: createElement(PopoverPrimitive.Popup, {
 				'data-slot': 'popover-content',
 				className: cn(

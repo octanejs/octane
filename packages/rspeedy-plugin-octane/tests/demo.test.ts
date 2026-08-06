@@ -1,5 +1,6 @@
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { get as httpGet } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -36,6 +37,29 @@ function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+// These two probes talk to a loopback development server, so they use
+// `node:http` rather than global `fetch`: Undici configures socket options the
+// loopback path can reject, and it raises that failure outside the request
+// promise, where an awaited `catch` cannot see it.
+function request(url: string, timeoutMs: number): Promise<{ status: number; body: Buffer }> {
+	return new Promise((resolveRequest, reject) => {
+		// No connection pooling: each probe asks the server a fresh question, and
+		// a pooled socket outliving the shutdown would answer the wrong one.
+		const client = httpGet(url, { agent: false }, (response) => {
+			const chunks: Buffer[] = [];
+			response.on('data', (chunk: Buffer) => chunks.push(chunk));
+			response.once('error', reject);
+			response.once('end', () => {
+				resolveRequest({ status: response.statusCode ?? 0, body: Buffer.concat(chunks) });
+			});
+		});
+		client.setTimeout(timeoutMs, () => {
+			client.destroy(new Error(`Timed out requesting ${url}.`));
+		});
+		client.once('error', reject);
+	});
+}
+
 async function waitForBundle(
 	child: ChildProcess,
 	url: string,
@@ -48,13 +72,16 @@ async function waitForBundle(
 			throw new Error(`Lynx demo exited before serving ${url}.\n${output()}`);
 		}
 		try {
-			const response = await fetch(url);
-			if (response.ok) {
+			// The timeout is socket inactivity, not total duration, so it tolerates
+			// a dev server holding the connection open across its first compile
+			// while still bounding a wedged socket inside the loop's deadline.
+			const response = await request(url, 15_000);
+			if (response.status >= 200 && response.status < 300) {
 				await delay(50);
 				if (child.exitCode !== null || child.signalCode !== null) {
 					throw new Error(`Lynx demo exited while serving ${url}.\n${output()}`);
 				}
-				return Buffer.from(await response.arrayBuffer());
+				return response.body;
 			}
 		} catch (error) {
 			if (error instanceof Error && error.message.startsWith('Lynx demo exited')) throw error;
@@ -107,7 +134,7 @@ async function waitForServerStop(url: string, timeoutMs: number): Promise<void> 
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() <= deadline) {
 		try {
-			await fetch(url, { signal: AbortSignal.timeout(500) });
+			await request(url, 500);
 		} catch {
 			return;
 		}

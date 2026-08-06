@@ -6,7 +6,15 @@
 // for roving focus when inside a <RadioGroup>). octane adaptations mirror Switch/Checkbox:
 // native events; the hidden input takes the live `checked` prop (octane inputs are CONTROLLED
 // exactly like React's) with native click dispatch.
-import { createContext, createElement, useContext, useLayoutEffect, useMemo, useRef } from 'octane';
+import {
+	createContext,
+	createElement,
+	Fragment,
+	useContext,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+} from 'octane';
 
 import { S, subSlot } from './internal';
 import { useRenderElement, type RenderProp } from './utils/useRenderElement';
@@ -318,7 +326,12 @@ function RadioRoot(props: RadioRootProps): any {
 
 	return createElement(RadioRootContext.Provider, {
 		value: state,
-		children: [rendered, createElement('input', inputProps)],
+		// Octane reconciles an ARRAY child as a keyed list, so each slot carries a stable key;
+		// values that cannot be keyed in place go through a keyed Fragment.
+		children: [
+			createElement(Fragment, { key: 'rendered', children: rendered }),
+			createElement('input', { key: 'input', ...inputProps }),
+		],
 	});
 }
 

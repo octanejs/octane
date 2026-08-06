@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const FIXTURE_DIR = join(__dirname, '../_fixtures');
 const CACHE_DIR = join(__dirname, '.react-cache');
+const ICONS_RUNTIME = join(CACHE_DIR, 'icons-runtime.js');
 
 function hashString(value: string): string {
 	let hash = 5381;
@@ -68,6 +69,13 @@ function walk(directory: string): string[] {
 
 export async function setup(): Promise<void> {
 	if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+	// icons.tsrx uses a narrow Octane implementation facade so the unbundled
+	// test does not load every generated icon. Give the compiled React fixture
+	// the equivalent facade; the root export inventories are tested separately.
+	writeFileSync(
+		ICONS_RUNTIME,
+		"export { Camera, CircleAlert, Icon, LucideProvider, Search } from 'lucide-react';\n",
+	);
 	if (!existsSync(FIXTURE_DIR)) return;
 	for (const sourcePath of walk(FIXTURE_DIR)) compileOne(sourcePath);
 }

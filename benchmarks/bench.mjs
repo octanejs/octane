@@ -546,6 +546,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal renderer update locality (Node-only): compiles the public issue
+		// fixture and measures one stateful leaf beside up to 4,000 unrelated owners.
+		name: 'universal-leaf-update',
+		cwd: 'universal-leaf-update',
+		servers: [],
+		iter: { normal: 5, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native Lynx dual-thread render cost (Node-only): drives the real
 		// background root, async transport, main receiver, and host driver through
 		// a cheap fake Element PAPI, so the milliseconds are Octane's own per-node

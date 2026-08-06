@@ -1864,7 +1864,29 @@ export default defineConfig({
 					include: [
 						'packages/lucide/tests/**/*.test.ts',
 						'!packages/lucide/tests/ssr/**/*.test.ts',
+						'!packages/lucide/tests/differential/**/*.test.ts',
 					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/lucide$/,
+							replacement: resolve(import.meta.dirname, 'packages/lucide/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/lucide\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'lucide-differential',
+					include: ['packages/lucide/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/lucide/tests/differential/_setup.ts'],
 					globals: false,
@@ -2083,10 +2105,44 @@ export default defineConfig({
 					name: 'dnd-kit',
 					include: [
 						'packages/dnd-kit/tests/conformance/**/*.test.ts',
-						'packages/dnd-kit/tests/differential/**/*.test.ts',
 						'packages/dnd-kit/tests/hydration/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dnd-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/hooks$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/sortable$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/utilities$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'dnd-kit-differential',
+					include: ['packages/dnd-kit/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					// The shared fixture mounts both adapters and drains both runtimes.
+					// Under full-suite contention this can exceed Vitest's 5s default
+					// even though the focused interaction completes in well under a second.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globalSetup: ['packages/dnd-kit/tests/differential/_setup.ts'],
 					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
 					globals: false,
@@ -2336,11 +2392,40 @@ export default defineConfig({
 						'packages/shadcn/tests/**/*.test.ts',
 						'packages/shadcn/tests/**/*.test.tsx',
 						'!packages/shadcn/tests/ssr/**/*.test.ts',
+						'!packages/shadcn/tests/differential/**/*.test.ts',
+						'!packages/shadcn/tests/differential/**/*.test.tsx',
 					],
 					environment: 'jsdom',
-					// Differential precompile for shadcn fixtures: rewrites
-					// `@octanejs/shadcn` → the vendored pinned upstream React sources
-					// (shadcn has no npm runtime package to rewrite to).
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						// Shadcn tests exercise only the Lucide components their fixtures render.
+						// Loading Lucide's full generated root barrel here repeats its own export
+						// inventory in every isolated Shadcn worker and dominates these cases.
+						{
+							find: /^@octanejs\/lucide$/,
+							replacement: resolve(import.meta.dirname, 'packages/shadcn/tests/_lucide.ts'),
+						},
+						// @octanejs/radix deliberately carries no alias: it resolves through
+						// node_modules like any other dependency. That used to mean the pinned
+						// published release (maintainer policy from the cmdk review); since the
+						// package moved to `workspace:*` it means packages/radix, so these
+						// tests now cover the sibling source this repo actually ships.
+					],
+				},
+			},
+			{
+				test: {
+					name: 'shadcn-differential',
+					include: [
+						'packages/shadcn/tests/differential/**/*.test.ts',
+						'packages/shadcn/tests/differential/**/*.test.tsx',
+					],
+					environment: 'jsdom',
+					// Rewrites @octanejs/shadcn subpaths to the matching vendored,
+					// pinned upstream React modules before the differential tests load.
 					globalSetup: ['packages/shadcn/tests/differential/_setup.ts'],
 					testTimeout: 30_000,
 					hookTimeout: 30_000,
@@ -2349,11 +2434,10 @@ export default defineConfig({
 				plugins: [octane()],
 				resolve: {
 					alias: [
-						// @octanejs/radix deliberately carries no alias: it resolves through
-						// node_modules like any other dependency. That used to mean the pinned
-						// published release (maintainer policy from the cmdk review); since the
-						// package moved to `workspace:*` it means packages/radix, so these
-						// tests now cover the sibling source this repo actually ships.
+						{
+							find: /^@octanejs\/lucide$/,
+							replacement: resolve(import.meta.dirname, 'packages/shadcn/tests/_lucide.ts'),
+						},
 					],
 				},
 			},
@@ -2650,10 +2734,28 @@ export default defineConfig({
 					include: [
 						'packages/styled-components/tests/**/*.test.ts',
 						'!packages/styled-components/tests/ssr/**/*.test.ts',
+						'!packages/styled-components/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
-					// Differential precompile for styled-components fixtures: rewrites
-					// `@octanejs/styled-components` → the real published styled-components.
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/styled-components$/,
+							replacement: resolve(import.meta.dirname, 'packages/styled-components/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'styled-components-differential',
+					include: ['packages/styled-components/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					// Rewrites @octanejs/styled-components to the published React
+					// package before the differential tests load.
 					globalSetup: ['packages/styled-components/tests/differential/_setup.ts'],
 					globals: false,
 				},
@@ -2945,9 +3047,23 @@ export default defineConfig({
 			{
 				test: {
 					name: 'rspeedy-plugin',
-					include: ['packages/rspeedy-plugin-octane/tests/**/*.test.ts'],
+					include: [
+						'packages/rspeedy-plugin-octane/tests/**/*.test.ts',
+						'!packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts',
+					],
 					environment: 'node',
 					globals: false,
+				},
+				resolve: { alias: LYNX_ALIASES },
+			},
+			{
+				test: {
+					name: 'rspeedy-plugin-browser',
+					include: ['packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 90_000,
+					hookTimeout: 60_000,
 				},
 				resolve: { alias: LYNX_ALIASES },
 			},

@@ -17,7 +17,7 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 	<p className="doc-callout-title">Before you begin</p>
 	<p>
 		{
-			'You need Node.js 22 or newer. Octane is currently alpha software, so pin versions when you use it in a real project.'
+			'You need Node.js 22.22.2 or newer. Octane is currently alpha software, so pin versions when you use it in a real project.'
 		}
 	</p>
 </aside>
@@ -53,15 +53,6 @@ things to delete.
 The scaffolder is `octane create`, and [the CLI guide](/docs/cli#create) documents its
 flags — including `--no-install`, which prints the dependency list instead of installing
 it.
-
-<aside className="doc-callout note">
-	<p className="doc-callout-title">Your editor and .tsrx</p>
-	<p>
-		{
-			'A scaffolded project builds, typechecks, and runs straight away. Making an editor understand .tsrx is separate: the extension is not published yet, so a .tsrx import may show as unresolved even while npm run typecheck passes. tsrx-tsc carries its own TypeScript and is the reliable answer on whether the project is type-correct.'
-		}
-	</p>
-</aside>
 
 <h2 id="install">Install into an existing project</h2>
 
@@ -171,6 +162,21 @@ export function TodoList(props) @{
 	</ul>
 }
 ```
+
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">Make .tsrx feel native in VS Code</p>
+	<p>
+		{
+			'For syntax highlighting, diagnostics, navigation, completions, and TypeScript-aware editor support in '
+		}
+		<code>.tsrx</code>
+		{' files, install '}
+		<a href="https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin">
+			{'TSRX for VS Code'}
+		</a>
+		{'.'}
+	</p>
+</aside>
 
 The same family includes `@if` for two-way branches, `@switch` for several choices, and
 `@try` for loading and error states. Plain JavaScript still belongs in the setup part of

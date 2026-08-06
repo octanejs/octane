@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "badge",
+  "type": "registry:ui",
+  "title": "Badge",
+  "files": [
+    {
+      "path": "ui/badge.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/badge.tsrx",
+      "content": "// Base UI base badge — a plain host `<span>` carrying the shared cva strings.\n//\n// The cva block is byte-identical to the radix and React Aria bases (checked, not assumed), and no\n// primitive is involved: badge is a span with `data-slot` and `data-variant`, and nothing\n// underneath emits state. So there is no dialect here to get wrong, and no motion to mistranslate.\n//\n// NO ESCAPE HATCH, DELIBERATELY. Upstream's other bases each let a badge render as a different\n// element, and each does it differently: radix takes `asChild` and swaps in `Slot`; React Aria\n// takes a `render` FUNCTION and calls it with the computed props. Base UI has no Slot, and its own\n// convention is a `render` ELEMENT prop backed by `useRender` — but badge is not a Base UI\n// primitive, so nothing here decides which of those shapes upstream's Base UI badge actually\n// exposes, or whether it exposes one at all.\n//\n// Guessing would publish an API this base may not have, and an API shape is not something a later\n// commit can quietly correct. Adding the hatch once the upstream source is available is additive\n// and non-breaking; shipping the wrong one is not. This follows button.tsrx in the same base,\n// which omits `LinkButton` for the same reason. A consumer needing a different element today can\n// spread `badgeVariants({ variant })` onto it directly, which is what the class export is for.\nimport { cva, type VariantProps } from 'class-variance-authority';\n\nimport { cn } from '@/lib/utils';\nimport type { HostProps } from '@/lib/types';\n\nexport const badgeVariants = cva(\n\t'group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'bg-primary text-primary-foreground [a]:hover:bg-primary/80',\n\t\t\t\tsecondary: 'bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80',\n\t\t\t\tdestructive: 'bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20',\n\t\t\t\toutline: 'border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground',\n\t\t\t\tghost: 'hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50',\n\t\t\t\tlink: 'text-primary underline-offset-4 hover:underline',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t},\n\t},\n);\n\nexport interface BadgeProps extends HostProps<'span'> {\n\tvariant?: VariantProps<typeof badgeVariants>['variant'];\n\t/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */\n\tasChild?: never;\n}\n\nexport function Badge({ className, variant = 'default', ...props }: BadgeProps) @{\n\t<span\n\t\tdata-slot=\"badge\"\n\t\tdata-variant={variant}\n\t\tclassName={cn(badgeVariants({ variant }), className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "@octane/types",
+    "@octane/utils"
+  ]
+}
