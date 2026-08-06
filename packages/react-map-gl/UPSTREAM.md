@@ -181,8 +181,12 @@ Four, three of them recorded in `audit/react-parity.json` and bound to a case:
    semantics; the id now reaches any descendant `<Layer>`, not only direct
    children.
 2. **`react-map-gl-children-container-order`** — the children container is
-   inserted before the DOM mapbox-gl appends, where React appends it after. Same
-   elements, different sibling order; no binding behavior depends on it.
+   inserted before the DOM mapbox-gl appends, where React appends it after, so
+   the port positions it absolutely rather than leaving it in upstream's
+   `height: 100%` flow. In flow it displaces `.mapboxgl-canvas-container` by the
+   full height of the map, and mapbox-gl derives pointer coordinates from that
+   element, so every point-anchored interaction is wrong by that offset. Same
+   box and same stacking as upstream; only `position` differs.
 3. **`react-map-gl-refs-as-props`** — `forwardRef` does not exist in Octane, so
    `Map`, `Marker`, `Popup` and `GeolocateControl` take `ref` as a plain prop.
    `<Map ref={mapRef} />` is unchanged for consumers.

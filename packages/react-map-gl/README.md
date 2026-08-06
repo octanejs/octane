@@ -66,10 +66,15 @@ drain that follows `root.unmount()`, so `map.remove()` — and with it the WebGL
 context and worker pool — happens one drain later. Do not assume the map's
 resources are released the instant `unmount()` returns.
 
-**Sibling order inside the map container.** The children container is inserted
-ahead of the DOM mapbox-gl appends, where React appends it after. Both trees
-contain the same elements; nothing in the binding positions content by sibling
-order. Do not depend on it.
+**The children container is positioned, not in flow.** Octane anchors it ahead
+of the DOM mapbox-gl appends, where React appends it last. Upstream's in-flow
+`height: 100%` is only safe in that trailing position: ahead of the library's
+nodes it pushes `.mapboxgl-canvas-container` down by the whole height of the
+map, and mapbox-gl measures every pointer coordinate against that element — so
+wheel zoom, double-click zoom and `queryRenderedFeatures` would all be off by
+that much. This port gives the container `position: absolute; inset: 0`, which
+reproduces upstream's box and its stacking beneath the canvas. Sibling order
+still differs; nothing should depend on it.
 
 **Out of scope.** `react-map-gl/mapbox-legacy` (mapbox-gl v1) and
 `@vis.gl/react-maplibre`.

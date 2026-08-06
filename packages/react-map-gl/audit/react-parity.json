@@ -527,7 +527,7 @@
         {
           "path": "packages/react-map-gl/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "56528fe431ca27cdec18a6c18f58f5d921dd9d54f492d3831cc60243fb832625",
+          "sha256": "a7fa9b83de60afc449fd1ae0db3423f453538bbaf8911074dd900174f6249bc6",
           "cases": [
             {
               "id": "differential:1",
@@ -616,11 +616,11 @@
       "id": "react-map-gl-children-container-order",
       "caseIds": ["differential:1"],
       "upstreamResult": "React appends the map's children container after the DOM mapbox-gl has already added to the same container.",
-      "octaneResult": "Octane's conditional block leaves comment anchors, so the children container returns to its authored position, ahead of the library's nodes.",
-      "rationale": "The container is rendered only once a map instance exists, which is after the library has appended its own DOM. React has no record of where its child belongs among foreign nodes; Octane does.",
+      "octaneResult": "Octane's conditional block leaves comment anchors, so the children container returns to its authored position, ahead of the library's nodes. The port therefore gives that container `position: absolute` covering the map, instead of upstream's in-flow `height: 100%`.",
+      "rationale": "The container is rendered only once a map instance exists, which is after the library has appended its own DOM. React has no record of where its child belongs among foreign nodes; Octane does. Upstream's in-flow container is only safe in that trailing position: ahead of the library's nodes a full-height block displaces `.mapboxgl-canvas-container`, which is `position: static` and is the element mapbox-gl measures every pointer coordinate against.",
       "classification": "insertion-anchoring",
-      "consumerImpact": "Both trees hold the same elements. Sibling order differs inside the map container, which no binding behavior depends on: markers, popups and controls are portalled into library-owned elements.",
-      "migrationGuidance": "Do not rely on sibling order inside the map container; position overlays with CSS or portal them through the binding as before.",
+      "consumerImpact": "Both trees hold the same elements, and the container keeps upstream's box and its stacking beneath the canvas. Sibling order differs, which no binding behavior depends on: markers, popups and controls are portalled into library-owned elements. Left in flow, the displacement would have broken wheel zoom, double-click zoom and queryRenderedFeatures by the full height of the map.",
+      "migrationGuidance": "Do not rely on sibling order inside the map container, and do not assume the children container takes part in normal flow; position overlays with CSS or portal them through the binding as before.",
       "owner": "@octanejs/react-map-gl",
       "reviewCondition": "Review if a consumer reports stacking or layout that depends on that sibling order."
     },

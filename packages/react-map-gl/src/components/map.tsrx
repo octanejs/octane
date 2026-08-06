@@ -124,15 +124,29 @@ export function Map(props: MapProps) @{
 		[props.style],
 	);
 
+	// OCTANE DIVERGENCE[react-map-gl-children-container-order][differential:1]: upstream's
+	// container is `{height: '100%'}` in normal flow, which is safe there only
+	// because React appends it AFTER mapbox-gl's own DOM. Octane anchors it at its
+	// authored position, ahead of that DOM, where a full-height block in flow
+	// pushes `.mapboxgl-canvas-container` down by the entire height of the map.
+	//
+	// That element is what mapbox-gl measures pointer coordinates against, so the
+	// displacement silently breaks every point-anchored interaction — wheel zoom,
+	// double-click zoom, feature queries — by exactly the map's height, which
+	// reads as "zoom always anchors near the top edge".
+	//
+	// Taking the container out of flow reproduces upstream's geometry exactly:
+	// the same full-container box, still painted beneath the canvas because it
+	// stays first in tree order among positioned siblings, and no dependency on
+	// where the library's nodes happen to sit.
 	const CHILD_CONTAINER_STYLE = {
+		position: 'absolute' as const,
+		top: 0,
+		left: 0,
+		width: '100%',
 		height: '100%',
 	};
 
-	// OCTANE DIVERGENCE[react-map-gl-children-container-order][differential:1]: this
-	// container is rendered only once an instance exists, by which point mapbox-gl
-	// has appended its own DOM. React appends its child after those foreign nodes;
-	// Octane's conditional block keeps comment anchors, so the container returns to
-	// its authored position ahead of them. Same elements, different sibling order.
 	<div id={props.id} ref={containerRef} style={style}>
 		@if (mapInstance) {
 			<MapContext.Provider value={contextValue}>

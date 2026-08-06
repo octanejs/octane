@@ -70,10 +70,15 @@ describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', (
 		 * anchors, so the container returns to its authored position — ahead of
 		 * the library's nodes.
 		 *
-		 * Both trees hold exactly the same elements, and nothing in the binding
-		 * positions content by sibling order: markers, popups and controls are
-		 * portalled into library-owned elements. This is a difference in insertion
-		 * anchoring, not in what a consumer renders.
+		 * Both trees hold exactly the same elements. The order itself is not free,
+		 * though: upstream's in-flow `height: 100%` container is only safe last,
+		 * because ahead of the library's nodes it displaces
+		 * `.mapboxgl-canvas-container` — the element mapbox-gl measures pointer
+		 * coordinates against — by the full height of the map. The port therefore
+		 * positions that container absolutely, which restores upstream's box and
+		 * its stacking beneath the canvas. That property is pinned by
+		 * `tests/runtime/children-container.test.ts`; jsdom performs no layout, so
+		 * this differential can see the ordering but never the displacement.
 		 */
 		await differential.observe('map shell after the library resolves', async (octane, react) => {
 			// The map library resolves through a promise, then its style loads on a
