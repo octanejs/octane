@@ -5,8 +5,9 @@
   "type": "module",
   "description": "The official Octane website",
   "scripts": {
-    "dev": "vite --configLoader runner",
-    "build": "vite build --configLoader runner",
+    "lynx-examples": "node scripts/prepare-lynx-examples.mjs",
+    "dev": "pnpm lynx-examples && vite --configLoader runner",
+    "build": "pnpm lynx-examples && vite build --configLoader runner",
     "preview": "vite preview --configLoader runner --port 3000",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
@@ -23,21 +24,24 @@
     "@octanejs/three": "workspace:*",
     "@octanejs/visx": "workspace:*",
     "octane": "workspace:*",
+    "qrcode": "1.5.4",
     "shiki": "catalog:default",
     "three": "catalog:default"
   },
   "devDependencies": {
+    "@lynx-js/web-core": "catalog:lynx",
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",
-    "@types/three": "catalog:default",
     "@tsrx/core": "catalog:default",
     "@tsrx/prettier-plugin": "catalog:default",
+    "@types/qrcode": "^1.5.6",
+    "@types/three": "catalog:default",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
-    "prettier": "catalog:default",
-    "sucrase": "catalog:default",
     "nitro": "^3.0.260311-beta",
     "playwright": "catalog:default",
+    "prettier": "catalog:default",
+    "sucrase": "catalog:default",
     "typescript": "catalog:default",
     "vite": "catalog:default"
   }

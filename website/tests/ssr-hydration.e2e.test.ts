@@ -61,6 +61,7 @@ const ROUTES = [
 	'/docs/core-apis',
 	'/docs/tsrx-vs-tsx',
 	'/docs/differences-from-react',
+	'/docs/lynx',
 	'/docs/react-compat',
 	'/docs/profiling',
 	'/docs/bindings',
@@ -1512,6 +1513,37 @@ describe(
 					expect(main.length).toBeGreaterThan(0);
 				} finally {
 					await page.close();
+				}
+			},
+		);
+
+		it.concurrent(
+			'keeps both Lynx example panes readable beside the desktop docs sidebar',
+			{ timeout: 30_000 },
+			async () => {
+				const context = await browser.newContext({ viewport: { width: 801, height: 900 } });
+				const page = await context.newPage();
+				const errors: string[] = [];
+				page.on('console', (message) => {
+					if (message.type() === 'error') errors.push(message.text());
+				});
+				page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+				try {
+					await page.goto(PREVIEW_ORIGIN + '/docs/lynx', { waitUntil: 'load' });
+					const panel = page.locator('.go').first();
+					await panel.scrollIntoViewIfNeeded();
+					const geometry = await panel.evaluate((element) => ({
+						code: element.querySelector('.go-code')!.getBoundingClientRect().width,
+						preview: element.querySelector('.go-preview')!.getBoundingClientRect().width,
+					}));
+
+					// At 801px the desktop docs sidebar leaves the example narrow enough
+					// that it must stack before either pane falls below its readable minimum.
+					expect(geometry.code).toBeGreaterThanOrEqual(200);
+					expect(geometry.preview).toBeGreaterThanOrEqual(260);
+					expect(errors).toEqual([]);
+				} finally {
+					await context.close();
 				}
 			},
 		);
