@@ -527,7 +527,7 @@
         {
           "path": "packages/react-map-gl/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "2e01701495baae369be35d5a21e21bd0c913857dee821933c9c12df87c9e641a",
+          "sha256": "56528fe431ca27cdec18a6c18f58f5d921dd9d54f492d3831cc60243fb832625",
           "cases": [
             {
               "id": "differential:1",
@@ -548,6 +548,11 @@
               "id": "differential:4",
               "testName": "reaches the map by id from outside it, and flies it",
               "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 reaches the map by id from outside it, and flies it"
+            },
+            {
+              "id": "differential:5",
+              "testName": "honours useControl options called straight from a consumer module",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 honours useControl options called straight from a consumer module"
             }
           ]
         },
@@ -575,6 +580,11 @@
           "path": "packages/react-map-gl/tests/_fixtures/differential/use-map-diff.tsrx",
           "role": "support",
           "sha256": "84b5dcef729f592bf9f64bd2b774a632e917a3402214968f2abd01c2e6b5a539"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/use-control-diff.tsrx",
+          "role": "support",
+          "sha256": "ec6c5bf38832663f18f5c9bff3fcd91ac9e9d5981d8dea6850d8cf7c589fbba2"
         },
         {
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",

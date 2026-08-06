@@ -31,6 +31,17 @@ export function useControl<T extends IControl>(
 	arg2?: ((context: MapContextValue) => void) | ControlOptions,
 	arg3?: ControlOptions,
 ): T {
+	// Octane's compiler rewrites a custom-hook call site in a `.tsrx` module to
+	// `withSlot(sym, useControl, ...args, sym)` and deliberately retains that
+	// trailing symbol, so bindings that read their slot off the last argument
+	// keep working. This hook resolves its optional trailing parameters
+	// positionally, so an un-stripped symbol wins the `arg3 || arg2 || arg1`
+	// race and the caller's options disappear — a control silently lands in the
+	// default corner. No legitimate argument here is ever a symbol.
+	if (typeof arg1 === 'symbol') arg1 = undefined;
+	if (typeof arg2 === 'symbol') arg2 = undefined;
+	if (typeof arg3 === 'symbol') arg3 = undefined;
+
 	const context = useContext(MapContext);
 	const ctrl = useMemo(() => onCreate(context), []);
 

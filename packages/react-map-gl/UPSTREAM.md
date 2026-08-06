@@ -59,7 +59,7 @@ Every runtime and type export of `modules/react-mapbox/src/index.ts` at the pin.
 | `GeolocateControl` | component | ported | `tests/upstream/controls.test.ts:3` |
 | `NavigationControl` | component | ported | `tests/upstream/controls.test.ts:4`, `:7` |
 | `ScaleControl` | component | ported | `tests/upstream/controls.test.ts:5`, `:6` |
-| `useControl` | hook | ported | exercised by all five controls; `:6` pins in-place reconfiguration |
+| `useControl` | hook | ported | exercised by all five controls; `:6` pins in-place reconfiguration; `differential:5` pins the consumer-facing hook itself |
 | `MapProvider` | component | ported | `tests/upstream/use-map.test.ts` (2 cases), `differential:4` |
 | `useMap` | hook | ported | `tests/upstream/use-map.test.ts` (2 cases), `differential:4` |
 | `MapProps` | type | ported | `typetests/*/types.test-d.ts` group 1–2 |
@@ -151,7 +151,7 @@ real `mapbox-gl@3` Map with a live `VITE_MAPBOX_TOKEN` and waits on
 loads. They are ported against `tests/_mocks/mapbox-gl.ts`, a port-authored
 double — **weaker evidence than a pristine run, and recorded as such**.
 
-What keeps the double honest is `tests/differential/parity.test.ts`: four
+What keeps the double honest is `tests/differential/parity.test.ts`: five
 fixtures run through this binding and through the *published*
 `@vis.gl/react-mapbox@8.1.2` on real React, sharing that same double. A double
 that flattered the Octane binding would have to flatter React identically. They
@@ -159,7 +159,8 @@ cover the map shell and portalled overlay content (`differential:1`),
 `<Source>`/`<Layer>` add, update and remove (`differential:2`), in-place popup
 option edits alongside control add and remove (`differential:3`), and reaching
 the map by id from a component outside it and flying the camera
-(`differential:4`).
+(`differential:4`), and `useControl` called straight from a consumer module
+(`differential:5`).
 
 `<Source>` and `<Layer>` emit no DOM, so `differential:2` reads the resulting
 style back off the live map through `useMap()` and renders it into the page —

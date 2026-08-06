@@ -283,14 +283,14 @@ vendored source; the double is replaced by the phase-4 oracle.
 
 ## Final state
 
-66 tests across five Vitest projects, all passing:
+67 tests across five Vitest projects, all passing:
 
 | Project | Tests | What it proves |
 | --- | --- | --- |
 | `react-map-gl-upstream-pristine` | 7 | upstream's util specs against upstream's own source |
 | `react-map-gl-upstream-adapted` | 7 | the same byte-exact specs against the reused modules |
 | `react-map-gl` | 46 | the 7 ported component specs, hydration adoption, lifecycle conformance, adapter controls |
-| `react-map-gl-differential` | 4 | four fixtures through Octane and published upstream on React |
+| `react-map-gl-differential` | 5 | five fixtures through Octane and published upstream on React |
 | `react-map-gl-ssr` | 2 | container-only server output |
 
 `pnpm react-parity:check` executes all seven declared lanes. Repo-wide

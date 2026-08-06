@@ -506,7 +506,7 @@ Scope/evidence last checked: 2026-08-06.
 
 - mapbox-gl is an optional peer, never vendored: from v2 it ships under the Mapbox Terms of Service and bills per map load. The pinned oracle is mapbox-gl@3.9.0, the release upstream develops against.
 - Upstream's five framework-neutral util specs run byte-exact against both upstream's source and the reused modules; both lanes passing is what backs the verbatim-reuse claim.
-- Upstream's seven component specs need a live Mapbox token and real WebGL under puppeteer, so they are ported against a port-authored double. A differential lane runs four fixtures through the published @vis.gl/react-mapbox 8.1.2 on React with that same double — map shell and overlays, Source/Layer add-update-remove, in-place popup option edits with control add/remove, and reaching the map by id from outside it to fly the camera — which is what licenses it as evidence.
+- Upstream's seven component specs need a live Mapbox token and real WebGL under puppeteer, so they are ported against a port-authored double. A differential lane runs five fixtures through the published @vis.gl/react-mapbox 8.1.2 on React with that same double — map shell and overlays, Source/Layer add-update-remove, in-place popup option edits with control add/remove, reaching the map by id from outside it to fly the camera, and useControl called straight from a consumer module — which is what licenses it as evidence.
 - Not covered: real WebGL, tile loading, pointer interaction, reuseMaps/recycle, external gl contexts, and RTL text plugin loading. A token-gated real-map lane is open work.
 
 See also: [`docs/react-map-gl-port-plan.md`](react-map-gl-port-plan.md), [`packages/react-map-gl/UPSTREAM.md`](../packages/react-map-gl/UPSTREAM.md)

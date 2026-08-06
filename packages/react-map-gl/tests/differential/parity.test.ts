@@ -16,6 +16,7 @@ const FIXTURE = resolve(__dirname, '../_fixtures/differential/map-diff.tsrx');
 const SOURCE_LAYER_FIXTURE = resolve(__dirname, '../_fixtures/differential/source-layer-diff.tsrx');
 const OVERLAY_FIXTURE = resolve(__dirname, '../_fixtures/differential/overlay-diff.tsrx');
 const USE_MAP_FIXTURE = resolve(__dirname, '../_fixtures/differential/use-map-diff.tsrx');
+const USE_CONTROL_FIXTURE = resolve(__dirname, '../_fixtures/differential/use-control-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 async function settle(): Promise<void> {
@@ -320,5 +321,43 @@ describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', (
 		});
 
 		differential.unmount();
+	});
+
+	// @parity-case differential:5
+	it('honours useControl options called straight from a consumer module', async () => {
+		const removals: string[] = [];
+		const differential = await mountDifferential(
+			USE_CONTROL_FIXTURE,
+			'UseControlDiff',
+			{ mapLib: Promise.resolve(mapboxgl), onRemoved: () => removals.push('removed') },
+			CACHE,
+		);
+
+		const position = (mount: DiffMount, selector: string) =>
+			(mount.find(selector) as HTMLElement | null)?.dataset.position;
+
+		await differential.observe('consumer-placed controls', async (o, r) => {
+			await settle();
+			await settle();
+
+			// Octane appends a call-site slot to custom hook calls and retains it as
+			// the last argument, so a hook resolving optional trailing parameters has
+			// to strip it. Getting that wrong drops the caller's options silently and
+			// the control lands in the default corner instead.
+			expect(position(o, '.mapboxgl-ctrl-scale')).toBe(position(r, '.mapboxgl-ctrl-scale'));
+			expect(position(o, '.mapboxgl-ctrl-scale')).toBe('bottom-left');
+
+			// The three-argument form resolves through a different position, and the
+			// onRemove callback must not be mistaken for the options object either.
+			expect(position(o, '.mapboxgl-ctrl-group')).toBe(position(r, '.mapboxgl-ctrl-group'));
+			expect(position(o, '.mapboxgl-ctrl-group')).toBe('top-left');
+		});
+
+		differential.unmount();
+		await settle();
+
+		// Both sides ran the consumer's onRemove on teardown — proof the callback
+		// still landed in the right positional slot after stripping.
+		expect(removals).toEqual(['removed', 'removed']);
 	});
 });

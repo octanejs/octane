@@ -398,6 +398,7 @@ const manifest = {
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/source-layer-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/overlay-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/use-map-diff.tsrx'),
+				supportFile('packages/react-map-gl/tests/_fixtures/differential/use-control-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_mocks/mapbox-gl.ts'),
 				supportFile('vitest.config.js'),
 			],
