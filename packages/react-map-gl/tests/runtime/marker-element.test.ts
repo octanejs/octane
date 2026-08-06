@@ -59,6 +59,24 @@ describe('marker element', () => {
 		}
 	});
 
+	it('falls back to the default pin when the children block renders nothing', async () => {
+		const markerRef: { current: any } = { current: null };
+		const view = mount(ToggleContentMarkerMap, baseProps({ markerRef, showContent: false }) as any);
+		try {
+			await settle();
+
+			// The block is opaque, so it reads as "has children" and the marker is
+			// built around the binding's element. Nothing rendered into it, so the
+			// pin goes back to Mapbox — upstream draws one for a falsy child too,
+			// and without this the marker is an empty element and invisible.
+			const element = markerRef.current.getElement();
+			expect(element.dataset.pin).toBe('default');
+			expect(element.querySelector('#toggled-content')).toBeNull();
+		} finally {
+			act(() => view.unmount());
+		}
+	});
+
 	it('carries class list changes across the rebuild', async () => {
 		const markerRef: { current: any } = { current: null };
 		const view = mount(
