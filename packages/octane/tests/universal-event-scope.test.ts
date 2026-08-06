@@ -797,9 +797,7 @@ describe('universal event scopes', () => {
 			const theme = useContext(Theme);
 			return universalValue(labelPlan, [`theme:${theme}`]);
 		});
-		const Middle = defineUniversalComponent('object', () =>
-			universalComponent('object', Reader),
-		);
+		const Middle = defineUniversalComponent('object', () => universalComponent('object', Reader));
 		const App = defineUniversalComponent('object', () => {
 			const [theme, setTheme] = useState('light', 'theme');
 			return [

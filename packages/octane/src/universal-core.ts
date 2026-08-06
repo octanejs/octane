@@ -1924,7 +1924,13 @@ function findClaimableChildRecord(
 	let cursor = readOwnerIdentity(cursors, component, identityPath, key) ?? 0;
 	while (cursor < bucket.length && parent.claimedChildren.has(bucket[cursor])) cursor++;
 	const record = bucket[cursor];
-	writeOwnerIdentity(cursors, component, identityPath, key, cursor + (record === undefined ? 0 : 1));
+	writeOwnerIdentity(
+		cursors,
+		component,
+		identityPath,
+		key,
+		cursor + (record === undefined ? 0 : 1),
+	);
 	return record;
 }
 

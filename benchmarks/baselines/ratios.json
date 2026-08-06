@@ -10,6 +10,14 @@
   {
     "suite": "universal-leaf-update",
     "op": "leaf_update_ms",
+    "target": "root-state-clean-siblings-4000",
+    "reference": "root-state-dirty-siblings-4000",
+    "maxRatio": 0.5,
+    "note": "State in the root component replays from the root range, and every clean leaf subtree is adopted without re-rendering (issue #574 follow-up). The dirty twin rewrites all 4,000 leaf props per press, so it must re-render each leaf; the clean run measures well under half of that (~0.25x observed). A ratio near 1x means retained-subtree adoption stopped engaging and clean leaves are re-rendering again."
+  },
+  {
+    "suite": "universal-leaf-update",
+    "op": "leaf_update_ms",
     "target": "list-item-siblings-4000",
     "reference": "list-item-siblings-0",
     "maxRatio": 8,
