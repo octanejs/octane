@@ -1,5 +1,12 @@
 # @octanejs/remix-router
 
+## 0.1.24
+
+### Patch Changes
+
+- Updated dependencies [2b98a33]
+  - octane@0.1.28
+
 ## 0.1.23
 
 ### Patch Changes

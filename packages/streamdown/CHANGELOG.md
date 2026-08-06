@@ -1,5 +1,12 @@
 # @octanejs/streamdown
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [2b98a33]
+  - octane@0.1.28
+
 ## 0.1.6
 
 ### Patch Changes

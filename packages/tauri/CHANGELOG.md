@@ -1,5 +1,12 @@
 # @octanejs/tauri
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [2b98a33]
+  - octane@0.1.28
+
 ## 0.0.10
 
 ### Patch Changes

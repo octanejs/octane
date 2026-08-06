@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.25",
-    "@octanejs/lucide@0.1.22"
+    "@octanejs/base-ui@0.1.26",
+    "@octanejs/lucide@0.1.23"
   ],
   "registryDependencies": [
     "@octane/button",

@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.21"
+    "@octanejs/aria@0.0.22"
   ],
   "registryDependencies": [
     "@octane/button",

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/remix-router",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "license": "MIT",
   "type": "module",
   "engines": {
