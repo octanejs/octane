@@ -84,8 +84,8 @@ jobs:
               core.setFailed(`Pull request #${number} has no deployable GitHub head.`);
               return;
             }
-            if (!pull.base?.sha || pull.base.sha === pull.head.sha) {
-              core.setFailed(`Pull request #${number} has no distinct base SHA for the Vercel push.`);
+            if (!pull.base?.sha) {
+              core.setFailed(`Pull request #${number} has no base SHA for the Vercel push.`);
               return;
             }
             const authorizer = context.payload.sender;

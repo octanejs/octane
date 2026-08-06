@@ -1126,6 +1126,17 @@ describe('Vercel preview workflow', () => {
 		assert.deepEqual(failures, []);
 	});
 
+	test('publishes a labeled preview when the pull request head matches its base', async () => {
+		const { currentRef, writtenComments, failures } = await runPreview({
+			pullResponse: { ...pull, base: { sha } },
+			deploymentSnapshots: [successfulDeployments],
+		});
+
+		assert.equal(currentRef, deploymentSha);
+		assert.match(writtenComments.at(-1).body, /SUCCESS/);
+		assert.deepEqual(failures, []);
+	});
+
 	test('does not publish a ref if the label was removed before a queued run starts', async () => {
 		const { deploymentQueries, gitCalls, writtenComments, notices } = await runPreview({
 			pullResponse: { ...pull, labels: [] },
