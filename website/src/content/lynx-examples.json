@@ -1,0 +1,40 @@
+[
+  {
+    "id": "gallery",
+    "title": "Two-column waterfall gallery",
+    "summary": "A recycling <list> of image cards, a per-card like button, and a scrollbar driven entirely by main-thread scripting.",
+    "directory": "packages/rspeedy-plugin-octane/examples/gallery",
+    "entry": "main",
+    "defaultFile": "src/Gallery.lynx.tsrx",
+    "tutorial": "https://lynxjs.org/4.0/learn/gallery.html"
+  },
+  {
+    "id": "swiper",
+    "title": "Product detail with carousel",
+    "summary": "A custom swiper whose drag, release and snap animation all run on the main thread, with the indicator kept in sync across the thread boundary.",
+    "directory": "packages/rspeedy-plugin-octane/examples/swiper",
+    "entry": "main",
+    "defaultFile": "src/Swiper.lynx.tsrx",
+    "tutorial": "https://lynxjs.org/4.0/learn/product-detail.html",
+    "autoGesture": {
+      "loop": true,
+      "startDelayMs": 1400,
+      "steps": [
+        {
+          "path": [
+            {
+              "x": 0.98,
+              "y": 0.3
+            },
+            {
+              "x": -0.02,
+              "y": 0.3
+            }
+          ],
+          "durationMs": 520,
+          "restMs": 2600
+        }
+      ]
+    }
+  }
+]

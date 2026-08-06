@@ -421,7 +421,7 @@ minimumReleaseAgeExclude:
   - 'shadcn@4.14.1'
   - 'tailwindcss@4.3.3'
   - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23
+  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23 || 0.1.28
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
