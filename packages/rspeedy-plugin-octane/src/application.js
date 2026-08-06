@@ -19,6 +19,9 @@ const TRAILING_FILENAME_HASHES =
 	/((?:\.\[(?:fullhash|chunkhash|contenthash|hash)(?::[^\]]+)?\])+)$/;
 const MAIN_THREAD_SUFFIX = '__octane_main_thread';
 const MAIN_THREAD_ASSET = /main-thread(?:\.[A-Fa-f0-9]+)?\.js$/;
+// Build-time constant the generated main-thread entry reads to pick its
+// first-screen render mode per platform. See FirstScreenRenderModePlugin.
+const FIRST_SCREEN_RENDER_DEFINE = '__OCTANE_LYNX_FIRST_SCREEN_RENDER__';
 const ENTRY_METADATA_KEYS = new Set([
 	'asyncChunks',
 	'baseUri',
@@ -66,6 +69,34 @@ class MarkMainThreadAssetPlugin {
 				},
 			);
 		});
+	}
+}
+
+/**
+ * Inject the platform-selected first-screen render mode as a build-time constant
+ * the generated main-thread entry reads.
+ *
+ * `engine` defers the one-shot first screen to the engine's post-evaluation
+ * `__RenderPage` lifecycle, which native needs so elements are created after the
+ * decoded PageConfig reaches the ElementManager (otherwise they bake unconfigured
+ * overflow defaults and clip — see #419). Lynx for Web never dispatches
+ * `__RenderPage` and has no config-gated overflow default, so deferring there
+ * only couples the first screen to the background readiness handshake for no
+ * benefit; `immediate` paints during evaluation, decoupled and more robust.
+ */
+class FirstScreenRenderModePlugin {
+	constructor(mode) {
+		this.mode = mode;
+	}
+
+	apply(compiler) {
+		const DefinePlugin = compiler.webpack?.DefinePlugin;
+		if (typeof DefinePlugin !== 'function') {
+			throw new TypeError(
+				`${PLUGIN_NAME}: this Rspack compiler does not expose webpack.DefinePlugin.`,
+			);
+		}
+		new DefinePlugin({ [FIRST_SCREEN_RENDER_DEFINE]: JSON.stringify(this.mode) }).apply(compiler);
 	}
 }
 
@@ -321,6 +352,9 @@ export function applyLynxApplication(chain, context, rspeedyConfig, options) {
 		]);
 	}
 
+	chain
+		.plugin(`${PLUGIN_NAME}:first-screen-render`)
+		.use(FirstScreenRenderModePlugin, [kind === 'web' ? 'immediate' : 'engine']);
 	chain.plugin(`${PLUGIN_NAME}:mark-main-thread`).use(MarkMainThreadAssetPlugin);
 	if (kind === 'lynx') {
 		chain.plugin(`${PLUGIN_NAME}:runtime-wrapper`).use(RuntimeWrapperWebpackPlugin, [
