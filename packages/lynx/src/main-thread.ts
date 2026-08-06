@@ -537,8 +537,14 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let firstScreenRenderInProgress = false;
 	let closePending = false;
 	let finalizeDeferredClose: (() => void) | null = null;
-	let firstScreenState: 'open' | 'painted' | 'skipped' | 'failed' | 'cleanup-pending' =
-		firstScreenEnabled ? 'open' : 'skipped';
+	type FirstScreenState =
+		| 'open'
+		| 'painted'
+		| 'skipped'
+		| 'failed'
+		| 'cleanup-pending:skipped'
+		| 'cleanup-pending:failed';
+	let firstScreenState: FirstScreenState = firstScreenEnabled ? 'open' : 'skipped';
 	let firstScreenSyncReady = !firstScreenEnabled;
 	const firstScreenRenderMode = options.firstScreenRender ?? 'immediate';
 	let pendingFirstScreenRender: (() => void) | null = null;
@@ -1209,9 +1215,12 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 	};
 
+	const isFirstScreenCleanupPending = () =>
+		firstScreenState === 'cleanup-pending:skipped' || firstScreenState === 'cleanup-pending:failed';
+
 	const canAnnounceReady = () =>
 		!firstScreenEnabled ||
-		(firstScreenState !== 'open' && firstScreenState !== 'cleanup-pending' && firstScreenSyncReady);
+		(firstScreenState !== 'open' && !isFirstScreenCleanupPending() && firstScreenSyncReady);
 
 	const dispatchReady = (request: number): boolean => {
 		// Request 0 is an unsolicited availability hint and can be emitted before a
@@ -1318,7 +1327,13 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		for (let attempt = 0; attempt < MAX_CLOSE_CLEANUP_ATTEMPTS; attempt++) {
 			const treeComplete = disposeAvailableFirstTree();
 			const sourceComplete = disposeFailedFirstScreenSource();
-			if (treeComplete && sourceComplete) return true;
+			if (treeComplete && sourceComplete) {
+				// Ready, fault, dispose, and unmount retries all finish here; preserve
+				// the outcome chosen when retirement began.
+				if (firstScreenState === 'cleanup-pending:skipped') firstScreenState = 'skipped';
+				else if (firstScreenState === 'cleanup-pending:failed') firstScreenState = 'failed';
+				return true;
+			}
 		}
 		return false;
 	};
@@ -1334,12 +1349,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		settled: 'skipped' | 'failed',
 		reason: string,
 	): void => {
-		firstScreenState = 'cleanup-pending';
+		firstScreenState = settled === 'skipped' ? 'cleanup-pending:skipped' : 'cleanup-pending:failed';
 		firstScreenSyncReady = true;
 		if (firstTree === null && source !== null) failedFirstScreenSource = source;
-		if (retryFirstScreenCleanup()) {
-			firstScreenState = settled;
-		} else {
+		if (!retryFirstScreenCleanup()) {
 			report(
 				new Error(
 					`Octane Lynx withheld background readiness because ${reason} first-screen cleanup remains incomplete.`,
@@ -1741,9 +1754,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			return;
 		}
 		queuedReadyRequests.add(message.request);
-		if (firstScreenState === 'cleanup-pending' && retryFirstScreenCleanup()) {
-			firstScreenState = 'failed';
-		}
+		if (isFirstScreenCleanupPending()) retryFirstScreenCleanup();
 		if (canAnnounceReady()) announceReady();
 	};
 
@@ -2453,7 +2464,9 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					// can still gate readiness until a retry succeeds.
 					firstScreenSyncReady = true;
 					if (!retryFirstScreenCleanup()) {
-						firstScreenState = 'cleanup-pending';
+						if (!isFirstScreenCleanupPending()) {
+							firstScreenState = 'cleanup-pending:skipped';
+						}
 						report(
 							new Error(
 								'Octane Lynx withheld background readiness because first-screen unmount cleanup remains incomplete.',
@@ -2461,11 +2474,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 						);
 						return;
 					}
-					if (
-						firstScreenState === 'open' ||
-						firstScreenState === 'painted' ||
-						firstScreenState === 'cleanup-pending'
-					) {
+					if (firstScreenState === 'open' || firstScreenState === 'painted') {
 						firstScreenState = 'skipped';
 					}
 					announceReady();
