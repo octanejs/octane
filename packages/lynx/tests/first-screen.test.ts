@@ -692,12 +692,12 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		]);
 	});
 
-	it('retries cleanup for a declined first screen instead of withholding readiness', () => {
-		let removalFailures = 0;
+	it('retries deferred cleanup for a declined first screen before announcing readiness', () => {
+		let allowCleanup = false;
 		const { dom, main } = installEnvironment((target) => {
 			const remove = target.__RemoveElement as (parent: object, child: object) => unknown;
 			target.__RemoveElement = (parent: object, child: object) => {
-				if (removalFailures++ < 1) throw new Error('transient declined-source remove failure');
+				if (!allowCleanup) throw new Error('transient declined-source remove failure');
 				return remove(parent, child);
 			};
 		});
@@ -708,12 +708,24 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 
 		expect(firstScreenRoot.render(FeedScene, {})).toBeNull();
 
-		// A removal that fails once and succeeds on retry is still an ordinary
-		// decline: the nodes come out and the background is released immediately.
-		expect(removalFailures).toBeGreaterThan(1);
+		expect(dom.window.document.querySelector('#feed-shell')).not.toBeNull();
+		expect(main.firstScreenSnapshot()).toBeNull();
+		expect(inbound).toEqual([]);
+
+		allowCleanup = true;
+		backgroundContext().dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'main-ready-request',
+				request: 52,
+			},
+		});
+
 		expect(dom.window.document.querySelector('#feed-shell')).toBeNull();
 		expect(main.firstScreenSnapshot()).toBeNull();
-		expect(inbound).toEqual([expect.objectContaining({ type: 'main-ready', request: 0 })]);
+		expect(inbound).toEqual([expect.objectContaining({ type: 'main-ready', request: 52 })]);
 	});
 
 	it('retains a failed pre-capture source and retries cleanup for background readiness', () => {
