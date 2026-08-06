@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/nuqs",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "license": "MIT",
   "type": "module",
   "engines": {

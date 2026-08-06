@@ -1,5 +1,13 @@
 # @octanejs/base-ui
 
+## 0.1.26
+
+### Patch Changes
+
+- Updated dependencies [2b98a33]
+  - octane@0.1.28
+  - @octanejs/floating-ui@0.1.27
+
 ## 0.1.25
 
 ### Patch Changes

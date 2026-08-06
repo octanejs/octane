@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.25"
+    "@octanejs/base-ui@0.1.26"
   ],
   "registryDependencies": [
     "@octane/button",
