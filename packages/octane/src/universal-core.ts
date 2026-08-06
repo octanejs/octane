@@ -889,6 +889,10 @@ interface UniversalOwnerRecord {
 	hooks: Map<unknown, UniversalHook>;
 	effectOrder: EffectHook[];
 	children: UniversalOwnerRecord[];
+	// The root's dirty epoch this owner (or a descendant) was last scheduled in.
+	// Comparing against an attempt's consumed epoch answers "does this subtree
+	// carry scheduled work?" in O(1); stale epochs expire without any clearing.
+	dirtyEpoch: number;
 	range: LogicalRecord | null;
 	contextValues: Map<UniversalContext<any>, unknown> | null;
 	updates: Map<unknown, UniversalHookUpdateQueue>;
@@ -926,10 +930,10 @@ interface RenderAttempt {
 	// renders need every owner re-executed for their own bookkeeping.
 	retainEligible: boolean;
 	retainedCount: number;
-	// Owners scheduled into this attempt plus their ancestor chains. A candidate
-	// subtree whose root appears here contains scheduled work, so it must
-	// re-render even when its props, updates queues, and contexts look clean.
-	dirtyOwners: ReadonlySet<UniversalOwnerRecord> | null;
+	// The dirty epoch this attempt consumed. An owner stamped with it contains
+	// scheduled work, so its subtree must re-render even when its props, update
+	// queues, and contexts look clean.
+	dirtyEpoch: number;
 }
 
 const UNIVERSAL_TREE_PORTAL = 1 << 0;
@@ -1809,6 +1813,7 @@ function createOwnerRecord(
 		hooks: new Map(),
 		effectOrder: [],
 		children: [],
+		dirtyEpoch: 0,
 		range: null,
 		contextValues: null,
 		updates: new Map(),
@@ -2189,7 +2194,7 @@ function materializeComponentValue(
 		record !== undefined &&
 		record.mounted &&
 		!record.disposed &&
-		!(attempt.dirtyOwners?.has(record) ?? false) &&
+		record.dirtyEpoch !== attempt.dirtyEpoch &&
 		record.visibility === 'visible' &&
 		parent.visibility === 'visible' &&
 		record.componentProps !== null &&
@@ -5405,9 +5410,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private scheduledFullRoot = false;
 	private readonly scheduledOwners = new Set<UniversalOwnerRecord>();
 	private scheduledPreparationDepth = 0;
-	// Captured by prepare() from the scheduled-owner set it consumes, so the
-	// attempts it spawns know which committed subtrees carry scheduled work.
-	private attemptDirtyOwners: Set<UniversalOwnerRecord> | null = null;
+	// The current dirty epoch: scheduleOwned() stamps it on the scheduled owner
+	// and its ancestors, and prepare() bumps it as it consumes the batch, so an
+	// attempt recognizes exactly the owners scheduled into it.
+	private dirtyEpoch = 1;
+	private attemptDirtyEpoch = 0;
 	private attemptFullRootScheduled = false;
 	private readonly scheduledTransitionBatches = new Set<UniversalTransitionBatch>();
 	private readonly unattemptedTransitionBatches = new Set<UniversalTransitionBatch>();
@@ -6285,6 +6292,16 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	scheduleOwned(owner: UniversalOwnerRecord): void {
 		if (owner.root !== this || owner.disposed) return;
 		this.scheduledOwners.add(owner);
+		// Stamp the owner and its ancestors so retained-subtree adoption can see
+		// scheduled work with one integer compare. The early stop bounds repeat
+		// schedules and converging chains to O(1) amortized per call.
+		for (
+			let current: UniversalOwnerRecord | null = owner;
+			current !== null && current.dirtyEpoch !== this.dirtyEpoch;
+			current = current.parent
+		) {
+			current.dirtyEpoch = this.dirtyEpoch;
+		}
 		this.markUrgentScheduled();
 	}
 
@@ -6867,7 +6884,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			// attempt, which is exactly the retain-eligible shape.
 			retainEligible: true,
 			retainedCount: 0,
-			dirtyOwners: this.attemptDirtyOwners,
+			dirtyEpoch: this.attemptDirtyEpoch,
 		};
 		ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
 		CURRENT_UNIVERSAL_WARM = null;
@@ -7038,27 +7055,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const scheduledUrgent = this.scheduledUrgent || this.scheduledPreparationDepth === 0;
 		// Scheduling is not always a hook update: a boundary invalidation (resolved
 		// thenable, routed error, Activity reveal) re-renders its owner with an
-		// empty update queue. Capture every scheduled owner and its ancestors so
-		// retained-subtree adoption never serves a scheduled subtree's stale
-		// output, and never retain at all when a full-root refresh was demanded.
+		// empty update queue. scheduleOwned() already epoch-stamped every
+		// scheduled owner and its ancestors; consuming the batch here just
+		// records that epoch for the attempt and opens the next one, so stale
+		// stamps expire without walking or clearing anything. Never retain at
+		// all when a full-root refresh was demanded.
 		this.attemptFullRootScheduled = this.scheduledFullRoot;
-		let dirtyOwners: Set<UniversalOwnerRecord> | null = null;
-		if (this.scheduledOwners.size !== 0) {
-			dirtyOwners = new Set();
-			for (const owner of this.scheduledOwners) {
-				for (
-					let current: UniversalOwnerRecord | null = owner;
-					current !== null;
-					current = current.parent
-				) {
-					// Chains converge: stopping at the first shared ancestor keeps the
-					// total walk near the scheduled-owner count, not count × depth.
-					if (dirtyOwners.has(current)) break;
-					dirtyOwners.add(current);
-				}
-			}
-		}
-		this.attemptDirtyOwners = dirtyOwners;
+		this.attemptDirtyEpoch = this.dirtyEpoch;
+		this.dirtyEpoch++;
 		this.scheduledUrgent = false;
 		this.scheduledFullRoot = false;
 		this.scheduledOwners.clear();
@@ -7198,7 +7202,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				transitionBatches.size === 0 &&
 				!transitionRender,
 			retainedCount: 0,
-			dirtyOwners: this.attemptDirtyOwners,
+			dirtyEpoch: this.attemptDirtyEpoch,
 		};
 		// A nested universal root is a separate render attempt. Do not let the
 		// caller's active component plans or speculative cache leak into it; child
