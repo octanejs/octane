@@ -173,24 +173,17 @@ lane remains open work.
 
 ## Divergences
 
-Four, three of them recorded in `audit/react-parity.json` and bound to a case:
+Three, two of them recorded in `audit/react-parity.json` and bound to a case:
 
 1. **`react-map-gl-source-id-by-context`** — upstream delivers a `<Source>` id to
    child layers with `cloneElement(child, {source: id})`. Octane cannot clone a
    compiled children block, so the id travels by context. Same override
    semantics; the id now reaches any descendant `<Layer>`, not only direct
    children.
-2. **`react-map-gl-children-container-order`** — the children container is
-   inserted before the DOM mapbox-gl appends, where React appends it after, so
-   the port positions it absolutely rather than leaving it in upstream's
-   `height: 100%` flow. In flow it displaces `.mapboxgl-canvas-container` by the
-   full height of the map, and mapbox-gl derives pointer coordinates from that
-   element, so every point-anchored interaction is wrong by that offset. Same
-   box and same stacking as upstream; only `position` differs.
-3. **`react-map-gl-refs-as-props`** — `forwardRef` does not exist in Octane, so
+2. **`react-map-gl-refs-as-props`** — `forwardRef` does not exist in Octane, so
    `Map`, `Marker`, `Popup` and `GeolocateControl` take `ref` as a plain prop.
    `<Map ref={mapRef} />` is unchanged for consumers.
-4. **Teardown timing** — effect cleanups run on the passive drain after
+3. **Teardown timing** — effect cleanups run on the passive drain after
    `root.unmount()`, not inside it, so the map's WebGL context and workers are
    released one drain later. This is an Octane runtime property rather than a
    binding behavior and no parity lane observes it, so it is deliberately not a

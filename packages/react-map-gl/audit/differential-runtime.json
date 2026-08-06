@@ -15,6 +15,11 @@
       "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 honours useControl options called straight from a consumer module"
     },
     {
+      "id": "runtime:ad7470b417e388b7",
+      "file": "packages/react-map-gl/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 picks the default pin or a custom element the same way as upstream"
+    },
+    {
       "id": "runtime:a11916ca3ede5a65",
       "file": "packages/react-map-gl/tests/differential/parity.test.ts",
       "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 reaches the map by id from outside it, and flies it"

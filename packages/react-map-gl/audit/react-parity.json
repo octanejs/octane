@@ -424,7 +424,7 @@
         {
           "path": "packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx",
           "role": "support",
-          "sha256": "8a22499bc9295fe31405703686f82f1d9660abe2c555f9e59f12fca8a6909e89"
+          "sha256": "9dbd3ec2094eaf545ad3ff61122eafc368d7866d07b7e41a3d960e8e39fb1b74"
         },
         {
           "path": "vitest.config.js",
@@ -527,7 +527,7 @@
         {
           "path": "packages/react-map-gl/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "a7fa9b83de60afc449fd1ae0db3423f453538bbaf8911074dd900174f6249bc6",
+          "sha256": "2a60bf2dca6c3a5a49b592a073461cc72fd4bf53e0647ae4040166d9f04136a5",
           "cases": [
             {
               "id": "differential:1",
@@ -553,6 +553,11 @@
               "id": "differential:5",
               "testName": "honours useControl options called straight from a consumer module",
               "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 honours useControl options called straight from a consumer module"
+            },
+            {
+              "id": "differential:6",
+              "testName": "picks the default pin or a custom element the same way as upstream",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 picks the default pin or a custom element the same way as upstream"
             }
           ]
         },
@@ -587,6 +592,11 @@
           "sha256": "ec6c5bf38832663f18f5c9bff3fcd91ac9e9d5981d8dea6850d8cf7c589fbba2"
         },
         {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/marker-children-diff.tsrx",
+          "role": "support",
+          "sha256": "08f0546cd077c8a5b317fa74de5ef92af90eca85aaef228248e6977c6ebbd6a1"
+        },
+        {
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
           "role": "support",
           "sha256": "ba922849c42f4756360689ba772e6d9c484971e61c00ef65d4a3bd0f188dc509"
@@ -611,18 +621,6 @@
       "migrationGuidance": "Set an explicit source on layers that must not belong to an enclosing <Source>, and keep such layers outside it.",
       "owner": "@octanejs/react-map-gl",
       "reviewCondition": "Review if Octane gains a way to project props onto a compiled children block."
-    },
-    {
-      "id": "react-map-gl-children-container-order",
-      "caseIds": ["differential:1"],
-      "upstreamResult": "React appends the map's children container after the DOM mapbox-gl has already added to the same container.",
-      "octaneResult": "Octane's conditional block leaves comment anchors, so the children container returns to its authored position, ahead of the library's nodes. The port therefore gives that container `position: absolute` covering the map, instead of upstream's in-flow `height: 100%`.",
-      "rationale": "The container is rendered only once a map instance exists, which is after the library has appended its own DOM. React has no record of where its child belongs among foreign nodes; Octane does. Upstream's in-flow container is only safe in that trailing position: ahead of the library's nodes a full-height block displaces `.mapboxgl-canvas-container`, which is `position: static` and is the element mapbox-gl measures every pointer coordinate against.",
-      "classification": "insertion-anchoring",
-      "consumerImpact": "Both trees hold the same elements, and the container keeps upstream's box and its stacking beneath the canvas. Sibling order differs, which no binding behavior depends on: markers, popups and controls are portalled into library-owned elements. Left in flow, the displacement would have broken wheel zoom, double-click zoom and queryRenderedFeatures by the full height of the map.",
-      "migrationGuidance": "Do not rely on sibling order inside the map container, and do not assume the children container takes part in normal flow; position overlays with CSS or portal them through the binding as before.",
-      "owner": "@octanejs/react-map-gl",
-      "reviewCondition": "Review if a consumer reports stacking or layout that depends on that sibling order."
     },
     {
       "id": "react-map-gl-refs-as-props",

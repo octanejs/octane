@@ -1,5 +1,7 @@
+/* global document */
 import {
 	createContext,
+	createPortal,
 	useContext,
 	useEffect,
 	useImperativeHandle,
@@ -44,6 +46,7 @@ export function Map(props: MapProps) @{
 	const mountedMapsContext = useContext(MountedMapsContext);
 	const [mapInstance, setMapInstance] = useState<Mapbox | null>(null);
 	const containerRef = useRef<HTMLDivElement | null>(null);
+	const childContainerRef = useRef<HTMLDivElement | null>(null);
 
 	const { current: contextValue } = useRef<MapContextValue>({
 		mapLib: null as unknown as MapLib,
@@ -78,8 +81,25 @@ export function Map(props: MapProps) @{
 			contextValue.map = createRef(mapbox)!;
 			contextValue.mapLib = mapboxgl;
 
+			// The children container is created and APPENDED here rather than
+			// rendered into the template, so it lands after the DOM mapbox-gl has
+			// just built — which is where React puts it, and the only arrangement
+			// that reproduces upstream's behavior.
+			//
+			// Rendered in the template, Octane's conditional block anchors it at its
+			// authored position, ahead of the library's nodes. In flow it then
+			// displaces `.mapboxgl-canvas-container`, the element mapbox-gl measures
+			// pointer coordinates against; taken out of flow it instead paints
+			// before the canvas, so a consumer's positioned overlay ends up hidden
+			// and unclickable beneath an opaque map. Appending sidesteps both: same
+			// `height: 100%` container as upstream, in the same place.
+			const childContainer = document.createElement('div');
+			childContainer.setAttribute('mapboxgl-children', '');
+			childContainer.style.height = '100%';
+			containerRef.current!.appendChild(childContainer);
+			childContainerRef.current = childContainer;
+
 			setMapInstance(mapbox);
-			mountedMapsContext?.onMapMount(contextValue.map, props.id);
 		}).catch((error) => {
 			const { onError } = props;
 			if (onError) {
@@ -95,8 +115,9 @@ export function Map(props: MapProps) @{
 
 		return () => {
 			isMounted = false;
+			childContainerRef.current?.remove();
+			childContainerRef.current = null;
 			if (mapbox) {
-				mountedMapsContext?.onMapUnmount(props.id);
 				if (props.reuseMaps) {
 					mapbox.recycle();
 				} else {
@@ -105,6 +126,20 @@ export function Map(props: MapProps) @{
 			}
 		};
 	}, []);
+
+	// Registration lives in its own effect rather than inside the promise above.
+	// `MapProvider` reports a duplicate or reserved map id by throwing from its
+	// state updater, and Octane runs updaters synchronously inside the setter, so
+	// called from that promise the throw landed in its `.catch` and surfaced as a
+	// map `onError` — the channel for style and network failures — instead of as
+	// a real error. Here it propagates like any other effect error.
+	useEffect(() => {
+		if (!mapInstance) {
+			return undefined;
+		}
+		mountedMapsContext?.onMapMount(contextValue.map, props.id);
+		return () => mountedMapsContext?.onMapUnmount(props.id);
+	}, [mapInstance]);
 
 	useIsomorphicLayoutEffect(() => {
 		if (mapInstance) {
@@ -124,34 +159,15 @@ export function Map(props: MapProps) @{
 		[props.style],
 	);
 
-	// OCTANE DIVERGENCE[react-map-gl-children-container-order][differential:1]: upstream's
-	// container is `{height: '100%'}` in normal flow, which is safe there only
-	// because React appends it AFTER mapbox-gl's own DOM. Octane anchors it at its
-	// authored position, ahead of that DOM, where a full-height block in flow
-	// pushes `.mapboxgl-canvas-container` down by the entire height of the map.
-	//
-	// That element is what mapbox-gl measures pointer coordinates against, so the
-	// displacement silently breaks every point-anchored interaction — wheel zoom,
-	// double-click zoom, feature queries — by exactly the map's height, which
-	// reads as "zoom always anchors near the top edge".
-	//
-	// Taking the container out of flow reproduces upstream's geometry exactly:
-	// the same full-container box, still painted beneath the canvas because it
-	// stays first in tree order among positioned siblings, and no dependency on
-	// where the library's nodes happen to sit.
-	const CHILD_CONTAINER_STYLE = {
-		position: 'absolute' as const,
-		top: 0,
-		left: 0,
-		width: '100%',
-		height: '100%',
-	};
-
+	// The children container itself is appended by the effect above, next to the
+	// DOM mapbox-gl builds; only its contents are rendered here, through a portal.
+	// `Marker` and `Popup` already reach their library-owned elements this way.
 	<div id={props.id} ref={containerRef} style={style}>
 		@if (mapInstance) {
-			<MapContext.Provider value={contextValue}>
-				<div mapboxgl-children="" style={CHILD_CONTAINER_STYLE}>{props.children}</div>
-			</MapContext.Provider>
+			<MapContext.Provider value={contextValue}>{createPortal(
+				props.children,
+				childContainerRef.current!,
+			)}</MapContext.Provider>
 		}
 	</div>
 }

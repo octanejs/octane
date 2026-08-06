@@ -399,6 +399,7 @@ const manifest = {
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/overlay-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/use-map-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/use-control-diff.tsrx'),
+				supportFile('packages/react-map-gl/tests/_fixtures/differential/marker-children-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_mocks/mapbox-gl.ts'),
 				supportFile('vitest.config.js'),
 			],
@@ -427,24 +428,6 @@ const manifest = {
 			owner: '@octanejs/react-map-gl',
 			reviewCondition:
 				'Review if Octane gains a way to project props onto a compiled children block.',
-		},
-		{
-			id: 'react-map-gl-children-container-order',
-			caseIds: ['differential:1'],
-			upstreamResult:
-				"React appends the map's children container after the DOM mapbox-gl has already added to the same container.",
-			octaneResult:
-				"Octane's conditional block leaves comment anchors, so the children container returns to its authored position, ahead of the library's nodes. The port therefore gives that container `position: absolute` covering the map, instead of upstream's in-flow `height: 100%`.",
-			rationale:
-				"The container is rendered only once a map instance exists, which is after the library has appended its own DOM. React has no record of where its child belongs among foreign nodes; Octane does. Upstream's in-flow container is only safe in that trailing position: ahead of the library's nodes a full-height block displaces `.mapboxgl-canvas-container`, which is `position: static` and is the element mapbox-gl measures every pointer coordinate against.",
-			classification: 'insertion-anchoring',
-			consumerImpact:
-				"Both trees hold the same elements, and the container keeps upstream's box and its stacking beneath the canvas. Sibling order differs, which no binding behavior depends on: markers, popups and controls are portalled into library-owned elements. Left in flow, the displacement would have broken wheel zoom, double-click zoom and queryRenderedFeatures by the full height of the map.",
-			migrationGuidance:
-				'Do not rely on sibling order inside the map container, and do not assume the children container takes part in normal flow; position overlays with CSS or portal them through the binding as before.',
-			owner: '@octanejs/react-map-gl',
-			reviewCondition:
-				'Review if a consumer reports stacking or layout that depends on that sibling order.',
 		},
 		{
 			id: 'react-map-gl-refs-as-props',

@@ -30,8 +30,7 @@ binding's defaults and nothing that would need the library, and `hydrateRoot`
 adopts that container rather than replacing it, so the reserved layout box
 survives hydration.
 
-Four intentional differences, all documented in `UPSTREAM.md` and the README:
+Three intentional differences, all documented in `UPSTREAM.md` and the README:
 `<Source>` publishes its id through context rather than `cloneElement`, so it
-reaches any descendant `<Layer>`; refs are plain props; the children container
-sorts ahead of the DOM mapbox-gl appends; and effect cleanups — so `map.remove()`
-— run on the drain after `unmount()` rather than inside it.
+reaches any descendant `<Layer>`; refs are plain props; and effect cleanups — so
+`map.remove()` — run on the drain after `unmount()` rather than inside it.

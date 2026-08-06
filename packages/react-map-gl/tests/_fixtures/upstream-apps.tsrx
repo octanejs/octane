@@ -202,3 +202,11 @@ export function EnclosingMapProbe(props: MapFixtureProps) @{
 		</Map>
 	</MapProvider>
 }
+
+/** Two maps registering under one id — a programming error, not a map failure. */
+export function DuplicateIdProvider(props: MapFixtureProps) @{
+	<MapProvider>
+		<Map id="dup" {...props.mapA} />
+		<Map id="dup" {...props.mapB} />
+	</MapProvider>
+}

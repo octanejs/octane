@@ -17,6 +17,10 @@ const SOURCE_LAYER_FIXTURE = resolve(__dirname, '../_fixtures/differential/sourc
 const OVERLAY_FIXTURE = resolve(__dirname, '../_fixtures/differential/overlay-diff.tsrx');
 const USE_MAP_FIXTURE = resolve(__dirname, '../_fixtures/differential/use-map-diff.tsrx');
 const USE_CONTROL_FIXTURE = resolve(__dirname, '../_fixtures/differential/use-control-diff.tsrx');
+const MARKER_CHILDREN_FIXTURE = resolve(
+	__dirname,
+	'../_fixtures/differential/marker-children-diff.tsrx',
+);
 const CACHE = resolve(__dirname, '.react-cache');
 
 async function settle(): Promise<void> {
@@ -60,25 +64,13 @@ describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', (
 		);
 
 		/**
-		 * OCTANE DIVERGENCE[react-map-gl-children-container-order][differential:1]: where the binding's children container sits relative
-		 * to DOM the map library appends itself.
-		 *
-		 * `Map` renders that container only once an instance exists, so it is
-		 * inserted after mapbox-gl has already appended its own nodes. React has
-		 * no record of where its child belongs among foreign nodes and appends, so
-		 * the container lands last. Octane's conditional block leaves comment
-		 * anchors, so the container returns to its authored position — ahead of
-		 * the library's nodes.
-		 *
-		 * Both trees hold exactly the same elements. The order itself is not free,
-		 * though: upstream's in-flow `height: 100%` container is only safe last,
-		 * because ahead of the library's nodes it displaces
-		 * `.mapboxgl-canvas-container` — the element mapbox-gl measures pointer
-		 * coordinates against — by the full height of the map. The port therefore
-		 * positions that container absolutely, which restores upstream's box and
-		 * its stacking beneath the canvas. That property is pinned by
-		 * `tests/runtime/children-container.test.ts`; jsdom performs no layout, so
-		 * this differential can see the ordering but never the displacement.
+		 * Sibling order inside the map container is load-bearing, not cosmetic.
+		 * The children container must come after the DOM mapbox-gl builds: ahead
+		 * of it, a full-height block displaces `.mapboxgl-canvas-container` — the
+		 * element mapbox-gl measures every pointer coordinate against — and a
+		 * consumer's positioned overlay paints beneath the opaque canvas instead
+		 * of above it. The binding therefore appends that container next to the
+		 * library's nodes rather than rendering it into the template.
 		 */
 		await differential.observe('map shell after the library resolves', async (octane, react) => {
 			// The map library resolves through a promise, then its style loads on a
@@ -86,25 +78,16 @@ describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', (
 			await settle();
 			await settle();
 
-			expect(containerChildren(octane)).toEqual([
-				'children-container',
-				'canvas',
-				'div.mapboxgl-ctrl mapboxgl-ctrl-attrib',
-				'div.mapboxgl-ctrl mapboxgl-ctrl-group',
-				'div.mapboxgl-marker',
-				'div.mapboxgl-popup',
-			]);
-			expect(containerChildren(react)).toEqual([
+			const expected = [
 				'canvas',
 				'children-container',
 				'div.mapboxgl-ctrl mapboxgl-ctrl-attrib',
 				'div.mapboxgl-ctrl mapboxgl-ctrl-group',
 				'div.mapboxgl-marker',
 				'div.mapboxgl-popup',
-			]);
-
-			// Same set of elements on both sides, differing only in that one order.
-			expect([...containerChildren(octane)].sort()).toEqual([...containerChildren(react)].sort());
+			];
+			expect(containerChildren(octane)).toEqual(expected);
+			expect(containerChildren(react)).toEqual(expected);
 		});
 
 		// Everything portalled into library-owned elements must match exactly.
@@ -364,5 +347,45 @@ describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', (
 		// Both sides ran the consumer's onRemove on teardown — proof the callback
 		// still landed in the right positional slot after stripping.
 		expect(removals).toEqual(['removed', 'removed']);
+	});
+
+	// @parity-case differential:6
+	it('picks the default pin or a custom element the same way as upstream', async () => {
+		const differential = await mountDifferential(
+			MARKER_CHILDREN_FIXTURE,
+			'MarkerChildrenDiff',
+			{ mapLib: Promise.resolve(mapboxgl), showPin: false, showText: true },
+			CACHE,
+		);
+
+		await differential.observe('marker elements', async (o, r) => {
+			await settle();
+			await settle();
+			// A marker whose block renders nothing is rebuilt with the default pin,
+			// which costs one extra render cycle beyond the map coming up.
+			await settle();
+
+			/** Whether each marker ended up with Mapbox's own pin. */
+			const pins = (mount: DiffMount) =>
+				['empty-block', 'filled-block', 'no-children'].map((name) => {
+					const element = mount.find(`.mapboxgl-marker.${name}`) as HTMLElement | null;
+					return [name, element?.dataset.pin === 'default'] as const;
+				});
+
+			expect(pins(o)).toEqual(pins(r));
+			expect(Object.fromEntries(pins(o))).toEqual({
+				// A block that renders nothing is not children — Mapbox draws its pin.
+				'empty-block': true,
+				// A block that renders something is, so the binding owns the element.
+				'filled-block': false,
+				'no-children': true,
+			});
+
+			// And the custom one actually carries the content.
+			expect(o.find('.mapboxgl-marker.filled-block')!.textContent).toContain('just text');
+			expect(r.find('.mapboxgl-marker.filled-block')!.textContent).toContain('just text');
+		});
+
+		differential.unmount();
 	});
 });
