@@ -15,7 +15,7 @@ afterEach(() => {
 function mount(props: {
 	packages?: string;
 	dev?: string;
-	command?: 'pack-dry-run' | 'create';
+	command?: 'pack-dry-run' | 'create' | 'server-entry';
 	directory?: string;
 }) {
 	const utils = render(PackageInstall as any, { props });
@@ -88,6 +88,21 @@ describe('PackageInstall', () => {
 		// showing a one-line start should copy out.
 		const { command } = mount({ command: 'create' });
 		expect(command()).toBe('pnpm create octane my-app');
+	});
+
+	it('selects the Node or Bun preload for a direct server entry', () => {
+		const { container, tab, command } = mount({ command: 'server-entry' });
+
+		expect(container.querySelector('[role="tablist"]')!.getAttribute('aria-label')).toBe(
+			'JavaScript runtime',
+		);
+		expect(tab('node').getAttribute('aria-selected')).toBe('true');
+		expect(command()).toBe('node --import octane/compiler/register entry-server.ts');
+		expect(tab('pnpm')).toBeUndefined();
+
+		fireEvent.click(tab('bun'));
+		expect(command()).toBe('bun --preload octane/compiler/register entry-server.ts');
+		expect(tab('bun').getAttribute('aria-selected')).toBe('true');
 	});
 
 	it('moves selection with arrow keys and keeps one tab in the tab order', () => {

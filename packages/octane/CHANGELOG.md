@@ -1,5 +1,110 @@
 # octane
 
+## 0.1.28
+
+### Patch Changes
+
+- 2b98a33: Universal target: the root component now carries a committed range, so a state
+  update in the root component itself replays through the scoped path instead of
+  falling back to a whole-root attempt (issue #574 follow-up). Replays also adopt
+  committed component subtrees whose props, state, contexts, and code revision
+  are provably unchanged instead of re-rendering and re-drafting them, and child
+  owner claims resolve through a positional fast path when the render keeps its
+  committed order. In the issue's repro shape with state at the root, one press
+  beside 4,000 untouched siblings drops from ~55 ms to ~10 ms, and clean-subtree
+  adoption also flattens the cost of large in-scope replays such as list
+  components re-rendering unchanged items.
+
+## 0.1.27
+
+### Patch Changes
+
+- 46e1833: Keep freshly mounted Suspense content hidden when hydration resumes inside a hidden Activity.
+- 5a8e807: Keep hidden Activity DOM hidden when a descendant independently replaces its output.
+
+  State updates, error and Suspense retries, and accepted hot-module updates now reapply the nearest
+  hidden Activity's visibility after rendering. Replacement elements and text remain hidden until the
+  Activity reveals, while authored display and text values are restored correctly on reveal. Activity
+  and Suspense now share hide ownership for overlapping DOM, so either boundary can reveal first
+  without capturing the other's temporary hidden styles.
+
+## 0.1.26
+
+### Patch Changes
+
+- 1f01b08: Refresh compiled component output correctly after accepted hot updates.
+
+  Hot refresh now discards the outgoing compiler-owned template and slot layout before mounting the
+  new body, while retaining the component block and its hook state. Exclusively owned markerless
+  output is promoted to a durable component range during refresh, so static markup edits and newly
+  added component calls update immediately in both mounted and hydrated applications instead of
+  leaving stale DOM or throwing during insertion. When an enclosing control-flow branch shares that
+  root as its boundary, the update safely falls back to a page reload instead.
+
+- 48e2397: Keep universal state updates proportional to their retained owner subtree: a leaf `setState` replays only its owning component, keyed-list item state and several owners updated by one event replay their nearest shared component ancestor instead of the root, updates under an idle `@try`/Suspense boundary stay scoped (active episodes and retained-hidden content still replay from the root, and a scoped render error falls back so the boundary catches it), structural updates that insert, reorder, or remove hosts commit through the scope's physical frame, compact leaf rows driven by list state update within their owning list component, and scoped commits edit the accepted listener tables in place instead of cloning them. Also avoid cloning the object driver's full instance map when preparing a small host batch, and expose the corresponding benchmark through the MCP server.
+
+## 0.1.25
+
+### Patch Changes
+
+- bd8bb1b: Require Node.js 22.22.2 or newer across Octane's published packages.
+
+  Add the `octane/compiler/register` preload for running server and SSG scripts
+  directly with Node or Bun. It compiles imported `.tsrx`/`.tsx` modules and
+  plain TypeScript custom hooks in server mode without a Vite build. Bun also
+  targets bare `octane` imports at `octane/server` in pass-through authored source
+  dependencies, including packages that manage their hook slots manually.
+
+## 0.1.24
+
+### Patch Changes
+
+- ec77602: Fix Rspack and Rsbuild development builds crashing while evaluating hot `.tsrx` modules by aliasing webpack HMR metadata before reading dispose data.
+- 29c5bdb: Track the receiver of one-level method calls in inferred hook dependencies
+  (#542).
+
+  `useMemo(() => count.toFixed(2))` used to infer `[count.toFixed]` — a function
+  that lives on `Number.prototype` and therefore never changes identity, so the
+  memo stayed frozen at its first value while `count` moved. The same hazard
+  applied to any prototype method called on a one-level receiver, including
+  instance methods of replaced class instances.
+
+  Neither static alternative is right for every program: depending on `count`
+  fixes primitives but would re-run `props.onChange(...)` hooks on every parent
+  render, because `props` is a fresh container whose own function property is the
+  real dependency. The inferred array now compiles such calls to
+  `__methodDep(root, 'name')`, a new semi-public runtime helper that picks the
+  comparable value per render: the member when it is an own property of the
+  receiver, the receiver when the method is inherited, and `undefined` when the
+  property is absent (so `props.onReady?.()` stays inert until a handler is
+  passed). Own-property callbacks and absent optional handlers keep exactly their
+  previous recompute behavior; inherited-method calls now correctly recompute
+  when the receiver changes.
+
+  Deeper callees (`a.b.c(...)`) and computed callees (`a[k](...)`) already
+  tracked their receivers and are unchanged, as are explicit dependency arrays.
+
+- 9b032d8: Treat closures marked with an other-context directive as opaque to dependency
+  inference (#542, problem 2).
+
+  A nested function whose directive prologue declares that its body executes
+  outside render — `'use gpu'` (TypeGPU shader code) or `'worklet'`
+  (Reanimated/worklets-core UI-thread code) — now contributes only its root
+  captures to an inferred dependency array. Previously the array hoisted the
+  closure's member reads to render time, which evaluated context-bound getters
+  such as TypeGPU's `.$` where they are illegal, forcing an explicit dependency
+  array. The TypeGPU example from the issue now infers `[root, timeUniform,
+hueUniform]` with no array written.
+
+  The directive list is a deliberate allowlist and can grow. Same-context hints
+  (`'use strict'`, React Compiler's `'use memo'`/`'use no memo'`) and directives
+  reserved for other semantics (`'use server'`, `'use client'`, `'use cache'`,
+  `'use workflow'`) never truncate; closures without a listed directive keep
+  today's member-path inference.
+
+- f9b2731: Observe promises recreated by plain async components during server replay, so rejected components render their `@catch` arm without emitting duplicate unhandled rejections.
+- 6714914: Keep host refs unpublished while an initial Suspense primary is hidden, and avoid detaching replacement refs that never committed before a suspended update.
+
 ## 0.1.23
 
 ### Patch Changes

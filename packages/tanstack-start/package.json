@@ -1,11 +1,11 @@
 {
   "name": "@octanejs/tanstack-start",
-  "version": "0.1.12",
+  "version": "0.1.17",
   "description": "TanStack Start for Octane, including file-route generation, server functions, SSR streaming, hydration, and Vite integration.",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "octane": {
     "hookSlots": {

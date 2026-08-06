@@ -3,6 +3,9 @@ import { createElement, flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import * as F from './_fixtures/base-ui-smoke.tsrx';
 import * as TableParity from './_fixtures/base-ui-table-parity.tsrx';
+import { badgeVariants as radixBadgeVariants } from '@octanejs/shadcn/Badge';
+import { sidebarMenuButtonVariants } from '@octanejs/shadcn/base-ui/Sidebar';
+import { badgeVariants as baseUiBadgeVariants } from '@octanejs/shadcn/base-ui/Badge';
 import {
 	Tooltip,
 	TooltipContent,
@@ -89,6 +92,11 @@ const CASES: Array<[string, () => unknown, string | null, boolean?]> = [
 	['Table', F.TableCase, 'INV-001'],
 	['Pagination', F.PaginationCase, 'Next'],
 	['Field', F.FieldCase, 'We never share it.'],
+	['Badge', F.BadgeCase, 'Secondary'],
+	['Breadcrumb', F.BreadcrumbCase, 'Current'],
+	['Item', F.ItemCase, 'Item description text.'],
+	['DropdownMenu', F.DropdownMenuCase, 'Profile', true],
+	['Tabs', F.TabsCase, 'Account panel'],
 ];
 
 describe('@octanejs/shadcn — Base UI base renders standalone', () => {
@@ -962,6 +970,657 @@ describe('@octanejs/shadcn — Base UI field errors dedupe and collapse', () => 
 		try {
 			expect(m.container.querySelector('[data-slot="probe"]')!.children).toHaveLength(0);
 			expect(m.container.querySelector('[data-slot="field-error"]')).toBe(null);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI badge is a plain span with the shared variants', () => {
+	it('writes the variant it was given, which its own utilities read', () => {
+		const m = mount(F.BadgeCase as never);
+		try {
+			const badges = [...m.container.querySelectorAll('[data-slot="badge"]')];
+			expect(badges.map((b) => b.tagName)).toEqual(['SPAN', 'SPAN', 'SPAN', 'SPAN']);
+			expect(badges.map((b) => b.getAttribute('data-variant'))).toEqual([
+				'default',
+				'secondary',
+				'destructive',
+				'outline',
+			]);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('applies the variant class, not just the attribute', () => {
+		// `data-variant` is written for consumers to target; the visual difference comes from cva.
+		const m = mount(F.BadgeCase as never);
+		try {
+			const [def, secondary] = m.container.querySelectorAll('[data-slot="badge"]');
+			expect(def.className).toContain('bg-primary');
+			expect(secondary.className).toContain('bg-secondary');
+			expect(def.className).not.toContain('bg-secondary');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — badge variants stay shared across bases', () => {
+	it('produces the same classes as the radix base for every variant', () => {
+		// badge has no primitive in any base, so the cva strings are supposed to be identical.
+		// Asserting it keeps the two from drifting when one base's flavor is updated alone.
+		for (const variant of [
+			'default',
+			'secondary',
+			'destructive',
+			'outline',
+			'ghost',
+			'link',
+		] as const) {
+			expect(baseUiBadgeVariants({ variant }), variant).toBe(radixBadgeVariants({ variant }));
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI breadcrumb is host elements throughout', () => {
+	it('emits the accessible landmark and list structure', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const nav = m.container.querySelector('[data-slot="breadcrumb"]')!;
+			expect(nav.tagName).toBe('NAV');
+			expect(nav.getAttribute('aria-label')).toBe('breadcrumb');
+			expect(m.container.querySelector('[data-slot="breadcrumb-list"]')!.tagName).toBe('OL');
+			expect(m.container.querySelectorAll('[data-slot="breadcrumb-item"]')).toHaveLength(3);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('marks the current page and hides the decorative parts', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const page = m.container.querySelector('[data-slot="breadcrumb-page"]')!;
+			expect(page.getAttribute('aria-current')).toBe('page');
+			expect(page.getAttribute('aria-disabled')).toBe('true');
+			for (const slot of ['breadcrumb-separator', 'breadcrumb-ellipsis']) {
+				for (const el of m.container.querySelectorAll(`[data-slot="${slot}"]`)) {
+					expect(el.getAttribute('aria-hidden'), slot).toBe('true');
+					expect(el.getAttribute('role'), slot).toBe('presentation');
+				}
+			}
+			// The ellipsis still names itself for assistive tech behind the aria-hidden icon.
+			expect(m.container.querySelector('[data-slot="breadcrumb-ellipsis"]')!.textContent).toContain(
+				'More',
+			);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('lets a separator override the default chevron', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const seps = [...m.container.querySelectorAll('[data-slot="breadcrumb-separator"]')];
+			expect(seps).toHaveLength(2);
+			// First takes the default icon, second the supplied text.
+			expect(seps[0].querySelector('svg')).not.toBe(null);
+			expect(seps[1].textContent).toBe('/');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders the link as a real anchor that keeps its href', () => {
+		const m = mount(F.BreadcrumbCase as never);
+		try {
+			const link = m.container.querySelector('[data-slot="breadcrumb-link"]')!;
+			expect(link.tagName).toBe('A');
+			expect(link.getAttribute('href')).toBe('/');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI item writes the attributes its own variants read', () => {
+	it('sets data-variant and data-size itself, with no primitive involved', () => {
+		// These look like the variants that caught toggle and slider, but they read what this
+		// component writes rather than state emitted by a primitive — so they carry across from the
+		// radix source unchanged, and that is the thing worth pinning.
+		const m = mount(F.ItemCase as never);
+		try {
+			const items = [...m.container.querySelectorAll('[data-slot="item"]')];
+			expect(items.map((i) => i.getAttribute('data-variant'))).toEqual(['default', 'outline']);
+			expect(items.map((i) => i.getAttribute('data-size'))).toEqual(['default', 'sm']);
+			expect(items[1].className).toContain('border-border');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('groups items as a list and nests content under the item', () => {
+		const m = mount(F.ItemCase as never);
+		try {
+			const group = m.container.querySelector('[data-slot="item-group"]')!;
+			expect(group.getAttribute('role')).toBe('list');
+			const item = group.querySelector('[data-slot="item"]')!;
+			expect(item.querySelector('[data-slot="item-title"]')!.textContent).toBe('Item title');
+			expect(item.querySelector('[data-slot="item-media"]')!.getAttribute('data-variant')).toBe(
+				'icon',
+			);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('routes ItemSeparator through this base Separator, aria-orientation and all', () => {
+		// The one part with a primitive under it. Base UI emits aria-orientation where radix emits
+		// data-orientation, so this is the only place in the family a dialect could go wrong.
+		const m = mount(F.ItemCase as never);
+		try {
+			const sep = m.container.querySelector('[data-slot="item-separator"]')!;
+			expect(sep).not.toBe(null);
+			expect(sep.getAttribute('aria-orientation')).toBe('horizontal');
+			expect(sep.className).toContain('my-2');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI span-rooted controls carry their own display', () => {
+	// A REGRESSION CLASS, not a one-off. Base UI renders checkbox, switch and radio roots as
+	// `<span role="…">` where Radix uses `<button>`. A `<button>` is `display: inline-block`, so
+	// Radix's class strings never needed a display utility and `size-4` simply worked; a bare
+	// `<span>` is `display: inline`, which IGNORES width and height. Copying a Radix string onto one
+	// collapses the control to a thin vertical bar showing only its border — which is exactly how
+	// the radio group shipped, and nothing in jsdom or a smoke test noticed.
+	//
+	// jsdom does no layout and loads no Tailwind, so the oracle is the class string: a span-rooted
+	// control that expects a box must also declare a display.
+	const DISPLAY = /(?:^|\s)(?:inline-flex|inline-block|inline-grid|flex|grid|block|table)(?:\s|$)/;
+
+	for (const [name, Case, slot] of [
+		['Checkbox', F.CheckboxCase, 'checkbox'],
+		['Switch', F.SwitchCase, 'switch'],
+		['RadioGroupItem', F.RadioGroupCase, 'radio-group-item'],
+	] as Array<[string, unknown, string]>) {
+		it(`${name} declares a display alongside its size`, () => {
+			const m = mount(Case as never);
+			try {
+				const el = m.container.querySelector(`[data-slot="${slot}"]`)!;
+				expect(el, slot).not.toBe(null);
+				expect(el.tagName, `${name} is expected to be span-rooted`).toBe('SPAN');
+				const cls = el.getAttribute('class') ?? '';
+				expect(
+					DISPLAY.test(cls),
+					`${name} gives a <span> a box but declares no display, so width/height are ignored`,
+				).toBe(true);
+			} finally {
+				m.unmount();
+			}
+		});
+	}
+
+	it('anchors the radio dot to the root box, not a zero-sized indicator', () => {
+		const m = mount(F.RadioGroupCase as never);
+		try {
+			const indicator = m.container.querySelector('[data-slot="radio-group-indicator"]')!;
+			// `relative` here would make the absolutely-positioned dot resolve against a flex item
+			// with no size of its own, putting it off-centre.
+			expect(indicator.className).not.toMatch(/(?:^|\s)relative(?:\s|$)/);
+			expect(indicator.className).toContain('size-full');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI dropdown-menu maps onto the Menu primitive', () => {
+	const open = async () => {
+		const m = mount(F.DropdownMenuCase as never);
+		await settle();
+		return m;
+	};
+
+	it('renders the label standalone, without a Group ancestor', async () => {
+		// `Menu.GroupLabel` calls useMenuGroupRootContext and THROWS "MenuGroupContext is missing"
+		// outside a `Menu.Group`, while shadcn's label is routinely used on its own. Routing it
+		// through the primitive would make the ordinary case a runtime crash — the same trap
+		// `Field.Label` already shipped once.
+		const m = await open();
+		try {
+			const label = document.querySelector('[data-slot="dropdown-menu-label"]')!;
+			expect(label).not.toBe(null);
+			expect(label.tagName).toBe('DIV');
+			expect(label.textContent).toBe('My account');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('positions through Positioner and reads the Base UI css vars', async () => {
+		// Radix publishes per-component variable names; Base UI's Positioner publishes generic
+		// ones. A utility pointing at a variable nothing sets silently does nothing, which is
+		// invisible to any structural assertion.
+		const m = await open();
+		try {
+			const content = document.querySelector('[data-slot="dropdown-menu-content"]')!;
+			expect(content.getAttribute('role')).toBe('menu');
+			for (const v of ['--available-height', '--anchor-width', '--transform-origin']) {
+				expect(content.className, v).toContain(v);
+			}
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('uses the trigger open dialect on the submenu trigger, not the popup one', async () => {
+		// Base UI marks an open TRIGGER with `data-popup-open`; `data-open` belongs to the popup.
+		// Radix's `data-open:bg-accent` here would never match, so an open submenu's parent row
+		// would lose its highlight.
+		const m = await open();
+		try {
+			const subTrigger = document.querySelector('[data-slot="dropdown-menu-sub-trigger"]')!;
+			expect(subTrigger.className).toContain('data-popup-open:bg-accent');
+			expect(subTrigger.className).not.toMatch(/(?:^|\s)data-open:/);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('emits the menu roles and the disabled dialect on items', async () => {
+		const m = await open();
+		try {
+			expect(document.querySelectorAll('[role="menuitem"]').length).toBeGreaterThanOrEqual(3);
+			expect(document.querySelector('[role="menuitemcheckbox"]')).not.toBe(null);
+			expect(document.querySelector('[role="menuitemradio"]')).not.toBe(null);
+			const disabled = [...document.querySelectorAll('[role="menuitem"]')].find(
+				(el) => el.textContent === 'Unavailable',
+			)!;
+			expect(disabled.hasAttribute('data-disabled')).toBe(true);
+			expect(disabled.className).toContain('data-disabled:opacity-50');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps radix focus: utilities, which work because Base UI moves real focus', async () => {
+		// Recorded because it looks like it should NOT carry over: Base UI publishes
+		// `data-highlighted`, but it also moves DOM focus onto the highlighted item, so radix's
+		// `focus:bg-accent` matches as written. Verified by driving ArrowDown and reading
+		// document.activeElement.
+		const m = await open();
+		try {
+			const item = document.querySelector('[role="menuitem"]')!;
+			expect(item.className).toContain('focus:bg-accent');
+			const popup = document.querySelector('[role="menu"]') as HTMLElement;
+			popup.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+			await settle();
+			const highlighted = document.querySelector('[role="menuitem"][data-highlighted]');
+			expect(highlighted).not.toBe(null);
+			expect(document.activeElement).toBe(highlighted);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders a separator even though Menu has no Separator part', async () => {
+		const m = await open();
+		try {
+			const seps = document.querySelectorAll('[data-slot="dropdown-menu-separator"]');
+			expect(seps.length).toBe(2);
+			expect(seps[0].getAttribute('role')).toBe('separator');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI overlays route positioning to the Positioner', () => {
+	// Radix has one `Content` element that takes every positioning prop; Base UI splits positioning
+	// into its own layer. A prop swept onto `Popup` by a rest spread is INERT — the overlay silently
+	// stays on its default side — and it also lands on the DOM as an invalid attribute. Nothing about
+	// the rendered structure looks wrong, which is why this needs asserting directly.
+	it('dropdown-menu honours side and does not leak the prop to the DOM', async () => {
+		const m = mount(F.DropdownMenuSideCase as never);
+		await settle();
+		try {
+			const popup = document.querySelector('[data-slot="dropdown-menu-content"]')!;
+			expect(popup.getAttribute('data-side')).toBe('top');
+			expect(popup.hasAttribute('side')).toBe(false);
+			expect(popup.hasAttribute('alignoffset')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('popover honours side too', async () => {
+		const m = mount(F.PopoverSideCase as never);
+		await settle();
+		try {
+			const popup = document.querySelector('[data-slot="popover-content"]')!;
+			expect(popup.getAttribute('data-side')).toBe('right');
+			expect(popup.hasAttribute('side')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI context-menu reuses the menu dialects', () => {
+	// Opened with a real contextmenu event, since there is no trigger to click.
+	const open = async () => {
+		const m = mount(F.ContextMenuCase as never);
+		await settle();
+		m.container
+			.querySelector('[data-slot="context-menu-trigger"]')!
+			.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+		await settle();
+		return m;
+	};
+
+	it('opens on contextmenu and reads the Base UI css vars', async () => {
+		const m = await open();
+		try {
+			const content = document.querySelector('[data-slot="context-menu-content"]')!;
+			expect(content).not.toBe(null);
+			expect(content.getAttribute('role')).toBe('menu');
+			for (const v of ['--available-height', '--transform-origin']) {
+				expect(content.className, v).toContain(v);
+			}
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('uses the real Separator part, which Menu does not have', async () => {
+		// The one place this family differs from dropdown-menu: ContextMenu ships a Separator, so it
+		// is the primitive here rather than a plain div, and it carries the a11y roles for free.
+		const m = await open();
+		try {
+			const sep = document.querySelector('[data-slot="context-menu-separator"]')!;
+			expect(sep).not.toBe(null);
+			expect(sep.getAttribute('role')).toBe('separator');
+			expect(sep.getAttribute('aria-orientation')).toBe('horizontal');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('renders the label standalone, without a Group ancestor', async () => {
+		const m = await open();
+		try {
+			const label = document.querySelector('[data-slot="context-menu-label"]')!;
+			expect(label.tagName).toBe('DIV');
+			expect(label.textContent).toBe('Actions');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('uses the trigger open dialect on the submenu trigger', async () => {
+		const m = await open();
+		try {
+			const sub = document.querySelector('[data-slot="context-menu-sub-trigger"]')!;
+			expect(sub.className).toContain('data-popup-open:bg-accent');
+			expect(sub.className).not.toMatch(/(?:^|\s)data-open:/);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI menubar composes the bar with Menu', () => {
+	const open = async () => {
+		const m = mount(F.MenubarCase as never);
+		await settle();
+		return m;
+	};
+
+	it('renders the bar as a menubar with menuitem triggers', async () => {
+		const m = await open();
+		try {
+			const bar = m.container.querySelector('[data-slot="menubar"]')!;
+			expect(bar.getAttribute('role')).toBe('menubar');
+			const triggers = [...m.container.querySelectorAll('[data-slot="menubar-trigger"]')];
+			expect(triggers).toHaveLength(2);
+			// Base UI gives bar triggers the menubar item role, not plain buttons in a row.
+			expect(triggers[0].getAttribute('role')).toBe('menuitem');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps aria-expanded on the BAR trigger, which is what its class targets', async () => {
+		// The one place this family departs from dropdown-menu. Radix styles the bar trigger with
+		// `aria-expanded:bg-muted` rather than a data attribute, and Base UI publishes
+		// `aria-expanded="true"` — so unlike the SUBMENU trigger, this one needed no rewrite.
+		const m = await open();
+		try {
+			const trigger = m.container.querySelector('[data-slot="menubar-trigger"]')!;
+			expect(trigger.getAttribute('aria-expanded')).toBe('true');
+			expect(trigger.className).toContain('aria-expanded:bg-muted');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('rewrites only the submenu trigger to the popup-open dialect', async () => {
+		const m = await open();
+		try {
+			const sub = document.querySelector('[data-slot="menubar-sub-trigger"]')!;
+			expect(sub.className).toContain('data-popup-open:bg-accent');
+			expect(sub.className).not.toMatch(/(?:^|\s)data-open:/);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('reads the Base UI transform-origin var, not the radix one', async () => {
+		const m = await open();
+		try {
+			const content = document.querySelector('[data-slot="menubar-content"]')!;
+			expect(content.getAttribute('role')).toBe('menu');
+			expect(content.className).toContain('origin-(--transform-origin)');
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI hover-card rewrites the state dialect', () => {
+	it('drives motion off data-open/data-closed, since data-state does not exist', async () => {
+		// THE ONE THAT WOULD HAVE FAILED SILENTLY AND COMPLETELY. This family's radix source uses the
+		// older `data-[state=open]:` / `data-[state=closed]:` spelling rather than the `data-open:`
+		// the other menu families use. Base UI publishes NO `data-state` attribute at all, so those
+		// utilities would match nothing and the card would pop in and out unanimated.
+		const m = mount(F.HoverCardCase as never);
+		await settle();
+		try {
+			const content = document.querySelector('[data-slot="hover-card-content"]')!;
+			expect(content).not.toBe(null);
+			expect(content.hasAttribute('data-open')).toBe(true);
+			// Nothing in the tree publishes data-state, which is what makes the rewrite necessary.
+			expect(document.querySelector('[data-state]')).toBe(null);
+			expect(content.className).toContain('data-open:animate-in');
+			expect(content.className).toContain('data-closed:animate-out');
+			expect(content.className).not.toContain('data-[state=');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('reads the Base UI transform-origin var', async () => {
+		const m = mount(F.HoverCardCase as never);
+		await settle();
+		try {
+			const content = document.querySelector('[data-slot="hover-card-content"]')!;
+			expect(content.className).toContain('origin-(--transform-origin)');
+			expect(content.className).not.toContain('--radix-');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('routes side to the Positioner rather than the Popup', async () => {
+		const m = mount(F.HoverCardSideCase as never);
+		await settle();
+		try {
+			const content = document.querySelector('[data-slot="hover-card-content"]')!;
+			expect(content.getAttribute('data-side')).toBe('top');
+			expect(content.hasAttribute('side')).toBe(false);
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI sidebar composes this base own families', () => {
+	it('mounts the provider tree and exposes its parts', async () => {
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			expect(m.container.querySelector('[data-slot="sidebar-wrapper"]')).not.toBe(null);
+			expect(m.container.querySelector('[data-slot="sidebar-menu-button"]')).not.toBe(null);
+			expect(m.container.querySelector('[data-slot="sidebar-group-label"]')!.textContent).toBe(
+				'Navigation',
+			);
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('marks the active menu button, which its classes target', async () => {
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			const active = m.container.querySelector(
+				'[data-slot="sidebar-menu-button"][data-active="true"]',
+			)!;
+			expect(active).not.toBe(null);
+			expect(active.tagName).toBe('BUTTON');
+			expect(active.className).toContain('data-active:bg-sidebar-accent');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('composes the tooltip through render, so no button nests inside another', async () => {
+		// The composition that made this family portable at all. Radix wraps the menu button in
+		// `<TooltipTrigger asChild>`, where Slot MERGES the trigger onto its child; Base UI has no
+		// Slot and its Tooltip.Trigger takes a `render` element, which merges the same way.
+		//
+		// Passing the button as CHILDREN instead is the trap: the trigger then renders its own
+		// `<button>` and the menu button lands INSIDE it. Two buttons still exist and both still
+		// carry their text, so a count or text assertion passes — but nested interactive elements
+		// are invalid HTML and break click and focus behaviour. The nesting is the oracle.
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			const buttons = [...m.container.querySelectorAll('[data-slot="sidebar-menu-button"]')];
+			expect(buttons).toHaveLength(2);
+			expect(buttons.map((b) => b.textContent)).toEqual(['Dashboard', 'Settings']);
+			for (const button of buttons) {
+				expect(button.tagName).toBe('BUTTON');
+				expect(button.closest('button:not([data-slot="sidebar-menu-button"])')).toBe(null);
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — Base UI tabs adapts the orientation dialect to the pin', () => {
+	it('switches panels on click, with aria wiring intact', async () => {
+		const m = mount(F.TabsCase as never);
+		await settle();
+		try {
+			const triggers = [...m.container.querySelectorAll<HTMLElement>('[data-slot="tabs-trigger"]')];
+			expect(triggers.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+			triggers[1].click();
+			await settle();
+			expect(triggers.map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+			expect(m.container.textContent).toContain('Password panel');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('targets data-[orientation=…], not the bare attributes upstream uses', async () => {
+		// The version skew this file exists to bridge. The pinned primitive emits
+		// `data-orientation="horizontal"`; upstream's source targets a bare `data-horizontal`, which
+		// would match nothing here — the root would never become a column and every
+		// `group-data-*/tabs` selector on the trigger would be dead.
+		const m = mount(F.TabsCase as never);
+		await settle();
+		try {
+			const root = m.container.querySelector('[data-slot="tabs"]')!;
+			expect(root.getAttribute('data-orientation')).toBe('horizontal');
+			expect(root.hasAttribute('data-horizontal')).toBe(false);
+			expect(root.className).toContain('data-[orientation=horizontal]:flex-col');
+			for (const el of m.container.querySelectorAll('[data-slot="tabs-trigger"]')) {
+				expect(el.className).not.toMatch(/group-data-(horizontal|vertical)\//);
+			}
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('keeps data-active, which the pin emits exactly as the classes expect', async () => {
+		const m = mount(F.TabsCase as never);
+		await settle();
+		try {
+			const active = m.container.querySelector('[data-slot="tabs-trigger"][data-active]')!;
+			expect(active).not.toBe(null);
+			expect(active.textContent).toBe('Account');
+			expect(active.className).toContain('data-active:bg-background');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('carries orientation through to the list and its variants', async () => {
+		const m = mount(F.TabsVerticalCase as never);
+		await settle();
+		try {
+			const root = m.container.querySelector('[data-slot="tabs"]')!;
+			expect(root.getAttribute('data-orientation')).toBe('vertical');
+			const list = m.container.querySelector('[data-slot="tabs-list"]')!;
+			expect(list.getAttribute('role')).toBe('tablist');
+			expect(list.getAttribute('aria-orientation')).toBe('vertical');
+			expect(list.getAttribute('data-variant')).toBe('line');
+		} finally {
+			m.unmount();
+		}
+	});
+});
+
+describe('@octanejs/shadcn — the Base UI sidebar escape hatch is reachable', () => {
+	it('exports the variants the header sends consumers to', () => {
+		// This base drops `asChild` on SidebarMenuButton and documents this helper as the substitute.
+		// It was declared non-exported (faithful to the radix source, which does not need it because
+		// it HAS asChild), so the documented workaround could not be imported at all.
+		expect(typeof sidebarMenuButtonVariants).toBe('function');
+		expect(sidebarMenuButtonVariants({ variant: 'default', size: 'default' })).toBeTruthy();
+	});
+
+	it('produces the same classes the component applies, so the workaround really substitutes', async () => {
+		// A helper that exists but yields different classes would be a worse trap than no helper.
+		const m = mount(F.SidebarCase as never);
+		await settle();
+		try {
+			const button = m.container.querySelector('[data-slot="sidebar-menu-button"]')!;
+			for (const cls of sidebarMenuButtonVariants({ variant: 'default', size: 'default' }).split(
+				' ',
+			)) {
+				expect(button.className, cls).toContain(cls);
+			}
 		} finally {
 			m.unmount();
 		}

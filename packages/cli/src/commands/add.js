@@ -90,7 +90,8 @@ export default defineCommand({
 			} else {
 				const spinner = ctx.ui.spinner(`Installing ${toInstall.join(', ')}`);
 				const ran = await installPackages(ctx, project, toInstall, { dev: input.flags.dev });
-				spinner.stop(ran);
+				spinner.stop(ran.command);
+				if (ran.warnings.length > 0) ctx.ui.note('Do this by hand', ran.warnings);
 			}
 		}
 

@@ -13,6 +13,7 @@ import {
 } from '../../components/CoreApiDemo.tsrx';
 import { PortalEventDemo } from '../../components/PortalEventDemo.tsrx';
 import { ViewTransitionsDemo } from '../../components/ViewTransitionsDemo.tsrx';
+import { CommandSelector } from '../../components/PackageInstall.tsrx';
 
 <div className="doc-hero">
 	<p className="doc-eyebrow">Learn the essentials</p>
@@ -1155,6 +1156,13 @@ import { App } from './App.tsrx';
 
 const { html, css } = renderToString(App);
 ```
+
+For a direct SSG script outside Vite, preload the compiler for your runtime:
+
+<CommandSelector command="server-entry" />
+
+The preload compiles imported `.tsrx`/`.tsx` modules and plain TypeScript custom hooks in
+server mode.
 
 Put `html` in the page body and the deduplicated scoped `css` in `<head>`. The streaming
 APIs can send the shell first and reveal Suspense content as it becomes ready.

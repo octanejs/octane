@@ -36,10 +36,12 @@ const publishIndexUpdate = (index: number) => {
 export function Swiper({
 	data,
 	itemWidth = SystemInfo.pixelWidth / SystemInfo.pixelRatio,
+	duration,
 	easing,
 }: {
 	data: string[];
 	itemWidth?: number;
+	duration?: number;
 	easing?: EasingFunction;
 }) @{
 	const [current, setCurrent] = useState(0);
@@ -102,7 +104,7 @@ export function Swiper({
 		cancelAnimate();
 		const from = currentOffsetRef.current;
 		const to = calcNearestPage(from);
-		const duration = 3000;
+		const snapDuration = duration ?? 3000;
 		const ease = easing ?? easings.easeInOutQuad;
 
 		let startTs = 0;
@@ -112,8 +114,8 @@ export function Swiper({
 				startTs = Number(ts);
 			}
 			// make sure progress can reach 100%
-			if (ts - startTs <= duration + 100) {
-				const progress = Math.max(Math.min(((ts - startTs) * 100) / duration, 100), 0) / 100;
+			if (ts - startTs <= snapDuration + 100) {
+				const progress = Math.max(Math.min(((ts - startTs) * 100) / snapDuration, 100), 0) / 100;
 				const easedProgress = ease(progress);
 				updateOffset(from + (to - from) * easedProgress);
 				rafId = requestAnimationFrame(step);
