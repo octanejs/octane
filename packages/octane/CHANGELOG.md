@@ -1,5 +1,18 @@
 # octane
 
+## 0.1.27
+
+### Patch Changes
+
+- 46e1833: Keep freshly mounted Suspense content hidden when hydration resumes inside a hidden Activity.
+- 5a8e807: Keep hidden Activity DOM hidden when a descendant independently replaces its output.
+
+  State updates, error and Suspense retries, and accepted hot-module updates now reapply the nearest
+  hidden Activity's visibility after rendering. Replacement elements and text remain hidden until the
+  Activity reveals, while authored display and text values are restored correctly on reveal. Activity
+  and Suspense now share hide ownership for overlapping DOM, so either boundary can reveal first
+  without capturing the other's temporary hidden styles.
+
 ## 0.1.26
 
 ### Patch Changes
