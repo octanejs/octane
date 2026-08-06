@@ -806,10 +806,13 @@ describe('Pull request labels', () => {
 
 describe('Vercel preview workflow', () => {
 	const sha = 'a'.repeat(40);
+	const deploymentSha = 'd'.repeat(40);
+	const treeSha = 'e'.repeat(40);
 	const pull = {
 		number: 612,
 		state: 'open',
 		labels: [{ name: 'deploy-preview' }],
+		base: { sha: 'b'.repeat(40) },
 		head: {
 			sha,
 			ref: 'feature/preview-this',
@@ -840,6 +843,14 @@ describe('Vercel preview workflow', () => {
 			rest: {
 				pulls: { get: async () => ({ data: structuredClone(pullResponse) }) },
 				git: {
+					getCommit: async (input) => {
+						gitCalls.push({ operation: 'get-commit', ...input });
+						return { data: { sha, tree: { sha: treeSha } } };
+					},
+					createCommit: async (input) => {
+						gitCalls.push({ operation: 'create-commit', ...input });
+						return { data: { sha: deploymentSha, tree: { sha: input.tree } } };
+					},
 					getRef: async (input) => {
 						gitCalls.push({ operation: 'get', ...input });
 						if (currentRef === null) {
@@ -935,7 +946,10 @@ describe('Vercel preview workflow', () => {
 					action,
 					label: labelName ? { name: labelName } : undefined,
 					pull_request: { number: pullResponse.number },
+					sender: { id: 329182, login: 'leonidaz' },
 				},
+				runId: 1234,
+				runAttempt: 1,
 			},
 			{
 				notice: (message) => notices.push(message),
@@ -943,6 +957,10 @@ describe('Vercel preview workflow', () => {
 				warning: (message) => warnings.push(message),
 			},
 			class extends Date {
+				constructor(...args) {
+					super(...(args.length > 0 ? args : [now]));
+				}
+
 				static now() {
 					return now;
 				}
@@ -993,6 +1011,35 @@ describe('Vercel preview workflow', () => {
 		});
 
 		assert.deepEqual(
+			gitCalls.filter((call) => call.operation === 'create-commit'),
+			[
+				{
+					operation: 'create-commit',
+					owner: 'octanejs',
+					repo: 'octane',
+					message: [
+						'chore: deploy preview for #612',
+						'',
+						'Authorized-by: @leonidaz',
+						`Source: ${sha}`,
+						'Run: 1234/1',
+					].join('\n'),
+					tree: treeSha,
+					parents: [sha],
+					author: {
+						name: 'leonidaz',
+						email: '329182+leonidaz@users.noreply.github.com',
+						date: '1970-01-01T00:00:00.000Z',
+					},
+					committer: {
+						name: 'leonidaz',
+						email: '329182+leonidaz@users.noreply.github.com',
+						date: '1970-01-01T00:00:00.000Z',
+					},
+				},
+			],
+		);
+		assert.deepEqual(
 			gitCalls.filter((call) => call.operation === 'create'),
 			[
 				{
@@ -1000,32 +1047,10 @@ describe('Vercel preview workflow', () => {
 					owner: 'octanejs',
 					repo: 'octane',
 					ref: 'refs/heads/deploy-preview-pr-612',
-					sha,
+					sha: pull.base.sha,
 				},
 			],
 		);
-		assert.ok(
-			deploymentQueries
-				.filter((query) => query.operation === 'deployments')
-				.every((query) => query.sha === sha && query.per_page === 100),
-		);
-		assert.ok(writtenComments.every((comment) => comment.operation === 'update'));
-		assert.ok(writtenComments.every((comment) => comment.id === 71));
-		assert.match(writtenComments.at(-1).body, /via `deploy-preview-pr-612`/);
-		assert.match(writtenComments.at(-1).body, /https:\/\/website-preview\.vercel\.app/);
-		assert.match(writtenComments.at(-1).body, /https:\/\/mcp-preview\.vercel\.app/);
-		assert.match(writtenComments.at(-1).body, /SUCCESS/);
-		assert.deepEqual(failures, []);
-	});
-
-	test('moves an existing preview branch to the latest authorized SHA', async () => {
-		const previousSha = 'b'.repeat(40);
-		const { currentRef, gitCalls, failures } = await runPreview({
-			existingRef: previousSha,
-			deploymentSnapshots: [successfulDeployments],
-		});
-
-		assert.equal(currentRef, sha);
 		assert.deepEqual(
 			gitCalls.filter((call) => call.operation === 'update'),
 			[
@@ -1034,11 +1059,81 @@ describe('Vercel preview workflow', () => {
 					owner: 'octanejs',
 					repo: 'octane',
 					ref: 'heads/deploy-preview-pr-612',
-					sha,
+					sha: deploymentSha,
 					force: true,
 				},
 			],
 		);
+		assert.ok(
+			deploymentQueries
+				.filter((query) => query.operation === 'deployments')
+				.every((query) => query.sha === deploymentSha && query.per_page === 100),
+		);
+		assert.ok(writtenComments.every((comment) => comment.operation === 'update'));
+		assert.ok(writtenComments.every((comment) => comment.id === 71));
+		assert.match(writtenComments.at(-1).body, /via `deploy-preview-pr-612`/);
+		assert.match(writtenComments.at(-1).body, /deployment commit `ddddddd`/);
+		assert.match(writtenComments.at(-1).body, /https:\/\/website-preview\.vercel\.app/);
+		assert.match(writtenComments.at(-1).body, /https:\/\/mcp-preview\.vercel\.app/);
+		assert.match(writtenComments.at(-1).body, /SUCCESS/);
+		assert.deepEqual(failures, []);
+	});
+
+	test('moves an existing preview branch to a unique authorized deployment commit', async () => {
+		const previousSha = 'c'.repeat(40);
+		const { currentRef, gitCalls, failures } = await runPreview({
+			existingRef: previousSha,
+			deploymentSnapshots: [successfulDeployments],
+		});
+
+		assert.equal(currentRef, deploymentSha);
+		assert.deepEqual(
+			gitCalls.filter((call) => call.operation === 'update'),
+			[
+				{
+					operation: 'update',
+					owner: 'octanejs',
+					repo: 'octane',
+					ref: 'heads/deploy-preview-pr-612',
+					sha: deploymentSha,
+					force: true,
+				},
+			],
+		);
+		assert.deepEqual(failures, []);
+	});
+
+	test('re-emits a push when the preview branch already points at the source SHA', async () => {
+		const { currentRef, gitCalls, failures } = await runPreview({
+			existingRef: sha,
+			deploymentSnapshots: [successfulDeployments],
+		});
+
+		assert.equal(currentRef, deploymentSha);
+		assert.deepEqual(
+			gitCalls.filter((call) => call.operation === 'update'),
+			[
+				{
+					operation: 'update',
+					owner: 'octanejs',
+					repo: 'octane',
+					ref: 'heads/deploy-preview-pr-612',
+					sha: deploymentSha,
+					force: true,
+				},
+			],
+		);
+		assert.deepEqual(failures, []);
+	});
+
+	test('publishes a labeled preview when the pull request head matches its base', async () => {
+		const { currentRef, writtenComments, failures } = await runPreview({
+			pullResponse: { ...pull, base: { sha } },
+			deploymentSnapshots: [successfulDeployments],
+		});
+
+		assert.equal(currentRef, deploymentSha);
+		assert.match(writtenComments.at(-1).body, /SUCCESS/);
 		assert.deepEqual(failures, []);
 	});
 
@@ -1121,7 +1216,7 @@ describe('Vercel preview workflow', () => {
 		assert.match(vercelPreviewWorkflow, /^ {6}contents: write$/m);
 		assert.match(vercelPreviewWorkflow, /^ {6}deployments: read$/m);
 		assert.match(vercelPreviewWorkflow, /^ {6}issues: write$/m);
-		assert.match(vercelPreviewWorkflow, /^ {6}pull-requests: read$/m);
+		assert.match(vercelPreviewWorkflow, /^ {6}pull-requests: write$/m);
 		assert.match(
 			vercelPreviewWorkflow,
 			/^ {6}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \}\}$/m,
@@ -1129,6 +1224,8 @@ describe('Vercel preview workflow', () => {
 		assert.match(vercelPreviewWorkflow, /^ {6}cancel-in-progress: false$/m);
 		assert.match(vercelPreviewWorkflow, /BRANCH_PREFIX = "deploy-preview-pr-"/);
 		assert.match(vercelPreviewWorkflow, /github\.rest\.git\.createRef/);
+		assert.match(vercelPreviewWorkflow, /github\.rest\.git\.createCommit/);
+		assert.match(vercelPreviewWorkflow, /github\.rest\.git\.updateRef/);
 		assert.match(vercelPreviewWorkflow, /github\.rest\.repos\.listDeployments/);
 		assert.doesNotMatch(vercelPreviewWorkflow, /actions\/checkout/);
 		assert.doesNotMatch(vercelPreviewWorkflow, /VERCEL_/);
