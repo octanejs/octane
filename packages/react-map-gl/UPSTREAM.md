@@ -179,7 +179,11 @@ Four, two of them recorded in `audit/react-parity.json` and bound to a case:
    child layers with `cloneElement(child, {source: id})`. Octane cannot clone a
    compiled children block, so the id travels by context. Same override
    semantics; the id now reaches any descendant `<Layer>`, not only direct
-   children.
+   children. `ported:source-layer:3` pins the half both models share — a layer
+   inherits the generated id and an explicit `source` still loses to the
+   enclosing one — with a direct child, so it cannot observe the half where they
+   part. `tests/runtime/source-context.test.ts` mounts a layer below a wrapper
+   component, which is the shape `cloneElement` would have missed.
 2. **`react-map-gl-refs-as-props`** — `forwardRef` does not exist in Octane, so
    `Map`, `Marker`, `Popup` and `GeolocateControl` take `ref` as a plain prop.
    `<Map ref={mapRef} />` is unchanged for consumers.

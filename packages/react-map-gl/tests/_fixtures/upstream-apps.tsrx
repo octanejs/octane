@@ -124,11 +124,22 @@ export function SourceLayerMap(props: MapFixtureProps) @{
 	</Map>
 }
 
-/** Layer nested below a wrapper element rather than as a direct child. */
+function LayerWrapper(props: MapFixtureProps) @{
+	<>
+		<Layer {...props.layerProps} />
+	</>
+}
+
+/**
+ * The layer sits below a wrapper component instead of being a direct child of
+ * the source. This is the shape that separates the two id-injection models:
+ * upstream's `cloneElement` only reaches direct children, so it would leave this
+ * layer's source unset, while a context reaches any descendant.
+ */
 export function NestedLayerMap(props: MapFixtureProps) @{
 	<Map {...props}>
 		<Source {...props.sourceProps}>
-			<Layer {...props.layerProps} />
+			<LayerWrapper layerProps={props.layerProps} />
 		</Source>
 	</Map>
 }
