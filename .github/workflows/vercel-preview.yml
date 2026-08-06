@@ -1,9 +1,10 @@
 name: Vercel preview
 
 # Vercel's GitHub App understands Git refs, not pull request labels. A
-# maintainer-applied `deploy-preview` label publishes the pull request's current
-# head as a temporary branch in this repository. Vercel is configured to deploy
-# only that branch namespace and main, so the label is the authorization step.
+# maintainer-applied `deploy-preview` label publishes the pull request's exact
+# tree as a temporary branch in this repository, attributed to that maintainer.
+# Vercel deploys only that branch namespace and main, so the label is the
+# authorization step.
 on:
   pull_request_target:
     types: [labeled, unlabeled, closed]
@@ -20,13 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # `pull_request_target` loads this script from the trusted base branch. It
-    # never checks out or executes pull request code; contents:write only moves
-    # the one preview ref that asks the installed Vercel GitHub App to build.
+    # never checks out or executes pull request code; contents:write only creates
+    # a tree-identical deployment commit and moves the one preview ref that asks
+    # the installed Vercel GitHub App to build.
     permissions:
       contents: write
       deployments: read
       issues: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       - name: Publish preview branch and report Vercel deployments
@@ -82,6 +84,47 @@ jobs:
               core.setFailed(`Pull request #${number} has no deployable GitHub head.`);
               return;
             }
+            if (!pull.base?.sha) {
+              core.setFailed(`Pull request #${number} has no base SHA for the Vercel push.`);
+              return;
+            }
+            const authorizer = context.payload.sender;
+            if (!authorizer?.login || !authorizer.id) {
+              core.setFailed(`The ${LABEL} event does not identify its authorizing GitHub user.`);
+              return;
+            }
+
+            // Give every label-triggered deployment a unique commit while
+            // preserving the pull request's exact tree. Vercel uses the
+            // commit author for deployment authorization, so the maintainer
+            // who applied the label intentionally owns this synthetic commit.
+            const { data: sourceCommit } = await github.rest.git.getCommit({
+              owner,
+              repo,
+              commit_sha: pull.head.sha,
+            });
+            const authoredAt = new Date().toISOString();
+            const deploymentAuthor = {
+              name: authorizer.login,
+              email: `${authorizer.id}+${authorizer.login}@users.noreply.github.com`,
+              date: authoredAt,
+            };
+            const { data: deploymentCommit } = await github.rest.git.createCommit({
+              owner,
+              repo,
+              message: [
+                `chore: deploy preview for #${number}`,
+                "",
+                `Authorized-by: @${authorizer.login}`,
+                `Source: ${pull.head.sha}`,
+                `Run: ${context.runId}/${context.runAttempt}`,
+              ].join("\n"),
+              tree: sourceCommit.tree.sha,
+              parents: [pull.head.sha],
+              author: deploymentAuthor,
+              committer: deploymentAuthor,
+            });
+            const deploymentSha = deploymentCommit.sha;
 
             let existingRef = null;
             try {
@@ -92,26 +135,32 @@ jobs:
             }
 
             if (existingRef) {
-              if (existingRef.object.sha === pull.head.sha) {
-                core.notice(`${branch} already points at ${pull.head.sha}.`);
-              } else {
-                await github.rest.git.updateRef({
-                  owner,
-                  repo,
-                  ref,
-                  sha: pull.head.sha,
-                  force: true,
-                });
-                core.notice(`Updated ${branch} to ${pull.head.sha}.`);
-              }
+              await github.rest.git.updateRef({
+                owner,
+                repo,
+                ref,
+                sha: deploymentSha,
+                force: true,
+              });
+              core.notice(`Updated ${branch} to deployment commit ${deploymentSha}.`);
             } else {
+              // Vercel did not react when the API created the branch directly
+              // at the source SHA. Create it at trusted base code, then update
+              // it so the push-driven Git integration receives a ref update.
               await github.rest.git.createRef({
                 owner,
                 repo,
                 ref: `refs/${ref}`,
-                sha: pull.head.sha,
+                sha: pull.base.sha,
               });
-              core.notice(`Created ${branch} at ${pull.head.sha}.`);
+              await github.rest.git.updateRef({
+                owner,
+                repo,
+                ref,
+                sha: deploymentSha,
+                force: true,
+              });
+              core.notice(`Created ${branch} at deployment commit ${deploymentSha}.`);
             }
 
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -135,7 +184,7 @@ jobs:
               });
               return [
                 COMMENT_MARKER,
-                `Vercel previews for \`${pull.head.sha.slice(0, 7)}\` via \`${branch}\`:`,
+                `Vercel previews for \`${pull.head.sha.slice(0, 7)}\` via \`${branch}\` (deployment commit \`${deploymentSha.slice(0, 7)}\`):`,
                 "",
                 "| Project | Preview | Status |",
                 "| --- | --- | --- |",
@@ -171,7 +220,7 @@ jobs:
               const { data: deployments } = await github.rest.repos.listDeployments({
                 owner,
                 repo,
-                sha: pull.head.sha,
+                sha: deploymentSha,
                 per_page: 100,
               });
               return Promise.all(
@@ -222,7 +271,7 @@ jobs:
                   .map((result) =>
                     result.deployment
                       ? `${result.label}: ${result.status?.state ?? "no deployment status was reported"}`
-                      : `${result.label}: Vercel did not report a deployment for ${pull.head.sha}`,
+                      : `${result.label}: Vercel did not report a deployment for ${deploymentSha}`,
                   )
                   .join("\n"),
               );
