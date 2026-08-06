@@ -416,6 +416,24 @@ describe('@octanejs/rspeedy-plugin', () => {
 		);
 	});
 
+	it('selects the first-screen render mode per platform: engine on native, immediate on web', () => {
+		// Native must defer the first screen to __RenderPage so elements see the
+		// decoded PageConfig (#419). Lynx for Web never sends __RenderPage and has no
+		// config-gated overflow default, so deferring only couples the first screen
+		// to the readiness handshake for no benefit — it must paint immediately.
+		const nativeMode = applyPlugin(
+			undefined,
+			'lynx',
+			{},
+			{ app: ['./src/App.lynx.tsrx'] },
+		).plugins.get('@octanejs/rspeedy-plugin:first-screen-render')?.options[0];
+		const webMode = applyPlugin(undefined, 'web', {}, { app: ['./src/App.lynx.tsrx'] }).plugins.get(
+			'@octanejs/rspeedy-plugin:first-screen-render',
+		)?.options[0];
+		expect(nativeMode).toBe('engine');
+		expect(webMode).toBe('immediate');
+	});
+
 	it('removes hot-update entries when hmr is explicitly false in development', () => {
 		const state = applyPlugin(
 			{ hmr: false },

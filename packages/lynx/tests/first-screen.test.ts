@@ -84,6 +84,24 @@ const MainSingleHost = defineFirstScreenComponent('lynx', (props: { readonly id:
 	firstScreenValue(mainPlan, [firstScreenProps([['set', 'id', props.id]])]),
 );
 
+const feedPlan = firstScreenPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	bindings: [['id', 0]],
+	children: [
+		{
+			kind: 'host',
+			type: 'list',
+			bindings: [['id', 1]],
+			children: [{ kind: 'host', type: 'list-item', bindings: [['item-key', 2]] }],
+		},
+	],
+});
+
+const FeedScene = defineFirstScreenComponent('lynx', () =>
+	firstScreenValue(feedPlan, ['feed-shell', 'feed', 'row-0']),
+);
+
 interface FirstScreenLinkedRuntime {
 	useLinkedState?<Source, Value>(
 		source: Source,
@@ -624,6 +642,78 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		expect(dom.window.document.querySelector('#cleanup-retry')).toBeNull();
 		expect(main.firstScreenSnapshot()).toBeNull();
 		expect(inbound).toEqual([expect.objectContaining({ type: 'main-ready', request: 43 })]);
+	});
+
+	// A `<list>` is a documented element an application is entitled to use, and
+	// the background genuinely cannot adopt one: the platform materializes its
+	// rows through main-local callbacks and owns the resulting cells. Declining
+	// the synchronous paint is therefore an ordinary outcome, and must not be
+	// reported the way the broken host in the next test is.
+	it('declines a synchronous first screen holding a native list without faulting', () => {
+		// The renderer captures the flush when the runtime installs, so this has to
+		// wrap it before that; each flush reports the page as the batch left it.
+		const painted: string[] = [];
+		const { dom, main } = installEnvironment((target) => {
+			const hostFlush = target.__FlushElementTree as (...args: unknown[]) => void;
+			target.__FlushElementTree = (...args: unknown[]) => {
+				hostFlush.apply(target, args);
+				painted.push((args[0] as { innerHTML?: string } | undefined)?.innerHTML ?? '');
+			};
+		});
+		const inbound: LynxBackgroundInboundMessage[] = [];
+		mainContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+			inbound.push(event.data as LynxBackgroundInboundMessage);
+		});
+
+		expect(firstScreenRoot.render(FeedScene, {})).toBeNull();
+
+		// The tree really was built, then retired, so the background owns the page
+		// alone rather than rendering beneath a duplicate.
+		expect(painted.some((html) => html.includes('id="feed"'))).toBe(true);
+		expect(dom.window.document.querySelector('#feed')).toBeNull();
+		expect(dom.window.document.querySelector('#feed-shell')).toBeNull();
+		expect(main.firstScreenSnapshot()).toBeNull();
+		expect(main.diagnostics()).toEqual([]);
+
+		backgroundContext().dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'main-ready-request',
+				request: 51,
+			},
+		});
+		// Declining settles readiness immediately, exactly as an entry that never
+		// rendered a first screen does, so the background is not left waiting.
+		expect(inbound).toEqual([
+			expect.objectContaining({ type: 'main-ready', request: 0 }),
+			expect.objectContaining({ type: 'main-ready', request: 51 }),
+		]);
+	});
+
+	it('retries cleanup for a declined first screen instead of withholding readiness', () => {
+		let removalFailures = 0;
+		const { dom, main } = installEnvironment((target) => {
+			const remove = target.__RemoveElement as (parent: object, child: object) => unknown;
+			target.__RemoveElement = (parent: object, child: object) => {
+				if (removalFailures++ < 1) throw new Error('transient declined-source remove failure');
+				return remove(parent, child);
+			};
+		});
+		const inbound: LynxBackgroundInboundMessage[] = [];
+		mainContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+			inbound.push(event.data as LynxBackgroundInboundMessage);
+		});
+
+		expect(firstScreenRoot.render(FeedScene, {})).toBeNull();
+
+		// A removal that fails once and succeeds on retry is still an ordinary
+		// decline: the nodes come out and the background is released immediately.
+		expect(removalFailures).toBeGreaterThan(1);
+		expect(dom.window.document.querySelector('#feed-shell')).toBeNull();
+		expect(main.firstScreenSnapshot()).toBeNull();
+		expect(inbound).toEqual([expect.objectContaining({ type: 'main-ready', request: 0 })]);
 	});
 
 	it('retains a failed pre-capture source and retries cleanup for background readiness', () => {
