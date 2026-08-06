@@ -28,6 +28,17 @@ function LateContent() @{
 	</>
 }
 
+/** A marker whose content and class list are both driven from outside. */
+export function ToggleContentMarkerMap(props: MapProps & Record<string, any>) @{
+	<Map {...props}>
+		<Marker longitude={-122} latitude={38} ref={props.markerRef} className={props.markerClassName}>
+			@if (props.showContent) {
+				<span id="toggled-content">here</span>
+			}
+		</Marker>
+	</Map>
+}
+
 export function LateMarkerMap(props: MapProps & Record<string, any>) @{
 	<Map {...props}>
 		<Marker longitude={-122} latitude={38} ref={props.markerRef} onClick={props.onMarkerClick}>

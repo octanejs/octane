@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { act, mapboxgl, mount, settle } from '../_helpers';
-import { LateMarkerMap } from '../_fixtures/map-apps.tsrx';
+import { LateMarkerMap, ToggleContentMarkerMap } from '../_fixtures/map-apps.tsrx';
 import { MarkerMap } from '../_fixtures/upstream-apps.tsrx';
 
 const baseProps = (extra: Record<string, unknown>) => ({
@@ -54,6 +54,43 @@ describe('marker element', () => {
 			});
 			expect(clicks).toHaveLength(1);
 			expect((clicks[0] as any).target).toBe(markerRef.current);
+		} finally {
+			act(() => view.unmount());
+		}
+	});
+
+	it('carries class list changes across the rebuild', async () => {
+		const markerRef: { current: any } = { current: null };
+		const view = mount(
+			ToggleContentMarkerMap,
+			baseProps({ markerRef, showContent: false, markerClassName: 'pin' }) as any,
+		);
+		try {
+			await settle();
+			expect(markerRef.current.getElement().dataset.pin).toBe('default');
+
+			// A class toggled after mount, the way a consumer marks a selection.
+			view.update(
+				ToggleContentMarkerMap,
+				baseProps({ markerRef, showContent: false, markerClassName: 'pin selected' }) as any,
+			);
+			await settle();
+			expect(markerRef.current.getElement().classList.contains('selected')).toBe(true);
+
+			// Content arriving takes the element back, which builds a new marker.
+			// Everything the render body reconciles against the live instance heals
+			// itself; the class list is diffed against the previous props instead,
+			// which do not change on that render, so it has to be carried over.
+			view.update(
+				ToggleContentMarkerMap,
+				baseProps({ markerRef, showContent: true, markerClassName: 'pin selected' }) as any,
+			);
+			await settle();
+
+			const element = markerRef.current.getElement();
+			expect(element.querySelector('#toggled-content')).not.toBeNull();
+			expect(element.classList.contains('pin')).toBe(true);
+			expect(element.classList.contains('selected')).toBe(true);
 		} finally {
 			act(() => view.unmount());
 		}

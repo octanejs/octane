@@ -43,9 +43,6 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 	const { map, mapLib } = useContext(MapContext);
 	const thisRef = useRef({ props });
 
-	/** Mount-time props, matching upstream's `useMemo(..., [])` construction. */
-	const initialProps = useRef(props).current;
-
 	// The portal target, owned by the binding and stable for the component's
 	// whole life. It is deliberately never `marker.getElement()`: aimed there,
 	// content that arrives after mount lands inside Mapbox's own pin and both
@@ -57,14 +54,22 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 	}
 	const contentEl = contentRef.current;
 
+	// Built from the latest committed props, not the mount-time ones. Upstream
+	// constructs once and can safely read mount props; a rebuild here happens
+	// after arbitrary updates, and the render body below only heals options it
+	// compares against the live instance. `className` is diffed against the
+	// previous props instead, and those do not change on the rebuild render, so a
+	// marker rebuilt from mount props would silently drop every class toggled
+	// since — and then diff further toggles against the wrong baseline.
 	const createMarker = (ownElement: boolean): MarkerInstance => {
+		const current = thisRef.current.props;
 		const options = {
-			...initialProps,
+			...current,
 			element: ownElement ? contentEl : null,
 		};
 
 		const mk = new mapLib.Marker(options as unknown as MarkerOptions);
-		mk.setLngLat([initialProps.longitude, initialProps.latitude]);
+		mk.setLngLat([current.longitude, current.latitude]);
 
 		mk.on('dragstart', (e) => {
 			const evt = e as MarkerDragEvent;
@@ -92,7 +97,7 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 	// what the block actually rendered into `contentEl`, which it can only see
 	// once a commit has happened.
 	const [marker, setMarker] = useState<MarkerInstance>(() =>
-		createMarker(hasRenderableChildren(initialProps.children)),
+		createMarker(hasRenderableChildren(props.children)),
 	);
 
 	useEffect(() => {
