@@ -879,6 +879,44 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('runs host lifecycle callbacks for retained hosts a parent reorder moves', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const itemPlan = universalPlan('object', { kind: 'host', type: 'item', propsSlot: 0 });
+		const log: string[] = [];
+		const Item = defineUniversalComponent('object', ({ id }: { id: string }) =>
+			universalValue(itemPlan, [
+				universalProps([
+					['set', 'label', id],
+					['set', 'onUpdate', () => log.push(`update:${id}`)],
+				]),
+			]),
+		);
+		let apply!: (ids: string[]) => void;
+		const App = defineUniversalComponent('object', () => {
+			const [ids, setIds] = useState(['a', 'b', 'c'], 'ids');
+			apply = (next) => setIds(next);
+			return ids.map((id) => universalComponent('object', Item, { id }, id));
+		});
+
+		root.render(App, undefined);
+		const [itemA, itemB, itemC] = container.children;
+		expect(log).toEqual(['update:a', 'update:b', 'update:c']);
+		log.length = 0;
+
+		// Only item c physically moves; its committed lifecycle callback must
+		// observe the placement even though the item itself did not re-render.
+		flushUniversalSync(() => apply(['c', 'a', 'b']));
+		expect(container.children).toEqual([itemC, itemA, itemB]);
+		expect(log).toEqual(['update:c']);
+
+		log.length = 0;
+		flushUniversalSync(() => apply(['a', 'c', 'b']));
+		expect(container.children).toEqual([itemA, itemC, itemB]);
+		expect(log).toEqual(['update:a']);
+		root.unmount();
+	});
+
 	it('reveals initially suspended stateless content beside retained siblings on resolve', async () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

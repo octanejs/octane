@@ -8347,18 +8347,27 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			cleanup: (() => void) | null;
 		}[] = [];
 		const refAttaches: DraftRecord[] = [];
-		const hostDraftsById = new Map<number, DraftRecord>();
-		const lifecycleDrafts = new Set<DraftRecord>();
+		const lifecycleHosts = new Set<LogicalRecord>();
 		if ((treeFeatures & UNIVERSAL_TREE_LIFECYCLE) !== 0) {
+			const hostsById = new Map<number, LogicalRecord>();
 			walkDraft(draftRoot, (draft) => {
+				if (draft.retained === true) {
+					// A retained subtree re-renders nothing, but a reorder around it can
+					// still move its top-level hosts; their committed lifecycle
+					// callbacks must observe that placement like any drafted host's.
+					for (const host of physicalRecords(draft.record.children)) {
+						hostsById.set(host.id, host);
+					}
+					return;
+				}
 				if (draft.record.kind !== 'host') return;
-				hostDraftsById.set(draft.record.id, draft);
-				if (draft.isNew || draft.hostUpdate !== null) lifecycleDrafts.add(draft);
+				hostsById.set(draft.record.id, draft.record);
+				if (draft.isNew || draft.hostUpdate !== null) lifecycleHosts.add(draft.record);
 			});
 			for (const placement of placements) {
 				if (placement.op !== 'move') continue;
-				const draft = hostDraftsById.get(placement.id);
-				if (draft !== undefined) lifecycleDrafts.add(draft);
+				const host = hostsById.get(placement.id);
+				if (host !== undefined) lifecycleHosts.add(host);
 			}
 		}
 		if ((treeFeatures & UNIVERSAL_TREE_REF) !== 0) {
@@ -8567,10 +8576,16 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			}
 		};
-		const lifecycleOrder: DraftRecord[] = [];
-		if (lifecycleDrafts.size !== 0) {
+		const lifecycleOrder: LogicalRecord[] = [];
+		if (lifecycleHosts.size !== 0) {
 			walkDraftPostOrder(draftRoot, (draft) => {
-				if (lifecycleDrafts.has(draft)) lifecycleOrder.push(draft);
+				if (draft.retained === true) {
+					for (const host of physicalRecords(draft.record.children)) {
+						if (lifecycleHosts.has(host)) lifecycleOrder.push(host);
+					}
+					return;
+				}
+				if (lifecycleHosts.has(draft.record)) lifecycleOrder.push(draft.record);
 			});
 		}
 		const hasPassiveWork =
@@ -8824,8 +8839,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			},
 			() => {
 				const tasks: (() => void)[] = [];
-				for (const draft of lifecycleOrder) {
-					const record = draft.record;
+				for (const record of lifecycleOrder) {
 					for (const callback of record.lifecycles.values()) {
 						tasks.push(() =>
 							runOwnedCommit(callback.owner, () =>
