@@ -11,6 +11,23 @@ packages/shadcn/registry/
 # provenance; do not reformat)
 packages/*/upstream/
 packages/shadcn/tests/differential/upstream/
+# The framework-neutral half of @vis.gl/react-mapbox is reused byte-for-byte, so
+# an upstream bump stays a clean diff against packages/react-map-gl/upstream/.
+# Provenance and per-file hashes live in packages/react-map-gl/UPSTREAM.md.
+packages/react-map-gl/src/mapbox/
+packages/react-map-gl/src/types/common.ts
+packages/react-map-gl/src/types/events.ts
+packages/react-map-gl/src/types/internal.ts
+packages/react-map-gl/src/types/lib.ts
+packages/react-map-gl/src/types/style-spec.ts
+packages/react-map-gl/src/utils/assert.ts
+packages/react-map-gl/src/utils/compare-class-names.ts
+packages/react-map-gl/src/utils/deep-equal.ts
+packages/react-map-gl/src/utils/set-globals.ts
+packages/react-map-gl/src/utils/style-utils.ts
+packages/react-map-gl/src/utils/transform.ts
+# Upstream's own mapbox-gl mock, reused byte-for-byte by the component double.
+packages/react-map-gl/tests/_mocks/mapbox-gl-mock/
 # Vendored pinned upstream shadcn style sheet (byte-exact below its header)
 playground/octane/src/styles/style-nova.css
 **/dist/

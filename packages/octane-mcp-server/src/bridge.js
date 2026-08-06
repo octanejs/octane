@@ -58,6 +58,11 @@ export const KNOWN_BINDINGS = {
 	'@streamdown/cjk': '@octanejs/streamdown',
 	shadcn: '@octanejs/shadcn',
 	recharts: '@octanejs/recharts',
+	// react-map-gl@8 is a re-export shell; the binding covers the package its
+	// ./mapbox subpath resolves to, so both specifiers map here.
+	'react-map-gl': '@octanejs/react-map-gl',
+	'react-map-gl/mapbox': '@octanejs/react-map-gl',
+	'@vis.gl/react-mapbox': '@octanejs/react-map-gl',
 	'@react-three/fiber': '@octanejs/three',
 	'@visx/visx': '@octanejs/visx',
 	'@visx/a11y': '@octanejs/visx',
