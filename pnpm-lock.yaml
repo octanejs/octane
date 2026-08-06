@@ -5051,6 +5051,9 @@ importers:
       '@lynx-js/tasm':
         specifier: catalog:lynx
         version: 0.0.39
+      '@lynx-js/web-core':
+        specifier: catalog:lynx
+        version: 0.22.2(@lynx-js/css-serializer@0.1.6)(tslib@2.8.1)
       '@rsbuild/core':
         specifier: catalog:lynx
         version: 2.1.4(core-js@3.49.0)
@@ -5066,6 +5069,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.1
       typescript:
         specifier: catalog:lynx
         version: 5.9.3

@@ -263,6 +263,31 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
 	});
 
+	test('routes the Lynx Web host smoke through the existing Chromium build lane', () => {
+		const browserGlob = 'packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts';
+		const browserSpec = 'packages/rspeedy-plugin-octane/tests/browser/web-host.test.ts';
+		assert.ok(jobSource('test_shard').includes(`--exclude "${browserGlob}"`));
+
+		const heavyIntegration = jobSource('heavy_integration');
+		const packageBuildStart = heavyIntegration.indexOf('- lane: package-builds');
+		const nextLane = heavyIntegration.indexOf('- lane: eval-corpus', packageBuildStart);
+		assert.notEqual(packageBuildStart, -1);
+		assert.notEqual(nextLane, -1);
+		const packageBuildLane = heavyIntegration.slice(packageBuildStart, nextLane);
+		assert.match(packageBuildLane, /chromium: true/);
+		assert.ok(packageBuildLane.includes(browserSpec));
+
+		const projects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		assert.deepEqual(projects.get('rspeedy-plugin').test.include, [
+			'packages/rspeedy-plugin-octane/tests/**/*.test.ts',
+			`!${browserGlob}`,
+		]);
+		assert.equal(projects.get('rspeedy-plugin').test.exclude, undefined);
+		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
+	});
+
 	test('derives sharded projects generically from execution-group ownership', () => {
 		const projects = configureShardedProjects([
 			{ test: { name: 'ordinary', include: ['ordinary/**/*.test.ts'] } },
