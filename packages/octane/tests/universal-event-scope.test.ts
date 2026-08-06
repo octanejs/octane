@@ -696,6 +696,244 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('scopes a root-component state update and keeps untouched siblings live', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const pressPlan = universalPlan('object', { kind: 'host', type: 'presser', propsSlot: 0 });
+		const extraPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'extra',
+			bindings: [['value', 0]],
+		});
+		const log: string[] = [];
+		const Leaf = defineUniversalComponent('object', ({ id }: { id: string }) => {
+			const [count, setCount] = useState(0, 'count');
+			useLayoutEffect(
+				() => {
+					log.push(`leaf:${id}:mount`);
+					return () => log.push(`leaf:${id}:cleanup`);
+				},
+				[],
+				'leaf-effect',
+			);
+			return universalValue(pressPlan, [
+				universalProps([
+					['set', 'value', `${id}:${count}`],
+					['set', 'onPress', () => setCount((value) => value + 1)],
+				]),
+			]);
+		});
+		// State lives in the root component itself: the update has no smaller
+		// enclosing component, so the root range is the replay scope.
+		const App = defineUniversalComponent('object', () => {
+			const [count, setCount] = useState(0, 'count');
+			return [
+				universalValue(pressPlan, [
+					universalProps([
+						['set', 'value', `root:${count}`],
+						['set', 'onPress', () => setCount((value) => value + 1)],
+					]),
+				]),
+				count % 2 === 1 ? universalValue(extraPlan, ['expanded']) : null,
+				universalComponent('object', Leaf, { id: 'a' }, 'a'),
+				universalComponent('object', Leaf, { id: 'b' }, 'b'),
+			];
+		});
+
+		root.render(App, undefined);
+		const rootHost = container.children[0];
+		const leafA = container.children[1];
+		const leafB = container.children[2];
+		expect(rootHost.props.value).toBe('root:0');
+		expect(log).toEqual(['leaf:a:mount', 'leaf:b:mount']);
+
+		// A root-state structural update (the extra host appears and disappears)
+		// commits around the retained leaves without disturbing their identity.
+		flushUniversalSync(() => container.dispatchEvent(rootHost, 'press', {}));
+		expect(container.children.map((child) => child.type)).toEqual([
+			'presser',
+			'extra',
+			'presser',
+			'presser',
+		]);
+		expect(container.children[0]).toBe(rootHost);
+		expect(rootHost.props.value).toBe('root:1');
+		expect(container.children[2]).toBe(leafA);
+		expect(container.children[3]).toBe(leafB);
+
+		flushUniversalSync(() => container.dispatchEvent(rootHost, 'press', {}));
+		expect(rootHost.props.value).toBe('root:2');
+		expect(container.children).toEqual([rootHost, leafA, leafB]);
+
+		// Leaves kept their own state, handlers, and effects across the root
+		// replays they did not participate in, and their updates still land.
+		flushUniversalSync(() => container.dispatchEvent(leafB, 'press', {}));
+		expect(leafB.props.value).toBe('b:1');
+		expect(leafA.props.value).toBe('a:0');
+		flushUniversalSync(() => container.dispatchEvent(rootHost, 'press', {}));
+		flushUniversalSync(() => container.dispatchEvent(leafB, 'press', {}));
+		expect(leafB.props.value).toBe('b:2');
+		expect(rootHost.props.value).toBe('root:3');
+		expect(log).toEqual(['leaf:a:mount', 'leaf:b:mount']);
+
+		root.unmount();
+		expect(log.filter((entry) => entry === 'leaf:a:cleanup')).toHaveLength(1);
+		expect(log.filter((entry) => entry === 'leaf:b:cleanup')).toHaveLength(1);
+	});
+
+	it('re-renders unchanged-prop descendants when a context value they read changes', () => {
+		const Theme = createContext('light');
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const pressPlan = universalPlan('object', { kind: 'host', type: 'presser', propsSlot: 0 });
+		const labelPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'label',
+			bindings: [['value', 0]],
+		});
+		// The reader sits two components below the provider with stable props, so
+		// only the changed context value can force it to re-render.
+		const Reader = defineUniversalComponent('object', () => {
+			const theme = useContext(Theme);
+			return universalValue(labelPlan, [`theme:${theme}`]);
+		});
+		const Middle = defineUniversalComponent('object', () => universalComponent('object', Reader));
+		const App = defineUniversalComponent('object', () => {
+			const [theme, setTheme] = useState('light', 'theme');
+			return [
+				universalValue(pressPlan, [
+					universalProps([
+						['set', 'value', theme],
+						['set', 'onPress', () => setTheme((value) => (value === 'light' ? 'dark' : 'light'))],
+					]),
+				]),
+				universalContext(Theme, theme, [universalComponent('object', Middle)]),
+			];
+		});
+
+		root.render(App, undefined);
+		const toggle = container.children[0];
+		const label = container.children[1];
+		expect(label.props.value).toBe('theme:light');
+
+		flushUniversalSync(() => container.dispatchEvent(toggle, 'press', {}));
+		expect(container.children[1]).toBe(label);
+		expect(label.props.value).toBe('theme:dark');
+
+		flushUniversalSync(() => container.dispatchEvent(toggle, 'press', {}));
+		expect(label.props.value).toBe('theme:light');
+		root.unmount();
+	});
+
+	it('reorders and removes untouched stateful children from parent state', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const pressPlan = universalPlan('object', { kind: 'host', type: 'presser', propsSlot: 0 });
+		const log: string[] = [];
+		const Item = defineUniversalComponent('object', ({ id }: { id: string }) => {
+			const [count, setCount] = useState(0, 'count');
+			useLayoutEffect(
+				() => {
+					log.push(`item:${id}:mount`);
+					return () => log.push(`item:${id}:cleanup`);
+				},
+				[],
+				'item-effect',
+			);
+			return universalValue(pressPlan, [
+				universalProps([
+					['set', 'value', `${id}:${count}`],
+					['set', 'onPress', () => setCount((value) => value + 1)],
+				]),
+			]);
+		});
+		let apply!: (ids: string[]) => void;
+		const App = defineUniversalComponent('object', () => {
+			const [ids, setIds] = useState(['a', 'b', 'c'], 'ids');
+			apply = (next) => setIds(next);
+			return ids.map((id) => universalComponent('object', Item, { id }, id));
+		});
+
+		root.render(App, undefined);
+		const [itemA, itemB, itemC] = container.children;
+		flushUniversalSync(() => container.dispatchEvent(itemB, 'press', {}));
+		expect(itemB.props.value).toBe('b:1');
+
+		// The parent's own state reorders children it does not otherwise touch:
+		// each keeps its host identity, accumulated state, and handlers.
+		flushUniversalSync(() => apply(['c', 'a', 'b']));
+		expect(container.children).toEqual([itemC, itemA, itemB]);
+		flushUniversalSync(() => container.dispatchEvent(itemB, 'press', {}));
+		expect(itemB.props.value).toBe('b:2');
+		expect(log.filter((entry) => entry.endsWith('mount'))).toHaveLength(3);
+
+		// Removing an untouched child still runs its cleanup and frees its host.
+		flushUniversalSync(() => apply(['c', 'b']));
+		expect(container.children).toEqual([itemC, itemB]);
+		expect(log.filter((entry) => entry === 'item:a:cleanup')).toHaveLength(1);
+
+		// Re-adding mounts a fresh instance rather than resurrecting disposed state.
+		flushUniversalSync(() => apply(['c', 'b', 'a']));
+		expect(container.children[2].props.value).toBe('a:0');
+		expect(log.filter((entry) => entry === 'item:a:mount')).toHaveLength(2);
+		root.unmount();
+	});
+
+	it('reveals initially suspended stateless content beside retained siblings on resolve', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const bodyPlan = universalPlan('object', { kind: 'host', type: 'primary', propsSlot: 0 });
+		const fallbackPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'fallback',
+			bindings: [['value', 0]],
+		});
+		const labelPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'label',
+			bindings: [['value', 0]],
+		});
+		let resolveAsset!: (value: string) => void;
+		const asset = new Promise<string>((resolve) => {
+			resolveAsset = resolve;
+		});
+		// The suspended content carries no hook state and queues no updates, so
+		// its post-resolve replay is driven purely by the boundary retry. Nothing
+		// about its committed (fallback-arm) output may be adopted as-is.
+		const Asset = defineUniversalComponent('object', () => {
+			const value = use(asset);
+			return universalValue(bodyPlan, [universalProps([['set', 'value', value]])]);
+		});
+		const Sibling = defineUniversalComponent('object', () =>
+			universalValue(labelPlan, ['sibling']),
+		);
+		// The boundary lives inside a child component whose props never change, so
+		// the post-resolve replay reaches it through a claim that looks clean from
+		// above: exactly the shape where stale committed arms must not be adopted.
+		const Panel = defineUniversalComponent('object', () => [
+			universalTry(
+				() => universalComponent('object', Asset),
+				() => universalValue(fallbackPlan, ['pending']),
+				() => null,
+			),
+			universalComponent('object', Sibling),
+		]);
+		const App = defineUniversalComponent('object', () => universalComponent('object', Panel));
+
+		root.render(App, undefined);
+		expect(container.children.map((child) => child.type)).toEqual(['fallback', 'label']);
+		const sibling = container.children[1];
+
+		resolveAsset('loaded');
+		await asset;
+		for (let index = 0; index < 8; index++) await Promise.resolve();
+
+		expect(container.children.map((child) => child.type)).toEqual(['primary', 'label']);
+		expect(container.children[0].props.value).toBe('loaded');
+		expect(container.children[1]).toBe(sibling);
+		root.unmount();
+	});
+
 	it('rejects a nested priority change and still closes the outer scope', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

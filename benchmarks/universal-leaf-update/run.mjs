@@ -230,7 +230,61 @@ try {
 		];
 	});
 
+	const DirtyLeaf = defineUniversalComponent('object', ({ index, count }) =>
+		universalValue(textPlan, [`leaf-${index}-${count}`]),
+	);
+
 	const scenarios = [
+		{
+			// State in the root component itself: the root range is the replay
+			// scope, and every untouched leaf subtree is adopted without a
+			// re-render. Its regression signal is the clean/dirty ratio guard.
+			name: 'root-state-clean',
+			note: 'root-component state beside untouched leaves (retained subtrees)',
+			shell: ({ size }) => {
+				const [count, setCount] = useState(0, 'count');
+				return [
+					presser(`count-${count}`, () => setCount((value) => value + 1)),
+					...leafSiblings(size),
+				];
+			},
+			expectedLabel: (presses) => `count-${presses}`,
+			verify: (container, size, presses, failures) => {
+				const leaves = container.children.filter((child) => child.type === 'text');
+				if (
+					leaves.length !== size ||
+					leaves.some((leaf, index) => leaf.props.label !== `leaf-${index}`)
+				) {
+					failures.push(`root-state-clean-${size}: untouched leaves lost their labels`);
+				}
+			},
+		},
+		{
+			// Semantic control for root-state-clean: the same shape where every
+			// leaf's props genuinely change per press, so no subtree may be
+			// retained and each leaf must re-render.
+			name: 'root-state-dirty',
+			note: 'root-component state that rewrites every leaf prop each press',
+			shell: ({ size }) => {
+				const [count, setCount] = useState(0, 'count');
+				return [
+					presser(`count-${count}`, () => setCount((value) => value + 1)),
+					...Array.from({ length: size }, (_, index) =>
+						universalComponent('object', DirtyLeaf, { index, count }, `leaf-${index}`),
+					),
+				];
+			},
+			expectedLabel: (presses) => `count-${presses}`,
+			verify: (container, size, presses, failures) => {
+				const leaves = container.children.filter((child) => child.type === 'text');
+				if (
+					leaves.length !== size ||
+					leaves.some((leaf, index) => leaf.props.label !== `leaf-${index}-${presses}`)
+				) {
+					failures.push(`root-state-dirty-${size}: leaves did not track the count`);
+				}
+			},
+		},
 		{
 			name: 'list-item',
 			note: 'keyed @for item state hoisted to its list component',
@@ -321,6 +375,7 @@ try {
 			if (actualLabel !== expectedLabel) {
 				failures.push(`${scenario.name}-${size}: expected ${expectedLabel}, got ${actualLabel}`);
 			}
+			scenario.verify?.(container, size, presses, failures);
 			const stats = summarizeSamples(samples);
 			targets.push({
 				name: `${scenario.name}-siblings-${size}`,
