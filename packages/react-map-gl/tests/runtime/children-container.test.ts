@@ -62,11 +62,25 @@ describe('children container', () => {
 			markerProps: { longitude: -122, latitude: 38 },
 		} as any);
 		await settle();
-		expect(view.container.querySelector('[mapboxgl-children]')).not.toBeNull();
 
-		// The container is appended imperatively, so nothing else will collect it.
+		const mapContainer = view.container.querySelector(
+			'div[style*="position: relative"]',
+		) as HTMLElement;
+		const container = mapContainer.querySelector('[mapboxgl-children]') as HTMLElement;
+		expect(container).not.toBeNull();
+
 		view.unmount();
 		await settle();
-		expect(view.container.querySelector('[mapboxgl-children]')).toBeNull();
+
+		// Held by reference, not re-queried: unmount detaches the whole subtree, so
+		// asking `view.container` for the node afterwards answers null whether or
+		// not the effect cleaned up, and the assertion could not fail. What the
+		// binding actually owes is the `.remove()` in its own cleanup — the
+		// container is appended imperatively, so Octane never adopted it and will
+		// not collect it. That shows up as this node losing its parent while its
+		// former parent, the map div, still exists.
+		expect(mapContainer.isConnected).toBe(false);
+		expect(container.parentNode).toBeNull();
+		expect(mapContainer.querySelector('[mapboxgl-children]')).toBeNull();
 	});
 });

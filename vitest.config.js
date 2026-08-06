@@ -2691,6 +2691,11 @@ export default defineConfig({
 						'packages/react-map-gl/tests/upstream-util/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					// The hydration cases boot a real Vite SSR server, which is well past
+					// the default 5s on its own. Every project using renderHydrationFixture
+					// raises this.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],

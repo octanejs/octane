@@ -46,22 +46,25 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 	/** Mount-time props, matching upstream's `useMemo(..., [])` construction. */
 	const initialProps = useRef(props).current;
 
+	// The portal target, owned by the binding and stable for the component's
+	// whole life. It is deliberately never `marker.getElement()`: aimed there,
+	// content that arrives after mount lands inside Mapbox's own pin and both
+	// are drawn at once. Here, late content lands somewhere harmless and the
+	// marker can be rebuilt around it.
+	const contentRef = useRef<HTMLDivElement | null>(null);
+	if (contentRef.current === null) {
+		contentRef.current = document.createElement('div');
+	}
+	const contentEl = contentRef.current;
+
 	const createMarker = (ownElement: boolean): MarkerInstance => {
 		const options = {
 			...initialProps,
-			element: ownElement ? document.createElement('div') : null,
+			element: ownElement ? contentEl : null,
 		};
 
 		const mk = new mapLib.Marker(options as unknown as MarkerOptions);
 		mk.setLngLat([initialProps.longitude, initialProps.latitude]);
-
-		mk.getElement().addEventListener('click', (e: MouseEvent) => {
-			thisRef.current.props.onClick?.({
-				type: 'click',
-				target: mk,
-				originalEvent: e,
-			});
-		});
 
 		mk.on('dragstart', (e) => {
 			const evt = e as MarkerDragEvent;
@@ -84,17 +87,13 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 
 	// A `.tsrx` children block cannot be inspected without evaluating it, and
 	// evaluating it here would run any hooks inside it a second time and collide
-	// on their call-site slots. So the marker starts with a binding-owned
-	// element, and if the block turns out to render nothing — an `@if` that is
-	// false at mount — it is rebuilt with Mapbox's default pin, which is what
-	// upstream produces for a falsy child. Without this a conditional pin that
-	// starts hidden leaves an empty element and the marker is invisible.
-	const ownsElement = useRef(false);
-	const [marker, setMarker] = useState<MarkerInstance>(() => {
-		const hasChildren = hasRenderableChildren(initialProps.children);
-		ownsElement.current = hasChildren;
-		return createMarker(hasChildren);
-	});
+	// on their call-site slots. Upstream asks `React.Children.forEach` whether it
+	// was handed anything truthy; the binding has to infer the same answer from
+	// what the block actually rendered into `contentEl`, which it can only see
+	// once a commit has happened.
+	const [marker, setMarker] = useState<MarkerInstance>(() =>
+		createMarker(hasRenderableChildren(initialProps.children)),
+	);
 
 	useEffect(() => {
 		marker.addTo(map.getMap());
@@ -104,16 +103,54 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 		};
 	}, [marker]);
 
+	// Upstream binds this once and lets the listener die with the element. The
+	// port can swap the marker underneath, and `contentEl` outlives that swap, so
+	// binding per marker instance would stack a second listener on the same node
+	// and fire `onClick` twice.
 	useEffect(() => {
-		if (!ownsElement.current) return;
 		const element = marker.getElement();
-		// Portal anchors are comments, so `children`/`textContent` are what say
-		// whether the block actually rendered anything.
-		if (element.children.length > 0 || (element.textContent ?? '').trim() !== '') return;
+		const handleClick = (e: MouseEvent) => {
+			thisRef.current.props.onClick?.({
+				type: 'click',
+				target: marker,
+				originalEvent: e,
+			});
+		};
 
-		ownsElement.current = false;
-		setMarker(createMarker(false));
-	}, []);
+		element.addEventListener('click', handleClick);
+		return () => element.removeEventListener('click', handleClick);
+	}, [marker]);
+
+	// Reconcile the guess above with what the block really rendered. A block that
+	// produced nothing hands the pin back to Mapbox, which is what upstream draws
+	// for a falsy child — otherwise a conditional pin that starts hidden leaves an
+	// empty element and the marker is invisible. Content that shows up later
+	// takes the element back, because upstream would have given a marker with
+	// truthy children its own element from the start.
+	useEffect(() => {
+		if (marker.getElement() === contentEl) {
+			if (!hasRenderedContent(contentEl)) {
+				setMarker(createMarker(false));
+			}
+			return undefined;
+		}
+
+		if (hasRenderedContent(contentEl)) {
+			setMarker(createMarker(true));
+			return undefined;
+		}
+
+		// Children can render on their own schedule — a component whose first
+		// paint waits on an effect, a fetch, or a transition — and that never
+		// re-renders `Marker`, so there is no render to observe it from.
+		const observer = new MutationObserver(() => {
+			if (hasRenderedContent(contentEl)) {
+				setMarker(createMarker(true));
+			}
+		});
+		observer.observe(contentEl, { childList: true, subtree: true, characterData: true });
+		return () => observer.disconnect();
+	}, [marker]);
 
 	const {
 		longitude,
@@ -163,5 +200,13 @@ export const Marker = memo(function Marker(props: MarkerProps) {
 	}
 
 	thisRef.current.props = props;
-	return createPortal(props.children, marker.getElement());
+	return createPortal(props.children, contentEl);
 });
+
+/**
+ * Portal anchors are comments, so elements and text are what say whether a
+ * children block rendered anything at all.
+ */
+function hasRenderedContent(element: HTMLElement): boolean {
+	return element.children.length > 0 || (element.textContent ?? '').trim() !== '';
+}

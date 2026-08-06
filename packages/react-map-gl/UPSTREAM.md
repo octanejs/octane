@@ -173,7 +173,7 @@ lane remains open work.
 
 ## Divergences
 
-Three, two of them recorded in `audit/react-parity.json` and bound to a case:
+Four, two of them recorded in `audit/react-parity.json` and bound to a case:
 
 1. **`react-map-gl-source-id-by-context`** — upstream delivers a `<Source>` id to
    child layers with `cloneElement(child, {source: id})`. Octane cannot clone a
@@ -188,6 +188,21 @@ Three, two of them recorded in `audit/react-parity.json` and bound to a case:
    released one drain later. This is an Octane runtime property rather than a
    binding behavior and no parity lane observes it, so it is deliberately not a
    manifest divergence; it is pinned by `tests/runtime/lifecycle.test.ts`.
+4. **`Marker` element chosen from rendered output** — upstream asks
+   `React.Children.forEach` whether it was handed a truthy child and, if so,
+   gives the marker its own element to portal into. A `.tsrx` children block is
+   an opaque render function, and evaluating it to look inside would re-run any
+   hooks it contains against the same call-site slots, so the binding infers the
+   answer from what the block rendered instead. It portals into an element it
+   owns from the first render — never `marker.getElement()`, or content arriving
+   late would land inside Mapbox's pin and both would draw — and rebuilds the
+   marker once the answer is known, in either direction. Same result as upstream
+   for a block that renders something and for one that renders nothing, and for
+   content that appears after mount. It differs for a child that is truthy but
+   renders nothing for the component's whole life: upstream leaves an empty
+   custom element, so the marker is invisible, and the port draws the default
+   pin. Pinned by `tests/runtime/marker-element.test.ts` and, against real
+   React, by `differential:6`.
 
 ## Regenerating
 
