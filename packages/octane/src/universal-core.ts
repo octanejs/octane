@@ -926,6 +926,10 @@ interface RenderAttempt {
 	// renders need every owner re-executed for their own bookkeeping.
 	retainEligible: boolean;
 	retainedCount: number;
+	// Owners scheduled into this attempt plus their ancestor chains. A candidate
+	// subtree whose root appears here contains scheduled work, so it must
+	// re-render even when its props, updates queues, and contexts look clean.
+	dirtyOwners: ReadonlySet<UniversalOwnerRecord> | null;
 }
 
 const UNIVERSAL_TREE_PORTAL = 1 << 0;
@@ -2185,6 +2189,7 @@ function materializeComponentValue(
 		record !== undefined &&
 		record.mounted &&
 		!record.disposed &&
+		!(attempt.dirtyOwners?.has(record) ?? false) &&
 		record.visibility === 'visible' &&
 		parent.visibility === 'visible' &&
 		record.componentProps !== null &&
@@ -5400,6 +5405,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private scheduledFullRoot = false;
 	private readonly scheduledOwners = new Set<UniversalOwnerRecord>();
 	private scheduledPreparationDepth = 0;
+	// Captured by prepare() from the scheduled-owner set it consumes, so the
+	// attempts it spawns know which committed subtrees carry scheduled work.
+	private attemptDirtyOwners: Set<UniversalOwnerRecord> | null = null;
+	private attemptFullRootScheduled = false;
 	private readonly scheduledTransitionBatches = new Set<UniversalTransitionBatch>();
 	private readonly unattemptedTransitionBatches = new Set<UniversalTransitionBatch>();
 	private eventScopeDepth = 0;
@@ -6492,6 +6501,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 							replay.entries,
 							replay.transitionBatches,
 							replay.transitionRender,
+							false,
 						);
 					} catch (error) {
 						const batches = new Set(replay.transitionBatches);
@@ -6529,6 +6539,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				replay.entries,
 				replay.transitionBatches,
 				replay.transitionRender,
+				false,
 			);
 		} catch (error) {
 			const batches = new Set(replay.transitionBatches);
@@ -6856,6 +6867,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			// attempt, which is exactly the retain-eligible shape.
 			retainEligible: true,
 			retainedCount: 0,
+			dirtyOwners: this.attemptDirtyOwners,
 		};
 		ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
 		CURRENT_UNIVERSAL_WARM = null;
@@ -7024,6 +7036,29 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				? this.resolveScopedTarget()
 				: undefined;
 		const scheduledUrgent = this.scheduledUrgent || this.scheduledPreparationDepth === 0;
+		// Scheduling is not always a hook update: a boundary invalidation (resolved
+		// thenable, routed error, Activity reveal) re-renders its owner with an
+		// empty update queue. Capture every scheduled owner and its ancestors so
+		// retained-subtree adoption never serves a scheduled subtree's stale
+		// output, and never retain at all when a full-root refresh was demanded.
+		this.attemptFullRootScheduled = this.scheduledFullRoot;
+		let dirtyOwners: Set<UniversalOwnerRecord> | null = null;
+		if (this.scheduledOwners.size !== 0) {
+			dirtyOwners = new Set();
+			for (const owner of this.scheduledOwners) {
+				for (
+					let current: UniversalOwnerRecord | null = owner;
+					current !== null;
+					current = current.parent
+				) {
+					// Chains converge: stopping at the first shared ancestor keeps the
+					// total walk near the scheduled-owner count, not count × depth.
+					if (dirtyOwners.has(current)) break;
+					dirtyOwners.add(current);
+				}
+			}
+		}
+		this.attemptDirtyOwners = dirtyOwners;
 		this.scheduledUrgent = false;
 		this.scheduledFullRoot = false;
 		this.scheduledOwners.clear();
@@ -7103,6 +7138,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		replayEntries: readonly SuspendedMemoEntry[],
 		transitionBatches: ReadonlySet<UniversalTransitionBatch>,
 		transitionRender: boolean,
+		// A queued replay re-renders content a boundary retained while suspended;
+		// its attempt must rebuild that content even where inputs look unchanged.
+		allowRetain = true,
 	): UniversalPreparedAttempt {
 		if (this.unmounted || this.unmounting) {
 			throw new Error('Cannot render an unmounted universal root.');
@@ -7152,12 +7190,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			// context read tracking, remote commit protocols); only a plain urgent
 			// local attempt may adopt committed subtrees without re-rendering them.
 			retainEligible:
+				allowRetain &&
 				this.transport === null &&
 				this.bridge === null &&
+				!this.attemptFullRootScheduled &&
 				replayEntries.length === 0 &&
 				transitionBatches.size === 0 &&
 				!transitionRender,
 			retainedCount: 0,
+			dirtyOwners: this.attemptDirtyOwners,
 		};
 		// A nested universal root is a separate render attempt. Do not let the
 		// caller's active component plans or speculative cache leak into it; child

@@ -879,6 +879,61 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('reveals initially suspended stateless content beside retained siblings on resolve', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const bodyPlan = universalPlan('object', { kind: 'host', type: 'primary', propsSlot: 0 });
+		const fallbackPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'fallback',
+			bindings: [['value', 0]],
+		});
+		const labelPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'label',
+			bindings: [['value', 0]],
+		});
+		let resolveAsset!: (value: string) => void;
+		const asset = new Promise<string>((resolve) => {
+			resolveAsset = resolve;
+		});
+		// The suspended content carries no hook state and queues no updates, so
+		// its post-resolve replay is driven purely by the boundary retry. Nothing
+		// about its committed (fallback-arm) output may be adopted as-is.
+		const Asset = defineUniversalComponent('object', () => {
+			const value = use(asset);
+			return universalValue(bodyPlan, [universalProps([['set', 'value', value]])]);
+		});
+		const Sibling = defineUniversalComponent('object', () =>
+			universalValue(labelPlan, ['sibling']),
+		);
+		// The boundary lives inside a child component whose props never change, so
+		// the post-resolve replay reaches it through a claim that looks clean from
+		// above: exactly the shape where stale committed arms must not be adopted.
+		const Panel = defineUniversalComponent('object', () => [
+			universalTry(
+				() => universalComponent('object', Asset),
+				() => universalValue(fallbackPlan, ['pending']),
+				() => null,
+			),
+			universalComponent('object', Sibling),
+		]);
+		const App = defineUniversalComponent('object', () => universalComponent('object', Panel));
+
+		root.render(App, undefined);
+		expect(container.children.map((child) => child.type)).toEqual(['fallback', 'label']);
+		const sibling = container.children[1];
+
+		resolveAsset('loaded');
+		await asset;
+		for (let index = 0; index < 8; index++) await Promise.resolve();
+
+		expect(container.children.map((child) => child.type)).toEqual(['primary', 'label']);
+		expect(container.children[0].props.value).toBe('loaded');
+		expect(container.children[1]).toBe(sibling);
+		root.unmount();
+	});
+
 	it('rejects a nested priority change and still closes the outer scope', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());
