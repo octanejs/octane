@@ -175,6 +175,7 @@ export function useNumberFieldState(...args: any[]): NumberFieldState {
 		subSlot(slot, 'number'),
 	);
 	let [initialValue] = useState(numberValue, subSlot(slot, 'initial'));
+	const providedFormatOptions = formatOptions;
 	// Normalize parser rounding options before linked-source comparison or formatting.
 	let [numberParser, normalizedFormatOptions] = useMemo(
 		() => {
@@ -206,7 +207,14 @@ export function useNumberFieldState(...args: any[]): NumberFieldState {
 				return '';
 			}
 
-			let options = source.formatOptions;
+			// React formats initial currencies before their parser normalizes rounding digits.
+			let options =
+				previous === undefined &&
+				providedFormatOptions?.style === 'currency' &&
+				providedFormatOptions.minimumFractionDigits == null &&
+				providedFormatOptions.maximumFractionDigits == null
+					? providedFormatOptions
+					: source.formatOptions;
 			if (previous !== undefined) {
 				const numberingSystem = numberParser.getNumberingSystem(previous.value);
 				options = { ...source.formatOptions, numberingSystem };

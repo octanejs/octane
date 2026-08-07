@@ -157,4 +157,61 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		);
 		d.unmount();
 	});
+
+	it.each([
+		['USD', '$12.25', '12.25'],
+		['JPY', '¥10', '10'],
+		['BHD', 'BHD\u00a012.270', '12.27'],
+		['KWD', 'KWD\u00a012.270', '12.27'],
+	] as const)(
+		'useNumberFieldState: %s rounding increments retain the same minor units as pinned react-stately',
+		async (currency, formattedValue, parsedValue) => {
+			const d = await mountDifferential(
+				FIXTURE,
+				'NumberFieldCurrencyRoundingSpec',
+				{ currency },
+				CACHE,
+			);
+
+			try {
+				await d.step('initial currency formatting retains ISO minor units', (octane, react) => {
+					expect(react.find('#currency-input').textContent).toBe(formattedValue);
+					expect(react.find('#currency-parsed').textContent).toBe(parsedValue);
+					expect(octane.find('#currency-input').textContent).toBe(formattedValue);
+					expect(octane.find('#currency-parsed').textContent).toBe(parsedValue);
+				});
+			} finally {
+				d.unmount();
+			}
+		},
+	);
+
+	it.each([
+		['USD', '$10'],
+		['JPY', '¥10'],
+		['BHD', 'BHD\u00a010'],
+		['KWD', 'KWD\u00a010'],
+	] as const)(
+		'useNumberFieldState: changing to %s rounding options retains pinned react-stately source-update behavior',
+		async (currency, formattedValue) => {
+			const d = await mountDifferential(
+				FIXTURE,
+				'NumberFieldCurrencyRoundingSpec',
+				{ currency, locale: 'en-US-u-ca-gregory', initiallyFormatted: false },
+				CACHE,
+			);
+
+			try {
+				await d.step('unformatted initial value', () => {});
+				await d.step('currency options change after initial mount', async (octane, react) => {
+					await octane.click('#currency-enable');
+					await react.click('#currency-enable');
+					expect(react.find('#currency-input').textContent).toBe(formattedValue);
+					expect(octane.find('#currency-input').textContent).toBe(formattedValue);
+				});
+			} finally {
+				d.unmount();
+			}
+		},
+	);
 });

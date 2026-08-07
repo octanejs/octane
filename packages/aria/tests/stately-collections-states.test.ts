@@ -285,6 +285,9 @@ describe('@octanejs/aria/stately — useNumberFieldState', () => {
 		[{ roundingIncrement: 5, maximumFractionDigits: 2 }, '12.25', '12.25'],
 		[{ roundingIncrement: 25, minimumFractionDigits: 2 }, '12.25', '12.25'],
 		[{ style: 'currency', currency: 'USD', roundingIncrement: 5 }, '$10', '10'],
+		[{ style: 'currency', currency: 'JPY', roundingIncrement: 5 }, '¥10', '10'],
+		[{ style: 'currency', currency: 'BHD', roundingIncrement: 5 }, 'BHD\u00a010', '10'],
+		[{ style: 'currency', currency: 'KWD', roundingIncrement: 5 }, 'KWD\u00a010', '10'],
 		[
 			{ style: 'currency', currency: 'USD', roundingIncrement: 5, minimumFractionDigits: 2 },
 			'$12.25',

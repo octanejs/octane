@@ -152,3 +152,35 @@ export function NumberFieldStateSpec() {
 		<output id="number-parsed">{String(state.numberValue) as string}</output>
 	</div>;
 }
+
+export function NumberFieldCurrencyRoundingSpec(props: {
+	currency: string;
+	locale?: string;
+	initiallyFormatted?: boolean;
+}) {
+	const [formatOptions, setFormatOptions] = useState(
+		props.initiallyFormatted === false
+			? undefined
+			: { style: 'currency' as const, currency: props.currency, roundingIncrement: 5 },
+	);
+	const state = useNumberFieldState({
+		value: 12.27,
+		locale: props.locale ?? 'en-US',
+		formatOptions,
+	});
+
+	return <div>
+		<button
+			id="currency-enable"
+			onClick={() => setFormatOptions({
+				style: 'currency',
+				currency: props.currency,
+				roundingIncrement: 5,
+			})}
+		>
+			enable
+		</button>
+		<output id="currency-input">{state.inputValue as string}</output>
+		<output id="currency-parsed">{String(state.numberValue) as string}</output>
+	</div>;
+}
