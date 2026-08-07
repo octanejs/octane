@@ -103,7 +103,9 @@
     },
     "./package.json": "./package.json"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/default-entry/client.js"
+  ],
   "scripts": {
     "test": "cd ../.. && vitest run --project tanstack-start"
   },
