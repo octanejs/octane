@@ -605,6 +605,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Public-import reachability (Node-only): builds and executes isolated
+		// production feature entries, then compares raw/gzip/brotli bytes with
+		// explicit same-run budget targets through the committed ratio guards.
+		name: 'bundle-reachability',
+		cwd: 'bundle-size',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run-minimal.mjs', args: () => [] }],
+	},
+	{
 		// Three host lifecycle work in a production browser: Octane Three against
 		// R3F 9.6.1 and a direct plain-Three lower bound. The injected renderer
 		// deliberately excludes GPU/driver time while retaining real Three objects,

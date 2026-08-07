@@ -1,5 +1,245 @@
 [
   {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "capture-only",
+    "reference": "capture-only-budget",
+    "maxRatio": 1,
+    "note": "Early public hydration-event capture without the client runtime; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "capture-only",
+    "reference": "capture-only-budget",
+    "maxRatio": 1,
+    "note": "Early public hydration-event capture without the client runtime; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "capture-only",
+    "reference": "capture-only-budget",
+    "maxRatio": 1,
+    "note": "Early public hydration-event capture without the client runtime; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "root-static-specialized",
+    "reference": "root-static-specialized-budget",
+    "maxRatio": 1,
+    "note": "A disposable top-level imported root with compiler-proven root specialization; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-static-specialized",
+    "reference": "root-static-specialized-budget",
+    "maxRatio": 1,
+    "note": "A disposable top-level imported root with compiler-proven root specialization; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-static-specialized",
+    "reference": "root-static-specialized-budget",
+    "maxRatio": 1,
+    "note": "A disposable top-level imported root with compiler-proven root specialization; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "root-static",
+    "reference": "root-static-budget",
+    "maxRatio": 1,
+    "note": "An escaped reusable root with public render and unmount semantics; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-static",
+    "reference": "root-static-budget",
+    "maxRatio": 1,
+    "note": "An escaped reusable root with public render and unmount semantics; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-static",
+    "reference": "root-static-budget",
+    "maxRatio": 1,
+    "note": "An escaped reusable root with public render and unmount semantics; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "hooks-state",
+    "reference": "hooks-state-budget",
+    "maxRatio": 1,
+    "note": "Interactive state, delegated events, effect execution, and cleanup; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "hooks-state",
+    "reference": "hooks-state-budget",
+    "maxRatio": 1,
+    "note": "Interactive state, delegated events, effect execution, and cleanup; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "hooks-state",
+    "reference": "hooks-state-budget",
+    "maxRatio": 1,
+    "note": "Interactive state, delegated events, effect execution, and cleanup; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "context",
+    "reference": "context-budget",
+    "maxRatio": 1,
+    "note": "A public context provider with a live consumer update; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "context",
+    "reference": "context-budget",
+    "maxRatio": 1,
+    "note": "A public context provider with a live consumer update; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "context",
+    "reference": "context-budget",
+    "maxRatio": 1,
+    "note": "A public context provider with a live consumer update; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "hydrate-root",
+    "reference": "hydrate-root-budget",
+    "maxRatio": 1,
+    "note": "Public hydration with server-node identity and an interactive update; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "hydrate-root",
+    "reference": "hydrate-root-budget",
+    "maxRatio": 1,
+    "note": "Public hydration with server-node identity and an interactive update; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "hydrate-root",
+    "reference": "hydrate-root-budget",
+    "maxRatio": 1,
+    "note": "Public hydration with server-node identity and an interactive update; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "deferred-hydration",
+    "reference": "deferred-hydration-budget",
+    "maxRatio": 1,
+    "note": "Interaction-triggered public deferred hydration and replay; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "deferred-hydration",
+    "reference": "deferred-hydration-budget",
+    "maxRatio": 1,
+    "note": "Interaction-triggered public deferred hydration and replay; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "deferred-hydration",
+    "reference": "deferred-hydration-budget",
+    "maxRatio": 1,
+    "note": "Interaction-triggered public deferred hydration and replay; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "suspense-transition",
+    "reference": "suspense-transition-budget",
+    "maxRatio": 1,
+    "note": "Public async Suspense recovery and a transition update; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "suspense-transition",
+    "reference": "suspense-transition-budget",
+    "maxRatio": 1,
+    "note": "Public async Suspense recovery and a transition update; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "suspense-transition",
+    "reference": "suspense-transition-budget",
+    "maxRatio": 1,
+    "note": "Public async Suspense recovery and a transition update; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-vanilla",
+    "reference": "binding-vanilla-budget",
+    "maxRatio": 1,
+    "note": "The isolated public Zustand vanilla entry without the Octane runtime; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-vanilla",
+    "reference": "binding-vanilla-budget",
+    "maxRatio": 1,
+    "note": "The isolated public Zustand vanilla entry without the Octane runtime; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-vanilla",
+    "reference": "binding-vanilla-budget",
+    "maxRatio": 1,
+    "note": "The isolated public Zustand vanilla entry without the Octane runtime; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-hooks",
+    "reference": "binding-hooks-budget",
+    "maxRatio": 1,
+    "note": "The public Zustand hook binding with a real vanilla store and update; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-hooks",
+    "reference": "binding-hooks-budget",
+    "maxRatio": 1,
+    "note": "The public Zustand hook binding with a real vanilla store and update; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-hooks",
+    "reference": "binding-hooks-budget",
+    "maxRatio": 1,
+    "note": "The public Zustand hook binding with a real vanilla store and update; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
     "suite": "universal-leaf-update",
     "op": "leaf_update_ms",
     "target": "siblings-4000",
