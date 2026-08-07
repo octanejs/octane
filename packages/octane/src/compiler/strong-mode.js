@@ -1249,6 +1249,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					calleeBinding?.kind === 'callback'
 				) {
 					visitCallback(calleeBinding.node, calleeBinding.scope, executionPhase);
+				} else if (
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					(calleeBinding?.kind === 'callback-choice' ||
+						callee?.type === 'SequenceExpression' ||
+						callee?.type === 'ConditionalExpression' ||
+						callee?.type === 'LogicalExpression')
+				) {
+					visitSynchronousHookCallback(callee, scope, executionPhase);
 				}
 				return;
 			}

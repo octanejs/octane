@@ -148,6 +148,51 @@ export function App() @{
 	});
 
 	it.each([
+		['sequence-selected setters', '(props.trace, setCount)(count + 1);'],
+		['conditional setters', '(props.enabled ? setCount : (value) => value)(count + 1);'],
+		['logically selected setters', '(props.update ?? setCount)(count + 1);'],
+		[
+			'named sequence-selected setters',
+			'const selected = (props.trace, setCount); selected(count + 1);',
+		],
+		[
+			'aliased sequence-selected callback bodies',
+			'const selected = (props.trace, () => setCount(count + 1)); const alias = selected; alias();',
+		],
+		[
+			'named logical callback choices',
+			'const selected = props.update || setCount; selected(count + 1);',
+		],
+		[
+			'sequence-selected state tuple updaters',
+			'const tuple = useState(0); (props.trace, tuple[1])(1);',
+		],
+	])('rejects immediately invoked %s', (_label, setup) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it('rejects ref writes from immediately invoked selected callback bodies', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  const selected = (props.trace, () => { ref.current = 1; });
+  selected();
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
+	it.each([
 		[
 			'named function declarations',
 			'function apply() { setCount(count + 1); } useMemo(apply, [count]);',
@@ -1221,6 +1266,48 @@ export function App() @{
 		)}`;
 
 		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it.each([
+		['sequence-selected setters', '(props.trace, setCount)(1);'],
+		[
+			'aliased callback choices',
+			'const selected = (props.trace, () => setCount(1)); const alias = selected; alias();',
+		],
+		['conditional setters', '(props.enabled ? setCount : (value) => value)(1);'],
+	])('rejects immediately invoked %s during effect setup', (_label, invocation) => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [, setCount] = useState(0);
+  useEffect(() => { ${invocation} }, []);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it('keeps selected callbacks legal after async render and effect work has yielded', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [, setCount] = useState(0);
+  (async () => {
+    await Promise.resolve();
+    const selected = (props.trace, setCount);
+    selected(1);
+    (props.enabled ? setCount : () => {})(1);
+  })();
+  useEffect(() => {
+    (async () => {
+      await Promise.resolve();
+      (props.trace, setCount)(1);
+    })();
+  }, []);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('allows cleanup callbacks and asynchronous state updates from effects', () => {
