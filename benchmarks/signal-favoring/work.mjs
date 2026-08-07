@@ -75,38 +75,38 @@ const GATES = {
 	},
 	'octane-jsx': {
 		mount: {
-			maxFullSlotCalls: 101,
+			maxFullSlotCalls: 11,
 			maxSlotCalls: 101,
-			max: { renderBlock: 201, componentSlot: 101, childSlot: 109, createElement: 200 },
+			max: { renderBlock: 21, componentSlot: 11, childSlot: 19, createElement: 20 },
 		},
 		bump_shallow: {
-			maxFullSlotCalls: 100,
-			maxSlotCalls: 100,
-			max: { renderBlock: 200, componentSlot: 100, childSlot: 99, createElement: 199 },
-			exact: { setText: 1 },
-		},
-		bump_middle: {
-			maxFullSlotCalls: 50,
-			maxSlotCalls: 50,
-			max: { renderBlock: 100, componentSlot: 50, childSlot: 49, createElement: 99 },
-			exact: { setText: 1 },
-		},
-		bump_deep: {
 			maxFullSlotCalls: 10,
-			maxSlotCalls: 10,
+			maxSlotCalls: 100,
 			max: { renderBlock: 20, componentSlot: 10, childSlot: 9, createElement: 19 },
 			exact: { setText: 1 },
 		},
+		bump_middle: {
+			maxFullSlotCalls: 5,
+			maxSlotCalls: 50,
+			max: { renderBlock: 10, componentSlot: 5, childSlot: 4, createElement: 9 },
+			exact: { setText: 1 },
+		},
+		bump_deep: {
+			maxFullSlotCalls: 1,
+			maxSlotCalls: 10,
+			max: { renderBlock: 2, componentSlot: 1, childSlot: 0, createElement: 1 },
+			exact: { setText: 1 },
+		},
 		bump_batched: {
-			maxFullSlotCalls: 100,
+			maxFullSlotCalls: 10,
 			maxSlotCalls: 100,
-			max: { renderBlock: 200, componentSlot: 100, childSlot: 99, createElement: 199 },
+			max: { renderBlock: 20, componentSlot: 10, childSlot: 9, createElement: 19 },
 			exact: { setText: 10 },
 		},
 		unmount: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
-			max: { unmountBlock: 201, unmountScope: 201 },
+			max: { unmountBlock: 21, unmountScope: 111 },
 		},
 	},
 };
