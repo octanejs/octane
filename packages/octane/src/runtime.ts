@@ -4806,8 +4806,22 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 	// detaches before its component descendants' cleanups (React's pre-order
 	// deletion walk).
 	if (block.deoptNode !== null) detachDeoptTreeRefs(block.deoptNode, null);
+	// This block's own range removal below takes every node inside it, so the
+	// descendants it encloses do not each have to detach their own DOM first:
+	// that is thousands of redundant removeChild calls on a deep route teardown,
+	// all of them on nodes the single range removal would take anyway. Same
+	// reasoning (and the same `detachDom: false`) as the batched list clears.
+	// Features whose DOM lives OUTSIDE the range still self-detach: portals force
+	// `true` in the slot walk, and a `createPortal` value hole tears down through
+	// teardownPortalState.
+	const removesEnclosingRange =
+		detachDom &&
+		((block.startMarker !== null &&
+			block.endMarker !== null &&
+			block.startMarker.parentNode !== null) ||
+			block.kind === 'root');
 	// Depth-first cleanup of all scopes reachable from this block.
-	unmountScope(block, detachDom);
+	unmountScope(block, removesEnclosingRange ? false : detachDom);
 	if (!detachDom) return;
 	// Remove DOM range.
 	if (block.startMarker && block.endMarker) {

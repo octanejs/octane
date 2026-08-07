@@ -841,7 +841,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) — the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
+    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) \u2014 the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
   },
   {
     "suite": "tanstack-start",
@@ -857,7 +857,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) — per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
+    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) \u2014 per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
   },
   {
     "suite": "tanstack-start",
@@ -898,5 +898,21 @@
     "reference": "octane-tsrx",
     "maxRatio": 1.5,
     "note": "Metaframework-overhead guard: the vite-plugin + adapter-cloudflare worker vs the raw octane worker measured 1.06x cold on 2026-07-20 (38ms vs 36ms). A breach means the app-core/adapter layer grew a workerd cold-start cost, independent of the renderer."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "nav_teardown",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.6,
+    "note": "Same-run 1024-leaf route teardown, gated on the shell surviving by node identity. Every block used to detach its own DOM range even when an enclosing range removal was about to take it, which measured 2.17x solid; detaching once measures 1.07x (0.60 against 0.50). The 1.6 ceiling leaves browser noise headroom on a sub-millisecond op while still failing if the per-block detach returns."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "nav_deep",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.4,
+    "note": "Same-run full route swap: 1024-leaf teardown plus 1024-leaf mount, measured 0.99x (2.00 against 2.10). The ceiling protects the navigation path as a whole, so a teardown regression that hides behind a mount improvement still fails."
   }
 ]
