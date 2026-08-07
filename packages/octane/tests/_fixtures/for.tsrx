@@ -571,3 +571,90 @@ export function NestedConditionalTransition(props: {
 		}
 	</div>
 }
+
+interface NestedReorderGroup {
+	id: number;
+	label: string;
+	rows: SelectionRow[];
+}
+
+export function NestedKeyedReorderList(props: {
+	groups: NestedReorderGroup[];
+	onPick: (groupId: number, rowId: number) => void;
+}) @{
+	const onPick = props.onPick;
+	<section id="nested-keyed-reorder-list">
+		@for (const group of props.groups; key group.id) {
+			<article class="nested-reorder-group" data-reorder-group={group.id}>
+				<h3>{group.label as string}</h3>
+				<ul>
+					@for (const row of group.rows; key row.id) {
+						<li class="nested-reorder-row" data-reorder-row={row.id}>
+							<button
+								type="button"
+								onClick={() => onPick(group.id, row.id)}
+							>{row.label as string}</button>
+						</li>
+					}
+				</ul>
+			</article>
+		}
+	</section>
+}
+
+export function NestedKeyedReorderBoundary(props: {
+	groups: NestedReorderGroup[];
+	onPick: (groupId: number, rowId: number) => void;
+}) @{
+	@try {
+		<NestedKeyedReorderList groups={props.groups} onPick={props.onPick} />
+	} @pending {
+		<span id="nested-reorder-pending">{'loading'}</span>
+	} @catch (error, reset) {
+		<button id="nested-reorder-retry" onClick={reset}>{(error as Error).message as string}</button>
+	}
+}
+
+function NestedKeyedReorderValue(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span id="nested-reorder-transition-value">{value as string}</span>
+}
+
+export function NestedKeyedReorderTransition(props: {
+	initialGroups: NestedReorderGroup[];
+	nextGroups: NestedReorderGroup[];
+	initialPromise: Promise<string>;
+	nextPromise: Promise<string>;
+	onPick: (groupId: number, rowId: number) => void;
+}) @{
+	const [groups, setGroups] = useState(props.initialGroups);
+	const [resource, setResource] = useState(props.initialPromise);
+	<div>
+		<button
+			id="nested-reorder-transition-start"
+			onClick={() => startTransition(() => {
+				setGroups(props.nextGroups);
+				setResource(props.nextPromise);
+			})}
+		>{'reorder'}</button>
+		<button
+			id="nested-reorder-transition-urgent"
+			onClick={() => setGroups(
+				props.nextGroups.map(
+					(group) => ({
+						...group,
+						rows: group.rows.map((row) => ({ ...row })),
+					}),
+				),
+			)}
+		>{'reorder urgently'}</button>
+		@try {
+			<>
+				<NestedKeyedReorderList groups={groups} onPick={props.onPick} />
+				<NestedKeyedReorderValue promise={resource} />
+			</>
+		} @pending {
+			<span id="nested-reorder-transition-pending">{'loading'}</span>
+		}
+	</div>
+}
