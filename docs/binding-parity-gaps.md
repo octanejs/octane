@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 53 binding package(s).**
+**0 active pin(s) across 54 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -38,6 +38,7 @@ surface and evidence.
 | `@octanejs/radix` | 0 |
 | `@octanejs/rainbowkit` | 0 |
 | `@octanejs/react-error-boundary` | 0 |
+| `@octanejs/react-map-gl` | 0 |
 | `@octanejs/recharts` | 0 |
 | `@octanejs/redux` | 0 |
 | `@octanejs/redux-toolkit` | 0 |

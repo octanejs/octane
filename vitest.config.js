@@ -2592,6 +2592,126 @@ export default defineConfig({
 					],
 				},
 			},
+			// @vis.gl/react-mapbox's five framework-neutral util specs run BYTE-EXACT
+			// from the vendored tree, once against upstream's own source and once
+			// against the modules this port reuses. Both lanes passing is what backs
+			// the "reused verbatim" claim in UPSTREAM.md; the pristine lane alone
+			// would only prove upstream still works.
+			...['pristine', 'adapted'].map((lane) => ({
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: `react-map-gl-upstream-${lane}`,
+					include: [`packages/react-map-gl/tests/upstream-util/${lane}.test.ts`],
+					environment: 'jsdom',
+					globals: false,
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^tape-promise\/tape$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/react-map-gl/tests/_harness/tape-adapter.ts',
+							),
+						},
+						{
+							find: /^@vis\.gl\/react-mapbox\/(.*)$/,
+							replacement:
+								resolve(
+									import.meta.dirname,
+									lane === 'pristine'
+										? 'packages/react-map-gl/upstream/src'
+										: 'packages/react-map-gl/src',
+								) + '/$1.ts',
+						},
+					],
+				},
+			})),
+			{
+				test: {
+					name: 'react-map-gl-ssr',
+					include: ['packages/react-map-gl/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/react-map-gl$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-map-gl/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// The same fixture through Octane and the PUBLISHED @vis.gl/react-mapbox
+				// 8.1.2 on real React — resolved from node_modules so the octane
+				// plugin never touches the oracle. Its own project because the
+				// React-side precompile does not belong to the ordinary suite.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-map-gl-differential',
+					include: ['packages/react-map-gl/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/react-map-gl/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/react-map-gl$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-map-gl/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// The ported @vis.gl/react-mapbox suite owns tests/upstream/**; the
+				// remaining files are Octane-only conformance for behavior the
+				// upstream suite cannot observe, so they stay in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-map-gl/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'react-map-gl',
+					include: ['packages/react-map-gl/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/react-map-gl/tests/differential/**/*.test.ts',
+						'packages/react-map-gl/tests/ssr/**/*.test.ts',
+						// Owned by the two upstream-util lanes, which alias
+						// @vis.gl/react-mapbox at their own source tree.
+						'packages/react-map-gl/tests/upstream-util/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// The hydration cases boot a real Vite SSR server, which is well past
+					// the default 5s on its own. Every project using renderHydrationFixture
+					// raises this.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/react-map-gl$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-map-gl/src/index.ts'),
+						},
+					],
+				},
+			},
 			{
 				test: {
 					name: 'sonner',

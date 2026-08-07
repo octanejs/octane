@@ -281,6 +281,14 @@ catalogs:
     lexical: 0.46.0
     lighthouse: 13.4.1
     lucide-react: 1.24.0
+    # Pinned to the release @vis.gl/react-mapbox 8.1.2 develops and tests
+    # against, so the port's oracle cannot drift with the registry.
+    mapbox-gl: 3.9.0
+    # Required by upstream's own vendored mapbox-gl mock, which the port reuses.
+    '@mapbox/point-geometry': 1.1.0
+    # The React oracle for the differential lane: the published binding this
+    # package ports, at the pinned release.
+    '@vis.gl/react-mapbox': 8.1.2
     '@phosphor-icons/react': 2.1.10
     motion: ^12.42.2
     motion-dom: ^12.0.0

@@ -331,6 +331,22 @@
       "verified": "2026-07-29"
     },
     {
+      "name": "@octanejs/react-map-gl",
+      "version": "0.0.1",
+      "category": "Data-heavy screens",
+      "upstream": { "package": "@vis.gl/react-mapbox", "version": "8.1.2 (b1e46fcf)" },
+      "surface": "Complete against the pinned @vis.gl/react-mapbox 8.1.2 public surface — the package react-map-gl/mapbox re-exports: Map (and default), Marker, Popup, Source, Layer, AttributionControl, FullscreenControl, GeolocateControl, NavigationControl, ScaleControl, useControl, MapProvider, useMap, and every published type. The framework-neutral half of upstream (the Mapbox engine, proxy transform, map ref, and six utils) is reused byte-for-byte and validated by upstream's own specs run against both source trees.",
+      "divergences": [
+        "<Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did.",
+        "Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged.",
+        "Effect cleanups run on the passive drain after root.unmount() rather than inside it, so the map's WebGL context and worker pool are released one drain later.",
+        "Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream.",
+        "react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope."
+      ],
+      "ssr": "Supported and tested: Map server-renders its container with the merged style and omits every child, because mapbox-gl is only imported inside an effect. Nothing in the tree reads a browser global on the server. hydrateRoot adopts that container rather than replacing it, and the map is created inside the server's own node once the library resolves.",
+      "verified": "2026-08-06"
+    },
+    {
       "name": "@octanejs/recharts",
       "version": "0.1.26",
       "category": "Data-heavy screens",
@@ -807,6 +823,7 @@
     "@tanstack/react-virtual": "@octanejs/tanstack-virtual",
     "@testing-library/react": "@octanejs/testing-library",
     "@tiptap/react": "@octanejs/tiptap",
+    "@vis.gl/react-mapbox": "@octanejs/react-map-gl",
     "@visx/a11y": "@octanejs/visx",
     "@visx/a11y/react": "@octanejs/visx",
     "@visx/a11y/server": "@octanejs/visx",
@@ -871,6 +888,8 @@
     "react-error-boundary": "@octanejs/react-error-boundary",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",
+    "react-map-gl": "@octanejs/react-map-gl",
+    "react-map-gl/mapbox": "@octanejs/react-map-gl",
     "react-redux": "@octanejs/redux",
     "react-router": "@octanejs/remix-router",
     "react-router-dom": "@octanejs/remix-router",
