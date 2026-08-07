@@ -638,6 +638,87 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
+	it.each([
+		['immutable false aliases', 'const disabled = false; useState(disabled && setCount);'],
+		[
+			'chained immutable false aliases',
+			'const disabled = false; const alias = disabled; useState(alias && setCount);',
+		],
+		['immutable true aliases', 'const enabled = true; useState(enabled || setCount);'],
+		['immutable null aliases', 'const missing = null; useState(missing && setCount);'],
+		['immutable undefined aliases', 'const missing = undefined; useState(missing && setCount);'],
+		['immutable empty-string aliases', "const empty = ''; useState(empty && setCount);"],
+		['immutable numeric aliases', 'const zero = 0; useState(zero && setCount);'],
+		[
+			'immutable object aliases',
+			'const value = {}; useState(value ?? setCount); useState(value || setCount);',
+		],
+		['immutable array aliases', 'const value = []; useState(value || setCount);'],
+		[
+			'nested non-null callback choices',
+			'const safe = (value) => value; useState((safe ?? setCount) || setCount);',
+		],
+		[
+			'conditional callbacks on logical AND left operands',
+			'const selected = props.enabled ? setCount : false; useState(selected && (() => count));',
+		],
+		[
+			'inline callbacks on logical AND left operands',
+			'useState((props.enabled ? setCount : false) && (() => count));',
+		],
+		[
+			'nested callbacks on logical AND left operands',
+			'useState((props.enabled && setCount) && (() => count));',
+		],
+		[
+			'comparator choices on logical AND left operands',
+			'useLinkedState(count, (value) => value, { sourceEqual: (props.enabled ? setCount : false) && Object.is });',
+		],
+		[
+			'option choices on logical AND left operands',
+			'const selected = props.enabled ? { sourceEqual: setCount } : false; useLinkedState(count, (value) => value, selected && { sourceEqual: Object.is });',
+		],
+		[
+			'spread option choices on logical AND left operands',
+			'const selected = props.enabled ? { sourceEqual: setCount } : false; useLinkedState(count, (value) => value, { ...(selected && { sourceEqual: Object.is }) });',
+		],
+		[
+			'ref-writing callbacks behind immutable false aliases',
+			'const disabled = false; useState(disabled && (() => { ref.current = 1; return 0; }));',
+		],
+	])('accepts logically unreachable synchronous callbacks from %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useRef, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const ref = useRef(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['falsy immutable OR aliases', 'const disabled = false; useState(disabled || setCount);'],
+		['nullish immutable fallback aliases', 'const missing = null; useState(missing ?? setCount);'],
+		['truthy immutable AND aliases', 'const enabled = true; useState(enabled && setCount);'],
+		[
+			'mutable aliases',
+			'let disabled = false; disabled = props.enabled; useState(disabled && setCount);',
+		],
+	])('continues rejecting reachable callbacks behind %s', (_label, setup) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
 	it('reports logical callback violations in TypeScript and editor diagnostics', () => {
 		const source = `"use strong";
 import { useMemo, useState } from 'octane';

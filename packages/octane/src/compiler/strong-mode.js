@@ -14,6 +14,10 @@ const TRANSPARENT_EXPRESSIONS = new Set([
 	'TSSatisfiesExpression',
 	'TSTypeAssertion',
 ]);
+const NULLISH_VALUE = 1;
+const FALSY_VALUE = 2;
+const TRUTHY_VALUE = 4;
+const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
 const SKIP_KEYS = new Set([
 	'type',
 	'start',
@@ -662,9 +666,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					value?.kind === 'callback' ||
 					value?.kind === 'callback-choice' ||
 					value?.kind === 'linked-options' ||
-					value?.kind === 'linked-key'
+					value?.kind === 'linked-key' ||
+					value?.kind === 'constant'
 				) {
 					target.bindings.set(declaration.id.name, value);
+				} else if (value == null && initial.name === 'undefined') {
+					target.bindings.set(declaration.id.name, { kind: 'constant', value: NULLISH_VALUE });
 				}
 			} else if (declarationKind === 'const' && FUNCTION_TYPES.has(initial?.type)) {
 				target.bindings.set(declaration.id.name, { kind: 'callback', node: initial, scope });
@@ -696,6 +703,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					node: initial,
 					scope,
 				});
+			} else if (declarationKind === 'const') {
+				const value = staticExpressionValue(initial, scope);
+				if (value !== UNKNOWN_VALUE) {
+					target.bindings.set(declaration.id.name, { kind: 'constant', value });
+				}
 			}
 		}
 		visit(declaration.init, scope, phase);
@@ -724,48 +736,106 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
-	function logicalExpressionBranches(expression, scope) {
-		const left = unwrap(expression.left);
-		let truthy;
-		let nullish;
-		if (left?.type === 'Literal') {
-			truthy = Boolean(left.value);
-			nullish = left.value == null;
+	function staticExpressionValue(value, scope) {
+		const expression = unwrap(value);
+		if (expression?.type === 'Literal') {
+			return expression.value == null
+				? NULLISH_VALUE
+				: expression.value
+					? TRUTHY_VALUE
+					: FALSY_VALUE;
 		} else if (
-			FUNCTION_TYPES.has(left?.type) ||
-			left?.type === 'ObjectExpression' ||
-			left?.type === 'ArrayExpression' ||
-			stateTupleUpdater(left, scope)
+			FUNCTION_TYPES.has(expression?.type) ||
+			expression?.type === 'ObjectExpression' ||
+			expression?.type === 'ArrayExpression' ||
+			stateTupleUpdater(expression, scope)
 		) {
-			truthy = true;
-			nullish = false;
-		} else if (left?.type === 'Identifier') {
-			const binding = resolve(scope, left.name);
-			if (binding == null && left.name === 'undefined') {
-				truthy = false;
-				nullish = true;
-			} else if (
+			return TRUTHY_VALUE;
+		} else if (expression?.type === 'Identifier') {
+			const binding = resolve(scope, expression.name);
+			if (binding == null && expression.name === 'undefined') return NULLISH_VALUE;
+			if (binding?.kind === 'constant') return binding.value;
+			if (
 				binding?.kind === 'callback' ||
 				binding?.kind === 'setter' ||
 				binding?.kind === 'ref' ||
 				binding?.kind === 'state-tuple' ||
-				(binding?.kind === 'linked-options' && unwrap(binding.node)?.type === 'ObjectExpression') ||
 				binding?.kind === 'linked-key' ||
 				binding?.kind === 'hook' ||
 				binding?.kind === 'namespace'
 			) {
-				truthy = true;
-				nullish = false;
+				return TRUTHY_VALUE;
 			}
+			if (binding?.kind === 'callback-choice' || binding?.kind === 'linked-options') {
+				if (activeCallbacks.has(binding.node)) return UNKNOWN_VALUE;
+				activeCallbacks.add(binding.node);
+				try {
+					return staticExpressionValue(binding.node, binding.scope);
+				} finally {
+					activeCallbacks.delete(binding.node);
+				}
+			}
+		} else if (expression?.type === 'LogicalExpression') {
+			const left = staticExpressionValue(expression.left, scope);
+			if (expression.operator === '??') {
+				return (
+					(left & (FALSY_VALUE | TRUTHY_VALUE)) |
+					((left & NULLISH_VALUE) !== 0 ? staticExpressionValue(expression.right, scope) : 0)
+				);
+			}
+			if (expression.operator === '||') {
+				return (
+					(left & TRUTHY_VALUE) |
+					((left & (NULLISH_VALUE | FALSY_VALUE)) !== 0
+						? staticExpressionValue(expression.right, scope)
+						: 0)
+				);
+			}
+			if (expression.operator === '&&') {
+				return (
+					(left & (NULLISH_VALUE | FALSY_VALUE)) |
+					((left & TRUTHY_VALUE) !== 0 ? staticExpressionValue(expression.right, scope) : 0)
+				);
+			}
+		} else if (expression?.type === 'ConditionalExpression') {
+			const test = staticExpressionValue(expression.test, scope);
+			return (
+				((test & TRUTHY_VALUE) !== 0 ? staticExpressionValue(expression.consequent, scope) : 0) |
+				((test & (NULLISH_VALUE | FALSY_VALUE)) !== 0
+					? staticExpressionValue(expression.alternate, scope)
+					: 0)
+			);
+		} else if (expression?.type === 'UnaryExpression' && expression.operator === 'void') {
+			return NULLISH_VALUE;
+		} else if (expression?.type === 'UnaryExpression' && expression.operator === '!') {
+			const argument = staticExpressionValue(expression.argument, scope);
+			return (
+				((argument & TRUTHY_VALUE) !== 0 ? FALSY_VALUE : 0) |
+				((argument & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? TRUTHY_VALUE : 0)
+			);
 		}
+		return UNKNOWN_VALUE;
+	}
+
+	function logicalExpressionBranches(expression, scope) {
+		const left = staticExpressionValue(expression.left, scope);
 		if (expression.operator === '??') {
-			return nullish === true ? 2 : nullish === false ? 1 : 3;
+			return (
+				((left & (FALSY_VALUE | TRUTHY_VALUE)) !== 0 ? 1 : 0) |
+				((left & NULLISH_VALUE) !== 0 ? 2 : 0)
+			);
 		}
 		if (expression.operator === '||') {
-			return truthy === true ? 1 : truthy === false ? 2 : 3;
+			return (
+				((left & TRUTHY_VALUE) !== 0 ? 1 : 0) |
+				((left & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? 2 : 0)
+			);
 		}
 		if (expression.operator === '&&') {
-			return truthy === true ? 2 : truthy === false ? 1 : 3;
+			return (
+				((left & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? 1 : 0) |
+				((left & TRUTHY_VALUE) !== 0 ? 2 : 0)
+			);
 		}
 		return 3;
 	}
@@ -781,7 +851,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return true;
 		} else if (callback?.type === 'LogicalExpression') {
 			const branches = logicalExpressionBranches(callback, scope);
-			if ((branches & 1) !== 0) visitSynchronousHookCallback(callback.left, scope, phase);
+			if ((branches & 1) !== 0 && callback.operator !== '&&') {
+				visitSynchronousHookCallback(callback.left, scope, phase);
+			}
 			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.right, scope, phase);
 			return true;
 		} else if (callback?.type === 'Identifier') {
@@ -822,7 +894,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (callback?.type === 'LogicalExpression') {
 			const branches = logicalExpressionBranches(callback, scope);
 			return (
-				((branches & 1) !== 0 && synchronousCallbackExpression(callback.left, scope)) ||
+				((branches & 1) !== 0 &&
+					callback.operator !== '&&' &&
+					synchronousCallbackExpression(callback.left, scope)) ||
 				((branches & 2) !== 0 && synchronousCallbackExpression(callback.right, scope))
 			);
 		}
@@ -856,6 +930,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			const branches = logical ? logicalExpressionBranches(options, scope) : 3;
 			return (
 				((branches & 1) !== 0 &&
+					(!logical || options.operator !== '&&') &&
 					linkedStateOptionsExpression(logical ? options.left : options.consequent, scope)) ||
 				((branches & 2) !== 0 &&
 					linkedStateOptionsExpression(logical ? options.right : options.alternate, scope))
@@ -895,7 +970,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (options.type === 'ConditionalExpression' || options.type === 'LogicalExpression') {
 				const logical = options.type === 'LogicalExpression';
 				const branches = logical ? logicalExpressionBranches(options, scope) : 3;
-				const first = logical ? options.left : options.consequent;
+				const first =
+					logical && options.operator === '&&' ? null : logical ? options.left : options.consequent;
 				const second = logical ? options.right : options.alternate;
 				if (branches !== 3) {
 					visitLinkedStateComparators(
