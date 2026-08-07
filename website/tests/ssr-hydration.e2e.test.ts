@@ -61,6 +61,7 @@ const ROUTES = [
 	'/docs/core-apis',
 	'/docs/tsrx-vs-tsx',
 	'/docs/differences-from-react',
+	'/docs/lynx',
 	'/docs/react-compat',
 	'/docs/profiling',
 	'/docs/bindings',
@@ -479,6 +480,18 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			);
 		};
 
+		// CodeMirror only mounts the lines around its scroll position, and the
+		// probes leave a pane deep in the document. Rewind it before waiting on
+		// text from the top of the file, which is otherwise never mounted.
+		// `0` is the source pane, `1` the output pane.
+		const rewindPane = (pane: 0 | 1) =>
+			page.evaluate((index) => {
+				const scroller = document
+					.querySelectorAll('.pg-editor .cm-content')
+					[index]?.closest('.cm-scroller');
+				if (scroller) scroller.scrollTop = 0;
+			}, pane);
+
 		for (const target of ['client', 'server']) {
 			await outputSelector.selectOption(target);
 			await page.waitForFunction(
@@ -570,15 +583,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
 		await outputSelector.selectOption('client');
-		// CodeMirror renders only the lines around its scroll position, and the
-		// clicks above left the output pane deep in the document. Rewind it, then
-		// wait on the import header at the top of the emit.
-		await page.evaluate(() => {
-			const scroller = document
-				.querySelectorAll('.pg-editor .cm-content')[1]
-				?.closest('.cm-scroller');
-			if (scroller) scroller.scrollTop = 0;
-		});
+		// The clicks above left the output pane deep in the document, so rewind
+		// it before waiting on the import header at the top of the emit.
+		await rewindPane(1);
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
@@ -613,6 +620,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			).toContain(keyword);
 		}
 		await outputSelector.selectOption('client');
+		// The types probes just above scrolled the output pane past the import
+		// header, and the switch back to `client` keeps that offset.
+		await rewindPane(1);
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
@@ -700,15 +710,9 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 			null,
 			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 		);
-		// The probes above left the SOURCE pane scrolled deep into another example,
-		// and CodeMirror renders only around its scroll position — rewind so the
-		// whole form is inside the rendered range.
-		await page.evaluate(() => {
-			const scroller = document
-				.querySelectorAll('.pg-editor .cm-content')[0]
-				?.closest('.cm-scroller');
-			if (scroller) scroller.scrollTop = 0;
-		});
+		// The probes above left the SOURCE pane scrolled deep into another example
+		// — rewind so the whole form is inside the rendered range.
+		await rewindPane(0);
 		await page.waitForFunction(
 			() =>
 				(document.querySelectorAll('.cm-content')[0]?.textContent ?? '').includes('defaultValue'),
@@ -1514,6 +1518,37 @@ describe(
 		);
 
 		it.concurrent(
+			'keeps both Lynx example panes readable beside the desktop docs sidebar',
+			{ timeout: 30_000 },
+			async () => {
+				const context = await browser.newContext({ viewport: { width: 801, height: 900 } });
+				const page = await context.newPage();
+				const errors: string[] = [];
+				page.on('console', (message) => {
+					if (message.type() === 'error') errors.push(message.text());
+				});
+				page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+				try {
+					await page.goto(PREVIEW_ORIGIN + '/docs/lynx', { waitUntil: 'load' });
+					const panel = page.locator('.go').first();
+					await panel.scrollIntoViewIfNeeded();
+					const geometry = await panel.evaluate((element) => ({
+						code: element.querySelector('.go-code')!.getBoundingClientRect().width,
+						preview: element.querySelector('.go-preview')!.getBoundingClientRect().width,
+					}));
+
+					// At 801px the desktop docs sidebar leaves the example narrow enough
+					// that it must stack before either pane falls below its readable minimum.
+					expect(geometry.code).toBeGreaterThanOrEqual(200);
+					expect(geometry.preview).toBeGreaterThanOrEqual(260);
+					expect(errors).toEqual([]);
+				} finally {
+					await context.close();
+				}
+			},
+		);
+
+		it.concurrent(
 			'keeps no-JS SSR and hydrated layout geometry identical',
 			{ timeout: 30_000 },
 			async () => {
@@ -1534,21 +1569,139 @@ describe(
 			},
 		);
 
-		it.concurrent('client-side navigation works after hydration', { timeout: 30_000 }, async () => {
-			const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/');
-			try {
-				await page.click('a.nav-link[href="/benchmarks"]');
-				await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
-					timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+		it.concurrent(
+			'client-side navigation does not start resources owned by the outgoing route',
+			{ timeout: 30_000 },
+			async () => {
+				const outgoingLynxRequests: string[] = [];
+				let navigating = false;
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/', {
+					beforeNavigation: async (page) => {
+						await page.route(/\/assets\/benchmarks-[^/]+\.js$/, async (route) => {
+							await new Promise((resolve) => setTimeout(resolve, 500));
+							await route.continue();
+						});
+						page.on('request', (request) => {
+							const pathname = new URL(request.url()).pathname;
+							if (navigating && pathname.startsWith('/lynx-examples/')) {
+								outgoingLynxRequests.push(pathname);
+							}
+						});
+					},
 				});
-				await page.waitForFunction(() => document.querySelector('main .benchpage') !== null, null, {
-					timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+				try {
+					navigating = true;
+					await page.click('a.nav-link[href="/benchmarks"]');
+					await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
+						timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+					});
+					await page.waitForFunction(
+						() => document.querySelector('main .benchpage') !== null,
+						null,
+						{
+							timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+						},
+					);
+					expect(outgoingLynxRequests).toEqual([]);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+		);
+
+		it.concurrent(
+			'late Lynx metadata cannot mount a preview after navigation starts',
+			{ timeout: 30_000 },
+			async () => {
+				const outgoingLynxRequests: string[] = [];
+				let navigating = false;
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/', {
+					beforeNavigation: async (page) => {
+						await page.addInitScript(() => {
+							const originalFetch = window.fetch.bind(window);
+							// Return a settled metadata response, then hold its JSON completion so
+							// the route can become inactive before the consumer resumes.
+							const metadataReleases: Array<() => void> = [];
+							const gate = window as Window & {
+								pendingLynxMetadata?: () => number;
+								releaseLynxMetadata?: () => void;
+							};
+							gate.pendingLynxMetadata = () => metadataReleases.length;
+							gate.releaseLynxMetadata = () => {
+								for (const release of metadataReleases.splice(0)) release();
+							};
+							window.fetch = (...args) => {
+								const input = args[0];
+								const url = input instanceof Request ? input.url : String(input);
+								if (!new URL(url, location.href).pathname.endsWith('/example-metadata.json')) {
+									return originalFetch(...args);
+								}
+								return Promise.resolve({
+									ok: true,
+									status: 200,
+									json: () =>
+										new Promise((resolve) => {
+											metadataReleases.push(() =>
+												resolve({
+													name: 'test',
+													files: [],
+													templateFiles: [
+														{
+															name: 'main',
+															file: 'dist/main.bundle',
+															webFile: 'dist/main.web.bundle',
+														},
+													],
+												}),
+											);
+										}),
+								} as Response);
+							};
+						});
+						await page.route(/\/assets\/benchmarks-[^/]+\.js$/, async (route) => {
+							await new Promise((resolve) => setTimeout(resolve, 1_000));
+							await route.continue();
+						});
+						page.on('request', (request) => {
+							const pathname = new URL(request.url()).pathname;
+							if (navigating && pathname.startsWith('/lynx-examples/')) {
+								outgoingLynxRequests.push(pathname);
+							}
+						});
+					},
 				});
-				expect(errors).toEqual([]);
-			} finally {
-				await page.close();
-			}
-		});
+				try {
+					await page.locator('section.lynx').scrollIntoViewIfNeeded();
+					await page.waitForFunction(
+						() => {
+							const pending = (window as Window & { pendingLynxMetadata?: () => number })
+								.pendingLynxMetadata;
+							return pending !== undefined && pending() > 0;
+						},
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					navigating = true;
+					await page.click('a.nav-link[href="/benchmarks"]');
+					await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
+						timeout: PLAYWRIGHT_ACTION_TIMEOUT,
+					});
+					await page.evaluate(() => {
+						(window as Window & { releaseLynxMetadata?: () => void }).releaseLynxMetadata?.();
+					});
+					await page.waitForFunction(
+						() => document.querySelector('main .benchpage') !== null,
+						null,
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					);
+					expect(outgoingLynxRequests).toEqual([]);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+		);
 
 		it.concurrent(
 			'playground compiles, runs, and handles an event inside its sandbox',

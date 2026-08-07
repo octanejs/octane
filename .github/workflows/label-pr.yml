@@ -3,7 +3,7 @@ name: Label PR
 # Both labels are things the author cannot apply themselves: a fork
 # contributor's token has no rights to label the base repository at all. A
 # `pull_request_target` job has the write token, so the author only has to state
-# the facts, in the title and in the body, and this turns them into labels.
+# the facts, in the title or branch and in the body, and this turns them into labels.
 on:
   pull_request_target:
     types: [opened, reopened, edited]
@@ -22,6 +22,7 @@ jobs:
     # `pull_request_target` is what gives a fork pull request a writable token.
     # Nothing here checks out or executes the pull request's code.
     permissions:
+      contents: write
       issues: read
       pull-requests: write
 
@@ -49,10 +50,13 @@ jobs:
             const add = [];
             const remove = [];
 
-            const titled = /^\s*([a-z]+)\s*(?:\([^)]*\))?\s*!?:/.exec(pull.title);
-            const type = titled && TYPES.includes(titled[1]) ? titled[1] : null;
-            // An invalid retitle must not leave a stale type behind. No type
-            // label is the visible signal that the title needs fixing.
+            const titled = /^\s*([a-z]+)(?:\s*(?:\([^)]*\))?\s*!?:|\/)/.exec(pull.title);
+            const branched = /^([a-z]+)\//.exec(pull.head.ref);
+            const titleType = titled && TYPES.includes(titled[1]) ? titled[1] : null;
+            const branchType = branched && TYPES.includes(branched[1]) ? branched[1] : null;
+            const type = titleType ?? branchType;
+            // Prefer the title, then use the repository's type-prefixed branch
+            // convention when GitHub supplied a plain or branch-shaped title.
             remove.push(
               ...current.filter((name) => name !== type && TYPES.includes(name)),
             );
@@ -62,8 +66,9 @@ jobs:
               if (!current.includes(type)) add.push(type);
             } else {
               core.notice(
-                `#${number} has no conventional-commit type in its title, so no type label was applied. ` +
-                  `Retitle it as one of ${TYPES.join(", ")} and this runs again.`,
+                `#${number} has no conventional-commit type in its title and no supported type prefix ` +
+                  `in its head branch, so no type label was applied. Retitle it or prefix the branch ` +
+                  `with one of ${TYPES.join(", ")} and this runs again.`,
               );
             }
 
@@ -139,11 +144,10 @@ jobs:
         if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          # Draft state is not repository content, so the job stays off
-          # `contents`. GITHUB_TOKEN has been reported to answer draft mutations
-          # with "Resource not accessible by integration" (actions/toolkit#1165)
-          # and GraphQL publishes no permission table to check that against, so
-          # an app or PAT secret takes over wherever the repository defines one.
+          # GitHub's GraphQL permission mapping requires `contents: write`
+          # alongside `pull-requests: write` for this mutation, even though no
+          # repository content changes. An app or PAT can still take over where
+          # the repository defines one.
           github-token: ${{ secrets.DRAFT_PR_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;

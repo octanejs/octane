@@ -55,10 +55,21 @@ const OPS = [
 	// next op's ensureState sees 2000 rows ≠ 1000 and rebuilds via #run.
 	{ name: 'add', pre: 'rows', click: '#add' },
 	{ name: 'update', pre: 'rows', click: '#update' },
-	{ name: 'select', pre: 'rows', click: 'tbody tr:nth-child(5) td:nth-child(2) a' },
+	{
+		name: 'select',
+		pre: 'rows',
+		click: 'tbody tr:nth-child(5) td:nth-child(2) a',
+		alternateClick: 'tbody tr:nth-child(6) td:nth-child(2) a',
+	},
 	{ name: 'swap', pre: 'rows', click: '#swaprows' },
 	{ name: 'remove', pre: 'rows', click: 'tbody tr:nth-child(5) td:nth-child(3) a' },
 	{ name: 'runlots', pre: 'empty', click: '#runlots' },
+	{
+		name: 'select_lots',
+		pre: 'rows-large',
+		click: 'tbody tr:nth-child(5000) td:nth-child(2) a',
+		alternateClick: 'tbody tr:nth-child(5001) td:nth-child(2) a',
+	},
 	// Canonical js-framework-benchmark `clear` measures clearing the
 	// 10K-row table that `runlots` populated — NOT the 1K-row table from
 	// `run`. The previous `pre: 'rows'` rebuilt 1K rows before the timed
@@ -141,6 +152,22 @@ async function timeClick(page, sel) {
 	}, sel);
 }
 
+async function verifySelection(page, selector) {
+	await page.evaluate((selector) => {
+		const expected = document.querySelector(selector)?.closest('tr');
+		const selected = document.querySelectorAll('tbody tr.danger');
+		if (expected && selected.length === 1 && selected[0] === expected) return;
+
+		const rowId = (row) => row.querySelector('td')?.textContent || '(missing id)';
+		throw new Error(
+			'selection gate failed: expected only ' +
+				(expected ? rowId(expected) : '(missing row)') +
+				', found ' +
+				(Array.from(selected, rowId).join(', ') || '(none)'),
+		);
+	}, selector);
+}
+
 async function runTarget(t) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -165,7 +192,9 @@ async function runTarget(t) {
 		const samples = [];
 		for (let i = 0; i < ITER; i++) {
 			await ensureState(page, op.pre);
-			const dt = await timeClick(page, op.click);
+			const selector = i % 2 === 1 && op.alternateClick ? op.alternateClick : op.click;
+			const dt = await timeClick(page, selector);
+			if (op.alternateClick) await verifySelection(page, selector);
 			samples.push(dt);
 			await sleep(60);
 		}

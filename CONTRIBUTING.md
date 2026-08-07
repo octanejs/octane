@@ -28,7 +28,7 @@ larger than a contained fix, open an issue and agree on the approach first.
 
 ## Setup
 
-Node.js 22 or newer (CI runs the suite on 22 and 24) and pnpm 11. The repo pins
+Node.js 22.22.2 or newer (CI runs the suite on 22.22.2 and 24) and pnpm 11. The repo pins
 its pnpm version in `package.json`, so `corepack enable` is the easiest way to
 get the right one.
 
@@ -144,6 +144,26 @@ own implementation will not think to check.
   must make validation fail. The tests need tests too; otherwise a green harness
   can be a stale evidence collector.
 
+### Configure parity execution
+
+Follow [the React parity test-execution contract](./docs/react-parity-testing.md)
+when a binding adds executable parity lanes. Keep the complete local project in
+`vitest.config.js`, then declare which work belongs to the generic parity runner:
+
+```js
+testExecution: {
+	group: 'react-parity',
+	include: ['packages/example/tests/upstream/**/*.test.ts'],
+}
+```
+
+Omit `testExecution.include` when the runner owns the complete project. When it
+is present, it contains parity-owned patterns only;
+`vitest.ci-sharded.config.js` derives the complement for ordinary shards. Do not
+put package paths in `ci.yml`, create package-specific parity jobs, or encode
+shard/Node/job details in the base project metadata. Package manifests under
+`packages/*/audit/react-parity.json` are discovered automatically.
+
 Fill the remaining gaps (DOM output over event sequences, render counts, effect
 ordering, ref lifecycle, keyed reorder identity) with differential and
 Octane-only tests as the skill describes.
@@ -236,9 +256,9 @@ Octane is 0.x, so every changeset stays on the `patch` track. `major` and
   validate it. Call out anything you deliberately left unverified.
 - Every pull request carries exactly one type label: `feat`, `fix`, `docs`,
   `test`, `perf`, `refactor`, `chore`, or `ci`. You do not apply it;
-  `.github/workflows/label-pr.yml` reads it off the title, so a
-  conventional-commit title is all it takes. `bug` and `enhancement` belong to
-  issues.
+  `.github/workflows/label-pr.yml` reads it off a conventional-commit title and
+  falls back to the `feat/…`, `fix/…`, or other type-prefixed head branch when
+  the title does not declare one. `bug` and `enhancement` belong to issues.
 
 CI intentionally runs nothing while a pull request is a draft and starts on the
 `ready_for_review` event. From there it runs the sharded test suite on Node 22 and

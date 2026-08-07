@@ -20,15 +20,34 @@
 //   Alert — transcribed and verified byte-identical to upstream's source. Should
 //     need no scrutiny.
 //
+//   Dialog, AlertDialog, Popover, Tooltip — still carry the radix KEYFRAME motion utilities
+//     (`data-open:animate-in` / `data-closed:animate-out`) rather than the transition pair the
+//     transcribed sheet uses. Base UI does emit both `data-open` and `data-closed`, so those
+//     utilities are not dead — but the sheet's derived version jumped on close and these have not
+//     been checked against upstream sources. OPEN AND CLOSE EACH ONE: a snap on close is the
+//     thing to report.
+//
+//   Avatar, Progress, Toggle, ToggleGroup — class strings derived, but
+//     each ADAPTED to a part tree or attribute that Base UI genuinely differs on,
+//     checked against the primitive's real output rather than assumed. What to
+//     look at: a pressed Toggle / ToggleGroup item must actually shade (Base UI
+//     emits `data-pressed`, not Radix's `data-[state=on]`); the Progress and
+//     Progress fill must sit flush against the left edge of its rail and stop at
+//     the right percentage — a fill offset sideways from where the number says it
+//     should be is the double-offset bug it was adapted to avoid. Slider is
+//     transcribed rather than derived, and is the one family here whose geometry
+//     no test can reach: check every thumb is visible and round.
+//
 //   Everything else — DERIVED from this package's React Aria base, not
 //     transcribed. Compare against the React Aria tab: they should look
 //     identical, and any difference is a porting bug worth reporting.
 //     `Skeleton` is the likeliest to be wrong, since its background token is
 //     known to differ per base (`bg-accent` in Radix, `bg-muted` in React Aria).
 //
-// Still absent: the overlay and form-control families (Checkbox, Switch, Dialog,
-// Popover, Tooltip, …). Base UI's primitive API is structurally different from
-// React Aria's, so those cannot be derived and need transcribed sources.
+// Still absent: 5 of 44 families. Four are blocked on unported @octanejs/base-ui
+// primitives (navigation-menu, scroll-area, select, tabs) and sonner on
+// next-themes; the rest are simply not ported yet. The README carries the
+// generated per-base coverage table.
 import {
 	Accordion,
 	AccordionContent,
@@ -36,6 +55,113 @@ import {
 	AccordionTrigger,
 } from '@octanejs/shadcn/base-ui/Accordion';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@octanejs/shadcn/base-ui/Alert';
+import {
+	Avatar,
+	AvatarFallback,
+	AvatarGroup,
+	AvatarGroupCount,
+	AvatarImage,
+} from '@octanejs/shadcn/base-ui/Avatar';
+import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@octanejs/shadcn/base-ui/Tabs';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
+import {
+	Menubar,
+	MenubarCheckboxItem,
+	MenubarContent,
+	MenubarItem,
+	MenubarLabel,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarSub,
+	MenubarSubContent,
+	MenubarSubTrigger,
+	MenubarTrigger,
+} from '@octanejs/shadcn/base-ui/Menubar';
+import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@octanejs/shadcn/base-ui/ContextMenu';
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from '@octanejs/shadcn/base-ui/DropdownMenu';
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from '@octanejs/shadcn/base-ui/Item';
+import {
+	Breadcrumb,
+	BreadcrumbEllipsis,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from '@octanejs/shadcn/base-ui/Breadcrumb';
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSeparator,
+	FieldSet,
+	FieldTitle,
+} from '@octanejs/shadcn/base-ui/Field';
+import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from '@octanejs/shadcn/base-ui/Pagination';
+import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableFooter,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@octanejs/shadcn/base-ui/Table';
+import { Slider } from '@octanejs/shadcn/base-ui/Slider';
+import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
+import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -50,6 +176,11 @@ import {
 } from '@octanejs/shadcn/base-ui/AlertDialog';
 import { Button } from '@octanejs/shadcn/base-ui/Button';
 import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@octanejs/shadcn/base-ui/Collapsible';
 import {
 	Dialog,
 	DialogClose,
@@ -104,9 +235,18 @@ import {
 	NativeSelectOptGroup,
 	NativeSelectOption,
 } from '@octanejs/shadcn/base-ui/NativeSelect';
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
-import { InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
+import { BellIcon, InboxIcon, TriangleAlertIcon } from '@octanejs/lucide';
 
 function Section({ title, note, children }: { title: string; note?: string; children?: unknown }) @{
 	<section class="space-y-3">
@@ -123,13 +263,13 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 export function ShadcnBaseUIDemo() @{
 	<div class="space-y-8">
 		<div class="rounded-lg border border-dashed p-4">
-			<p class="text-sm font-medium">Partial base — 21 of 44 families</p>
+			<p class="text-sm font-medium">Partial base — 40 of 44 families</p>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Accordion, Button, Input, Label and Separator run on real Base UI primitives. Alert is
-				verified byte-identical to upstream's Base UI source. Every other class string is derived
-				from the React Aria base, so compare the two tabs — they should look identical, and any
-				difference is a porting bug. Checkbox, Switch, Dialog and the other overlay and form-control
-				families are not ported yet.
+				Most families here now run on real Base UI primitives — Accordion, Button, Input, Label,
+				Separator, Checkbox, Switch, RadioGroup, Dialog, AlertDialog, Popover, Tooltip and
+				Collapsible. Alert is verified byte-identical to upstream's Base UI source. The remaining
+				class strings are derived from the React Aria base, so compare the two tabs: they should
+				look identical, and any difference is a porting bug.
 			</p>
 		</div>
 
@@ -353,6 +493,61 @@ export function ShadcnBaseUIDemo() @{
 			</div>
 		</Section>
 
+		<Section
+			title="Collapsible"
+			note="Unstyled in every base — layout is the consumer's. Click to toggle; the trigger's aria-controls points at the panel."
+		>
+			<Collapsible class="w-full max-w-sm space-y-2">
+				<CollapsibleTrigger render={<Button variant="outline" />}>
+					Toggle details
+				</CollapsibleTrigger>
+				<CollapsibleContent class="rounded-lg border p-3 text-sm text-muted-foreground">
+					Base UI calls this part Panel; shadcn calls it CollapsibleContent. Same element, same
+					data-slot.
+				</CollapsibleContent>
+			</Collapsible>
+		</Section>
+
+		<Section
+			title="Sheet"
+			note="A Dialog anchored to an edge. Open each side — the slide-in direction comes from data-side, which this component sets itself."
+		>
+			<div class="flex flex-wrap items-center gap-2">
+				<Sheet>
+					<SheetTrigger render={<Button variant="outline" />}>Right</SheetTrigger>
+					<SheetContent>
+						<SheetHeader>
+							<SheetTitle>Edit profile</SheetTitle>
+							<SheetDescription>Make changes here. Click save when you are done.</SheetDescription>
+						</SheetHeader>
+						<SheetFooter>
+							<Button>Save changes</Button>
+						</SheetFooter>
+					</SheetContent>
+				</Sheet>
+
+				<Sheet>
+					<SheetTrigger render={<Button variant="outline" />}>Left</SheetTrigger>
+					<SheetContent side="left">
+						<SheetHeader>
+							<SheetTitle>Navigation</SheetTitle>
+							<SheetDescription>Slides in from the left.</SheetDescription>
+						</SheetHeader>
+					</SheetContent>
+				</Sheet>
+
+				<Sheet>
+					<SheetTrigger render={<Button variant="outline" />}>Bottom</SheetTrigger>
+					<SheetContent side="bottom">
+						<SheetHeader>
+							<SheetTitle>Details</SheetTitle>
+							<SheetDescription>Slides up from the bottom.</SheetDescription>
+						</SheetHeader>
+					</SheetContent>
+				</Sheet>
+			</div>
+		</Section>
+
 		<Section title="Alert" note="Verified byte-identical to upstream.">
 			<div class="space-y-3">
 				<Alert>
@@ -461,6 +656,421 @@ export function ShadcnBaseUIDemo() @{
 					<Skeleton class="h-4 w-[220px]" />
 					<Skeleton class="h-4 w-[160px]" />
 				</div>
+			</div>
+		</Section>
+
+		<Section
+			title="Table"
+			note="Base-independent: no table primitive exists in either Radix or Base UI, so this is the radix file unchanged and a test asserts the two render identical DOM."
+		>
+			<Table>
+				<TableCaption>Recent invoices</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Invoice</TableHead>
+						<TableHead>Status</TableHead>
+						<TableHead>Amount</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					<TableRow>
+						<TableCell>INV-001</TableCell>
+						<TableCell>Paid</TableCell>
+						<TableCell>$250.00</TableCell>
+					</TableRow>
+					<TableRow data-state="selected">
+						<TableCell>INV-002</TableCell>
+						<TableCell>Pending</TableCell>
+						<TableCell>$150.00</TableCell>
+					</TableRow>
+					<TableRow>
+						<TableCell>INV-003</TableCell>
+						<TableCell>Unpaid</TableCell>
+						<TableCell>$350.00</TableCell>
+					</TableRow>
+				</TableBody>
+				<TableFooter>
+					<TableRow>
+						<TableCell>Total</TableCell>
+						<TableCell />
+						<TableCell>$750.00</TableCell>
+					</TableRow>
+				</TableFooter>
+			</Table>
+		</Section>
+
+		<Section
+			title="Pagination"
+			note="Transcribed. Base UI has no Slot, so upstream composes the link as Button + nativeButton={false} + render — which means these links carry role=button and tabindex, unlike the Radix tab's plain anchors. Styling should still match Radix exactly, and page 2 must read as the current page."
+		>
+			<Pagination>
+				<PaginationContent>
+					<PaginationItem>
+						<PaginationPrevious href="#prev" />
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationLink href="#1">1</PaginationLink>
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationLink href="#2" isActive>2</PaginationLink>
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationLink href="#3">3</PaginationLink>
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationEllipsis />
+					</PaginationItem>
+					<PaginationItem>
+						<PaginationNext href="#next" />
+					</PaginationItem>
+				</PaginationContent>
+			</Pagination>
+		</Section>
+
+		<Section
+			title="Field"
+			note="Transcribed. Upstream does NOT route this through Base UI's Field primitive — it is host elements plus this base's Label and Separator — so data-invalid stays consumer-written. The invalid row must go red, and the separator must show a rule with 'or' centred on it."
+		>
+			<FieldSet>
+				<FieldLegend>Contact details</FieldLegend>
+				<FieldGroup>
+					<Field>
+						<FieldLabel htmlFor="field-email">Email</FieldLabel>
+						<Input id="field-email" type="email" placeholder="you@example.com" />
+						<FieldDescription>We will never share your address.</FieldDescription>
+					</Field>
+					<FieldSeparator>or</FieldSeparator>
+					<Field data-invalid="true">
+						<FieldLabel htmlFor="field-phone">Phone</FieldLabel>
+						<Input id="field-phone" aria-invalid="true" placeholder="+1 555 0100" />
+						<FieldError errors={[{ message: 'Enter a valid number' }]} />
+					</Field>
+					<Field orientation="horizontal">
+						<Checkbox id="field-tos" />
+						<FieldContent>
+							<FieldTitle>Accept terms</FieldTitle>
+							<FieldDescription>Required before continuing.</FieldDescription>
+						</FieldContent>
+					</Field>
+				</FieldGroup>
+			</FieldSet>
+		</Section>
+
+		<Section
+			title="Badge"
+			note="No primitive in any base — a plain span. The cva strings are shared with Radix and a test asserts they stay identical, so this should look exactly like the Radix tab. No asChild/render escape here yet: see the file header."
+		>
+			<div class="flex flex-wrap items-center gap-2">
+				<Badge>Default</Badge>
+				<Badge variant="secondary">Secondary</Badge>
+				<Badge variant="destructive">Destructive</Badge>
+				<Badge variant="outline">Outline</Badge>
+				<Badge variant="ghost">Ghost</Badge>
+				<Badge variant="link">Link</Badge>
+			</div>
+		</Section>
+
+		<Section
+			title="Breadcrumb"
+			note="Host elements throughout, class strings from the Radix source — should match the Radix tab exactly. BreadcrumbLink has no asChild here yet: see the file header."
+		>
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink href="#home">Home</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbEllipsis />
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbLink href="#components">Components</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>Breadcrumb</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+		</Section>
+
+		<Section
+			title="Item"
+			note="Host elements plus this base's Separator. The data-variant/data-size utilities read attributes the component writes itself, so no primitive dialect is involved — this should match the Radix tab. Item has no asChild here yet: see the file header."
+		>
+			<ItemGroup class="max-w-md">
+				<Item variant="outline">
+					<ItemMedia variant="icon">
+						<BellIcon />
+					</ItemMedia>
+					<ItemContent>
+						<ItemTitle>Notifications</ItemTitle>
+						<ItemDescription>Choose what you want to be notified about.</ItemDescription>
+					</ItemContent>
+					<ItemActions>
+						<Switch />
+					</ItemActions>
+				</Item>
+				<ItemSeparator />
+				<Item variant="muted" size="sm">
+					<ItemContent>
+						<ItemTitle>Compact row</ItemTitle>
+						<ItemDescription>Uses the sm size.</ItemDescription>
+					</ItemContent>
+				</Item>
+			</ItemGroup>
+		</Section>
+
+		<Section
+			title="DropdownMenu"
+			note="Runs on the Base UI Menu primitive: Portal > Positioner > Popup. Open it and check the submenu — hovering 'More' must keep that row highlighted (it uses data-popup-open, not data-open), the checkbox and radio ticks must appear, and arrow keys must move the highlight."
+		>
+			<DropdownMenu>
+				<DropdownMenuTrigger render={<Button variant="outline" />}>Open menu</DropdownMenuTrigger>
+				<DropdownMenuContent>
+					<DropdownMenuLabel>My account</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<DropdownMenuItem>
+							Profile
+							<DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+						</DropdownMenuItem>
+						<DropdownMenuItem>
+							Billing
+							<DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+						</DropdownMenuItem>
+						<DropdownMenuItem disabled>Unavailable</DropdownMenuItem>
+					</DropdownMenuGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuCheckboxItem checked>Show sidebar</DropdownMenuCheckboxItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuRadioGroup value="light">
+						<DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+						<DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+					</DropdownMenuRadioGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger>More options</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent>
+							<DropdownMenuItem>Nested item</DropdownMenuItem>
+							<DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</Section>
+
+		<Section
+			title="ContextMenu"
+			note="Right-click the dashed box. Unlike DropdownMenu this family has a real Separator part. Check the submenu row stays highlighted while open, and that the menu opens at the pointer."
+		>
+			<ContextMenu>
+				<ContextMenuTrigger
+					class="flex h-32 w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground"
+				>
+					Right click here
+				</ContextMenuTrigger>
+				<ContextMenuContent>
+					<ContextMenuLabel>Actions</ContextMenuLabel>
+					<ContextMenuSeparator />
+					<ContextMenuItem>
+						Back
+						<ContextMenuShortcut>⌘[</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuItem>
+						Forward
+						<ContextMenuShortcut>⌘]</ContextMenuShortcut>
+					</ContextMenuItem>
+					<ContextMenuSeparator />
+					<ContextMenuCheckboxItem checked>Show grid</ContextMenuCheckboxItem>
+					<ContextMenuSeparator />
+					<ContextMenuSub>
+						<ContextMenuSubTrigger>More tools</ContextMenuSubTrigger>
+						<ContextMenuSubContent>
+							<ContextMenuItem>Save page</ContextMenuItem>
+							<ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+						</ContextMenuSubContent>
+					</ContextMenuSub>
+				</ContextMenuContent>
+			</ContextMenu>
+		</Section>
+
+		<Section
+			title="Menubar"
+			note="The bar is Base UI's Menubar; each menu is the same Menu primitive DropdownMenu uses. Open File, then arrow across to Edit without closing — that hand-off is the bar's job. The open bar trigger should stay shaded (it keys off aria-expanded, not a data attribute)."
+		>
+			<Menubar>
+				<MenubarMenu>
+					<MenubarTrigger>File</MenubarTrigger>
+					<MenubarContent>
+						<MenubarLabel>Document</MenubarLabel>
+						<MenubarSeparator />
+						<MenubarItem>
+							New tab
+							<MenubarShortcut>⌘T</MenubarShortcut>
+						</MenubarItem>
+						<MenubarItem>
+							New window
+							<MenubarShortcut>⌘N</MenubarShortcut>
+						</MenubarItem>
+						<MenubarSeparator />
+						<MenubarCheckboxItem checked>Autosave</MenubarCheckboxItem>
+						<MenubarSub>
+							<MenubarSubTrigger>Share</MenubarSubTrigger>
+							<MenubarSubContent>
+								<MenubarItem>Email link</MenubarItem>
+								<MenubarItem>Copy link</MenubarItem>
+							</MenubarSubContent>
+						</MenubarSub>
+					</MenubarContent>
+				</MenubarMenu>
+				<MenubarMenu>
+					<MenubarTrigger>Edit</MenubarTrigger>
+					<MenubarContent>
+						<MenubarItem>
+							Undo
+							<MenubarShortcut>⌘Z</MenubarShortcut>
+						</MenubarItem>
+						<MenubarItem variant="destructive">Delete</MenubarItem>
+					</MenubarContent>
+				</MenubarMenu>
+				<MenubarMenu>
+					<MenubarTrigger>View</MenubarTrigger>
+					<MenubarContent>
+						<MenubarItem>Reload</MenubarItem>
+					</MenubarContent>
+				</MenubarMenu>
+			</Menubar>
+		</Section>
+
+		<Section
+			title="HoverCard"
+			note="Runs on Base UI's PreviewCard. Hover the link and wait — the card must FADE AND SCALE in, not pop. This family's radix source used data-[state=open]:, which Base UI never emits, so an unrewritten copy would animate not at all."
+		>
+			<HoverCard>
+				<HoverCardTrigger class="text-sm font-medium underline underline-offset-4">
+					@octanejs
+				</HoverCardTrigger>
+				<HoverCardContent>
+					<div class="flex gap-3">
+						<Avatar>
+							<AvatarFallback>OC</AvatarFallback>
+						</Avatar>
+						<div class="space-y-1">
+							<p class="text-sm font-medium">@octanejs</p>
+							<p class="text-sm text-muted-foreground">
+								A React-shaped UI framework compiled ahead of time.
+							</p>
+						</div>
+					</div>
+				</HoverCardContent>
+			</HoverCard>
+		</Section>
+
+		<Section
+			title="Tabs"
+			note="Runs on the Tabs primitive ported into @octanejs/base-ui for this family. Arrow keys must move the highlight and Home/End jump to the ends. The pinned primitive emits data-orientation where current shadcn sources expect a bare data-horizontal, so the vertical variant is the one to check switches to a column."
+		>
+			<div class="flex flex-col gap-6">
+				<Tabs defaultValue="account">
+					<TabsList>
+						<TabsTrigger value="account">Account</TabsTrigger>
+						<TabsTrigger value="password">Password</TabsTrigger>
+						<TabsTrigger value="disabled" disabled>Disabled</TabsTrigger>
+					</TabsList>
+					<TabsContent value="account">Make changes to your account here.</TabsContent>
+					<TabsContent value="password">Change your password here.</TabsContent>
+				</Tabs>
+
+				<Tabs defaultValue="one" orientation="vertical">
+					<TabsList variant="line">
+						<TabsTrigger value="one">Vertical one</TabsTrigger>
+						<TabsTrigger value="two">Vertical two</TabsTrigger>
+					</TabsList>
+					<TabsContent value="one">First vertical panel.</TabsContent>
+					<TabsContent value="two">Second vertical panel.</TabsContent>
+				</Tabs>
+			</div>
+		</Section>
+
+		<Section title="Avatar" note="Direct one-to-one mapping — no Base UI dialect involved.">
+			<div class="flex items-center gap-6">
+				<Avatar>
+					<AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+					<AvatarFallback>CN</AvatarFallback>
+				</Avatar>
+				<Avatar size="sm">
+					<AvatarFallback>SM</AvatarFallback>
+				</Avatar>
+				<Avatar size="lg">
+					<AvatarFallback>LG</AvatarFallback>
+				</Avatar>
+				<AvatarGroup>
+					<Avatar>
+						<AvatarFallback>A</AvatarFallback>
+					</Avatar>
+					<Avatar>
+						<AvatarFallback>B</AvatarFallback>
+					</Avatar>
+					<AvatarGroupCount>+3</AvatarGroupCount>
+				</AvatarGroup>
+			</div>
+		</Section>
+
+		<Section
+			title="Progress"
+			note="Base UI adds a Track part and sizes the fill by width — each bar's fill should start flush left and end at its labelled percentage."
+		>
+			<div class="flex max-w-md flex-col gap-4">
+				<Progress value={0} />
+				<Progress value={25} />
+				<Progress value={50} />
+				<Progress value={100} />
+			</div>
+		</Section>
+
+		<Section
+			title="Slider"
+			note="Transcribed. Thumbs sit OUTSIDE the track (nested, they get clipped to a sliver by its overflow-hidden). thumbAlignment='edge' measures with getBoundingClientRect, so thumbs and fill are hidden until laid out — jsdom cannot see this, only a browser can. Every thumb must be visible and round, the end thumbs flush with the rail ends, and the fill must track a drag exactly."
+		>
+			<div class="flex max-w-md flex-col gap-8">
+				<Slider defaultValue={[50]} />
+				<Slider defaultValue={[25, 75]} />
+				<Slider defaultValue={[40]} step={10} />
+				<Slider defaultValue={[30]} disabled />
+			</div>
+		</Section>
+
+		<Section
+			title="Toggle"
+			note="Pressed state rides on `data-pressed`, not Radix's `data-[state=on]` — a pressed toggle that does not shade is that dialect being wrong."
+		>
+			<div class="flex items-center gap-3">
+				<Toggle>Default</Toggle>
+				<Toggle defaultPressed>Pressed</Toggle>
+				<Toggle variant="outline">Outline</Toggle>
+				<Toggle size="sm">Small</Toggle>
+				<Toggle size="lg">Large</Toggle>
+				<Toggle disabled>Disabled</Toggle>
+			</div>
+		</Section>
+
+		<Section
+			title="ToggleGroup"
+			note="Base UI has no ToggleGroup.Item — items are plain Toggles. Values are always arrays here, in single mode too."
+		>
+			<div class="flex flex-col items-start gap-4">
+				<ToggleGroup defaultValue={['b']}>
+					<ToggleGroupItem value="a">A</ToggleGroupItem>
+					<ToggleGroupItem value="b">B</ToggleGroupItem>
+					<ToggleGroupItem value="c">C</ToggleGroupItem>
+				</ToggleGroup>
+				<ToggleGroup type="multiple" variant="outline" defaultValue={['bold', 'italic']}>
+					<ToggleGroupItem value="bold">Bold</ToggleGroupItem>
+					<ToggleGroupItem value="italic">Italic</ToggleGroupItem>
+					<ToggleGroupItem value="underline">Underline</ToggleGroupItem>
+				</ToggleGroup>
 			</div>
 		</Section>
 

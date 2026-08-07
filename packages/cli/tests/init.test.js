@@ -323,6 +323,120 @@ describe('octane init', () => {
 		expect(ran[0]).toContain('add');
 	});
 
+	it('finishes the install when pnpm blocks a dependency build script', async () => {
+		// pnpm refuses to run a dependency's install script until the project
+		// records a decision, and since 11.0 it fails the command to say so, after
+		// the packages are already on disk. Treating that as a dead scaffold left
+		// the dev dependencies uninstalled, so the generated app had no bundler and
+		// `pnpm dev` died on `Cannot find package 'vite'`.
+		const { root } = fixture();
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file) =>
+				file === 'git'
+					? { code: 0, stdout: '', stderr: '' }
+					: {
+							code: 1,
+							stdout: '',
+							stderr: '[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.28.1',
+						},
+		};
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'pnpm', '--json'],
+			{ exec },
+		);
+
+		expect(result.exitCode).toBe(0);
+		// The dev dependencies are the half that used to be skipped.
+		expect(result.json().installed).toContain('vite');
+		// And the decision pnpm is waiting on is handed back to the user.
+		expect(result.json().manual.join('\n')).toContain('pnpm approve-builds');
+		// Said once, however many installs hit the same blocked script.
+		expect(
+			result.json().manual.filter((/** @type {string} */ l) => l.includes('approve-builds')).length,
+		).toBe(1);
+	});
+
+	it('still fails when the install itself fails', async () => {
+		// The tolerance above is for one specific pnpm exit, not for any non-zero
+		// code. A registry that refused the request leaves nothing installed, and
+		// carrying on would report a working scaffold that cannot run.
+		const { root } = fixture();
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file) =>
+				file === 'git'
+					? { code: 0, stdout: '', stderr: '' }
+					: { code: 1, stdout: '', stderr: 'ERR_PNPM_FETCH_404  GET https://registry...' },
+		};
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'pnpm'],
+			{ exec },
+		);
+
+		expect(result.exitCode).not.toBe(0);
+		expect(result.stderr).toContain('failed');
+	});
+
+	it('tells pnpm to run the build script the generated app needs', async () => {
+		// esbuild's install script is how vite's platform binary arrives, so the
+		// app cannot start without it. Approving it up front is also what keeps
+		// pnpm from failing the install over an undecided script.
+		const { root } = fixture();
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'pnpm'], {
+			exec: recorder.exec,
+		});
+
+		const installs = recorder.args.filter((argv) => argv[0] === 'add');
+		expect(installs.length).toBeGreaterThan(0);
+		expect(installs.every((argv) => argv.includes('--allow-build=esbuild'))).toBe(true);
+	});
+
+	it('installs anyway when pnpm is too old to take the build approval', async () => {
+		// `--allow-build` landed in pnpm 10.4, and an older pnpm rejects the flag
+		// instead of installing. Retrying without it beats reporting a scaffold
+		// that never ran.
+		const { root } = fixture();
+		/** @type {string[][]} */
+		const ran = [];
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ argv) => {
+				if (file === 'git') return { code: 0, stdout: '', stderr: '' };
+				ran.push(argv);
+				return argv.some((arg) => arg.startsWith('--allow-build'))
+					? { code: 1, stdout: '', stderr: " ERROR  Unknown option: 'allow-build'" }
+					: { code: 0, stdout: '', stderr: '' };
+			},
+		};
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'pnpm', '--json'],
+			{ exec },
+		);
+
+		expect(result.exitCode).toBe(0);
+		expect(result.json().installed).toContain('vite');
+		expect(ran.some((argv) => !argv.some((arg) => arg.startsWith('--allow-build')))).toBe(true);
+	});
+
+	it('keeps the pnpm build approval out of the other managers', async () => {
+		// `--allow-build` is pnpm's spelling. npm reads it as a package name and
+		// installs something nobody asked for.
+		const { root } = fixture();
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--package-manager', 'npm'], {
+			exec: recorder.exec,
+		});
+
+		expect(recorder.args.flat().some((arg) => arg.startsWith('--allow-build'))).toBe(false);
+	});
+
 	it('rejects a package manager it cannot drive', async () => {
 		const { root } = fixture();
 

@@ -1,10 +1,10 @@
 {
   "name": "@octanejs/rsbuild-plugin",
-  "version": "0.1.18",
+  "version": "0.1.24",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "description": "Rsbuild metaframework plugin for Octane (Rspack compiler, routing, SSR, hydration, and production builds)",
   "author": {
@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@rsbuild/core": "catalog:default",
+    "@rsbuild/plugin-react": "catalog:default",
     "@rspack/core": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",

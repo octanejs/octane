@@ -1,5 +1,84 @@
 # @octanejs/cli
 
+## 0.0.6
+
+### Patch Changes
+
+- e814506: Finish the install when pnpm blocks a dependency build script.
+
+  pnpm refuses to run a dependency's install script until the project records a
+  decision about it, and since 11.0 it says so by failing the command, after the
+  packages are already on disk. `octane init` and `octane create` read any
+  non-zero exit as a dead install and stopped there, which left the dependencies
+  installed and the dev dependencies missing: the generated app had no bundler,
+  and `pnpm dev` died on `Cannot find package 'vite'`. Scaffolding a `fullstack`
+  app with pnpm 11 hit this every time, since `esbuild` reaches that tree and
+  carries an install script.
+
+  Installs driven by the scaffold now name the build scripts the generated app
+  needs, passing `--allow-build=esbuild` to pnpm: that install script is how
+  vite's platform binary arrives. Only that package is approved, so a build script
+  arriving through some other dependency stays the user's decision. pnpm older
+  than 10.4 does not take the flag and the install is retried without it, and
+  `--allow-build` is never passed to npm, yarn, or bun, which would read it as a
+  package name.
+
+  A blocked build script the CLI did not name no longer aborts the run either. The
+  packages installed, so setup continues and the pending decision is reported
+  under `Do this by hand` as a `pnpm approve-builds` step.
+
+## 0.0.5
+
+### Patch Changes
+
+- bd8bb1b: Require Node.js 22.22.2 or newer across Octane's published packages.
+
+  Add the `octane/compiler/register` preload for running server and SSG scripts
+  directly with Node or Bun. It compiles imported `.tsrx`/`.tsx` modules and
+  plain TypeScript custom hooks in server mode without a Vite build. Bun also
+  targets bare `octane` imports at `octane/server` in pass-through authored source
+  dependencies, including packages that manage their hook slots manually.
+
+## 0.0.4
+
+### Patch Changes
+
+- 522c083: Scaffold a landing page instead of a placeholder, and give `fullstack` the
+  routes that justify its name.
+
+  `octane create` and `octane init` previously wrote an `App.tsrx` reading "Hello
+  from Octane", and `fullstack` differed from `spa` only by an `octane.config.ts`
+  carrying a single route — so the template that exists to demonstrate routing,
+  SSR and hydration demonstrated none of them, and the first thing a new project
+  showed was a placeholder to delete.
+
+  Both templates now open on a landing page: the Octane mark, and cards linking
+  into the documentation. `fullstack` additionally scaffolds `/counter`, which
+  arrives server-rendered and becomes interactive on hydration, a `Layout.tsrx`
+  the two pages share, and a `GET /api/health` `ServerRoute` — a handler returning
+  a `Response` rather than a component, which is the half of the app layer `spa`
+  has no equivalent for.
+
+  The palette, typography and card styling are octanejs.dev's own, so a scaffolded
+  app and the documentation look like one thing. `src/styles.css` carries the
+  tokens and both colour schemes and the shell links it; each component keeps its
+  own scoped `<style>`. No CSS framework, nothing to uninstall.
+
+  The stylesheet is linked from the shell rather than imported by a component,
+  because a CSS import is injected by JavaScript in dev and the tokens would
+  arrive after the server-rendered markup that reads them. When `init` runs
+  against a project that kept its own `index.html`, it writes the stylesheet and
+  states the `<link>` to add, the same way it already states the SSR markers.
+
+  `tsconfig.json` now includes `octane.config.ts`, so a route entry naming an
+  export that does not exist fails `typecheck` rather than at request time.
+
+  `octane init --mode fullstack` no longer writes an entry component into a
+  project that brought its own `octane.config.ts`. The pages belong to the routes
+  this command declares; that config names its own entries, which may not be these
+  files at all, so writing them produced components nothing routed to. A missing
+  entry in someone's own config stays `octane doctor`'s to report.
+
 ## 0.0.3
 
 ### Patch Changes

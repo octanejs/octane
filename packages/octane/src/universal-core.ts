@@ -668,7 +668,11 @@ interface BlueprintRange {
 	kind: 'range';
 	key: UniversalKey | null;
 	children: BlueprintNode[];
+	owner?: UniversalOwnerRecord;
 	compactLeafList?: BlueprintCompactLeafList;
+	// The committed range this marker stands for: the subtree neither re-rendered
+	// nor re-drafted, so reconciliation must adopt the committed records as-is.
+	retained?: LogicalRecord;
 }
 
 interface BlueprintHost {
@@ -748,6 +752,9 @@ interface DraftRecord {
 	children: DraftRecord[];
 	isNew: boolean;
 	hostUpdate: UniversalHostUpdateKind | null;
+	// A retained subtree adopts its committed records wholesale: commit must not
+	// rewrite the record's children, and placement reads them from the record.
+	retained?: boolean;
 }
 
 type EffectPhase = 'insertion' | 'layout' | 'passive';
@@ -869,6 +876,11 @@ interface UniversalOwnerRecord {
 	readonly root: UniversalRootImpl<any, any>;
 	readonly renderer: string;
 	component: UniversalComponent<any> | null;
+	componentProps: any;
+	// The component revision this owner last rendered under. HMR swaps keep the
+	// wrapper identity and bump only the revision, so a retained-subtree reuse
+	// must compare it to know the committed output still reflects current code.
+	componentRevision: number;
 	parent: UniversalOwnerRecord | null;
 	identityPath: readonly unknown[];
 	key: unknown;
@@ -877,6 +889,11 @@ interface UniversalOwnerRecord {
 	hooks: Map<unknown, UniversalHook>;
 	effectOrder: EffectHook[];
 	children: UniversalOwnerRecord[];
+	// The root's dirty epoch this owner (or a descendant) was last scheduled in.
+	// Comparing against an attempt's consumed epoch answers "does this subtree
+	// carry scheduled work?" in O(1); stale epochs expire without any clearing.
+	dirtyEpoch: number;
+	range: LogicalRecord | null;
 	contextValues: Map<UniversalContext<any>, unknown> | null;
 	updates: Map<unknown, UniversalHookUpdateQueue>;
 	isBoundary: boolean;
@@ -897,6 +914,7 @@ interface BoundaryOwner {
 interface RenderAttempt {
 	root: UniversalRootImpl<any, any>;
 	owner: DraftOwner;
+	scope: UniversalOwnerRecord | null;
 	owners: DraftOwner[];
 	treeFeatures: number;
 	replayEntries: readonly SuspendedMemoEntry[];
@@ -906,6 +924,16 @@ interface RenderAttempt {
 	transitionBatches: ReadonlySet<UniversalTransitionBatch>;
 	transitionRender: boolean;
 	bridgeContextReads: Map<UniversalContext<any>, unknown> | null;
+	// Whether this attempt may reuse committed component subtrees whose inputs
+	// are provably unchanged instead of re-rendering them. Only plain urgent
+	// local-driver attempts qualify; replay, transition, bridge, and transport
+	// renders need every owner re-executed for their own bookkeeping.
+	retainEligible: boolean;
+	retainedCount: number;
+	// The dirty epoch this attempt consumed. An owner stamped with it contains
+	// scheduled work, so its subtree must re-render even when its props, update
+	// queues, and contexts look clean.
+	dirtyEpoch: number;
 }
 
 const UNIVERSAL_TREE_PORTAL = 1 << 0;
@@ -918,13 +946,24 @@ const UNIVERSAL_TREE_HIDDEN = 1 << 6;
 
 interface DraftOwner {
 	record: UniversalOwnerRecord;
+	componentProps: any;
+	componentRevision: number;
 	parent: DraftOwner | null;
 	replayPath: readonly SuspendedOwnerSegment[];
 	hooks: Map<unknown, UniversalHook>;
 	clonedHooks: Set<unknown>;
 	seenEffects: EffectHook[];
 	children: DraftOwner[];
+	// Committed child owners adopted without re-rendering, with the drafted-child
+	// index each was claimed at so commit can rebuild record.children in exact
+	// claim order.
+	retainedChildren: { record: UniversalOwnerRecord; position: number }[] | null;
 	claimedChildren: Set<UniversalOwnerRecord>;
+	// Claims almost always revisit committed children in their original order,
+	// so a plain cursor with a direct identity compare resolves them without
+	// touching the identity-path index; the first out-of-order claim builds the
+	// buckets and retires the cursor for this render.
+	sequentialClaimCursor: number;
 	childOwnerBuckets: OwnerIdentityIndex<UniversalOwnerRecord[]> | null;
 	childClaimCursors: OwnerIdentityIndex<number> | null;
 	childReplayOrdinals: OwnerIdentityIndex<number> | null;
@@ -938,6 +977,9 @@ interface DraftOwner {
 	isBoundary: boolean;
 	canHandleSuspense: boolean;
 	visibility: UniversalVisibility;
+	// Lazily memoized answer to "has any context this owner can observe changed
+	// value since the last commit?"; null until computed for this attempt.
+	contextStable: boolean | null;
 }
 
 interface LazyLeafOwnerScope {
@@ -1761,6 +1803,8 @@ function createOwnerRecord(
 		root,
 		renderer: root.renderer,
 		component,
+		componentProps: null,
+		componentRevision: 0,
 		parent,
 		identityPath,
 		key,
@@ -1769,6 +1813,8 @@ function createOwnerRecord(
 		hooks: new Map(),
 		effectOrder: [],
 		children: [],
+		dirtyEpoch: 0,
+		range: null,
 		contextValues: null,
 		updates: new Map(),
 		isBoundary: false,
@@ -1789,13 +1835,17 @@ function draftOwner(
 ): DraftOwner {
 	return {
 		record,
+		componentProps: record.componentProps,
+		componentRevision: record.componentRevision,
 		parent,
 		replayPath,
 		hooks: new Map(record.hooks),
 		clonedHooks: new Set(),
 		seenEffects: [],
 		children: [],
+		retainedChildren: null,
 		claimedChildren: new Set(),
+		sequentialClaimCursor: 0,
 		childOwnerBuckets: null,
 		childClaimCursors: null,
 		childReplayOrdinals: null,
@@ -1808,7 +1858,8 @@ function draftOwner(
 		boundaryThenable: record.boundaryThenable,
 		isBoundary: record.isBoundary,
 		canHandleSuspense: record.canHandleSuspense,
-		visibility: parent?.visibility ?? 'visible',
+		visibility: parent?.visibility ?? record.visibility,
+		contextStable: null,
 	};
 }
 
@@ -1846,34 +1897,123 @@ function childOwnerBucket(
 	return readOwnerIdentity(buckets, component, identityPath, key);
 }
 
+function identityPathsEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
+	if (left === right) return true;
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index++) {
+		if (!Object.is(left[index], right[index])) return false;
+	}
+	return true;
+}
+
+function findClaimableChildRecord(
+	parent: DraftOwner,
+	component: UniversalComponent<any> | null,
+	identityPath: readonly unknown[],
+	key: unknown,
+): UniversalOwnerRecord | undefined {
+	// Order-stable renders resolve every claim with one positional compare; the
+	// identity-path buckets exist for reorders, insertions, and removals.
+	if (parent.childOwnerBuckets === null) {
+		const candidate = parent.record.children[parent.sequentialClaimCursor];
+		if (
+			candidate !== undefined &&
+			candidate.component === component &&
+			Object.is(candidate.key, key) &&
+			identityPathsEqual(candidate.identityPath, identityPath) &&
+			!parent.claimedChildren.has(candidate)
+		) {
+			parent.sequentialClaimCursor++;
+			return candidate;
+		}
+	}
+	const bucket = childOwnerBucket(parent, component, identityPath, key);
+	if (bucket === undefined) return undefined;
+	const cursors = (parent.childClaimCursors ??= createOwnerIdentityIndex());
+	let cursor = readOwnerIdentity(cursors, component, identityPath, key) ?? 0;
+	while (cursor < bucket.length && parent.claimedChildren.has(bucket[cursor])) cursor++;
+	const record = bucket[cursor];
+	writeOwnerIdentity(
+		cursors,
+		component,
+		identityPath,
+		key,
+		cursor + (record === undefined ? 0 : 1),
+	);
+	return record;
+}
+
+function adoptChildOwner(
+	parent: DraftOwner,
+	record: UniversalOwnerRecord,
+	component: UniversalComponent<any> | null,
+	identityPath: readonly unknown[],
+	key: unknown,
+): DraftOwner {
+	const attempt = currentAttempt();
+	parent.claimedChildren.add(record);
+	const draft = draftOwner(record, parent, childReplayPath(parent, component, identityPath, key));
+	parent.children.push(draft);
+	attempt.owners.push(draft);
+	return draft;
+}
+
 function claimChildOwner(
 	parent: DraftOwner,
 	component: UniversalComponent<any> | null,
 	identityPath: readonly unknown[],
 	key: unknown,
 ): DraftOwner {
-	const attempt = currentAttempt();
-	let record: UniversalOwnerRecord | undefined;
-	const bucket = childOwnerBucket(parent, component, identityPath, key);
-	if (bucket !== undefined) {
-		const cursors = (parent.childClaimCursors ??= createOwnerIdentityIndex());
-		let cursor = readOwnerIdentity(cursors, component, identityPath, key) ?? 0;
-		while (cursor < bucket.length && parent.claimedChildren.has(bucket[cursor])) cursor++;
-		record = bucket[cursor];
-		writeOwnerIdentity(
-			cursors,
-			component,
-			identityPath,
-			key,
-			cursor + (record === undefined ? 0 : 1),
-		);
+	const record =
+		findClaimableChildRecord(parent, component, identityPath, key) ??
+		createOwnerRecord(currentAttempt().root, component, parent.record, identityPath, key);
+	return adoptChildOwner(parent, record, component, identityPath, key);
+}
+
+// Whether every context value observable from `owner` still matches the last
+// commit. Anything an in-scope provider changed this attempt shows up as a
+// draft contextValues entry that differs from its committed record; providers
+// outside the scope could not have re-rendered, so their values are unchanged.
+function ancestorContextsStable(owner: DraftOwner): boolean {
+	if (owner.contextStable !== null) return owner.contextStable;
+	let stable = owner.parent === null ? true : ancestorContextsStable(owner.parent);
+	if (stable && owner.contextValues !== null) {
+		const committed = owner.record.mounted ? owner.record.contextValues : null;
+		if (committed === null) {
+			stable = owner.contextValues.size === 0;
+		} else if (committed.size !== owner.contextValues.size) {
+			stable = false;
+		} else {
+			for (const [context, value] of owner.contextValues) {
+				if (!committed.has(context) || !Object.is(committed.get(context), value)) {
+					stable = false;
+					break;
+				}
+			}
+		}
 	}
-	record ??= createOwnerRecord(attempt.root, component, parent.record, identityPath, key);
-	parent.claimedChildren.add(record);
-	const draft = draftOwner(record, parent, childReplayPath(parent, component, identityPath, key));
-	parent.children.push(draft);
-	attempt.owners.push(draft);
-	return draft;
+	owner.contextStable = stable;
+	return stable;
+}
+
+// Whether a committed owner subtree can be adopted without re-rendering: no
+// pending hook updates, no active boundary episode, no retained-hidden
+// content, no warm-plan component, and no HMR revision drift anywhere below.
+function ownerSubtreeRetainable(owner: UniversalOwnerRecord): boolean {
+	if (
+		owner.updates.size !== 0 ||
+		owner.visibility !== 'visible' ||
+		(owner.isBoundary && (owner.hasBoundaryError || owner.boundaryThenable !== null)) ||
+		(owner.component as any)?.__warm !== undefined ||
+		(owner.component !== null &&
+			universalComponentRevision(owner.component) !== owner.componentRevision)
+	) {
+		return false;
+	}
+	for (const child of owner.children) {
+		if (!ownerSubtreeRetainable(child)) return false;
+	}
+	return true;
 }
 
 function activateLazyLeafOwner(): DraftOwner | null {
@@ -1911,6 +2051,15 @@ function readOwnerContext<T>(
 			return value;
 		}
 	}
+	if (currentAttempt().scope !== null) {
+		for (let current = owner?.record.parent ?? null; current !== null; current = current.parent) {
+			if (current.contextValues?.has(context)) {
+				value = current.contextValues.get(context) as T;
+				if (trackMemoRead) CURRENT_MEMO_CONTEXT_READS?.set(context, value);
+				return value;
+			}
+		}
+	}
 	value = currentAttempt().root.readBridgeContext(context);
 	if (trackMemoRead) CURRENT_MEMO_CONTEXT_READS?.set(context, value);
 	return value;
@@ -1930,9 +2079,12 @@ function executeOwner(
 		if (renderCount > 0) resetDraftChildren(owner);
 		owner.seenEffects = [];
 		owner.children = [];
+		owner.retainedChildren = null;
 		owner.claimedChildren = new Set();
+		owner.sequentialClaimCursor = 0;
 		owner.childClaimCursors = null;
 		owner.childReplayOrdinals = null;
+		owner.contextStable = null;
 		owner.needsRender = false;
 		owner.implicitSlot = 0;
 		const previousOwner = CURRENT_OWNER;
@@ -2002,7 +2154,7 @@ function renderLazyLeafItem(
 }
 
 function ownerRange(owner: DraftOwner, children: BlueprintNode[]): BlueprintNode[] {
-	return [{ kind: 'range', key: owner.record.rangeKey, children }];
+	return [{ kind: 'range', key: owner.record.rangeKey, owner: owner.record, children }];
 }
 
 function componentContext(renderer: string): UniversalRenderContext {
@@ -2034,8 +2186,55 @@ function materializeComponentValue(
 	const parent = CURRENT_OWNER;
 	if (parent === null) throw new Error('A nested universal component requires an owner.');
 	const normalized = normalizePropsValue(value.props);
-	const owner = claimChildOwner(parent, value.component, path, value.hasKey ? value.key : null);
+	const key = value.hasKey ? value.key : null;
+	const attempt = currentAttempt();
+	const record = findClaimableChildRecord(parent, value.component, path, key);
+	if (
+		attempt.retainEligible &&
+		record !== undefined &&
+		record.mounted &&
+		!record.disposed &&
+		record.dirtyEpoch !== attempt.dirtyEpoch &&
+		record.visibility === 'visible' &&
+		parent.visibility === 'visible' &&
+		record.componentProps !== null &&
+		universalShallowEqual(record.componentProps, normalized.props) &&
+		record.range !== null &&
+		record.range.owner === record &&
+		ancestorContextsStable(parent) &&
+		ownerSubtreeRetainable(record)
+	) {
+		const features = logicalTreeFeatures(record.range);
+		if ((features & (UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION)) === 0) {
+			// Adopt the committed subtree wholesale: the claim is recorded so the
+			// records survive reconciliation, but no draft is created and nothing
+			// below re-renders. The committed features join the attempt's so the
+			// commit keeps every staging branch those features rely on.
+			parent.claimedChildren.add(record);
+			(parent.retainedChildren ??= []).push({ record, position: parent.children.length });
+			attempt.treeFeatures |= features;
+			attempt.retainedCount++;
+			return [
+				{
+					kind: 'range',
+					key: record.range.key,
+					owner: record,
+					retained: record.range,
+					children: [],
+				},
+			];
+		}
+	}
+	const owner = adoptChildOwner(
+		parent,
+		record ?? createOwnerRecord(attempt.root, value.component, parent.record, path, key),
+		value.component,
+		path,
+		key,
+	);
+	owner.componentRevision = universalComponentRevision(value.component);
 	const props = { ...normalized.props };
+	owner.componentProps = props;
 	const nodes = executeOwner(owner, () => {
 		const rendered = value.component(props, componentContext(expectedRenderer));
 		return materializeValue(rendered, expectedRenderer, null, [...path, 'output']);
@@ -2072,6 +2271,8 @@ function disposeUncommittedDraft(owner: DraftOwner): void {
 	for (const child of owner.children) disposeUncommittedDraft(child);
 	if (!owner.record.mounted) {
 		owner.record.disposed = true;
+		owner.record.componentProps = null;
+		owner.record.range = null;
 		owner.record.updates.clear();
 		for (const hook of owner.hooks.values()) {
 			if (hook.kind === 'effect-event') hook.cell.active = false;
@@ -2082,7 +2283,9 @@ function disposeUncommittedDraft(owner: DraftOwner): void {
 function resetDraftChildren(owner: DraftOwner): void {
 	for (const child of owner.children) disposeUncommittedDraft(child);
 	owner.children = [];
+	owner.retainedChildren = null;
 	owner.claimedChildren = new Set();
+	owner.sequentialClaimCursor = 0;
 	owner.childClaimCursors = null;
 	owner.childReplayOrdinals = null;
 }
@@ -2093,7 +2296,9 @@ function retainCommittedOwnerTree(owner: DraftOwner): void {
 	owner.contextValues =
 		owner.record.contextValues === null ? null : new Map(owner.record.contextValues);
 	owner.children = [];
+	owner.retainedChildren = null;
 	owner.claimedChildren = new Set(owner.record.children);
+	owner.sequentialClaimCursor = 0;
 	owner.childClaimCursors = null;
 	owner.childReplayOrdinals = null;
 	for (const childRecord of owner.record.children) {
@@ -2122,6 +2327,7 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 		return {
 			kind: 'range',
 			key: record.key,
+			...(record.owner === null ? null : { owner: record.owner }),
 			children: record.children.map(blueprintFromLogical),
 		};
 	}
@@ -3033,11 +3239,12 @@ function physicalRecords(records: readonly LogicalRecord[]): LogicalRecord[] {
 	return output;
 }
 
-function physicalDrafts(records: readonly DraftRecord[]): DraftRecord[] {
-	const output: DraftRecord[] = [];
-	for (const record of records) {
-		if (record.record.kind === 'host') output.push(record);
-		else if (record.record.kind === 'range') output.push(...physicalDrafts(record.children));
+function physicalDrafts(drafts: readonly DraftRecord[]): LogicalRecord[] {
+	const output: LogicalRecord[] = [];
+	for (const draft of drafts) {
+		if (draft.record.kind === 'host') output.push(draft.record);
+		else if (draft.retained === true) output.push(...physicalRecords(draft.record.children));
+		else if (draft.record.kind === 'range') output.push(...physicalDrafts(draft.children));
 	}
 	return output;
 }
@@ -3055,6 +3262,81 @@ function walkDraft(record: DraftRecord, visit: (record: DraftRecord) => void): v
 function walkDraftPostOrder(record: DraftRecord, visit: (record: DraftRecord) => void): void {
 	for (const child of record.children) walkDraftPostOrder(child, visit);
 	visit(record);
+}
+
+function logicalTreeFeatures(record: LogicalRecord): number {
+	let features = 0;
+	walkLogical(record, (current) => {
+		if (current.kind === 'portal') {
+			features |= UNIVERSAL_TREE_PORTAL;
+			return;
+		}
+		if (current.kind !== 'host') return;
+		if (current.events.size !== 0) features |= UNIVERSAL_TREE_EVENT;
+		if (current.lifecycles.size !== 0) features |= UNIVERSAL_TREE_LIFECYCLE;
+		if (current.localCallbacks.size !== 0) features |= UNIVERSAL_TREE_LOCAL_CALLBACK;
+		if (current.ref != null) features |= UNIVERSAL_TREE_REF;
+		if (current.visibility !== 'visible') features |= UNIVERSAL_TREE_HIDDEN;
+		for (const value of Object.values(current.props)) {
+			if (isRendererRegion(value)) {
+				features |= UNIVERSAL_TREE_REGION;
+				break;
+			}
+		}
+	});
+	return features;
+}
+
+function ownerTreeHasWarmPlan(owner: UniversalOwnerRecord): boolean {
+	if ((owner.component as any)?.__warm !== undefined) return true;
+	for (const child of owner.children) {
+		if (ownerTreeHasWarmPlan(child)) return true;
+	}
+	return false;
+}
+
+function commonOwnerAncestor(
+	left: UniversalOwnerRecord,
+	right: UniversalOwnerRecord,
+): UniversalOwnerRecord | null {
+	let leftDepth = 0;
+	for (let current = left.parent; current !== null; current = current.parent) leftDepth++;
+	let rightDepth = 0;
+	for (let current = right.parent; current !== null; current = current.parent) rightDepth++;
+	let a: UniversalOwnerRecord | null = left;
+	let b: UniversalOwnerRecord | null = right;
+	for (; leftDepth > rightDepth; leftDepth--) a = a!.parent;
+	for (; rightDepth > leftDepth; rightDepth--) b = b!.parent;
+	while (a !== null && a !== b) {
+		a = a.parent;
+		b = b!.parent;
+	}
+	return a;
+}
+
+function stableLogicalChildren(
+	records: readonly LogicalRecord[],
+	blueprints: readonly BlueprintNode[],
+): boolean {
+	if (records.length !== blueprints.length) return false;
+	for (let index = 0; index < records.length; index++) {
+		const record = records[index];
+		const blueprint = blueprints[index];
+		if (blueprint.kind === 'range' && blueprint.retained !== undefined) {
+			// An adopted committed subtree is shape-stable exactly when it stands
+			// for the record already in this position.
+			if (blueprint.retained === record) continue;
+			return false;
+		}
+		if (
+			(blueprint.kind === 'range' && blueprint.compactLeafList !== undefined) ||
+			!sameRecordShape(record, blueprint) ||
+			!stableLogicalChildren(record.children, blueprint.children)
+		) {
+			return false;
+		}
+	}
+	return true;
 }
 
 function collectRemovedPostOrder(record: LogicalRecord, output: LogicalRecord[]): void {
@@ -3455,7 +3737,7 @@ function scheduleOwner(owner: UniversalOwnerRecord, slot?: unknown): void {
 		'state',
 		typeof slot === 'symbol' || typeof slot === 'number' ? slot : undefined,
 	);
-	owner.root.schedule();
+	owner.root.scheduleOwned(owner);
 }
 
 function currentDraftOwner(): DraftOwner {
@@ -5125,7 +5407,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private retryRenderInput: readonly [UniversalComponent<any>, any] | null = null;
 	private scheduled = false;
 	private scheduledUrgent = false;
+	private scheduledFullRoot = false;
+	private readonly scheduledOwners = new Set<UniversalOwnerRecord>();
 	private scheduledPreparationDepth = 0;
+	// The current dirty epoch: scheduleOwned() stamps it on the scheduled owner
+	// and its ancestors, and prepare() bumps it as it consumes the batch, so an
+	// attempt recognizes exactly the owners scheduled into it.
+	private dirtyEpoch = 1;
+	private attemptDirtyEpoch = 0;
+	private attemptFullRootScheduled = false;
 	private readonly scheduledTransitionBatches = new Set<UniversalTransitionBatch>();
 	private readonly unattemptedTransitionBatches = new Set<UniversalTransitionBatch>();
 	private eventScopeDepth = 0;
@@ -5990,13 +6280,34 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		this.__scheduleMicrotask(() => this.flushScheduledWork());
 	}
 
-	schedule(): void {
+	private markUrgentScheduled(): void {
 		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) return;
 		this.scheduledUrgent = true;
 		if (this.scheduled) return;
 		this.scheduled = true;
 		SCHEDULED_UNIVERSAL_ROOTS.add(this);
 		if (this.eventScopeDepth === 0 && UNIVERSAL_SYNC_DEPTH === 0) this.queueScheduledWork();
+	}
+
+	scheduleOwned(owner: UniversalOwnerRecord): void {
+		if (owner.root !== this || owner.disposed) return;
+		this.scheduledOwners.add(owner);
+		// Stamp the owner and its ancestors so retained-subtree adoption can see
+		// scheduled work with one integer compare. The early stop bounds repeat
+		// schedules and converging chains to O(1) amortized per call.
+		for (
+			let current: UniversalOwnerRecord | null = owner;
+			current !== null && current.dirtyEpoch !== this.dirtyEpoch;
+			current = current.parent
+		) {
+			current.dirtyEpoch = this.dirtyEpoch;
+		}
+		this.markUrgentScheduled();
+	}
+
+	schedule(): void {
+		this.scheduledFullRoot = true;
+		this.markUrgentScheduled();
 	}
 
 	/** @internal Associates promoted transition work with its accepting transaction. */
@@ -6207,6 +6518,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 							replay.entries,
 							replay.transitionBatches,
 							replay.transitionRender,
+							false,
 						);
 					} catch (error) {
 						const batches = new Set(replay.transitionBatches);
@@ -6244,6 +6556,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				replay.entries,
 				replay.transitionBatches,
 				replay.transitionRender,
+				false,
 			);
 		} catch (error) {
 			const batches = new Set(replay.transitionBatches);
@@ -6424,6 +6737,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		for (const draft of owners) {
 			if (committed.has(draft.record)) continue;
 			draft.record.disposed = true;
+			draft.record.componentProps = null;
+			draft.record.range = null;
 			draft.record.updates.clear();
 			for (const hook of draft.hooks.values()) {
 				if (hook.kind === 'effect-event') hook.cell.active = false;
@@ -6489,9 +6804,268 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		};
 	}
 
+	// A local state update may replay only the component range that owns its hook.
+	// The retained topology check keeps reconciliation atomic: features that need
+	// root-wide coordination, or any structural change, fall back to the ordinary
+	// full-root attempt before a host batch is prepared.
+	private prepareOwnedUpdate(
+		target: UniversalOwnerRecord,
+		component: UniversalComponent<any>,
+		props: any,
+	): UniversalPreparedAttempt | null {
+		const range = target.range;
+		// Transported and bridged roots stay on the full-root path: their commits
+		// are acknowledged (or invalidated) against a whole-tree version, so a
+		// scoped batch would need its own ACK/rollback protocol on the far side
+		// before it could be accepted independently.
+		if (
+			this.transport !== null ||
+			this.bridge !== null ||
+			target.component === null ||
+			target.componentProps === null ||
+			ownerTreeHasWarmPlan(target) ||
+			range === null ||
+			range.kind !== 'range' ||
+			range.owner !== target ||
+			target.visibility === 'suspense-hidden'
+		) {
+			return null;
+		}
+		// An idle ancestor boundary needs no coordination: a scoped render that
+		// suspends or throws below it falls back to the full-root attempt, where
+		// the boundary handles the episode exactly as it always has. Only an
+		// already-active episode keeps its subtree on the full-root path.
+		for (let ancestor = target.parent; ancestor !== null; ancestor = ancestor.parent) {
+			if (
+				ancestor.isBoundary &&
+				(ancestor.hasBoundaryError || ancestor.boundaryThenable !== null)
+			) {
+				return null;
+			}
+		}
+		const unsupported = UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION;
+		// A root-scoped update covers the whole committed tree, whose feature union
+		// the last full commit already recorded; walking the tree again per update
+		// would reintroduce the O(tree) cost this path exists to avoid.
+		const scopeFeatures =
+			range === this.rootRecord ? this.treeFeatures : logicalTreeFeatures(range);
+		if ((scopeFeatures & unsupported) !== 0) return null;
+
+		this.flushPassivesBeforeRender();
+		this.pending?.abort();
+		const owner = draftOwner(target, null, [
+			{
+				component: target.component,
+				identityPath: target.identityPath,
+				key: target.key,
+				ordinal: 0,
+			},
+		]);
+		owner.componentRevision = universalComponentRevision(target.component);
+		const previousAttempt = CURRENT_ATTEMPT;
+		const previousOwner = CURRENT_OWNER;
+		const previousWarm = CURRENT_UNIVERSAL_WARM;
+		const previousWarmClaims = CURRENT_UNIVERSAL_WARM_CLAIMS;
+		const previousWarmPlans = ACTIVE_UNIVERSAL_WARM_PLANS.slice();
+		const attempt: RenderAttempt = {
+			root: this,
+			owner,
+			scope: target,
+			owners: [owner],
+			treeFeatures: 0,
+			replayEntries: [],
+			retryThenables: new Set(),
+			nextUniversalId: this.nextUniversalId,
+			implicitSlot: 0,
+			transitionBatches: EMPTY_UNIVERSAL_TRANSITION_BATCHES,
+			transitionRender: false,
+			bridgeContextReads: null,
+			// The owned-update guards already require a plain urgent local-driver
+			// attempt, which is exactly the retain-eligible shape.
+			retainEligible: true,
+			retainedCount: 0,
+			dirtyEpoch: this.attemptDirtyEpoch,
+		};
+		ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
+		CURRENT_UNIVERSAL_WARM = null;
+		CURRENT_UNIVERSAL_WARM_CLAIMS = null;
+		CURRENT_ATTEMPT = attempt;
+		CURRENT_OWNER = owner;
+		let nodes: BlueprintNode[];
+		try {
+			nodes = executeOwner(owner, () => {
+				const value = target.component!(target.componentProps, componentContext(this.renderer));
+				return materializeValue(value, this.renderer, null, [...target.identityPath, 'output']);
+			});
+		} catch (error) {
+			this.discardDraftOwners(attempt.owners);
+			if (error instanceof UniversalSuspense) {
+				UNIVERSAL_WARM_CACHES.delete(this);
+				return null;
+			}
+			// An error that escapes the scope can only be handled by a boundary
+			// above it. Fall back so the full-root attempt reaches that boundary's
+			// materialize-time handling; without one the error is the caller's.
+			for (let ancestor = target.parent; ancestor !== null; ancestor = ancestor.parent) {
+				if (ancestor.isBoundary) {
+					UNIVERSAL_WARM_CACHES.delete(this);
+					return null;
+				}
+			}
+			throw error;
+		} finally {
+			ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
+			ACTIVE_UNIVERSAL_WARM_PLANS.push(...previousWarmPlans);
+			CURRENT_UNIVERSAL_WARM = previousWarm;
+			CURRENT_UNIVERSAL_WARM_CLAIMS = previousWarmClaims;
+			CURRENT_ATTEMPT = previousAttempt;
+			CURRENT_OWNER = previousOwner;
+		}
+		if (attempt.retryThenables.size !== 0 || (attempt.treeFeatures & unsupported) !== 0) {
+			this.discardDraftOwners(attempt.owners);
+			UNIVERSAL_WARM_CACHES.delete(this);
+			return null;
+		}
+
+		const blueprint: BlueprintRange = {
+			kind: 'range',
+			// The committed range key: rangeKey for an ownerRange() scope, null for
+			// the root range, so the reapplied key never drifts from what the full
+			// render path would commit.
+			key: range.key,
+			owner: target,
+			children: nodes,
+		};
+		// Retained compact rows are ordinary expanded host records, so the scoped
+		// blueprint expands the same way before it is compared or reconciled.
+		this.expandCompactLeafLists(blueprint);
+		// Structural changes commit through a physical frame for the scope. A
+		// portal or detached ancestor has no such frame, so those scopes fall
+		// back once their shape changes; shape-stable updates need no frame.
+		let scopePlacement: { parent: number | null; endAnchor: number | null } | null = null;
+		// The root scope has no out-of-scope siblings: commit plans its placements
+		// against the container directly, so it needs no precomputed frame.
+		if (range !== this.rootRecord && !stableLogicalChildren(range.children, blueprint.children)) {
+			scopePlacement = this.scopePhysicalPlacement(range);
+			if (scopePlacement === null) {
+				this.discardDraftOwners(attempt.owners);
+				UNIVERSAL_WARM_CACHES.delete(this);
+				return null;
+			}
+		}
+		try {
+			const transaction = this.createPreparedTransaction(
+				blueprint,
+				attempt,
+				component,
+				props,
+				new Set(),
+				range,
+				scopeFeatures,
+				scopePlacement,
+			);
+			this.pending = transaction;
+			return transaction;
+		} catch (error) {
+			this.discardDraftOwners(attempt.owners);
+			throw error;
+		}
+	}
+
+	// The physical frame a scoped range commits into: its nearest host (or
+	// container) ancestor plus the first physical host that follows the scope
+	// inside that parent. Untouched siblings cannot move during a scoped commit,
+	// so both stay valid anchors for inserted or reordered scope content. A
+	// portal or detached ancestor owns a separate physical tree: no frame.
+	private scopePhysicalPlacement(
+		scope: LogicalRecord,
+	): { parent: number | null; endAnchor: number | null } | null {
+		let endAnchor: number | null = null;
+		let current = scope;
+		for (let parent = current.parent; parent !== null; current = parent, parent = current.parent) {
+			if (parent.kind !== 'host' && parent.kind !== 'range') return null;
+			if (endAnchor === null) {
+				const siblings = parent.children;
+				for (let index = siblings.indexOf(current) + 1; index < siblings.length; index++) {
+					const found = physicalRecords([siblings[index]]);
+					if (found.length !== 0) {
+						endAnchor = found[0].id;
+						break;
+					}
+				}
+			}
+			if (parent.kind === 'host') return { parent: parent.id, endAnchor };
+			if (parent === this.rootRecord) return { parent: null, endAnchor };
+		}
+		return null;
+	}
+
+	// A scheduled owner that cannot replay alone (an anonymous @for-item owner,
+	// or several owners raised by one event scope) still has one smallest
+	// ancestor whose retained props and range can replay every queued update:
+	// the nearest enclosing component owner of their common ancestor.
+	private resolveScopedTarget(): UniversalOwnerRecord | undefined {
+		let scope: UniversalOwnerRecord | null = null;
+		for (const owner of this.scheduledOwners) {
+			if (owner.disposed) continue;
+			// Retained-hidden content belongs to a boundary episode; only the
+			// full-root attempt coordinates its retention and reveal.
+			if (owner.visibility === 'suspense-hidden') return undefined;
+			scope = scope === null ? owner : commonOwnerAncestor(scope, owner);
+			if (scope === null) return undefined;
+		}
+		let target: UniversalOwnerRecord | null = null;
+		for (let current = scope; current !== null; current = current.parent) {
+			if (current.component !== null && current.componentProps !== null && current.range !== null) {
+				target = current;
+				break;
+			}
+		}
+		if (target === null) return undefined;
+		// Hoisting may carry the replay across boundaries the scheduled owner sits
+		// under. An idle boundary re-renders its body inline like any other owner,
+		// but an active episode (pending thenable or routed error) owns retained
+		// arms whose replay and reveal are coordinated from the root.
+		for (const owner of this.scheduledOwners) {
+			if (owner.disposed) continue;
+			for (
+				let current: UniversalOwnerRecord | null = owner;
+				current !== target;
+				current = current.parent
+			) {
+				if (
+					current === null ||
+					(current.isBoundary && (current.hasBoundaryError || current.boundaryThenable !== null))
+				) {
+					return undefined;
+				}
+			}
+		}
+		return target;
+	}
+
 	prepare(component: UniversalComponent<any>, props: any): UniversalPreparedAttempt {
+		const ownedTarget =
+			this.scheduledPreparationDepth > 0 &&
+			this.scheduledUrgent &&
+			!this.scheduledFullRoot &&
+			this.scheduledOwners.size !== 0
+				? this.resolveScopedTarget()
+				: undefined;
 		const scheduledUrgent = this.scheduledUrgent || this.scheduledPreparationDepth === 0;
+		// Scheduling is not always a hook update: a boundary invalidation (resolved
+		// thenable, routed error, Activity reveal) re-renders its owner with an
+		// empty update queue. scheduleOwned() already epoch-stamped every
+		// scheduled owner and its ancestors; consuming the batch here just
+		// records that epoch for the attempt and opens the next one, so stale
+		// stamps expire without walking or clearing anything. Never retain at
+		// all when a full-root refresh was demanded.
+		this.attemptFullRootScheduled = this.scheduledFullRoot;
+		this.attemptDirtyEpoch = this.dirtyEpoch;
+		this.dirtyEpoch++;
 		this.scheduledUrgent = false;
+		this.scheduledFullRoot = false;
+		this.scheduledOwners.clear();
 		if (scheduledUrgent) this.urgentBoundarySuspension = null;
 		const bridgeReplay = this.bridge === null ? null : this.queuedReplay;
 		if (
@@ -6531,6 +7105,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		// update or remount that returns to the same dependency values.
 		UNIVERSAL_WARM_CACHES.delete(this);
 		try {
+			if (
+				ownedTarget !== undefined &&
+				component === this.lastComponent &&
+				universalShallowEqual(props, this.lastProps)
+			) {
+				const ownedAttempt = this.prepareOwnedUpdate(ownedTarget, component, props);
+				if (ownedAttempt !== null) return ownedAttempt;
+			}
 			const attempt = this.prepareWithReplay(
 				component,
 				props,
@@ -6560,6 +7142,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		replayEntries: readonly SuspendedMemoEntry[],
 		transitionBatches: ReadonlySet<UniversalTransitionBatch>,
 		transitionRender: boolean,
+		// A queued replay re-renders content a boundary retained while suspended;
+		// its attempt must rebuild that content even where inputs look unchanged.
+		allowRetain = true,
 	): UniversalPreparedAttempt {
 		if (this.unmounted || this.unmounting) {
 			throw new Error('Cannot render an unmounted universal root.');
@@ -6584,6 +7169,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			{ component, identityPath: ownerRecord.identityPath, key: ownerRecord.key, ordinal: 0 },
 		];
 		const owner = draftOwner(ownerRecord, null, rootPath);
+		owner.componentProps = props;
+		owner.componentRevision = universalComponentRevision(component);
 		const previousAttempt = CURRENT_ATTEMPT;
 		const previousOwner = CURRENT_OWNER;
 		const previousWarm = CURRENT_UNIVERSAL_WARM;
@@ -6592,6 +7179,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const attempt: RenderAttempt = {
 			root: this,
 			owner,
+			scope: null,
 			owners: [owner],
 			treeFeatures: 0,
 			replayEntries,
@@ -6601,6 +7189,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			transitionBatches,
 			transitionRender,
 			bridgeContextReads: null,
+			// Replay, transition, bridge, and transport attempts re-execute every
+			// owner for their own bookkeeping (warm replays, lane rebasing, bridge
+			// context read tracking, remote commit protocols); only a plain urgent
+			// local attempt may adopt committed subtrees without re-rendering them.
+			retainEligible:
+				allowRetain &&
+				this.transport === null &&
+				this.bridge === null &&
+				!this.attemptFullRootScheduled &&
+				replayEntries.length === 0 &&
+				transitionBatches.size === 0 &&
+				!transitionRender,
+			retainedCount: 0,
+			dirtyEpoch: this.attemptDirtyEpoch,
 		};
 		// A nested universal root is a separate render attempt. Do not let the
 		// caller's active component plans or speculative cache leak into it; child
@@ -6614,10 +7216,19 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		try {
 			nodes = executeOwner(owner, () => {
 				const value = component(props, componentContext(this.renderer));
-				return materializeValue(value, this.renderer, null, ['root-output']);
+				// The same `[identityPath, 'output']` shape materializeComponentValue
+				// uses, so a later owner-scoped replay of the root claims the exact
+				// child identities this render committed.
+				return materializeValue(value, this.renderer, null, [
+					...ownerRecord.identityPath,
+					'output',
+				]);
 			});
 		} catch (error) {
-			const suspendedMemos = collectSuspendedMemos(attempt);
+			// Replay ordinals count only drafted children, so an attempt that adopted
+			// retained subtrees cannot produce replay paths a full retry (which
+			// drafts everything) would resolve identically. Retry cold instead.
+			const suspendedMemos = attempt.retainedCount !== 0 ? [] : collectSuspendedMemos(attempt);
 			this.discardDraftOwners(attempt.owners);
 			if (error instanceof UniversalSuspense) {
 				return this.suspend(
@@ -6640,7 +7251,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			CURRENT_OWNER = previousOwner;
 		}
 		try {
-			const rootBlueprint: BlueprintRange = { kind: 'range', key: null, children: nodes };
+			// The root range carries its owner exactly like every ownerRange() child,
+			// so resolveScopedTarget() can hoist to the root component when state
+			// lives at the top of the app.
+			const rootBlueprint: BlueprintRange = {
+				kind: 'range',
+				key: null,
+				owner: owner.record,
+				children: nodes,
+			};
 			const transaction = this.createTransaction(rootBlueprint, attempt, component, props);
 			this.pending = transaction;
 			return transaction;
@@ -6922,6 +7541,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				for (const draft of attempt.owners) {
 					const record = draft.record;
+					record.componentProps = draft.componentProps;
+					record.componentRevision = draft.componentRevision;
 					record.parent = draft.parent?.record ?? null;
 					record.hooks = draft.hooks;
 					record.effectOrder = [...draft.seenEffects];
@@ -7056,6 +7677,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				for (const draft of attempt.owners) {
 					const record = draft.record;
+					record.componentProps = draft.componentProps;
+					record.componentRevision = draft.componentRevision;
 					record.parent = draft.parent?.record ?? null;
 					record.hooks = draft.hooks;
 					record.effectOrder = [...draft.seenEffects];
@@ -7156,11 +7779,36 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		component: UniversalComponent<any>,
 		props: any,
 		stagedPortalRegistrations: Set<UniversalPortalTargetRegistration>,
+		scopeRecord: LogicalRecord = this.rootRecord,
+		scopeFeatures = 0,
+		scopePlacement: { parent: number | null; endAnchor: number | null } | null = null,
 	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
-		const treeFeatures = this.treeFeatures | attempt.treeFeatures;
-		const used = new Set<LogicalRecord>([this.rootRecord]);
+		const scoped = scopeRecord !== this.rootRecord;
+		const treeFeatures = (scoped ? scopeFeatures : this.treeFeatures) | attempt.treeFeatures;
+		const used = new Set<LogicalRecord>([scopeRecord]);
+		const changedRangeOwners: DraftRecord[] = [];
 		let topologyChanged = false;
+		const retainedScopes = new Set<LogicalRecord>();
+		// A retained marker matched to its own committed record adopts the whole
+		// subtree in place. A marker whose record could not be matched (its
+		// physical parent changed shape) expands into an ordinary blueprint built
+		// from the committed records: the hosts recreate under the new parent
+		// while the owner records, and therefore all hook state, carry over.
+		const retainedDraft = (record: LogicalRecord, blueprint: BlueprintRange): DraftRecord => {
+			retainedScopes.add(record);
+			return { record, blueprint, children: [], isNew: false, hostUpdate: null, retained: true };
+		};
+		const expandRetained = (marker: BlueprintRange): BlueprintRange => {
+			// blueprintFromLogical reports tree features against the active attempt.
+			const previousAttempt = CURRENT_ATTEMPT;
+			CURRENT_ATTEMPT = attempt;
+			try {
+				return blueprintFromLogical(marker.retained!) as BlueprintRange;
+			} finally {
+				CURRENT_ATTEMPT = previousAttempt;
+			}
+		};
 		const reconcileChildren = (
 			oldChildren: readonly LogicalRecord[],
 			blueprints: readonly BlueprintNode[],
@@ -7172,14 +7820,25 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			) {
 				return oldChildren.map((record, index) => {
 					used.add(record);
-					const blueprint = blueprints[index];
-					return {
+					let blueprint = blueprints[index];
+					if (blueprint.kind === 'range' && blueprint.retained !== undefined) {
+						if (blueprint.retained === record) return retainedDraft(record, blueprint);
+						blueprint = expandRetained(blueprint);
+					}
+					const draft: DraftRecord = {
 						record,
 						blueprint,
 						children: reconcileChildren(record.children, blueprint.children),
 						isNew: false,
 						hostUpdate: null,
 					};
+					if (
+						record.kind === 'range' &&
+						record.owner !== ((blueprint as BlueprintRange).owner ?? null)
+					) {
+						changedRangeOwners.push(draft);
+					}
+					return draft;
 				});
 			}
 			const keyed = new Map<UniversalKey, LogicalRecord>();
@@ -7188,7 +7847,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const nextKeys = new Set<UniversalKey>();
 			const output: DraftRecord[] = [];
 			for (let childIndex = 0; childIndex < blueprints.length; childIndex++) {
-				const child = blueprints[childIndex];
+				let child = blueprints[childIndex];
 				let record: LogicalRecord | undefined;
 				if (child.key !== null) {
 					if (nextKeys.has(child.key)) {
@@ -7214,6 +7873,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						record = candidate;
 					}
 				}
+				if (child.kind === 'range' && child.retained !== undefined) {
+					if (record === child.retained && record !== undefined) {
+						claimed.add(record);
+						used.add(record);
+						output.push(retainedDraft(record, child));
+						continue;
+					}
+					child = expandRetained(child);
+				}
 				if (record?.kind === 'portal' && child.kind === 'portal') {
 					const previousRegistration = record.portalRegistration;
 					const nextRegistration = child.registration;
@@ -7238,13 +7906,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				record ??= createLogicalRecord(nextId++, child);
 				claimed.add(record);
 				used.add(record);
-				output.push({
+				const draft: DraftRecord = {
 					record,
 					blueprint: child,
 					children: reconcileChildren(record.children, child.children),
 					isNew,
 					hostUpdate: null,
-				});
+				};
+				if (record.kind === 'range' && record.owner !== ((child as BlueprintRange).owner ?? null)) {
+					changedRangeOwners.push(draft);
+				}
+				output.push(draft);
 			}
 			if (
 				oldChildren.length !== output.length ||
@@ -7256,20 +7928,28 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		};
 
 		const draftRoot: DraftRecord = {
-			record: this.rootRecord,
+			record: scopeRecord,
 			blueprint,
-			children: reconcileChildren(this.rootRecord.children, blueprint.children),
+			children: reconcileChildren(scopeRecord.children, blueprint.children),
 			isNew: false,
 			hostUpdate: null,
 		};
+		// The scope record itself never passes through reconcileChildren, so its
+		// owner link (the root range adopting the root component owner, or a new
+		// root owner after the rendered component changed) is staged here.
+		if (scopeRecord.kind === 'range' && scopeRecord.owner !== (blueprint.owner ?? null)) {
+			changedRangeOwners.push(draftRoot);
+		}
 		const removedRoots: LogicalRecord[] = [];
 		const findRemoved = (parent: LogicalRecord) => {
 			for (const child of parent.children) {
+				// A retained scope's descendants have no drafts, so they are absent
+				// from `used` while remaining fully committed: never descend.
 				if (!used.has(child)) removedRoots.push(child);
-				else findRemoved(child);
+				else if (!retainedScopes.has(child)) findRemoved(child);
 			}
 		};
-		if (topologyChanged) findRemoved(this.rootRecord);
+		if (topologyChanged) findRemoved(scopeRecord);
 		const previousPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
 		const nextPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
 		let reorderedPortalRecords: Set<LogicalRecord> | null = null;
@@ -7277,7 +7957,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const previousPortalsByTarget = topologyChanged
 				? new Map<UniversalPortalTargetHandle, LogicalRecord[]>()
 				: null;
-			for (const child of this.rootRecord.children) {
+			for (const child of scopeRecord.children) {
 				walkLogical(child, (record) => {
 					if (record.kind === 'portal' && record.portalRegistration !== null) {
 						previousPortalRegistrations.add(record.portalRegistration);
@@ -7337,7 +8017,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}[] = [];
 		const nextRegionBridges = new Set<UniversalRendererRegionOwnerBridge>();
 		if ((treeFeatures & UNIVERSAL_TREE_REGION) !== 0) {
-			for (const child of this.rootRecord.children) {
+			for (const child of scopeRecord.children) {
 				walkLogical(child, (record) => {
 					if (record.kind !== 'host') return;
 					for (const value of Object.values(record.props)) {
@@ -7430,10 +8110,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			newDrafts: readonly DraftRecord[],
 			sourceParentId: UniversalHostParent = parentId,
 			forceMove = false,
+			endAnchor: number | null = null,
 		) => {
 			const oldPhysical = physicalRecords(oldRecords);
 			const newPhysical = physicalDrafts(newDrafts);
-			const desiredIds = new Set(newPhysical.map((entry) => entry.record.id));
+			const desiredIds = new Set(newPhysical.map((entry) => entry.id));
 			for (const old of oldPhysical) {
 				if (!desiredIds.has(old.id)) {
 					removes.push({ op: 'remove', parent: sourceParentId, id: old.id });
@@ -7444,11 +8125,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				? []
 				: oldPhysical.filter((entry) => desiredIds.has(entry.id)).map((entry) => entry.id);
 			for (let index = 0; index < newPhysical.length; index++) {
-				const draft = newPhysical[index];
-				const id = draft.record.id;
+				const id = newPhysical[index].id;
 				if (current[index] === id) continue;
 				const currentIndex = current.indexOf(id);
-				const before = current[index] ?? null;
+				const before = current[index] ?? endAnchor;
 				if (currentIndex === -1) {
 					placements.push({
 						op: forceMove && previousIds.has(id) ? 'move' : 'insert',
@@ -7467,6 +8147,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			walkDraftPostOrder(draftRoot, (draft) => {
 				if (draft.record === this.rootRecord) {
 					planPlacements(null, this.rootRecord.children, draft.children);
+				} else if (scoped && draft === draftRoot && scopePlacement !== null) {
+					// The scope's own top-level hosts sit inside a physical parent that
+					// also holds untouched out-of-scope siblings; the precomputed frame
+					// anchors appends before the first host that follows the scope.
+					planPlacements(
+						scopePlacement.parent,
+						draft.record.children,
+						draft.children,
+						scopePlacement.parent,
+						false,
+						scopePlacement.endAnchor,
+					);
 				} else if (draft.record.kind === 'host') {
 					planPlacements(draft.record.id, draft.record.children, draft.children);
 				} else if (draft.record.kind === 'portal') {
@@ -7655,18 +8347,27 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			cleanup: (() => void) | null;
 		}[] = [];
 		const refAttaches: DraftRecord[] = [];
-		const hostDraftsById = new Map<number, DraftRecord>();
-		const lifecycleDrafts = new Set<DraftRecord>();
+		const lifecycleHosts = new Set<LogicalRecord>();
 		if ((treeFeatures & UNIVERSAL_TREE_LIFECYCLE) !== 0) {
+			const hostsById = new Map<number, LogicalRecord>();
 			walkDraft(draftRoot, (draft) => {
+				if (draft.retained === true) {
+					// A retained subtree re-renders nothing, but a reorder around it can
+					// still move its top-level hosts; their committed lifecycle
+					// callbacks must observe that placement like any drafted host's.
+					for (const host of physicalRecords(draft.record.children)) {
+						hostsById.set(host.id, host);
+					}
+					return;
+				}
 				if (draft.record.kind !== 'host') return;
-				hostDraftsById.set(draft.record.id, draft);
-				if (draft.isNew || draft.hostUpdate !== null) lifecycleDrafts.add(draft);
+				hostsById.set(draft.record.id, draft.record);
+				if (draft.isNew || draft.hostUpdate !== null) lifecycleHosts.add(draft.record);
 			});
 			for (const placement of placements) {
 				if (placement.op !== 'move') continue;
-				const draft = hostDraftsById.get(placement.id);
-				if (draft !== undefined) lifecycleDrafts.add(draft);
+				const host = hostsById.get(placement.id);
+				if (host !== undefined) lifecycleHosts.add(host);
 			}
 		}
 		if ((treeFeatures & UNIVERSAL_TREE_REF) !== 0) {
@@ -7731,13 +8432,22 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		}
 		const draftedRecords = new Set(draftOwnersParentFirst.map((owner) => owner.record));
+		// Owners the render adopted without re-drafting stay committed exactly as
+		// they are: neither they nor their descendants may be treated as removed.
+		const retainedOwnerRoots = new Set<UniversalOwnerRecord>();
+		for (const draft of draftOwnersParentFirst) {
+			if (draft.retainedChildren === null) continue;
+			for (const entry of draft.retainedChildren) retainedOwnerRoots.add(entry.record);
+		}
 		const committedOwnersParentFirst: UniversalOwnerRecord[] = [];
 		const walkCommittedOwners = (owner: UniversalOwnerRecord | null) => {
 			if (owner === null) return;
 			committedOwnersParentFirst.push(owner);
-			for (const child of owner.children) walkCommittedOwners(child);
+			for (const child of owner.children) {
+				if (!retainedOwnerRoots.has(child)) walkCommittedOwners(child);
+			}
 		};
-		walkCommittedOwners(this.owner);
+		walkCommittedOwners(scoped ? attempt.owner.record : this.owner);
 		const removedOwners = committedOwnersParentFirst.filter((owner) => !draftedRecords.has(owner));
 		const removedEffectEventCells = collectEffectEventCells(removedOwners);
 		const orderedEffectCleanups: { phase: EffectPhase; hook: EffectHook }[] = [];
@@ -7822,20 +8532,40 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				record.localCallbacks = localCallbackStage.staged.get(record) ?? record.localCallbacks;
 				record.visibility = host.visibility;
 			};
+			const applyRangeOwner = (draft: DraftRecord) => {
+				const record = draft.record;
+				const nextOwner = (draft.blueprint as BlueprintRange).owner ?? null;
+				if (record.owner !== nextOwner && record.owner?.range === record) {
+					record.owner.range = null;
+				}
+				record.owner = nextOwner;
+				if (nextOwner !== null) nextOwner.range = record;
+			};
 			const apply = (draft: DraftRecord, parent: LogicalRecord | null) => {
 				const record = draft.record;
+				if (draft.retained === true) {
+					// The adopted subtree is already committed; only its attachment
+					// point may have moved.
+					record.parent = parent;
+					return;
+				}
 				record.parent = parent;
 				record.key = draft.blueprint.key;
 				if (record.kind === 'host') {
 					applyHost(draft);
+				} else if (record.kind === 'range') {
+					applyRangeOwner(draft);
 				} else if (record.kind === 'portal') {
 					record.portalRegistration = (draft.blueprint as BlueprintPortal).registration;
 				}
 				record.children = draft.children.map((child) => child.record);
 				for (const child of draft.children) apply(child, record);
 			};
-			if (topologyChanged) apply(draftRoot, null);
-			else for (const draft of hostDrafts) applyHost(draft);
+			if (topologyChanged) apply(draftRoot, scoped ? scopeRecord.parent : null);
+			else {
+				for (const draft of hostDrafts) applyHost(draft);
+				for (const draft of changedRangeOwners) applyRangeOwner(draft);
+			}
 			stagedPortalRegistrations.clear();
 			for (const registration of previousPortalRegistrations) {
 				if (nextPortalRegistrations.has(registration)) continue;
@@ -7846,16 +8576,40 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			}
 		};
-		const lifecycleOrder: DraftRecord[] = [];
-		if (lifecycleDrafts.size !== 0) {
+		const lifecycleOrder: LogicalRecord[] = [];
+		if (lifecycleHosts.size !== 0) {
 			walkDraftPostOrder(draftRoot, (draft) => {
-				if (lifecycleDrafts.has(draft)) lifecycleOrder.push(draft);
+				if (draft.retained === true) {
+					for (const host of physicalRecords(draft.record.children)) {
+						if (lifecycleHosts.has(host)) lifecycleOrder.push(host);
+					}
+					return;
+				}
+				if (lifecycleHosts.has(draft.record)) lifecycleOrder.push(draft.record);
 			});
 		}
 		const hasPassiveWork =
 			removedEffectEventCells.length !== 0 ||
 			orderedEffectCleanups.some((cleanup) => cleanup.phase === 'passive') ||
 			effectChanges.some(({ next, changed }) => changed && next.phase === 'passive');
+		// Listeners to retire: those owned by hosts this commit re-staged or
+		// removed. Hosts inside retained subtrees have no drafts and keep their
+		// committed listeners registered as-is.
+		const previousReplacedEventListeners = new Set<number>();
+		const previousReplacedLocalCallbacks = new Set<number>();
+		if ((treeFeatures & (UNIVERSAL_TREE_EVENT | UNIVERSAL_TREE_LOCAL_CALLBACK)) !== 0) {
+			const collectReplaced = (record: LogicalRecord) => {
+				if (record.kind !== 'host') return;
+				for (const event of record.events.values()) {
+					previousReplacedEventListeners.add(event.listener);
+				}
+				for (const callback of record.localCallbacks.values()) {
+					previousReplacedLocalCallbacks.add(callback.listener);
+				}
+			};
+			walkDraft(draftRoot, (draft) => collectReplaced(draft.record));
+			for (const removed of removedHosts) collectReplaced(removed);
+		}
 		const prepareHost = (value: UniversalHostBatch) =>
 			this.driver.prepareBatch(this.container, value, {
 				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
@@ -7908,9 +8662,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				if ((treeFeatures & UNIVERSAL_TREE_EVENT) !== 0) {
-					for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
-					this.publishedListeners.clear();
-					const handlers = new Map<number, CommittedEvent>();
+					// The accepted listener table is edited in place: this closure is
+					// already the accept point (EVENT_DISPATCHERS mutates here either
+					// way), retiring only the listeners of re-staged or removed hosts.
+					// Rebuilding from staged events would drop the live listeners of
+					// retained subtrees, which this commit never re-staged.
+					const handlers = this.handlers;
+					for (const listener of previousReplacedEventListeners) {
+						EVENT_DISPATCHERS.delete(listener);
+						this.publishedListeners.delete(listener);
+						handlers.delete(listener);
+					}
 					for (const [record, events] of stagedEvents) {
 						if (!stagedVisibleEventRecords.has(record)) continue;
 						for (const event of events.values()) {
@@ -7921,28 +8683,52 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 							);
 						}
 					}
-					this.handlers = handlers;
 				}
 				if ((treeFeatures & UNIVERSAL_TREE_LOCAL_CALLBACK) !== 0) {
-					const localCallbacks = new Map<number, CommittedHostCallback>();
+					const localCallbacks = this.localCallbacks;
+					for (const listener of previousReplacedLocalCallbacks) {
+						localCallbacks.delete(listener);
+					}
 					for (const callbacks of localCallbackStage.staged.values()) {
 						for (const callback of callbacks.values()) {
 							localCallbacks.set(callback.listener, callback);
 						}
 					}
-					this.localCallbacks = localCallbacks;
 				}
 				for (const owner of removedOwners) {
 					owner.disposed = true;
 					owner.mounted = false;
+					owner.componentProps = null;
+					owner.range = null;
 					owner.updates.clear();
 				}
 				for (const draft of draftOwnersParentFirst) {
 					const record = draft.record;
-					record.parent = draft.parent?.record ?? null;
+					record.componentProps = draft.componentProps;
+					record.componentRevision = draft.componentRevision;
+					if (!scoped || draft !== attempt.owner) {
+						record.parent = draft.parent?.record ?? null;
+					}
 					record.hooks = draft.hooks;
 					record.effectOrder = [...draft.seenEffects];
-					record.children = draft.children.map((child) => child.record);
+					if (draft.retainedChildren === null) {
+						record.children = draft.children.map((child) => child.record);
+					} else {
+						// Interleave adopted committed children back at the drafted-child
+						// index each was claimed at, restoring exact claim order.
+						const merged: UniversalOwnerRecord[] = [];
+						let retainedIndex = 0;
+						for (let index = 0; index <= draft.children.length; index++) {
+							while (
+								retainedIndex < draft.retainedChildren.length &&
+								draft.retainedChildren[retainedIndex].position === index
+							) {
+								merged.push(draft.retainedChildren[retainedIndex++].record);
+							}
+							if (index < draft.children.length) merged.push(draft.children[index].record);
+						}
+						record.children = merged;
+					}
 					record.contextValues = draft.contextValues;
 					record.isBoundary = draft.isBoundary;
 					record.canHandleSuspense = draft.canHandleSuspense;
@@ -7999,19 +8785,21 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						}
 					}
 				}
-				this.owner = attempt.owner.record;
+				if (!scoped) this.owner = attempt.owner.record;
 				this.lastComponent = component;
 				this.lastProps = props;
 				this.retryRenderInput = null;
 				this.urgentBoundarySuspension = null;
-				this.bridgeContextReads = attempt.bridgeContextReads;
+				if (!scoped) this.bridgeContextReads = attempt.bridgeContextReads;
 				if (retryThenables.length > 0) {
 					this.publishLocalReplay(retryThenables, retryMemos, component, props);
 				}
 				this.nextId = nextId;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.nextListener = nextListener;
-				this.treeFeatures = attempt.treeFeatures;
+				this.treeFeatures = scoped
+					? this.treeFeatures | attempt.treeFeatures
+					: attempt.treeFeatures;
 				for (const context of changedContexts) context.$$version++;
 				const retainedRegionCells = new Set<RendererRegionBridgeCell>();
 				for (const { next, previous } of stagedRegionBridges) {
@@ -8051,8 +8839,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			},
 			() => {
 				const tasks: (() => void)[] = [];
-				for (const draft of lifecycleOrder) {
-					const record = draft.record;
+				for (const record of lifecycleOrder) {
 					for (const callback of record.lifecycles.values()) {
 						tasks.push(() =>
 							runOwnedCommit(callback.owner, () =>
@@ -8405,6 +9192,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			finalize: (acceptedHostError) => {
 				this.scheduled = false;
 				this.scheduledUrgent = false;
+				this.scheduledFullRoot = false;
+				this.scheduledOwners.clear();
 				SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 				const transitionBatches = new Set(this.takeScheduledTransitionBatches());
 				for (const transition of stagedTransitionBatches) transitionBatches.add(transition);
@@ -8415,6 +9204,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				// root. Teardown owns the final scheduler state and drops that stale wave.
 				this.scheduled = false;
 				this.scheduledUrgent = false;
+				this.scheduledFullRoot = false;
+				this.scheduledOwners.clear();
 				SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 				let attachmentUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
 				if (this.hostAttachments !== null) {
@@ -8425,6 +9216,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				this.rootRecord.children = [];
+				this.rootRecord.owner = null;
 				let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
 				for (const registration of portalRegistrations) {
 					try {
@@ -8441,6 +9233,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				for (const owner of owners) {
 					owner.disposed = true;
 					owner.mounted = false;
+					owner.componentProps = null;
+					owner.range = null;
 					owner.updates.clear();
 				}
 				const deactivatedRegionCells = new Set<RendererRegionBridgeCell>();
@@ -8879,6 +9673,7 @@ export interface ObjectHostInstance {
 
 interface ObjectDriverState {
 	instances: Map<number, ObjectHostInstance>;
+	parents: Map<number, number | null>;
 	events: Map<number, Map<string, UniversalEventListenerDescriptor>>;
 	lifecycles: Map<number, Map<string, UniversalListenerDescriptor>>;
 	localCallbacks: Map<number, Map<string, UniversalListenerDescriptor>>;
@@ -8899,6 +9694,7 @@ export function createObjectContainer(renderer = 'object'): ObjectHostContainer 
 	assertRendererId(renderer, 'Object container renderer');
 	const state: ObjectDriverState = {
 		instances: new Map(),
+		parents: new Map(),
 		events: new Map(),
 		lifecycles: new Map(),
 		localCallbacks: new Map(),
@@ -8975,20 +9771,24 @@ export function createObjectDriver(
 				);
 			}
 			const state = container[OBJECT_DRIVER_STATE];
-			const simulated = new Map<
-				number,
-				{
-					type: string;
-					props: Readonly<Record<string, unknown>>;
-					visible: boolean;
-					children: number[];
-					events: Map<string, UniversalEventListenerDescriptor>;
-					lifecycles: Map<string, UniversalListenerDescriptor>;
-					localCallbacks: Map<string, UniversalListenerDescriptor>;
-				}
-			>();
-			for (const [id, instance] of state.instances) {
-				simulated.set(id, {
+			type SimulatedInstance = {
+				type: string;
+				props: Readonly<Record<string, unknown>>;
+				visible: boolean;
+				children: number[];
+				events: Map<string, UniversalEventListenerDescriptor>;
+				lifecycles: Map<string, UniversalListenerDescriptor>;
+				localCallbacks: Map<string, UniversalListenerDescriptor>;
+			};
+			const simulated = new Map<number, SimulatedInstance>();
+			const destroyed = new Set<number>();
+			const readSimulated = (id: number): SimulatedInstance | undefined => {
+				if (destroyed.has(id)) return undefined;
+				let value = simulated.get(id);
+				if (value !== undefined) return value;
+				const instance = state.instances.get(id);
+				if (instance === undefined) return undefined;
+				value = {
 					type: instance.type,
 					props: instance.props,
 					visible: instance.visible,
@@ -8996,8 +9796,12 @@ export function createObjectDriver(
 					events: new Map(state.events.get(id)),
 					lifecycles: new Map(state.lifecycles.get(id)),
 					localCallbacks: new Map(state.localCallbacks.get(id)),
-				});
-			}
+				};
+				simulated.set(id, value);
+				return value;
+			};
+			const hasSimulated = (id: number): boolean =>
+				!destroyed.has(id) && (simulated.has(id) || state.instances.has(id));
 			const stagedInstances = new Map<number, ObjectHostInstance>();
 			const cleanupKeys = new Set<string>();
 			const invokeKeys = new Set<string>();
@@ -9006,17 +9810,36 @@ export function createObjectDriver(
 				const separator = key.indexOf(':');
 				return [Number(key.slice(0, separator)), key.slice(separator + 1)];
 			};
-			const rootChildren = container.children.map((child) => child.id);
+			const DETACHED = Symbol('octane.object-driver.detached');
+			type SimulatedParent = number | null | typeof DETACHED;
+			const parentChanges = new Map<number, SimulatedParent>();
+			let rootChildren: number[] | null = null;
+			const readParent = (id: number): SimulatedParent => {
+				if (parentChanges.has(id)) return parentChanges.get(id)!;
+				return state.parents.has(id) ? state.parents.get(id)! : DETACHED;
+			};
 			const simulatedChildren = (parent: number | null) => {
-				if (parent === null) return rootChildren;
-				const value = simulated.get(parent);
+				if (parent === null) {
+					return (rootChildren ??= container.children.map((child) => child.id));
+				}
+				const value = readSimulated(parent);
 				if (value === undefined) throw new Error(`Object driver: unknown parent ${parent}.`);
 				return value.children;
 			};
+			const detachSimulated = (id: number): void => {
+				const parent = readParent(id);
+				if (parent === DETACHED) return;
+				const children = simulatedChildren(parent);
+				const index = children.indexOf(id);
+				if (index === -1) throw new Error(`Object driver: child ${id} is not attached.`);
+				children.splice(index, 1);
+				parentChanges.set(id, DETACHED);
+			};
 			for (const command of batch.commands) {
 				if (command.op === 'create') {
-					if (simulated.has(command.id))
+					if (hasSimulated(command.id))
 						throw new Error(`Object driver: duplicate id ${command.id}.`);
+					destroyed.delete(command.id);
 					simulated.set(command.id, {
 						type: command.type,
 						props: command.props,
@@ -9034,11 +9857,11 @@ export function createObjectDriver(
 						children: [],
 					});
 				} else if (command.op === 'update') {
-					const value = simulated.get(command.id);
+					const value = readSimulated(command.id);
 					if (value === undefined) throw new Error(`Object driver: unknown update ${command.id}.`);
 					value.props = command.props;
 				} else if (command.op === 'recreate') {
-					const value = simulated.get(command.id);
+					const value = readSimulated(command.id);
 					const current = state.instances.get(command.id);
 					if (value === undefined || current === undefined) {
 						throw new Error(`Object driver: unknown recreate ${command.id}.`);
@@ -9059,25 +9882,25 @@ export function createObjectDriver(
 						invokeKeys.add(keyFor(command.id, type));
 					}
 				} else if (command.op === 'visibility') {
-					const value = simulated.get(command.id);
+					const value = readSimulated(command.id);
 					if (value === undefined) {
 						throw new Error(`Object driver: unknown visibility target ${command.id}.`);
 					}
 					value.visible = command.state === 'visible';
 				} else if (command.op === 'event') {
-					const value = simulated.get(command.id);
+					const value = readSimulated(command.id);
 					if (value === undefined)
 						throw new Error(`Object driver: unknown event target ${command.id}.`);
 					if (command.listener === null) value.events.delete(command.type);
 					else value.events.set(command.type, command.listener);
 				} else if (command.op === 'lifecycle') {
-					const value = simulated.get(command.id);
+					const value = readSimulated(command.id);
 					if (value === undefined)
 						throw new Error(`Object driver: unknown lifecycle target ${command.id}.`);
 					if (command.listener === null) value.lifecycles.delete(command.type);
 					else value.lifecycles.set(command.type, command.listener);
 				} else if (command.op === 'local-callback') {
-					const value = simulated.get(command.id);
+					const value = readSimulated(command.id);
 					if (value === undefined)
 						throw new Error(`Object driver: unknown local callback target ${command.id}.`);
 					const key = keyFor(command.id, command.type);
@@ -9091,22 +9914,17 @@ export function createObjectDriver(
 					if (command.parent !== null && typeof command.parent !== 'number') {
 						throw new Error('Object driver does not support portal target parents.');
 					}
-					if (!simulated.has(command.id))
+					if (!hasSimulated(command.id))
 						throw new Error(`Object driver: unknown child ${command.id}.`);
-					for (const value of [
-						rootChildren,
-						...[...simulated.values()].map((entry) => entry.children),
-					]) {
-						const old = value.indexOf(command.id);
-						if (old !== -1) value.splice(old, 1);
-					}
+					detachSimulated(command.id);
 					const children = simulatedChildren(command.parent);
 					const before =
 						command.before === null ? children.length : children.indexOf(command.before);
 					if (before === -1) throw new Error(`Object driver: unknown before id ${command.before}.`);
 					children.splice(before, 0, command.id);
+					parentChanges.set(command.id, command.parent);
 					if (command.op === 'move') {
-						for (const type of simulated.get(command.id)!.localCallbacks.keys()) {
+						for (const type of readSimulated(command.id)!.localCallbacks.keys()) {
 							const key = keyFor(command.id, type);
 							cleanupKeys.add(key);
 							invokeKeys.add(key);
@@ -9120,26 +9938,22 @@ export function createObjectDriver(
 					const index = children.indexOf(command.id);
 					if (index === -1) throw new Error(`Object driver: child ${command.id} is not attached.`);
 					children.splice(index, 1);
-					for (const type of simulated.get(command.id)!.localCallbacks.keys()) {
+					parentChanges.set(command.id, DETACHED);
+					for (const type of readSimulated(command.id)!.localCallbacks.keys()) {
 						cleanupKeys.add(keyFor(command.id, type));
 					}
 				} else if (command.op === 'destroy') {
-					const instance = simulated.get(command.id);
+					const instance = readSimulated(command.id);
 					if (instance === undefined)
 						throw new Error(`Object driver: unknown destroy ${command.id}.`);
-					for (const value of [
-						rootChildren,
-						...[...simulated.values()].map((entry) => entry.children),
-					]) {
-						const attached = value.indexOf(command.id);
-						if (attached !== -1) value.splice(attached, 1);
-					}
+					detachSimulated(command.id);
+					for (const child of instance.children) parentChanges.set(child, DETACHED);
 					instance.children.length = 0;
-					simulated.delete(command.id);
+					destroyed.add(command.id);
 				}
 			}
 			for (const [id, instance] of stagedInstances) {
-				const staged = simulated.get(id);
+				const staged = readSimulated(id);
 				if (staged === undefined) continue;
 				instance.visible = staged.visible;
 				instance.children.splice(
@@ -9152,6 +9966,17 @@ export function createObjectDriver(
 			}
 			let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
 			let acceptedCallbacksRan = false;
+			const liveChildren = (parent: number | null): ObjectHostInstance[] =>
+				objectChildren(container, parent, state.instances);
+			const detachLive = (id: number): void => {
+				if (!state.parents.has(id)) return;
+				const parent = state.parents.get(id)!;
+				const instance = state.instances.get(id)!;
+				const children = liveChildren(parent);
+				const index = children.indexOf(instance);
+				if (index !== -1) children.splice(index, 1);
+				state.parents.delete(id);
+			};
 			return {
 				apply() {
 					if (status !== 'prepared') return;
@@ -9168,7 +9993,11 @@ export function createObjectDriver(
 					tasks.push(() => {
 						for (const command of batch.commands) {
 							if (command.op === 'create') {
-								state.instances.set(command.id, stagedInstances.get(command.id)!);
+								const instance = stagedInstances.get(command.id)!;
+								state.instances.set(command.id, instance);
+								for (const child of instance.children) {
+									state.parents.set(child.id, command.id);
+								}
 								state.events.set(command.id, new Map());
 								state.lifecycles.set(command.id, new Map());
 								state.localCallbacks.set(command.id, new Map());
@@ -9178,10 +10007,8 @@ export function createObjectDriver(
 							} else if (command.op === 'recreate') {
 								const previous = state.instances.get(command.id)!;
 								const replacement = stagedInstances.get(command.id)!;
-								for (const parent of [
-									container.children,
-									...[...state.instances.values()].map((entry) => entry.children),
-								]) {
+								if (state.parents.has(command.id)) {
+									const parent = liveChildren(state.parents.get(command.id)!);
 									const index = parent.indexOf(previous);
 									if (index !== -1) parent[index] = replacement;
 								}
@@ -9206,36 +10033,28 @@ export function createObjectDriver(
 									throw new Error('Object driver does not support portal target parents.');
 								}
 								const instance = state.instances.get(command.id)!;
-								for (const parent of [
-									container.children,
-									...[...state.instances.values()].map((entry) => entry.children),
-								]) {
-									const old = parent.indexOf(instance);
-									if (old !== -1) parent.splice(old, 1);
-								}
-								const children = objectChildren(container, command.parent, state.instances);
+								detachLive(command.id);
+								const children = liveChildren(command.parent);
 								const before =
 									command.before === null
 										? children.length
 										: children.indexOf(state.instances.get(command.before)!);
 								children.splice(before, 0, instance);
+								state.parents.set(command.id, command.parent);
 							} else if (command.op === 'remove') {
 								if (command.parent !== null && typeof command.parent !== 'number') {
 									throw new Error('Object driver does not support portal target parents.');
 								}
-								const children = objectChildren(container, command.parent, state.instances);
+								const children = liveChildren(command.parent);
 								children.splice(children.indexOf(state.instances.get(command.id)!), 1);
+								state.parents.delete(command.id);
 							} else if (command.op === 'destroy') {
 								const instance = state.instances.get(command.id)!;
-								for (const parent of [
-									container.children,
-									...[...state.instances.values()].map((entry) => entry.children),
-								]) {
-									const attached = parent.indexOf(instance);
-									if (attached !== -1) parent.splice(attached, 1);
-								}
+								detachLive(command.id);
+								for (const child of instance.children) state.parents.delete(child.id);
 								instance.children.length = 0;
 								state.instances.delete(command.id);
+								state.parents.delete(command.id);
 								state.events.delete(command.id);
 								state.lifecycles.delete(command.id);
 								state.localCallbacks.delete(command.id);
@@ -9256,13 +10075,8 @@ export function createObjectDriver(
 						const listener = state.localCallbacks.get(id)?.get(type);
 						if (instance === undefined || listener === undefined) continue;
 						tasks.push(() => {
-							let parent: ObjectHostInstance | null = null;
-							for (const candidate of state.instances.values()) {
-								if (candidate.children.includes(instance)) {
-									parent = candidate;
-									break;
-								}
-							}
+							const parentId = state.parents.get(id);
+							const parent = parentId == null ? null : (state.instances.get(parentId) ?? null);
 							const cleanup = context.invokeLocalCallback(listener.id, [parent, instance]);
 							if (cleanup == null) return;
 							if (typeof cleanup !== 'function') {

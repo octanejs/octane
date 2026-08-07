@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { Toggle, Pick } from './_fixtures/control.tsrx';
+import { FragmentIfRows, Toggle, Pick } from './_fixtures/control.tsrx';
 
 // SSR Phase 6 (M3) — @if / @switch hydration: the client adopts the server's
 // taken-branch range (the branch element instance is reused, not rebuilt) and
@@ -97,6 +97,31 @@ describe('hydrateRoot — @switch (SSR Phase 6 / M3)', () => {
 		flushSync(() => {});
 		expect(container.querySelector('.b')).toBe(span); // adopted, not rebuilt
 		expect((container.querySelector('.b') as HTMLElement).textContent).toBe('BBB');
+		root.unmount();
+	});
+});
+
+describe('hydrateRoot — fragment-rooted @if blocks under @for', () => {
+	it('adopts every server-rendered row and tag without a hydration mismatch', () => {
+		const { html } = ServerRT.renderToString(server.FragmentIfRows);
+		container.innerHTML = html;
+		const rows = [...container.querySelectorAll('.time-row')];
+		const tags = [...container.querySelectorAll('.time-row > span:not(.place)')];
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		const root = hydrateRoot(container, FragmentIfRows);
+		flushSync(() => {});
+
+		const diagnostics = [...errSpy.mock.calls, ...warnSpy.mock.calls].filter((call) =>
+			String(call[0]).toLowerCase().includes('hydration mismatch'),
+		);
+		errSpy.mockRestore();
+		warnSpy.mockRestore();
+		expect(diagnostics).toEqual([]);
+		expect([...container.querySelectorAll('.time-row')]).toEqual(rows);
+		expect([...container.querySelectorAll('.time-row > span:not(.place)')]).toEqual(tags);
+		expect(tags.map((tag) => tag.textContent)).toEqual(['confirm', 'transit', 'confirm', 'sunny']);
 		root.unmount();
 	});
 });

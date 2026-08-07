@@ -99,12 +99,21 @@ machine-readable copy of the results when `BENCH_JSON=<path>` is set
 with a top-level `"failed"` field).
 
 Output is a table of median + min millis per operation: `run`, `replace`,
-`add`, `update`, `select`, `swap`, `remove`, `runlots`, `clear`. The harness
-uses `page.evaluate(el.click)` to fire clicks synchronously inside the page —
-avoids per-click CDP IPC overhead (~10ms each on Chromium) so the numbers
-reflect the renderer's wall time, not Playwright transport. Before warmup, each
-target receives the same seeded `Math.random` stream so generated label lengths
-and allocation patterns cannot drift between dialects.
+`add`, `update`, `select`, `swap`, `remove`, `runlots`, `select_lots`, `clear`.
+The harness uses `page.evaluate(el.click)` to fire clicks synchronously inside
+the page — avoids per-click CDP IPC overhead (~10ms each on Chromium) so the
+numbers reflect the renderer's wall time, not Playwright transport. Before
+warmup, each target receives the same seeded `Math.random` stream so generated
+label lengths and allocation patterns cannot drift between dialects.
+
+Selection samples alternate between the fifth and sixth rows so every click
+changes the selected key instead of measuring an equal-value state bailout.
+`select_lots` reuses the 10,000 rows from `runlots` and alternates between rows
+5,000 and 5,001, moving list-wide selection work above the browser's timer
+resolution. Its same-run TSRX/JSX ratio protects compiler-proven keyed selection
+without depending on machine-specific absolute timings. After each timed
+selection, an untimed correctness gate verifies that exactly the clicked row
+carries the selected class.
 
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 

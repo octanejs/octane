@@ -1,10 +1,10 @@
 {
   "name": "@octanejs/electron",
-  "version": "0.0.1",
+  "version": "0.0.7",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "octane": {
     "hookSlots": {

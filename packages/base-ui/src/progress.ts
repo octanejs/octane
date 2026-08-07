@@ -7,7 +7,7 @@
 // the `status` state ('indeterminate' | 'progressing' | 'complete') is exposed on every
 // part as `data-progressing`/`data-complete`/`data-indeterminate`. Base UI uses a PLAIN
 // React context — ported as a plain octane createContext.
-import { createContext, createElement, useContext, useMemo, useState } from 'octane';
+import { createContext, createElement, Fragment, useContext, useMemo, useState } from 'octane';
 
 import { S, subSlot } from './internal';
 import { useRenderElement, type RenderProp } from './utils/useRenderElement';
@@ -129,9 +129,16 @@ function ProgressRoot(props: ProgressRootProps): any {
 		'aria-valuenow': value ?? undefined,
 		'aria-valuetext': getAriaValueText(formattedValue, value),
 		role: 'progressbar',
+		// Array children reconcile as a keyed list in octane, so both slots carry a key. The
+		// consumer's go through a keyed Fragment because they cannot be keyed in place.
 		children: [
-			children,
-			createElement('span', { role: 'presentation', style: visuallyHidden, children: 'x' }),
+			createElement(Fragment, { key: 'children', children }),
+			createElement('span', {
+				key: 'sr-hint',
+				role: 'presentation',
+				style: visuallyHidden,
+				children: 'x',
+			}),
 		],
 	};
 

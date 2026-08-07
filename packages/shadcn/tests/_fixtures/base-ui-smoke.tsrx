@@ -28,7 +28,130 @@ import {
 	AlertDialogTrigger,
 } from '@octanejs/shadcn/base-ui/AlertDialog';
 import { AspectRatio } from '@octanejs/shadcn/base-ui/AspectRatio';
+import {
+	Avatar,
+	AvatarFallback,
+	AvatarGroup,
+	AvatarGroupCount,
+} from '@octanejs/shadcn/base-ui/Avatar';
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSeparator,
+	FieldSet,
+	FieldTitle,
+} from '@octanejs/shadcn/base-ui/Field';
+import { Badge } from '@octanejs/shadcn/base-ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@octanejs/shadcn/base-ui/Tabs';
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarGroup,
+	SidebarGroupLabel,
+	SidebarHeader,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarProvider,
+	SidebarTrigger,
+} from '@octanejs/shadcn/base-ui/Sidebar';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@octanejs/shadcn/base-ui/HoverCard';
+import {
+	Menubar,
+	MenubarCheckboxItem,
+	MenubarContent,
+	MenubarItem,
+	MenubarLabel,
+	MenubarMenu,
+	MenubarSeparator,
+	MenubarShortcut,
+	MenubarSub,
+	MenubarSubContent,
+	MenubarSubTrigger,
+	MenubarTrigger,
+} from '@octanejs/shadcn/base-ui/Menubar';
+import {
+	ContextMenu,
+	ContextMenuCheckboxItem,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@octanejs/shadcn/base-ui/ContextMenu';
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from '@octanejs/shadcn/base-ui/DropdownMenu';
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from '@octanejs/shadcn/base-ui/Item';
+import {
+	Breadcrumb,
+	BreadcrumbEllipsis,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from '@octanejs/shadcn/base-ui/Breadcrumb';
+import { Progress } from '@octanejs/shadcn/base-ui/Progress';
+import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from '@octanejs/shadcn/base-ui/Pagination';
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableFooter,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@octanejs/shadcn/base-ui/Table';
+import { Slider } from '@octanejs/shadcn/base-ui/Slider';
+import { Toggle } from '@octanejs/shadcn/base-ui/Toggle';
+import { ToggleGroup, ToggleGroupItem } from '@octanejs/shadcn/base-ui/ToggleGroup';
 import { Checkbox } from '@octanejs/shadcn/base-ui/Checkbox';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@octanejs/shadcn/base-ui/Collapsible';
 import {
 	Dialog,
 	DialogContent,
@@ -81,6 +204,15 @@ import {
 	NativeSelectOption,
 } from '@octanejs/shadcn/base-ui/NativeSelect';
 import { Separator } from '@octanejs/shadcn/base-ui/Separator';
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@octanejs/shadcn/base-ui/Sheet';
 import { Skeleton } from '@octanejs/shadcn/base-ui/Skeleton';
 import { Spinner } from '@octanejs/shadcn/base-ui/Spinner';
 import { Textarea } from '@octanejs/shadcn/base-ui/Textarea';
@@ -259,4 +391,370 @@ export function TooltipCase() @{
 			<TooltipContent>Tooltip body</TooltipContent>
 		</Tooltip>
 	</TooltipProvider>
+}
+
+export function CollapsibleCase() @{
+	<Collapsible defaultOpen>
+		<CollapsibleTrigger>Toggle</CollapsibleTrigger>
+		<CollapsibleContent>Collapsible body</CollapsibleContent>
+	</Collapsible>
+}
+
+// Rendered OPEN so the portalled tree exists; a closed sheet renders only its trigger.
+export function SheetCase() @{
+	<Sheet defaultOpen>
+		<SheetTrigger>Open sheet</SheetTrigger>
+		<SheetContent>
+			<SheetHeader>
+				<SheetTitle>Sheet title</SheetTitle>
+				<SheetDescription>Sheet description.</SheetDescription>
+			</SheetHeader>
+			<SheetFooter>Sheet footer</SheetFooter>
+		</SheetContent>
+	</Sheet>
+}
+
+export function SheetLeftCase() @{
+	<Sheet defaultOpen>
+		<SheetTrigger>Open left</SheetTrigger>
+		<SheetContent side="left">
+			<SheetTitle>Left sheet</SheetTitle>
+		</SheetContent>
+	</Sheet>
+}
+
+export function AvatarCase() @{
+	<Avatar>
+		<AvatarFallback>AB</AvatarFallback>
+	</Avatar>
+}
+
+export function AvatarGroupCase() @{
+	<AvatarGroup>
+		<Avatar size="lg">
+			<AvatarFallback>CD</AvatarFallback>
+		</Avatar>
+		<AvatarGroupCount>+2</AvatarGroupCount>
+	</AvatarGroup>
+}
+
+export function ProgressCase() @{
+	<Progress value={40} />
+}
+
+// Indeterminate: shadcn's `value` is optional, and Base UI's Root types it as `number | null`.
+export function ProgressNoValueCase() @{
+	<Progress />
+}
+
+export function SliderCase() @{
+	<Slider defaultValue={[30]} />
+}
+
+export function SliderRangeCase() @{
+	<Slider defaultValue={[20, 60]} />
+}
+
+export function TogglePressedCase() @{
+	<Toggle defaultPressed>Bold</Toggle>
+}
+
+export function ToggleGroupCase() @{
+	<ToggleGroup defaultValue={['b']}>
+		<ToggleGroupItem value="a">A</ToggleGroupItem>
+		<ToggleGroupItem value="b">B</ToggleGroupItem>
+	</ToggleGroup>
+}
+
+export function TableCase() @{
+	<Table>
+		<TableCaption>Recent invoices</TableCaption>
+		<TableHeader>
+			<TableRow>
+				<TableHead>Invoice</TableHead>
+				<TableHead>Amount</TableHead>
+			</TableRow>
+		</TableHeader>
+		<TableBody>
+			<TableRow data-state="selected">
+				<TableCell>INV-001</TableCell>
+				<TableCell>$250.00</TableCell>
+			</TableRow>
+		</TableBody>
+		<TableFooter>
+			<TableRow>
+				<TableCell>Total</TableCell>
+				<TableCell>$250.00</TableCell>
+			</TableRow>
+		</TableFooter>
+	</Table>
+}
+
+export function PaginationCase() @{
+	<Pagination>
+		<PaginationContent>
+			<PaginationItem>
+				<PaginationPrevious href="#prev" />
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationLink href="#1">1</PaginationLink>
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationLink href="#2" isActive>2</PaginationLink>
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationEllipsis />
+			</PaginationItem>
+			<PaginationItem>
+				<PaginationNext href="#next" />
+			</PaginationItem>
+		</PaginationContent>
+	</Pagination>
+}
+
+// Standalone on purpose, like every case here: FieldLabel must not require a Field.Root ancestor.
+export function FieldCase() @{
+	<FieldSet>
+		<FieldLegend>Contact</FieldLegend>
+		<FieldGroup>
+			<Field>
+				<FieldLabel htmlFor="email-x">Email</FieldLabel>
+				<FieldDescription>We never share it.</FieldDescription>
+			</Field>
+			<FieldSeparator>or</FieldSeparator>
+			<Field orientation="horizontal" data-invalid="true">
+				<FieldContent>
+					<FieldTitle>Phone</FieldTitle>
+				</FieldContent>
+			</Field>
+		</FieldGroup>
+	</FieldSet>
+}
+
+export function FieldErrorsCase() @{
+	<FieldError
+		errors={[{ message: 'Required' }, { message: 'Required' }, { message: 'Too short' }]}
+	/>
+}
+
+export function FieldErrorSingleCase() @{
+	<FieldError errors={[{ message: 'Required' }, { message: 'Required' }]} />
+}
+
+export function FieldErrorEmptyCase() @{
+	<div data-slot="probe">
+		<FieldError errors={[]} />
+	</div>
+}
+
+// Base UI accepts a scalar for a single-value slider; the thumb count must follow the value shape.
+export function SliderScalarCase() @{
+	<Slider defaultValue={30} />
+}
+
+export function SliderScalarZeroCase() @{
+	<Slider value={0} />
+}
+
+export function BadgeCase() @{
+	<div>
+		<Badge>Default</Badge>
+		<Badge variant="secondary">Secondary</Badge>
+		<Badge variant="destructive">Destructive</Badge>
+		<Badge variant="outline">Outline</Badge>
+	</div>
+}
+
+export function BreadcrumbCase() @{
+	<Breadcrumb>
+		<BreadcrumbList>
+			<BreadcrumbItem>
+				<BreadcrumbLink href="/">Home</BreadcrumbLink>
+			</BreadcrumbItem>
+			<BreadcrumbSeparator />
+			<BreadcrumbItem>
+				<BreadcrumbEllipsis />
+			</BreadcrumbItem>
+			<BreadcrumbSeparator>/</BreadcrumbSeparator>
+			<BreadcrumbItem>
+				<BreadcrumbPage>Current</BreadcrumbPage>
+			</BreadcrumbItem>
+		</BreadcrumbList>
+	</Breadcrumb>
+}
+
+export function ItemCase() @{
+	<ItemGroup>
+		<Item>
+			<ItemMedia variant="icon" />
+			<ItemContent>
+				<ItemTitle>Item title</ItemTitle>
+				<ItemDescription>Item description text.</ItemDescription>
+			</ItemContent>
+			<ItemActions>Act</ItemActions>
+		</Item>
+		<ItemSeparator />
+		<Item variant="outline" size="sm">
+			<ItemContent>
+				<ItemTitle>Second</ItemTitle>
+			</ItemContent>
+		</Item>
+	</ItemGroup>
+}
+
+// Open so the portalled tree exists. Standalone: the label must not need a Group ancestor.
+export function DropdownMenuCase() @{
+	<DropdownMenu defaultOpen>
+		<DropdownMenuTrigger>Open menu</DropdownMenuTrigger>
+		<DropdownMenuContent>
+			<DropdownMenuLabel>My account</DropdownMenuLabel>
+			<DropdownMenuSeparator />
+			<DropdownMenuGroup>
+				<DropdownMenuItem>
+					Profile
+					<DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+				</DropdownMenuItem>
+				<DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+				<DropdownMenuItem disabled>Unavailable</DropdownMenuItem>
+			</DropdownMenuGroup>
+			<DropdownMenuSeparator />
+			<DropdownMenuCheckboxItem checked>Show sidebar</DropdownMenuCheckboxItem>
+			<DropdownMenuRadioGroup value="light">
+				<DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+				<DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+			</DropdownMenuRadioGroup>
+			<DropdownMenuSub>
+				<DropdownMenuSubTrigger>More</DropdownMenuSubTrigger>
+				<DropdownMenuSubContent>
+					<DropdownMenuItem>Nested</DropdownMenuItem>
+				</DropdownMenuSubContent>
+			</DropdownMenuSub>
+		</DropdownMenuContent>
+	</DropdownMenu>
+}
+
+// side/alignOffset must reach the Positioner, not be swept onto the Popup where they are inert.
+export function DropdownMenuSideCase() @{
+	<DropdownMenu defaultOpen>
+		<DropdownMenuTrigger>Open</DropdownMenuTrigger>
+		<DropdownMenuContent side="top" alignOffset={12}>
+			<DropdownMenuItem>One</DropdownMenuItem>
+		</DropdownMenuContent>
+	</DropdownMenu>
+}
+
+export function PopoverSideCase() @{
+	<Popover defaultOpen>
+		<PopoverTrigger>Open</PopoverTrigger>
+		<PopoverContent side="right">Popover body</PopoverContent>
+	</Popover>
+}
+
+// Standalone: the label must not require a Group ancestor.
+export function ContextMenuCase() @{
+	<ContextMenu>
+		<ContextMenuTrigger>Right click here</ContextMenuTrigger>
+		<ContextMenuContent>
+			<ContextMenuLabel>Actions</ContextMenuLabel>
+			<ContextMenuSeparator />
+			<ContextMenuItem>
+				Back
+				<ContextMenuShortcut>⌘[</ContextMenuShortcut>
+			</ContextMenuItem>
+			<ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+			<ContextMenuCheckboxItem checked>Show grid</ContextMenuCheckboxItem>
+			<ContextMenuSub>
+				<ContextMenuSubTrigger>More</ContextMenuSubTrigger>
+				<ContextMenuSubContent>
+					<ContextMenuItem>Nested</ContextMenuItem>
+				</ContextMenuSubContent>
+			</ContextMenuSub>
+		</ContextMenuContent>
+	</ContextMenu>
+}
+
+export function MenubarCase() @{
+	<Menubar>
+		<MenubarMenu defaultOpen>
+			<MenubarTrigger>File</MenubarTrigger>
+			<MenubarContent>
+				<MenubarLabel>Document</MenubarLabel>
+				<MenubarSeparator />
+				<MenubarItem>
+					New tab
+					<MenubarShortcut>⌘T</MenubarShortcut>
+				</MenubarItem>
+				<MenubarCheckboxItem checked>Autosave</MenubarCheckboxItem>
+				<MenubarSub>
+					<MenubarSubTrigger>Share</MenubarSubTrigger>
+					<MenubarSubContent>
+						<MenubarItem>Email link</MenubarItem>
+					</MenubarSubContent>
+				</MenubarSub>
+			</MenubarContent>
+		</MenubarMenu>
+		<MenubarMenu>
+			<MenubarTrigger>Edit</MenubarTrigger>
+			<MenubarContent>
+				<MenubarItem>Undo</MenubarItem>
+			</MenubarContent>
+		</MenubarMenu>
+	</Menubar>
+}
+
+export function HoverCardCase() @{
+	<HoverCard defaultOpen>
+		<HoverCardTrigger>@octane</HoverCardTrigger>
+		<HoverCardContent>Hover card body</HoverCardContent>
+	</HoverCard>
+}
+
+export function HoverCardSideCase() @{
+	<HoverCard defaultOpen>
+		<HoverCardTrigger>@octane</HoverCardTrigger>
+		<HoverCardContent side="top">Positioned body</HoverCardContent>
+	</HoverCard>
+}
+
+export function SidebarCase() @{
+	<SidebarProvider>
+		<Sidebar>
+			<SidebarHeader>Project</SidebarHeader>
+			<SidebarContent>
+				<SidebarGroup>
+					<SidebarGroupLabel>Navigation</SidebarGroupLabel>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton isActive>Dashboard</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton tooltip="Settings">Settings</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroup>
+			</SidebarContent>
+		</Sidebar>
+		<SidebarTrigger />
+	</SidebarProvider>
+}
+
+export function TabsCase() @{
+	<Tabs defaultValue="account">
+		<TabsList>
+			<TabsTrigger value="account">Account</TabsTrigger>
+			<TabsTrigger value="password">Password</TabsTrigger>
+		</TabsList>
+		<TabsContent value="account">Account panel</TabsContent>
+		<TabsContent value="password">Password panel</TabsContent>
+	</Tabs>
+}
+
+export function TabsVerticalCase() @{
+	<Tabs defaultValue="a" orientation="vertical">
+		<TabsList variant="line">
+			<TabsTrigger value="a">A</TabsTrigger>
+			<TabsTrigger value="b">B</TabsTrigger>
+		</TabsList>
+		<TabsContent value="a">Vertical panel</TabsContent>
+	</Tabs>
 }

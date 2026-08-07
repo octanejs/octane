@@ -820,20 +820,28 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 	];
 }
 
+function vitestRunIdentities(lane, result, root) {
+	if (!result || !Array.isArray(result.testResults)) {
+		throw new Error(`lane ${lane.id} returned an invalid Vitest JSON result`);
+	}
+	return result.testResults.flatMap((suite) => {
+		if (typeof suite.name !== 'string' || !Array.isArray(suite.assertionResults)) {
+			throw new Error(`lane ${lane.id} returned an invalid Vitest test result`);
+		}
+		return suite.assertionResults.map((test) => ({
+			file: toPortablePath(relative(root, suite.name)),
+			fullName: test.fullName,
+			status: test.status,
+		}));
+	});
+}
+
 export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 	if (lane.execution?.kind === 'typescript') return true;
 	const result = JSON.parse(stdout);
 	if (lane.execution?.kind === 'vitest-full') {
 		const inventory = JSON.parse(readFileSync(resolve(root, lane.execution.inventory), 'utf8'));
-		const executed = result.testResults
-			.flatMap((suite) =>
-				suite.assertionResults.map((test) => ({
-					file: toPortablePath(relative(root, suite.name)),
-					fullName: test.fullName,
-					status: test.status,
-				})),
-			)
-			.sort(compareTestIdentities);
+		const executed = vitestRunIdentities(lane, result, root).sort(compareTestIdentities);
 		const expected = inventory.tests.map(({ file, fullName }) => ({
 			file,
 			fullName,
@@ -861,10 +869,22 @@ export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 			);
 		return true;
 	}
-	const expected = lane.files.reduce((count, file) => count + (file.cases?.length ?? 0), 0);
-	if (result.numPassedTests !== expected) {
+	const expected = lane.files
+		.flatMap((file) =>
+			(file.cases ?? []).map((test) => ({
+				file: file.path,
+				fullName: test.fullName,
+				status: 'passed',
+			})),
+		)
+		.sort(compareTestIdentities);
+	const declaredNames = new Set(expected.map((test) => test.fullName));
+	const executed = vitestRunIdentities(lane, result, root)
+		.filter((test) => test.status === 'passed' || declaredNames.has(test.fullName))
+		.sort(compareTestIdentities);
+	if (JSON.stringify(executed) !== JSON.stringify(expected)) {
 		throw new Error(
-			`lane ${lane.id} executed ${result.numPassedTests ?? 0} of ${expected} declared tests`,
+			`lane ${lane.id} did not execute every declared test identity exactly once:\n  ${describeTestIdentityMismatch(expected, executed)}`,
 		);
 	}
 	return true;

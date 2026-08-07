@@ -1,5 +1,50 @@
 # @octanejs/adapter-vercel
 
+## 0.0.26
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.25
+
+## 0.0.25
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.24
+
+## 0.0.24
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.23
+
+## 0.0.23
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.22
+
+## 0.0.22
+
+### Patch Changes
+
+- bd8bb1b: Require Node.js 22.22.2 or newer across Octane's published packages.
+
+  Add the `octane/compiler/register` preload for running server and SSG scripts
+  directly with Node or Bun. It compiles imported `.tsrx`/`.tsx` modules and
+  plain TypeScript custom hooks in server mode without a Vite build. Bun also
+  targets bare `octane` imports at `octane/server` in pass-through authored source
+  dependencies, including packages that manage their hook slots manually.
+
+- Updated dependencies [bd8bb1b]
+  - @octanejs/app-core@0.0.21
+
+## 0.0.21
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.20
+
 ## 0.0.20
 
 ### Patch Changes

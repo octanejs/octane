@@ -1,11 +1,11 @@
 {
   "name": "@octanejs/i18next",
-  "version": "0.1.18",
+  "version": "0.1.24",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "octane": {
     "hookSlots": {

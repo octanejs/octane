@@ -29,6 +29,8 @@ describe('hydration: adoption of server css chunks', () => {
 		resetDom();
 	});
 
+	// A fresh public-entry import is the boot behavior under test, so it cannot
+	// reuse the suite's already-loaded binding. Allow headroom on loaded CI hosts.
 	it('keeps server rules active while adopting styled/keyframes chunks', async () => {
 		seedChunk('sc.hydrate-test-cid.hydname', '.hydname{color:navy;}');
 		seedChunk('sc.sc-keyframes-tkf.tkfname', '@keyframes tkfname{0%{opacity:0;}}');
@@ -50,7 +52,7 @@ describe('hydration: adoption of server css chunks', () => {
 		// adopted into the client stylesheet.
 		expect(engineCSS()).toContain('color:navy');
 		expect(engineCSS()).toContain('@keyframes tkfname');
-	});
+	}, 30_000);
 
 	it('does not re-inject rules the boot adoption already owns (no duplicates)', async () => {
 		// Phase 1 — LEARN: render the probe on a clean client to capture the

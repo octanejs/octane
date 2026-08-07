@@ -162,6 +162,39 @@ function playgroundRuntime(): Plugin {
 	};
 }
 
+/**
+ * `vite preview` serves the built `public/` through its own static middleware,
+ * which answers `.wasm` with `application/octet-stream`. The Lynx runtime under
+ * /lynx-runtime instantiates its engine with `WebAssembly.compileStreaming`,
+ * which rejects anything that is not `application/wasm` — so every Lynx preview
+ * on /docs/lynx renders nothing, and the production e2e suite (which drives
+ * every route through `vite preview`) sees the failure as page errors.
+ *
+ * Only the preview server needs this. Vite's dev server and the built Nitro
+ * server both type it correctly on their own.
+ */
+function previewWasmContentType(): Plugin {
+	return {
+		name: 'octane-preview-wasm-content-type',
+		configurePreviewServer(server) {
+			server.middlewares.use((request, response, next) => {
+				if (!request.url?.split('?')[0]?.endsWith('.wasm')) return next();
+				// Setting the header here is not enough on its own: the static
+				// handler downstream sets its own Content-Type, and the last write
+				// wins. Pin the value for this response instead of guessing where
+				// the built file lives.
+				const setHeader = response.setHeader.bind(response);
+				response.setHeader = (name: string, value: never) =>
+					name.toLowerCase() === 'content-type'
+						? setHeader(name, 'application/wasm')
+						: setHeader(name, value);
+				setHeader('Content-Type', 'application/wasm');
+				next();
+			});
+		},
+	};
+}
+
 // Dependencies the scanner cannot reach (raw workspace sources, dynamic route
 // imports) — pre-declared so no optimize pass runs mid-session.
 const PREBUNDLED = [
@@ -227,6 +260,7 @@ const PREBUNDLED = [
 export default defineConfig({
 	plugins: [
 		playgroundRuntime(),
+		previewWasmContentType(),
 		// octaneMdx() owns `.mdx` (full pipeline: @mdx-js/mdx → Octane compile,
 		// with Shiki highlighting via rehype). tanstackStart() supplies the Octane
 		// compiler plus file routing, SSR, hydration, and the Start runtime. The
@@ -258,6 +292,16 @@ export default defineConfig({
 						{
 							src: '/assets/(.*)',
 							headers: { 'cache-control': 'public,max-age=31536000,immutable' },
+							continue: true,
+						},
+						// State the Lynx runtime's wasm type rather than inherit it. The
+						// engine loads through WebAssembly.compileStreaming, which
+						// rejects anything that is not `application/wasm`, and the
+						// symptom is a silently blank preview — see
+						// previewWasmContentType above, where exactly that happened.
+						{
+							src: '/lynx-runtime/static/wasm/(.*)',
+							headers: { 'content-type': 'application/wasm' },
 							continue: true,
 						},
 						{ handle: 'filesystem' },

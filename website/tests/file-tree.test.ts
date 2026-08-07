@@ -7,6 +7,29 @@ import { cleanup, render, waitFor } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import { FileTree } from '../src/components/FileTree.tsrx';
+import manifest from '../../packages/cli/data/scaffold-manifest.json';
+
+/**
+ * Rebuild the paths a rendered tree stands for, by walking it.
+ *
+ * Reading them back out of the markup rather than off the props is what makes
+ * this evidence: it fails both when the page is given the wrong list and when
+ * the nesting it draws does not mean what it looks like.
+ */
+function renderedPaths(group: Element): string[] {
+	const paths: string[] = [];
+	const walk = (list: Element, prefix: string) => {
+		for (const item of Array.from(list.children)) {
+			const name = item.querySelector(':scope > .ft-row > .ft-name')?.textContent ?? '';
+			const nested = item.querySelector(':scope > ul');
+			if (nested === null) paths.push(prefix + name);
+			else walk(nested, `${prefix}${name}/`);
+		}
+	};
+	const root = group.querySelector(':scope > ul');
+	if (root !== null) walk(root, '');
+	return paths;
+}
 
 afterEach(cleanup);
 
@@ -79,5 +102,14 @@ describe('the CLI page’s scaffold listings', () => {
 			expect(group.querySelector('pre')).toBeNull();
 		}
 		expect(container.querySelector('.prose pre.shiki')).toBeTruthy();
+
+		// The page draws exactly what `octane create` writes, because it is handed
+		// the generated snapshot rather than a restatement of it. Order included:
+		// the manifest is sorted, and the tree preserves the order it is given.
+		for (const [mode, files] of Object.entries(manifest.templates)) {
+			const group = container.querySelector(`[aria-label="Files created by the ${mode} template"]`);
+			expect(group, `no tree for the ${mode} template`).toBeTruthy();
+			expect(renderedPaths(group!)).toEqual(files);
+		}
 	});
 });

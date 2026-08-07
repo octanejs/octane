@@ -14,3 +14,9 @@ declare const SystemInfo: {
 
 declare function __AddInlineStyle(element: object, name: string, value: string): void;
 declare function __FlushElementTree(): void;
+declare function __InvokeUIMethod(
+	element: object,
+	method: string,
+	params: Readonly<Record<string, boolean | number | string>>,
+	callback: (result: { code: number; data?: unknown }) => void,
+): void;

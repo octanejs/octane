@@ -1,10 +1,10 @@
 {
   "name": "@octanejs/aria",
-  "version": "0.0.17",
+  "version": "0.0.23",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "octane": {
     "hookSlots": {
