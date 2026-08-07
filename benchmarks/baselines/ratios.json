@@ -113,6 +113,14 @@
   },
   {
     "suite": "js-framework",
+    "op": "select_lots",
+    "target": "octane-tsrx",
+    "reference": "octane-jsx",
+    "maxRatio": 0.5,
+    "note": "Alternating selection across 10,000 keyed rows escapes the browser timer floor. TSRX updates only the previously selected and newly selected rows; the JSX compatibility path remains a same-run list-wide control. The ceiling catches loss of compiler-proven O(1) invalidation with generous timing headroom."
+  },
+  {
+    "suite": "js-framework",
     "op": "swap",
     "target": "octane-tsrx",
     "reference": "react",

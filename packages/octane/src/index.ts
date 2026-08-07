@@ -183,6 +183,7 @@ export {
 	delegateEvents,
 	delegateCaptureEvents,
 	forBlock,
+	keyedForBlock,
 	mapSlot,
 	ifBlock,
 	tryBlock,

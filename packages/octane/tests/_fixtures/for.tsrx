@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { startTransition, use, useState } from 'octane';
 
 export function List(props) @{
 	<ul>
@@ -167,5 +167,105 @@ export function PlainCalleeList() @{
 				<li class="pc-row">{fmtRow(item)}</li>
 			}
 		</ul>
+	</div>
+}
+
+interface SelectionRow {
+	id: number;
+	label: string;
+}
+
+export function KeyedSelectionList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	prefix?: string;
+}) @{
+	const selected = props.selected;
+	const prefix = props.prefix ?? 'row';
+	<ul id="keyed-selection-list">
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'selected' : ''}
+				data-prefix={prefix}
+			>{row.label as string}</li>
+		}
+	</ul>
+}
+
+export function KeyedSelectionUuidList(props: {
+	items: Array<{ uuid: string; label: string }>;
+	selected: string | null;
+}) @{
+	const selected = props.selected;
+	<ul id="keyed-selection-uuid-list">
+		@for (const row of props.items; key row.uuid) {
+			<li class={row.uuid === selected ? 'selected' : ''}>{row.label as string}</li>
+		}
+	</ul>
+}
+
+export function MismatchedKeyedSelectionList(props: {
+	items: Array<{ uuid: string; id: string; label: string }>;
+	selected: string | null;
+}) @{
+	const selected = props.selected;
+	<ul id="mismatched-keyed-selection-list">
+		@for (const row of props.items; key row.uuid) {
+			<li class={selected === row.id ? 'selected' : ''}>{row.label as string}</li>
+		}
+	</ul>
+}
+
+export function SharedKeyedSelectionList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+}) @{
+	const selected = props.selected;
+	<ul id="shared-keyed-selection-list">
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'selected' : ''}
+				data-selected={selected}
+			>{row.label as string}</li>
+		}
+	</ul>
+}
+
+function SelectionTransitionValue(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span id="selection-transition-value">{value as string}</span>
+}
+
+export function KeyedSelectionTransition(props: {
+	items: SelectionRow[];
+	initialPromise: Promise<string>;
+	nextPromise: Promise<string>;
+}) @{
+	const [selected, setSelected] = useState(1);
+	const [resource, setResource] = useState(props.initialPromise);
+	<div>
+		<button
+			id="selection-transition-bump"
+			onClick={() => startTransition(() => {
+				setSelected(2);
+				setResource(props.nextPromise);
+			})}
+		>{'select next'}</button>
+		<button
+			id="selection-transition-urgent"
+			onClick={() => setSelected(3)}
+		>{'select urgently'}</button>
+		@try {
+			<>
+				<ul id="selection-transition-list">
+					@for (const row of props.items; key row.id) {
+						<li class={selected === row.id ? 'selected' : ''}>{row.label as string}</li>
+					}
+				</ul>
+				<SelectionTransitionValue promise={resource} />
+			</>
+		} @pending {
+			<span id="selection-transition-fallback">{'loading'}</span>
+		}
 	</div>
 }
