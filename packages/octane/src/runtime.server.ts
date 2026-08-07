@@ -1099,7 +1099,7 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 
 // Guarded escapers: a single .test() scan first, so the common no-escape case
 // returns the ORIGINAL string with zero allocation (~5x on clean text). When
-// something does need escaping, the chained native .replace passes are kept —
+// something does need escaping, native replacement passes are kept —
 // measured faster than an exec-loop or replace-with-callback single pass on V8
 // for both sparse and dense escape densities.
 const HTML_ESCAPE_RE = /[&<>]/g;
@@ -1107,7 +1107,7 @@ export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
 	HTML_ESCAPE_RE.lastIndex = 0;
 	if (!HTML_ESCAPE_RE.test(s)) return s;
-	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 const ATTR_ESCAPE_RE = /[&"]/g;

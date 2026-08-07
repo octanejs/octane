@@ -74,8 +74,14 @@ Octane-specific server paths.
   (hydration markers legitimately differ). **The headline number is the
   plain/compiled ratio** — the SSR authoring cliff a binding-heavy page pays.
 - **`escape-heavy`** — 10k text holes whose every value contains `&<>"'`.
-  Isolates the multi-pass regex `escapeHtml`; a regression here is that one
-  function.
+  Isolates `escapeHtml`. After timing and memory measurement, a deterministic
+  work gate renders the fixture again, checks that its complete response is
+  unchanged, and rejects regular-expression escaping passes. It also reports
+  the number and size of eager list snapshots without changing their semantics.
+  Production profiling attributed about 0.64% of sampled allocated bytes to
+  the list snapshot; its independently measured cost was about 0.025% of
+  render time. Preserving that snapshot protects custom iterators, observable
+  getters, and render-time mutations.
 
 ## Running
 
