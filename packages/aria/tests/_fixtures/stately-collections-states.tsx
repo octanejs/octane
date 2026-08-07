@@ -10,7 +10,10 @@ import { useMenuTriggerState } from '../../src/stately/menu/useMenuTriggerState'
 import { useSubmenuTriggerState } from '../../src/stately/menu/useSubmenuTriggerState';
 import { useSelectState } from '../../src/stately/select/useSelectState';
 import { useComboBoxState } from '../../src/stately/combobox/useComboBoxState';
-import { useNumberFieldState } from '../../src/stately/numberfield/useNumberFieldState';
+import {
+	useNumberFieldState,
+	type NumberFieldStateOptions,
+} from '../../src/stately/numberfield/useNumberFieldState';
 import { useSliderState } from '../../src/stately/slider/useSliderState';
 
 // --- useListState (dynamic items + render function, multiple selection) ---
@@ -336,6 +339,25 @@ export function NumberFieldHarness() {
 				{'p:' + state.validate('12') + ',' + state.validate('abc') + ',' + state.validate('-')}
 			</output>
 			<output data-testid="log">{'log:' + log}</output>
+		</div>
+	);
+}
+
+export function ControlledNumberFieldHarness(props: NumberFieldStateOptions & { draft: string }) {
+	const { draft, ...options } = props;
+	const state = useNumberFieldState(options);
+
+	return (
+		<div>
+			<button data-testid="edit" onClick={() => state.setInputValue(draft)}>
+				{'edit'}
+			</button>
+			<button data-testid="commit" onClick={() => state.commit()}>
+				{'commit'}
+			</button>
+			<output data-testid="input">{'in:' + state.inputValue}</output>
+			<output data-testid="number">{'n:' + state.numberValue}</output>
+			<output data-testid="valid">{'valid:' + state.validate(draft)}</output>
 		</div>
 	);
 }
