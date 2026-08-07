@@ -1,7 +1,7 @@
 import { renderToString } from 'octane/server';
 import { describe, expect, it } from 'vitest';
 
-import { AriaServerFixture } from './_fixtures/server.tsx';
+import { AriaNumberFieldServerFixture, AriaServerFixture } from './_fixtures/server.tsx';
 
 describe('@octanejs/aria server rendering', () => {
 	it('renders stable label relationships and reads the server snapshot without a DOM', () => {
@@ -24,4 +24,36 @@ describe('@octanejs/aria server rendering', () => {
 		expect(html).toContain('data-direction="rtl"');
 		expect(html).toContain('aria-labelledby="aria-hydration-label"');
 	});
+
+	it('formats and parses controlled number fields on the server without a DOM', () => {
+		expect(typeof document).toBe('undefined');
+		const { html } = renderToString(AriaNumberFieldServerFixture, {
+			locale: 'de-DE',
+			value: 1234.5,
+			formatOptions: { minimumFractionDigits: 2 },
+		});
+
+		expect(html).toContain('id="aria-server-number"');
+		expect(html).toContain('data-number="1234.5"');
+		expect(html).toContain('>1.234,50</output>');
+	});
+
+	it.each([
+		['USD', '$12.25', '12.25'],
+		['JPY', '¥10', '10'],
+		['BHD', 'BHD\u00a012.270', '12.27'],
+		['KWD', 'KWD\u00a012.270', '12.27'],
+	] as const)(
+		'preserves %s minor units when server-rendered rounding increments omit precision',
+		(currency, formattedValue, parsedValue) => {
+			const { html } = renderToString(AriaNumberFieldServerFixture, {
+				locale: 'en-US',
+				value: 12.27,
+				formatOptions: { style: 'currency', currency, roundingIncrement: 5 },
+			});
+
+			expect(html).toContain('data-number="' + parsedValue + '"');
+			expect(html).toContain('>' + formattedValue + '</output>');
+		},
+	);
 });
