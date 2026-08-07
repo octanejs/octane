@@ -1,0 +1,52 @@
+{
+  "capture-only": {
+    "raw": 3776,
+    "gzip": 1728,
+    "brotli": 1536
+  },
+  "root-static-specialized": {
+    "raw": 49760,
+    "gzip": 16736,
+    "brotli": 15088
+  },
+  "root-static": {
+    "raw": 111952,
+    "gzip": 36480,
+    "brotli": 32096
+  },
+  "hooks-state": {
+    "raw": 115248,
+    "gzip": 37712,
+    "brotli": 33120
+  },
+  "context": {
+    "raw": 117296,
+    "gzip": 38400,
+    "brotli": 33696
+  },
+  "hydrate-root": {
+    "raw": 128016,
+    "gzip": 41536,
+    "brotli": 36336
+  },
+  "deferred-hydration": {
+    "raw": 151776,
+    "gzip": 48928,
+    "brotli": 42576
+  },
+  "suspense-transition": {
+    "raw": 120448,
+    "gzip": 39088,
+    "brotli": 34288
+  },
+  "binding-vanilla": {
+    "raw": 668,
+    "gzip": 444,
+    "brotli": 376
+  },
+  "binding-hooks": {
+    "raw": 116064,
+    "gzip": 38128,
+    "brotli": 33504
+  }
+}

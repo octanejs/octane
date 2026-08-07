@@ -85,6 +85,7 @@ export const BENCHMARK_SUITES = [
 	'codegen-size',
 	'compiler-throughput',
 	'bundle-size',
+	'bundle-reachability',
 	'three-renderer',
 	'three-bundle-size',
 ];

@@ -47,7 +47,8 @@ runner loops their per-target invocations and merges them),
 **lynx-render**, and **lynx-bundle-size** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
-and **codegen-size** / **bundle-size** / **three-bundle-size** /
+and **codegen-size** / **bundle-size** / **bundle-reachability** /
+**three-bundle-size** /
 **lynx-bundle-size** are deterministic build/byte checks.
 
 ## Regression modes
@@ -209,6 +210,7 @@ internally, get their own baseline and guard namespace.
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | six real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
+| `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
 | `three-bundle-size` | three | none (builds, then checks in Chromium) | minimal/full-catalogue shipped JS bytes for Octane Three, R3F, and plain Three |
 
@@ -237,6 +239,34 @@ the primary scaling ratchet as applications grow; `fw_*` tracks the one-time
 runtime cost separately. App-shaped
 sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
 service and formatting modules count as app code in both framework builds.
+
+`bundle-reachability` builds ten independent public-entry feature fixtures with
+the production Octane compiler, disabled HMR/profiling, and normalized esbuild
+minification. Each measured IIFE executes unchanged in an isolated jsdom realm;
+its visible DOM, interaction, hydration, Suspense, store, and cleanup behavior
+must match its feature oracle. The emitted module graph rejects React, server,
+profiling, devtools, package-metadata, and RPC-serialization reachability. Early
+hydration-event capture and the vanilla Zustand entry must also exclude the
+client runtime, while the hook binding must retain the real vanilla store.
+
+The two static-root fixtures deliberately measure different public contracts.
+`root-static-specialized` matches an application's disposable top-level
+`createRoot(container).render(ImportedComponent)` entry, allowing the production
+compiler to specialize the root. `root-static` retains an escaped, reusable
+`Root`, calls `render`, and verifies `unmount`; its broader reachable runtime is
+real and must not be disguised as the specialized entry.
+
+`bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
+ceilings for every feature. Budgets leave about 3% deterministic headroom, with
+small byte-aligned allowances for tiny isolated entries. Each scenario publishes
+its committed ceiling as a
+same-run `*-budget` reference target, so thirty `maxRatio: 1` entries in
+`baselines/ratios.json` enforce all three metrics in the existing weekly/manual
+Bench CI workflow. Run the complete executable and byte guard directly with:
+
+```bash
+node benchmarks/bench.mjs --quick --ratios bundle-reachability
+```
 
 ## Adding a suite
 

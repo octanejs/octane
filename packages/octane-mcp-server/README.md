@@ -164,9 +164,9 @@ one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
 `scheduler-responsiveness`, `suspense-recovery`, `event-delegation`,
 `application-composition`, `scaling-curves`, `streaming-ssr`,
 `streaming-backpressure`, `compiler-throughput`, `codegen-size`,
-`bundle-size`, `three-renderer`, `three-bundle-size`, …) or every suite with
-`all`; `quick` selects the reduced-iteration smoke pass. The suite list mirrors
-the runner manifest and `node benchmarks/bench.mjs --list`.
+`bundle-size`, `bundle-reachability`, `three-renderer`, `three-bundle-size`, …)
+or every suite with `all`; `quick` selects the reduced-iteration smoke pass. The
+suite list mirrors the runner manifest and `node benchmarks/bench.mjs --list`.
 
 ### `octane_issue_context`
 

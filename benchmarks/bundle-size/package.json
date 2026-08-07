@@ -8,6 +8,9 @@
     "bench": "node run.mjs"
   },
   "dependencies": {
+    "@octanejs/zustand": "workspace:*",
+    "jsdom": "catalog:default",
+    "octane": "workspace:*",
     "vite": "catalog:default"
   }
 }
