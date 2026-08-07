@@ -155,6 +155,9 @@ describe('automatic gesture playback', () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		vi.restoreAllMocks();
+		// `restoreAllMocks` does not undo `stubGlobal`, and a stubbed `Touch`
+		// would otherwise decide the next test's dispatch path.
+		vi.unstubAllGlobals();
 		if (elementFromPointDescriptor) {
 			Object.defineProperty(document, 'elementFromPoint', elementFromPointDescriptor);
 		} else {
@@ -201,6 +204,82 @@ describe('automatic gesture playback', () => {
 		expect(events.slice(0, 2)).toEqual(['pointerdown', 'pointermove']);
 		playback.stop();
 		expect(events.at(-1)).toBe('pointerup');
+	});
+
+	it('keeps driving an example on a browser that refuses `new Touch()`', async () => {
+		// Safari declares `Touch` and throws `Illegal constructor` when you call
+		// it, while still shipping the legacy `document.createTouch` factory and
+		// wanting `TouchList`s rather than arrays. The throw used to reject the
+		// playback loop on the very first contact, so the swiper never moved —
+		// and `@lynx-js/web-core` binds touch events, not pointer events, so the
+		// pointer half alone demonstrates nothing.
+		vi.useFakeTimers();
+		vi.stubGlobal(
+			'Touch',
+			class {
+				constructor() {
+					throw new TypeError('Illegal constructor');
+				}
+			},
+		);
+		const legacy = {
+			createTouch: (
+				_view: Window,
+				target: EventTarget,
+				identifier: number,
+				pageX: number,
+				pageY: number,
+			) => ({ target, identifier, pageX, pageY }),
+			createTouchList: (...touches: unknown[]) => touches,
+		};
+		for (const [name, value] of Object.entries(legacy)) {
+			Object.defineProperty(document, name, { configurable: true, value });
+		}
+
+		const host = document.createElement('div');
+		const target = document.createElement('div');
+		host.append(target);
+		document.body.append(host);
+		vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(
+			DOMRect.fromRect({ x: 0, y: 0, width: 100, height: 100 }),
+		);
+		Object.defineProperty(document, 'elementFromPoint', {
+			configurable: true,
+			value: () => target,
+		});
+
+		const seen: string[] = [];
+		for (const type of ['touchstart', 'touchmove', 'touchend']) {
+			target.addEventListener(type, () => seen.push(type));
+		}
+
+		// A fresh module: the resolved factory is cached for the page's lifetime.
+		vi.resetModules();
+		const { playAutoGesture: play } =
+			await import('../src/components/go/lynx-view/auto-gesture.ts');
+		const playback = play(host, {
+			steps: [
+				{
+					path: [
+						{ x: 0.8, y: 0.5 },
+						{ x: 0.2, y: 0.5 },
+					],
+					durationMs: 0,
+					restMs: 0,
+				},
+			],
+			loop: false,
+			showPointer: false,
+			startDelayMs: 0,
+			stopOnUserInput: false,
+		});
+		await vi.runAllTimersAsync();
+		playback.stop();
+
+		// The whole gesture runs, rather than dying on the first contact.
+		expect(seen.at(0)).toBe('touchstart');
+		expect(seen.at(-1)).toBe('touchend');
+		for (const name of Object.keys(legacy)) Reflect.deleteProperty(document, name);
 	});
 
 	it('finishes each repeated direction before reversing', async () => {

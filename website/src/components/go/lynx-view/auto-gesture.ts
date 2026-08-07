@@ -181,7 +181,11 @@ export function playAutoGesture(host: HTMLElement, options: AutoGestureOptions):
 		endActiveContact();
 	}
 
-	void run();
+	// A demonstration must never take the page down with it. Anything thrown
+	// mid-drag would otherwise surface as an unhandled rejection and leave the
+	// contact down, the circle drawn, and the example believing a finger is
+	// still on it.
+	void run().catch(() => stop());
 	return { stop };
 }
 
@@ -233,14 +237,120 @@ const POINTER_TYPE = {
 	touchend: 'pointerup',
 } as const;
 
+type TouchPoint = { clientX: number; clientY: number };
+type TouchType = 'touchstart' | 'touchmove' | 'touchend';
+type TouchEventFactory = (
+	target: Element,
+	type: TouchType,
+	identifier: number,
+	point: TouchPoint,
+) => TouchEvent;
+
+/** Safari's legacy touch factories, absent everywhere else. */
+type LegacyTouchDocument = Document & {
+	createTouch: (
+		view: Window,
+		target: EventTarget,
+		identifier: number,
+		pageX: number,
+		pageY: number,
+		screenX: number,
+		screenY: number,
+	) => Touch;
+	createTouchList: (...touches: Touch[]) => TouchList;
+};
+
+/** `new Touch()` plus plain arrays — every engine but Safari. */
+const standardTouchEvent: TouchEventFactory = (target, type, identifier, point) => {
+	const touch = new Touch({
+		identifier,
+		target,
+		clientX: point.clientX,
+		clientY: point.clientY,
+		pageX: point.clientX + window.scrollX,
+		pageY: point.clientY + window.scrollY,
+		screenX: point.clientX,
+		screenY: point.clientY,
+	});
+	return new TouchEvent(type, {
+		...TOUCH_EVENT_INIT,
+		touches: type === 'touchend' ? [] : [touch],
+		targetTouches: type === 'touchend' ? [] : [touch],
+		changedTouches: [touch],
+	});
+};
+
+/**
+ * Safari's path: `document.createTouch` for the contact, and `TouchList`s
+ * rather than arrays for the event.
+ *
+ * Both halves are load-bearing. Safari's `TouchEvent` constructor rejects a
+ * plain array with a bare "Type error", and `createTouch` takes *page*
+ * coordinates — it derives `clientX`/`clientY` by subtracting the scroll, so
+ * the scroll has to be added back, and a preview is usually well down the page
+ * by the time anyone sees it.
+ */
+const legacyTouchEvent: TouchEventFactory = (target, type, identifier, point) => {
+	const legacy = document as LegacyTouchDocument;
+	const touch = legacy.createTouch(
+		window,
+		target,
+		identifier,
+		point.clientX + window.scrollX,
+		point.clientY + window.scrollY,
+		point.clientX,
+		point.clientY,
+	);
+	const touches = type === 'touchend' ? legacy.createTouchList() : legacy.createTouchList(touch);
+	// The DOM lib types these as `Touch[]`, following the current spec. Safari
+	// implements the older IDL and rejects an array outright, so the `TouchList`s
+	// have to go through a cast rather than a wider parameter type.
+	return new TouchEvent(type, {
+		...TOUCH_EVENT_INIT,
+		touches,
+		targetTouches: touches,
+		changedTouches: legacy.createTouchList(touch),
+	} as unknown as TouchEventInit);
+};
+
+const TOUCH_EVENT_INIT = { bubbles: true, cancelable: true, composed: true } as const;
+
+let touchEventFactory: TouchEventFactory | null | undefined;
+
+/**
+ * How this browser lets a script build a `TouchEvent`, or `null` if it will not.
+ *
+ * `typeof` is not the question. Safari declares `Touch` and throws
+ * `Illegal constructor` when you call it, so an existence check passes and the
+ * constructor throws — which used to reject the playback loop and take the
+ * whole demonstration down with it. What it accepts instead is not derivable
+ * from what it declares, so each strategy is probed by building one throwaway
+ * event. Probe once and cache: on Safari the first branch throws every time,
+ * and this runs per frame.
+ */
+function resolveTouchEventFactory(): TouchEventFactory | null {
+	if (touchEventFactory !== undefined) return touchEventFactory;
+	for (const factory of [standardTouchEvent, legacyTouchEvent]) {
+		try {
+			void factory(document.body, 'touchstart', 0, { clientX: 0, clientY: 0 });
+			touchEventFactory = factory;
+			return factory;
+		} catch {
+			// Try the next strategy.
+		}
+	}
+	touchEventFactory = null;
+	return null;
+}
+
 /**
  * One contact, as the browser reports it.
  *
- * Real touch input produces a pointer event *and* a touch event for every
- * contact, and a consumer may listen for either — `@lynx-js/web-core` drives
- * its gestures from the pointer stream, so dispatching only `touchstart` /
- * `touchmove` / `touchend` reaches the right element and does nothing at all.
- * Both are sent, in the order Chrome sends them.
+ * `@lynx-js/web-core` binds `touchstart` / `touchend` / `touchcancel` and no
+ * pointer events at all, so the touch half below is the one that actually
+ * drives the example — where it cannot be synthesized, the gesture does
+ * nothing. The pointer event is sent because real touch input produces both,
+ * in the order Chrome sends them, and an example may listen for either.
  */
 function dispatchTouch(
 	target: Element,
@@ -267,30 +377,9 @@ function dispatchTouch(
 	};
 	target.dispatchEvent(new PointerEvent(POINTER_TYPE[type], pointerInit));
 
-	// Touch/TouchEvent are unavailable on desktop builds without touch support;
-	// the pointer half above still drives the example there.
-	if (typeof Touch === 'undefined' || typeof TouchEvent === 'undefined') return;
-	const touch = new Touch({
-		identifier,
-		target,
-		clientX: point.clientX,
-		clientY: point.clientY,
-		pageX: point.clientX,
-		pageY: point.clientY,
-		screenX: point.clientX,
-		screenY: point.clientY,
-	});
-	const touches = type === 'touchend' ? [] : [touch];
-	target.dispatchEvent(
-		new TouchEvent(type, {
-			bubbles: true,
-			cancelable: true,
-			composed: true,
-			touches,
-			targetTouches: touches,
-			changedTouches: [touch],
-		}),
-	);
+	const factory = resolveTouchEventFactory();
+	if (!factory) return;
+	target.dispatchEvent(factory(target, type, identifier, point));
 }
 
 /** The simulator-style contact circle. */
