@@ -26,7 +26,8 @@ diff; either form keeps the label workflow successful.
 
 A bot reads this box and applies the label, so nothing here needs repository
 permissions and it works the same from a fork. The type label comes from the
-conventional-commit type in the title. Do not apply either by hand.
+conventional-commit type in the title, with the type-prefixed head branch as a
+fallback. Do not apply either by hand.
 
 When updating an existing pull request, merge this template content into the
 current body. Preserve every bot-managed HTML comment region and all existing

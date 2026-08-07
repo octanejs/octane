@@ -173,10 +173,11 @@ from a maintainer.
 ## Labels
 
 Do not apply labels. Both are applied by the bot above: the type label (`feat`,
-`fix`, `docs`, `test`, `perf`, `refactor`, `chore`, `ci`) from the PR title, and
-`agent-authored` from the box. Retitling moves the type label, and a title the
-regex cannot read leaves the PR unlabelled, which is the signal to fix the title.
-`bug` and `enhancement` belong to issues.
+`fix`, `docs`, `test`, `perf`, `refactor`, `chore`, `ci`) from the PR title, with
+the type-prefixed head branch as a fallback, and `agent-authored` from the box.
+Retitling to another supported type moves the type label. A title and branch the
+parser cannot read leave the PR unlabelled. `bug` and `enhancement` belong to
+issues.
 
 ## Final response
 
