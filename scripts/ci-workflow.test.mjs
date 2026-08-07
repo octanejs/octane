@@ -826,6 +826,7 @@ describe('Vercel preview workflow', () => {
 		pullResponse = pull,
 		comments = [],
 		existingRef = null,
+		deleteRefError = null,
 		deploymentSnapshots = [],
 	} = {}) {
 		const gitCalls = [];
@@ -870,6 +871,7 @@ describe('Vercel preview workflow', () => {
 					},
 					deleteRef: async (input) => {
 						gitCalls.push({ operation: 'delete', ...input });
+						if (deleteRefError) throw deleteRefError;
 						if (currentRef === null) {
 							throw Object.assign(new Error('missing ref'), { status: 404 });
 						}
@@ -1156,6 +1158,12 @@ describe('Vercel preview workflow', () => {
 		assert.equal(currentRef, null);
 		assert.deepEqual(gitCalls, [
 			{
+				operation: 'get',
+				owner: 'octanejs',
+				repo: 'octane',
+				ref: 'heads/deploy-preview-pr-612',
+			},
+			{
 				operation: 'delete',
 				owner: 'octanejs',
 				repo: 'octane',
@@ -1171,7 +1179,26 @@ describe('Vercel preview workflow', () => {
 		const { gitCalls, failures, notices } = await runPreview({ action: 'closed' });
 
 		assert.equal(gitCalls.length, 1);
-		assert.equal(gitCalls[0].operation, 'delete');
+		assert.equal(gitCalls[0].operation, 'get');
+		assert.match(notices.join('\n'), /already absent/);
+		assert.deepEqual(failures, []);
+	});
+
+	test('treats a preview branch removed during cleanup as already absent', async () => {
+		const deleteRefError = Object.assign(new Error('Reference does not exist'), {
+			status: 422,
+			response: { data: { message: 'Reference does not exist' } },
+		});
+		const { gitCalls, failures, notices } = await runPreview({
+			action: 'closed',
+			existingRef: sha,
+			deleteRefError,
+		});
+
+		assert.deepEqual(
+			gitCalls.map((call) => call.operation),
+			['get', 'delete'],
+		);
 		assert.match(notices.join('\n'), /already absent/);
 		assert.deepEqual(failures, []);
 	});
