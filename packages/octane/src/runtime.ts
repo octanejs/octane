@@ -7953,14 +7953,15 @@ function recordContextDependency(block: Block | null, context: Context<any>): vo
 	}
 }
 
-// Active only while a scoped JSX value resolves its deferred record (see
-// createScopedValue). A scoped value has to rebuild when a context it actually
-// read changes, and the reads collected here are what "actually read" means:
-// a descriptor that reads no context is never rebuilt by a provider update, so
-// the props object it produced — and every inline callback identity inside it —
-// survives. Rebuilding on a global epoch instead made an unrelated provider
-// update hand a component's children brand-new prop identities, which churns
-// effect/memo deps and cannot converge when such an effect feeds that provider.
+// Active only while a scoped JSX resolver reads its deferred record (see
+// createScopedResolver). A scoped record has to rebuild when a context it
+// actually read changes, and the reads collected here are what "actually read"
+// means: a descriptor that reads no context is never rebuilt by a provider
+// update, so the props object it produced — and every inline callback identity
+// inside it — survives. Rebuilding on a global epoch instead made an unrelated
+// provider update hand a component's children brand-new prop identities, which
+// churns effect/memo deps and cannot converge when such an effect feeds that
+// provider.
 let SCOPED_READ_TRACKING = false;
 let SCOPED_READS: Map<Context<any>, number> | null = null;
 
@@ -7970,6 +7971,49 @@ function scopedReadsChanged(reads: Map<Context<any>, number> | null): boolean {
 		if (context.$$version !== version) return true;
 	}
 	return false;
+}
+
+function createScopedResolver<T>(read: () => T): () => T {
+	let resolved = false;
+	let resolvedScope: Scope | null = null;
+	let resolvedReads: Map<Context<any>, number> | null = null;
+	let resolvedValue: T;
+
+	return (): T => {
+		const scope = CURRENT_SCOPE;
+		const sameScope =
+			resolvedScope === scope ||
+			(resolvedScope !== null &&
+				scope !== null &&
+				scope.block.parentBlock === resolvedScope.block &&
+				scope.$$ctxValues === null);
+		// A record that read no context is the same in every scope, so only a
+		// context-reading one is rebuilt when its resolving scope changes. Host
+		// classification previews a record in the parent block before its direct
+		// child block renders it, so that one same-context handoff is reusable.
+		if (!resolved || scopedReadsChanged(resolvedReads) || (resolvedReads !== null && !sameScope)) {
+			const previousTracking = SCOPED_READ_TRACKING;
+			const previousReads = SCOPED_READS;
+			SCOPED_READ_TRACKING = true;
+			SCOPED_READS = null;
+			let next: T;
+			try {
+				next = read();
+			} finally {
+				resolvedReads = SCOPED_READS;
+				SCOPED_READ_TRACKING = previousTracking;
+				SCOPED_READS = previousReads;
+			}
+			resolvedScope = scope;
+			resolvedValue = next;
+			resolved = true;
+		} else if (resolvedScope !== scope) {
+			// Move ownership from the previewing parent to its direct child so a
+			// later sibling or provider scope still resolves independently.
+			resolvedScope = scope;
+		}
+		return resolvedValue;
+	};
 }
 
 function readContextFrom<T>(reader: Scope | null, block: Block | null, context: Context<T>): T {
@@ -14599,62 +14643,15 @@ type ScopedValueDescriptor<P> = ElementDescriptor<P> & {
  *
  * The marker stays eagerly available to public element checks, while inspecting
  * any actual field resolves type, props, key, ref, and children together in the
- * current render scope. A shared value is rebuilt when its provider scope or
- * context epoch changes, just like a scoped element's deferred children.
+ * current render scope. A shared value is rebuilt when its provider scope or a
+ * context it read changes, just like a scoped element's deferred children.
  *
  * @internal
  */
 export function createScopedValue<P>(
 	readElement: () => ElementDescriptor<P>,
 ): ElementDescriptor<P> {
-	let resolved: ElementDescriptor<P> | undefined;
-	let resolvedScope: Scope | null = null;
-	let resolvedReads: Map<Context<any>, number> | null = null;
-
-	const resolve = (): ElementDescriptor<P> => {
-		const scope = CURRENT_SCOPE;
-		const sameScope =
-			resolvedScope === scope ||
-			(resolvedScope !== null &&
-				scope !== null &&
-				scope.block.parentBlock === resolvedScope.block &&
-				scope.$$ctxValues === null);
-		// A record that read no context is the same in every scope, so only a
-		// context-reading one is rebuilt when its resolving scope changes. Host
-		// classification resolves a child in the parent block before the child
-		// block renders it, so without that condition the two scopes alternate and
-		// every render rebuilds — re-creating props the owner never re-created.
-		if (
-			resolved === undefined ||
-			scopedReadsChanged(resolvedReads) ||
-			(resolvedReads !== null && !sameScope)
-		) {
-			const previousTracking = SCOPED_READ_TRACKING;
-			const previousReads = SCOPED_READS;
-			SCOPED_READ_TRACKING = true;
-			SCOPED_READS = null;
-			let next: ElementDescriptor<P>;
-			try {
-				next = readElement();
-			} finally {
-				resolvedReads = SCOPED_READS;
-				SCOPED_READ_TRACKING = previousTracking;
-				SCOPED_READS = previousReads;
-			}
-			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
-				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
-			}
-			resolvedScope = scope;
-			resolved = next;
-		} else if (resolvedScope !== scope) {
-			// Host classification previews a scoped value in the parent block before
-			// immediately rendering it in the host's direct child block. Reuse that
-			// same-context record once, then move ownership to the child so a later
-			// sibling or provider scope still resolves independently.
-			resolvedScope = scope;
-		}
-		return resolved;
-	};
+	const resolve = createScopedResolver(readElement);
 
 	const descriptor: ElementDescriptor<P> = {
 		$$kind: ELEMENT_TAG,
@@ -14665,7 +14662,12 @@ export function createScopedValue<P>(
 			return resolve().props;
 		},
 		get key() {
-			return resolve().key;
+			const next = resolve();
+			const key = next.key;
+			if (key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
+				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
+			}
+			return key;
 		},
 		get ref() {
 			return resolve().ref;
@@ -14700,45 +14702,7 @@ export function createScopedElement<P>(
 	const copiedProps = copyElementConfig(src);
 	applyElementDefaultProps(type, copiedProps);
 
-	let resolved = false;
-	let resolvedScope: Scope | null = null;
-	let resolvedReads: Map<Context<any>, number> | null = null;
-	let resolvedChildren: unknown;
-	const children = (): unknown => {
-		const scope = CURRENT_SCOPE;
-		const sameScope =
-			resolvedScope === scope ||
-			(resolvedScope !== null &&
-				scope !== null &&
-				scope.block.parentBlock === resolvedScope.block &&
-				scope.$$ctxValues === null);
-		// Same rule as createScopedValue: scope only matters to children that
-		// actually read context while resolving.
-		if (!resolved || scopedReadsChanged(resolvedReads) || (resolvedReads !== null && !sameScope)) {
-			const previousTracking = SCOPED_READ_TRACKING;
-			const previousReads = SCOPED_READS;
-			SCOPED_READ_TRACKING = true;
-			SCOPED_READS = null;
-			let nextChildren: unknown;
-			try {
-				nextChildren = readChildren();
-			} finally {
-				resolvedReads = SCOPED_READS;
-				SCOPED_READ_TRACKING = previousTracking;
-				SCOPED_READS = previousReads;
-			}
-			resolvedScope = scope;
-			resolvedChildren = nextChildren;
-			resolved = true;
-		} else if (resolvedScope !== scope) {
-			// Host classification previews scoped children in the parent block before
-			// hostElementBody immediately renders them in its direct child block.
-			// Reuse that same-context preview once, then move ownership to the child
-			// so sibling/provider scopes cannot inherit another subtree's values.
-			resolvedScope = scope;
-		}
-		return resolvedChildren;
-	};
+	const children = createScopedResolver(readChildren);
 	const childProperty = { configurable: true, enumerable: true, get: children };
 	Object.defineProperty(copiedProps, 'children', childProperty);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
