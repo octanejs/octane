@@ -13,6 +13,7 @@ import { expect, it } from 'vitest';
 import { pluginOctane } from '../../src/index.js';
 
 const DEMO_ROOT = resolve(import.meta.dirname, '../../examples/demo');
+const GALLERY_ROOT = resolve(import.meta.dirname, '../../examples/gallery');
 const MAIN_THREAD_FLUSH_ROOT = resolve(import.meta.dirname, '../_fixtures/main-thread-flush');
 const WEB_CORE_ROOT = resolve(
 	dirname(fileURLToPath(import.meta.resolve('@lynx-js/web-core/package.json'))),
@@ -60,6 +61,7 @@ async function startHost(bundlePath: string): Promise<{
 	url: string;
 	close: () => Promise<void>;
 }> {
+	const bundleRoot = dirname(bundlePath);
 	const server = createServer(async (request, response) => {
 		try {
 			const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
@@ -72,10 +74,15 @@ async function startHost(bundlePath: string): Promise<{
 			const file =
 				pathname === '/main.web.bundle'
 					? bundlePath
-					: pathname.startsWith('/static/')
-						? resolve(WEB_CORE_ROOT, pathname.slice(1))
-						: undefined;
-			if (file === undefined || (file !== bundlePath && !isWithin(WEB_CORE_ROOT, file))) {
+					: pathname.startsWith('/static/image/')
+						? resolve(bundleRoot, pathname.slice(1))
+						: pathname.startsWith('/static/')
+							? resolve(WEB_CORE_ROOT, pathname.slice(1))
+							: undefined;
+			if (
+				file === undefined ||
+				(file !== bundlePath && !isWithin(WEB_CORE_ROOT, file) && !isWithin(bundleRoot, file))
+			) {
 				response.writeHead(404).end('Not found');
 				return;
 			}
@@ -207,6 +214,34 @@ it('mounts the demo through Lynx for Web and handles a native tap', async () => 
 		const updatedCount = page.getByText('Count 1', { exact: true });
 		await updatedCount.waitFor({ state: 'visible' });
 		expect(await updatedCount.count()).toBe(1);
+	});
+}, 90_000);
+
+it('reverses gallery auto-scroll at the bottom and top edges', async () => {
+	await withWebHostPage(GALLERY_ROOT, 'octane-lynx-web-gallery-', async (page) => {
+		const list = page.locator('lynx-view').locator('x-list.list');
+		await list.waitFor({ state: 'attached' });
+		const scrollTop = () => list.evaluate((element) => element.scrollTop);
+		const initialPosition = await scrollTop();
+		await expect.poll(scrollTop, { timeout: 5_000 }).toBeGreaterThan(initialPosition + 10);
+
+		// The production rate is deliberately slow. Move close to each edge so the
+		// native scroller still crosses and reverses there without a minutes-long test.
+		const nearBottom = await list.evaluate((element) => {
+			element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight - 40);
+			return element.scrollTop;
+		});
+		await expect.poll(scrollTop).toBeGreaterThan(nearBottom + 10);
+		const lowerEdge = await scrollTop();
+		await expect.poll(scrollTop, { timeout: 5_000 }).toBeLessThan(lowerEdge - 10);
+
+		const nearTop = await list.evaluate((element) => {
+			element.scrollTop = 40;
+			return element.scrollTop;
+		});
+		await expect.poll(scrollTop).toBeLessThan(nearTop - 10);
+		const upperEdge = await scrollTop();
+		await expect.poll(scrollTop, { timeout: 5_000 }).toBeGreaterThan(upperEdge + 10);
 	});
 }, 90_000);
 
