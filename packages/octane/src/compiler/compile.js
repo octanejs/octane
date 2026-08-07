@@ -4429,6 +4429,111 @@ function isSsrMarkerlessForItem(node) {
 	return jsxChildren.length === 1 && isPlainHostRoot(jsxChildren[0]);
 }
 
+// Direct host-row mounting skips component-render bookkeeping. Keep the proof
+// narrower than markerless item rendering so opaque host lifecycles fail closed.
+const HOST_MOUNT_SAFE_TAGS = new Set([
+	'a',
+	'article',
+	'aside',
+	'b',
+	'br',
+	'div',
+	'em',
+	'footer',
+	'h1',
+	'h2',
+	'h3',
+	'h4',
+	'h5',
+	'h6',
+	'header',
+	'hr',
+	'i',
+	'li',
+	'main',
+	'nav',
+	'ol',
+	'p',
+	'section',
+	'small',
+	'span',
+	'strong',
+	'table',
+	'tbody',
+	'td',
+	'tfoot',
+	'th',
+	'thead',
+	'tr',
+	'ul',
+]);
+
+const HOST_MOUNT_UNSAFE_ATTRIBUTES = new Set([
+	'autofocus',
+	'checked',
+	'dangerouslysetinnerhtml',
+	'defaultchecked',
+	'defaultvalue',
+	'form',
+	'formaction',
+	'formenctype',
+	'formmethod',
+	'formnovalidate',
+	'formtarget',
+	'innerhtml',
+	'is',
+	'multiple',
+	'ref',
+	'selected',
+	'slot',
+	'src',
+	'srcset',
+	'style',
+	'value',
+]);
+
+function isHostMountSafeTree(root) {
+	const seen = new WeakSet();
+	function walk(node) {
+		if (node == null || typeof node !== 'object') return true;
+		if (Array.isArray(node)) return node.every(walk);
+		if (seen.has(node)) return true;
+		seen.add(node);
+		const type = node.type;
+		if (
+			type === 'ArrowFunctionExpression' ||
+			type === 'FunctionExpression' ||
+			type === 'FunctionDeclaration'
+		) {
+			// Delegated event callbacks run after the live row has mounted.
+			return true;
+		}
+		if (type === 'JSXFragment' || type === 'Fragment') return false;
+		if (type === 'Element' || type === 'JSXElement') {
+			const tag = node.id || node.openingElement?.name;
+			if (
+				(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
+				!HOST_MOUNT_SAFE_TAGS.has(tag.name)
+			) {
+				return false;
+			}
+			for (const attribute of node.attributes || node.openingElement?.attributes || []) {
+				if (attribute.type !== 'Attribute' && attribute.type !== 'JSXAttribute') return false;
+				const name = jsxAttrRawName(attribute);
+				if (typeof name !== 'string' || HOST_MOUNT_UNSAFE_ATTRIBUTES.has(name.toLowerCase())) {
+					return false;
+				}
+			}
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			if (!walk(node[key])) return false;
+		}
+		return true;
+	}
+	return walk(root);
+}
+
 /**
  * Whether a function can return from its own body before reaching its compiled
  * output. Nested functions are separate execution scopes and do not affect the
@@ -17189,11 +17294,21 @@ function planJsx(
 	for (const fc of forCalls) {
 		const isMappedList = fc.mapMethodExpr !== null;
 		const forHelper = isMappedList
-			? 'mapSlot'
+			? fc.hostMountSafe
+				? 'fastMapSlot'
+				: 'mapSlot'
 			: fc.keyedSelectionIndex >= 0
-				? 'keyedForBlock'
-				: 'forBlock';
+				? fc.hostMountSafe
+					? 'fastKeyedForBlock'
+					: 'keyedForBlock'
+				: fc.hostMountSafe
+					? 'fastForBlock'
+					: 'forBlock';
 		ctx.runtimeNeeded.add(forHelper);
+		if (isMappedList && fc.hostMountSafe && fc.autoMemoDeps !== null) {
+			// Memoized maps query the original native-array guard before dispatch.
+			ctx.runtimeNeeded.add('mapSlot');
+		}
 		const slotIndex = fc.slotIndex;
 		const org = fc.origin ?? planOrigin;
 		registerDirectiveOrigin(ctx, org, [
@@ -17279,7 +17394,7 @@ function planJsx(
 			if (fc.autoMemoDeps !== null) {
 				const mappedCall = b.stmt(
 					b.call(
-						'_$mapSlot',
+						rtAlias(forHelper),
 						b.id('__s'),
 						b.literal(slotIndex),
 						hostExpr(),
@@ -17321,7 +17436,7 @@ function planJsx(
 					org,
 					b.stmt(
 						b.call(
-							'_$mapSlot',
+							rtAlias(forHelper),
 							b.id('__s'),
 							b.literal(slotIndex),
 							hostExpr(),
@@ -21922,6 +22037,23 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		}
 	}
 
+	const ssrMarkerless = isSsrMarkerlessForItem(node);
+	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
+	const hostMountSafe =
+		ctx.autoMemo === true &&
+		ctx._universalRuntimeUnit == null &&
+		(parentNs === 'html' || (parentNs === 'opaque' && HTML_ONLY_TAGS.has(hostRootTag))) &&
+		!emptyStmts &&
+		!isDestructured &&
+		!node.index &&
+		subStmts.length === 1 &&
+		singleRoot &&
+		ssrMarkerless &&
+		!containsComponentCallOrControlFlow(subStmts) &&
+		!containsRenderCall(subStmts) &&
+		!containsAutoMemoUnsafeStructure(subStmts) &&
+		isHostMountSafeTree(subStmts[0]);
+
 	const mapCall = node.nativeArrayMap || null;
 	return {
 		id: ctx.nextHelperId++,
@@ -21955,7 +22087,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		pure,
 		singleRoot,
 		singleRootExpr,
-		ssrMarkerless: isSsrMarkerlessForItem(node),
+		ssrMarkerless,
+		hostMountSafe,
 		// The env union doubles as the deps array: emitted whenever the helpers
 		// capture anything (Phase 2 — the runtime stamps it as block.extra), and
 		// ALSO compared for the dep-pure survivor short-circuit when depEligible.
