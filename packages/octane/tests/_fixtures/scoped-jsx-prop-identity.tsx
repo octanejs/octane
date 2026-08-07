@@ -1,6 +1,6 @@
 /** @jsxImportSource octane */
 
-import { createContext, useContext, useState } from 'octane';
+import { createContext, type ElementDescriptor, useContext, useState } from 'octane';
 
 const Ctx = createContext<number>(0);
 const Unrelated = createContext<number>(0);
@@ -51,5 +51,31 @@ export function Owner(props: {
 				<LazyReader value={lazy.current} />
 			</ContextHost>
 		</UnrelatedHost>
+	);
+}
+
+export function NestedFailureOwner(props: {
+	seen: Array<() => void>;
+	bind: (fn: () => void) => void;
+}) {
+	const throwing = {
+		get current(): number {
+			useContext(Ctx);
+			throw new Error('nested scoped record');
+		},
+	};
+	const nested = <span data-failure={throwing.current}>unreachable</span>;
+	const deferred = {
+		get callback(): () => void {
+			try {
+				void (nested as ElementDescriptor).props;
+			} catch {}
+			return () => {};
+		},
+	};
+	return (
+		<ContextHost bind={props.bind}>
+			<Consumer cb={deferred.callback} seen={props.seen} />
+		</ContextHost>
 	);
 }
