@@ -5,11 +5,14 @@
 import { useState, useCallback, useEffect } from 'octane';
 import { flatten } from './utils/flatten.ts';
 import { useFormContext } from './useFormContext.ts';
+import type { FieldValues, FormProps } from './types';
 
 const POST_REQUEST = 'post';
 
-export function Form(props) {
-	const methods = useFormContext();
+export function Form<TFieldValues extends FieldValues, TTransformedValues = TFieldValues>(
+	props: FormProps<TFieldValues, TTransformedValues>,
+) {
+	const methods = useFormContext<TFieldValues, any, TTransformedValues>();
 	const [mounted, setMounted] = useState(false);
 	const {
 		control = methods.control,
@@ -39,7 +42,7 @@ export function Form(props) {
 			} catch {
 			}
 
-			const flattenFormValues = flatten(data);
+			const flattenFormValues = flatten(data as FieldValues);
 
 			for (const key in flattenFormValues) {
 				formData.append(key, flattenFormValues[key]);
@@ -47,7 +50,7 @@ export function Form(props) {
 
 			if (onSubmit) {
 				await onSubmit({
-					data,
+					data: data as TTransformedValues,
 					event,
 					method,
 					formData,
@@ -110,7 +113,7 @@ export function Form(props) {
 
 	return <form
 		noValidate={mounted}
-		action={action}
+		action={action as string | undefined}
 		method={method}
 		encType={encType}
 		onSubmit={submit}

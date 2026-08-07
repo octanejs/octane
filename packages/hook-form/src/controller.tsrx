@@ -4,5 +4,12 @@
 // custom-hook call slot-wrapped by the compiler; the plain-.ts slotting pass
 // only slots BASE octane hooks (see compiler/slot-hooks.js).
 import { useController } from './useController.ts';
+import type { ControllerProps, FieldPath, FieldValues } from './types';
 
-export const Controller = (props) => props.render(useController(props));
+export const Controller = <
+	TFieldValues extends FieldValues = FieldValues,
+	TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+	TTransformedValues = TFieldValues,
+>(props: ControllerProps<TFieldValues, TName, TTransformedValues>) => props.render(
+	useController<TFieldValues, TName, TTransformedValues>(props),
+);

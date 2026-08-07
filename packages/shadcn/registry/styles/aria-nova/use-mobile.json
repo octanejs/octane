@@ -1,0 +1,14 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "use-mobile",
+  "type": "registry:hook",
+  "title": "use-mobile",
+  "files": [
+    {
+      "path": "hooks/use-mobile.ts",
+      "type": "registry:hook",
+      "target": "hooks/use-mobile.ts",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/hooks/use-mobile.ts. React hooks map onto\n// octane's; the explicit `[]` dependency array is retained from upstream\n// (subscribe once on mount). SSR-safe: `window` is only touched in the effect.\nimport { useEffect, useState } from 'octane';\n\nconst MOBILE_BREAKPOINT = 768;\n\nexport function useIsMobile() {\n\tconst [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);\n\n\tuseEffect(() => {\n\t\tconst mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);\n\t\tconst onChange = () => {\n\t\t\tsetIsMobile(window.innerWidth < MOBILE_BREAKPOINT);\n\t\t};\n\t\tmql.addEventListener('change', onChange);\n\t\tsetIsMobile(window.innerWidth < MOBILE_BREAKPOINT);\n\t\treturn () => mql.removeEventListener('change', onChange);\n\t}, []);\n\n\treturn !!isMobile;\n}\n"
+    }
+  ]
+}

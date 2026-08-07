@@ -41,7 +41,12 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
-import { analyzeHookDependencies, applyHookDependencies, isInvariantLiteral } from './hook-deps.js';
+import {
+	METHOD_DEP_IMPORT,
+	analyzeHookDependencies,
+	applyHookDependencies,
+	isInvariantLiteral,
+} from './hook-deps.js';
 import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
 import {
 	expandDomRendererRegionsAst,
@@ -4405,6 +4410,31 @@ export function hasOwnValueReturn(node) {
 }
 
 /**
+ * Whether a statement list always completes abruptly, so control can never fall
+ * past its end. Lets an outputless `@{ … }` body drop the tail return it would
+ * otherwise synthesize, because the body's own returns already cover every path.
+ *
+ * Deliberately syntactic: `return`, `throw`, a block that ends abruptly, and an
+ * if/else whose arms both do. Anything subtler keeps the tail, which is always
+ * safe — the runtime reads a fallen-through `undefined` as "this body already
+ * emitted its template", so the tail must stay wherever reachability is unproven.
+ */
+function alwaysCompletesAbruptly(statements) {
+	const last = statements[statements.length - 1];
+	if (!last) return false;
+	if (last.type === 'ReturnStatement' || last.type === 'ThrowStatement') return true;
+	if (last.type === 'BlockStatement') return alwaysCompletesAbruptly(last.body || []);
+	if (last.type === 'IfStatement') {
+		return (
+			!!last.alternate &&
+			alwaysCompletesAbruptly([last.consequent]) &&
+			alwaysCompletesAbruptly([last.alternate])
+		);
+	}
+	return false;
+}
+
+/**
  * A mixed shorthand's early return must always reach renderReturnedValue. The
  * runtime reserves `undefined` for a compiled-void body that already emitted its
  * template, so normalize every component-level early return through `?? null`.
@@ -6039,12 +6069,16 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			rendererBoundaryPreparation?.universalUnits,
 		),
 	});
+	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(
 			options,
 			rendererBoundaryPreparation?.universalUnits,
 		),
+		onRuntimeHelper: () => {
+			hookDepHelperNeeded = true;
+		},
 	});
 	const hmrOption = options && options.hmr;
 	const hmrDialect = hmrOption === true ? 'vite' : hmrOption || false;
@@ -6177,6 +6211,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// single module print must carry a loc (OCTANE_COMPILE_ASSERT_LOC).
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
+	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
@@ -6797,7 +6832,18 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// it. Persist that canonical identity again for the next update. This keeps
 			// working across any number of edits; accept callbacks in webpack are error
 			// handlers, not Vite-style callbacks carrying the new module namespace.
-			const webpackHot = () => b.member(importMeta(), 'webpackHot');
+			// Keep every access after the recognized `import.meta.webpackHot` root on a
+			// local. Rspack's React/Rsbuild transform pipeline otherwise treats deeper
+			// expressions such as `import.meta.webpackHot.data` as unsupported even
+			// though it lowers the root itself to `module.hot`.
+			const webpackHotName = allocCompilerName(ctx, '_$webpackHot');
+			const webpackHot = () => b.id(webpackHotName);
+			hmrNodes.push(
+				inheritOriginLoc(
+					b.const(webpackHotName, b.member(importMeta(), 'webpackHot')),
+					moduleOrigin,
+				),
+			);
 			const previousComponent = (name, optional) =>
 				b.member(
 					b.member(
@@ -7097,9 +7143,13 @@ function compileServer(source, filename, options, analyzedAst = null) {
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
+	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(options),
+		onRuntimeHelper: () => {
+			hookDepHelperNeeded = true;
+		},
 	});
 	const ctx = {
 		filename,
@@ -7143,6 +7193,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		// Scaffolding without a more precise authored construct maps here.
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
+	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
@@ -10562,10 +10613,20 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const shellOrigin = node.loc ? node : node.id?.loc ? node.id : prevFnOrigin;
 	let plan = null;
 	let returnedExpression = null;
-	if (returnedOutput) {
-		const rendered = jsxNodes[0];
+	if (returnedOutput && jsxNodes.length === 0) {
+		// A `@{ … }` body can carry value returns with NO trailing output node —
+		// `@{ … return null }` while a component is being written, or a React-shaped
+		// `return <jsx>` inside the block. There is no template to lower: the body's
+		// own returns are the whole output, so the tail is a plain `null` covering
+		// the fall-through path. When the body provably never falls through, that
+		// tail is unreachable and is dropped. Statement returns already normalized
+		// to `?? null`.
+		if (!alwaysCompletesAbruptly(rewrittenStatements)) {
+			returnedExpression = b.literal(null, 'null', node);
+		}
+	} else if (returnedOutput) {
 		returnedExpression = lowerReturnJsx(
-			rewriteHookCalls(rendered, ctx, name, options?.localHookSlots === true),
+			rewriteHookCalls(jsxNodes[0], ctx, name, options?.localHookSlots === true),
 			ctx,
 			inlinedSubs,
 			cssHash,
@@ -16678,12 +16739,10 @@ function planJsx(
 			ctx.runtimeNeeded.add('queueRefDetach'); // unmount-detach of a spread-supplied ref
 		}
 		if (b.kind === 'ref') {
-			ctx.runtimeNeeded.add('attachRef');
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred mount attach (commit-phase timing)
 			ctx.runtimeNeeded.add('queueRefDetach'); // deferred unmount detach (same phasing)
 		}
 		if (b.kind === 'fragmentRef') {
-			ctx.runtimeNeeded.add('attachRef');
 			ctx.runtimeNeeded.add('mountFragmentRef');
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred update re-attach
 			ctx.runtimeNeeded.add('queueRefDetach'); // deferred update/unmount detach
@@ -18251,18 +18310,18 @@ function emitBindingMount(bind, elVar, bag) {
 			// bound element rides along as the cleanup target, so a callback ref
 			// shared across elements (ref={registerItem} on every @for row)
 			// releases ITS row's React-19 cleanup, not another row's.
-			// Both deferred closures read through the captured `_b` (committed by the
-			// time attach/cleanup run); `_ref$` must be a LIVE read — updates re-point it.
+			// Both deferred operations retain the bound element. `_ref$` must be a LIVE
+			// cleanup read because updates re-point it. Assigning both bag locals inside
+			// the queue call evaluates each mount value once while avoiding throwaway
+			// temporaries; Suspense still receives the exact ref/target pair.
 			return st(
 				b.block([
-					b.const('_r', bind.expr),
-					b.stmt(b.assignment('=', local(`_ref$${bind.id}`), b.id('_r'))),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
 					b.stmt(
 						b.call(
 							'_$queueRefAttach',
 							b.id('__s'),
-							b.arrow([], b.call('_$attachRef', b.id('_r'), bagFieldNode(bag, `_el$${bind.id}`))),
+							b.assignment('=', local(`_ref$${bind.id}`), bind.expr),
+							b.assignment('=', local(`_el$${bind.id}`), el()),
 						),
 					),
 					cleanupsPush(
@@ -18286,22 +18345,13 @@ function emitBindingMount(bind, elVar, bag) {
 			// the user's ref, and registers a single cleanup that detaches
 			// the ref + destroys the instance on unmount.
 			return st(
-				b.block([
-					b.const('_r', bind.expr),
-					b.stmt(
-						b.assignment(
-							'=',
-							local(`_fi$${bind.id}`),
-							b.call(
-								'_$mountFragmentRef',
-								b.id('__s'),
-								el(),
-								hostVarNode(bind.endElVar),
-								b.id('_r'),
-							),
-						),
+				b.stmt(
+					b.assignment(
+						'=',
+						local(`_fi$${bind.id}`),
+						b.call('_$mountFragmentRef', b.id('__s'), el(), hostVarNode(bind.endElVar), bind.expr),
 					),
-				]),
+				),
 			);
 		}
 	}
@@ -18561,13 +18611,7 @@ function emitBindingUpdate(bind, bag) {
 							),
 							b.if(
 								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(
-									b.call(
-										'_$queueRefAttach',
-										b.id('__s'),
-										b.arrow([], b.call('_$attachRef', b.id('_r'), F('_el'))),
-									),
-								),
+								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), F('_el'))),
 								null,
 							),
 							b.stmt(b.assignment('=', F('_ref'), b.id('_r'))),
@@ -18600,13 +18644,7 @@ function emitBindingUpdate(bind, bag) {
 							),
 							b.if(
 								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(
-									b.call(
-										'_$queueRefAttach',
-										b.id('__s'),
-										b.arrow([], b.call('_$attachRef', b.id('_r'), fi())),
-									),
-								),
+								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), fi())),
 								null,
 							),
 							b.stmt(b.assignment('=', cur(), b.id('_r'))),

@@ -3,12 +3,15 @@
 // compiled MDX component. docs.ts zips this with the MDX imports for the
 // site; the remote MCP server (mcp/) imports only this file plus the raw
 // .mdx sources, so it never pulls compiled components into its bundle.
-// Its import chain must stay MDX-free (bindings.ts is JSON-only).
+// Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
 import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
+import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
 	id: string;
 	title: string;
+	/** Metadata-only aliases that should land on this exact indexed `<h2>` in search. */
+	searchTerms?: readonly string[];
 	// Heading depth for the "On this page" tree: 2 for a top-level `<h2>` section
 	// (the default), 3 for an `<h2>` subsection anchored by an `<h3>`. Only the
 	// table of contents reads this; the search index is built from `<h2>` anchors.
@@ -28,13 +31,29 @@ export const docsMeta: DocMeta[] = [
 	{
 		slug: 'quick-start',
 		title: 'Quick start',
-		description: 'Install octane, mount a component, and learn the .tsrx essentials.',
+		description:
+			'Scaffold a new Octane app, or add Octane to an existing project, and learn the .tsrx essentials.',
 		group: 'Start here',
+		searchTerms: [
+			'npm create octane',
+			'create-octane',
+			'scaffold',
+			'new project',
+			'--template',
+			'spa',
+			'fullstack',
+		],
 		sections: [
-			{ id: 'install', title: 'Install and configure' },
-			{ id: 'first-component', title: 'Your first component' },
+			{ id: 'scaffold', title: 'Create a new app' },
+			{ id: 'install', title: 'Install into an existing project' },
+			{ id: 'first-component', title: 'Build your first component' },
 			{ id: 'mount', title: 'Connect it to the page' },
-			{ id: 'tsrx-at-a-glance', title: 'TSRX at a glance' },
+			{
+				id: 'tsrx-at-a-glance',
+				title: 'TSRX at a glance',
+				searchTerms: ['VSCode', 'VSCode extension', 'TSRX VSCode'],
+			},
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -48,9 +67,36 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'rspack', title: 'Rspack' },
 			{ id: 'rsbuild', title: 'Rsbuild' },
 			{ id: 'strong-mode', title: 'Strong mode' },
+			{ id: 'mixed-toolchains', title: 'Mixed toolchains and file ownership' },
 			{ id: 'full-app-configuration', title: 'Full app configuration' },
 			{ id: 'production-and-preview', title: 'Production and preview' },
 			{ id: 'renderer-targets', title: 'Renderer targets' },
+		],
+	},
+	{
+		slug: 'framework-integrations',
+		title: 'Framework integrations',
+		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} app frameworks through first-party integrations.`,
+		group: 'Start here',
+		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
+			integration.title,
+			integration.packageName,
+			integration.model,
+			integration.description,
+			...(integration.packageName === '@octanejs/tanstack-start'
+				? [
+						'@octanejs/tanstack-router',
+						'@octanejs/tanstack-query',
+						'@octanejs/tanstack-form',
+						'TanStack bindings',
+					]
+				: []),
+		]),
+		sections: [
+			{ id: 'choose-a-framework', title: 'Find the right integration' },
+			{ id: 'astro', title: 'Astro islands' },
+			{ id: 'docusaurus', title: 'Docusaurus content sites' },
+			{ id: 'tanstack-start', title: 'TanStack Start applications' },
 		],
 	},
 	{
@@ -61,6 +107,15 @@ export const docsMeta: DocMeta[] = [
 		group: 'Start here',
 		searchTerms: [
 			'octane doctor',
+			'octane analyze',
+			'octane create',
+			'npm create octane',
+			'create-octane',
+			'scaffold',
+			'new project',
+			'--template',
+			'spa',
+			'fullstack',
 			'octane init',
 			'octane add',
 			'octane explain',
@@ -76,6 +131,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'doctor', title: 'octane doctor' },
 			{ id: 'fixing', title: 'Fixing what it finds', level: 3 },
 			{ id: 'analyze', title: 'octane analyze' },
+			{ id: 'create', title: 'octane create' },
 			{ id: 'init', title: 'octane init' },
 			{ id: 'bindings', title: 'Bindings and errors' },
 			{ id: 'mcp', title: 'octane mcp' },
@@ -92,22 +148,42 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'mental-model', title: 'The mental model' },
 			{ id: 'components-and-props', title: 'Components and props' },
 			{ id: 'state-and-events', title: 'State and events' },
-			{ id: 'use-linked-state', title: 'useLinkedState', level: 3 },
-			{ id: 'strong-mode', title: 'Strong mode', level: 3 },
+			{
+				id: 'use-linked-state',
+				title: 'Keep editable state in sync with useLinkedState',
+				level: 3,
+			},
+			{ id: 'strong-mode', title: 'Catch state mistakes with Strong mode', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
-			{ id: 'context', title: 'Sharing data' },
+			{ id: 'context', title: 'Sharing data with context' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
-			{ id: 'use-sync-external-store', title: 'useSyncExternalStore', level: 3 },
+			{
+				id: 'use-sync-external-store',
+				title: 'Subscribe to external state with useSyncExternalStore',
+				level: 3,
+			},
 			{ id: 'async-ui', title: 'Loading data and code' },
 			{ id: 'deferred-hydration', title: 'Deferred hydration' },
-			{ id: 'responsive-updates', title: 'Responsive updates' },
-			{ id: 'use-transition', title: 'useTransition', level: 3 },
-			{ id: 'use-deferred-value', title: 'useDeferredValue', level: 3 },
-			{ id: 'view-transitions', title: 'ViewTransition', level: 3 },
+			{ id: 'responsive-updates', title: 'Responsive updates and actions' },
+			{
+				id: 'use-transition',
+				title: 'Keep the current screen with useTransition',
+				level: 3,
+			},
+			{
+				id: 'use-deferred-value',
+				title: 'Let a slow view lag with useDeferredValue',
+				level: 3,
+			},
+			{
+				id: 'view-transitions',
+				title: 'Animate visual changes with ViewTransition',
+				level: 3,
+			},
 			{ id: 'roots-and-rendering', title: 'Roots and rendering' },
-			{ id: 'create-portal', title: 'createPortal', level: 3 },
-			{ id: 'server-rendering', title: 'Server rendering' },
-			{ id: 'api-index', title: 'API index' },
+			{ id: 'create-portal', title: 'Render an overlay with createPortal', level: 3 },
+			{ id: 'server-rendering', title: 'Server and static rendering' },
+			{ id: 'api-index', title: 'API index by job' },
 			{ id: 'practice', title: 'Practice' },
 			{ id: 'next-steps', title: 'Next steps' },
 		],
@@ -119,9 +195,15 @@ export const docsMeta: DocMeta[] = [
 		group: 'Learn Octane',
 		sections: [
 			{ id: 'which-should-i-use', title: 'Which should I use?' },
-			{ id: 'component-bodies', title: 'Component bodies' },
-			{ id: 'rendered-control-flow', title: 'Rendered control flow' },
-			{ id: 'text-holes', title: 'Text holes' },
+			{ id: 'component-bodies', title: 'The same component, with less ceremony' },
+			{ id: 'rendered-control-flow', title: 'Branches and lists that read top to bottom' },
+			{ id: 'text-holes', title: 'Text holes make the output explicit' },
+			{
+				id: 'editor-support',
+				title: 'Editor support',
+				searchTerms: ['VSCode', 'VSCode extension', 'TSRX VSCode'],
+			},
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -130,12 +212,51 @@ export const docsMeta: DocMeta[] = [
 		description: 'The deliberate divergences — everything else matching React is the point.',
 		group: 'Explore',
 		sections: [
-			{ id: 'hooks', title: 'Hooks' },
-			{ id: 'strong-mode', title: 'Strong mode' },
-			{ id: 'events-and-dom', title: 'Events and the DOM' },
-			{ id: 'async-work', title: 'Async work' },
+			{ id: 'hooks', title: 'Hooks fit the code' },
+			{ id: 'strong-mode', title: 'Strong mode is optional' },
+			{ id: 'events-and-dom', title: 'Events come from the browser' },
+			{ id: 'async-work', title: 'Transitions without time slicing' },
 			{ id: 'errors-and-server', title: 'Errors and server rendering' },
-			{ id: 'not-supported', title: 'APIs left out' },
+			{ id: 'not-supported', title: 'APIs Octane leaves out' },
+		],
+	},
+	{
+		slug: 'lynx',
+		title: 'Native apps with Lynx',
+		description:
+			'Render Octane components as native UI on iOS and Android through Lynx, and preview the same bundle on the web.',
+		group: 'Explore',
+		searchTerms: [
+			'Lynx',
+			'@octanejs/lynx',
+			'@octanejs/rspeedy-plugin',
+			'Rspeedy',
+			'Lynx Explorer',
+			'Lynx for Web',
+			'native',
+			'iOS',
+			'Android',
+			'mobile',
+			'main thread',
+			'main-thread scripting',
+			'lynx-view',
+			'.lynx.bundle',
+		],
+		sections: [
+			{ id: 'what-lynx-is', title: 'How Lynx and Octane work together' },
+			{
+				id: 'gallery',
+				title: 'Image gallery with a main-thread scrollbar',
+				searchTerms: ['gallery', 'waterfall', 'list', 'scrollbar'],
+			},
+			{
+				id: 'swiper',
+				title: 'Product carousel animated on the main thread',
+				searchTerms: ['swiper', 'carousel', 'product detail', 'gesture'],
+			},
+			{ id: 'two-threads', title: 'Two threads, one component tree' },
+			{ id: 'run-it', title: 'Run it yourself' },
+			{ id: 'status', title: 'Current status' },
 		],
 	},
 	{
@@ -151,6 +272,8 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'react-context', title: 'Share React context' },
 			{ id: 'server-rendering', title: 'Server rendering and hydration' },
 			{ id: 'not-supported', title: "What isn't supported" },
+			{ id: 'editor-and-type-checking', title: 'Editor and type checking' },
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -186,10 +309,10 @@ export const docsMeta: DocMeta[] = [
 		],
 		sections: [
 			{ id: 'source-package-contract', title: 'The source-package contract' },
-			{ id: 'package-the-source', title: 'Package the source' },
+			{ id: 'package-the-source', title: 'Package the complete source graph' },
 			{ id: 'authoring-and-types', title: 'Authoring and types' },
-			{ id: 'package-metadata', title: 'Package metadata' },
-			{ id: 'verify-the-package', title: 'Verify the package' },
+			{ id: 'package-metadata', title: 'Use package metadata only for real exceptions' },
+			{ id: 'verify-the-package', title: 'Verify what users receive' },
 		],
 	},
 	{
@@ -203,9 +326,9 @@ export const docsMeta: DocMeta[] = [
 			...category.packages,
 		]),
 		sections: [
-			{ id: 'find-a-binding', title: 'Find a binding' },
-			{ id: 'install-and-use', title: 'Install and use' },
-			{ id: 'check-support', title: 'Check support' },
+			{ id: 'find-a-binding', title: 'Pick by the job' },
+			{ id: 'install-and-use', title: 'Install it, then change the import' },
+			{ id: 'check-support', title: 'Check the part you plan to use' },
 		],
 	},
 ];

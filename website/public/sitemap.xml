@@ -4,10 +4,12 @@
 	<url><loc>https://octanejs.dev/docs</loc></url>
 	<url><loc>https://octanejs.dev/docs/quick-start</loc></url>
 	<url><loc>https://octanejs.dev/docs/build-tools</loc></url>
+	<url><loc>https://octanejs.dev/docs/framework-integrations</loc></url>
 	<url><loc>https://octanejs.dev/docs/cli</loc></url>
 	<url><loc>https://octanejs.dev/docs/core-apis</loc></url>
 	<url><loc>https://octanejs.dev/docs/tsrx-vs-tsx</loc></url>
 	<url><loc>https://octanejs.dev/docs/differences-from-react</loc></url>
+	<url><loc>https://octanejs.dev/docs/lynx</loc></url>
 	<url><loc>https://octanejs.dev/docs/react-compat</loc></url>
 	<url><loc>https://octanejs.dev/docs/profiling</loc></url>
 	<url><loc>https://octanejs.dev/docs/publishing-libraries</loc></url>

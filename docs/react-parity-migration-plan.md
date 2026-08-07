@@ -12,6 +12,11 @@
 > **[differences-from-react.md](./differences-from-react.md)**; keep that page
 > current when a divergence is added or closed.
 
+> This historical core migration plan is not the configuration guide for
+> binding-package parity jobs. Current manifest, Vitest project ownership, and
+> CI execution rules live in
+> **[React parity test execution](./react-parity-testing.md)**.
+
 > The 2026-07-16 residual audit assigns every discovered case a risk, owner,
 > workstream, and status: there are zero untriaged cases. A `planned` status still
 > means supported behavior needs executable evidence; it is not counted as ported.

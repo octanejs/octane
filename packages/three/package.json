@@ -1,11 +1,11 @@
 {
   "name": "@octanejs/three",
-  "version": "0.1.15",
+  "version": "0.1.22",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "octane": {
     "hookSlots": {

@@ -58,6 +58,11 @@ export const KNOWN_BINDINGS = {
 	'@streamdown/cjk': '@octanejs/streamdown',
 	shadcn: '@octanejs/shadcn',
 	recharts: '@octanejs/recharts',
+	// react-map-gl@8 is a re-export shell; the binding covers the package its
+	// ./mapbox subpath resolves to, so both specifiers map here.
+	'react-map-gl': '@octanejs/react-map-gl',
+	'react-map-gl/mapbox': '@octanejs/react-map-gl',
+	'@vis.gl/react-mapbox': '@octanejs/react-map-gl',
 	'@react-three/fiber': '@octanejs/three',
 	'@visx/visx': '@octanejs/visx',
 	'@visx/a11y': '@octanejs/visx',
@@ -121,7 +126,11 @@ export const KNOWN_BINDINGS = {
 // Octane-specific ecosystem packages that have no React import to rewrite.
 // Keep these out of KNOWN_BINDINGS so the React bridge never invents a source
 // package mapping for native tooling.
-export const KNOWN_NATIVE_BINDINGS = new Set(['@octanejs/devtools', '@octanejs/tauri']);
+export const KNOWN_NATIVE_BINDINGS = new Set([
+	'@octanejs/devtools',
+	'@octanejs/electron',
+	'@octanejs/tauri',
+]);
 
 // Workspace directory names for the maintained bindings. Keep this derived
 // from both catalogs so repository path routing cannot drift from the public

@@ -1,0 +1,61 @@
+{
+  "name": "@octanejs/react-map-gl",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "Mapbox GL JS bindings for Octane — a port of @vis.gl/react-mapbox, the package react-map-gl/mapbox re-exports.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/react-map-gl"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./mapbox": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project react-map-gl"
+  },
+  "peerDependencies": {
+    "mapbox-gl": ">=3.5.0",
+    "octane": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "mapbox-gl": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mapbox/point-geometry": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vis.gl/react-mapbox": "catalog:default",
+    "esbuild": "catalog:default",
+    "mapbox-gl": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

@@ -673,7 +673,7 @@ export function ShadcnDemo() @{
 				</CardHeader>
 				<CardContent
 					className="text-sm text-muted-foreground"
-				>{'This playground’s own navigation IS the sidebar component — rail, mobile sheet, Cmd/Ctrl+B and the collapse cookie. A second SidebarProvider nested here would fight it for the same keyboard shortcut, so it is demonstrated by the shell instead of by a card.'}</CardContent>
+				>{'This playground’s own navigation IS the sidebar component — rail, mobile sheet, Cmd/Ctrl+B and the collapse cookie. A second SidebarProvider nested here would fight it for the same keyboard shortcut, so it is demonstrated by the shell instead of by a card. NOTE: the shell now runs the BASE UI sidebar (@octanejs/shadcn/base-ui/Sidebar), so what you are steering is that port, not the radix copy installed alongside this page.'}</CardContent>
 			</Card>
 		</div>
 

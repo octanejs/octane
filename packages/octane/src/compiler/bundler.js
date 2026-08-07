@@ -31,6 +31,7 @@ import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
+import { rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertStrongMode } from './strong-mode.js';
 import {
 	assertNoLiveClientOnlyImports,
@@ -848,6 +849,20 @@ class OctaneBundlerCompiler {
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);
 		const filename = this._canonicalModuleId(file);
+		const targetRuntimeRequests = (source, kind) => {
+			if (environment !== 'server' || options.explicitRuntimeRequests !== true) return null;
+			const runtimeResult = rewriteServerRuntimeRequests(source, filename);
+			if (runtimeResult === null) return null;
+			return {
+				code: runtimeResult.code,
+				map: runtimeResult.map,
+				kind,
+				...finishMetadata(collected),
+			};
+		};
+		const passThrough = () => {
+			return targetRuntimeRequests(code, 'runtime-requests') ?? this._passThrough(code, collected);
+		};
 		const clientOnlyImports =
 			environment === 'server' && Array.isArray(options.clientOnlyImports)
 				? options.clientOnlyImports
@@ -974,22 +989,22 @@ class OctaneBundlerCompiler {
 			if (this.requireDirective && !pragmaOwned && this._isProjectOwnedSource(file)) {
 				this._warnUnmarkedOctaneImport(code, filename);
 			}
-			return this._passThrough(code, collected);
+			return passThrough();
 		}
 
 		if (plainHelperSource) {
-			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
+			if (/\/\/\s*octane-no-slot\b/.test(code)) return passThrough();
 			if (this.exclude.some((path) => file.includes(path))) {
 				// Same conflict diagnostic as the full-compile gate: an ownership
 				// pragma inside an excluded path must not fail silent.
 				if (this.requireDirective) {
 					this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
 				}
-				return null;
+				return passThrough();
 			}
-			if (!/from\s*['"]octane['"]/.test(code)) return null;
+			if (!/from\s*['"]octane['"]/.test(code)) return passThrough();
 			if (!this._isInstalledOctaneSource(file, collected)) {
-				return this._passThrough(code, collected);
+				return passThrough();
 			}
 			// Hook slotting is an Octane-ownership rewrite, so the ownership
 			// gate applies to it exactly as to full compilation: an unmarked
@@ -997,7 +1012,7 @@ class OctaneBundlerCompiler {
 			// pragma diagnostic), a pragma-marked one gets its hook slots.
 			if (this.requireDirective && !pragmaOwned && this._isProjectOwnedSource(file)) {
 				this._warnUnmarkedOctaneImport(code, filename);
-				return this._passThrough(code, collected);
+				return passThrough();
 			}
 			if (this._hasManualHookSlots(file, collected)) {
 				// Hand-slotted bindings still own their authored policy. Opting one
@@ -1008,7 +1023,7 @@ class OctaneBundlerCompiler {
 						strong,
 					});
 				}
-				return this._passThrough(code, collected);
+				return passThrough();
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
@@ -1025,16 +1040,18 @@ class OctaneBundlerCompiler {
 						}
 					: {}),
 			});
-			if (out === null) return this._passThrough(code, collected);
-			return {
-				code: out.code,
-				map: out.map,
-				kind: 'slots',
-				...finishMetadata(collected),
-			};
+			if (out === null) return passThrough();
+			return (
+				targetRuntimeRequests(out.code, 'slots') ?? {
+					code: out.code,
+					map: out.map,
+					kind: 'slots',
+					...finishMetadata(collected),
+				}
+			);
 		}
 
-		return null;
+		return passThrough();
 	}
 }
 

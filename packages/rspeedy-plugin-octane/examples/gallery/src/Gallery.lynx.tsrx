@@ -8,6 +8,7 @@ import type { Picture } from './pictures/furnituresPictures.ts';
 import { calculateEstimatedSize } from './utils.ts';
 
 interface GalleryScrollDetail {
+	deltaY: number;
 	scrollTop: number;
 	scrollHeight: number;
 }
@@ -24,28 +25,50 @@ export function NiceScrollbarMTS({
 
 export function Gallery({ pictureData }: { pictureData: Picture[] }) @{
 	const scrollbarMTSRef = useMainThreadRef<object>();
+	const galleryMTSRef = useMainThreadRef<object>();
 	const galleryRef = useRef<LynxPublicHandle | null>(null);
 
 	const onScrollMTS = (event: { detail: GalleryScrollDetail }) => {
 		'main thread';
 		const scrollbar = scrollbarMTSRef.current;
-		if (scrollbar === null || scrollbar === undefined) return;
+		const gallery = galleryMTSRef.current;
+		if (
+			scrollbar === null || scrollbar === undefined || gallery === null || gallery === undefined
+		) return;
 		const listHeight = SystemInfo.pixelHeight / SystemInfo.pixelRatio - 48;
 		const scrollbarHeight = listHeight * (listHeight / event.detail.scrollHeight);
 		const scrollbarTop = listHeight * (event.detail.scrollTop / event.detail.scrollHeight);
 		__AddInlineStyle(scrollbar, 'height', scrollbarHeight + 'px');
 		__AddInlineStyle(scrollbar, 'top', scrollbarTop + 'px');
 		__FlushElementTree();
+
+		const atBottom = event.detail.scrollTop + listHeight >= event.detail.scrollHeight;
+		if (event.detail.deltaY > 0 && atBottom) {
+			__InvokeUIMethod(
+				gallery,
+				'autoScroll',
+				{ rate: '-60', start: true, autoStop: true },
+				() => {},
+			);
+		} else if (event.detail.deltaY < 0 && event.detail.scrollTop <= 0) {
+			__InvokeUIMethod(
+				gallery,
+				'autoScroll',
+				{ rate: '60', start: true, autoStop: true },
+				() => {},
+			);
+		}
 	};
 
 	useEffect(() => {
-		void galleryRef.current?.invoke('autoScroll', { rate: '60', start: true });
+		void galleryRef.current?.invoke('autoScroll', { rate: '60', start: true, autoStop: true });
 	}, []);
 
 	<view class="gallery-wrapper">
 		<NiceScrollbarMTS scrollbarRef={scrollbarMTSRef} />
 		<list
 			ref={galleryRef}
+			main-thread:ref={galleryMTSRef}
 			class="list"
 			list-type="waterfall"
 			span-count={2}

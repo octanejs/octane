@@ -48,6 +48,35 @@ describe('octaneMdx() id claiming', () => {
 		expect(await transform(p, '# hi\n', '/docs/doc.mdx?import&v=abc123')).not.toBeNull();
 	});
 
+	it('compiles each deferred hydration query as its boundary child', async () => {
+		const p = plugin();
+		const source = `
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+<p data-eager-only="yes">Eager</p>
+<Hydrate when={visible()}><aside data-first-only="yes">First</aside></Hydrate>
+<Hydrate when={visible()}><aside data-second-only="yes">Second</aside></Hydrate>
+`;
+
+		const root = await transform(p, source, '/docs/doc.mdx');
+		expect(root?.code).toContain('./doc.mdx?octane-hydrate=0');
+		expect(root?.code).toContain('./doc.mdx?octane-hydrate=1');
+		expect(root?.code).toContain('data-eager-only');
+		expect(root?.code).not.toContain('data-first-only');
+		expect(root?.code).not.toContain('data-second-only');
+
+		const first = await transform(p, source, '/docs/doc.mdx?octane-hydrate=0');
+		expect(first?.code).toContain('data-first-only');
+		expect(first?.code).not.toContain('data-eager-only');
+		expect(first?.code).not.toContain('data-second-only');
+
+		const second = await transform(p, source, '/docs/doc.mdx?octane-hydrate=1');
+		expect(second?.code).toContain('data-second-only');
+		expect(second?.code).not.toContain('data-eager-only');
+		expect(second?.code).not.toContain('data-first-only');
+	});
+
 	it('publishes one authored-range warning per module generation', async () => {
 		const p = plugin();
 		const warn = vi.fn();

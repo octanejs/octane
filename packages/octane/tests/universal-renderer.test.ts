@@ -595,7 +595,7 @@ export const capturedDeclarationValue = setupCapturedDeclaration();`;
 
 	it.each([
 		['Vite', true, 'import.meta.hot.dispose'],
-		['webpack', 'webpack', 'import.meta.webpackHot.dispose'],
+		['webpack', 'webpack', '__octaneWebpackHot.dispose'],
 	] as const)(
 		'unregisters every active-layer thread site on %s disposal without requiring a component',
 		(_label, hmr, disposeCall) => {
@@ -2479,6 +2479,8 @@ export function Scene() @{
 			export function Scene() @{ <scene /> }
 		`;
 		let output = compile(source, '/src/HotData.object.tsrx', { renderer, hmr: 'webpack' }).code;
+		expect(output).toContain('const __octaneWebpackHot = import.meta.webpackHot;');
+		expect(output).not.toContain('import.meta.webpackHot.data');
 		output = output.replace(
 			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>

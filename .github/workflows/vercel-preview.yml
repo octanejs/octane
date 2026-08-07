@@ -1,0 +1,278 @@
+name: Vercel preview
+
+# Vercel's GitHub App understands Git refs, not pull request labels. A
+# maintainer-applied `deploy-preview` label publishes the pull request's exact
+# tree as a temporary branch in this repository, attributed to that maintainer.
+# Vercel deploys only that branch namespace and main, so the label is the
+# authorization step.
+on:
+  pull_request_target:
+    types: [labeled, unlabeled, closed]
+
+jobs:
+  deploy:
+    name: deploy website previews
+    if: github.event.action == 'closed' || github.event.label.name == 'deploy-preview'
+    # Keep unrelated labels out of the queue and serialize publication with
+    # cleanup for the same pull request.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # `pull_request_target` loads this script from the trusted base branch. It
+    # never checks out or executes pull request code; contents:write only creates
+    # a tree-identical deployment commit and moves the one preview ref that asks
+    # the installed Vercel GitHub App to build.
+    permissions:
+      contents: write
+      deployments: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Publish preview branch and report Vercel deployments
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const LABEL = "deploy-preview";
+            const BRANCH_PREFIX = "deploy-preview-pr-";
+            const COMMENT_MARKER = "<!-- octane-vercel-preview -->";
+            const POLL_INTERVAL_MS = 5000;
+            const POLL_TIMEOUT_MS = 12 * 60 * 1000;
+            const TERMINAL_STATES = new Set(["success", "failure", "error", "inactive"]);
+            const projects = [
+              { label: "Website", environment: "Preview – octane-website" },
+              { label: "MCP website", environment: "Preview – octane-website-mcp" },
+            ];
+
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+            const branch = `${BRANCH_PREFIX}${number}`;
+            const ref = `heads/${branch}`;
+
+            const deletePreviewRef = async () => {
+              try {
+                await github.rest.git.deleteRef({ owner, repo, ref });
+                core.notice(`Deleted temporary Vercel preview branch ${branch}.`);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.notice(`Temporary Vercel preview branch ${branch} is already absent.`);
+                  return;
+                }
+                throw error;
+              }
+            };
+
+            if (context.payload.action === "unlabeled" || context.payload.action === "closed") {
+              await deletePreviewRef();
+              return;
+            }
+
+            // The event may have waited behind another run. Read the live pull
+            // request so the ref always publishes the currently authorized SHA.
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+            if (pull.state !== "open" || !pull.labels.some((label) => label.name === LABEL)) {
+              core.notice(`Skipping #${number}: ${LABEL} is no longer applied to an open pull request.`);
+              return;
+            }
+            if (!pull.head?.sha) {
+              core.setFailed(`Pull request #${number} has no deployable GitHub head.`);
+              return;
+            }
+            if (!pull.base?.sha) {
+              core.setFailed(`Pull request #${number} has no base SHA for the Vercel push.`);
+              return;
+            }
+            const authorizer = context.payload.sender;
+            if (!authorizer?.login || !authorizer.id) {
+              core.setFailed(`The ${LABEL} event does not identify its authorizing GitHub user.`);
+              return;
+            }
+
+            // Give every label-triggered deployment a unique commit while
+            // preserving the pull request's exact tree. Vercel uses the
+            // commit author for deployment authorization, so the maintainer
+            // who applied the label intentionally owns this synthetic commit.
+            const { data: sourceCommit } = await github.rest.git.getCommit({
+              owner,
+              repo,
+              commit_sha: pull.head.sha,
+            });
+            const authoredAt = new Date().toISOString();
+            const deploymentAuthor = {
+              name: authorizer.login,
+              email: `${authorizer.id}+${authorizer.login}@users.noreply.github.com`,
+              date: authoredAt,
+            };
+            const { data: deploymentCommit } = await github.rest.git.createCommit({
+              owner,
+              repo,
+              message: [
+                `chore: deploy preview for #${number}`,
+                "",
+                `Authorized-by: @${authorizer.login}`,
+                `Source: ${pull.head.sha}`,
+                `Run: ${context.runId}/${context.runAttempt}`,
+              ].join("\n"),
+              tree: sourceCommit.tree.sha,
+              parents: [pull.head.sha],
+              author: deploymentAuthor,
+              committer: deploymentAuthor,
+            });
+            const deploymentSha = deploymentCommit.sha;
+
+            let existingRef = null;
+            try {
+              const response = await github.rest.git.getRef({ owner, repo, ref });
+              existingRef = response.data;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            if (existingRef) {
+              await github.rest.git.updateRef({
+                owner,
+                repo,
+                ref,
+                sha: deploymentSha,
+                force: true,
+              });
+              core.notice(`Updated ${branch} to deployment commit ${deploymentSha}.`);
+            } else {
+              // Vercel did not react when the API created the branch directly
+              // at the source SHA. Create it at trusted base code, then update
+              // it so the push-driven Git integration receives a ref update.
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: `refs/${ref}`,
+                sha: pull.base.sha,
+              });
+              await github.rest.git.updateRef({
+                owner,
+                repo,
+                ref,
+                sha: deploymentSha,
+                force: true,
+              });
+              core.notice(`Created ${branch} at deployment commit ${deploymentSha}.`);
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            let comment = comments.find(
+              (candidate) =>
+                candidate.user?.login === "github-actions[bot]" &&
+                candidate.body?.includes(COMMENT_MARKER),
+            );
+
+            const commentBody = (results) => {
+              const rows = results.map((result) => {
+                const url = result.status?.environment_url ?? result.status?.target_url;
+                const preview = url ? `[Open preview](${url})` : "URL pending";
+                const state = result.status?.state ?? "queued";
+                return `| ${result.label} | ${preview} | ${state.toUpperCase()} |`;
+              });
+              return [
+                COMMENT_MARKER,
+                `Vercel previews for \`${pull.head.sha.slice(0, 7)}\` via \`${branch}\` (deployment commit \`${deploymentSha.slice(0, 7)}\`):`,
+                "",
+                "| Project | Preview | Status |",
+                "| --- | --- | --- |",
+                ...rows,
+              ].join("\n");
+            };
+
+            const writeComment = async (results) => {
+              const body = commentBody(results);
+              if (comment) {
+                const response = await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: comment.id,
+                  body,
+                });
+                comment = response.data;
+              } else {
+                const response = await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: number,
+                  body,
+                });
+                comment = response.data;
+              }
+            };
+
+            const waiting = projects.map((project) => ({ ...project, deployment: null, status: null }));
+            await writeComment(waiting);
+
+            const readVercelDeployments = async () => {
+              const { data: deployments } = await github.rest.repos.listDeployments({
+                owner,
+                repo,
+                sha: deploymentSha,
+                per_page: 100,
+              });
+              return Promise.all(
+                projects.map(async (project) => {
+                  const deployment = deployments.find(
+                    (candidate) =>
+                      candidate.environment === project.environment &&
+                      candidate.creator?.login === "vercel[bot]",
+                  );
+                  if (!deployment) return { ...project, deployment: null, status: null };
+                  const { data: statuses } = await github.rest.repos.listDeploymentStatuses({
+                    owner,
+                    repo,
+                    deployment_id: deployment.id,
+                    per_page: 1,
+                  });
+                  return { ...project, deployment, status: statuses[0] ?? null };
+                }),
+              );
+            };
+
+            const deadline = Date.now() + POLL_TIMEOUT_MS;
+            let results = waiting;
+            while (Date.now() < deadline) {
+              try {
+                results = await readVercelDeployments();
+                if (
+                  results.every(
+                    (result) =>
+                      result.deployment &&
+                      result.status &&
+                      TERMINAL_STATES.has(result.status.state),
+                  )
+                ) {
+                  break;
+                }
+              } catch (error) {
+                core.warning(`Unable to read Vercel deployment status from GitHub: ${error.message}`);
+              }
+              await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            }
+
+            await writeComment(results);
+            const failures = results.filter((result) => result.status?.state !== "success");
+            if (failures.length > 0) {
+              core.setFailed(
+                failures
+                  .map((result) =>
+                    result.deployment
+                      ? `${result.label}: ${result.status?.state ?? "no deployment status was reported"}`
+                      : `${result.label}: Vercel did not report a deployment for ${deploymentSha}`,
+                  )
+                  .join("\n"),
+              );
+            }

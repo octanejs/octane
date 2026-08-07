@@ -5,8 +5,14 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
+import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
+import {
+	FRAMEWORK_INTEGRATIONS,
+	FRAMEWORK_INTEGRATION_COUNT,
+	frameworkIntegrationRepositoryHref,
+} from '../src/content/framework-integrations.ts';
 import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
@@ -123,7 +129,9 @@ describe('website routes', () => {
 		// The redesign uses one full-width top bar across every route (no docs-only width).
 		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 		expect(container.querySelector('.hero h1')?.textContent?.trim()).toBeTruthy();
-		expect(container.textContent).toContain('No hand-maintained dependency arrays');
+		expect(container.textContent).toContain(
+			'No virtual DOM, rules of hooks, or dependency arrays you have to maintain yourself.',
+		);
 		const heroActions = container.querySelector('.hero-actions')!;
 		expect(findLink(heroActions, '/docs/quick-start')).toBeTruthy();
 		expect(findLink(heroActions, '/docs/differences-from-react')).toBeTruthy();
@@ -162,20 +170,20 @@ describe('website routes', () => {
 		const why = container.querySelector<HTMLElement>('section.why[aria-labelledby="why-heading"]')!;
 		expect(why).toBeTruthy();
 		expect(why.querySelector('#why-heading')?.textContent?.trim()).toBe(
-			'Fast should be how your app feels. Not a new way you have to think.',
+			'Your app should feel fast. Your code should still feel familiar.',
 		);
 		const whyQuestions = Array.from(why.querySelectorAll('.why-question')).map((question) =>
 			question.textContent?.trim(),
 		);
 		expect(whyQuestions).toEqual([
-			'Why would I move my app to Octane?',
-			"Why isn't Octane built on signals?",
+			'What does moving a React app to Octane look like?',
+			'Why not build Octane on signals?',
 		]);
 		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// cli, compat, spin, explorer. (Each section carries a compiler-added scoped
+		// compat, lynx, spin, explorer. (Each section carries a compiler-added scoped
 		// class after its semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
@@ -185,11 +193,20 @@ describe('website routes', () => {
 			'features',
 			'proven',
 			'why',
-			'cli',
 			'compat',
+			'lynx',
 			'spin',
 			'explorer',
 		]);
+
+		// The Lynx section is the entry point to /docs/lynx: its own link, plus one
+		// card per packaged example. The phones behind them are deferred, so the
+		// server renders the copy and the cards mount when the section comes near.
+		const lynx = container.querySelector('section.lynx')!;
+		expect(lynx.querySelector('.lynx-title')?.textContent).toContain(
+			'Build Native Apps, with Lynx and Octane',
+		);
+		expect(findLink(lynx, '/docs/lynx')).toBeTruthy();
 
 		// The home page renders the interactive benchmark explorer from the checked-in
 		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
@@ -316,6 +333,13 @@ describe('website routes', () => {
 			const tag = section.level === 3 ? 'h3' : 'h2';
 			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
+		// And the other direction. Registering a section is what puts it in this
+		// table of contents, in the sidebar reading order, and in the section list
+		// the remote MCP server serves from the same registry — so an `<h2>` that
+		// no entry names is invisible in all three at once, while the loop above
+		// still passes. `<h3>` stays opt-in: it marks a subsection that a document
+		// may or may not want surfaced.
+		expectRegisteredHeadings(container, doc);
 		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
 		expect(sidebarLinks).toHaveLength(docs.length);
 		expect(sidebar.querySelectorAll('.sidebar-group')).toHaveLength(docGroups.length);
@@ -330,6 +354,36 @@ describe('website routes', () => {
 	it('/docs/quick-start renders highlighted MDX code', async () => {
 		const { container } = await renderRoute('/docs/quick-start');
 		expect(container.querySelector('.prose pre.shiki code')).toBeTruthy();
+	});
+
+	it('/docs/quick-start keeps inline callout prose and links inline', async () => {
+		const { container } = await renderRoute('/docs/quick-start');
+		const callout = Array.from(container.querySelectorAll<HTMLElement>('.doc-callout')).find(
+			(candidate) =>
+				candidate.querySelector('.doc-callout-title')?.textContent ===
+				'Make .tsrx feel native in VS Code',
+		);
+
+		expect(callout).toBeTruthy();
+		expect(callout!.querySelector('p p')).toBeNull();
+		expect(callout!.querySelector('a p')).toBeNull();
+		expect(callout!.querySelector('a')?.textContent).toBe('TSRX for VS Code');
+	});
+
+	it('/docs/tsrx-vs-tsx keeps the editor-support link inline', async () => {
+		const { container } = await renderRoute('/docs/tsrx-vs-tsx');
+		const heading = container.querySelector('h2#editor-support')!;
+		let element = heading.nextElementSibling;
+		let link: HTMLAnchorElement | null = null;
+
+		while (element && element.tagName !== 'H2') {
+			if (element instanceof HTMLAnchorElement) link = element;
+			else link ??= element.querySelector('a');
+			element = element.nextElementSibling;
+		}
+
+		expect(link?.textContent).toBe('TSRX for VS Code');
+		expect(link?.querySelector('p')).toBeNull();
 	});
 
 	it('/docs/publishing-libraries renders the package-manager dry-run selector', async () => {
@@ -360,6 +414,28 @@ describe('website routes', () => {
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
 			expect(link?.textContent).toBe(packageName);
 		}
+	});
+
+	it('/docs/framework-integrations links every first-party framework integration', async () => {
+		const { container } = await renderRoute('/docs/framework-integrations');
+		const packageLinks = Array.from(
+			container.querySelectorAll<HTMLAnchorElement>(
+				'.framework-integration-directory a[href*="/packages/"]',
+			),
+		);
+
+		expect(packageLinks).toHaveLength(FRAMEWORK_INTEGRATION_COUNT);
+		expect(container.querySelector('.doc-eyebrow')?.textContent).toBe(
+			`${FRAMEWORK_INTEGRATION_COUNT} first-party framework integrations`,
+		);
+		for (const integration of FRAMEWORK_INTEGRATIONS) {
+			const href = frameworkIntegrationRepositoryHref(integration.packageName);
+			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
+			expect(link?.textContent).toBe(integration.packageName);
+		}
+		expect(findLink(container, '/docs/bindings#find-a-binding')?.textContent).toContain(
+			'TanStack bindings',
+		);
 	});
 
 	it('an unknown route renders the root notFoundComponent inside the layout', async () => {

@@ -513,6 +513,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'resolveOctaneRuntimeRequest',
 		'resolveRendererForFile',
 	],
+	'./compiler/register': [],
 	'./compiler/renderers': [
 		'DOM_RENDERER_ID',
 		'DOM_RENDERER_MODULE',

@@ -1,4 +1,5 @@
 import { hasOwnSymbolFields } from './own-symbols.js';
+import { hasCrossRealmPlainPrototype } from './plain-object.js';
 import type {
 	UNIVERSAL_TRANSPORT_PROTOCOL_VERSION,
 	UniversalHostBatch,
@@ -288,8 +289,9 @@ function record(
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		return fail(label, 'must be an object.', index, field);
 	}
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) {
+	// A background message crosses a realm boundary in production, so its
+	// prototype is that realm's Object.prototype — never identical to this one.
+	if (!hasCrossRealmPlainPrototype(value)) {
 		return fail(label, 'must be a plain object.', index, field);
 	}
 	if (hasOwnSymbolFields(value)) {

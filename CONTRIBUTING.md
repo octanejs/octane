@@ -28,7 +28,7 @@ larger than a contained fix, open an issue and agree on the approach first.
 
 ## Setup
 
-Node.js 22 or newer (CI runs the suite on 22 and 24) and pnpm 11. The repo pins
+Node.js 22.22.2 or newer (CI runs the suite on 22.22.2 and 24) and pnpm 11. The repo pins
 its pnpm version in `package.json`, so `corepack enable` is the easiest way to
 get the right one.
 
@@ -100,6 +100,10 @@ The short version:
 
 - Pin an immutable upstream release and record it in `packages/<name>/UPSTREAM.md`
   (package, version, tag commit, advertised range, oracle versions).
+- Inspect both the published package and the canonical repository at that tag.
+  Do not assume the registry tarball contains the release's source, tests,
+  fixtures, snapshots, or runner configuration; fetch missing evidence from the
+  tagged repository and record which artifact supplied it.
 - Vendor that release's React-facing source under `packages/<name>/upstream/`,
   byte-exact and unpublished, and lay `src/` out to mirror it so each Octane
   module sits where the upstream module it replaces does.
@@ -135,6 +139,30 @@ own implementation will not think to check.
   Octane's behavior with an `// OCTANE DIVERGENCE:` rationale. Skipped and todo
   markers are not a tracking mechanism here: `pnpm test:markers:check` rejects
   them, so an unported case lives in the crosswalk instead.
+- Add negative controls for the parity harness itself: removing, renaming,
+  skipping, or failing to execute a recorded case, and changing pinned evidence,
+  must make validation fail. The tests need tests too; otherwise a green harness
+  can be a stale evidence collector.
+
+### Configure parity execution
+
+Follow [the React parity test-execution contract](./docs/react-parity-testing.md)
+when a binding adds executable parity lanes. Keep the complete local project in
+`vitest.config.js`, then declare which work belongs to the generic parity runner:
+
+```js
+testExecution: {
+	group: 'react-parity',
+	include: ['packages/example/tests/upstream/**/*.test.ts'],
+}
+```
+
+Omit `testExecution.include` when the runner owns the complete project. When it
+is present, it contains parity-owned patterns only;
+`vitest.ci-sharded.config.js` derives the complement for ordinary shards. Do not
+put package paths in `ci.yml`, create package-specific parity jobs, or encode
+shard/Node/job details in the base project metadata. Package manifests under
+`packages/*/audit/react-parity.json` are discovered automatically.
 
 Fill the remaining gaps (DOM output over event sequences, render counts, effect
 ordering, ref lifecycle, keyed reorder identity) with differential and
@@ -237,6 +265,20 @@ CI intentionally runs nothing while a pull request is a draft and starts on the
 24, `typecheck`, the lint job with all the generated-file checks, the heavy
 integration lanes, the example browser journeys, and the website integration
 suite. Documentation-only changes take a lighter path.
+
+Green checks are necessary but not sufficient readiness evidence. Before a PR
+leaves draft, separately confirm that all actionable review threads are
+resolved on the current head, the head contains the live base branch, and GitHub
+reports the PR mergeable without conflicts or a branch-currency blocker. Repeat
+those checks after the final push; a review fix or a moving base can invalidate
+an earlier clean result. Agents leave drafts alone unless explicitly authorized
+to mark one ready, and that authorization never authorizes merging.
+
+Because Actions starts on `ready_for_review`, the initial authorized transition
+is the bootstrap that creates the required checks. It may happen only after the
+non-CI gates above and relevant local validation pass. Keep the PR ready while
+CI runs, but do not call it fully ready or merge-ready until every required
+check is terminal and successful.
 
 ## AI-assisted contributions
 

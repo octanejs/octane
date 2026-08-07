@@ -1,9 +1,10 @@
-import { Camera, CircleAlert, Icon, LucideProvider, Search } from '@octanejs/lucide';
+import { Camera, CircleAlert, Icon, LucideProvider, Search } from './icons-runtime.js';
+import type { IconNode } from '../../src/types.js';
 
-const customNode = [
+const customNode: IconNode = [
 	['circle', { cx: '12', cy: '12', r: '9', key: 'outer' }],
 	['path', { d: 'm9 12 2 2 4-4', key: 'check' }],
-] as const;
+];
 
 export function IconGallery(
 	props: {
