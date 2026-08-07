@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import { flushSync, hydrateRoot } from '../src/index.js';
+import { Counter as ClientCounter } from './_fixtures/basic.tsrx';
 
 const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
@@ -129,6 +131,82 @@ describe('SSR Phase 1 — semantics', () => {
 		const out = await RT.renderToString(basic.Greet, { name: '<script>"x"' });
 		expect(out.html).toContain('&lt;script&gt;');
 		expect(out.html).not.toContain('<script>');
+	});
+
+	it.each([
+		['ordinary text and quotes', 'safe "quoted" text', 'safe "quoted" text'],
+		['an ampersand', '&', '&amp;'],
+		['an opening angle bracket', '<', '&lt;'],
+		['a closing angle bracket', '>', '&gt;'],
+		['interleaved sensitive characters', '<&><&>', '&lt;&amp;&gt;&lt;&amp;&gt;'],
+		['existing entities', '&amp;&lt;&#60;', '&amp;amp;&amp;lt;&amp;#60;'],
+		[
+			'hostile markup',
+			'<img src=x onerror=alert(1)>&"',
+			'&lt;img src=x onerror=alert(1)&gt;&amp;"',
+		],
+		[
+			'unpaired surrogates and null characters',
+			'😀\ud800&\udfff<\u0000>',
+			'😀\ud800&amp;\udfff&lt;\u0000&gt;',
+		],
+	])('escapes %s identically in buffered and static markup', (_label, value, expected) => {
+		const expectedMarkup = `<span>${expected}</span>`;
+		expect(RT.renderToString(basic.Counter, { n: value }).html).toBe(expectedMarkup);
+		expect(RT.renderToStaticMarkup(basic.Counter, { n: value }).html).toBe(expectedMarkup);
+	});
+
+	it('coerces escaped text exactly once and keeps nested server rendering isolated', () => {
+		const coercions: string[] = [];
+		const value = {
+			[Symbol.toPrimitive](hint: string) {
+				coercions.push(hint);
+				expect(RT.renderToString(basic.Counter, { n: '<nested>&' }).html).toBe(
+					'<span>&lt;nested&gt;&amp;</span>',
+				);
+				return '&<outer>';
+			},
+		};
+
+		expect(RT.renderToString(basic.Counter, { n: value }).html).toBe(
+			'<span>&amp;&lt;outer&gt;</span>',
+		);
+		expect(coercions).toEqual(['string']);
+	});
+
+	it('propagates text coercion failures without retrying coercion', () => {
+		const failure = new Error('text coercion failed');
+		const coerce = vi.fn(() => {
+			throw failure;
+		});
+
+		expect(() => RT.renderToString(basic.Counter, { n: { [Symbol.toPrimitive]: coerce } })).toThrow(
+			failure,
+		);
+		expect(coerce).toHaveBeenCalledTimes(1);
+	});
+
+	it('streams escaped text without introducing executable markup', async () => {
+		const value = '&<script>alert("x")</script>&amp;';
+		const stream = await RT.renderToReadableStream(basic.Counter, { n: value });
+		const html = await new Response(stream).text();
+
+		expect(html).toBe('<span>&amp;&lt;script&gt;alert("x")&lt;/script&gt;&amp;amp;</span>');
+		expect(html).not.toContain('<script>');
+	});
+
+	it('hydrates escaped text by adopting the existing server-rendered node', () => {
+		const value = '&<script>"quoted"</script>&amp;';
+		const container = document.createElement('div');
+		container.innerHTML = RT.renderToString(basic.Counter, { n: value }).html;
+		const serverNode = container.querySelector('span');
+		const root = hydrateRoot(container, ClientCounter, { n: value });
+		flushSync(() => {});
+
+		expect(container.querySelector('span')).toBe(serverNode);
+		expect(serverNode?.textContent).toBe(value);
+		expect(container.querySelector('script')).toBeNull();
+		root.unmount();
 	});
 
 	it('hooks render their initial value; effects do NOT run on the server', async () => {
