@@ -42,6 +42,8 @@ routing, no storage, no PRNG: fully deterministic.
 - `edit10` — dblclick label, set `.edit`, Enter — first 10 items
 - `clearCompleted` — at 75/25 split
 - `destroy25` — 25 first-item `.destroy` clicks
+- `row_class_writes_complete25` — exact row-class attribute mutations during a
+  separately verified `complete25` pass; unchanged-value writes are included
 - `comments_100` — comment-node DOM weight at 100 mounted todos (marker-elision
   tripwire, deterministic)
 
@@ -49,9 +51,8 @@ Timing protocol matches ../js-framework/run.mjs: interactions dispatch inside
 one `page.evaluate`, frameworks commit synchronously in the window (or via the
 awaited `__benchFlush` hook), `--expose-gc` + a gc() before each sample.
 
-React's column runs its dev-mode transform under the vite dev server (same as
-the js-framework react column) — compare react-to-react across commits, not
-react-to-compiled-frameworks absolute.
+The unified suite runner production-builds every framework and serves its Vite
+preview, so the published columns compare production output across frameworks.
 
 The target matrix also includes native **Preact** on `:5261` and runes-mode
 **Svelte 5** on `:5272`. Both preserve the same native input/change semantics,
