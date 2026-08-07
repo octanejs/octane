@@ -1,4 +1,4 @@
-import { startTransition, use, useState } from 'octane';
+import { createContext, type OctaneNode, startTransition, use, useState } from 'octane';
 
 export function List(props) @{
 	<ul>
@@ -268,4 +268,185 @@ export function KeyedSelectionTransition(props: {
 			<span id="selection-transition-fallback">{'loading'}</span>
 		}
 	</div>
+}
+
+export function FastHostKeyedList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	onPick: (id: number) => void;
+}) @{
+	const selected = props.selected;
+	const onPick = props.onPick;
+	<ul id="fast-host-keyed-list">
+		<li class="fast-host-before">{'before'}</li>
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'fast-host-row selected' : 'fast-host-row'}
+				data-fast-host-id={row.id}
+				onClick={() => onPick(row.id)}
+			>{row.label as string}</li>
+		}
+		<li class="fast-host-after">{'after'}</li>
+	</ul>
+}
+
+export function FastHostMappedList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	onPick: (id: number) => void;
+}) @{
+	const selected = props.selected;
+	const onPick = props.onPick;
+	<ul id="fast-host-mapped-list">{props.items.map(
+		(row) =>
+			<li
+				key={row.id}
+				class={selected === row.id ? 'fast-host-mapped-row selected' : 'fast-host-mapped-row'}
+				data-fast-host-id={row.id}
+				onClick={() => onPick(row.id)}
+			>{row.label as string}</li>,
+	)}</ul>
+}
+
+export function FastHostCustomList(props: { items: SelectionRow[] }) @{
+	<ul id="fast-host-custom-list">
+		@for (const row of props.items; key row.id) {
+			<li class="fast-host-custom-row">
+				<div is="octane-fast-host-row">{row.label as string}</div>
+			</li>
+		}
+	</ul>
+}
+
+export function FastHostRefList(props: {
+	items: SelectionRow[];
+	onRef: (element: HTMLLIElement | null) => void;
+}) @{
+	const onRef = props.onRef;
+	<ul id="fast-host-ref-list">
+		@for (const row of props.items; key row.id) {
+			<li class="fast-host-ref-row" ref={onRef}>{row.label as string}</li>
+		}
+	</ul>
+}
+
+export function FastHostControlledList(props: { items: SelectionRow[] }) @{
+	<div id="fast-host-controlled-list">
+		@for (const row of props.items; key row.id) {
+			<input class="fast-host-controlled-row" value={row.label} readOnly={true} />
+		}
+	</div>
+}
+
+export function FastHostRenderCallList(props: {
+	items: Array<{ id: number; read: () => string }>;
+}) @{
+	<ul id="fast-host-render-call-list">
+		@for (const row of props.items; key row.id) {
+			<li class="fast-host-render-call-row">{row.read() as string}</li>
+		}
+	</ul>
+}
+
+function FastHostTransitionValue(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span id="fast-host-transition-value">{value as string}</span>
+}
+
+export function FastHostTransitionList(props: {
+	items: SelectionRow[];
+	initialPromise: Promise<string>;
+	nextPromise: Promise<string>;
+}) @{
+	const [items, setItems] = useState([] as SelectionRow[]);
+	const [resource, setResource] = useState(props.initialPromise);
+	<div>
+		<button
+			id="fast-host-transition-fill"
+			onClick={() => startTransition(() => {
+				setItems(props.items);
+				setResource(props.nextPromise);
+			})}
+		>{'fill'}</button>
+		@try {
+			<>
+				<ul id="fast-host-transition-list">
+					@for (const row of items; key row.id) {
+						<li class="fast-host-transition-row">{row.label as string}</li>
+					}
+				</ul>
+				<FastHostTransitionValue promise={resource} />
+			</>
+		} @pending {
+			<span id="fast-host-transition-fallback">{'loading'}</span>
+		}
+	</div>
+}
+
+export const FastRowContext = createContext('outside');
+
+export function FastContextGetterList(props: {
+	items: Array<{ id: number; label: string }>;
+	value: string;
+}) @{
+	<FastRowContext.Provider value={props.value}>
+		<ul id="fast-context-getter-list">
+			@for (const row of props.items; key row.id) {
+				<li class="fast-context-getter-row">{row.label as string}</li>
+			}
+		</ul>
+	</FastRowContext.Provider>
+}
+
+export function FastRenderableProbe(props: {
+	onRender: (connectedRows: number, value: string) => void;
+	onRef: (element: HTMLSpanElement | null) => void;
+}) @{
+	const value = use(FastRowContext);
+	props.onRender(document.querySelectorAll('#fast-renderable-list > li').length, value);
+	<span class="fast-renderable-probe" ref={props.onRef}>{value as string}</span>
+}
+
+export function FastMappedRenderableList(props: {
+	items: Array<{ id: number; content: OctaneNode }>;
+	value: string;
+}) @{
+	<FastRowContext.Provider value={props.value}>
+		<ul id="fast-renderable-list">{props.items.map(
+			(row) => <li class="fast-renderable-row" key={row.id}>{row.content}</li>,
+		)}</ul>
+	</FastRowContext.Provider>
+}
+
+export function FastMappedBoundaryList(props: {
+	items: Array<{ id: number; content: OctaneNode }>;
+	value: string;
+}) @{
+	@try {
+		<FastMappedRenderableList items={props.items} value={props.value} />
+	} @catch (error, reset) {
+		<button
+			id="fast-mapped-renderable-retry"
+			onClick={reset}
+		>{(error as Error).message as string}</button>
+	}
+}
+
+export function FastSuspendingGetterList(props: {
+	items: Array<{ id: number; label: string }>;
+}) @{
+	@try {
+		<ul id="fast-suspending-getter-list">
+			@for (const row of props.items; key row.id) {
+				<li class="fast-suspending-getter-row">{row.label as string}</li>
+			}
+		</ul>
+	} @pending {
+		<span id="fast-suspending-getter-pending">{'loading'}</span>
+	} @catch (error, reset) {
+		<button
+			id="fast-suspending-getter-retry"
+			onClick={reset}
+		>{(error as Error).message as string}</button>
+	}
 }

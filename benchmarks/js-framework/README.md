@@ -115,6 +115,16 @@ without depending on machine-specific absolute timings. After each timed
 selection, an untimed correctness gate verifies that exactly the clicked row
 carries the selected class.
 
+After all timed samples, both Octane dialects also mount 1,000 and 10,000 rows,
+append 1,000 or 100 rows, and prepend or insert 100 rows into the middle under
+deterministic browser DOM instrumentation. Each row must retain its ordinary
+direct insertion into the connected table body: detached fragments reduced DOM
+API calls but measurably slowed Chromium's real mount time. The gate checks row
+count, insertion position and order, survivor DOM identity, connectivity,
+delegated events, and selection, then uses precise production call coverage in
+a separate `--jitless` browser to guard reduced per-row framework work without
+depending on minified helper names or contaminating wall-clock measurements.
+
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 
 The canonical suite only ever reorders two rows (`swap`). `run-reorder.mjs`

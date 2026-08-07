@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createElement, flushSync, hydrateRoot, use } from '../src/index.js';
 import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
@@ -16,6 +16,19 @@ import {
 	KeyedSelectionUuidList,
 	MismatchedKeyedSelectionList,
 	SharedKeyedSelectionList,
+	FastHostKeyedList,
+	FastHostMappedList,
+	FastHostCustomList,
+	FastHostRefList,
+	FastHostControlledList,
+	FastHostRenderCallList,
+	FastHostTransitionList,
+	FastRowContext,
+	FastContextGetterList,
+	FastRenderableProbe,
+	FastMappedRenderableList,
+	FastMappedBoundaryList,
+	FastSuspendingGetterList,
 	setExternal,
 } from './_fixtures/for.tsrx';
 
@@ -417,6 +430,384 @@ describe('keyed list selection', () => {
 		r.click('#selection-transition-urgent');
 		expect(r.findAll('#selection-transition-list .selected')).toHaveLength(1);
 		expect(r.find('#selection-transition-list .selected').textContent).toBe('third');
+		r.unmount();
+	});
+});
+
+describe('large keyed list fills', () => {
+	const makeRows = (length = 24) =>
+		Array.from({ length }, (_, index) => ({ id: index + 1, label: `row ${index + 1}` }));
+
+	it('preserves row order, static siblings, delegated events, selection, and keyed identity', () => {
+		const items = makeRows();
+		const picked: number[] = [];
+		const onPick = (id: number) => picked.push(id);
+		const r = mount(FastHostKeyedList, { items: [], selected: null, onPick });
+
+		r.update(FastHostKeyedList, { items, selected: 5, onPick });
+		const rows = r.findAll('.fast-host-row');
+		expect(rows.map((row) => row.textContent)).toEqual(items.map((row) => row.label));
+		expect(rows.every((row) => row.isConnected)).toBe(true);
+		expect(r.find('#fast-host-keyed-list').firstElementChild?.className).toBe('fast-host-before');
+		expect(r.find('#fast-host-keyed-list').lastElementChild?.className).toBe('fast-host-after');
+		expect(r.find('.fast-host-row.selected').textContent).toBe('row 5');
+
+		r.click('[data-fast-host-id="5"]');
+		expect(picked).toEqual([5]);
+		r.update(FastHostKeyedList, { items, selected: 20, onPick });
+		expect(r.findAll('.fast-host-row')).toEqual(rows);
+		expect(r.find('.fast-host-row.selected').textContent).toBe('row 20');
+
+		const changed = items.map((row) => (row.id === 12 ? { ...row, label: 'updated row 12' } : row));
+		r.update(FastHostKeyedList, { items: changed, selected: 12, onPick });
+		expect(r.find('[data-fast-host-id="12"]').textContent).toBe('updated row 12');
+		expect(r.findAll('.fast-host-row')).toEqual(rows);
+
+		const reversed = changed.toReversed();
+		r.update(FastHostKeyedList, { items: reversed, selected: 12, onPick });
+		expect(r.findAll('.fast-host-row')).toEqual(rows.toReversed());
+		r.update(FastHostKeyedList, { items: [], selected: null, onPick });
+		expect(r.findAll('.fast-host-row')).toHaveLength(0);
+		r.update(FastHostKeyedList, { items, selected: 1, onPick });
+		expect(r.findAll('.fast-host-row').map((row) => row.textContent)).toEqual(
+			items.map((row) => row.label),
+		);
+		r.unmount();
+	});
+
+	it('keeps mapped JSX rows interactive and reusable after an empty-to-populated update', () => {
+		const items = makeRows();
+		const picked: number[] = [];
+		const onPick = (id: number) => picked.push(id);
+		const r = mount(FastHostMappedList, { items: [], selected: null, onPick });
+
+		r.update(FastHostMappedList, { items, selected: 6, onPick });
+		const rows = r.findAll('.fast-host-mapped-row');
+		expect(rows.map((row) => row.textContent)).toEqual(items.map((row) => row.label));
+		expect(rows.every((row) => row.isConnected)).toBe(true);
+		expect(r.find('.fast-host-mapped-row.selected').textContent).toBe('row 6');
+		r.click('[data-fast-host-id="6"]');
+		expect(picked).toEqual([6]);
+
+		r.update(FastHostMappedList, { items: items.toReversed(), selected: 20, onPick });
+		expect(r.findAll('.fast-host-mapped-row')).toEqual(rows.toReversed());
+		expect(r.find('.fast-host-mapped-row.selected').textContent).toBe('row 20');
+		r.unmount();
+	});
+
+	it('handles small lists and initially populated lists without changing their behavior', () => {
+		const onPick = () => {};
+		const small = makeRows(15);
+		const large = makeRows();
+		const r = mount(FastHostKeyedList, { items: [], selected: null, onPick });
+
+		r.update(FastHostKeyedList, { items: small, selected: 15, onPick });
+		expect(r.findAll('.fast-host-row')).toHaveLength(15);
+		expect(r.find('.fast-host-row.selected').textContent).toBe('row 15');
+		r.update(FastHostKeyedList, { items: [], selected: null, onPick });
+		r.update(FastHostKeyedList, { items: makeRows(16), selected: 16, onPick });
+		expect(r.findAll('.fast-host-row')).toHaveLength(16);
+		expect(r.find('.fast-host-row.selected').textContent).toBe('row 16');
+		r.unmount();
+
+		const initiallyPopulated = mount(FastHostKeyedList, {
+			items: large,
+			selected: 24,
+			onPick,
+		});
+		expect(initiallyPopulated.findAll('.fast-host-row')).toHaveLength(24);
+		expect(initiallyPopulated.find('.fast-host-row.selected').textContent).toBe('row 24');
+		initiallyPopulated.unmount();
+	});
+
+	it('retains the ordinary first-fill behavior when sibling rows share a key', () => {
+		const items = makeRows();
+		items[12] = { id: items[3]!.id, label: 'same key' };
+		const onPick = () => {};
+		const r = mount(FastHostKeyedList, { items: [], selected: null, onPick });
+
+		r.update(FastHostKeyedList, { items, selected: null, onPick });
+		expect(r.findAll('.fast-host-row').map((row) => row.textContent)).toEqual(
+			items.map((row) => row.label),
+		);
+		r.update(FastHostKeyedList, { items: [], selected: null, onPick });
+		expect(r.findAll('.fast-host-row')).toHaveLength(0);
+		r.unmount();
+
+		const mapped = mount(FastHostMappedList, { items: [], selected: null, onPick });
+		mapped.update(FastHostMappedList, { items, selected: null, onPick });
+		expect(mapped.findAll('.fast-host-mapped-row').map((row) => row.textContent)).toEqual(
+			items.map((row) => row.label),
+		);
+		mapped.update(FastHostMappedList, { items: [], selected: null, onPick });
+		expect(mapped.findAll('.fast-host-mapped-row')).toHaveLength(0);
+		mapped.unmount();
+	});
+
+	it('connects custom-element descendants in their ordinary row-by-row order', () => {
+		const observed: number[] = [];
+		class FastHostRowElement extends HTMLDivElement {
+			connectedCallback() {
+				observed.push(
+					this.ownerDocument.querySelectorAll('#fast-host-custom-list [is="octane-fast-host-row"]')
+						.length,
+				);
+			}
+		}
+		customElements.define('octane-fast-host-row', FastHostRowElement, { extends: 'div' });
+		const items = makeRows();
+		const r = mount(FastHostCustomList, { items: [] });
+
+		r.update(FastHostCustomList, { items });
+		expect(observed).toEqual(items.map((_, index) => index + 1));
+		expect(r.findAll('.fast-host-custom-row').map((row) => row.textContent)).toEqual(
+			items.map((row) => row.label),
+		);
+		r.unmount();
+	});
+
+	it('attaches row refs only after their elements are connected and releases them on unmount', () => {
+		const connected: boolean[] = [];
+		let detached = 0;
+		const onRef = (element: HTMLLIElement | null) => {
+			if (element === null) detached++;
+			else connected.push(element.isConnected);
+		};
+		const items = makeRows();
+		const r = mount(FastHostRefList, { items: [], onRef });
+
+		r.update(FastHostRefList, { items, onRef });
+		expect(r.findAll('.fast-host-ref-row')).toHaveLength(items.length);
+		expect(connected).toEqual(items.map(() => true));
+		r.unmount();
+		expect(detached).toBe(items.length);
+	});
+
+	it('preserves controlled input values, focus, and survivor identity', () => {
+		const items = makeRows();
+		const r = mount(FastHostControlledList, { items: [] });
+		r.update(FastHostControlledList, { items });
+		const controls = r.findAll('.fast-host-controlled-row') as HTMLInputElement[];
+		controls[0]!.focus();
+		expect(document.activeElement).toBe(controls[0]);
+		expect(controls.map((control) => control.value)).toEqual(items.map((row) => row.label));
+
+		const changed = items.map((row) => (row.id === 2 ? { ...row, label: 'updated' } : row));
+		r.update(FastHostControlledList, { items: changed });
+		expect(r.findAll('.fast-host-controlled-row')).toEqual(controls);
+		expect(controls[1]!.value).toBe('updated');
+		expect(document.activeElement).toBe(controls[0]);
+		r.unmount();
+	});
+
+	it('keeps render-time row methods able to observe previously connected rows', () => {
+		const items = makeRows().map((row) => ({
+			id: row.id,
+			read: () =>
+				String(
+					document.querySelectorAll('#fast-host-render-call-list .fast-host-render-call-row')
+						.length,
+				),
+		}));
+		const r = mount(FastHostRenderCallList, { items: [] });
+		r.update(FastHostRenderCallList, { items });
+		expect(r.findAll('.fast-host-render-call-row').map((row) => row.textContent)).toEqual(
+			items.map((_, index) => String(index)),
+		);
+		r.unmount();
+	});
+
+	it('evaluates implicit row getters in their represented context scope', () => {
+		const items = makeRows().map(({ id }) => ({
+			id,
+			get label() {
+				return `${use(FastRowContext)} ${id}`;
+			},
+		}));
+		const r = mount(FastContextGetterList, { items: [], value: 'inside' });
+
+		r.update(FastContextGetterList, { items, value: 'inside' });
+		expect(r.findAll('.fast-context-getter-row').map((row) => row.textContent)).toEqual(
+			items.map(({ id }) => `inside ${id}`),
+		);
+		r.unmount();
+	});
+
+	it('renders dynamic mapped component values after each row connects', () => {
+		const renderRows: number[] = [];
+		const renderValues: string[] = [];
+		const attached: boolean[] = [];
+		const onRender = (connectedRows: number, value: string) => {
+			renderRows.push(connectedRows);
+			renderValues.push(value);
+		};
+		const onRef = (element: HTMLSpanElement | null) => {
+			if (element !== null) attached.push(element.isConnected);
+		};
+		const items = makeRows().map(({ id }) => ({
+			id,
+			content: createElement(FastRenderableProbe, { onRender, onRef }),
+		}));
+		const r = mount(FastMappedRenderableList, { items: [], value: 'inside' });
+
+		r.update(FastMappedRenderableList, { items, value: 'inside' });
+		expect(renderRows).toEqual(items.map((_, index) => index + 1));
+		expect(renderValues).toEqual(items.map(() => 'inside'));
+		expect(attached).toEqual(items.map(() => true));
+		expect(r.findAll('.fast-renderable-row').map((row) => row.textContent)).toEqual(
+			items.map(() => 'inside'),
+		);
+		r.unmount();
+	});
+
+	it('disposes a throwing dynamic child together with every completed row', () => {
+		let shouldThrow = true;
+		const attached: boolean[] = [];
+		const onRender = (connectedRows: number) => {
+			if (connectedRows === 12 && shouldThrow) throw new Error('child failed');
+		};
+		const onRef = (element: HTMLSpanElement | null) => {
+			if (element !== null) attached.push(element.isConnected);
+		};
+		const items = makeRows().map(({ id }) => ({
+			id,
+			content: createElement(FastRenderableProbe, { onRender, onRef }),
+		}));
+		const r = mount(FastMappedBoundaryList, { items: [], value: 'inside' });
+
+		r.update(FastMappedBoundaryList, { items, value: 'inside' });
+		expect(r.findAll('.fast-renderable-row')).toHaveLength(0);
+		expect(r.find('#fast-mapped-renderable-retry').textContent).toBe('child failed');
+		expect(attached).toEqual([]);
+
+		shouldThrow = false;
+		r.click('#fast-mapped-renderable-retry');
+		expect(r.findAll('.fast-renderable-row')).toHaveLength(items.length);
+		expect(attached).toEqual(items.map(() => true));
+		r.unmount();
+	});
+
+	it('rolls back an implicit getter suspension and remounts cleanly on resolution', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const items = makeRows().map(({ id, label }) => ({
+			id,
+			get label() {
+				return id === 12 ? use(promise) : label;
+			},
+		}));
+		const r = mount(FastSuspendingGetterList, { items: [] });
+
+		r.update(FastSuspendingGetterList, { items });
+		expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
+		expect(r.find('#fast-suspending-getter-pending').textContent).toBe('loading');
+
+		await act(() => resolve('resolved row 12'));
+		expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(items.length);
+		expect(r.findAll('.fast-suspending-getter-row')[11]!.textContent).toBe('resolved row 12');
+		r.unmount();
+	});
+
+	it('disposes every completed row when an implicit getter throws, then retries', () => {
+		let shouldThrow = true;
+		const items = makeRows().map(({ id, label }) => ({
+			id,
+			get label() {
+				if (id === 12 && shouldThrow) throw new Error('row failed');
+				return label;
+			},
+		}));
+		const r = mount(FastSuspendingGetterList, { items: [] });
+
+		r.update(FastSuspendingGetterList, { items });
+		expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
+		expect(r.find('#fast-suspending-getter-retry').textContent).toBe('row failed');
+
+		shouldThrow = false;
+		r.click('#fast-suspending-getter-retry');
+		expect(r.findAll('.fast-suspending-getter-row').map((row) => row.textContent)).toEqual(
+			makeRows().map((row) => row.label),
+		);
+		r.unmount();
+	});
+
+	it('unwinds completed rows when a key getter throws and evaluates each key only once', () => {
+		let shouldThrow = true;
+		const reads: number[] = [];
+		const items = makeRows().map(({ id, label }) => ({
+			get id() {
+				reads.push(id);
+				if (id === 12 && shouldThrow) throw new Error('key failed');
+				return id;
+			},
+			label,
+		}));
+		const r = mount(FastSuspendingGetterList, { items: [] });
+
+		r.update(FastSuspendingGetterList, { items });
+		expect(reads).toEqual(Array.from({ length: 12 }, (_, index) => index + 1));
+		expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
+		expect(r.find('#fast-suspending-getter-retry').textContent).toBe('key failed');
+
+		shouldThrow = false;
+		reads.length = 0;
+		r.click('#fast-suspending-getter-retry');
+		expect(reads).toEqual(Array.from({ length: items.length }, (_, index) => index + 1));
+		expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(items.length);
+		r.unmount();
+	});
+
+	it('adopts a populated server list without replacing its original rows or losing events', () => {
+		const items = makeRows();
+		const picked: number[] = [];
+		const onPick = (id: number) => picked.push(id);
+		const props = { items, selected: 8, onPick };
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(server.FastHostKeyedList, props).html;
+		const originalRows = Array.from(container.querySelectorAll('.fast-host-row'));
+		const root = hydrateRoot(container, FastHostKeyedList, props);
+		flushSync(() => {});
+
+		expect(Array.from(container.querySelectorAll('.fast-host-row'))).toEqual(originalRows);
+		expect(container.querySelector('.fast-host-row.selected')?.textContent).toBe('row 8');
+		flushSync(() => (container.querySelector('[data-fast-host-id="8"]') as HTMLElement).click());
+		expect(picked).toEqual([8]);
+		flushSync(() => root.render(FastHostKeyedList, { ...props, selected: 12 }));
+		expect(Array.from(container.querySelectorAll('.fast-host-row'))).toEqual(originalRows);
+		expect(container.querySelector('.fast-host-row.selected')?.textContent).toBe('row 12');
+		root.unmount();
+		container.remove();
+	});
+
+	it('rolls back a suspended transition fill and restores the full list when it retries', async () => {
+		const items = makeRows();
+		const initialPromise = Promise.resolve('initial');
+		let resolveNext!: (value: string) => void;
+		const nextPromise = new Promise<string>((resolve) => {
+			resolveNext = resolve;
+		});
+		await Promise.resolve();
+		const r = mount(FastHostTransitionList, { items, initialPromise, nextPromise });
+		await act(() => {});
+		expect(r.findAll('.fast-host-transition-row')).toHaveLength(0);
+		expect(r.find('#fast-host-transition-value').textContent).toBe('initial');
+
+		r.click('#fast-host-transition-fill');
+		expect(r.findAll('.fast-host-transition-row')).toHaveLength(0);
+		expect(r.find('#fast-host-transition-value').textContent).toBe('initial');
+		expect(r.findAll('#fast-host-transition-fallback')).toHaveLength(0);
+
+		await act(() => resolveNext('resolved'));
+		expect(r.findAll('.fast-host-transition-row').map((row) => row.textContent)).toEqual(
+			items.map((row) => row.label),
+		);
+		expect(r.find('#fast-host-transition-value').textContent).toBe('resolved');
 		r.unmount();
 	});
 });

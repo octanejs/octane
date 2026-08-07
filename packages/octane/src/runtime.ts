@@ -23024,6 +23024,258 @@ export function keyedForBlock<T>(
 	}
 }
 
+// Keep the certified host-only mounting path off common small lists.
+const FAST_HOST_LIST_MIN_ITEMS = 16;
+
+/** Select an existing, empty compiler-certified list for direct host mounting. */
+function fastHostListParent(
+	state: ForSlot | null | undefined,
+	items: ArrayLike<any>,
+	flags: number | undefined,
+): Node | null {
+	if (
+		state === undefined ||
+		state === null ||
+		state.size !== 0 ||
+		state.emptyBlock !== null ||
+		state.adopt !== null ||
+		((flags || 0) & 2) === 0 ||
+		!Array.isArray(items) ||
+		items.length < FAST_HOST_LIST_MIN_ITEMS ||
+		TRANSITION_JOURNAL !== null ||
+		activeHydration() !== null ||
+		state.end.parentNode === null ||
+		state.start.parentNode !== state.end.parentNode
+	) {
+		return null;
+	}
+	return state.end.parentNode;
+}
+
+/** Mount certified host-only rows without the full component render machinery. */
+function mountFastHostItems<T>(
+	parentScope: Scope,
+	state: ForSlot,
+	parentNode: Node,
+	items: ArrayLike<T>,
+	getKey: (item: T, index: number) => any,
+	itemBody: (item: T, scope: Scope) => void,
+	flags: number | undefined,
+	deps: any[] | undefined,
+	mapped: boolean,
+): void {
+	const parentBlock = parentScope.block;
+	const renderMode = parentBlock.currentRenderMode ?? 'urgent';
+	const deferred = parentBlock.currentRenderDeferred;
+	const previousScope = CURRENT_SCOPE;
+	const previousBlock = CURRENT_BLOCK;
+	let previous: Block | null = null;
+	let current: Block | null = null;
+	state.env = deps;
+	if (((flags || 0) & 4) !== 0 && deps !== undefined) state.cachedDeps = deps;
+	if (mapped) state.mappedNative = true;
+	try {
+		for (let index = 0; index < items.length; index++) {
+			const item = items[index];
+			const sourceKey = getKey(item, index);
+			const key = mapped ? 'k' + String(sourceKey) : sourceKey;
+			const block = new BlockImpl(
+				'control-flow',
+				parentBlock,
+				parentNode,
+				null,
+				state.end,
+				itemBody as ComponentBody,
+				item,
+				deps,
+				null,
+			) as unknown as Block;
+			current = block;
+			block.forSlot = state;
+			block.itemIndex = index;
+			block.currentRenderMode = renderMode;
+			block.currentRenderDeferred = deferred;
+			CURRENT_SCOPE = block;
+			CURRENT_BLOCK = block;
+			(itemBody as any)(item, block, deps);
+			CURRENT_SCOPE = previousScope;
+			CURRENT_BLOCK = previousBlock;
+			block.mounted = true;
+			const root = state.end.previousSibling!;
+			block.startMarker = root;
+			block.endMarker = root;
+			state.items.set(key, block);
+			block.key = key;
+			block.prevSibling = previous;
+			if (previous !== null) previous.nextSibling = block;
+			else state.head = block;
+			previous = block;
+			current = null;
+		}
+		state.tail = previous;
+		state.size = items.length;
+	} catch (error) {
+		CURRENT_SCOPE = previousScope;
+		CURRENT_BLOCK = previousBlock;
+		if (current !== null) {
+			// A value-position child can throw or suspend after commitBag inserted
+			// its host. The still-unregistered row owns that host and any nested
+			// child scopes, so dispose it before unwinding the completed prefix.
+			if (current.slots[0] !== undefined) {
+				const root = state.end.previousSibling;
+				if (root !== null && root !== state.start) {
+					current.startMarker = root;
+					current.endMarker = root;
+				}
+			}
+			unmountBlock(current, true);
+		}
+		while (previous !== null) {
+			const block = previous;
+			previous = block.prevSibling;
+			state.items.delete(block.key);
+			unmountBlock(block, true);
+		}
+		state.head = null;
+		state.tail = null;
+		state.size = 0;
+		throw error;
+	}
+}
+
+/** Compiler-only direct host-row entry; ordinary list bundles do not retain it. */
+export function fastForBlock<T>(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	items: ArrayLike<T>,
+	getKey: (item: T, index: number) => any,
+	itemBody: (item: T, scope: Scope) => void,
+	flags?: number,
+	deps?: any[],
+	emptyBody?: ComponentBody | null,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+): void {
+	const state = parentScope.slots[slotKey] as ForSlot | undefined;
+	const parent = fastHostListParent(state, items, flags);
+	if (parent === null) {
+		forBlock(
+			parentScope,
+			slotKey,
+			domParent,
+			items,
+			getKey,
+			itemBody,
+			flags,
+			deps,
+			emptyBody,
+			anchor,
+			ownEnd,
+		);
+		return;
+	}
+	mountFastHostItems(parentScope, state!, parent, items, getKey, itemBody, flags, deps, false);
+}
+
+/** Direct host-row mounts composed with the independent keyed-selection proof. */
+export function fastKeyedForBlock<T>(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	items: ArrayLike<T>,
+	getKey: (item: T, index: number) => any,
+	itemBody: (item: T, scope: Scope) => void,
+	flags: number,
+	deps: any[],
+	emptyBody?: ComponentBody | null,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+): void {
+	const state = parentScope.slots[slotKey] as ForSlot | undefined;
+	const parent = fastHostListParent(state, items, flags);
+	if (parent === null) {
+		keyedForBlock(
+			parentScope,
+			slotKey,
+			domParent,
+			items,
+			getKey,
+			itemBody,
+			flags,
+			deps,
+			emptyBody,
+			anchor,
+			ownEnd,
+		);
+		return;
+	}
+	mountFastHostItems(parentScope, state!, parent, items, getKey, itemBody, flags, deps, false);
+	state!.selectionItems = items;
+}
+
+/** Direct host-row mounts for compiler-proven, guarded native JSX map rows. */
+export function fastMapSlot(
+	scopeOrItems: any,
+	slotOrMethod: any,
+	domParent?: Node,
+	items?: any,
+	method?: any,
+	native?: boolean | ((...args: any[]) => any),
+	callback?: (...args: any[]) => any,
+	getKey?: (item: any, index: number) => any,
+	itemBody?: (item: any, scope: Scope) => void,
+	flags?: number,
+	deps?: any[],
+	anchor?: Node | null,
+	ownEnd?: boolean | 1,
+): boolean | void {
+	if (arguments.length === 2) return mapSlot(scopeOrItems, slotOrMethod);
+	// Compact map calls carry the callback in place of the native answer. Mirror
+	// mapSlot's normalization so custom receivers execute exactly one guard and
+	// retain their complete observable map callback/species/getter behavior.
+	if (typeof native === 'function') {
+		ownEnd = anchor as boolean | 1 | undefined;
+		anchor = deps as Node | null | undefined;
+		deps = flags as any[] | undefined;
+		flags = itemBody as unknown as number | undefined;
+		itemBody = getKey as unknown as (item: any, scope: Scope) => void;
+		getKey = callback as (item: any, index: number) => any;
+		callback = native;
+		native = mapSlot(items, method) as boolean;
+	}
+	const state = ((scopeOrItems as Scope).slots[slotOrMethod] as ChildSlot | undefined)?.forSlot;
+	const parent = native === true ? fastHostListParent(state, items, flags) : null;
+	if (parent === null) {
+		return mapSlot(
+			scopeOrItems,
+			slotOrMethod,
+			domParent,
+			items,
+			method,
+			native,
+			callback,
+			getKey,
+			itemBody,
+			flags,
+			deps,
+			anchor,
+			ownEnd,
+		);
+	}
+	mountFastHostItems(
+		scopeOrItems as Scope,
+		state!,
+		parent,
+		items,
+		getKey!,
+		itemBody!,
+		flags,
+		deps,
+		true,
+	);
+}
+
 /**
  * STRUCTURAL recovery for an @for where the SERVER rendered MORE items than the client now
  * renders: after reconcile adopts the client's items, the cursor sits on the first unconsumed
