@@ -26,6 +26,11 @@ import { isCompilerSite } from './internal/site.js';
 import { useApolloClient } from './useApolloClient.js';
 import { useSyncExternalStore } from './useSyncExternalStore.js';
 const lastWatchOptions = Symbol();
+const linkedQueryStateOptions = {
+	sourceEqual(previous, next) {
+		return previous.client === next.client && previous.query === next.query;
+	},
+};
 export const useQuery = function useQuery(query, options) {
 	'use no memo';
 	if (isCompilerSite(options, skipToken)) options = undefined;
@@ -54,16 +59,11 @@ function useQuery_(query, options = {}) {
 			},
 		};
 	}
-	let [state, setState] = React.useState(createState);
-	if (client !== state.client || query !== state.query) {
-		// If the client or query have changed, we need to create a new InternalState.
-		// This will trigger a re-render with the new state, but it will also continue
-		// to run the current render function to completion.
-		// Since we sometimes trigger some side-effects in the render function, we
-		// re-assign `state` to the new state to ensure that those side-effects are
-		// triggered with the new state.
-		setState((state = createState(state)));
-	}
+	const [state] = React.useLinkedState(
+		{ client, query },
+		(_source, previous) => createState(previous?.value),
+		linkedQueryStateOptions,
+	);
 	const { observable, resultData } = state;
 	useInitialFetchPolicyIfNecessary(watchQueryOptions, observable);
 	useResubscribeIfNecessary(
