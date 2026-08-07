@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { flushSync } from '../src/index.js';
 import { mount } from './_helpers.js';
-import { Owner } from './_fixtures/scoped-jsx-prop-identity.tsx';
+import { NestedFailureOwner, Owner } from './_fixtures/scoped-jsx-prop-identity.tsx';
 
 // A component's children resolve lazily, in the scope they render in. That
 // deferral must not cost the owner's identities: props an owner wrote once stay
@@ -51,6 +51,22 @@ describe('scoped JSX child props', () => {
 
 		flushSync(bump);
 		expect(result.find('[data-role="lazy"]').textContent).toBe('2');
+		result.unmount();
+	});
+
+	it('isolates a nested deferred record that throws', () => {
+		const seen: Array<() => void> = [];
+		let bump = (): void => {};
+		const result = mount(NestedFailureOwner, {
+			seen,
+			bind: (fn: () => void) => (bump = fn),
+		});
+
+		flushSync(bump);
+		flushSync(bump);
+
+		expect(seen.length).toBeGreaterThan(2);
+		for (const cb of seen) expect(cb).toBe(seen[0]);
 		result.unmount();
 	});
 });
