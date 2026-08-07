@@ -1,18 +1,30 @@
 // Small hook utilities ported from react-router's utils.tsx. Plain-`.ts` hooks
 // forward the caller's compiler-injected slot (see internal.ts).
-import { useRef } from 'octane';
+import { type LinkedStatePrevious, useLinkedState } from 'octane';
 import { splitSlot, subSlot } from './internal';
 
+function previousCommittedValue<Value>(
+	_current: Value,
+	previous: LinkedStatePrevious<Value, Value | null> | undefined,
+): Value | null {
+	return previous === undefined ? null : previous.source;
+}
+
+const PREVIOUS_VALUE_OPTIONS = {
+	sourceEqual: <Value>(previous: Value, next: Value) => previous === next,
+};
+
 // Returns the value from the previous render (null on first render). Ported from
-// react-router's usePrevious — the previous/current pair lives in one ref cell and
-// rolls forward during render when the incoming value changes.
+// react-router's usePrevious — linked state advances only when a changed value commits,
+// keeping abandoned Suspense attempts out of the previous-distinct history.
 export function usePrevious(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const value = user[0];
-	const ref = useRef({ value, prev: null }, subSlot(slot, 'prev'));
-	const current = ref.current.value;
-	if (value !== current) {
-		ref.current = { value, prev: current };
-	}
-	return ref.current.prev;
+	const [previous] = useLinkedState(
+		value,
+		previousCommittedValue,
+		PREVIOUS_VALUE_OPTIONS,
+		subSlot(slot, 'prev'),
+	);
+	return previous;
 }
