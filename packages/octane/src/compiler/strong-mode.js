@@ -656,11 +656,44 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				target.bindings.set(declaration.id.name, { kind: 'ref' });
 			} else if (declarationKind === 'const' && initial?.type === 'Identifier') {
 				const value = resolve(scope, initial.name);
-				if (value?.kind === 'setter' || value?.kind === 'ref' || value?.kind === 'callback') {
+				if (
+					value?.kind === 'setter' ||
+					value?.kind === 'ref' ||
+					value?.kind === 'callback' ||
+					value?.kind === 'callback-choice' ||
+					value?.kind === 'linked-options' ||
+					value?.kind === 'linked-key'
+				) {
 					target.bindings.set(declaration.id.name, value);
 				}
 			} else if (declarationKind === 'const' && FUNCTION_TYPES.has(initial?.type)) {
 				target.bindings.set(declaration.id.name, { kind: 'callback', node: initial, scope });
+			} else if (
+				declarationKind === 'const' &&
+				initial?.type === 'Literal' &&
+				(initial.value === 'sourceEqual' || initial.value === 'valueEqual')
+			) {
+				target.bindings.set(declaration.id.name, { kind: 'linked-key', value: initial.value });
+			} else if (
+				declarationKind === 'const' &&
+				(initial?.type === 'ObjectExpression' || initial?.type === 'ConditionalExpression') &&
+				linkedStateOptionsExpression(initial, scope)
+			) {
+				target.bindings.set(declaration.id.name, {
+					kind: 'linked-options',
+					node: initial,
+					scope,
+				});
+			} else if (
+				declarationKind === 'const' &&
+				initial?.type === 'ConditionalExpression' &&
+				synchronousCallbackExpression(initial, scope)
+			) {
+				target.bindings.set(declaration.id.name, {
+					kind: 'callback-choice',
+					node: initial,
+					scope,
+				});
 			}
 		}
 		visit(declaration.init, scope, phase);
@@ -694,10 +727,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (FUNCTION_TYPES.has(callback?.type)) {
 			visitCallback(callback, scope, phase);
 			return true;
+		} else if (callback?.type === 'ConditionalExpression') {
+			visitSynchronousHookCallback(callback.consequent, scope, phase);
+			visitSynchronousHookCallback(callback.alternate, scope, phase);
+			return true;
 		} else if (callback?.type === 'Identifier') {
 			const binding = resolve(scope, callback.name);
 			if (binding?.kind === 'callback') visitCallback(binding.node, binding.scope, phase);
-			else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
+			else if (binding?.kind === 'callback-choice') {
+				visitSynchronousHookCallback(binding.node, binding.scope, phase);
+			} else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
 				reportSetter(callback, phase);
 			}
 			return true;
@@ -706,6 +745,119 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return true;
 		}
 		return false;
+	}
+
+	function synchronousCallbackExpression(value, scope) {
+		const callback = unwrap(value);
+		if (FUNCTION_TYPES.has(callback?.type) || stateTupleUpdater(callback, scope)) return true;
+		if (callback?.type === 'Identifier') {
+			const kind = resolve(scope, callback.name)?.kind;
+			return kind === 'callback' || kind === 'callback-choice' || kind === 'setter';
+		}
+		if (callback?.type === 'ConditionalExpression') {
+			return (
+				synchronousCallbackExpression(callback.consequent, scope) ||
+				synchronousCallbackExpression(callback.alternate, scope)
+			);
+		}
+		return false;
+	}
+
+	function linkedStateComparatorName(property, scope) {
+		if (property?.type !== 'Property' || property.kind !== 'init') return null;
+		const key = unwrap(property.key);
+		let name;
+		if (property.computed !== true) {
+			name = key?.type === 'Identifier' ? key.name : key?.value;
+		} else if (key?.type === 'Identifier') {
+			const binding = resolve(scope, key.name);
+			name = binding?.kind === 'linked-key' ? binding.value : null;
+		} else if (key?.type === 'TemplateLiteral' && (key.expressions?.length ?? 0) === 0) {
+			name = key.quasis?.[0]?.value?.cooked;
+		} else {
+			name = key?.type === 'Literal' ? key.value : null;
+		}
+		return name === 'sourceEqual' || name === 'valueEqual' ? name : null;
+	}
+
+	function linkedStateOptionsExpression(value, scope) {
+		const options = unwrap(value);
+		if (options?.type === 'Identifier') {
+			return resolve(scope, options.name)?.kind === 'linked-options';
+		}
+		if (options?.type === 'ConditionalExpression') {
+			return (
+				linkedStateOptionsExpression(options.consequent, scope) ||
+				linkedStateOptionsExpression(options.alternate, scope)
+			);
+		}
+		return (
+			options?.type === 'ObjectExpression' &&
+			(options.properties ?? []).some((property) =>
+				property.type === 'SpreadElement'
+					? linkedStateOptionsExpression(property.argument, scope)
+					: linkedStateComparatorName(property, scope) !== null,
+			)
+		);
+	}
+
+	function visitLinkedStateComparators(value, parentScope, phase, overridden, activeOptions) {
+		let options = unwrap(value);
+		let scope = parentScope;
+		if (options?.type === 'Identifier') {
+			const binding = resolve(scope, options.name);
+			if (binding?.kind !== 'linked-options') return;
+			options = binding.node;
+			scope = binding.scope;
+		}
+		if (
+			(options?.type !== 'ObjectExpression' && options?.type !== 'ConditionalExpression') ||
+			activeOptions?.has(options)
+		) {
+			return;
+		}
+		overridden ??= new Set();
+		activeOptions ??= new Set();
+		activeOptions.add(options);
+		try {
+			if (options.type === 'ConditionalExpression') {
+				const consequentOverrides = new Set(overridden);
+				const alternateOverrides = new Set(overridden);
+				visitLinkedStateComparators(
+					options.consequent,
+					scope,
+					phase,
+					consequentOverrides,
+					activeOptions,
+				);
+				visitLinkedStateComparators(
+					options.alternate,
+					scope,
+					phase,
+					alternateOverrides,
+					activeOptions,
+				);
+				for (const name of consequentOverrides) {
+					if (alternateOverrides.has(name)) overridden.add(name);
+				}
+				return;
+			}
+			const properties = options.properties ?? [];
+			for (let index = properties.length - 1; index >= 0; index--) {
+				const property = properties[index];
+				if (property.type === 'SpreadElement') {
+					visitLinkedStateComparators(property.argument, scope, phase, overridden, activeOptions);
+					continue;
+				}
+				const name = linkedStateComparatorName(property, scope);
+				if (name !== null && !overridden.has(name)) {
+					overridden.add(name);
+					visitSynchronousHookCallback(property.value, scope, phase);
+				}
+			}
+		} finally {
+			activeOptions.delete(options);
+		}
 	}
 
 	function visit(node, scope, phase) {
@@ -860,10 +1012,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visit(node.callee, scope, phase);
 				}
 				let executionPhase = phaseAfter(node.callee, phase, true, node.optional === true);
-				const synchronousHook = EFFECT_HOOKS.has(hook) || hook === 'useMemo';
+				const synchronousCallbackIndex =
+					hook === 'useLinkedState'
+						? 1
+						: hook === 'useReducer'
+							? 2
+							: hook === 'useState' || hook === 'useMemo' || EFFECT_HOOKS.has(hook)
+								? 0
+								: -1;
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
-					if (index !== 0 || !synchronousHook || !FUNCTION_TYPES.has(unwrap(argument)?.type)) {
+					if (index !== synchronousCallbackIndex || !FUNCTION_TYPES.has(unwrap(argument)?.type)) {
 						visit(argument, scope, executionPhase);
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
@@ -878,8 +1037,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitSynchronousHookCallback(node.arguments?.[0], scope, 'effect');
 					return;
 				}
-				if (hook === 'useMemo') {
+				if (hook === 'useState' || hook === 'useMemo') {
 					visitSynchronousHookCallback(node.arguments?.[0], scope, executionPhase);
+					return;
+				}
+				if (hook === 'useReducer') {
+					visitSynchronousHookCallback(node.arguments?.[2], scope, executionPhase);
+					return;
+				}
+				if (hook === 'useLinkedState') {
+					visitSynchronousHookCallback(node.arguments?.[1], scope, executionPhase);
+					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
 					return;
 				}
 				if (FUNCTION_TYPES.has(callee?.type)) {

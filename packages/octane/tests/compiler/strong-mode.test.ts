@@ -173,6 +173,377 @@ export function App() @{
 	});
 
 	it.each([
+		['inline state initializers', 'useState(() => { setCount(count + 1); return count; });'],
+		[
+			'named state initializers',
+			'function initialize() { setCount(count + 1); return count; } useState(initialize);',
+		],
+		[
+			'aliased state initializers',
+			'const initialize = () => setCount(count + 1); const initial = initialize; useState(initial);',
+		],
+		['state updaters passed as initializers', 'useState(setCount);'],
+		[
+			'state tuple updaters passed as initializers',
+			'const tuple = useState(0); useState(tuple[1]);',
+		],
+		[
+			'inline linked-state reconcilers',
+			'useLinkedState(count, (value) => { setCount(value + 1); return value; });',
+		],
+		[
+			'named linked-state reconcilers',
+			'function reconcile(value) { setCount(value + 1); return value; } useLinkedState(count, reconcile);',
+		],
+		[
+			'aliased linked-state reconcilers',
+			'const reconcile = (value) => setCount(value); const calculate = reconcile; useLinkedState(count, calculate);',
+		],
+		['state updaters passed as linked-state reconcilers', 'useLinkedState(count, setCount);'],
+		[
+			'inline source comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: (previous, next) => { setCount(next); return previous === next; } });',
+		],
+		[
+			'inline value comparators',
+			'useLinkedState(count, (value) => value, { valueEqual: (previous, next) => { setCount(next); return previous === next; } });',
+		],
+		[
+			'named source comparators',
+			'function compare(previous, next) { setCount(next); return previous === next; } useLinkedState(count, (value) => value, { sourceEqual: compare });',
+		],
+		[
+			'aliased value comparators',
+			'const compare = (previous, next) => setCount(next); const equal = compare; useLinkedState(count, (value) => value, { valueEqual: equal });',
+		],
+		[
+			'state updaters passed as source comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: setCount });',
+		],
+		[
+			'source comparator methods',
+			'useLinkedState(count, (value) => value, { sourceEqual(previous, next) { setCount(next); return previous === next; } });',
+		],
+		[
+			'wrapped computed comparator names',
+			"useLinkedState(count, (value) => value, { ['valueEqual' as const]: (previous, next) => { setCount(next); return previous === next; } });",
+		],
+		[
+			'named comparator options',
+			'const options = { sourceEqual: (previous, next) => { setCount(next); return previous === next; } }; useLinkedState(count, (value) => value, options);',
+		],
+		[
+			'aliased comparator options',
+			'const options = { valueEqual: (previous, next) => { setCount(next); return previous === next; } }; const comparisons = options; useLinkedState(count, (value) => value, comparisons);',
+		],
+	])('rejects render updates from %s', (_label, setup) => {
+		const source = `"use strong";\n${stateComponent(setup, 'useState, useLinkedState')}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		[
+			'inline options spreads',
+			'useLinkedState(count, (value) => value, { ...{ sourceEqual: (previous, next) => { setCount(next); return previous === next; } } });',
+		],
+		[
+			'named options spreads',
+			'const options = { valueEqual: (previous, next) => { setCount(next); return previous === next; } }; useLinkedState(count, (value) => value, { ...options });',
+		],
+		[
+			'aliased and nested options spreads',
+			'const compare = (previous, next) => { setCount(next); return previous === next; }; const options = { sourceEqual: compare }; const alias = options; const spread = { ...alias }; useLinkedState(count, (value) => value, { ...spread });',
+		],
+		[
+			'options spreads overriding an earlier comparator',
+			'const options = { sourceEqual: setCount }; useLinkedState(count, (value) => value, { sourceEqual: Object.is, ...options });',
+		],
+		[
+			'inline conditional linked-state reconcilers',
+			'useLinkedState(count, count > 0 ? (value) => value : (value) => { setCount(value); return value; });',
+		],
+		[
+			'named conditional linked-state reconcilers',
+			'const reconcile = count > 0 ? (value) => { setCount(value); return value; } : (value) => value; useLinkedState(count, reconcile);',
+		],
+		[
+			'aliased conditional linked-state reconcilers',
+			'const reconcile = (value) => { setCount(value); return value; }; const selected = count > 0 ? Object.is : reconcile; const alias = selected; useLinkedState(count, alias);',
+		],
+		[
+			'conditional state initializers',
+			'useState(count > 0 ? () => count : () => setCount(count + 1));',
+		],
+		[
+			'inline conditional linked-state comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: count > 0 ? Object.is : (previous, next) => { setCount(next); return previous === next; } });',
+		],
+		[
+			'named conditional linked-state comparators',
+			'const compare = count > 0 ? Object.is : (previous, next) => { setCount(next); return previous === next; }; useLinkedState(count, (value) => value, { valueEqual: compare });',
+		],
+		[
+			'conditional linked-state options',
+			'useLinkedState(count, (value) => value, count > 0 ? { sourceEqual: Object.is } : { sourceEqual: setCount });',
+		],
+		[
+			'named conditional linked-state options',
+			'const options = count > 0 ? { valueEqual: Object.is } : { valueEqual: setCount }; useLinkedState(count, (value) => value, options);',
+		],
+		[
+			'conditional linked-state option spreads',
+			'const options = count > 0 ? { sourceEqual: Object.is } : { sourceEqual: setCount }; useLinkedState(count, (value) => value, { ...options });',
+		],
+		[
+			'named computed source comparators',
+			"const key = 'sourceEqual'; useLinkedState(count, (value) => value, { [key]: setCount });",
+		],
+		[
+			'aliased computed value comparators',
+			"const key = 'valueEqual' as const; const alias = key; useLinkedState(count, (value) => value, { [alias]: setCount });",
+		],
+		[
+			'computed template-literal comparators',
+			'useLinkedState(count, (value) => value, { [`sourceEqual`]: setCount });',
+		],
+	])('rejects render updates hidden by %s', (_label, setup) => {
+		const source = `"use strong";\n${stateComponent(setup, 'useState, useLinkedState')}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		[
+			'inline reducer initializers',
+			'useReducer((value) => value, count, () => { setCount(count + 1); return count; });',
+		],
+		[
+			'named reducer initializers',
+			'const initialize = () => setCount(count + 1); useReducer((value) => value, count, initialize);',
+		],
+		[
+			'conditional reducer initializers',
+			'useReducer((value) => value, count, count > 0 ? () => count : setCount);',
+		],
+	])('rejects render updates from lazy %s', (_label, setup) => {
+		const source = `"use strong";\n${stateComponent(setup, 'useState, useReducer')}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		['state initializers', 'useState(() => { ref.current = 1; return 0; });'],
+		[
+			'linked-state reconcilers',
+			'useLinkedState(0, (value) => { ref.current = value; return value; });',
+		],
+		[
+			'source comparators',
+			'useLinkedState(0, (value) => value, { sourceEqual: (previous, next) => { ref.current = next; return previous === next; } });',
+		],
+		[
+			'value comparator methods',
+			'useLinkedState(0, (value) => value, { valueEqual(previous, next) { ref.current = next; return previous === next; } });',
+		],
+		[
+			'aliased named comparators',
+			'const compare = (previous, next) => { ref.current = next; return previous === next; }; const equal = compare; useLinkedState(0, (value) => value, { sourceEqual: equal });',
+		],
+		[
+			'named comparator options',
+			'const options = { valueEqual: (previous, next) => { ref.current = next; return previous === next; } }; useLinkedState(0, (value) => value, options);',
+		],
+		[
+			'spread comparator options',
+			'const options = { sourceEqual: (previous, next) => { ref.current = next; return previous === next; } }; useLinkedState(0, (value) => value, { ...options });',
+		],
+		[
+			'conditional reconcilers',
+			'useLinkedState(0, ref.current ? (value) => value : (value) => { ref.current = value; return value; });',
+		],
+		[
+			'named computed comparators',
+			"const key = 'valueEqual'; useLinkedState(0, (value) => value, { [key]: (previous, next) => { ref.current = next; return previous === next; } });",
+		],
+		[
+			'lazy reducer initializers',
+			'useReducer((value) => value, 0, () => { ref.current = 1; return 0; });',
+		],
+	])('rejects render-time ref writes from %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useReducer, useRef, useState } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
+	it.each([
+		[
+			'aliased state imports',
+			`import { useState as state } from 'octane';
+export function App() @{ const [, update] = state(0); state(() => update(1)); <div /> }`,
+		],
+		[
+			'aliased linked-state imports',
+			`import { useLinkedState as linked, useState } from 'octane';
+export function App() @{ const [, update] = useState(0); linked(0, () => update(1)); <div /> }`,
+		],
+		[
+			'namespace state imports',
+			`import * as Octane from 'octane';
+export function App() @{ const [, update] = Octane.useState(0); Octane.useState(() => update(1)); <div /> }`,
+		],
+		[
+			'namespace linked-state imports',
+			`import * as Octane from 'octane';
+export function App() @{ const [, update] = Octane.useState(0); Octane.useLinkedState(0, (value) => value, { valueEqual: update }); <div /> }`,
+		],
+		[
+			'wrapped namespace linked-state properties',
+			`import * as Octane from 'octane';
+export function App() @{ const [, update] = Octane.useState(0); Octane['useLinkedState' as const](0, update); <div /> }`,
+		],
+	])('tracks synchronous state callbacks through %s', (_label, source) => {
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])('rejects linked comparator writes during $mode compilation with dev=$dev', (options) => {
+		const source = `"use strong";\n${stateComponent(
+			'useLinkedState(count, (value) => value, { sourceEqual: () => setCount(count + 1) });',
+			'useState, useLinkedState',
+		)}`;
+
+		expect(() => compile(source, '/src/Counter.tsrx?octane-hydrate=Counter', options)).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it('keeps synchronous state callbacks compatible when Strong mode is disabled', () => {
+		const source = stateComponent(
+			'useState(count > 0 ? () => count : setCount); useReducer((value) => value, count, setCount); useLinkedState(count, count > 0 ? (value) => value : setCount, { ...{ sourceEqual: setCount } });',
+			'useState, useReducer, useLinkedState',
+		);
+
+		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
+		expect(() => compile(source, '/src/Counter.tsrx', { strong: false } as any)).not.toThrow();
+	});
+
+	it('keeps deferred and unknown callbacks inside state initializers and linked options legal', () => {
+		const source = `"use strong";
+import { useLinkedState, useRef, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const ref = useRef(0);
+  useState(() => () => setCount(count + 1));
+  const reconcile = (value) => {
+    setTimeout(() => setCount(value + 1), 0);
+    return value;
+  };
+  const compare = (previous, next) => {
+    queueMicrotask(() => { ref.current = next; });
+    return previous === next;
+  };
+  useLinkedState(count, reconcile, {
+    sourceEqual: compare,
+    valueEqual: props.compare,
+    onSettled: () => setCount(count + 1),
+  });
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps overridden, deferred, dynamic, and unrelated linked-state comparators legal', () => {
+		const source = `"use strong";
+import { useLinkedState, useReducer, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const later = (value) => { setTimeout(() => setCount(value), 0); return value; };
+  const unsafe = (value) => setCount(value);
+  const overridden = { sourceEqual: unsafe };
+  const dynamicKey = props.comparatorName;
+  useReducer((value) => value, count, count > 0 ? later : props.initialize);
+  useLinkedState(count, count > 0 ? later : props.reconcile, {
+    ...overridden,
+    sourceEqual: Object.is,
+    [dynamicKey]: unsafe,
+    valueEqual: count > 0 ? Object.is : props.compare,
+    onSettled: unsafe,
+  });
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('reports spread and conditional callback violations in TypeScript and editor diagnostics', () => {
+		const source = `"use strong";
+import { useLinkedState, useState } from 'octane';
+export function useValue(value) {
+  const [, update] = useState(0);
+  const options = { sourceEqual: update };
+  return useLinkedState(value, (next) => next, { ...options });
+}`;
+		const editorSource = `"use strong";
+import { useLinkedState, useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  const key = 'valueEqual';
+  useLinkedState(props.value, (value) => value, {
+    [key]: props.value ? Object.is : (previous, next) => { ref.current = next; return previous === next; },
+  });
+  <div />
+}`;
+		const diagnostics = compileToVolarMappings(editorSource, '/src/App.tsrx');
+
+		expect(() => slotHooks(source, '/src/useValue.ts')).toThrow(RENDER_STATE_UPDATE);
+		expect(diagnostics.diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, severity: 'error' }),
+		);
+		expect(diagnostics.errors).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, type: 'usage' }),
+		);
+	});
+
+	it('reports synchronous linked-state callback violations in plain TypeScript and editor diagnostics', () => {
+		const source = `"use strong";
+import { useLinkedState, useRef, useState } from 'octane';
+export function useValue(value) {
+  const [, update] = useState(0);
+  return useLinkedState(value, () => update(value));
+}`;
+		const editorSource = `"use strong";
+import { useLinkedState, useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  useLinkedState(props.value, (value) => value, {
+    valueEqual: (previous, next) => { ref.current = next; return previous === next; },
+  });
+  <div />
+}`;
+		const diagnostics = compileToVolarMappings(editorSource, '/src/App.tsrx');
+
+		expect(() => slotHooks(source, '/src/useValue.ts')).toThrow(RENDER_STATE_UPDATE);
+		expect(diagnostics.diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, severity: 'error' }),
+		);
+		expect(diagnostics.errors).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, type: 'usage' }),
+		);
+	});
+
+	it.each([
 		[
 			'aliased imports',
 			`import { useMemo as memo, useState } from 'octane';
