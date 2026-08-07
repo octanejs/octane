@@ -11,6 +11,11 @@ interface GalleryScrollDetail {
 	deltaY: number;
 	scrollTop: number;
 	scrollHeight: number;
+	/**
+ * The list's own height in px. Native engines report it; Lynx for Web does
+ * not, so treat it as optional and fall back to the page height.
+ */
+	listHeight?: number;
 }
 
 export function NiceScrollbarMTS({
@@ -35,7 +40,15 @@ export function Gallery({ pictureData }: { pictureData: Picture[] }) @{
 		if (
 			scrollbar === null || scrollbar === undefined || gallery === null || gallery === undefined
 		) return;
-		const listHeight = SystemInfo.pixelHeight / SystemInfo.pixelRatio - 48;
+		// The viewport the scrollbar maps onto is the list's own box. Native
+		// engines report it directly; Lynx for Web does not, and there the list
+		// fills the page, so the page height is the same number.
+		//
+		// Deriving it from SystemInfo *minus a fixed 48px* — as this example used
+		// to — assumed a full-screen page behind Explorer's title bar. That was
+		// wrong on Web, wrong in Explorer's fullscreen mode, and it also left the
+		// list 48px short of its wrapper, which is where the black band came from.
+		const listHeight = event.detail.listHeight ?? SystemInfo.pixelHeight / SystemInfo.pixelRatio;
 		const scrollbarHeight = listHeight * (listHeight / event.detail.scrollHeight);
 		const scrollbarTop = listHeight * (event.detail.scrollTop / event.detail.scrollHeight);
 		__AddInlineStyle(scrollbar, 'height', scrollbarHeight + 'px');
