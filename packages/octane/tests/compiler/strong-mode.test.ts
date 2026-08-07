@@ -405,6 +405,58 @@ export function App(props) @{
 	});
 
 	it.each([
+		['state initializer values', 'useState((props.trace, setCount));'],
+		['inline state initializer callbacks', 'useState((props.trace, () => setCount(count + 1)));'],
+		[
+			'named and aliased state initializers',
+			'const initialize = (props.trace, setCount); const alias = initialize; useState(alias);',
+		],
+		['nested state initializer sequences', 'useState((props.first, (props.second, setCount)));'],
+		['reducer initializers', 'useReducer((value) => value, count, (props.trace, setCount));'],
+		['memo callbacks', 'useMemo((props.trace, setCount), [count]);'],
+		['linked-state reconcilers', 'useLinkedState(count, (props.trace, setCount));'],
+		[
+			'source comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: (props.trace, setCount) });',
+		],
+		[
+			'named value comparators',
+			'const compare = (props.trace, setCount); useLinkedState(count, (value) => value, { valueEqual: compare });',
+		],
+		[
+			'linked-state options',
+			'useLinkedState(count, (value) => value, (props.trace, { sourceEqual: setCount }));',
+		],
+		[
+			'named and aliased linked-state options',
+			'const options = (props.trace, { valueEqual: setCount }); const alias = options; useLinkedState(count, (value) => value, alias);',
+		],
+		[
+			'linked-state option spreads',
+			'useLinkedState(count, (value) => value, { ...(props.trace, { sourceEqual: setCount }) });',
+		],
+		[
+			'nested logical linked-state options',
+			'useLinkedState(count, (value) => value, props.options ?? (props.trace, { valueEqual: setCount }));',
+		],
+		[
+			'state-tuple updater results',
+			'const tuple = useState(0); useState((props.trace, tuple[1]));',
+		],
+		['immediately executed earlier operands', 'useState((setCount(count + 1), () => count));'],
+	])('rejects render updates from sequence-selected %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useMemo, useReducer, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
 		[
 			'inline reducer initializers',
 			'useReducer((value) => value, count, () => { setCount(count + 1); return count; });',
@@ -497,6 +549,32 @@ export function App() @{
 	])('rejects render-time ref writes hidden by logical %s', (_label, setup) => {
 		const source = `"use strong";
 import { useLinkedState, useReducer, useRef, useState } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
+	it.each([
+		[
+			'state initializer callbacks',
+			'useState((props.trace, () => { ref.current = 1; return 0; }));',
+		],
+		[
+			'linked-state reconciler callbacks',
+			'useLinkedState(0, (props.trace, (value) => { ref.current = value; return value; }));',
+		],
+		[
+			'named linked-state option spreads',
+			'const options = (props.trace, { sourceEqual: (previous, next) => { ref.current = next; return previous === next; } }); useLinkedState(0, (value) => value, { ...options });',
+		],
+		['immediately executed earlier operands', 'useState((ref.current = 1, () => 0));'],
+	])('rejects ref writes from sequence-selected %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useRef, useState } from 'octane';
 export function App(props) @{
   const ref = useRef(0);
   ${setup}
@@ -692,6 +770,58 @@ import { useLinkedState, useRef, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['known true state initializers', 'useState(true ? () => count : setCount);'],
+		['known false state initializers', 'useState(false ? setCount : () => count);'],
+		[
+			'aliased immutable conditional flags',
+			'const enabled = true; const active = enabled; useState(active ? () => count : setCount);',
+		],
+		[
+			'nested immutable conditional flags',
+			'const disabled = false; useState(disabled ? setCount : (true ? () => count : setCount));',
+		],
+		[
+			'known conditional linked-state reconcilers',
+			'const enabled = true; useLinkedState(count, enabled ? (value) => value : setCount);',
+		],
+		[
+			'known conditional linked-state comparators',
+			'useLinkedState(count, (value) => value, { valueEqual: false ? setCount : Object.is });',
+		],
+		[
+			'known conditional linked-state options',
+			'const enabled = true; useLinkedState(count, (value) => value, enabled ? { sourceEqual: Object.is } : { sourceEqual: setCount });',
+		],
+		[
+			'named known conditional linked-state options',
+			'const disabled = false; const options = disabled ? { sourceEqual: setCount } : { sourceEqual: Object.is }; useLinkedState(count, (value) => value, options);',
+		],
+		[
+			'known conditional spread overrides',
+			'const enabled = true; useLinkedState(count, (value) => value, { sourceEqual: setCount, ...(enabled ? { sourceEqual: Object.is } : { sourceEqual: setCount }) });',
+		],
+		['discarded earlier callback identities', 'useState((setCount, () => count));'],
+		[
+			'discarded earlier comparator options',
+			'useLinkedState(count, (value) => value, ({ sourceEqual: setCount }, { sourceEqual: Object.is }));',
+		],
+		[
+			'false sequence-result aliases',
+			'const disabled = (props.trace, false); useState(disabled && setCount);',
+		],
+	])('accepts unreachable sequence and conditional callbacks from %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
   ${setup}
   <div />
 }`;

@@ -685,7 +685,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				declarationKind === 'const' &&
 				(initial?.type === 'ObjectExpression' ||
 					initial?.type === 'ConditionalExpression' ||
-					initial?.type === 'LogicalExpression') &&
+					initial?.type === 'LogicalExpression' ||
+					initial?.type === 'SequenceExpression') &&
 				linkedStateOptionsExpression(initial, scope)
 			) {
 				target.bindings.set(declaration.id.name, {
@@ -695,7 +696,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				});
 			} else if (
 				declarationKind === 'const' &&
-				(initial?.type === 'ConditionalExpression' || initial?.type === 'LogicalExpression') &&
+				(initial?.type === 'ConditionalExpression' ||
+					initial?.type === 'LogicalExpression' ||
+					initial?.type === 'SequenceExpression') &&
 				synchronousCallbackExpression(initial, scope)
 			) {
 				target.bindings.set(declaration.id.name, {
@@ -775,6 +778,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					activeCallbacks.delete(binding.node);
 				}
 			}
+		} else if (expression?.type === 'SequenceExpression') {
+			const expressions = expression.expressions ?? [];
+			return staticExpressionValue(expressions[expressions.length - 1], scope);
 		} else if (expression?.type === 'LogicalExpression') {
 			const left = staticExpressionValue(expression.left, scope);
 			if (expression.operator === '??') {
@@ -817,6 +823,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return UNKNOWN_VALUE;
 	}
 
+	function conditionalExpressionBranches(expression, scope) {
+		const test = staticExpressionValue(expression.test, scope);
+		return (
+			((test & TRUTHY_VALUE) !== 0 ? 1 : 0) | ((test & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? 2 : 0)
+		);
+	}
+
 	function logicalExpressionBranches(expression, scope) {
 		const left = staticExpressionValue(expression.left, scope);
 		if (expression.operator === '??') {
@@ -845,9 +858,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (FUNCTION_TYPES.has(callback?.type)) {
 			visitCallback(callback, scope, phase);
 			return true;
+		} else if (callback?.type === 'SequenceExpression') {
+			const expressions = callback.expressions ?? [];
+			return visitSynchronousHookCallback(expressions[expressions.length - 1], scope, phase);
 		} else if (callback?.type === 'ConditionalExpression') {
-			visitSynchronousHookCallback(callback.consequent, scope, phase);
-			visitSynchronousHookCallback(callback.alternate, scope, phase);
+			const branches = conditionalExpressionBranches(callback, scope);
+			if ((branches & 1) !== 0) visitSynchronousHookCallback(callback.consequent, scope, phase);
+			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.alternate, scope, phase);
 			return true;
 		} else if (callback?.type === 'LogicalExpression') {
 			const branches = logicalExpressionBranches(callback, scope);
@@ -885,10 +902,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			const kind = resolve(scope, callback.name)?.kind;
 			return kind === 'callback' || kind === 'callback-choice' || kind === 'setter';
 		}
+		if (callback?.type === 'SequenceExpression') {
+			const expressions = callback.expressions ?? [];
+			return synchronousCallbackExpression(expressions[expressions.length - 1], scope);
+		}
 		if (callback?.type === 'ConditionalExpression') {
+			const branches = conditionalExpressionBranches(callback, scope);
 			return (
-				synchronousCallbackExpression(callback.consequent, scope) ||
-				synchronousCallbackExpression(callback.alternate, scope)
+				((branches & 1) !== 0 && synchronousCallbackExpression(callback.consequent, scope)) ||
+				((branches & 2) !== 0 && synchronousCallbackExpression(callback.alternate, scope))
 			);
 		}
 		if (callback?.type === 'LogicalExpression') {
@@ -925,9 +947,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (options?.type === 'Identifier') {
 			return resolve(scope, options.name)?.kind === 'linked-options';
 		}
+		if (options?.type === 'SequenceExpression') {
+			const expressions = options.expressions ?? [];
+			return linkedStateOptionsExpression(expressions[expressions.length - 1], scope);
+		}
 		if (options?.type === 'ConditionalExpression' || options?.type === 'LogicalExpression') {
 			const logical = options.type === 'LogicalExpression';
-			const branches = logical ? logicalExpressionBranches(options, scope) : 3;
+			const branches = logical
+				? logicalExpressionBranches(options, scope)
+				: conditionalExpressionBranches(options, scope);
 			return (
 				((branches & 1) !== 0 &&
 					(!logical || options.operator !== '&&') &&
@@ -958,7 +986,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (
 			(options?.type !== 'ObjectExpression' &&
 				options?.type !== 'ConditionalExpression' &&
-				options?.type !== 'LogicalExpression') ||
+				options?.type !== 'LogicalExpression' &&
+				options?.type !== 'SequenceExpression') ||
 			activeOptions?.has(options)
 		) {
 			return;
@@ -967,9 +996,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		activeOptions ??= new Set();
 		activeOptions.add(options);
 		try {
+			if (options.type === 'SequenceExpression') {
+				const expressions = options.expressions ?? [];
+				visitLinkedStateComparators(
+					expressions[expressions.length - 1],
+					scope,
+					phase,
+					overridden,
+					activeOptions,
+				);
+				return;
+			}
 			if (options.type === 'ConditionalExpression' || options.type === 'LogicalExpression') {
 				const logical = options.type === 'LogicalExpression';
-				const branches = logical ? logicalExpressionBranches(options, scope) : 3;
+				const branches = logical
+					? logicalExpressionBranches(options, scope)
+					: conditionalExpressionBranches(options, scope);
 				const first =
 					logical && options.operator === '&&' ? null : logical ? options.left : options.consequent;
 				const second = logical ? options.right : options.alternate;
