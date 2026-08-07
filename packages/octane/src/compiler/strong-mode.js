@@ -14,6 +14,11 @@ const TRANSPARENT_EXPRESSIONS = new Set([
 	'TSSatisfiesExpression',
 	'TSTypeAssertion',
 ]);
+const NULLISH_VALUE = 1;
+const FALSY_VALUE = 2;
+const TRUTHY_VALUE = 4;
+const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
+const UNKNOWN_PRIMITIVE = Symbol('unknown primitive');
 const SKIP_KEYS = new Set([
 	'type',
 	'start',
@@ -646,6 +651,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			const element = declaration.id.elements?.[1];
 			const setter = element?.type === 'AssignmentPattern' ? element.left : element;
 			if (setter?.type === 'Identifier') target.bindings.set(setter.name, { kind: 'setter' });
+		} else if (declaration.id?.type === 'ObjectPattern' && stateTuple) {
+			for (const property of declaration.id.properties ?? []) {
+				if (property.type !== 'Property') continue;
+				const key = property.computed
+					? staticPrimitiveValue(property.key, scope)
+					: property.key?.type === 'Identifier'
+						? property.key.name
+						: property.key?.value;
+				const value = property.value;
+				const setter = value?.type === 'AssignmentPattern' ? value.left : value;
+				if ((key === 1 || key === '1') && setter?.type === 'Identifier') {
+					target.bindings.set(setter.name, { kind: 'setter' });
+				}
+			}
 		} else if (declaration.id?.type === 'Identifier') {
 			if (stateTuple) {
 				target.bindings.set(declaration.id.name, { kind: 'state-tuple' });
@@ -654,13 +673,75 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				importedHook(initial.callee, scope) === 'useRef'
 			) {
 				target.bindings.set(declaration.id.name, { kind: 'ref' });
+			} else if (declarationKind === 'const' && stateTupleUpdater(initial, scope)) {
+				target.bindings.set(declaration.id.name, { kind: 'setter' });
 			} else if (declarationKind === 'const' && initial?.type === 'Identifier') {
 				const value = resolve(scope, initial.name);
-				if (value?.kind === 'setter' || value?.kind === 'ref' || value?.kind === 'callback') {
+				if (
+					value?.kind === 'setter' ||
+					value?.kind === 'ref' ||
+					value?.kind === 'callback' ||
+					value?.kind === 'callback-choice' ||
+					value?.kind === 'linked-options' ||
+					value?.kind === 'linked-key' ||
+					value?.kind === 'constant'
+				) {
 					target.bindings.set(declaration.id.name, value);
+				} else if (value == null && initial.name === 'undefined') {
+					target.bindings.set(declaration.id.name, {
+						kind: 'constant',
+						value: NULLISH_VALUE,
+						primitive: undefined,
+					});
 				}
 			} else if (declarationKind === 'const' && FUNCTION_TYPES.has(initial?.type)) {
 				target.bindings.set(declaration.id.name, { kind: 'callback', node: initial, scope });
+			} else if (
+				declarationKind === 'const' &&
+				staticLinkedStateComparatorKey(initial, scope) !== null
+			) {
+				target.bindings.set(declaration.id.name, {
+					kind: 'linked-key',
+					value: staticLinkedStateComparatorKey(initial, scope),
+				});
+			} else if (
+				declarationKind === 'const' &&
+				(initial?.type === 'ObjectExpression' ||
+					initial?.type === 'ConditionalExpression' ||
+					initial?.type === 'LogicalExpression' ||
+					initial?.type === 'SequenceExpression') &&
+				linkedStateOptionsExpression(initial, scope)
+			) {
+				target.bindings.set(declaration.id.name, {
+					kind: 'linked-options',
+					node: initial,
+					scope,
+				});
+			} else if (
+				declarationKind === 'const' &&
+				(initial?.type === 'ConditionalExpression' ||
+					initial?.type === 'LogicalExpression' ||
+					initial?.type === 'SequenceExpression') &&
+				synchronousCallbackExpression(initial, scope)
+			) {
+				target.bindings.set(declaration.id.name, {
+					kind: 'callback-choice',
+					node: initial,
+					scope,
+				});
+			} else if (declarationKind === 'const') {
+				const primitive = staticPrimitiveValue(initial, scope);
+				let value = staticExpressionValue(initial, scope);
+				if (value === UNKNOWN_VALUE && primitive !== UNKNOWN_PRIMITIVE) {
+					value = primitive == null ? NULLISH_VALUE : primitive ? TRUTHY_VALUE : FALSY_VALUE;
+				}
+				if (value !== UNKNOWN_VALUE) {
+					target.bindings.set(declaration.id.name, {
+						kind: 'constant',
+						value,
+						primitive,
+					});
+				}
 			}
 		}
 		visit(declaration.init, scope, phase);
@@ -680,13 +761,250 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function stateTupleUpdater(value, scope) {
 		const member = unwrap(value);
 		if (member?.type !== 'MemberExpression' || member.computed !== true) return false;
-		const property = unwrap(member.property);
+		const property = staticPrimitiveValue(member.property, scope);
 		return (
-			property?.type === 'Literal' &&
-			(property.value === 1 || property.value === '1') &&
+			(property === 1 || property === '1') &&
 			unwrap(member.object)?.type === 'Identifier' &&
 			resolve(scope, unwrap(member.object).name)?.kind === 'state-tuple'
 		);
+	}
+
+	function staticPrimitiveValue(value, scope) {
+		const expression = unwrap(value);
+		if (expression?.type === 'Literal') return expression.value;
+		if (expression?.type === 'Identifier') {
+			const binding = resolve(scope, expression.name);
+			if (binding?.kind === 'linked-key') return binding.value;
+			if (binding?.kind === 'constant') return binding.primitive;
+			if (binding == null && expression.name === 'undefined') return undefined;
+			return UNKNOWN_PRIMITIVE;
+		}
+		if (expression?.type === 'TemplateLiteral') {
+			let result = '';
+			for (let index = 0; index < (expression.quasis?.length ?? 0); index++) {
+				const text = expression.quasis[index]?.value?.cooked;
+				if (text == null) return UNKNOWN_PRIMITIVE;
+				result += text;
+				if (index < (expression.expressions?.length ?? 0)) {
+					const part = staticPrimitiveValue(expression.expressions[index], scope);
+					if (
+						part === UNKNOWN_PRIMITIVE ||
+						(part !== null && typeof part === 'object') ||
+						typeof part === 'function' ||
+						typeof part === 'symbol'
+					) {
+						return UNKNOWN_PRIMITIVE;
+					}
+					result += String(part);
+				}
+			}
+			return result;
+		}
+		if (expression?.type === 'BinaryExpression' && expression.operator === '+') {
+			const left = staticPrimitiveValue(expression.left, scope);
+			const right = staticPrimitiveValue(expression.right, scope);
+			if (
+				left === UNKNOWN_PRIMITIVE ||
+				right === UNKNOWN_PRIMITIVE ||
+				(left !== null && typeof left === 'object') ||
+				(right !== null && typeof right === 'object') ||
+				typeof left === 'function' ||
+				typeof right === 'function' ||
+				typeof left === 'symbol' ||
+				typeof right === 'symbol'
+			) {
+				return UNKNOWN_PRIMITIVE;
+			}
+			if (
+				(typeof left === 'bigint' || typeof right === 'bigint') &&
+				typeof left !== 'string' &&
+				typeof right !== 'string' &&
+				(typeof left !== 'bigint' || typeof right !== 'bigint')
+			) {
+				return UNKNOWN_PRIMITIVE;
+			}
+			return left + right;
+		}
+		if (expression?.type === 'UnaryExpression') {
+			if (expression.operator === 'void') return undefined;
+			const argument = staticPrimitiveValue(expression.argument, scope);
+			if (expression.operator === '!') {
+				if (argument !== UNKNOWN_PRIMITIVE) return !argument;
+				const value = staticExpressionValue(expression.argument, scope);
+				return value === TRUTHY_VALUE
+					? false
+					: value !== UNKNOWN_VALUE && (value & TRUTHY_VALUE) === 0
+						? true
+						: UNKNOWN_PRIMITIVE;
+			}
+			if (
+				argument === UNKNOWN_PRIMITIVE ||
+				(argument !== null && typeof argument === 'object') ||
+				typeof argument === 'function' ||
+				typeof argument === 'symbol'
+			) {
+				return UNKNOWN_PRIMITIVE;
+			}
+			if (expression.operator === '+') {
+				return typeof argument === 'bigint' ? UNKNOWN_PRIMITIVE : +argument;
+			}
+			if (expression.operator === '-') return -argument;
+			if (expression.operator === '~') return ~argument;
+		}
+		if (expression?.type === 'SequenceExpression') {
+			const expressions = expression.expressions ?? [];
+			return staticPrimitiveValue(expressions[expressions.length - 1], scope);
+		}
+		if (expression?.type === 'ConditionalExpression') {
+			const branches = conditionalExpressionBranches(expression, scope);
+			return branches === 1
+				? staticPrimitiveValue(expression.consequent, scope)
+				: branches === 2
+					? staticPrimitiveValue(expression.alternate, scope)
+					: UNKNOWN_PRIMITIVE;
+		}
+		if (expression?.type === 'LogicalExpression') {
+			const branches = logicalExpressionBranches(expression, scope);
+			return branches === 1
+				? staticPrimitiveValue(expression.left, scope)
+				: branches === 2
+					? staticPrimitiveValue(expression.right, scope)
+					: UNKNOWN_PRIMITIVE;
+		}
+		return UNKNOWN_PRIMITIVE;
+	}
+
+	function staticLinkedStateComparatorKey(value, scope) {
+		const key = staticPrimitiveValue(value, scope);
+		return key === 'sourceEqual' || key === 'valueEqual' ? key : null;
+	}
+
+	function staticExpressionValue(value, scope) {
+		const expression = unwrap(value);
+		if (expression?.type === 'Literal') {
+			return expression.value == null
+				? NULLISH_VALUE
+				: expression.value
+					? TRUTHY_VALUE
+					: FALSY_VALUE;
+		} else if (
+			FUNCTION_TYPES.has(expression?.type) ||
+			expression?.type === 'ObjectExpression' ||
+			expression?.type === 'ArrayExpression' ||
+			stateTupleUpdater(expression, scope)
+		) {
+			return TRUTHY_VALUE;
+		} else if (
+			expression?.type === 'TemplateLiteral' ||
+			(expression?.type === 'BinaryExpression' && expression.operator === '+') ||
+			(expression?.type === 'UnaryExpression' &&
+				(expression.operator === '+' || expression.operator === '-' || expression.operator === '~'))
+		) {
+			const primitive = staticPrimitiveValue(expression, scope);
+			return primitive === UNKNOWN_PRIMITIVE
+				? UNKNOWN_VALUE
+				: primitive == null
+					? NULLISH_VALUE
+					: primitive
+						? TRUTHY_VALUE
+						: FALSY_VALUE;
+		} else if (expression?.type === 'Identifier') {
+			const binding = resolve(scope, expression.name);
+			if (binding == null && expression.name === 'undefined') return NULLISH_VALUE;
+			if (binding?.kind === 'constant') return binding.value;
+			if (
+				binding?.kind === 'callback' ||
+				binding?.kind === 'setter' ||
+				binding?.kind === 'ref' ||
+				binding?.kind === 'state-tuple' ||
+				binding?.kind === 'linked-key' ||
+				binding?.kind === 'hook' ||
+				binding?.kind === 'namespace'
+			) {
+				return TRUTHY_VALUE;
+			}
+			if (binding?.kind === 'callback-choice' || binding?.kind === 'linked-options') {
+				if (activeCallbacks.has(binding.node)) return UNKNOWN_VALUE;
+				activeCallbacks.add(binding.node);
+				try {
+					return staticExpressionValue(binding.node, binding.scope);
+				} finally {
+					activeCallbacks.delete(binding.node);
+				}
+			}
+		} else if (expression?.type === 'SequenceExpression') {
+			const expressions = expression.expressions ?? [];
+			return staticExpressionValue(expressions[expressions.length - 1], scope);
+		} else if (expression?.type === 'LogicalExpression') {
+			const left = staticExpressionValue(expression.left, scope);
+			if (expression.operator === '??') {
+				return (
+					(left & (FALSY_VALUE | TRUTHY_VALUE)) |
+					((left & NULLISH_VALUE) !== 0 ? staticExpressionValue(expression.right, scope) : 0)
+				);
+			}
+			if (expression.operator === '||') {
+				return (
+					(left & TRUTHY_VALUE) |
+					((left & (NULLISH_VALUE | FALSY_VALUE)) !== 0
+						? staticExpressionValue(expression.right, scope)
+						: 0)
+				);
+			}
+			if (expression.operator === '&&') {
+				return (
+					(left & (NULLISH_VALUE | FALSY_VALUE)) |
+					((left & TRUTHY_VALUE) !== 0 ? staticExpressionValue(expression.right, scope) : 0)
+				);
+			}
+		} else if (expression?.type === 'ConditionalExpression') {
+			const test = staticExpressionValue(expression.test, scope);
+			return (
+				((test & TRUTHY_VALUE) !== 0 ? staticExpressionValue(expression.consequent, scope) : 0) |
+				((test & (NULLISH_VALUE | FALSY_VALUE)) !== 0
+					? staticExpressionValue(expression.alternate, scope)
+					: 0)
+			);
+		} else if (expression?.type === 'UnaryExpression' && expression.operator === 'void') {
+			return NULLISH_VALUE;
+		} else if (expression?.type === 'UnaryExpression' && expression.operator === '!') {
+			const argument = staticExpressionValue(expression.argument, scope);
+			return (
+				((argument & TRUTHY_VALUE) !== 0 ? FALSY_VALUE : 0) |
+				((argument & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? TRUTHY_VALUE : 0)
+			);
+		}
+		return UNKNOWN_VALUE;
+	}
+
+	function conditionalExpressionBranches(expression, scope) {
+		const test = staticExpressionValue(expression.test, scope);
+		return (
+			((test & TRUTHY_VALUE) !== 0 ? 1 : 0) | ((test & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? 2 : 0)
+		);
+	}
+
+	function logicalExpressionBranches(expression, scope) {
+		const left = staticExpressionValue(expression.left, scope);
+		if (expression.operator === '??') {
+			return (
+				((left & (FALSY_VALUE | TRUTHY_VALUE)) !== 0 ? 1 : 0) |
+				((left & NULLISH_VALUE) !== 0 ? 2 : 0)
+			);
+		}
+		if (expression.operator === '||') {
+			return (
+				((left & TRUTHY_VALUE) !== 0 ? 1 : 0) |
+				((left & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? 2 : 0)
+			);
+		}
+		if (expression.operator === '&&') {
+			return (
+				((left & (NULLISH_VALUE | FALSY_VALUE)) !== 0 ? 1 : 0) |
+				((left & TRUTHY_VALUE) !== 0 ? 2 : 0)
+			);
+		}
+		return 3;
 	}
 
 	function visitSynchronousHookCallback(value, scope, phase) {
@@ -694,10 +1012,33 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (FUNCTION_TYPES.has(callback?.type)) {
 			visitCallback(callback, scope, phase);
 			return true;
+		} else if (callback?.type === 'SequenceExpression') {
+			const expressions = callback.expressions ?? [];
+			return visitSynchronousHookCallback(expressions[expressions.length - 1], scope, phase);
+		} else if (callback?.type === 'ConditionalExpression') {
+			const branches = conditionalExpressionBranches(callback, scope);
+			if ((branches & 1) !== 0) visitSynchronousHookCallback(callback.consequent, scope, phase);
+			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.alternate, scope, phase);
+			return true;
+		} else if (callback?.type === 'LogicalExpression') {
+			const branches = logicalExpressionBranches(callback, scope);
+			if ((branches & 1) !== 0 && callback.operator !== '&&') {
+				visitSynchronousHookCallback(callback.left, scope, phase);
+			}
+			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.right, scope, phase);
+			return true;
 		} else if (callback?.type === 'Identifier') {
 			const binding = resolve(scope, callback.name);
 			if (binding?.kind === 'callback') visitCallback(binding.node, binding.scope, phase);
-			else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
+			else if (binding?.kind === 'callback-choice') {
+				if (activeCallbacks.has(binding.node)) return true;
+				activeCallbacks.add(binding.node);
+				try {
+					visitSynchronousHookCallback(binding.node, binding.scope, phase);
+				} finally {
+					activeCallbacks.delete(binding.node);
+				}
+			} else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
 				reportSetter(callback, phase);
 			}
 			return true;
@@ -706,6 +1047,158 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return true;
 		}
 		return false;
+	}
+
+	function synchronousCallbackExpression(value, scope) {
+		const callback = unwrap(value);
+		if (FUNCTION_TYPES.has(callback?.type) || stateTupleUpdater(callback, scope)) return true;
+		if (callback?.type === 'Identifier') {
+			const kind = resolve(scope, callback.name)?.kind;
+			return kind === 'callback' || kind === 'callback-choice' || kind === 'setter';
+		}
+		if (callback?.type === 'SequenceExpression') {
+			const expressions = callback.expressions ?? [];
+			return synchronousCallbackExpression(expressions[expressions.length - 1], scope);
+		}
+		if (callback?.type === 'ConditionalExpression') {
+			const branches = conditionalExpressionBranches(callback, scope);
+			return (
+				((branches & 1) !== 0 && synchronousCallbackExpression(callback.consequent, scope)) ||
+				((branches & 2) !== 0 && synchronousCallbackExpression(callback.alternate, scope))
+			);
+		}
+		if (callback?.type === 'LogicalExpression') {
+			const branches = logicalExpressionBranches(callback, scope);
+			return (
+				((branches & 1) !== 0 &&
+					callback.operator !== '&&' &&
+					synchronousCallbackExpression(callback.left, scope)) ||
+				((branches & 2) !== 0 && synchronousCallbackExpression(callback.right, scope))
+			);
+		}
+		return false;
+	}
+
+	function linkedStateComparatorName(property, scope) {
+		if (property?.type !== 'Property' || property.kind !== 'init') return null;
+		const key = unwrap(property.key);
+		const name =
+			property.computed !== true
+				? key?.type === 'Identifier'
+					? key.name
+					: key?.value
+				: staticPrimitiveValue(key, scope);
+		return name === 'sourceEqual' || name === 'valueEqual' ? name : null;
+	}
+
+	function linkedStateOptionsExpression(value, scope) {
+		const options = unwrap(value);
+		if (options?.type === 'Identifier') {
+			return resolve(scope, options.name)?.kind === 'linked-options';
+		}
+		if (options?.type === 'SequenceExpression') {
+			const expressions = options.expressions ?? [];
+			return linkedStateOptionsExpression(expressions[expressions.length - 1], scope);
+		}
+		if (options?.type === 'ConditionalExpression' || options?.type === 'LogicalExpression') {
+			const logical = options.type === 'LogicalExpression';
+			const branches = logical
+				? logicalExpressionBranches(options, scope)
+				: conditionalExpressionBranches(options, scope);
+			return (
+				((branches & 1) !== 0 &&
+					(!logical || options.operator !== '&&') &&
+					linkedStateOptionsExpression(logical ? options.left : options.consequent, scope)) ||
+				((branches & 2) !== 0 &&
+					linkedStateOptionsExpression(logical ? options.right : options.alternate, scope))
+			);
+		}
+		return (
+			options?.type === 'ObjectExpression' &&
+			(options.properties ?? []).some((property) =>
+				property.type === 'SpreadElement'
+					? linkedStateOptionsExpression(property.argument, scope)
+					: linkedStateComparatorName(property, scope) !== null,
+			)
+		);
+	}
+
+	function visitLinkedStateComparators(value, parentScope, phase, overridden, activeOptions) {
+		let options = unwrap(value);
+		let scope = parentScope;
+		if (options?.type === 'Identifier') {
+			const binding = resolve(scope, options.name);
+			if (binding?.kind !== 'linked-options') return;
+			options = binding.node;
+			scope = binding.scope;
+		}
+		if (
+			(options?.type !== 'ObjectExpression' &&
+				options?.type !== 'ConditionalExpression' &&
+				options?.type !== 'LogicalExpression' &&
+				options?.type !== 'SequenceExpression') ||
+			activeOptions?.has(options)
+		) {
+			return;
+		}
+		overridden ??= new Set();
+		activeOptions ??= new Set();
+		activeOptions.add(options);
+		try {
+			if (options.type === 'SequenceExpression') {
+				const expressions = options.expressions ?? [];
+				visitLinkedStateComparators(
+					expressions[expressions.length - 1],
+					scope,
+					phase,
+					overridden,
+					activeOptions,
+				);
+				return;
+			}
+			if (options.type === 'ConditionalExpression' || options.type === 'LogicalExpression') {
+				const logical = options.type === 'LogicalExpression';
+				const branches = logical
+					? logicalExpressionBranches(options, scope)
+					: conditionalExpressionBranches(options, scope);
+				const first =
+					logical && options.operator === '&&' ? null : logical ? options.left : options.consequent;
+				const second = logical ? options.right : options.alternate;
+				if (branches !== 3) {
+					visitLinkedStateComparators(
+						branches === 1 ? first : second,
+						scope,
+						phase,
+						overridden,
+						activeOptions,
+					);
+					return;
+				}
+				const firstOverrides = new Set(overridden);
+				const secondOverrides = new Set(overridden);
+				visitLinkedStateComparators(first, scope, phase, firstOverrides, activeOptions);
+				visitLinkedStateComparators(second, scope, phase, secondOverrides, activeOptions);
+				for (const name of firstOverrides) {
+					if (secondOverrides.has(name)) overridden.add(name);
+				}
+				return;
+			}
+			const properties = options.properties ?? [];
+			for (let index = properties.length - 1; index >= 0; index--) {
+				const property = properties[index];
+				if (property.type === 'SpreadElement') {
+					visitLinkedStateComparators(property.argument, scope, phase, overridden, activeOptions);
+					continue;
+				}
+				const name = linkedStateComparatorName(property, scope);
+				if (name !== null && !overridden.has(name)) {
+					overridden.add(name);
+					visitSynchronousHookCallback(property.value, scope, phase);
+				}
+			}
+		} finally {
+			activeOptions.delete(options);
+		}
 	}
 
 	function visit(node, scope, phase) {
@@ -860,10 +1353,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visit(node.callee, scope, phase);
 				}
 				let executionPhase = phaseAfter(node.callee, phase, true, node.optional === true);
-				const synchronousHook = EFFECT_HOOKS.has(hook) || hook === 'useMemo';
+				const synchronousCallbackIndex =
+					hook === 'useLinkedState'
+						? 1
+						: hook === 'useReducer'
+							? 2
+							: hook === 'useState' || hook === 'useMemo' || EFFECT_HOOKS.has(hook)
+								? 0
+								: -1;
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
-					if (index !== 0 || !synchronousHook || !FUNCTION_TYPES.has(unwrap(argument)?.type)) {
+					if (index !== synchronousCallbackIndex || !FUNCTION_TYPES.has(unwrap(argument)?.type)) {
 						visit(argument, scope, executionPhase);
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
@@ -878,8 +1378,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitSynchronousHookCallback(node.arguments?.[0], scope, 'effect');
 					return;
 				}
-				if (hook === 'useMemo') {
+				if (hook === 'useState' || hook === 'useMemo') {
 					visitSynchronousHookCallback(node.arguments?.[0], scope, executionPhase);
+					return;
+				}
+				if (hook === 'useReducer') {
+					visitSynchronousHookCallback(node.arguments?.[2], scope, executionPhase);
+					return;
+				}
+				if (hook === 'useLinkedState') {
+					visitSynchronousHookCallback(node.arguments?.[1], scope, executionPhase);
+					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
 					return;
 				}
 				if (FUNCTION_TYPES.has(callee?.type)) {
@@ -889,6 +1398,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					calleeBinding?.kind === 'callback'
 				) {
 					visitCallback(calleeBinding.node, calleeBinding.scope, executionPhase);
+				} else if (
+					(executionPhase === 'render' || executionPhase === 'effect') &&
+					(calleeBinding?.kind === 'callback-choice' ||
+						callee?.type === 'SequenceExpression' ||
+						callee?.type === 'ConditionalExpression' ||
+						callee?.type === 'LogicalExpression')
+				) {
+					visitSynchronousHookCallback(callee, scope, executionPhase);
 				}
 				return;
 			}
