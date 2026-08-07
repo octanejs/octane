@@ -314,6 +314,97 @@ export function App() @{
 	});
 
 	it.each([
+		['nullish state initializers', 'useState(props.initialize ?? (() => setCount(count + 1)));'],
+		['logical OR state initializers', 'useState(props.initialize || (() => setCount(count + 1)));'],
+		['logical AND state initializers', 'useState(props.enabled && (() => setCount(count + 1)));'],
+		[
+			'named and aliased nullish state initializers',
+			'const fallback = () => setCount(count + 1); const initialize = props.initialize ?? fallback; const alias = initialize; useState(alias);',
+		],
+		[
+			'logical reducer initializers',
+			'useReducer((value) => value, count, props.initialize ?? setCount);',
+		],
+		['logical memo callbacks', 'useMemo(props.calculate || (() => setCount(count + 1)), [count]);'],
+		['nullish linked-state reconcilers', 'useLinkedState(count, props.reconcile ?? setCount);'],
+		[
+			'named and aliased logical OR reconcilers',
+			'const reconcile = props.reconcile || setCount; const alias = reconcile; useLinkedState(count, alias);',
+		],
+		['logical AND linked-state reconcilers', 'useLinkedState(count, props.enabled && setCount);'],
+		[
+			'nested logical and conditional reconcilers',
+			'const reconcile = props.reconcile ?? (props.enabled ? Object.is : setCount); useLinkedState(count, reconcile);',
+		],
+		[
+			'nullish source comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: props.compare ?? setCount });',
+		],
+		[
+			'named and aliased logical OR value comparators',
+			'const compare = props.compare || setCount; const alias = compare; useLinkedState(count, (value) => value, { valueEqual: alias });',
+		],
+		[
+			'logical AND source comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: props.enabled && setCount });',
+		],
+		[
+			'nullish linked-state options',
+			'useLinkedState(count, (value) => value, props.options ?? { sourceEqual: setCount });',
+		],
+		[
+			'named and aliased logical OR linked-state options',
+			'const options = props.options || { valueEqual: setCount }; const alias = options; useLinkedState(count, (value) => value, alias);',
+		],
+		[
+			'nullable logical linked-state option aliases',
+			'const maybe = props.enabled && { sourceEqual: Object.is }; const options = maybe || { sourceEqual: setCount }; useLinkedState(count, (value) => value, options);',
+		],
+		[
+			'nullable conditional linked-state option aliases',
+			'const maybe = props.enabled ? { sourceEqual: Object.is } : null; const options = maybe ?? { sourceEqual: setCount }; useLinkedState(count, (value) => value, options);',
+		],
+		[
+			'nullable linked-state option alias spreads',
+			'const maybe = props.enabled ? { sourceEqual: Object.is } : null; useLinkedState(count, (value) => value, { ...(maybe || { sourceEqual: setCount }) });',
+		],
+		[
+			'logical AND linked-state options',
+			'useLinkedState(count, (value) => value, props.enabled && { sourceEqual: setCount });',
+		],
+		[
+			'nullish linked-state option spreads',
+			'useLinkedState(count, (value) => value, { ...(props.options ?? { sourceEqual: setCount }) });',
+		],
+		[
+			'logical AND linked-state option spreads',
+			'useLinkedState(count, (value) => value, { ...(props.enabled && { valueEqual: setCount }) });',
+		],
+		[
+			'nested logical linked-state options',
+			'const options = props.options ?? (props.enabled && { sourceEqual: setCount }); useLinkedState(count, (value) => value, { ...options });',
+		],
+		[
+			'conditionally overridden earlier comparators',
+			'useLinkedState(count, (value) => value, { sourceEqual: setCount, ...(props.enabled && { sourceEqual: Object.is }) });',
+		],
+		[
+			'logical state-tuple updater fallbacks',
+			'const tuple = useState(0); useState(props.initialize ?? tuple[1]);',
+		],
+	])('rejects render updates hidden by logical %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useMemo, useReducer, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
 		[
 			'inline reducer initializers',
 			'useReducer((value) => value, count, () => { setCount(count + 1); return count; });',
@@ -374,6 +465,39 @@ export function App() @{
 		const source = `"use strong";
 import { useLinkedState, useReducer, useRef, useState } from 'octane';
 export function App() @{
+  const ref = useRef(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
+	it.each([
+		[
+			'nullish state initializers',
+			'useState(props.initialize ?? (() => { ref.current = 1; return 0; }));',
+		],
+		[
+			'logical OR linked-state reconcilers',
+			'useLinkedState(0, props.reconcile || ((value) => { ref.current = value; return value; }));',
+		],
+		[
+			'logical AND linked-state comparators',
+			'useLinkedState(0, (value) => value, { valueEqual: props.enabled && ((previous, next) => { ref.current = next; return previous === next; }) });',
+		],
+		[
+			'named logical linked-state option spreads',
+			'const options = props.options ?? { sourceEqual: (previous, next) => { ref.current = next; return previous === next; } }; useLinkedState(0, (value) => value, { ...options });',
+		],
+		[
+			'logical reducer initializers',
+			'useReducer((value) => value, 0, props.initialize || (() => { ref.current = 1; return 0; }));',
+		],
+	])('rejects render-time ref writes hidden by logical %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useReducer, useRef, useState } from 'octane';
+export function App(props) @{
   const ref = useRef(0);
   ${setup}
   <div />
@@ -485,6 +609,63 @@ export function App(props) @{
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps unreachable, overridden, deferred, and dynamic logical callbacks legal', () => {
+		const source = `"use strong";
+import { useLinkedState, useMemo, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const unsafe = (value) => setCount(value);
+  const safe = (value) => value;
+  const knownOptions = { sourceEqual: Object.is };
+  useState(false && unsafe);
+  useState(safe || unsafe);
+  useState((() => count) ?? unsafe);
+  useMemo(safe || unsafe, [count]);
+  useLinkedState(count, props.reconcile ?? safe, {
+    ...(props.options ?? { sourceEqual: unsafe }),
+    sourceEqual: Object.is,
+    valueEqual: props.compare && safe,
+    [props.comparatorName]: unsafe,
+    onSettled: props.onSettled || unsafe,
+  });
+  useLinkedState(count, safe, knownOptions || { sourceEqual: unsafe });
+  useLinkedState(count, safe, false && { sourceEqual: unsafe });
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('reports logical callback violations in TypeScript and editor diagnostics', () => {
+		const source = `"use strong";
+import { useMemo, useState } from 'octane';
+export function useValue(value, calculate) {
+  const [, update] = useState(0);
+  return useMemo(calculate || update, [value]);
+}`;
+		const editorSource = `"use strong";
+import { useLinkedState, useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  useLinkedState(props.value, (value) => value, props.options ?? {
+    valueEqual: props.compare || ((previous, next) => {
+      ref.current = next;
+      return previous === next;
+    }),
+  });
+  <div />
+}`;
+		const diagnostics = compileToVolarMappings(editorSource, '/src/App.tsrx');
+
+		expect(() => slotHooks(source, '/src/useValue.ts')).toThrow(RENDER_STATE_UPDATE);
+		expect(diagnostics.diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, severity: 'error' }),
+		);
+		expect(diagnostics.errors).toContainEqual(
+			expect.objectContaining({ code: RENDER_REF_WRITE, type: 'usage' }),
+		);
 	});
 
 	it('reports spread and conditional callback violations in TypeScript and editor diagnostics', () => {

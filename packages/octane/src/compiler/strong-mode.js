@@ -676,7 +676,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				target.bindings.set(declaration.id.name, { kind: 'linked-key', value: initial.value });
 			} else if (
 				declarationKind === 'const' &&
-				(initial?.type === 'ObjectExpression' || initial?.type === 'ConditionalExpression') &&
+				(initial?.type === 'ObjectExpression' ||
+					initial?.type === 'ConditionalExpression' ||
+					initial?.type === 'LogicalExpression') &&
 				linkedStateOptionsExpression(initial, scope)
 			) {
 				target.bindings.set(declaration.id.name, {
@@ -686,7 +688,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				});
 			} else if (
 				declarationKind === 'const' &&
-				initial?.type === 'ConditionalExpression' &&
+				(initial?.type === 'ConditionalExpression' || initial?.type === 'LogicalExpression') &&
 				synchronousCallbackExpression(initial, scope)
 			) {
 				target.bindings.set(declaration.id.name, {
@@ -722,6 +724,52 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
+	function logicalExpressionBranches(expression, scope) {
+		const left = unwrap(expression.left);
+		let truthy;
+		let nullish;
+		if (left?.type === 'Literal') {
+			truthy = Boolean(left.value);
+			nullish = left.value == null;
+		} else if (
+			FUNCTION_TYPES.has(left?.type) ||
+			left?.type === 'ObjectExpression' ||
+			left?.type === 'ArrayExpression' ||
+			stateTupleUpdater(left, scope)
+		) {
+			truthy = true;
+			nullish = false;
+		} else if (left?.type === 'Identifier') {
+			const binding = resolve(scope, left.name);
+			if (binding == null && left.name === 'undefined') {
+				truthy = false;
+				nullish = true;
+			} else if (
+				binding?.kind === 'callback' ||
+				binding?.kind === 'setter' ||
+				binding?.kind === 'ref' ||
+				binding?.kind === 'state-tuple' ||
+				(binding?.kind === 'linked-options' && unwrap(binding.node)?.type === 'ObjectExpression') ||
+				binding?.kind === 'linked-key' ||
+				binding?.kind === 'hook' ||
+				binding?.kind === 'namespace'
+			) {
+				truthy = true;
+				nullish = false;
+			}
+		}
+		if (expression.operator === '??') {
+			return nullish === true ? 2 : nullish === false ? 1 : 3;
+		}
+		if (expression.operator === '||') {
+			return truthy === true ? 1 : truthy === false ? 2 : 3;
+		}
+		if (expression.operator === '&&') {
+			return truthy === true ? 2 : truthy === false ? 1 : 3;
+		}
+		return 3;
+	}
+
 	function visitSynchronousHookCallback(value, scope, phase) {
 		const callback = unwrap(value);
 		if (FUNCTION_TYPES.has(callback?.type)) {
@@ -731,11 +779,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			visitSynchronousHookCallback(callback.consequent, scope, phase);
 			visitSynchronousHookCallback(callback.alternate, scope, phase);
 			return true;
+		} else if (callback?.type === 'LogicalExpression') {
+			const branches = logicalExpressionBranches(callback, scope);
+			if ((branches & 1) !== 0) visitSynchronousHookCallback(callback.left, scope, phase);
+			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.right, scope, phase);
+			return true;
 		} else if (callback?.type === 'Identifier') {
 			const binding = resolve(scope, callback.name);
 			if (binding?.kind === 'callback') visitCallback(binding.node, binding.scope, phase);
 			else if (binding?.kind === 'callback-choice') {
-				visitSynchronousHookCallback(binding.node, binding.scope, phase);
+				if (activeCallbacks.has(binding.node)) return true;
+				activeCallbacks.add(binding.node);
+				try {
+					visitSynchronousHookCallback(binding.node, binding.scope, phase);
+				} finally {
+					activeCallbacks.delete(binding.node);
+				}
 			} else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
 				reportSetter(callback, phase);
 			}
@@ -758,6 +817,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return (
 				synchronousCallbackExpression(callback.consequent, scope) ||
 				synchronousCallbackExpression(callback.alternate, scope)
+			);
+		}
+		if (callback?.type === 'LogicalExpression') {
+			const branches = logicalExpressionBranches(callback, scope);
+			return (
+				((branches & 1) !== 0 && synchronousCallbackExpression(callback.left, scope)) ||
+				((branches & 2) !== 0 && synchronousCallbackExpression(callback.right, scope))
 			);
 		}
 		return false;
@@ -785,10 +851,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (options?.type === 'Identifier') {
 			return resolve(scope, options.name)?.kind === 'linked-options';
 		}
-		if (options?.type === 'ConditionalExpression') {
+		if (options?.type === 'ConditionalExpression' || options?.type === 'LogicalExpression') {
+			const logical = options.type === 'LogicalExpression';
+			const branches = logical ? logicalExpressionBranches(options, scope) : 3;
 			return (
-				linkedStateOptionsExpression(options.consequent, scope) ||
-				linkedStateOptionsExpression(options.alternate, scope)
+				((branches & 1) !== 0 &&
+					linkedStateOptionsExpression(logical ? options.left : options.consequent, scope)) ||
+				((branches & 2) !== 0 &&
+					linkedStateOptionsExpression(logical ? options.right : options.alternate, scope))
 			);
 		}
 		return (
@@ -811,7 +881,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			scope = binding.scope;
 		}
 		if (
-			(options?.type !== 'ObjectExpression' && options?.type !== 'ConditionalExpression') ||
+			(options?.type !== 'ObjectExpression' &&
+				options?.type !== 'ConditionalExpression' &&
+				options?.type !== 'LogicalExpression') ||
 			activeOptions?.has(options)
 		) {
 			return;
@@ -820,25 +892,27 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		activeOptions ??= new Set();
 		activeOptions.add(options);
 		try {
-			if (options.type === 'ConditionalExpression') {
-				const consequentOverrides = new Set(overridden);
-				const alternateOverrides = new Set(overridden);
-				visitLinkedStateComparators(
-					options.consequent,
-					scope,
-					phase,
-					consequentOverrides,
-					activeOptions,
-				);
-				visitLinkedStateComparators(
-					options.alternate,
-					scope,
-					phase,
-					alternateOverrides,
-					activeOptions,
-				);
-				for (const name of consequentOverrides) {
-					if (alternateOverrides.has(name)) overridden.add(name);
+			if (options.type === 'ConditionalExpression' || options.type === 'LogicalExpression') {
+				const logical = options.type === 'LogicalExpression';
+				const branches = logical ? logicalExpressionBranches(options, scope) : 3;
+				const first = logical ? options.left : options.consequent;
+				const second = logical ? options.right : options.alternate;
+				if (branches !== 3) {
+					visitLinkedStateComparators(
+						branches === 1 ? first : second,
+						scope,
+						phase,
+						overridden,
+						activeOptions,
+					);
+					return;
+				}
+				const firstOverrides = new Set(overridden);
+				const secondOverrides = new Set(overridden);
+				visitLinkedStateComparators(first, scope, phase, firstOverrides, activeOptions);
+				visitLinkedStateComparators(second, scope, phase, secondOverrides, activeOptions);
+				for (const name of firstOverrides) {
+					if (secondOverrides.has(name)) overridden.add(name);
 				}
 				return;
 			}
