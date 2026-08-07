@@ -7953,7 +7953,29 @@ function recordContextDependency(block: Block | null, context: Context<any>): vo
 	}
 }
 
+// Active only while a scoped JSX value resolves its deferred record (see
+// createScopedValue). A scoped value has to rebuild when a context it actually
+// read changes, and the reads collected here are what "actually read" means:
+// a descriptor that reads no context is never rebuilt by a provider update, so
+// the props object it produced — and every inline callback identity inside it —
+// survives. Rebuilding on a global epoch instead made an unrelated provider
+// update hand a component's children brand-new prop identities, which churns
+// effect/memo deps and cannot converge when such an effect feeds that provider.
+let SCOPED_READ_TRACKING = false;
+let SCOPED_READS: Map<Context<any>, number> | null = null;
+
+function scopedReadsChanged(reads: Map<Context<any>, number> | null): boolean {
+	if (reads === null) return false;
+	for (const [context, version] of reads) {
+		if (context.$$version !== version) return true;
+	}
+	return false;
+}
+
 function readContextFrom<T>(reader: Scope | null, block: Block | null, context: Context<T>): T {
+	// One boolean test per context read; the map is allocated only for a
+	// descriptor that reads context while resolving.
+	if (SCOPED_READ_TRACKING) (SCOPED_READS ??= new Map()).set(context, context.$$version);
 	if (reader !== null && reader.$$ctxCache !== null) {
 		const hit = reader.$$ctxCache.get(context);
 		if (hit !== undefined) {
@@ -14587,24 +14609,42 @@ export function createScopedValue<P>(
 ): ElementDescriptor<P> {
 	let resolved: ElementDescriptor<P> | undefined;
 	let resolvedScope: Scope | null = null;
-	let resolvedEpoch = 0;
+	let resolvedReads: Map<Context<any>, number> | null = null;
 
 	const resolve = (): ElementDescriptor<P> => {
 		const scope = CURRENT_SCOPE;
-		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
 		const sameScope =
 			resolvedScope === scope ||
 			(resolvedScope !== null &&
 				scope !== null &&
 				scope.block.parentBlock === resolvedScope.block &&
 				scope.$$ctxValues === null);
-		if (resolved === undefined || !sameScope || resolvedEpoch !== epoch) {
-			const next = readElement();
+		// A record that read no context is the same in every scope, so only a
+		// context-reading one is rebuilt when its resolving scope changes. Host
+		// classification resolves a child in the parent block before the child
+		// block renders it, so without that condition the two scopes alternate and
+		// every render rebuilds — re-creating props the owner never re-created.
+		if (
+			resolved === undefined ||
+			scopedReadsChanged(resolvedReads) ||
+			(resolvedReads !== null && !sameScope)
+		) {
+			const previousTracking = SCOPED_READ_TRACKING;
+			const previousReads = SCOPED_READS;
+			SCOPED_READ_TRACKING = true;
+			SCOPED_READS = null;
+			let next: ElementDescriptor<P>;
+			try {
+				next = readElement();
+			} finally {
+				resolvedReads = SCOPED_READS;
+				SCOPED_READ_TRACKING = previousTracking;
+				SCOPED_READS = previousReads;
+			}
 			if (next.key === null && KEYED_ELEMENT_DESCRIPTORS.has(next)) {
 				KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
 			}
 			resolvedScope = scope;
-			resolvedEpoch = epoch;
 			resolved = next;
 		} else if (resolvedScope !== scope) {
 			// Host classification previews a scoped value in the parent block before
@@ -14662,21 +14702,32 @@ export function createScopedElement<P>(
 
 	let resolved = false;
 	let resolvedScope: Scope | null = null;
-	let resolvedEpoch = 0;
+	let resolvedReads: Map<Context<any>, number> | null = null;
 	let resolvedChildren: unknown;
 	const children = (): unknown => {
 		const scope = CURRENT_SCOPE;
-		const epoch = COMPILER_CACHE_CONTEXT_EPOCH;
 		const sameScope =
 			resolvedScope === scope ||
 			(resolvedScope !== null &&
 				scope !== null &&
 				scope.block.parentBlock === resolvedScope.block &&
 				scope.$$ctxValues === null);
-		if (!resolved || !sameScope || resolvedEpoch !== epoch) {
-			const nextChildren = readChildren();
+		// Same rule as createScopedValue: scope only matters to children that
+		// actually read context while resolving.
+		if (!resolved || scopedReadsChanged(resolvedReads) || (resolvedReads !== null && !sameScope)) {
+			const previousTracking = SCOPED_READ_TRACKING;
+			const previousReads = SCOPED_READS;
+			SCOPED_READ_TRACKING = true;
+			SCOPED_READS = null;
+			let nextChildren: unknown;
+			try {
+				nextChildren = readChildren();
+			} finally {
+				resolvedReads = SCOPED_READS;
+				SCOPED_READ_TRACKING = previousTracking;
+				SCOPED_READS = previousReads;
+			}
 			resolvedScope = scope;
-			resolvedEpoch = epoch;
 			resolvedChildren = nextChildren;
 			resolved = true;
 		} else if (resolvedScope !== scope) {
