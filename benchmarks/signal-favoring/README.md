@@ -170,4 +170,10 @@ teardown work at the current production levels while allowing every count to
 fall. Every row requires live production-bundle coverage. C1/C51/C91 must still
 perform exactly one text write, and the ancestor-first batch exactly ten.
 
+The TSX chain's private, hookless components reuse their existing compiled host
+renderers through lightweight component slots. Its shallow update is limited to
+20 block renders, 10 full slots, 100 total slots, 9 child slots, and 19
+descriptors. Stateful or escaping components retain normal component boundaries
+and inspectable return values.
+
 Default: 5 warmups + 20 iters. Pass an integer to `bench` to override iters.

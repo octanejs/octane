@@ -1,4 +1,17 @@
-import { useState, createContext, use } from 'octane';
+/** @jsxImportSource octane */
+
+import {
+	Children,
+	ErrorBoundary,
+	Suspense,
+	cloneElement,
+	createContext,
+	isValidElement,
+	use,
+	useState,
+	type ElementDescriptor,
+	type OctaneNode,
+} from 'octane';
 
 // Regression fixtures for octane's JSX (`.tsx`) backwards-compat path:
 //   1. `<Ctx.Provider value={…}>` with an ELEMENT-descriptor child (not a render-fn)
@@ -116,5 +129,298 @@ export function InputListApp() {
 				<input className="li" data-idx={i as number} key={i as number} />
 			))}
 		</div>
+	);
+}
+
+function DirectNestedLeaf() {
+	const theme = use(Ctx);
+	const [count, setCount] = useState(0);
+
+	return (
+		<button className="direct-nested-leaf" onClick={() => setCount((value) => value + 1)}>
+			{`${theme}:${count}`}
+		</button>
+	);
+}
+
+function DirectNestedHost(props: { label: string }) {
+	return (
+		<section className="direct-nested-host" data-label={props.label}>
+			<DirectNestedLeaf />
+		</section>
+	);
+}
+
+export function DirectNestedApp(props: { label: string; theme: string }) {
+	return (
+		<Ctx.Provider value={props.theme}>
+			<DirectNestedHost label={props.label} />
+		</Ctx.Provider>
+	);
+}
+
+function StaticNestedLeaf() {
+	return <span className="static-nested-leaf">static</span>;
+}
+
+function StaticNestedMiddle() {
+	return (
+		<div className="static-nested-middle">
+			<StaticNestedLeaf />
+		</div>
+	);
+}
+
+export function StaticNestedApp() {
+	return (
+		<section className="static-nested-root">
+			<i className="static-nested-before">before</i>
+			<StaticNestedMiddle />
+			<i className="static-nested-after">after</i>
+		</section>
+	);
+}
+
+function PrivateNestedLeaf() {
+	return <span className="private-nested-leaf">private</span>;
+}
+
+function PrivateNestedMiddle() {
+	return (
+		<div className="private-nested-middle">
+			<PrivateNestedLeaf />
+		</div>
+	);
+}
+
+export function PrivateNestedApp() {
+	return (
+		<section className="private-nested-root">
+			<i className="private-nested-before">before</i>
+			<PrivateNestedMiddle />
+			<i className="private-nested-after">after</i>
+		</section>
+	);
+}
+
+export function directNestedReturnValue() {
+	return StaticNestedLeaf();
+}
+
+export function directNestedMiddleReturnValue() {
+	return StaticNestedMiddle();
+}
+
+function DescriptorEscapedLeaf() {
+	return <span className="descriptor-escaped-leaf">descriptor</span>;
+}
+
+export function escapedNestedDescriptor() {
+	const child = <DescriptorEscapedLeaf />;
+	return child;
+}
+
+export function DescriptorEscapedApp() {
+	return (
+		<section className="descriptor-escaped-root">
+			<DescriptorEscapedLeaf />
+		</section>
+	);
+}
+
+function MixedNestedShell() {
+	return (
+		<div className="mixed-nested-shell">
+			<DirectNestedLeaf />
+		</div>
+	);
+}
+
+function MixedNestedHost() {
+	return (
+		<section className="mixed-nested-host">
+			<StaticNestedMiddle />
+			<MixedNestedShell />
+		</section>
+	);
+}
+
+export function MixedNestedApp(props: { theme: string }) {
+	return (
+		<Ctx.Provider value={props.theme}>
+			<MixedNestedHost />
+		</Ctx.Provider>
+	);
+}
+
+let nestedDefaultEvents: string[] = [];
+let nestedDefaultVersion = '';
+
+function DefaultPropsPureLeaf() {
+	return <span className="default-props-pure">pure</span>;
+}
+
+Object.defineProperty(DefaultPropsPureLeaf, 'defaultProps', {
+	configurable: true,
+	get() {
+		const theme = use(Ctx);
+		nestedDefaultEvents.push(`pure:${theme}:${nestedDefaultVersion}`);
+		return {};
+	},
+});
+
+function DefaultPropsStatefulLeaf(props: { label?: string }) {
+	const [count, setCount] = useState(0);
+
+	return (
+		<button className="default-props-stateful" onClick={() => setCount((value) => value + 1)}>
+			{`${props.label}:${count}`}
+		</button>
+	);
+}
+
+Object.defineProperty(DefaultPropsStatefulLeaf, 'defaultProps', {
+	configurable: true,
+	get() {
+		const theme = use(Ctx);
+		nestedDefaultEvents.push(`stateful:${theme}:${nestedDefaultVersion}`);
+		return { label: `${theme}:${nestedDefaultVersion}` };
+	},
+});
+
+function DefaultPropsNestedShell() {
+	return (
+		<div className="default-props-shell">
+			<DefaultPropsPureLeaf />
+			<DefaultPropsStatefulLeaf />
+		</div>
+	);
+}
+
+export function DefaultPropsNestedApp(props: { theme: string; version: string }) {
+	nestedDefaultVersion = props.version;
+
+	return (
+		<Ctx.Provider value={props.theme}>
+			<DefaultPropsNestedShell />
+		</Ctx.Provider>
+	);
+}
+
+export function resetNestedDefaultEvents() {
+	nestedDefaultEvents = [];
+}
+
+export function readNestedDefaultEvents() {
+	return nestedDefaultEvents.slice();
+}
+
+function FallbackPropLeaf(props: { label: string; kind: string }) {
+	return <span data-fallback-kind={props.kind}>{props.label}</span>;
+}
+
+function FallbackRefLeaf(props: { ref?: (node: HTMLButtonElement | null) => void }) {
+	return (
+		<button className="fallback-ref" ref={props.ref}>
+			ref
+		</button>
+	);
+}
+
+function FallbackKeyedLeaf() {
+	const [count, setCount] = useState(0);
+
+	return (
+		<button className="fallback-keyed" onClick={() => setCount((value) => value + 1)}>
+			{count}
+		</button>
+	);
+}
+
+function FallbackChildrenLeaf(props: { children: OctaneNode }) {
+	const child = Children.only(props.children) as ElementDescriptor;
+
+	return (
+		<div className="fallback-children" data-valid={String(isValidElement(child))}>
+			{cloneElement(child, {})}
+		</div>
+	);
+}
+
+export function NestedFallbackApp(props: {
+	label: string;
+	identity: string;
+	onRef: (node: HTMLButtonElement | null) => void;
+}) {
+	return (
+		<section className="nested-fallback-root">
+			<FallbackPropLeaf label={props.label} kind="attribute" />
+			<FallbackPropLeaf {...{ label: props.label, kind: 'spread' }} />
+			<FallbackRefLeaf ref={props.onRef} />
+			<FallbackKeyedLeaf key={props.identity} />
+			<FallbackChildrenLeaf>
+				<StaticNestedLeaf />
+			</FallbackChildrenLeaf>
+		</section>
+	);
+}
+
+export function EscapedNestedApp() {
+	const child = <StaticNestedLeaf />;
+	const inspected = Children.only(child) as ElementDescriptor;
+
+	return (
+		<section className="escaped-nested-root" data-valid={String(isValidElement(inspected))}>
+			{cloneElement(inspected, {})}
+		</section>
+	);
+}
+
+function ThrowingNestedLeaf() {
+	throw new Error('nested child failed');
+	return <span className="nested-unreachable">unreachable</span>;
+}
+
+function ThrowingNestedHost() {
+	return (
+		<div className="nested-error-host">
+			<ThrowingNestedLeaf />
+		</div>
+	);
+}
+
+export function NestedErrorApp() {
+	return (
+		<ErrorBoundary fallback={<strong className="nested-error-fallback">caught</strong>}>
+			<ThrowingNestedHost />
+		</ErrorBoundary>
+	);
+}
+
+const NestedPromiseContext = createContext<Promise<string> | null>(null);
+
+function SuspendingNestedLeaf() {
+	const promise = use(NestedPromiseContext);
+	if (promise === null) throw new Error('missing nested promise');
+	const value = use(promise);
+
+	return <span className="nested-resolved">{value}</span>;
+}
+
+function SuspendingNestedHost() {
+	return (
+		<div className="nested-suspense-host">
+			<SuspendingNestedLeaf />
+		</div>
+	);
+}
+
+export function NestedSuspenseApp(props: { promise: Promise<string> }) {
+	return (
+		<Suspense fallback={<span className="nested-pending">pending</span>}>
+			<NestedPromiseContext.Provider value={props.promise}>
+				<SuspendingNestedHost />
+			</NestedPromiseContext.Provider>
+		</Suspense>
 	);
 }
