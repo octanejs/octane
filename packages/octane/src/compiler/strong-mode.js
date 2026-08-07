@@ -18,6 +18,7 @@ const NULLISH_VALUE = 1;
 const FALSY_VALUE = 2;
 const TRUTHY_VALUE = 4;
 const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
+const UNKNOWN_PRIMITIVE = Symbol('unknown primitive');
 const SKIP_KEYS = new Set([
 	'type',
 	'start',
@@ -650,6 +651,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			const element = declaration.id.elements?.[1];
 			const setter = element?.type === 'AssignmentPattern' ? element.left : element;
 			if (setter?.type === 'Identifier') target.bindings.set(setter.name, { kind: 'setter' });
+		} else if (declaration.id?.type === 'ObjectPattern' && stateTuple) {
+			for (const property of declaration.id.properties ?? []) {
+				if (property.type !== 'Property') continue;
+				const key = property.computed
+					? staticPrimitiveValue(property.key, scope)
+					: property.key?.type === 'Identifier'
+						? property.key.name
+						: property.key?.value;
+				const value = property.value;
+				const setter = value?.type === 'AssignmentPattern' ? value.left : value;
+				if ((key === 1 || key === '1') && setter?.type === 'Identifier') {
+					target.bindings.set(setter.name, { kind: 'setter' });
+				}
+			}
 		} else if (declaration.id?.type === 'Identifier') {
 			if (stateTuple) {
 				target.bindings.set(declaration.id.name, { kind: 'state-tuple' });
@@ -658,6 +673,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				importedHook(initial.callee, scope) === 'useRef'
 			) {
 				target.bindings.set(declaration.id.name, { kind: 'ref' });
+			} else if (declarationKind === 'const' && stateTupleUpdater(initial, scope)) {
+				target.bindings.set(declaration.id.name, { kind: 'setter' });
 			} else if (declarationKind === 'const' && initial?.type === 'Identifier') {
 				const value = resolve(scope, initial.name);
 				if (
@@ -671,16 +688,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					target.bindings.set(declaration.id.name, value);
 				} else if (value == null && initial.name === 'undefined') {
-					target.bindings.set(declaration.id.name, { kind: 'constant', value: NULLISH_VALUE });
+					target.bindings.set(declaration.id.name, {
+						kind: 'constant',
+						value: NULLISH_VALUE,
+						primitive: undefined,
+					});
 				}
 			} else if (declarationKind === 'const' && FUNCTION_TYPES.has(initial?.type)) {
 				target.bindings.set(declaration.id.name, { kind: 'callback', node: initial, scope });
 			} else if (
 				declarationKind === 'const' &&
-				initial?.type === 'Literal' &&
-				(initial.value === 'sourceEqual' || initial.value === 'valueEqual')
+				staticLinkedStateComparatorKey(initial, scope) !== null
 			) {
-				target.bindings.set(declaration.id.name, { kind: 'linked-key', value: initial.value });
+				target.bindings.set(declaration.id.name, {
+					kind: 'linked-key',
+					value: staticLinkedStateComparatorKey(initial, scope),
+				});
 			} else if (
 				declarationKind === 'const' &&
 				(initial?.type === 'ObjectExpression' ||
@@ -709,7 +732,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			} else if (declarationKind === 'const') {
 				const value = staticExpressionValue(initial, scope);
 				if (value !== UNKNOWN_VALUE) {
-					target.bindings.set(declaration.id.name, { kind: 'constant', value });
+					target.bindings.set(declaration.id.name, {
+						kind: 'constant',
+						value,
+						primitive: staticPrimitiveValue(initial, scope),
+					});
 				}
 			}
 		}
@@ -730,13 +757,78 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function stateTupleUpdater(value, scope) {
 		const member = unwrap(value);
 		if (member?.type !== 'MemberExpression' || member.computed !== true) return false;
-		const property = unwrap(member.property);
+		const property = staticPrimitiveValue(member.property, scope);
 		return (
-			property?.type === 'Literal' &&
-			(property.value === 1 || property.value === '1') &&
+			(property === 1 || property === '1') &&
 			unwrap(member.object)?.type === 'Identifier' &&
 			resolve(scope, unwrap(member.object).name)?.kind === 'state-tuple'
 		);
+	}
+
+	function staticPrimitiveValue(value, scope) {
+		const expression = unwrap(value);
+		if (expression?.type === 'Literal') return expression.value;
+		if (expression?.type === 'Identifier') {
+			const binding = resolve(scope, expression.name);
+			if (binding?.kind === 'linked-key') return binding.value;
+			if (binding?.kind === 'constant') return binding.primitive;
+			if (binding == null && expression.name === 'undefined') return undefined;
+			return UNKNOWN_PRIMITIVE;
+		}
+		if (expression?.type === 'TemplateLiteral') {
+			let result = '';
+			for (let index = 0; index < (expression.quasis?.length ?? 0); index++) {
+				const text = expression.quasis[index]?.value?.cooked;
+				if (text == null) return UNKNOWN_PRIMITIVE;
+				result += text;
+				if (index < (expression.expressions?.length ?? 0)) {
+					const part = staticPrimitiveValue(expression.expressions[index], scope);
+					if (
+						part === UNKNOWN_PRIMITIVE ||
+						(part !== null && typeof part === 'object') ||
+						typeof part === 'function' ||
+						typeof part === 'symbol'
+					) {
+						return UNKNOWN_PRIMITIVE;
+					}
+					result += String(part);
+				}
+			}
+			return result;
+		}
+		if (expression?.type === 'BinaryExpression' && expression.operator === '+') {
+			const left = staticPrimitiveValue(expression.left, scope);
+			const right = staticPrimitiveValue(expression.right, scope);
+			return typeof left === 'string' && typeof right === 'string'
+				? left + right
+				: UNKNOWN_PRIMITIVE;
+		}
+		if (expression?.type === 'SequenceExpression') {
+			const expressions = expression.expressions ?? [];
+			return staticPrimitiveValue(expressions[expressions.length - 1], scope);
+		}
+		if (expression?.type === 'ConditionalExpression') {
+			const branches = conditionalExpressionBranches(expression, scope);
+			return branches === 1
+				? staticPrimitiveValue(expression.consequent, scope)
+				: branches === 2
+					? staticPrimitiveValue(expression.alternate, scope)
+					: UNKNOWN_PRIMITIVE;
+		}
+		if (expression?.type === 'LogicalExpression') {
+			const branches = logicalExpressionBranches(expression, scope);
+			return branches === 1
+				? staticPrimitiveValue(expression.left, scope)
+				: branches === 2
+					? staticPrimitiveValue(expression.right, scope)
+					: UNKNOWN_PRIMITIVE;
+		}
+		return UNKNOWN_PRIMITIVE;
+	}
+
+	function staticLinkedStateComparatorKey(value, scope) {
+		const key = staticPrimitiveValue(value, scope);
+		return key === 'sourceEqual' || key === 'valueEqual' ? key : null;
 	}
 
 	function staticExpressionValue(value, scope) {
@@ -754,6 +846,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			stateTupleUpdater(expression, scope)
 		) {
 			return TRUTHY_VALUE;
+		} else if (expression?.type === 'TemplateLiteral') {
+			const primitive = staticPrimitiveValue(expression, scope);
+			return primitive === UNKNOWN_PRIMITIVE
+				? UNKNOWN_VALUE
+				: primitive
+					? TRUTHY_VALUE
+					: FALSY_VALUE;
 		} else if (expression?.type === 'Identifier') {
 			const binding = resolve(scope, expression.name);
 			if (binding == null && expression.name === 'undefined') return NULLISH_VALUE;
@@ -928,17 +1027,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function linkedStateComparatorName(property, scope) {
 		if (property?.type !== 'Property' || property.kind !== 'init') return null;
 		const key = unwrap(property.key);
-		let name;
-		if (property.computed !== true) {
-			name = key?.type === 'Identifier' ? key.name : key?.value;
-		} else if (key?.type === 'Identifier') {
-			const binding = resolve(scope, key.name);
-			name = binding?.kind === 'linked-key' ? binding.value : null;
-		} else if (key?.type === 'TemplateLiteral' && (key.expressions?.length ?? 0) === 0) {
-			name = key.quasis?.[0]?.value?.cooked;
-		} else {
-			name = key?.type === 'Literal' ? key.value : null;
-		}
+		const name =
+			property.computed !== true
+				? key?.type === 'Identifier'
+					? key.name
+					: key?.value
+				: staticPrimitiveValue(key, scope);
 		return name === 'sourceEqual' || name === 'valueEqual' ? name : null;
 	}
 

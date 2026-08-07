@@ -359,6 +359,144 @@ export function App(props) @{
 	});
 
 	it.each([
+		[
+			'lazy state initializers',
+			'const tuple = useState(0); const update = tuple[1]; useState(update);',
+		],
+		[
+			'chained setter aliases',
+			'const tuple = useState(0); const update = tuple[1]; const alias = update; useState(alias);',
+		],
+		[
+			'TypeScript-wrapped tuple indexes',
+			'const tuple = useState(0); const update = tuple[1 as const]; useState(update);',
+		],
+		[
+			'immutable numeric tuple indexes',
+			'const tuple = useState(0); const index = 1; const update = tuple[index]; useState(update);',
+		],
+		[
+			'immutable string tuple indexes',
+			'const tuple = useState(0); const index = "1"; const update = tuple[index]; useState(update);',
+		],
+		[
+			'immutable template tuple indexes',
+			'const tuple = useState(0); const index = `1`; const update = tuple[index]; useState(update);',
+		],
+		[
+			'inline template tuple indexes',
+			'const tuple = useState(0); const update = tuple[`1`]; useState(update);',
+		],
+		[
+			'object-pattern tuple setter aliases',
+			'const tuple = useState(0); const { 1: update } = tuple; useState(update);',
+		],
+		[
+			'computed object-pattern tuple setter aliases',
+			'const tuple = useState(0); const index = 1; const { [index]: update } = tuple; useState(update);',
+		],
+		[
+			'TypeScript-wrapped setter aliases',
+			'const tuple = useState(0); const update = tuple[1] as (value: number) => void; useState(update);',
+		],
+		[
+			'direct setter invocation',
+			'const tuple = useState(0); const update = tuple[1]; update(count + 1);',
+		],
+		[
+			'lazy reducer initializers',
+			'const tuple = useState(0); const update = tuple[1]; useReducer((value) => value, count, update);',
+		],
+		[
+			'linked-state reconcilers',
+			'const tuple = useState(0); const update = tuple[1]; useLinkedState(count, update);',
+		],
+		[
+			'linked-state comparators',
+			'const tuple = useState(0); const update = tuple[1]; useLinkedState(count, (value) => value, { sourceEqual: update });',
+		],
+		[
+			'reducer dispatch aliases',
+			'const tuple = useReducer((value) => value, 0); const update = tuple[1]; useState(update);',
+		],
+		[
+			'linked-state setter aliases',
+			'const tuple = useLinkedState(count, (value) => value); const update = tuple[1]; useState(update);',
+		],
+	])('rejects render updates through aliased tuple setters in %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useReducer, useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		[
+			'named template source comparator keys',
+			'const key = `sourceEqual`; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'named template value comparator keys',
+			'const key = `valueEqual`; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'aliased template comparator keys',
+			'const key = `sourceEqual`; const alias = key; useLinkedState(count, (value) => value, { [alias]: setCount });',
+		],
+		[
+			'TypeScript-wrapped template comparator keys',
+			'const key = `valueEqual` as const; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'statically concatenated comparator keys',
+			'const key = "source" + "Equal"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'inline statically concatenated comparator keys',
+			'useLinkedState(count, (value) => value, { ["value" + "Equal"]: setCount });',
+		],
+		[
+			'statically interpolated comparator keys',
+			'const key = `source${"Equal"}`; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'sequence-selected comparator keys',
+			'const key = (props.trace, "sourceEqual"); useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'known conditional comparator keys',
+			'const key = true ? "valueEqual" : "other"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'known logical comparator keys',
+			'const key = null ?? "sourceEqual"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'template-keyed spread comparators',
+			'const key = `sourceEqual`; const options = { [key]: setCount }; useLinkedState(count, (value) => value, { ...options });',
+		],
+		[
+			'template-keyed aliased tuple comparators',
+			'const tuple = useState(0); const update = tuple[1]; const key = `valueEqual`; useLinkedState(count, (value) => value, { [key]: update });',
+		],
+	])('rejects render updates hidden by %s', (_label, setup) => {
+		const source = `"use strong";
+import { useLinkedState, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
 		['nullish state initializers', 'useState(props.initialize ?? (() => setCount(count + 1)));'],
 		['logical OR state initializers', 'useState(props.initialize || (() => setCount(count + 1)));'],
 		['logical AND state initializers', 'useState(props.enabled && (() => setCount(count + 1)));'],
@@ -629,6 +767,22 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
 	});
 
+	it('rejects ref writes from aliased template comparator keys', () => {
+		const source = `"use strong";
+import { useLinkedState, useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  const key = \`sourceEqual\`;
+  const alias = key;
+  useLinkedState(props.value, (value) => value, {
+    [alias]: (previous, next) => { ref.current = next; return previous === next; },
+  });
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
 	it.each([
 		[
 			'aliased state imports',
@@ -868,6 +1022,33 @@ import { useLinkedState, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   ${setup}
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps mutable tuple aliases and dynamic or overridden template comparator keys legal', () => {
+		const source = `"use strong";
+import { useLinkedState, useState } from 'octane';
+export function App(props) @{
+  const tuple = useState(0);
+  let mutable = tuple[1];
+  mutable = (value) => value;
+  useState(mutable);
+  let mutableIndex = 1;
+  mutableIndex = props.index;
+  const dynamicUpdate = tuple[mutableIndex];
+  useState(dynamicUpdate);
+  const unrelated = \`onSettled\`;
+  const dynamic = \`\${props.prefix}Equal\`;
+  const known = \`sourceEqual\`;
+  useLinkedState(tuple[0], (value) => value, {
+    [unrelated]: tuple[1],
+    [dynamic]: tuple[1],
+    [known]: tuple[1],
+    sourceEqual: Object.is,
+  });
   <div />
 }`;
 
@@ -1281,6 +1462,22 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [, setCount] = useState(0);
   useEffect(() => { ${invocation} }, []);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it.each([
+		['effect callbacks', 'useEffect(update, []);'],
+		['direct calls in effect setup', 'useEffect(() => { update(1); }, []);'],
+	])('rejects aliased tuple setters used as %s', (_label, effect) => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App() @{
+  const tuple = useState(0);
+  const update = tuple[1];
+  ${effect}
   <div />
 }`;
 
