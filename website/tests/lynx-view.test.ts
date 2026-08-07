@@ -202,6 +202,64 @@ describe('automatic gesture playback', () => {
 		playback.stop();
 		expect(events.at(-1)).toBe('pointerup');
 	});
+
+	it('finishes each repeated direction before reversing', async () => {
+		vi.useFakeTimers();
+		const host = document.createElement('div');
+		const target = document.createElement('div');
+		host.append(target);
+		document.body.append(host);
+		vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(
+			DOMRect.fromRect({ x: 0, y: 0, width: 100, height: 100 }),
+		);
+		Object.defineProperty(document, 'elementFromPoint', {
+			configurable: true,
+			value: () => target,
+		});
+
+		const contacts: number[][] = [];
+		target.addEventListener('pointerdown', (event) => {
+			contacts.push([(event as PointerEvent).clientX]);
+		});
+		target.addEventListener('pointerup', (event) => {
+			contacts.at(-1)!.push((event as PointerEvent).clientX);
+		});
+		const playback = playAutoGesture(host, {
+			steps: [
+				{
+					path: [
+						{ x: 0.8, y: 0.5 },
+						{ x: 0.2, y: 0.5 },
+					],
+					iterations: 2,
+					durationMs: 0,
+					restMs: 0,
+				},
+				{
+					path: [
+						{ x: 0.2, y: 0.5 },
+						{ x: 0.8, y: 0.5 },
+					],
+					iterations: 2,
+					durationMs: 0,
+					restMs: 0,
+				},
+			],
+			loop: false,
+			showPointer: false,
+			startDelayMs: 0,
+			stopOnUserInput: false,
+		});
+
+		await vi.runAllTimersAsync();
+		expect(contacts).toEqual([
+			[80, 20],
+			[80, 20],
+			[20, 80],
+			[20, 80],
+		]);
+		playback.stop();
+	});
 });
 
 describe('example manifest', () => {
@@ -213,5 +271,16 @@ describe('example manifest', () => {
 			expect(example.defaultFile.startsWith('src/'), example.id).toBe(true);
 			expect(example.entry.length).toBeGreaterThan(0);
 		}
+	});
+
+	it('drives the swiper to each end before reversing', () => {
+		const swiper = LYNX_EXAMPLES.find((example) => example.id === 'swiper');
+		const directions = swiper!.autoGesture!.steps.flatMap((step) => {
+			const first = step.path[0]!;
+			const last = step.path.at(-1)!;
+			return Array.from({ length: step.iterations ?? 1 }, () => Math.sign(last.x - first.x));
+		});
+
+		expect(directions).toEqual([-1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1]);
 	});
 });

@@ -49,11 +49,21 @@ export function exampleRoot(id: string): string {
 	return `${LYNX_EXAMPLE_BASE_PATH}/${id}`;
 }
 
+/**
+ * Just the metadata: which bundles the example has, and where.
+ *
+ * A caller that only wants to mount a preview should stop here. The highlighted
+ * sources beside it are an order of magnitude larger, and the home page shows
+ * no code.
+ */
+export function loadExampleMetadata(id: string, signal?: AbortSignal): Promise<ExampleMetadata> {
+	return fetchJson<ExampleMetadata>(`${exampleRoot(id)}/example-metadata.json`, signal);
+}
+
 export async function loadExample(id: string, signal?: AbortSignal): Promise<LoadedExample> {
-	const root = exampleRoot(id);
 	const [metadata, source] = await Promise.all([
-		fetchJson<ExampleMetadata>(`${root}/example-metadata.json`, signal),
-		fetchJson<ExampleSource>(`${root}/example-source.json`, signal),
+		loadExampleMetadata(id, signal),
+		fetchJson<ExampleSource>(`${exampleRoot(id)}/example-source.json`, signal),
 	]);
 	return { metadata, source };
 }

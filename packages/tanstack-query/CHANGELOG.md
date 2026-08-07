@@ -1,5 +1,12 @@
 # @octanejs/tanstack-query
 
+## 0.1.28
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+
 ## 0.1.27
 
 ### Patch Changes

@@ -1,10 +1,12 @@
 // The Lynx examples the site publishes for its <Go> previews.
 //
-// One manifest, two consumers that must not drift: scripts/prepare-lynx-examples.mjs
+// One catalog, two consumers that must not drift: scripts/prepare-lynx-examples.mjs
 // builds and packages each entry into public/lynx-examples/<id>/, and the pages
-// name the same ids when they mount a <Go>. The JSON is the shared half so the
-// build script can read it without a TypeScript loader.
+// name the same ids when they mount a <Go>. The base JSON is shared with the
+// build script; preview-only behavior lives beside the example source so its
+// code panel can show exactly what drives it.
 import type { AutoGestureOptions } from '../components/go/lynx-view/index.ts';
+import swiperPreview from '../../../packages/rspeedy-plugin-octane/examples/swiper/preview.json';
 import lynxExamples from './lynx-examples.json';
 
 export interface LynxExample {
@@ -28,7 +30,14 @@ export interface LynxExample {
 	autoGesture?: AutoGestureOptions;
 }
 
-export const LYNX_EXAMPLES = lynxExamples satisfies LynxExample[];
+const PREVIEW_BY_ID: Record<string, Pick<LynxExample, 'autoGesture'>> = {
+	swiper: swiperPreview,
+};
+
+export const LYNX_EXAMPLES = lynxExamples.map((example) => ({
+	...example,
+	...PREVIEW_BY_ID[example.id],
+})) satisfies LynxExample[];
 
 export function findLynxExample(id: string): LynxExample | undefined {
 	return LYNX_EXAMPLES.find((example) => example.id === id);

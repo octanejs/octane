@@ -32,6 +32,8 @@ export interface GesturePoint {
 export interface GestureStep {
 	/** Contact path. One point taps; two or more drag through each in turn. */
 	path: readonly GesturePoint[];
+	/** Perform this step this many times before advancing. Defaults to one. */
+	iterations?: number;
 	/** How long the contact lasts. */
 	durationMs?: number;
 	/** How long to wait after lifting, before the next step. */
@@ -132,10 +134,13 @@ export function playAutoGesture(host: HTMLElement, options: AutoGestureOptions):
 		await wait(startDelayMs);
 		do {
 			for (const step of steps) {
-				if (stopped) return;
-				await playStep(step);
-				if (stopped) return;
-				await wait(step.restMs ?? DEFAULT_REST_MS);
+				const iterations = Math.max(1, Math.trunc(step.iterations ?? 1));
+				for (let iteration = 0; iteration < iterations; iteration++) {
+					if (stopped) return;
+					await playStep(step);
+					if (stopped) return;
+					await wait(step.restMs ?? DEFAULT_REST_MS);
+				}
 			}
 		} while (loop && !stopped);
 		pointer?.remove();
