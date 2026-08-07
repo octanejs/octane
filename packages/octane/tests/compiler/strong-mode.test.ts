@@ -384,6 +384,42 @@ export function App(props) @{
 			'const tuple = useState(0); const index = `1`; const update = tuple[index]; useState(update);',
 		],
 		[
+			'immutable concatenated tuple indexes',
+			'const tuple = useState(0); const index = "" + "1"; const update = tuple[index]; useState(update);',
+		],
+		[
+			'aliased concatenated tuple index fragments',
+			'const tuple = useState(0); const fragment = "" + ""; const index = fragment + "1"; const update = tuple[index]; useState(update);',
+		],
+		[
+			'immutable numeric addition tuple indexes',
+			'const tuple = useState(0); const index = 0 + 1; const update = tuple[index]; useState(update);',
+		],
+		[
+			'immutable unary numeric tuple indexes',
+			'const tuple = useState(0); const index = +1; const update = tuple[index]; useState(update);',
+		],
+		[
+			'immutable boolean-coerced tuple indexes',
+			'const tuple = useState(0); const enabled = !false; const index = +enabled; const update = tuple[index]; useState(update);',
+		],
+		[
+			'immutable mixed string and numeric tuple indexes',
+			'const tuple = useState(0); const index = "" + 1; const update = tuple[index]; useState(update);',
+		],
+		[
+			'sequence-selected concatenated tuple indexes',
+			'const tuple = useState(0); const index = (props.trace, "" + "1"); const update = tuple[index]; useState(update);',
+		],
+		[
+			'conditionally selected concatenated tuple indexes',
+			'const tuple = useState(0); const index = true ? "" + "1" : "0"; const update = tuple[index]; useState(update);',
+		],
+		[
+			'logically selected concatenated tuple indexes',
+			'const tuple = useState(0); const index = "" || ("" + "1"); const update = tuple[index]; useState(update);',
+		],
+		[
 			'inline template tuple indexes',
 			'const tuple = useState(0); const update = tuple[`1`]; useState(update);',
 		],
@@ -394,6 +430,10 @@ export function App(props) @{
 		[
 			'computed object-pattern tuple setter aliases',
 			'const tuple = useState(0); const index = 1; const { [index]: update } = tuple; useState(update);',
+		],
+		[
+			'computed concatenated object-pattern tuple setter aliases',
+			'const tuple = useState(0); const index = "" + "1"; const { [index]: update } = tuple; useState(update);',
 		],
 		[
 			'TypeScript-wrapped setter aliases',
@@ -457,6 +497,34 @@ export function App(props) @{
 			'const key = "source" + "Equal"; useLinkedState(count, (value) => value, { [key]: setCount });',
 		],
 		[
+			'aliased concatenated source comparator fragments',
+			'const prefix = "sou" + "rce"; const key = prefix + "Equal"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'aliased concatenated value comparator fragments',
+			'const suffix = "Equ" + "al"; const key = "value" + suffix; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'chained concatenated comparator fragments',
+			'const first = "so" + "u"; const second = first + "rce"; const key = `${second}Equal`; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'sequence-selected concatenated comparator fragments',
+			'const prefix = (props.trace, "sou" + "rce"); const key = `${prefix}Equal`; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'conditionally selected concatenated comparator fragments',
+			'const prefix = true ? "sou" + "rce" : "other"; const key = prefix + "Equal"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'logically selected concatenated comparator fragments',
+			'const prefix = null ?? ("sou" + "rce"); const key = prefix + "Equal"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
+			'falsy concatenated comparator selection flags',
+			'const disabled = "" + ""; const key = disabled ? "other" : "valueEqual"; useLinkedState(count, (value) => value, { [key]: setCount });',
+		],
+		[
 			'inline statically concatenated comparator keys',
 			'useLinkedState(count, (value) => value, { ["value" + "Equal"]: setCount });',
 		],
@@ -479,6 +547,10 @@ export function App(props) @{
 		[
 			'template-keyed spread comparators',
 			'const key = `sourceEqual`; const options = { [key]: setCount }; useLinkedState(count, (value) => value, { ...options });',
+		],
+		[
+			'fragment-keyed spread comparators',
+			'const prefix = "sou" + "rce"; const key = `${prefix}Equal`; const options = { [key]: setCount }; useLinkedState(count, (value) => value, { ...options });',
 		],
 		[
 			'template-keyed aliased tuple comparators',
@@ -783,6 +855,22 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
 	});
 
+	it('rejects ref writes from aliased concatenated comparator fragments', () => {
+		const source = `"use strong";
+import { useLinkedState, useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  const prefix = "sou" + "rce";
+  const key = \`\${prefix}Equal\`;
+  useLinkedState(props.value, (value) => value, {
+    [key]: (previous, next) => { ref.current = next; return previous === next; },
+  });
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_WRITE);
+	});
+
 	it.each([
 		[
 			'aliased state imports',
@@ -1045,6 +1133,35 @@ export function App(props) @{
   const known = \`sourceEqual\`;
   useLinkedState(tuple[0], (value) => value, {
     [unrelated]: tuple[1],
+    [dynamic]: tuple[1],
+    [known]: tuple[1],
+    sourceEqual: Object.is,
+  });
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps computed primitive truthiness, overrides, and dynamic fragments precise', () => {
+		const source = `"use strong";
+import { useLinkedState, useState } from 'octane';
+export function App(props) @{
+  const tuple = useState(0);
+  const empty = "" + "";
+  const truthy = "x" + "";
+  const negativeZero = -0;
+  useState(empty && tuple[1]);
+  useState(negativeZero && tuple[1]);
+  useState(truthy || tuple[1]);
+  useState(("x" + "") ? (() => 0) : tuple[1]);
+  let mutable = "sou" + "rce";
+  mutable = props.prefix;
+  const dynamic = props.prefix + "Equal";
+  const prefix = "sou" + "rce";
+  const known = prefix + "Equal";
+  useLinkedState(tuple[0], (value) => value, {
+    [mutable + "Equal"]: tuple[1],
     [dynamic]: tuple[1],
     [known]: tuple[1],
     sourceEqual: Object.is,
@@ -1471,6 +1588,10 @@ export function App(props) @{
 	it.each([
 		['effect callbacks', 'useEffect(update, []);'],
 		['direct calls in effect setup', 'useEffect(() => { update(1); }, []);'],
+		[
+			'concatenated tuple indexes in effect setup',
+			'useEffect(() => { const index = "" + "1"; const selected = tuple[index]; selected(1); }, []);',
+		],
 	])('rejects aliased tuple setters used as %s', (_label, effect) => {
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';

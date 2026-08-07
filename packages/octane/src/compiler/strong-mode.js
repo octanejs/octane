@@ -730,12 +730,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					scope,
 				});
 			} else if (declarationKind === 'const') {
-				const value = staticExpressionValue(initial, scope);
+				const primitive = staticPrimitiveValue(initial, scope);
+				let value = staticExpressionValue(initial, scope);
+				if (value === UNKNOWN_VALUE && primitive !== UNKNOWN_PRIMITIVE) {
+					value = primitive == null ? NULLISH_VALUE : primitive ? TRUTHY_VALUE : FALSY_VALUE;
+				}
 				if (value !== UNKNOWN_VALUE) {
 					target.bindings.set(declaration.id.name, {
 						kind: 'constant',
 						value,
-						primitive: staticPrimitiveValue(initial, scope),
+						primitive,
 					});
 				}
 			}
@@ -799,9 +803,53 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (expression?.type === 'BinaryExpression' && expression.operator === '+') {
 			const left = staticPrimitiveValue(expression.left, scope);
 			const right = staticPrimitiveValue(expression.right, scope);
-			return typeof left === 'string' && typeof right === 'string'
-				? left + right
-				: UNKNOWN_PRIMITIVE;
+			if (
+				left === UNKNOWN_PRIMITIVE ||
+				right === UNKNOWN_PRIMITIVE ||
+				(left !== null && typeof left === 'object') ||
+				(right !== null && typeof right === 'object') ||
+				typeof left === 'function' ||
+				typeof right === 'function' ||
+				typeof left === 'symbol' ||
+				typeof right === 'symbol'
+			) {
+				return UNKNOWN_PRIMITIVE;
+			}
+			if (
+				(typeof left === 'bigint' || typeof right === 'bigint') &&
+				typeof left !== 'string' &&
+				typeof right !== 'string' &&
+				(typeof left !== 'bigint' || typeof right !== 'bigint')
+			) {
+				return UNKNOWN_PRIMITIVE;
+			}
+			return left + right;
+		}
+		if (expression?.type === 'UnaryExpression') {
+			if (expression.operator === 'void') return undefined;
+			const argument = staticPrimitiveValue(expression.argument, scope);
+			if (expression.operator === '!') {
+				if (argument !== UNKNOWN_PRIMITIVE) return !argument;
+				const value = staticExpressionValue(expression.argument, scope);
+				return value === TRUTHY_VALUE
+					? false
+					: value !== UNKNOWN_VALUE && (value & TRUTHY_VALUE) === 0
+						? true
+						: UNKNOWN_PRIMITIVE;
+			}
+			if (
+				argument === UNKNOWN_PRIMITIVE ||
+				(argument !== null && typeof argument === 'object') ||
+				typeof argument === 'function' ||
+				typeof argument === 'symbol'
+			) {
+				return UNKNOWN_PRIMITIVE;
+			}
+			if (expression.operator === '+') {
+				return typeof argument === 'bigint' ? UNKNOWN_PRIMITIVE : +argument;
+			}
+			if (expression.operator === '-') return -argument;
+			if (expression.operator === '~') return ~argument;
 		}
 		if (expression?.type === 'SequenceExpression') {
 			const expressions = expression.expressions ?? [];
@@ -846,13 +894,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			stateTupleUpdater(expression, scope)
 		) {
 			return TRUTHY_VALUE;
-		} else if (expression?.type === 'TemplateLiteral') {
+		} else if (
+			expression?.type === 'TemplateLiteral' ||
+			(expression?.type === 'BinaryExpression' && expression.operator === '+') ||
+			(expression?.type === 'UnaryExpression' &&
+				(expression.operator === '+' || expression.operator === '-' || expression.operator === '~'))
+		) {
 			const primitive = staticPrimitiveValue(expression, scope);
 			return primitive === UNKNOWN_PRIMITIVE
 				? UNKNOWN_VALUE
-				: primitive
-					? TRUTHY_VALUE
-					: FALSY_VALUE;
+				: primitive == null
+					? NULLISH_VALUE
+					: primitive
+						? TRUTHY_VALUE
+						: FALSY_VALUE;
 		} else if (expression?.type === 'Identifier') {
 			const binding = resolve(scope, expression.name);
 			if (binding == null && expression.name === 'undefined') return NULLISH_VALUE;
