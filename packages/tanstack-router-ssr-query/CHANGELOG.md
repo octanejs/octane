@@ -1,5 +1,14 @@
 # @octanejs/tanstack-router-ssr-query
 
+## 0.0.18
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+  - @octanejs/tanstack-query@0.1.28
+  - @octanejs/tanstack-router@0.1.28
+
 ## 0.0.17
 
 ### Patch Changes
