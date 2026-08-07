@@ -299,7 +299,7 @@ catalogs:
     picocolors: ^1.1.1
     '@clack/prompts': ^1.7.0
     prettier: ^3.9.6
-    preact: ^10.29.7
+    preact: ^10.29.8
     preact-render-to-string: ^6.7.0
     proxy-compare: ^3.0.1
     prettier-plugin-svelte: ^4.1.1
@@ -406,30 +406,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - '@ripple-ts/adapter@0.3.117 || 0.3.118'
-  - '@ripple-ts/vite-plugin@0.3.117 || 0.3.118'
-  - '@tanstack/ai-client@0.21.0'
-  - '@tanstack/ai-react@0.17.0'
-  - '@tanstack/ai@0.41.0'
-  - '@tsrx/core@0.1.54 || 0.1.55 || 0.1.56'
-  - '@tsrx/prettier-plugin@0.3.117 || 0.3.118'
-  - '@tsrx/react@0.2.55 || 0.2.56'
-  - '@tsrx/ripple@0.1.56 || 0.1.57'
-  - '@tsrx/solid@0.1.55 || 0.1.56'
-  - '@tsrx/typescript-plugin@0.3.117 || 0.3.118'
-  - '@tsrx/vite-plugin-react@0.0.87 || 0.0.88'
-  - '@tsrx/vite-plugin-solid@0.0.85 || 0.0.86'
-  - jsdom@30.0.1
-  - ripple@0.3.117 || 0.3.118
-  - '@lynx-js/types@4.1.0'
-  - '@tanstack/react-table@9.0.0-beta.58'
-  - '@tanstack/table-core@9.0.0-beta.58'
-  # shadcn CLI + Tailwind v4 for the playground's registry-mode consumption of
-  # @octanejs/shadcn (the CLI ships days-fresh; pinned exact above).
-  - 'shadcn@4.14.1'
-  - 'tailwindcss@4.3.3'
-  - '@tailwindcss/vite@4.3.3'
-  - octane@0.1.18 || 0.1.19 || 0.1.21 || 0.1.22 || 0.1.23 || 0.1.28
+
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
