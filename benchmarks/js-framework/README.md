@@ -203,6 +203,15 @@ Two methodology points, both visible in the harness source:
   correctly, because there are no survivors *after* the inserted run. octane-tsrx,
   octane-jsx, and react pass all 14 ops.
 
+- **Bounded reorder-scratch gate.** After all timing samples, Octane's two
+  dialects repeat reverse, rotation, shuffle, and small-displacement operations
+  over 1,000 and 10,000 keyed rows. A transparent typed-array constructor trap
+  rejects allocations after the initial warmup while independently checking
+  survivor identity and final order. A contiguous append must remain
+  allocation-free, an oversized 18,000-row reorder must not evict reusable
+  storage, and an explicit browser garbage collection bounds retained observed
+  scratch backing storage to 128 KiB.
+
 Run it against the same eight targets as `run.mjs`:
 
 ```bash

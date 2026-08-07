@@ -240,6 +240,161 @@ async function timeSample(page, sel, reps) {
 	);
 }
 
+// Observe typed scratch allocations only after every wall-clock sample. The
+// transparent constructor trap cannot contaminate timed inline caches, and
+// every measured permutation must retain its original keyed DOM survivors.
+async function scratchStorageGate(page, targetName) {
+	await resetRows(page);
+	const measurement = await page.evaluate(() => {
+		const NativeInt32Array = globalThis.Int32Array;
+		const allocations = [];
+		const references = [];
+		const phases = [];
+		const readRows = () => Array.from(document.querySelectorAll('tbody tr'));
+		const rowId = (row) => row.firstElementChild.textContent;
+
+		function measure(button, repetitions) {
+			const before = readRows();
+			const survivors = new Map(before.map((row) => [rowId(row), row]));
+			const expected = before.map(rowId);
+			const firstAllocation = allocations.length;
+			for (let iteration = 0; iteration < repetitions; iteration++) {
+				document.getElementById(button).click();
+				if (button === 'reverse') expected.reverse();
+				else if (button === 'rotateb') expected.push(expected.shift());
+				else if (button === 'rotatef') expected.unshift(expected.pop());
+				else if (button === 'swaprows' && expected.length > 998) {
+					const first = expected[1];
+					expected[1] = expected[998];
+					expected[998] = first;
+				}
+			}
+
+			const after = readRows();
+			if (after.length !== before.length) {
+				throw new Error(`${button}: expected ${before.length} rows, got ${after.length}`);
+			}
+			for (let index = 0; index < after.length; index++) {
+				const id = rowId(after[index]);
+				if (survivors.get(id) !== after[index]) {
+					throw new Error(`${button}: surviving row ${id} lost its DOM identity`);
+				}
+				if (button !== 'shuffle' && expected[index] !== id) {
+					throw new Error(`${button}: position ${index} expected ${expected[index]}, got ${id}`);
+				}
+			}
+
+			const observed = allocations.slice(firstAllocation);
+			const phase = {
+				button,
+				rows: before.length,
+				repetitions,
+				allocations: observed.length,
+				bytes: observed.reduce((total, bytes) => total + bytes, 0),
+			};
+			phases.push(phase);
+			if (phase.allocations !== 0) {
+				throw new Error(
+					`${button}/${before.length}: warm reorders allocated ` +
+						`${phase.allocations} typed arrays (${phase.bytes} bytes)`,
+				);
+			}
+		}
+
+		try {
+			globalThis.Int32Array = new Proxy(NativeInt32Array, {
+				construct(target, args, newTarget) {
+					const value = Reflect.construct(target, args, newTarget);
+					allocations.push(value.byteLength);
+					references.push(new WeakRef(value));
+					return value;
+				},
+			});
+
+			// The first reverse is explicitly outside each steady-state budget.
+			document.getElementById('reverse').click();
+			measure('reverse', 4);
+			measure('rotateb', 8);
+			measure('rotatef', 4);
+			measure('shuffle', 3);
+			measure('swaprows', 4);
+
+			const beforeAppend = readRows();
+			const appendStart = allocations.length;
+			document.getElementById('append100').click();
+			const afterAppend = readRows();
+			if (
+				afterAppend.length !== beforeAppend.length + 100 ||
+				beforeAppend.some((row, index) => afterAppend[index] !== row)
+			) {
+				throw new Error('append100 changed an existing keyed row');
+			}
+			if (allocations.length !== appendStart) {
+				throw new Error('append100 allocated typed reorder scratch');
+			}
+
+			document.getElementById('runlots').click();
+			if (readRows().length !== 10000) throw new Error('runlots did not produce 10000 rows');
+			document.getElementById('reverse').click();
+			measure('reverse', 2);
+			measure('rotateb', 4);
+			measure('shuffle', 2);
+			measure('swaprows', 2);
+
+			// An oversized one-shot must not evict the bounded reusable buffers.
+			for (let index = 0; index < 8; index++) document.getElementById('add').click();
+			const oversizedBefore = readRows();
+			if (oversizedBefore.length !== 18000) {
+				throw new Error('oversized control expected 18000 rows');
+			}
+			const oversizedStart = allocations.length;
+			document.getElementById('rotateb').click();
+			document.getElementById('rotateb').click();
+			const oversizedAfter = readRows();
+			if (
+				oversizedAfter.length !== oversizedBefore.length ||
+				oversizedAfter.some((row, index) => row !== oversizedBefore[(index + 2) % 18000])
+			) {
+				throw new Error('oversized rotations lost survivor identity or order');
+			}
+			if (allocations.length - oversizedStart !== 4) {
+				throw new Error('oversized rotations unexpectedly retained reusable scratch');
+			}
+			document.getElementById('run').click();
+			if (readRows().length !== 1000) throw new Error('shrink control expected 1000 rows');
+			measure('rotateb', 4);
+		} finally {
+			globalThis.Int32Array = NativeInt32Array;
+			globalThis.__benchScratchReferences = references;
+		}
+
+		return { phases, observedAllocations: allocations.length };
+	});
+
+	const cdp = await page.context().newCDPSession(page);
+	try {
+		await cdp.send('HeapProfiler.collectGarbage');
+		measurement.retainedScratchBytes = await page.evaluate(() => {
+			let total = 0;
+			for (const reference of globalThis.__benchScratchReferences) {
+				total += reference.deref()?.byteLength ?? 0;
+			}
+			delete globalThis.__benchScratchReferences;
+			return total;
+		});
+	} finally {
+		await cdp.detach().catch(() => {});
+	}
+	if (measurement.retainedScratchBytes > 128 * 1024) {
+		throw new Error(
+			`${targetName} retained typed reorder scratch exceeds 128 KiB: ` +
+				`${measurement.retainedScratchBytes} bytes`,
+		);
+	}
+
+	return measurement;
+}
+
 async function runTarget(t) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -302,16 +457,33 @@ async function runTarget(t) {
 		}
 		results[op.name] = summarize(samples);
 	}
+	let scratchWork;
+	if (t.name === 'octane-tsrx' || t.name === 'octane-jsx') {
+		try {
+			scratchWork = await scratchStorageGate(page, t.name);
+		} catch (error) {
+			const message = String(error && error.message ? error.message : error);
+			gateFails['scratch-storage'] = message;
+			console.error(`  ⚠ SCRATCH FAIL ${t.name}: ${message}`);
+		}
+	}
 
 	await browser.close();
-	return { results, gateFails };
+	return { results, gateFails, scratchWork };
 }
 
 // Per-target identity-gate summary for BENCH_JSON meta: "pass" when every op
 // held, else "fail: <op>[, <op>…]" listing exactly which ops broke.
-function gateMeta(gateFails) {
-	const failed = Object.keys(gateFails);
-	return { identityGate: failed.length ? `fail: ${failed.join(', ')}` : 'pass' };
+function gateMeta(gateFails, scratchWork) {
+	const failed = Object.keys(gateFails).filter((name) => name !== 'scratch-storage');
+	return {
+		identityGate: failed.length ? `fail: ${failed.join(', ')}` : 'pass',
+		...(scratchWork === undefined
+			? gateFails['scratch-storage'] === undefined
+				? {}
+				: { scratchGate: 'fail' }
+			: { scratchGate: 'pass', ...scratchWork }),
+	};
 }
 
 function writeBenchJson(payload) {
@@ -334,10 +506,10 @@ function writeBenchJson(payload) {
 			suite: 'keyed-reorder-matrix',
 			iterations: ITER,
 			failed: String(e && e.message ? e.message : e),
-			targets: Object.entries(all).map(([name, { results, gateFails }]) => ({
+			targets: Object.entries(all).map(([name, { results, gateFails, scratchWork }]) => ({
 				name,
 				ops: Object.fromEntries(Object.entries(results).filter(([, v]) => v != null)),
-				meta: gateMeta(gateFails),
+				meta: gateMeta(gateFails, scratchWork),
 			})),
 		});
 		throw e;
@@ -404,11 +576,11 @@ function writeBenchJson(payload) {
 					.filter(([, v]) => v != null)
 					.map(([op, r]) => [op, timingStatForJson(r)]),
 			),
-			meta: gateMeta(all[t.name].gateFails),
+			meta: gateMeta(all[t.name].gateFails, all[t.name].scratchWork),
 		})),
 	});
 	if (failures.length) {
-		console.error(`\n${failures.length} identity-gate failure(s):`);
+		console.error(`\n${failures.length} keyed-reorder gate failure(s):`);
 		for (const f of failures) console.error(`  ✗ ${f}`);
 		process.exit(1);
 	}
