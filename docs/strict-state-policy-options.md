@@ -1,13 +1,56 @@
 # Strict-state policy naming and compatibility options
 
-> **Status: DECISION MEMO — no option is selected.** Prepared 2026-07-19 as a
-> companion to [`strict-state-plan.md`](./strict-state-plan.md). This memo is for
-> choosing the public configuration vocabulary and the third-party compatibility
-> boundary; it does not reopen the underlying state-phase semantics.
+> **Status: HISTORICAL DECISION MEMO; NOT THE SHIPPED CONFIGURATION.** Prepared
+> 2026-07-19 as a companion to
+> [`strict-state-plan.md`](./strict-state-plan.md). None of the five policy
+> objects, manifest flags, runtime guards, or package approval mechanisms below
+> were implemented. Octane instead shipped `useLinkedState` in
+> [#366](https://github.com/octanejs/octane/pull/366) and opt-in, compiler-only
+> Strong mode in [#376](https://github.com/octanejs/octane/pull/376).
+
+## Current implementation
+
+The public configuration is already selected:
+
+```ts
+// octane.config.ts
+export default {
+	compiler: {
+		strong: true,
+	},
+};
+```
+
+Strong mode defaults to `false`. A module can also opt itself in with a top-level
+`"use strong"` directive. Application configuration applies only to
+application-owned source: dependencies and separately manifested workspace
+packages retain their existing React-compatible behavior unless their own module
+opts in. Vite, Rspack, and Rsbuild also expose a `strong: true` plugin option.
+
+The shipped enforcement is **compile-time only**: it rejects statically provable
+state updates during render or synchronous effect setup and render-time
+`ref.current` writes. State initializers, `useLinkedState` reconcilers, and its
+`sourceEqual`/`valueEqual` callbacks execute synchronously during render;
+genuinely deferred callbacks remain valid. `useLinkedState` replaces the
+originally proposed keyed-reset hook and compares sources with `Object.is` by
+default, including arrays; composite comparisons require `sourceEqual`.
+
+There is no runtime execution-phase guard, strict/compat hook-cell policy,
+package-manifest state-policy field, compatibility allowlist, package approval
+flow, or policy inventory. Published Octane packages ship authored source, not
+precompiled policy-bearing artifacts. See the current [Strong-mode
+guide](./tsrx-basics.md#strong-mode), [linked-state
+guide](./tsrx-basics.md#state-that-follows-another-value), and [documented React
+differences](./differences-from-react.md#optional-strong-mode).
+
+The remainder preserves naming and containment ideas that could inform a future,
+explicitly proposed runtime-backed policy. Example configuration and manifest
+fields below are illustrative only; none are current Octane APIs.
 
 ## 1. Decision to make
 
-Octane needs one build-time policy with two behaviors:
+The historical proposal considered a possible future runtime-backed policy with
+two behaviors:
 
 - **Native behavior:** authored state transitions are allowed at causal boundaries
   such as events, actions, and later callback turns. They are rejected while render,
@@ -16,9 +59,11 @@ Octane needs one build-time policy with two behaviors:
 - **React-compatible behavior:** existing render-phase replay and lifecycle update
   behavior remains available for code that has not migrated yet.
 
-The policy needs both a project default, so the work can roll out without an atomic
-repository migration, and a narrow way to retain React behavior for third-party
-Octane packages.
+A hypothetical policy could need both a project default and a narrow way to
+retain React behavior for third-party Octane packages. The shipped implementation
+already achieves application/dependency containment through optional
+`compiler.strong` and package ownership, without any of the proposed policy
+objects or manifest exceptions.
 
 The naming decision has three independent parts:
 
@@ -27,54 +72,64 @@ The naming decision has three independent parts:
 3. Is the API presented as a choice between two models, a positive Octane feature,
    or a React compatibility exception?
 
-The five proposals below intentionally vary all three.
+The five historical proposals below intentionally varied all three. None was
+selected or implemented.
 
 ## 2. Shared contract across every proposal
 
-The choice of spelling must not change these mechanics.
+These mechanics belong to the **unimplemented runtime-backed proposal**. They
+are not claims about shipped compiler-only Strong mode.
 
 ### 2.1 Enforcement
 
-- The runtime is the semantic defense in development and production. The compiler
-  adds earlier, richer diagnostics where execution timing is statically provable.
+- A future runtime guard could provide semantic defense in development and
+  production; today the compiler is the only Strong-mode enforcement surface.
 - `useCallback` creation is never itself illegal. The compiler follows local aliases
   and calls and reports only a callback proven to execute synchronously from a
   forbidden phase. Passing a callback to an opaque subscription remains a runtime
   question because registration does not prove synchronous invocation.
 - A later timer, observer, subscription notification, async continuation, or
   deliberate deferral is a legal causal transition.
-- Internal runtime scheduling remains outside the user-dispatcher guard.
+- Internal runtime scheduling would remain outside any future user-dispatcher
+  guard.
 
 ### 2.2 Compatibility containment
 
-Compatibility must not leak from a dependency into application-authored code. In a
-forbidden phase, the intended composition rule is:
+Compatibility must not leak from a dependency into application-authored code.
+The shipped compiler already contains its application-wide setting by package.
+If a future runtime introduced policy-bearing hook cells, its proposed
+composition rule would be:
 
 | Executing code     | Native cell | React-compatible cell |
 | ------------------ | ----------- | --------------------- |
 | Native             | Throw       | Throw                 |
 | React-compatible   | Throw       | Existing behavior     |
 
-Outside a forbidden phase, ordinary updates remain legal in every combination.
-This permits a React-compatible package to manage its own state while preventing a
-native application from laundering a lifecycle write through a setter returned by
-that package.
+Outside a forbidden phase, ordinary updates would remain legal in every
+combination. These strict/compatible cell distinctions do not exist in the
+shipped runtime.
 
 ### 2.3 Third-party packages
 
-The package boundary is the initial compatibility granularity:
+The shipped package boundary already prevents application Strong configuration
+from claiming dependencies. The following manifest declarations, consumer
+approvals, and cell-level propagation are **future proposals, not existing
+configuration**:
 
-- Package authors can declare that their package requires React-compatible
+- Package authors could declare that their package requires React-compatible
   behavior in the existing `octane` object in their `package.json`. Whether that
   declaration is self-authorizing or instead requires consumer approval is an open
   decision called out below.
-- Applications can approve a dependency explicitly in compiler configuration.
-- Consumer exceptions use exact npm package names. They do not accept filesystem
+- Applications could approve a dependency explicitly in future compiler
+  configuration.
+- Hypothetical consumer exceptions would use exact npm package names. They would
+  not accept filesystem
   globs, source paths, export subpaths, or inline comments.
-- An exception cannot target the application package itself. A nested workspace
+- An exception would not target the application package itself. A nested workspace
   package with its own manifest is a separate package, even when it is physically
   inside the bundler root.
-- Package behavior is non-transitive. Native children and native callbacks passed
+- A future runtime package policy would be non-transitive. Native children and
+  native callbacks passed
   into a compatible package retain their originating behavior, and a native setter
   remains native when passed into compatible code.
 - A usage-site `compat(Component)` wrapper is not part of the initial design. It is
@@ -84,12 +139,14 @@ The package boundary is the initial compatibility granularity:
   hook-slot ownership, whereas a compatible package must still compile so its
   policy can be encoded.
 
-The compiler already has a watched nearest-manifest resolver in
+The shipped compiler already uses a watched nearest-manifest resolver for package
+ownership in
 [`bundler.js`](../packages/octane/src/compiler/bundler.js). The implementation should
-extend that resolver rather than matching `node_modules` paths, which are unstable
-across package managers and symlinks.
+extend that resolver if a future policy is designed, rather than matching
+`node_modules` paths, which are unstable across package managers and symlinks.
 
-There are two viable authorization models for package metadata:
+There were two proposed authorization models for future package metadata; neither
+exists today:
 
 1. **Self-declaration:** the package manifest is sufficient to select compatible
    behavior, and the build inventory makes that decision visible.
@@ -104,13 +161,16 @@ documentation for port authors can describe it separately.
 
 ### 2.4 Distribution and auditability
 
+These are possible requirements for a future runtime-backed policy, not current
+distribution behavior or build outputs:
+
 - Full `.tsrx`/`.tsx` compilation and plain `.ts`/`.js` hook slotting resolve the
   same package policy.
 - Manual-slot packages need the policy encoded in their slot-family ABI rather than
   being permanently defaulted to compatibility.
-- New precompiled output needs a versioned policy marker. The treatment of older
-  unmarked output—automatic existing behavior reported as `legacy-precompiled`, or
-  an explicit consumer approval—is an open migration decision.
+- Octane currently publishes authored source, not precompiled compiler output.
+  The historical idea of versioned precompiled policy markers would matter only
+  if that packaging contract changed; it is not needed today.
 - Client, SSR, hydration, and universal compilation must resolve the same policy.
 - Builds emit a deterministic inventory containing package name, version, resolved
   root, and policy origin (`package-declared`, `consumer-exception`, or
@@ -122,7 +182,7 @@ documentation for port authors can describe it separately.
 - Evaluation runs count adding a compatibility exception as evasion rather than a
   successful repair.
 
-## 3. Proposal A — `stateSemantics`
+## 3. Historical proposal A — `stateSemantics` (not implemented)
 
 This presents the setting as a choice between two explicitly named semantic models.
 
@@ -171,7 +231,7 @@ Risks:
 - The short value `react` could be read as claiming complete React equivalence rather
   than compatibility for this state behavior alone.
 
-## 4. Proposal B — `stateModel`
+## 4. Historical proposal B — `stateModel` (not implemented)
 
 This uses framework names instead of introducing a new conceptual value.
 
@@ -217,7 +277,7 @@ Risks:
   renderer or authoring profile with the same phase rules.
 - Framework-name values can age poorly if React changes its own behavior.
 
-## 5. Proposal C — `causalState`
+## 5. Historical proposal C — `causalState` (not implemented)
 
 This presents the design as one positive Octane feature with compatibility
 exceptions, using a boolean for rollout.
@@ -263,7 +323,7 @@ Risks:
   rather than an execution-phase rule.
 - The list shape is less extensible if another behavior is ever introduced.
 
-## 6. Proposal D — `stateUpdatePolicy`
+## 6. Historical proposal D — `stateUpdatePolicy` (not implemented)
 
 This optimizes for precision and uses fully descriptive values, accepting a more
 verbose public API.
@@ -310,7 +370,7 @@ Risks:
   priority.
 - `policy` sounds administrative rather than like a core programming model.
 
-## 7. Proposal E — `reactCompatibility.stateUpdates`
+## 7. Historical proposal E — `reactCompatibility.stateUpdates` (not implemented)
 
 This leaves the native behavior unnamed and configures only the compatibility
 surface. The default boolean doubles as the rollout flag.
