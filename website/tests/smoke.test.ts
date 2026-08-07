@@ -4,6 +4,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import bundleSizeBaseline from '../../benchmarks/baselines/local/bundle-size.json';
 import { getRouter } from '../src/router.ts';
 import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
@@ -82,6 +83,29 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
+	it('reports total shipped gzip for every bundle-size fixture', () => {
+		const bundleSize = FRAMEWORK_CARDS.find((card) => card.id === 'bundle-size')!;
+		const expectedRows = [
+			['rows total gzip', 'js_gzip'],
+			['TodoMVC total gzip', 'todo_js_gzip'],
+			['chat total gzip', 'chat_js_gzip'],
+			['weather total gzip', 'weather_js_gzip'],
+		] as const;
+		const targets = new Map(bundleSizeBaseline.targets.map((target) => [target.name, target]));
+
+		expect(bundleSize.rows.map((row) => row.op)).toEqual(expectedRows.map(([label]) => label));
+		for (const [index, [, op]] of expectedRows.entries()) {
+			const row = bundleSize.rows[index];
+			for (const series of bundleSize.series) {
+				const target = targets.get(series.key);
+				const stat = (
+					target?.ops as Record<string, { score?: number; median: number }> | undefined
+				)?.[op];
+				expect(row[series.key], `${row.op}/${series.key}`).toBe(stat?.score ?? stat?.median);
+			}
+		}
+	});
+
 	it('publishes each framework only where the checked benchmark has measurements', () => {
 		// Math.log/exp may differ by one ULP between libc implementations. Keep
 		// this snapshot check exact at a stable precision beyond the chart's display.
