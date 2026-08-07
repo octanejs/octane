@@ -17427,7 +17427,74 @@ const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbo
 // per row on every unchanged parent render; holes and intrinsic overrides are
 // still rechecked each time. Mutating an existing data index into an accessor
 // without changing the snapshot identity/length is outside that contract.
-const NATIVE_ARRAY_ACCESSORS = new WeakMap<object, { length: number; accessor: boolean }>();
+const NATIVE_ARRAY_ACCESSORS = new WeakMap<
+	object,
+	{ length: number; accessor: boolean; renderable?: boolean }
+>();
+
+/**
+ * Compiler ABI for a safely reusable value-position array. A plain dense array
+ * of ordinary descriptor snapshots can skip reconciliation while its identity
+ * holds; indexed getters, nested collections, Fragments, and scope-sensitive
+ * descriptors must stay on the ordinary live-render path. A fresh array will
+ * be reconciled regardless, so inspect its entries only when that same identity
+ * can actually skip a later render. Classification is cached by immutable
+ * snapshot identity, just like the existing mapped-array accessor proof, so
+ * subsequent cache hits remain constant-time without penalizing fresh lists.
+ * @internal
+ */
+export function compilerCacheArray(value: unknown, previous: unknown): boolean {
+	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+	// The region's existing identity-miss guard guarantees a changed value runs
+	// its ordinary reconciliation. No safety classification is needed until a
+	// previously rendered array could actually be reused.
+	if (value !== previous) return true;
+	const length = value.length;
+	const cached = NATIVE_ARRAY_ACCESSORS.get(value);
+	if (cached !== undefined && cached.length === length) {
+		if (cached.accessor) return false;
+		if (cached.renderable !== undefined) return cached.renderable;
+	}
+
+	let accessor = false;
+	let renderable = true;
+	for (let index = 0; index < length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, index);
+		if (descriptor === undefined || descriptor.get !== undefined || descriptor.set !== undefined) {
+			accessor = true;
+			renderable = false;
+			break;
+		}
+		const item = descriptor.value;
+		if (Array.isArray(item)) {
+			renderable = false;
+			continue;
+		}
+		if (item !== null && typeof item === 'object') {
+			if (item.$$kind !== ELEMENT_TAG) {
+				renderable = false;
+				continue;
+			}
+			// A scoped-value descriptor exposes type/props through getters. Check its
+			// private marker before touching either field or moving context reads.
+			if ((item as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD] !== undefined) {
+				renderable = false;
+				continue;
+			}
+			// Hosts and Fragments own child collections that may hide live getters;
+			// only ordinary component descriptor snapshots are independently safe.
+			if (typeof item.type !== 'function' || SCOPED_ELEMENT_PROPS.has(item.props as object)) {
+				renderable = false;
+			}
+		} else if (typeof item === 'function' || typeof item === 'symbol') {
+			renderable = false;
+		}
+	}
+	// Continue scanning after a nested/scoped rejection: mapSlot shares this
+	// record and still needs its accessor verdict to cover every array index.
+	NATIVE_ARRAY_ACCESSORS.set(value, { length, accessor, renderable });
+	return renderable;
+}
 
 /** Shared compiler ABI: native-array eligibility query plus stable keyed map dispatch. */
 export function mapSlot(
@@ -18764,6 +18831,49 @@ function restampCtxDeps(block: Block): void {
 	}
 }
 
+// A cached output region bypasses the memo/implicit bailouts that normally
+// restore a skipped subtree's context dependencies onto rerendered ancestors.
+// Descend only until the first stamped boundary: its aggregate already covers
+// the entire live subtree. Lite child scopes are not Blocks, so continue
+// through them rather than mistaking their owning block for a fresh boundary.
+function restampCachedContextScope(scope: Scope): void {
+	if (scope.block === scope) {
+		const block = scope as Block;
+		if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
+			restampCtxDeps(block);
+			return;
+		}
+		if (block.$$ctxDirect !== null && block.$$ctxDirect.size !== 0) {
+			restampCtxDeps(block);
+		}
+	}
+	forEachSubtreeChild(scope, restampCachedContextScope);
+}
+
+function restampCachedSlotContext(slot: any): void {
+	if (slot.__kind === 'forBlockSlot') {
+		for (let item: Block | null = slot.head; item !== null; item = item.nextSibling) {
+			restampCachedContextScope(item);
+		}
+		if (slot.emptyBlock !== null) restampCachedContextScope(slot.emptyBlock);
+		return;
+	}
+	if (slot.block !== undefined && slot.block !== null) {
+		restampCachedContextScope(slot.block);
+		return;
+	}
+	if (slot.__kind !== 'childSlot') return;
+	if (slot.forSlot !== null) {
+		const list = slot.forSlot as ForSlot;
+		for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
+			restampCachedContextScope(item);
+		}
+		if (list.emptyBlock !== null) restampCachedContextScope(list.emptyBlock);
+	} else if (slot.portal?.block !== undefined && slot.portal.block !== null) {
+		restampCachedContextScope(slot.portal.block);
+	}
+}
+
 function refreshBlockForContext(block: Block): void {
 	if (ctxDirectChanged(block)) {
 		// This child directly consumes the changed context (or shares its block
@@ -18788,30 +18898,70 @@ function refreshBlockForContext(block: Block): void {
  * Compiler ABI for a flat output-cache hit. Context consumers are normally
  * reached while their parent slot reconciles; a cache hit intentionally skips
  * that reconciliation, so an intervening Provider commit must refresh the
- * slot's existing Block(s) directly. The common path is one numeric equality
- * check. `previous === undefined` snapshots the epoch after a cache miss
- * without refreshing the freshly-rendered subtree.
+ * slot's existing Block(s) directly. Activity/Suspense reveals must also
+ * reconnect effects retained by a skipped subtree, in its live source order,
+ * and opted-in renderable-array regions restore their descendants' context
+ * reads onto memoized ancestors. Existing mapped regions keep their original
+ * constant-time hit; only array-region hits inspect precomputed memo ancestry.
+ * `previous === undefined` snapshots the epoch after a cache miss without
+ * revisiting the freshly-rendered subtree.
  * @internal
  */
 export function compilerCacheContext(
 	scope: Scope,
 	slotKey: number,
 	previous: number | undefined,
+	restampMemoAncestors: boolean = false,
 ): number {
 	const current = COMPILER_CACHE_CONTEXT_EPOCH;
-	if (previous === undefined || previous === current) return current;
+	if (previous === undefined) return current;
+	const reconnect = EFFECT_RECONNECT_CONTEXT !== null;
+	const restamp = restampMemoAncestors && scope.block.memoInChain;
+	if (previous === current && !reconnect && !restamp) return current;
 	const slot = scope.slots[slotKey];
 	if (slot === undefined || slot === null) return current;
-	if (slot.__kind === 'forBlockSlot') {
-		for (const item of slot.items.values()) refreshBlockForContext(item);
-		if (slot.emptyBlock) refreshBlockForContext(slot.emptyBlock);
-	} else if (slot.block) {
-		refreshBlockForContext(slot.block);
-	} else if (slot.__kind === 'childSlot' && slot.forSlot) {
-		for (const item of slot.forSlot.items.values()) refreshBlockForContext(item);
-	} else if (slot.__kind === 'childSlot' && slot.portal?.block) {
-		refreshBlockForContext(slot.portal.block);
+	if (reconnect) {
+		const contextChanged = previous !== current;
+		const list =
+			slot.__kind === 'forBlockSlot'
+				? (slot as ForSlot)
+				: slot.__kind === 'childSlot'
+					? (slot.forSlot as ForSlot | null)
+					: null;
+		if (list !== null) {
+			// Map insertion order stays unchanged when keyed survivors reorder;
+			// effects must reconnect in the live linked chain's source order.
+			for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
+				if (contextChanged) refreshBlockForContext(item);
+				reconnectBailedEffects(item);
+			}
+			if (list.emptyBlock !== null) {
+				if (contextChanged) refreshBlockForContext(list.emptyBlock);
+				reconnectBailedEffects(list.emptyBlock);
+			}
+		} else {
+			const block = slot.block ?? (slot.__kind === 'childSlot' ? slot.portal?.block : null);
+			if (block !== undefined && block !== null) {
+				if (contextChanged) refreshBlockForContext(block);
+				reconnectBailedEffects(block);
+			}
+		}
+		if (restamp) restampCachedSlotContext(slot);
+		return current;
 	}
+	if (previous !== current) {
+		if (slot.__kind === 'forBlockSlot') {
+			for (const item of slot.items.values()) refreshBlockForContext(item);
+			if (slot.emptyBlock) refreshBlockForContext(slot.emptyBlock);
+		} else if (slot.block) {
+			refreshBlockForContext(slot.block);
+		} else if (slot.__kind === 'childSlot' && slot.forSlot) {
+			for (const item of slot.forSlot.items.values()) refreshBlockForContext(item);
+		} else if (slot.__kind === 'childSlot' && slot.portal?.block) {
+			refreshBlockForContext(slot.portal.block);
+		}
+	}
+	if (restamp) restampCachedSlotContext(slot);
 	return current;
 }
 

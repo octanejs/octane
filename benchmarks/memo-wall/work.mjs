@@ -27,6 +27,7 @@ const METRICS = [
 	'buildValueRows',
 	'createElement',
 	'shallowEqualProps',
+	'restampCachedContextScope',
 	'RowImpl',
 	'InnerImpl',
 	'Leaf',
@@ -109,18 +110,20 @@ const OPS = [
 		},
 	},
 	// Wall B's imported helper is cached against its `items` argument by
-	// production auto-calculation. Equal/context-only TSRX parent updates reuse
-	// that descriptor array; changed items still rebuild it in one_change_B.
+	// production auto-calculation. Equal/context-only parent updates reuse that
+	// descriptor array. TSRX also caches its proven-immutable renderable region,
+	// so unchanged rows never enter keyed reconciliation; context updates still
+	// refresh their mounted leaf consumers directly.
 	{
 		name: 'context_B',
 		hook: '__ctxB',
 		expect: {
 			RowsA: 0,
-			updateSurvivor: ROWS,
+			updateSurvivor: 0,
 			itemBody: 0,
 			buildValueRows: 0,
 			createElement: 0,
-			shallowEqualProps: ROWS,
+			shallowEqualProps: 0,
 			RowImpl: 0,
 			InnerImpl: 0,
 			Leaf: ROWS,
@@ -131,11 +134,11 @@ const OPS = [
 		hook: '__tickB',
 		expect: {
 			RowsA: 0,
-			updateSurvivor: ROWS,
+			updateSurvivor: 0,
 			itemBody: 0,
 			buildValueRows: 0,
 			createElement: 0,
-			shallowEqualProps: ROWS,
+			shallowEqualProps: 0,
 			RowImpl: 0,
 			InnerImpl: 0,
 			Leaf: 0,
@@ -154,8 +157,18 @@ const JSX_EXPECTATIONS = {
 	one_change_A: { createElement: 8 },
 	context_A: { RowsA: 1, createElement: ROWS + 3 },
 	one_change_B: { createElement: ROWS + 6 },
-	context_B: { buildValueRows: 1, createElement: ROWS * 2 + 1 },
-	equal_B_control: { buildValueRows: 1, createElement: ROWS + 1 },
+	context_B: {
+		updateSurvivor: ROWS,
+		buildValueRows: 0,
+		createElement: ROWS + 1,
+		shallowEqualProps: ROWS,
+	},
+	equal_B_control: {
+		updateSurvivor: ROWS,
+		buildValueRows: 0,
+		createElement: 1,
+		shallowEqualProps: ROWS,
+	},
 };
 
 function callCounts(coverage) {
@@ -219,7 +232,13 @@ try {
 	for (const op of OPS) {
 		const counts = await measure(browser, op);
 		results[op.name] = counts;
-		const expected = DIALECT === 'jsx' ? { ...op.expect, ...JSX_EXPECTATIONS[op.name] } : op.expect;
+		const expected = {
+			...op.expect,
+			...(DIALECT === 'jsx' ? JSX_EXPECTATIONS[op.name] : {}),
+			// Legacy context-aware list regions must never walk their memoized rows
+			// merely because the owning JSX fragment has an implicit-bail ancestor.
+			restampCachedContextScope: 0,
+		};
 		for (const metric of METRICS) {
 			if (counts[metric] !== expected[metric]) {
 				failures.push(`${op.name}.${metric}: ${counts[metric]} !== expected ${expected[metric]}`);
@@ -231,15 +250,15 @@ try {
 }
 
 console.log(
-	'Operation       | RowsA | survivors | item body | buildB | descriptors | memo cmp | Row/Inner/Leaf',
+	'Operation       | RowsA | survivors | item body | buildB | descriptors | memo cmp | restamp | Row/Inner/Leaf',
 );
 console.log(
-	'----------------+-------+-----------+-----------+--------+-------------+----------+---------------',
+	'----------------+-------+-----------+-----------+--------+-------------+----------+---------+---------------',
 );
 for (const op of OPS) {
 	const c = results[op.name];
 	console.log(
-		`${op.name.padEnd(15)} | ${String(c.RowsA).padStart(5)} | ${String(c.updateSurvivor).padStart(9)} | ${String(c.itemBody).padStart(9)} | ${String(c.buildValueRows).padStart(6)} | ${String(c.createElement).padStart(11)} | ${String(c.shallowEqualProps).padStart(8)} | ${c.RowImpl}/${c.InnerImpl}/${c.Leaf}`,
+		`${op.name.padEnd(15)} | ${String(c.RowsA).padStart(5)} | ${String(c.updateSurvivor).padStart(9)} | ${String(c.itemBody).padStart(9)} | ${String(c.buildValueRows).padStart(6)} | ${String(c.createElement).padStart(11)} | ${String(c.shallowEqualProps).padStart(8)} | ${String(c.restampCachedContextScope).padStart(7)} | ${c.RowImpl}/${c.InnerImpl}/${c.Leaf}`,
 	);
 }
 
