@@ -10,6 +10,10 @@ import {
 	ToggleableEmpty,
 	DepPureList,
 	CallBodyList,
+	NestedConditionalActivityList,
+	NestedConditionalCallBodyList,
+	NestedConditionalList,
+	NestedConditionalTransition,
 	PlainCalleeList,
 	KeyedSelectionList,
 	KeyedSelectionTransition,
@@ -30,6 +34,7 @@ import {
 	FastMappedBoundaryList,
 	FastSuspendingGetterList,
 	setExternal,
+	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
@@ -210,6 +215,23 @@ describe('forBlock — render-time calls defeat the survivor short-circuit', () 
 		r.unmount();
 		setExternal('tick0'); // reset the module-level fixture state
 	});
+
+	it('re-evaluates item methods inside nested conditional markup', () => {
+		const r = mount(NestedConditionalCallBodyList);
+		expect(r.findAll('.nested-call-row').map((row) => row.textContent)).toEqual([
+			'r1:tick0',
+			'r2:tick0',
+		]);
+
+		setExternal('tick1');
+		r.click('#nested-call-rerender');
+		expect(r.findAll('.nested-call-row').map((row) => row.textContent)).toEqual([
+			'r1:tick1',
+			'r2:tick1',
+		]);
+		r.unmount();
+		setExternal('tick0');
+	});
 });
 
 describe('forBlock — DEP-PURE promotion compares deps with Object.is', () => {
@@ -229,6 +251,195 @@ describe('forBlock — DEP-PURE promotion compares deps with Object.is', () => {
 		expect(r.findAll('.dp-row').map((li) => li.textContent)).toEqual(['row1:tick0', 'row2:tick0']);
 		r.unmount();
 		setExternal('tick0'); // reset the module-level fixture state
+	});
+});
+
+describe('keyed rows with nested conditional content', () => {
+	const makeRows = () => [
+		{ id: 1, label: 'first' },
+		{ id: 2, label: 'second' },
+		{ id: 3, label: 'third' },
+	];
+
+	it('updates Activity visibility in stable keyed rows alongside host conditionals', () => {
+		const items = [{ id: 1, label: 'first' }];
+		const r = mount(NestedConditionalActivityList, { items, visible: true });
+		const content = r.find('.nested-conditional-activity-content') as HTMLElement;
+
+		try {
+			expect(content.style.display).toBe('');
+
+			setNestedConditionalActivityMode('hidden');
+			r.update(NestedConditionalActivityList, { items: [...items], visible: true });
+			expect(content.style.display).toBe('none');
+			expect(r.find('.nested-conditional-activity-content')).toBe(content);
+
+			setNestedConditionalActivityMode('visible');
+			r.update(NestedConditionalActivityList, { items: [...items], visible: true });
+			expect(content.style.display).toBe('');
+			expect(r.find('.nested-conditional-activity-label').textContent).toBe('first');
+		} finally {
+			r.unmount();
+			setNestedConditionalActivityMode('visible');
+		}
+	});
+
+	it('preserves surviving rows while updating immutable values, editing state, and callbacks', () => {
+		const initialItems = makeRows();
+		const calls: string[] = [];
+		const originalHandler = (id: number, prefix: string) => {
+			calls.push('original:' + prefix + ':' + id);
+		};
+		const initialProps = {
+			items: initialItems,
+			editing: 2,
+			prefix: 'before',
+			onSelect: originalHandler,
+		};
+		const r = mount(NestedConditionalList, initialProps);
+		const originalRows = r.findAll('li');
+		const editor = r.find('.nested-conditional-editor') as HTMLInputElement;
+		editor.value = 'uncommitted draft';
+
+		const updatedItems = [
+			initialItems[0]!,
+			{ ...initialItems[1]!, label: 'updated second', completed: true },
+			initialItems[2]!,
+		];
+		r.update(NestedConditionalList, { ...initialProps, items: updatedItems });
+		expect(r.findAll('li')).toEqual(originalRows);
+		expect(r.find('.completed .nested-conditional-label').textContent).toBe('updated second');
+		expect(r.find('.nested-conditional-editor')).toBe(editor);
+		expect(editor.value).toBe('uncommitted draft');
+
+		const nextHandler = (id: number, prefix: string) => {
+			calls.push('updated:' + prefix + ':' + id);
+		};
+		r.update(NestedConditionalList, {
+			items: updatedItems,
+			editing: 3,
+			prefix: 'after',
+			onSelect: nextHandler,
+		});
+		expect(r.findAll('li')).toEqual(originalRows);
+		expect(r.findAll('li').map((row) => row.getAttribute('data-prefix'))).toEqual([
+			'after',
+			'after',
+			'after',
+		]);
+		expect(r.find('.editing .nested-conditional-label').textContent).toBe('third');
+		expect((r.find('.nested-conditional-editor') as HTMLInputElement).value).toBe('third');
+		r.click('.editing .nested-conditional-action');
+		expect(calls).toEqual(['updated:after:3']);
+		r.unmount();
+	});
+
+	it('preserves conditional DOM and live events when surviving rows move or disappear', () => {
+		const initialItems = makeRows();
+		const selected: number[] = [];
+		const props = {
+			items: initialItems,
+			editing: 2,
+			prefix: 'row',
+			onSelect: (id: number) => {
+				selected.push(id);
+			},
+		};
+		const r = mount(NestedConditionalList, props);
+		const originalRows = r.findAll('li');
+		const editor = r.find('.nested-conditional-editor') as HTMLInputElement;
+		editor.value = 'keep my draft';
+
+		const reordered = [initialItems[2]!, initialItems[1]!, initialItems[0]!];
+		r.update(NestedConditionalList, { ...props, items: reordered });
+		expect(r.findAll('li')).toEqual([originalRows[2], originalRows[1], originalRows[0]]);
+		expect(r.find('.nested-conditional-editor')).toBe(editor);
+		expect(editor.value).toBe('keep my draft');
+		r.click('.editing .nested-conditional-action');
+
+		r.update(NestedConditionalList, {
+			...props,
+			items: [reordered[0]!, reordered[2]!],
+			editing: null,
+		});
+		expect(r.findAll('li')).toEqual([originalRows[2], originalRows[0]]);
+		expect(r.findAll('.nested-conditional-editor')).toHaveLength(0);
+		r.click('.nested-conditional-action');
+		expect(selected).toEqual([2, 3]);
+		r.unmount();
+	});
+
+	it('adopts server-rendered conditional rows while preserving inputs and live handlers', () => {
+		const items = makeRows();
+		const selected: number[] = [];
+		const props = {
+			items,
+			editing: 2,
+			prefix: 'hydrated',
+			onSelect: (id: number) => {
+				selected.push(id);
+			},
+		};
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(server.NestedConditionalList, props).html;
+		const originalRows = Array.from(container.querySelectorAll('li'));
+		const originalEditor = container.querySelector(
+			'.nested-conditional-editor',
+		) as HTMLInputElement;
+		originalEditor.value = 'typed before hydration';
+		const root = hydrateRoot(container, NestedConditionalList, props);
+		flushSync(() => {});
+
+		expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
+		expect(container.querySelector('.nested-conditional-editor')).toBe(originalEditor);
+		expect(originalEditor.value).toBe('typed before hydration');
+
+		flushSync(() => root.render(NestedConditionalList, { ...props, editing: 3 }));
+		expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
+		expect(container.querySelector('.editing .nested-conditional-label')?.textContent).toBe(
+			'third',
+		);
+		(container.querySelector('.editing .nested-conditional-action') as HTMLButtonElement).click();
+		expect(selected).toEqual([3]);
+
+		root.unmount();
+		container.remove();
+	});
+
+	it('keeps committed conditional-row bindings intact while a later transition sibling suspends', async () => {
+		const items = makeRows();
+		const initialPromise = Promise.resolve('initial');
+		let resolveNext!: (value: string) => void;
+		const nextPromise = new Promise<string>((resolve) => {
+			resolveNext = resolve;
+		});
+		await Promise.resolve();
+		const r = mount(NestedConditionalTransition, { items, initialPromise, nextPromise });
+		await act(() => {});
+		const originalRows = r.findAll('#nested-transition-list li');
+		const rowLabels = () => r.findAll('.nested-transition-label').map((row) => row.textContent);
+		expect(rowLabels()).toEqual(['initial:first', 'initial:second', 'initial:third']);
+		expect(r.find('.nested-transition-detail').textContent).toBe('initial:first');
+
+		r.click('#nested-transition-bump');
+		expect(r.findAll('#nested-transition-list li')).toEqual(originalRows);
+		expect(rowLabels()).toEqual(['initial:first', 'initial:second', 'initial:third']);
+		expect(r.find('.nested-transition-detail').textContent).toBe('initial:first');
+		expect(r.findAll('#nested-transition-fallback')).toHaveLength(0);
+
+		await act(() => resolveNext('resolved'));
+		expect(r.findAll('#nested-transition-list li')).toEqual(originalRows);
+		expect(rowLabels()).toEqual(['pending:first', 'pending:second', 'pending:third']);
+		expect(r.find('.nested-transition-detail').textContent).toBe('pending:first');
+
+		r.click('#nested-transition-urgent');
+		expect(rowLabels()).toEqual(['urgent:first', 'urgent:second', 'urgent:third']);
+		expect(r.find('.nested-transition-detail').textContent).toBe('urgent:first');
+		r.unmount();
 	});
 });
 

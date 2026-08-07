@@ -22695,10 +22695,10 @@ interface ForSlot {
 	size: number; // count of item Blocks
 	// Last-render snapshot of the body's closed-over parent locals. The compiler
 	// emits a fresh `deps` array on every parent render for DEP-PURE for-of
-	// calls (impure body, no hooks/comps/control-flow). When this render's deps
-	// match last render's element-by-element, the runtime treats the body as
-	// PURE for the survivor short-circuit — saving the entire body call for
-	// every item whose ref + position are unchanged.
+	// calls (hookless host bodies, optionally with proven host-only conditional
+	// content). When this render's deps match last render's element-by-element,
+	// the runtime treats the body as PURE for the survivor short-circuit — saving
+	// the entire body call for every item whose ref + position are unchanged.
 	cachedDeps: any[] | null;
 	// `@for (...) { ... } @empty { ... }` support: mounted-empty-branch Block,
 	// or null when there are items (or no `@empty` branch was compiled). The
@@ -22747,7 +22747,9 @@ export function forBlock<T>(
 	// promote body to PURE when unchanged), bit 3 = indexIndependent (the body
 	// binds no `index` name → a pure reorder that only moves a survivor's
 	// position need not re-render it), bit 4 = the server emitted direct-host
-	// items without per-item pairs. Packed into one numeric literal.
+	// items without per-item pairs, bit 5 = a nested host conditional requires
+	// its owning Block's scope whenever an item body does need to render.
+	// Packed into one numeric literal.
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as ForSlot | undefined;
@@ -22915,22 +22917,29 @@ export function forBlock<T>(
 	// and last render's snapshot matches this render's, we can treat the body
 	// as PURE for the survivor short-circuit. The body still runs for moved/
 	// mounted/removed items — only stable survivors get skipped.
-	// `lite` = body is depEligible but did NOT promote to pure this render.
-	// depEligible (see makeForCall's body analysis in compile.js, packed into
-	// the forBlock `flags` bits) means no hooks, no nested comps, no
-	// control flow → the body can't observe CURRENT_SCOPE / CURRENT_BLOCK and
-	// never throws Suspense. We skip renderBlock's activeBlock plumbing and
-	// call itemBody directly. Saves ~10 ops/survivor — meaningful on the
-	// select-row tick where `selected` changes and 1000 survivors all
-	// re-evaluate but only 2 actually flip their class.
+	// `lite` = an unstructured depEligible body did NOT promote to pure this
+	// render. Such a body has no hooks, nested components, or control flow, so
+	// it cannot observe CURRENT_SCOPE / CURRENT_BLOCK and can run directly.
+	// Host-only nested conditionals may also qualify for the survivor skip, but
+	// need their owning Block's scope when a dependency actually changes.
+	// In particular, transition rollback must snapshot each row's own bag.
 	let lite = false;
 	if ((f & 4) !== 0 && deps !== undefined) {
-		if (state.cachedDeps !== null && depsEqual(state.cachedDeps, deps)) {
-			pure = true;
+		const requiresScope = (f & 32) !== 0;
+		if (requiresScope && TRANSITION_JOURNAL !== null) {
+			// The list journal restores membership and DOM, not this dependency
+			// snapshot. A suspended attempt must never leave a rolled-back list
+			// believing that its uncommitted dependencies are still current.
+			state.cachedDeps = null;
+			pure = false;
 		} else {
-			lite = true;
+			if (state.cachedDeps !== null && depsEqual(state.cachedDeps, deps)) {
+				pure = true;
+			} else {
+				lite = !requiresScope;
+			}
+			state.cachedDeps = deps;
 		}
-		state.cachedDeps = deps;
 	}
 	if (state.size === 0) {
 		// First fill (hydration adopt / fresh mount / update-path 0 → N): the
@@ -22971,7 +22980,7 @@ export function forBlock<T>(
 /**
  * Compiler-only keyed-selection entry. Keeping the specialization outside
  * forBlock lets applications without a proven selection tree-shake its cost.
- * Bit 5 identifies the proof; bits 6+ hold its captured dependency index.
+ * This entry point identifies the proof; bits 6+ hold its dependency index.
  */
 export function keyedForBlock<T>(
 	parentScope: Scope,

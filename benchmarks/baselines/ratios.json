@@ -617,6 +617,14 @@
   },
   {
     "suite": "todomvc",
+    "op": "row_class_writes_complete25",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.0,
+    "note": "Twenty-five immutable TodoMVC row updates should write only the 25 changed row classes. The host-only conditional survivor bailout reduces Octane from 2,500 writes to React's 25; 2x allows implementation variation while catching a return to list-wide writes."
+  },
+  {
+    "suite": "todomvc",
     "op": "nodes_100",
     "target": "octane-tsrx",
     "reference": "react",

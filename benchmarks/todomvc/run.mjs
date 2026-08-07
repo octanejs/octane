@@ -253,6 +253,39 @@ async function timeOp(page, op) {
 	})()`);
 }
 
+async function countRowClassWritesDuringComplete25(page) {
+	await ensureState(page, 'items');
+	return await page.evaluate(`(async () => {
+		${HELPERS}
+		const flush = window.__benchFlush;
+		let writes = 0;
+		const countWrites = (records) => {
+			for (const record of records) {
+				if (record.target.localName === 'li') writes++;
+			}
+		};
+		const observer = new MutationObserver(countWrites);
+		observer.observe($('.todo-list'), {
+			attributes: true,
+			attributeFilter: ['class'],
+			subtree: true,
+		});
+		try {
+			const toggles = $$('.todo-list li .toggle');
+			for (let i = 0; i < ${N}; i += 4) {
+				toggles[i].click();
+				if (flush) await flush();
+			}
+			countWrites(observer.takeRecords());
+		} finally {
+			observer.disconnect();
+		}
+		expect(count('.todo-list li.completed') === 25, 'class-write sample completed count');
+		expect($('.todo-count strong').textContent === '75', 'class-write sample remaining count');
+		return writes;
+	})()`);
+}
+
 async function runTarget(t) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -279,6 +312,13 @@ async function runTarget(t) {
 		}
 		results[op.name] = summarizeSamples(samples);
 	}
+
+	// Exact browser-observed work for the 25 immutable single-row updates. A
+	// MutationObserver also records writes that repeat the existing class value,
+	// so it catches a keyed-survivor bailout disappearing without timer noise.
+	results.row_class_writes_complete25 = deterministicCount(
+		await countRowClassWritesDuringComplete25(page),
+	);
 
 	// Full steady-state DOM shape (100 todos mounted). Element/text counts are
 	// semantic controls beside the bookkeeping-node total.
@@ -317,6 +357,7 @@ async function runTarget(t) {
 		console.log(row.join('| '));
 	}
 	for (const [label, op] of [
+		['#rowCls25', 'row_class_writes_complete25'],
 		['#nodes', 'nodes_100'],
 		['#elems', 'elements_100'],
 		['#text', 'text_100'],
