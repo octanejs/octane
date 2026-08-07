@@ -1,5 +1,12 @@
 # @octanejs/seo
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+
 ## 0.0.13
 
 ### Patch Changes

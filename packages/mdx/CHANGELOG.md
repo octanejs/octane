@@ -1,5 +1,13 @@
 # @octanejs/mdx
 
+## 0.1.26
+
+### Patch Changes
+
+- 23a2538: Preserve deferred-hydration boundary queries in the Vite plugin so split children inside MDX mount correctly instead of recompiling the whole document.
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+
 ## 0.1.25
 
 ### Patch Changes

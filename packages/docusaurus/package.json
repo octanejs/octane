@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/docusaurus",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Docusaurus content and MDX integration for Octane",
   "license": "MIT",
   "type": "module",

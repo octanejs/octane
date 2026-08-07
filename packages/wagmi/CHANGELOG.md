@@ -1,5 +1,13 @@
 # @octanejs/wagmi
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+  - @octanejs/tanstack-query@0.1.28
+
 ## 0.0.8
 
 ### Patch Changes

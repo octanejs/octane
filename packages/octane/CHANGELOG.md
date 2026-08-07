@@ -1,5 +1,11 @@
 # octane
 
+## 0.1.29
+
+### Patch Changes
+
+- 8fb7990: Fix hydration of sibling `@if` and `@switch` blocks at fragment roots, including components rendered inside keyed `@for` lists.
+
 ## 0.1.28
 
 ### Patch Changes

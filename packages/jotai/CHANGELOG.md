@@ -1,5 +1,12 @@
 # @octanejs/jotai
 
+## 0.1.26
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+
 ## 0.1.25
 
 ### Patch Changes

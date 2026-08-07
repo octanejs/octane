@@ -1,5 +1,12 @@
 # @octanejs/usehooks-ts
 
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+
 ## 0.0.9
 
 ### Patch Changes
