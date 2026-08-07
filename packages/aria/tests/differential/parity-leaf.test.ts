@@ -7,7 +7,7 @@
  * useControlledState + useField id plumbing, and useProgressBar over useLabel +
  * useNumberFormatter.
  */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
 
@@ -98,6 +98,63 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 	it('useProgressBar: aria value attributes + formatted valuetext, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ProgressSpec', undefined, CACHE);
 		await d.step('mount', () => {});
+		d.unmount();
+	});
+
+	it('useNumberFieldState: controlled values and unfinished edits match pinned react-stately', async () => {
+		const d = await mountDifferential(FIXTURE, 'NumberFieldStateSpec', undefined, CACHE);
+		await d.step('initial controlled format', () => {
+			expect(d.octane.find('#number-input').textContent).toBe('1,234.5');
+		});
+		await d.step('preserve unfinished user-entered precision', async (octane, react) => {
+			await octane.click('#number-draft');
+			await react.click('#number-draft');
+			expect(octane.find('#number-input').textContent).toBe('9,876.500');
+		});
+		await d.step('keep the draft when equivalent options are recreated', async (octane, react) => {
+			await octane.click('#number-refresh');
+			await react.click('#number-refresh');
+			expect(octane.find('#number-input').textContent).toBe('9,876.500');
+		});
+		await d.step('reconcile a new controlled value and parser together', async (octane, react) => {
+			await octane.click('#number-value');
+			await react.click('#number-value');
+			expect(octane.find('#number-input').textContent).toBe('2,500.25');
+			expect(octane.find('#number-parsed').textContent).toBe('2500.25');
+		});
+		d.unmount();
+	});
+
+	it('useNumberFieldState: locale, formatting and user-selected numerals match react-stately', async () => {
+		const d = await mountDifferential(FIXTURE, 'NumberFieldStateSpec', undefined, CACHE);
+		await d.step('switch locale and parser', async (octane, react) => {
+			await octane.click('#number-german');
+			await react.click('#number-german');
+			expect(octane.find('#number-input').textContent).toBe('1.234,5');
+			expect(octane.find('#number-parsed').textContent).toBe('1234.5');
+		});
+		await d.step('reformat when effective format options change', async (octane, react) => {
+			await octane.click('#number-precision');
+			await react.click('#number-precision');
+			expect(octane.find('#number-input').textContent).toBe('1.234,50');
+		});
+		await d.step('switch to an Arabic locale', async (octane, react) => {
+			await octane.click('#number-arabic');
+			await react.click('#number-arabic');
+		});
+		await d.step('honor a user-selected Latin numbering system', async (octane, react) => {
+			await octane.click('#number-latin');
+			await react.click('#number-latin');
+			expect(octane.find('#number-input').textContent).toBe('9876.5');
+		});
+		await d.step(
+			'retain user-selected numerals for the next controlled value',
+			async (octane, react) => {
+				await octane.click('#number-value');
+				await react.click('#number-value');
+				expect(octane.find('#number-input').textContent).toBe('2,500.25');
+			},
+		);
 		d.unmount();
 	});
 });

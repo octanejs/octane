@@ -1,7 +1,7 @@
 import { renderToString } from 'octane/server';
 import { describe, expect, it } from 'vitest';
 
-import { AriaServerFixture } from './_fixtures/server.tsx';
+import { AriaNumberFieldServerFixture, AriaServerFixture } from './_fixtures/server.tsx';
 
 describe('@octanejs/aria server rendering', () => {
 	it('renders stable label relationships and reads the server snapshot without a DOM', () => {
@@ -23,5 +23,18 @@ describe('@octanejs/aria server rendering', () => {
 		expect(html).toContain('data-locale="ar-AE"');
 		expect(html).toContain('data-direction="rtl"');
 		expect(html).toContain('aria-labelledby="aria-hydration-label"');
+	});
+
+	it('formats and parses controlled number fields on the server without a DOM', () => {
+		expect(typeof document).toBe('undefined');
+		const { html } = renderToString(AriaNumberFieldServerFixture, {
+			locale: 'de-DE',
+			value: 1234.5,
+			formatOptions: { minimumFractionDigits: 2 },
+		});
+
+		expect(html).toContain('id="aria-server-number"');
+		expect(html).toContain('data-number="1234.5"');
+		expect(html).toContain('>1.234,50</output>');
 	});
 });
