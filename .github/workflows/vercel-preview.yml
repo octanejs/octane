@@ -53,10 +53,26 @@ jobs:
 
             const deletePreviewRef = async () => {
               try {
+                await github.rest.git.getRef({ owner, repo, ref });
+              } catch (error) {
+                if (error.status === 404) {
+                  core.notice(`Temporary Vercel preview branch ${branch} is already absent.`);
+                  return;
+                }
+                throw error;
+              }
+
+              try {
                 await github.rest.git.deleteRef({ owner, repo, ref });
                 core.notice(`Deleted temporary Vercel preview branch ${branch}.`);
               } catch (error) {
-                if (error.status === 404) {
+                // GitHub reports a ref that disappears between the read and
+                // delete as 422 rather than 404.
+                if (
+                  error.status === 404 ||
+                  (error.status === 422 &&
+                    error.response?.data?.message === "Reference does not exist")
+                ) {
                   core.notice(`Temporary Vercel preview branch ${branch} is already absent.`);
                   return;
                 }
