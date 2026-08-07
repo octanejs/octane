@@ -3383,9 +3383,11 @@ function hasOnlyHostConditionalItemBodies(stmts) {
 			type === 'DoWhileStatement' ||
 			type === 'TryStatement' ||
 			type === 'SwitchStatement' ||
+			type === 'ActivityStatement' ||
 			type === 'JSXForExpression' ||
 			type === 'JSXTryExpression' ||
 			type === 'JSXSwitchExpression' ||
+			type === 'JSXActivityExpression' ||
 			((type === 'TSRXExpression' || type === 'JSXExpressionContainer') &&
 				node.expression &&
 				isCreatePortalCall(node.expression))

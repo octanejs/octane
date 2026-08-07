@@ -10,6 +10,7 @@ import {
 	ToggleableEmpty,
 	DepPureList,
 	CallBodyList,
+	NestedConditionalActivityList,
 	NestedConditionalCallBodyList,
 	NestedConditionalList,
 	NestedConditionalTransition,
@@ -33,6 +34,7 @@ import {
 	FastMappedBoundaryList,
 	FastSuspendingGetterList,
 	setExternal,
+	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
@@ -258,6 +260,29 @@ describe('keyed rows with nested conditional content', () => {
 		{ id: 2, label: 'second' },
 		{ id: 3, label: 'third' },
 	];
+
+	it('updates Activity visibility in stable keyed rows alongside host conditionals', () => {
+		const items = [{ id: 1, label: 'first' }];
+		const r = mount(NestedConditionalActivityList, { items, visible: true });
+		const content = r.find('.nested-conditional-activity-content') as HTMLElement;
+
+		try {
+			expect(content.style.display).toBe('');
+
+			setNestedConditionalActivityMode('hidden');
+			r.update(NestedConditionalActivityList, { items: [...items], visible: true });
+			expect(content.style.display).toBe('none');
+			expect(r.find('.nested-conditional-activity-content')).toBe(content);
+
+			setNestedConditionalActivityMode('visible');
+			r.update(NestedConditionalActivityList, { items: [...items], visible: true });
+			expect(content.style.display).toBe('');
+			expect(r.find('.nested-conditional-activity-label').textContent).toBe('first');
+		} finally {
+			r.unmount();
+			setNestedConditionalActivityMode('visible');
+		}
+	});
 
 	it('preserves surviving rows while updating immutable values, editing state, and callbacks', () => {
 		const initialItems = makeRows();

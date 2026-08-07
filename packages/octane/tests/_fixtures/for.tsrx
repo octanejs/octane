@@ -1,4 +1,11 @@
-import { createContext, type OctaneNode, startTransition, use, useState } from 'octane';
+import {
+	Activity as ActivitySentinel,
+	createContext,
+	type OctaneNode,
+	startTransition,
+	use,
+	useState,
+} from 'octane';
 
 export function List(props: { items: Array<{ id: number; label: string }> }) @{
 	<ul>
@@ -210,6 +217,41 @@ export function NestedConditionalList(props: {
 				@if (editing === row.id) {
 					<input class="nested-conditional-editor" defaultValue={row.label} />
 				}
+			</li>
+		}
+	</ul>
+}
+
+const Activity = ActivitySentinel as unknown as
+	(props: {
+		mode: 'hidden' | 'visible';
+		children?: OctaneNode;
+	}) => null;
+
+let nestedConditionalActivityMode: 'hidden' | 'visible' = 'visible';
+
+function readNestedConditionalActivityMode() {
+	return nestedConditionalActivityMode;
+}
+
+export function setNestedConditionalActivityMode(mode: 'hidden' | 'visible') {
+	nestedConditionalActivityMode = mode;
+}
+
+export function NestedConditionalActivityList(props: {
+	items: SelectionRow[];
+	visible: boolean;
+}) @{
+	const visible = props.visible;
+	<ul id="nested-conditional-activity-list">
+		@for (const row of props.items; key row.id) {
+			<li>
+				@if (visible) {
+					<span class="nested-conditional-activity-label">{row.label as string}</span>
+				}
+				<Activity mode={readNestedConditionalActivityMode()}>
+					<span class="nested-conditional-activity-content">{row.label as string}</span>
+				</Activity>
 			</li>
 		}
 	</ul>
