@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { createElement, Suspense, use } from 'octane';
 import { mount, nextPaint } from '../_helpers';
 import { RouterProvider } from '@octanejs/tanstack-router';
+import { usePrevious } from '../../src/utils';
 import { makeHooksRouter, navigateIdentities } from '../_fixtures/hooks.tsrx';
 
 async function flush() {
@@ -104,5 +106,68 @@ describe('@octanejs/tanstack-router — hooks', () => {
 		await flush();
 		expect(r.find('.search').textContent).toBe('{"q":""}');
 		r.unmount();
+	});
+});
+
+interface PreviousRouterValueProps {
+	value: string | number;
+	resource?: Promise<void> | null;
+}
+
+const PREVIOUS_ROUTER_VALUE_SLOT = Symbol('router-previous-value');
+
+function PreviousRouterValue(props: PreviousRouterValueProps) {
+	const previous = usePrevious(props.value, PREVIOUS_ROUTER_VALUE_SLOT);
+	if (props.resource != null) use(props.resource);
+	return createElement('output', { 'data-testid': 'previous-value' }, previous ?? 'initial');
+}
+
+function PreviousRouterValueBoundary(props: PreviousRouterValueProps) {
+	return createElement(
+		Suspense,
+		{ fallback: createElement('output', { 'data-testid': 'pending' }, 'pending') },
+		createElement(PreviousRouterValue, props),
+	);
+}
+
+describe('@octanejs/tanstack-router — previous distinct value', () => {
+	it('starts empty and retains the previous distinct committed value', () => {
+		const result = mount(PreviousRouterValueBoundary, { value: 'first' });
+		try {
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('initial');
+
+			result.update(PreviousRouterValueBoundary, { value: 'second' });
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('first');
+
+			result.update(PreviousRouterValueBoundary, { value: 'second' });
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('first');
+
+			result.update(PreviousRouterValueBoundary, { value: 'third' });
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('second');
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('does not treat positive and negative zero as distinct values', () => {
+		const result = mount(PreviousRouterValueBoundary, { value: 0 });
+		try {
+			result.update(PreviousRouterValueBoundary, { value: -0 });
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('initial');
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('does not publish previous-value history from an abandoned Suspense render', () => {
+		const pending = new Promise<void>(() => {});
+		const result = mount(PreviousRouterValueBoundary, { value: 'committed' });
+		try {
+			result.update(PreviousRouterValueBoundary, { value: 'abandoned', resource: pending });
+			result.update(PreviousRouterValueBoundary, { value: 'replacement', resource: null });
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('committed');
+		} finally {
+			result.unmount();
+		}
 	});
 });
