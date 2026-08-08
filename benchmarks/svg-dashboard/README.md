@@ -97,7 +97,9 @@ emits anchors (452 comments + empty text), react emits none.
   octane slot-keyed `useState` + compiled prev-guards (ui state colocated in
   a `Viewport` leaf so pan/zoom commits don't re-walk the dashboard — the
   descriptor-prop analogue of react's memo isolation); react `useState` +
-  `memo` on rows and domain sections; solid stores + `reconcile`-by-id
+  `memo` on rows and domain sections, built through the production React
+  Compiler like every primary React benchmark (see the repo README's React
+  Compiler section); solid stores + `reconcile`-by-id
   (reconcile over fresh object graphs is Solid's documented worst case, as in
   the dbmon fixture); svelte `$state.raw` + keyed each blocks.
 - **Solid cannot express two things declaratively** (both hand-rolled and

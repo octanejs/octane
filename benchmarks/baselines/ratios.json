@@ -1556,8 +1556,8 @@
     "op": "drag_nodes",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 2.2,
-    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x, 2026-08-07 \u2014 a known gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening."
+    "maxRatio": 2.5,
+    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening."
   },
   {
     "suite": "svg-dashboard",
