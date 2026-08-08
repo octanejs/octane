@@ -171,6 +171,32 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it('keeps imported memoized row hosts focused and stateful across parent and context updates', () => {
+		const root = mount(AutoMemoApp);
+		const firstRow = root.find('#auto-memo-rows > li');
+		const firstButton = root.find('.own-1') as HTMLButtonElement;
+
+		root.click('.own-1');
+		firstButton.focus();
+		expect(document.activeElement).toBe(firstButton);
+
+		root.click('#auto-tick');
+		expect(root.find('#auto-memo-rows > li')).toBe(firstRow);
+		expect(root.find('.own-1')).toBe(firstButton);
+		expect(document.activeElement).toBe(firstButton);
+		expect(firstButton.textContent).toBe('t0:a:1');
+
+		root.click('#auto-item-context');
+		expect(root.find('#auto-memo-rows > li')).toBe(firstRow);
+		expect(root.find('.own-1')).toBe(firstButton);
+		expect(document.activeElement).toBe(firstButton);
+		expect(firstButton.textContent).toBe('t0!:a!:1');
+
+		root.click('.own-1');
+		expect(firstButton.textContent).toBe('t0!:a!:2');
+		root.unmount();
+	});
+
 	it('re-renders keyed survivors when a captured parent local changes', () => {
 		const root = mount(ParentCaptureApp);
 		const cells = () =>

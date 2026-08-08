@@ -27,6 +27,11 @@ const METRICS = {
 	total_blocking_time: 'total-blocking-time',
 	cumulative_layout_shift: 'cumulative-layout-shift',
 };
+const OBSERVED_METRICS = {
+	observed_first_contentful_paint: 'observedFirstContentfulPaint',
+	observed_largest_contentful_paint: 'observedLargestContentfulPaint',
+};
+const OPERATIONS = [...Object.keys(METRICS), ...Object.keys(OBSERVED_METRICS)];
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
 	: [
@@ -146,6 +151,12 @@ async function auditTarget(target, sample) {
 			assert(Number.isFinite(value) && value >= 0, `${target.name} ${audit} is unavailable`);
 			metrics[operation] = value;
 		}
+		const observedMetrics = lhr.audits.metrics?.details?.items?.[0];
+		for (const [operation, field] of Object.entries(OBSERVED_METRICS)) {
+			const value = observedMetrics?.[field];
+			assert(Number.isFinite(value) && value >= 0, `${target.name} ${field} is unavailable`);
+			metrics[operation] = value;
+		}
 
 		const expectedUrl = new URL(target.url);
 		const finalUrl = new URL(lhr.finalDisplayedUrl);
@@ -166,6 +177,23 @@ async function auditTarget(target, sample) {
 		assert(
 			externalRequests.length === 0,
 			`${target.name} made external requests: ${externalRequests.join(', ')}`,
+		);
+		const javascriptRequests = networkRequests.filter(
+			(request) => request.resourceType === 'Script',
+		);
+		assert(javascriptRequests.length > 0, `${target.name} did not load production JavaScript`);
+		const javascript = {
+			requests: javascriptRequests.length,
+			transferBytes: javascriptRequests.reduce((total, request) => total + request.transferSize, 0),
+			resourceBytes: javascriptRequests.reduce((total, request) => total + request.resourceSize, 0),
+		};
+		assert(
+			Number.isFinite(javascript.transferBytes) && javascript.transferBytes > 0,
+			`${target.name} JavaScript transfer size is unavailable`,
+		);
+		assert(
+			Number.isFinite(javascript.resourceBytes) && javascript.resourceBytes > 0,
+			`${target.name} JavaScript resource size is unavailable`,
 		);
 
 		const suboptimalAudits = {};
@@ -189,10 +217,31 @@ async function auditTarget(target, sample) {
 			chromeUserAgent: lhr.environment.hostUserAgent,
 			runWarnings: lhr.runWarnings,
 			networkRequestCount: networkRequests.length,
+			javascript,
 		};
 	} finally {
 		await chrome.kill();
 	}
+}
+
+async function auditTargetWithTransportRetry(target, sample) {
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		try {
+			return await auditTarget(target, sample);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const failedLocalDevTools =
+				/^Failed to fetch browser webSocket URL from http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/json\/version\b/.test(
+					message,
+				) && /(?:HTTP Bad Gateway|fetch failed|ECONNREFUSED)/.test(message);
+			if (!failedLocalDevTools || attempt === 3) throw error;
+			console.error(
+				`Retrying ${target.name} sample ${sample + 1} after local DevTools startup failure ` +
+					`(${attempt}/2)…`,
+			);
+		}
+	}
+	throw new Error('unreachable Lighthouse transport retry state');
 }
 
 const values = new Map(
@@ -201,7 +250,7 @@ const values = new Map(
 		{
 			target,
 			categories: Object.fromEntries(CATEGORIES.map((category) => [category, []])),
-			metrics: Object.fromEntries(Object.keys(METRICS).map((operation) => [operation, []])),
+			metrics: Object.fromEntries(OPERATIONS.map((operation) => [operation, []])),
 			reports: [],
 		},
 	]),
@@ -214,12 +263,12 @@ try {
 		const orderedTargets = sample % 2 === 0 ? TARGETS : [...TARGETS].reverse();
 		for (const target of orderedTargets) {
 			console.error(`Lighthouse ${target.name} sample ${sample + 1}/${ITER}…`);
-			const report = await auditTarget(target, sample);
+			const report = await auditTargetWithTransportRetry(target, sample);
 			const targetValues = values.get(target.name);
 			for (const category of CATEGORIES) {
 				targetValues.categories[category].push(report.categories[category]);
 			}
-			for (const operation of Object.keys(METRICS)) {
+			for (const operation of OPERATIONS) {
 				targetValues.metrics[operation].push(report.metrics[operation]);
 			}
 			targetValues.reports.push(report);
@@ -274,8 +323,10 @@ const targets = TARGETS.map((target) => {
 			chromeUserAgent: lastReport?.chromeUserAgent ?? null,
 			runWarnings: lastReport?.runWarnings ?? [],
 			networkRequestCount: lastReport?.networkRequestCount ?? null,
+			javascript: lastReport?.javascript ?? null,
 			formFactor: 'desktop',
 			throttlingMethod: 'simulate',
+			observedMetrics: 'unthrottled-trace',
 			mockMode: true,
 		},
 	};

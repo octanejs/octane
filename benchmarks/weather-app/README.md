@@ -65,11 +65,23 @@ measurements beside these semantic controls.
 `weather-app-lighthouse` runs all six production apps through Lighthouse's desktop Dense 4G
 simulation with a fresh Chromium profile for every sample. It records performance,
 accessibility, best-practices, and SEO scores together with first and largest contentful
-paint, Speed Index, total blocking time, and cumulative layout shift. The upstream
-80/90/80/90 category thresholds are retained in result metadata; the stable
+paint, Speed Index, total blocking time, and cumulative layout shift. The existing
+`first_contentful_paint` and `largest_contentful_paint` operations are Lighthouse's
+**simulated** desktop-network estimates. Separate `observed_first_contentful_paint` and
+`observed_largest_contentful_paint` operations report the corresponding unthrottled
+browser-trace measurements from the same navigation; they are not interchangeable with
+the simulated values. Result metadata also reports the total JavaScript response
+transfer bytes, uncompressed resource bytes, and number of JavaScript requests. The
+upstream 80/90/80/90 category thresholds are retained in result metadata; the stable
 accessibility, best-practices, and SEO thresholds are gates, while the noisier
 performance threshold remains diagnostic. A browser preflight verifies visible London
 weather, and every audit must load the local mock without making external requests.
+
+Lighthouse's desktop model uses discrete network round trips, so compressed JavaScript
+can change its paint estimates in roughly 40 ms steps even when observed paint and
+application behavior are unchanged. Compare the modeled and observed measurements
+separately and inspect the actual response transfer bytes before attributing a modeled
+paint difference to rendering work.
 
 The repository-wide `bundle-size` suite also builds all six weather targets with the same
 normalized production minifier used for its other app comparisons. Its `weather_*`
@@ -79,11 +91,31 @@ an independently compressed response and sums the app and framework buckets; it 
 inspect a server's content encoding. The framework bucket includes the Octane workspace
 runtime or the reference framework's dependencies together with bundler virtual helpers.
 
+`pnpm --filter octane-weather-app-benchmarks bench:work` is an untimed production
+regression gate for Octane's compressed JavaScript and bookkeeping DOM nodes. Start the
+Octane production preview first. The gate verifies London weather, all seven forecast
+rows, expansion and collapse with preserved row identity, a live Tokyo search, rejected
+invalid-city input, Paris recovery, local storage, and the existing application semantics
+before enforcing its gzip and comment budgets. It never substitutes marker counts for
+those observable correctness controls.
+
+`pnpm --filter octane-weather-app-benchmarks bench:delivery` runs a separate,
+explicitly labeled client-rendered versus streamed-server-shell delivery experiment.
+Octane and React both use their native streaming renderer and hydrate an equivalent
+server-rendered shell; the existing six-framework client-rendered Lighthouse suite and
+its ratio guards remain unchanged. Server effects do not run, so the shell does not
+pretend to contain prefetched weather: both streamed targets still fetch the same local
+mock after hydration and must satisfy the same weather and interaction checks.
+
 ## Run
 
 ```bash
 node benchmarks/bench.mjs weather-app
 node benchmarks/bench.mjs --quick weather-app weather-app-lighthouse bundle-size
+pnpm --filter octane-tsrx-weather-app-bench build
+pnpm --filter octane-tsrx-weather-app-bench preview
+pnpm --filter octane-weather-app-benchmarks bench:work
+pnpm --filter octane-weather-app-benchmarks bench:delivery
 ```
 
 ## Attribution

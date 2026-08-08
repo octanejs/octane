@@ -2,9 +2,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
+import { prerender } from 'octane/static';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { Page, NestedPage, RouterShape } from './_fixtures/trycatch-client-error.tsrx';
+import {
+	Page,
+	NestedPage,
+	RouterShape,
+	JsxBoundaryPage,
+	JsxRejectedBoundaryPage,
+} from './_fixtures/trycatch-client-error.tsrx';
 
 // The server rendered a @try's SUCCESS arm, but on the client the try body throws
 // during hydration (the live report: a route module failed to import on a hot dev
@@ -167,6 +174,72 @@ describe('hydrateRoot — try body throws during hydration, @catch mounts', () =
 		expect(msg!.textContent).toBe('outer:boom');
 		expect(container.querySelector('#before')!.textContent).toBe('Title');
 		expect(container.querySelector('#after')!.textContent).toBe('after');
+		root.unmount();
+	});
+});
+
+describe('hydrateRoot — JSX error boundaries', () => {
+	it('adopts successful server content without replacing its stateful host', async () => {
+		const state = { failed: false };
+		const { html } = await ServerRT.renderToString(server.JsxBoundaryPage, { state });
+		container.innerHTML = html;
+		const before = container.querySelector('#jsx-before');
+		const button = container.querySelector('#ok') as HTMLButtonElement;
+		const after = container.querySelector('#jsx-after');
+
+		const root = hydrateRoot(container, JsxBoundaryPage, { state });
+		flushSync(() => {});
+		expect(container.querySelector('#jsx-before')).toBe(before);
+		expect(container.querySelector('#ok')).toBe(button);
+		expect(container.querySelector('#jsx-after')).toBe(after);
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('ok:1');
+		expect(errSpy).not.toHaveBeenCalled();
+		root.unmount();
+	});
+
+	it('replaces client-failed server content without disturbing siblings, then recovers on reset', async () => {
+		const { html } = await ServerRT.renderToString(server.JsxBoundaryPage, {
+			state: { failed: false },
+		});
+		container.innerHTML = html;
+		const before = container.querySelector('#jsx-before');
+		const after = container.querySelector('#jsx-after');
+		const state = { failed: true };
+
+		const root = hydrateRoot(container, JsxBoundaryPage, { state });
+		flushSync(() => {});
+		const fallback = container.querySelector('#jsx-boundary-error') as HTMLButtonElement;
+		expect(fallback.textContent).toBe('caught:boom');
+		expect(container.querySelector('#ok')).toBeNull();
+		expect(container.querySelector('#jsx-before')).toBe(before);
+		expect(container.querySelector('#jsx-after')).toBe(after);
+		flushSync(() => fallback.click());
+		expect(container.querySelector('#ok')?.textContent).toBe('ok:0');
+		expect(container.querySelector('#jsx-boundary-error')).toBeNull();
+		expect(container.querySelector('#jsx-before')).toBe(before);
+		expect(container.querySelector('#jsx-after')).toBe(after);
+		expect(errSpy).not.toHaveBeenCalled();
+		root.unmount();
+	});
+
+	it('adopts a server-rendered rejection fallback and exposes its original primitive reason', async () => {
+		const { html } = await prerender(server.JsxRejectedBoundaryPage, {
+			promise: Promise.reject('server rejected'),
+		});
+		container.innerHTML = html;
+		const fallback = container.querySelector('#jsx-rejected-error');
+		const sibling = container.querySelector('#jsx-rejected-after');
+
+		const root = hydrateRoot(container, JsxRejectedBoundaryPage, {
+			promise: new Promise<string>(() => {}),
+		});
+		flushSync(() => {});
+		expect(container.querySelector('#jsx-rejected-error')).toBe(fallback);
+		expect(fallback?.textContent).toBe('server rejected');
+		expect(fallback?.getAttribute('data-kind')).toBe('string');
+		expect(container.querySelector('#jsx-rejected-after')).toBe(sibling);
+		expect(errSpy).not.toHaveBeenCalled();
 		root.unmount();
 	});
 });

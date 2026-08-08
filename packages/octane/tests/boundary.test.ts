@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { flushSync } from 'octane';
-import { mount, nextPaint } from './_helpers';
+import { act, flushEffects, mount, nextPaint } from './_helpers';
 import {
 	SuspenseHost,
 	SuspenseHostJsx,
@@ -8,6 +8,9 @@ import {
 	ResetErrorHost,
 	RetainedResetErrorHost,
 	RetainedResetSuspenseHost,
+	EffectErrorHost,
+	LifecycleErrorHost,
+	RefDetachErrorHost,
 } from './_fixtures/boundary.tsrx';
 
 describe('<Suspense> component', () => {
@@ -96,6 +99,63 @@ describe('<ErrorBoundary> component', () => {
 		resolve('ready');
 		await nextPaint();
 		expect(r.find('#v').textContent).toBe('v:ready');
+		r.unmount();
+	});
+
+	it.each(['layout', 'passive'] as const)(
+		'catches a descendant %s effect without retaining its failed content',
+		async (phase) => {
+			const r = mount(EffectErrorHost, { phase });
+			await act(async () => {});
+			flushEffects();
+			expect(r.find('#effect-error').textContent).toBe(`${phase} failed`);
+			expect(r.findAll('#effect-before-error')).toHaveLength(0);
+			r.unmount();
+		},
+	);
+
+	it('detaches a failed primary ref and runs its committed cleanup exactly once', () => {
+		const log: string[] = [];
+		const refs: Array<Element | null> = [];
+		const hostRef = (node: Element | null) => {
+			refs.push(node);
+		};
+		const r = mount(LifecycleErrorHost, { fail: false, log, hostRef });
+		const primary = r.find('#boundary-primary');
+		expect(refs).toEqual([primary]);
+		expect(log).toEqual(['setup']);
+
+		r.update(LifecycleErrorHost, { fail: true, log, hostRef });
+		expect(r.find('#lifecycle-error').textContent).toBe('lifecycle failed');
+		expect(r.findAll('#boundary-primary')).toHaveLength(0);
+		expect(refs).toEqual([primary, null]);
+		expect(log).toEqual(['setup', 'cleanup']);
+		r.unmount();
+		expect(log).toEqual(['setup', 'cleanup']);
+	});
+
+	it('stops committing fallback when primary cleanup unmounts its root', () => {
+		const log: string[] = [];
+		let mounted!: ReturnType<typeof mount>;
+		const onCleanup = () => mounted.unmount();
+		mounted = mount(LifecycleErrorHost, { fail: false, log, onCleanup });
+		expect(() => mounted.update(LifecycleErrorHost, { fail: true, log, onCleanup })).not.toThrow();
+		expect(mounted.container.childNodes).toHaveLength(0);
+		expect(log).toEqual(['setup', 'cleanup']);
+	});
+
+	it('catches a descendant ref-detach failure without leaving its previous subtree mounted', () => {
+		const calls: Array<Element | null> = [];
+		const hostRef = (node: Element | null) => {
+			calls.push(node);
+			if (node === null) throw new Error('ref detach failed');
+		};
+		const r = mount(RefDetachErrorHost, { keep: true, hostRef });
+		const primary = r.find('#boundary-ref');
+		expect(() => r.update(RefDetachErrorHost, { keep: false, hostRef })).not.toThrow();
+		expect(r.find('#ref-error').textContent).toBe('ref detach failed');
+		expect(r.findAll('#boundary-ref-sibling')).toHaveLength(0);
+		expect(calls).toEqual([primary, null]);
 		r.unmount();
 	});
 });
