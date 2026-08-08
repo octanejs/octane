@@ -27,6 +27,10 @@ const draftWorkflow = readFileSync(
 	'utf8',
 );
 const labelWorkflow = readFileSync(path.join(REPO, '.github/workflows/label-pr.yml'), 'utf8');
+const reviewReadinessWorkflow = readFileSync(
+	path.join(REPO, '.github/workflows/review-readiness-label.yml'),
+	'utf8',
+);
 const vercelPreviewWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/vercel-preview.yml'),
 	'utf8',
@@ -817,6 +821,19 @@ describe('Pull request labels', () => {
 			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
 		);
 		assert.doesNotMatch(labelWorkflow, /actions\/checkout/);
+	});
+});
+
+describe('Review readiness label', () => {
+	test('handles only pull request comments with permission to update pull request labels', () => {
+		assert.match(
+			reviewReadinessWorkflow,
+			/on:\n {2}issue_comment:\n {4}types: \[created, edited\]/,
+		);
+		assert.match(reviewReadinessWorkflow, /^ {4}if: github\.event\.issue\.pull_request$/m);
+		assert.match(reviewReadinessWorkflow, /^ {6}issues: read$/m);
+		assert.match(reviewReadinessWorkflow, /^ {6}pull-requests: write$/m);
+		assert.doesNotMatch(reviewReadinessWorkflow, /actions\/checkout/);
 	});
 });
 

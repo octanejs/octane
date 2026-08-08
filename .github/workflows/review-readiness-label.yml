@@ -1,0 +1,80 @@
+name: Review readiness label
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+concurrency:
+  # Keep label updates for the same pull request from racing.
+  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: update label
+    if: github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: write
+
+    steps:
+      - name: Apply the latest review readiness command
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const READY = "READY FOR REVIEW";
+            const WITHDRAWN = "REVIEW WITHDRAWN";
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+
+            // Commands are case-sensitive standalone lines, so they can be
+            // accompanied by an explanation without matching ordinary prose.
+            const commands = context.payload.comment.body
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter((line) => line === READY || line === WITHDRAWN);
+            const command = commands.at(-1);
+            if (!command) {
+              return;
+            }
+
+            // Refetch because another comment-driven run may have changed the
+            // labels since this event was queued.
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number,
+            });
+            const labels = issue.labels.map((label) =>
+              typeof label === "string" ? label : label.name,
+            );
+            const hasLabel = labels.includes(READY);
+
+            try {
+              if (command === READY && !hasLabel) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number,
+                  labels: [READY],
+                });
+                core.notice(`Applied ${READY} to #${issue_number}.`);
+              } else if (command === WITHDRAWN && hasLabel) {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number,
+                  name: READY,
+                });
+                core.notice(`Removed ${READY} from #${issue_number}.`);
+              } else {
+                core.notice(
+                  `${READY} is already ${hasLabel ? "applied to" : "absent from"} #${issue_number}.`,
+                );
+              }
+            } catch (error) {
+              core.setFailed(
+                `Could not update ${READY} on #${issue_number}: ${error.message}`,
+              );
+            }
