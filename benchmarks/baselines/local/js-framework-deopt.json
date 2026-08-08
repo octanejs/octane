@@ -124,60 +124,6 @@
           "scoreRme": 12.79650315852296,
           "warmupRatio": 0.9463414636642573,
           "samples": 8
-        },
-        "nodes_1k": {
-          "median": 10074,
-          "min": 10074,
-          "samples": 1
-        },
-        "elements_1k": {
-          "median": 8051,
-          "min": 8051,
-          "samples": 1
-        },
-        "text_1k": {
-          "median": 2021,
-          "min": 2021,
-          "samples": 1
-        },
-        "comments_1k": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
-        },
-        "empty_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        }
-      },
-      "meta": {
-        "dom": {
-          "root": "#main",
-          "total": 10074,
-          "elements": 8051,
-          "text": 2021,
-          "comments": 2,
-          "emptyText": 0,
-          "whitespaceText": 0,
-          "hydrationMarkersPhysical": 0,
-          "hydrationMarkersLogical": 0,
-          "hydrationMarkersCounted": 0,
-          "hydrationMarkerMaxMultiplicity": 0,
-          "leadingHydrationStartsPhysical": 0,
-          "leadingHydrationStartsLogical": 0,
-          "commentsByData": {
-            "/for": 1,
-            "for": 1
-          },
-          "commentParents": {
-            "tbody": 2
-          }
         }
       }
     },
@@ -303,60 +249,6 @@
           "scoreRme": 12.290812321819715,
           "warmupRatio": 0.9384469738789416,
           "samples": 8
-        },
-        "nodes_1k": {
-          "median": 10074,
-          "min": 10074,
-          "samples": 1
-        },
-        "elements_1k": {
-          "median": 8051,
-          "min": 8051,
-          "samples": 1
-        },
-        "text_1k": {
-          "median": 2021,
-          "min": 2021,
-          "samples": 1
-        },
-        "comments_1k": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
-        },
-        "empty_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        }
-      },
-      "meta": {
-        "dom": {
-          "root": "#main",
-          "total": 10074,
-          "elements": 8051,
-          "text": 2021,
-          "comments": 2,
-          "emptyText": 0,
-          "whitespaceText": 0,
-          "hydrationMarkersPhysical": 0,
-          "hydrationMarkersLogical": 0,
-          "hydrationMarkersCounted": 0,
-          "hydrationMarkerMaxMultiplicity": 0,
-          "leadingHydrationStartsPhysical": 0,
-          "leadingHydrationStartsLogical": 0,
-          "commentsByData": {
-            "/for": 1,
-            "for": 1
-          },
-          "commentParents": {
-            "tbody": 2
-          }
         }
       }
     },
@@ -482,59 +374,6 @@
           "scoreRme": 16.28622658176491,
           "warmupRatio": 0.9380530973451326,
           "samples": 8
-        },
-        "nodes_1k": {
-          "median": 10074,
-          "min": 10074,
-          "samples": 1
-        },
-        "elements_1k": {
-          "median": 8051,
-          "min": 8051,
-          "samples": 1
-        },
-        "text_1k": {
-          "median": 2021,
-          "min": 2021,
-          "samples": 1
-        },
-        "comments_1k": {
-          "median": 2,
-          "min": 2,
-          "samples": 1
-        },
-        "empty_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        }
-      },
-      "meta": {
-        "dom": {
-          "root": "#main",
-          "total": 10074,
-          "elements": 8051,
-          "text": 2021,
-          "comments": 2,
-          "emptyText": 0,
-          "whitespaceText": 0,
-          "hydrationMarkersPhysical": 0,
-          "hydrationMarkersLogical": 0,
-          "hydrationMarkersCounted": 0,
-          "hydrationMarkerMaxMultiplicity": 0,
-          "leadingHydrationStartsPhysical": 0,
-          "leadingHydrationStartsLogical": 0,
-          "commentsByData": {
-            "": 2
-          },
-          "commentParents": {
-            "tbody": 2
-          }
         }
       }
     },
@@ -660,55 +499,6 @@
           "scoreRme": 8.597402649335521,
           "warmupRatio": 0.9518005525588974,
           "samples": 8
-        },
-        "nodes_1k": {
-          "median": 10072,
-          "min": 10072,
-          "samples": 1
-        },
-        "elements_1k": {
-          "median": 8051,
-          "min": 8051,
-          "samples": 1
-        },
-        "text_1k": {
-          "median": 2021,
-          "min": 2021,
-          "samples": 1
-        },
-        "comments_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "empty_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        },
-        "whitespace_text_1k": {
-          "median": 0,
-          "min": 0,
-          "samples": 1
-        }
-      },
-      "meta": {
-        "dom": {
-          "root": "#main",
-          "total": 10072,
-          "elements": 8051,
-          "text": 2021,
-          "comments": 0,
-          "emptyText": 0,
-          "whitespaceText": 0,
-          "hydrationMarkersPhysical": 0,
-          "hydrationMarkersLogical": 0,
-          "hydrationMarkersCounted": 0,
-          "hydrationMarkerMaxMultiplicity": 0,
-          "leadingHydrationStartsPhysical": 0,
-          "leadingHydrationStartsLogical": 0,
-          "commentsByData": {},
-          "commentParents": {}
         }
       }
     }

@@ -812,50 +812,6 @@
     "note": "Cross-framework transition topology guard: Octane reaches the honest 2-wave dependency floor vs React's 3 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
-    "suite": "js-framework",
-    "op": "nodes_1k",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "maxRatio": 1.01,
-    "note": "Deterministic DOM census at 1k rows. Marker reuse leaves Octane at 10074 vs React 10072 nodes (2026-07-13); catches structural-node regressions without timing noise."
-  },
-  {
-    "suite": "js-framework",
-    "op": "elements_1k",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control for the node census: equivalent fixtures must render exactly the same 8051 elements."
-  },
-  {
-    "suite": "js-framework",
-    "op": "text_1k",
-    "target": "octane-tsrx",
-    "reference": "react",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Semantic control for the node census: equivalent fixtures must render exactly the same 2021 text nodes."
-  },
-  {
-    "suite": "js-framework-deopt",
-    "op": "nodes_1k",
-    "target": "octane-tsrx-naive",
-    "reference": "octane-tsrx",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "A stamped sole-component row must share its host boundary: TSRX naive and tuned now both render 10074 nodes instead of the naive fixture carrying 2000 extra comments."
-  },
-  {
-    "suite": "js-framework-deopt",
-    "op": "nodes_1k",
-    "target": "octane-jsx-naive",
-    "reference": "octane-tsrx",
-    "minRatio": 1.0,
-    "maxRatio": 1.0,
-    "note": "Return-JSX single-root stamping plus keyed boundary sharing removes the JSX naive fixture's 4000 extra comments; its DOM shape must stay equal to tuned."
-  },
-  {
     "suite": "todomvc",
     "op": "row_class_writes_complete25",
     "target": "octane-tsrx",

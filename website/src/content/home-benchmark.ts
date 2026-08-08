@@ -25,12 +25,12 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'js-framework',
 			'octane-tsrx': 1,
-			react: 3.1628437699777208,
-			preact: 2.8830352950529026,
-			solid: 1.5736534016482975,
-			svelte: 2.3445336979556464,
-			ripple: 1.6949511804042041,
-			'vue-vapor': 1.0755299105793,
+			react: 4.467964206999877,
+			preact: 3.9610796002257804,
+			solid: 1.8029780240427107,
+			svelte: 2.6144821652325283,
+			ripple: 1.985461156493767,
+			'vue-vapor': 1.099263414898243,
 		},
 		{
 			op: 'todomvc',
