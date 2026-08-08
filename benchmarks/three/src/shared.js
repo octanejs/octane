@@ -67,14 +67,22 @@ export async function waitForDisposals(expected) {
 
 export function createRenderer(canvas) {
 	const listeners = { sessionstart: new Set(), sessionend: new Set() };
+	let renderCalls = 0;
 	return {
 		domElement: canvas,
 		outputColorSpace: THREE.SRGBColorSpace,
 		toneMapping: THREE.NoToneMapping,
 		shadowMap: { enabled: false, type: THREE.PCFShadowMap },
 		render(scene, camera) {
+			renderCalls++;
 			scene.updateMatrixWorld(true);
 			camera.updateMatrixWorld(true);
+		},
+		get renderCalls() {
+			return renderCalls;
+		},
+		resetRenderCalls() {
+			renderCalls = 0;
 		},
 		setPixelRatio() {},
 		setSize() {},

@@ -131,7 +131,11 @@ export function useFrame(callback: RenderCallback, ...args: unknown[]): null {
 	const [userArgs, slot] = splitSlot(args);
 	const renderPriority = typeof userArgs[0] === 'number' ? userArgs[0] : 0;
 	const store = useStore();
-	const callbackRef = useRef(callback, subSlot(slot, 'useFrame:callback'));
+	const callbackRef = useMemo(
+		() => ({ current: callback }),
+		[],
+		subSlot(slot, 'useFrame:callback'),
+	);
 
 	useLayoutEffect(
 		() => {

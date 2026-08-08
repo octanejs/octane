@@ -11,15 +11,29 @@ The pages use real Three scenes and an injected no-WebGL renderer so the timings
 isolate renderer/reconciler work from GPU and driver variance:
 
 - mount, update, keyed reverse, and tree removal for 1,000 meshes;
-- reconstruction of 1,000 constructor-backed objects plus observed disposal;
-- 1,000 frame subscribers, averaged across 20 manual frames;
+- reconstruction of 1,000 constructor-backed intrinsic objects plus observed
+  disposal, using the same catalogue-registration form in both bindings;
+- the same reconstruction through each binding's component-form `extend`, so
+  constructor-backed registration and owner-free compilation remain separately
+  measurable;
+- 1,000 frame subscribers, averaged across 20 manual frames that each update
+  the same complete scene and camera matrices, including direct Three;
 - 40 overlapping raycast targets, averaged across 20 native pointer events.
 
 Plain Three is a practical lower bound, not an API-equivalent declarative
 renderer. Each sample is rejected unless its public scene topology, object
-identity, updated values, disposal count, frame callback checksum, and event
-checksum match the operation. `unmount_tree_1k` measures clearing the rendered
-tree; it intentionally excludes each framework's delayed root-registry cleanup.
+identity, updated values, disposal count, frame callback and render counts, and
+event checksum match the operation. Reconstruction timings stop when the scene
+update commits; asynchronously scheduled disposal is then drained and verified
+outside the timed section so event-loop wakeups are not attributed to
+reconciliation. `unmount_tree_1k` measures clearing the rendered tree; it
+intentionally excludes each framework's delayed root-registry cleanup.
+
+Every runtime operation has a same-run ratio guard requiring Octane to be at
+least as fast as React Three Fiber. Cross-origin-isolated production pages retain
+high-resolution browser timers, and the normal and quick runners keep 20 and 10
+measured samples respectively so sub-millisecond operations have more stable
+comparison data.
 
 ## Bundle operations
 

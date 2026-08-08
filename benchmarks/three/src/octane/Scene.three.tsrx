@@ -1,11 +1,12 @@
 import { extend, useFrame } from '@octanejs/three';
 import { DisposableObject } from '../shared.js';
 
+extend({ DisposableObject });
 const Disposable = extend(DisposableObject);
 
-function FrameSubscriber(props) @{
-	useFrame(() => props.record(props.id));
-	<group name={'frame-' + props.id} />
+function FrameSubscriber({ id, record }) @{
+	useFrame(() => record(id));
+	<group name={'frame-' + id} />
 }
 
 export function BenchScene(props) @{
@@ -16,6 +17,11 @@ export function BenchScene(props) @{
 			}
 		}
 		@if (props.mode === 'disposable') {
+			@for (const item of props.items; key item.id) {
+				<disposableObject args={[item.id, props.version]} />
+			}
+		}
+		@if (props.mode === 'component-disposable') {
 			@for (const item of props.items; key item.id) {
 				<Disposable args={[item.id, props.version]} />
 			}

@@ -25,9 +25,10 @@ const canvas = document.getElementById('bench');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Missing benchmark canvas.');
 const geometry = new BoxGeometry(1, 1, 1);
 const material = new MeshBasicMaterial();
+const renderer = createRenderer(canvas);
 const root = createRoot(canvas);
 await root.configure({
-	gl: createRenderer(canvas),
+	gl: renderer,
 	size: { width: 64, height: 64 },
 	dpr: 1,
 	frameloop: 'never',
@@ -64,11 +65,12 @@ async function prepare(op) {
 	render('empty');
 	await drainScheduledWork();
 	resetDisposals();
+	renderer.resetRenderCalls();
 	frameCalls = frameChecksum = eventCalls = eventChecksum = 0;
 	identities = new Map();
 	if (op === 'mount_1k') return;
-	if (op === 'reconstruct_dispose_1k') {
-		render('disposable', baseItems, 0);
+	if (op === 'reconstruct_dispose_1k' || op === 'reconstruct_component_dispose_1k') {
+		render(op === 'reconstruct_dispose_1k' ? 'disposable' : 'component-disposable', baseItems, 0);
 		identities = captureIdentities(state.scene);
 		return;
 	}
@@ -93,9 +95,8 @@ async function run(op) {
 	else if (op === 'update_1k') render('mesh', updatedItems);
 	else if (op === 'reorder_1k') render('mesh', reorderedItems);
 	else if (op === 'unmount_tree_1k') render('empty');
-	else if (op === 'reconstruct_dispose_1k') {
-		render('disposable', baseItems, 1);
-		await waitForDisposals(MESH_COUNT);
+	else if (op === 'reconstruct_dispose_1k' || op === 'reconstruct_component_dispose_1k') {
+		render(op === 'reconstruct_dispose_1k' ? 'disposable' : 'component-disposable', baseItems, 1);
 	} else if (op === 'frame_1k_subscribers') {
 		for (let index = 0; index < FRAME_REPS; index++) state.advance(index / 60);
 	} else if (op === 'raycast_event') {
@@ -117,10 +118,16 @@ globalThis.__threeBench = {
 	ready: true,
 	prepare,
 	run,
+	async settle(op) {
+		if (op === 'reconstruct_dispose_1k' || op === 'reconstruct_component_dispose_1k') {
+			await waitForDisposals(MESH_COUNT);
+		}
+	},
 	snapshot() {
 		return snapshotScene(state.scene, identities, {
 			frameCalls,
 			frameChecksum,
+			frameRenderCalls: renderer.renderCalls,
 			eventCalls,
 			eventChecksum,
 			disposalCount: disposalCount(),

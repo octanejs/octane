@@ -640,7 +640,7 @@ const SUITES = [
 		name: 'three-renderer',
 		cwd: 'three',
 		servers: [{ filter: 'octane-three-bench', port: 5291 }],
-		iter: { normal: 10, quick: 2 },
+		iter: { normal: 20, quick: 10 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
