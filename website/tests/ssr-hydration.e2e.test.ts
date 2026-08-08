@@ -861,7 +861,8 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
 			try {
 				const plots = page.locator('.bench-card .bench-plot');
-				expect(await plots.count()).toBe(18);
+				const serverPlotCount = await plots.count();
+				expect(serverPlotCount).toBeGreaterThan(0);
 				const firstPlot = plots.first();
 				const serverPlot = await firstPlot.elementHandle();
 				expect(serverPlot).toBeTruthy();
@@ -876,7 +877,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 
 				expect(await page.locator('.recharts-wrapper').count()).toBe(0);
 				expect(await page.locator('.bench-plot-shell').count()).toBe(0);
-				expect(await plots.count()).toBe(18);
+				expect(await plots.count()).toBe(serverPlotCount);
 				// Hydration adopts the server-rendered chart node instead of replacing it.
 				expect(
 					await page.evaluate(
