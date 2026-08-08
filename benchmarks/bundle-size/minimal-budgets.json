@@ -39,6 +39,21 @@
     "gzip": 39088,
     "brotli": 34288
   },
+  "server-hooks": {
+    "raw": 608,
+    "gzip": 416,
+    "brotli": 352
+  },
+  "server-render": {
+    "raw": 31600,
+    "gzip": 11360,
+    "brotli": 10256
+  },
+  "component-owned-effects": {
+    "raw": 113024,
+    "gzip": 36928,
+    "brotli": 32432
+  },
   "binding-vanilla": {
     "raw": 668,
     "gzip": 444,

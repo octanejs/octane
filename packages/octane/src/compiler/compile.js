@@ -1758,6 +1758,62 @@ function moduleImportsViewTransition(astBody) {
 	}
 }
 
+function classifyViewTransitionOwnership(astBody, production, ownComponents) {
+	if (!moduleImportsViewTransition(astBody)) return { global: false, owners: new Set() };
+	if (!production) return { global: true, owners: new Set() };
+
+	const imported = new Set();
+	for (const statement of astBody) {
+		if (statement.type === 'ImportDeclaration' && statement.source?.value === 'octane') {
+			for (const specifier of statement.specifiers || []) {
+				if (specifier.type === 'ImportNamespaceSpecifier') {
+					return { global: true, owners: new Set() };
+				}
+				const name = specifier.imported?.name ?? specifier.imported?.value;
+				if (name === 'ViewTransition' || name === 'unstable_ViewTransition') {
+					imported.add(specifier.local.name);
+				}
+			}
+		} else if (
+			(statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportAllDeclaration') &&
+			statement.source?.value === 'octane'
+		) {
+			return { global: true, owners: new Set() };
+		}
+	}
+	if (imported.size === 0) return { global: true, owners: new Set() };
+
+	const mentionsImportedTransition = (root) => {
+		const free = collectFreeIdentifiers(
+			root,
+			isComponentFunction(root) ? collectComponentLocals(root) : new Set(),
+		);
+		for (const name of imported) {
+			if (free.has(name)) return true;
+		}
+		return false;
+	};
+
+	let global = false;
+	const owners = new Set();
+	for (const statement of astBody) {
+		if (statement.type === 'ImportDeclaration') continue;
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (!mentionsImportedTransition(declaration ?? statement)) continue;
+		const exported =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
+		if (ownComponents && exported && isComponentFunction(declaration)) {
+			owners.add(declaration.id.name);
+		} else {
+			global = true;
+		}
+	}
+	return { global, owners };
+}
+
 export const HOOK_NAMES = new Set([
 	'useState',
 	'useLinkedState',
@@ -2213,7 +2269,7 @@ function isArrowStableOver(arrow, stable, componentLocals) {
  * Idempotent: a const we already rewrote into `useCallback(...)` won't be
  * re-wrapped (its init is now a CallExpression, not an ArrowFunctionExpression).
  */
-function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
+function rewriteAutoCallback(stmt, stable, componentLocals, ctx, invariant) {
 	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
 	let modified = false;
 	const newDecls = stmt.declarations.map((decl) => {
@@ -2245,7 +2301,11 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 					// `_octaneGenerated` tells rewriteHookCalls (which slots this call next)
 					// that the callee is compiler-inserted — it renames it to the shadow-proof
 					// `_$useCallback` alias instead of treating it as a user identifier.
-					{ ...b.id('useCallback'), _octaneGenerated: true },
+					{
+						...b.id('useCallback'),
+						_octaneGenerated: true,
+						_octaneLifetimeInvariant: invariant.has(decl.id.name),
+					},
 					arrow,
 					b.array(deps.map((n) => b.id(n))),
 				),
@@ -6587,10 +6647,16 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		exactOrigins: new Map(), // see registerExactOrigin
 		originAliases: [], // see registerOriginAlias
 		hoistedTemplates: [], // { name, ast, html, ns, frag, origins }
+		internedTemplates: new Map(), // HTML -> one template or namespace/fragment variants
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
+		unownedDelegatedEvents: new Set(),
+		unownedCapturedEvents: new Set(),
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
+		ownedCssInjections: new Set(),
+		componentOwners: [],
+		currentComponentOwner: null,
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		currentMapTemps: null, // receiver/method temps owned by the current emitted function
 		currentAutoMemoOffset: 0, // flat compiler-cache cell offset for the body being emitted
@@ -6801,8 +6867,54 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	ctx.moduleFunctionDeclarations = collectImmutableModuleFunctions(ast.body);
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
-	// Client prelude `_$vtSeen()` module-load hint (view-transitions plan).
-	ctx._usesViewTransition = moduleImportsViewTransition(ast.body);
+	const productionEffects = !ctx.hmr && !ctx.dev && !ctx.profile;
+	const exportedComponents = ast.body.filter(
+		(statement) =>
+			(statement.type === 'ExportNamedDeclaration' ||
+				statement.type === 'ExportDefaultDeclaration') &&
+			isComponentFunction(statement.declaration),
+	);
+	// Prelude registration historically precedes every authored module effect.
+	// An effect above any component could observe its stylesheet, delegated
+	// listeners, or transition capability, so retain the entire module prelude.
+	let effectBeforeComponent = false;
+	let precedingModuleEffect = false;
+	if (productionEffects && exportedComponents.length > 1) {
+		for (const statement of ast.body) {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+					? statement.declaration
+					: statement;
+			if (isComponentFunction(declaration)) {
+				if (precedingModuleEffect) {
+					effectBeforeComponent = true;
+					break;
+				}
+				continue;
+			}
+			if (
+				statement.type === 'ImportDeclaration' ||
+				statement.type === 'ExportAllDeclaration' ||
+				(statement.type === 'ExportNamedDeclaration' && declaration == null) ||
+				declaration?.type === 'FunctionDeclaration' ||
+				declaration?.type === 'TSInterfaceDeclaration' ||
+				declaration?.type === 'TSTypeAliasDeclaration' ||
+				statement.type === 'EmptyStatement'
+			) {
+				continue;
+			}
+			precedingModuleEffect = true;
+		}
+	}
+	ctx.componentEffectOwnership =
+		productionEffects && exportedComponents.length > 1 && !effectBeforeComponent;
+	const viewTransitions = classifyViewTransitionOwnership(
+		ast.body,
+		productionEffects,
+		ctx.componentEffectOwnership,
+	);
+	ctx._usesViewTransition = viewTransitions.global;
+	ctx.viewTransitionOwners = viewTransitions.owners;
 
 	// List of exported components needing HMR wrapping. Each entry: { name,
 	// exportKind: 'default' | 'named' }. We emit the `Comp = hmr(Comp)` lines
@@ -7175,6 +7287,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		}
 	}
 
+	finalizeComponentInitializers(ctx, bodyNodes);
+
 	// Auto-emit delegateEvents([...]) / delegateCaptureEvents([...]) once at module
 	// scope for every (bubble / capture) event seen.
 	if (ctx.delegatedEvents.size > 0) {
@@ -7216,22 +7330,24 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			),
 		);
 	}
-	const styleNodes = ctx.cssInjections.map((i) => {
-		// Point the authored `<style>` block at the CSS this injection carries.
-		// Both sides are whole units — the block and the stylesheet it became —
-		// which is the useful pairing for a scoped style.
-		const anchor = claimCssOrigins(ctx, i);
-		return inheritOriginLoc(
-			b.stmt(
-				b.call(
-					'_$injectStyle',
-					b.literal(i.hash, JSON.stringify(i.hash)),
-					b.literal(i.css, JSON.stringify(i.css)),
+	const styleNodes = ctx.cssInjections
+		.filter((i) => !ctx.ownedCssInjections.has(i))
+		.map((i) => {
+			// Point the authored `<style>` block at the CSS this injection carries.
+			// Both sides are whole units — the block and the stylesheet it became —
+			// which is the useful pairing for a scoped style.
+			const anchor = claimCssOrigins(ctx, i);
+			return inheritOriginLoc(
+				b.stmt(
+					b.call(
+						'_$injectStyle',
+						b.literal(i.hash, JSON.stringify(i.hash)),
+						b.literal(i.css, JSON.stringify(i.css)),
+					),
 				),
-			),
-			anchor ?? moduleOrigin,
-		);
-	});
+				anchor ?? moduleOrigin,
+			);
+		});
 	const templateNodes = ctx.hoistedTemplates.map((t) => {
 		const args = [b.literal(t.html, JSON.stringify(t.html))];
 		if (t.ns || t.frag) args.push(b.literal(t.ns | 0));
@@ -10591,6 +10707,103 @@ function singleRootInitializer(ctx, component) {
 	return markPure(b.call('_$__s', component));
 }
 
+function finalizeComponentInitializers(ctx, bodyNodes) {
+	if (!ctx.componentEffectOwnership || ctx.componentOwners.length === 0) return;
+
+	const delegatedOwners = new Map();
+	const capturedOwners = new Map();
+	const ownableStyles = new Set();
+	for (const owner of ctx.componentOwners) {
+		for (const event of owner.delegatedEvents) {
+			delegatedOwners.set(event, (delegatedOwners.get(event) ?? 0) + 1);
+		}
+		for (const event of owner.capturedEvents) {
+			capturedOwners.set(event, (capturedOwners.get(event) ?? 0) + 1);
+		}
+		for (const style of owner.styles) ownableStyles.add(style);
+	}
+	// The prelude emitted all stylesheets in authored order. Moving only owned
+	// sheets behind an unowned style map or local component reverses that cascade.
+	const preserveModuleStyleOrder = ctx.cssInjections.some((style) => !ownableStyles.has(style));
+
+	const replacements = new Map();
+	for (const owner of ctx.componentOwners) {
+		const calls = [];
+		if (owner.transition && !ctx._usesViewTransition) {
+			ctx.runtimeNeeded.add('__vtSeen');
+			calls.push(b.call(rtAlias('__vtSeen')));
+		}
+
+		const delegated = [...owner.delegatedEvents]
+			.filter((event) => delegatedOwners.get(event) === 1 && !ctx.unownedDelegatedEvents.has(event))
+			.sort();
+		if (delegated.length !== 0) {
+			for (const event of delegated) ctx.delegatedEvents.delete(event);
+			ctx.runtimeNeeded.add('delegateEvents');
+			calls.push(
+				b.call(
+					'_$delegateEvents',
+					b.array(delegated.map((event) => b.literal(event, JSON.stringify(event)))),
+				),
+			);
+		}
+
+		const captured = [...owner.capturedEvents]
+			.filter((event) => capturedOwners.get(event) === 1 && !ctx.unownedCapturedEvents.has(event))
+			.sort();
+		if (captured.length !== 0) {
+			for (const event of captured) ctx.capturedEvents.delete(event);
+			ctx.runtimeNeeded.add('delegateCaptureEvents');
+			calls.push(
+				b.call(
+					'_$delegateCaptureEvents',
+					b.array(captured.map((event) => b.literal(event, JSON.stringify(event)))),
+				),
+			);
+		}
+
+		if (!preserveModuleStyleOrder) {
+			for (const style of owner.styles) {
+				ctx.ownedCssInjections.add(style);
+				const origin = claimCssOrigins(ctx, style);
+				calls.push(
+					inheritOriginLoc(
+						b.call(
+							'_$injectStyle',
+							b.literal(style.hash, JSON.stringify(style.hash)),
+							b.literal(style.css, JSON.stringify(style.css)),
+						),
+						origin ?? owner.origin,
+					),
+				);
+			}
+		}
+		if (calls.length === 0) continue;
+
+		const declarator = owner.declaration.declarations[0];
+		const initializer = inheritOriginLoc(
+			markPure(b.call(b.arrow([], b.sequence([...calls, declarator.init])))),
+			owner.origin,
+		);
+		replacements.set(owner.declaration, {
+			...owner.declaration,
+			declarations: [{ ...declarator, init: initializer }],
+		});
+	}
+
+	if (replacements.size === 0) return;
+	for (let index = 0; index < bodyNodes.length; index++) {
+		const statement = bodyNodes[index];
+		const replacement = replacements.get(statement);
+		if (replacement !== undefined) {
+			bodyNodes[index] = replacement;
+		} else if (statement.type === 'ExportNamedDeclaration') {
+			const declaration = replacements.get(statement.declaration);
+			if (declaration !== undefined) bodyNodes[index] = { ...statement, declaration };
+		}
+	}
+}
+
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
@@ -10599,6 +10812,19 @@ function compileComponent(node, ctx, options) {
 	const isDefault = !!node.default;
 	const hmrWrap = !!(options && options.hmrWrap);
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
+	const owner =
+		ctx.componentEffectOwnership && isExported
+			? {
+					name,
+					origin: node,
+					delegatedEvents: new Set(),
+					capturedEvents: new Set(),
+					styles: [],
+					transition: ctx.viewTransitionOwners.has(name),
+					declaration: null,
+				}
+			: null;
+	const firstStyle = ctx.cssInjections.length;
 
 	// Scoped `<style>` block. New TSRX surfaces each style block as a
 	// `JSXStyleElement` child of the rendered tree (parser pre-computes the
@@ -10630,9 +10856,11 @@ function compileComponent(node, ctx, options) {
 	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
 	const prevKnownStr = ctx.knownStringLocals;
 	const prevProfileComponentId = ctx.currentProfileComponentId;
+	const previousComponentOwner = ctx.currentComponentOwner;
 	ctx.currentComponentLocals = collectComponentLocals(node);
 	ctx.currentAutoMemoCallsitesSafe = ctx.componentInfo.get(name)?.autoMemoCallsitesSafe !== false;
 	ctx.knownStringLocals = collectKnownStringLocals(node);
+	ctx.currentComponentOwner = owner;
 	if (ctx.profile) ctx.currentProfileComponentId = profileComponentId(ctx, name, node);
 	let fnNode;
 	try {
@@ -10650,7 +10878,9 @@ function compileComponent(node, ctx, options) {
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
 		ctx.knownStringLocals = prevKnownStr;
 		ctx.currentProfileComponentId = prevProfileComponentId;
+		ctx.currentComponentOwner = previousComponentOwner;
 	}
+	if (owner !== null) owner.styles = ctx.cssInjections.slice(firstStyle);
 
 	// Parallel-use warm plan: attached to the INNER function object (not the
 	// module const) so the component's own body — where the function-
@@ -10691,6 +10921,11 @@ function compileComponent(node, ctx, options) {
 		sourceBeforeNode !== '' &&
 		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(sourceBeforeNode);
 	if (referencedAboveDeclaration) {
+		if (owner !== null) {
+			for (const event of owner.delegatedEvents) ctx.unownedDelegatedEvents.add(event);
+			for (const event of owner.capturedEvents) ctx.unownedCapturedEvents.add(event);
+			if (owner.transition) ctx._usesViewTransition = true;
+		}
 		// Every stamp is `typeof`-guarded: route code-splitters (TanStack's) may
 		// EXTRACT the declaration into its own module and leave these statements
 		// behind — `typeof` on the then-undeclared identifier short-circuits
@@ -10780,6 +11015,10 @@ function compileComponent(node, ctx, options) {
 		b.declaration(declKind, [b.declarator(b.id(name, node.id ?? node), valueExpr)]),
 		node,
 	);
+	if (owner !== null) {
+		owner.declaration = declNode;
+		ctx.componentOwners.push(owner);
+	}
 	if (isDefault) {
 		if (options && options.hmrMutable) {
 			return {
@@ -10885,7 +11124,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			);
 		}
 		workingStatements = removeMountEventCallbackDeclarations(statements, mountCallbackSinks).map(
-			(s) => rewriteAutoCallback(s, stableSet, ctx.currentComponentLocals, ctx),
+			(s) =>
+				rewriteAutoCallback(s, stableSet, ctx.currentComponentLocals, ctx, bodyInvariantLocals),
 		);
 	}
 	if (returnedOutput) {
@@ -13524,7 +13764,17 @@ function authoredHookMemoOf(stmt) {
 		if (containsHookShapedCall(fn.body)) return null;
 		if (fn.body.type === 'BlockStatement' && !blockBodyInlineSafe(fn.body)) return null;
 	}
-	return { name, decl, kind: stmt.kind, fn, deps };
+	return {
+		name,
+		decl,
+		kind: stmt.kind,
+		fn,
+		deps,
+		generatedInvariant:
+			name === 'useCallback' &&
+			callee._octaneGenerated === true &&
+			callee._octaneLifetimeInvariant === true,
+	};
 }
 
 // Compute statements writing the site's result into `target` (an expression
@@ -13600,7 +13850,7 @@ function lowerPuMemoDecl(stmt, ctx) {
 function lowerAuthoredHookMemo(stmt, ctx) {
 	const entry = authoredHookMemoOf(stmt);
 	if (entry === null) return null;
-	const { name, decl, kind, fn, deps } = entry;
+	const { name, decl, kind, fn, deps, generatedInvariant } = entry;
 	// Explicit `null` deps: recompute every render — no cache at all. A
 	// useCallback degenerates to the factory itself; a useMemo evaluates
 	// inline (via the shared block machinery when the body is a block).
@@ -13616,6 +13866,24 @@ function lowerAuthoredHookMemo(stmt, ctx) {
 	}
 	const names = hookMemoNames(ctx);
 	const base = ctx.currentHookMemoOffset;
+	if (generatedInvariant) {
+		// A compiler-owned callback whose captures are lifetime-invariant cannot
+		// miss after its first render. Its function value doubles as the init flag,
+		// and publishing it immediately preserves identity across suspension.
+		ctx.currentHookMemoOffset = base + 1;
+		const valueCell = () => b.member(b.id(names.cache), hkNumLit(base), true);
+		return [
+			{
+				...stmt,
+				declarations: [
+					{
+						...decl,
+						init: b.logical('??', valueCell(), b.assignment('=', valueCell(), fn)),
+					},
+				],
+			},
+		];
+	}
 	const k = deps.length;
 	ctx.currentHookMemoOffset = base + k + 2;
 	const cellRef = (i) => b.member(b.id(names.cache), hkNumLit(i), true);
@@ -17367,10 +17635,11 @@ function planJsx(
 			const elVar = ensureVar(c.hostPath || []);
 			c.elVar = elVar;
 			const org = c.origin ?? planOrigin;
-			if (!noTemplate) {
+			const key = `_${hostKey}$${c.id}`;
+			if (!noTemplate && bag.host(key, elVar)) {
 				mountLines.push(
 					inheritOriginLoc(
-						b.stmt(b.assignment('=', b.id(bag.local(`_${hostKey}$${c.id}`)), hostVarNode(elVar))),
+						b.stmt(b.assignment('=', b.id(bag.local(key)), hostVarNode(elVar))),
 						org,
 					),
 				);
@@ -18448,6 +18717,7 @@ function bagLetter(i) {
 function makeBag() {
 	const fields = [];
 	const byKey = new Map();
+	const byHost = new Map();
 	const reg = (key, constExpr) => {
 		let r = byKey.get(key);
 		if (r === undefined) {
@@ -18470,6 +18740,16 @@ function makeBag() {
 	return {
 		/** Mount-write target for `key` — the pre-declared local. */
 		local: (key) => reg(key, undefined).local,
+		/** Register one immutable DOM-host field; aliases reuse its first mount write. */
+		host: (key, host) => {
+			const existing = byHost.get(host);
+			if (existing !== undefined) {
+				byKey.set(key, existing);
+				return false;
+			}
+			byHost.set(host, reg(key, undefined));
+			return true;
+		},
 		/** Seed `key` with a constant expression (no local, no mount write). */
 		constField: (key, expr) => {
 			reg(key, expr);
@@ -18614,8 +18894,10 @@ function emitDeferredMount(bind, elVar, bag) {
 	if (!(bind.kind === 'class' && bind.fresh)) {
 		bag.constField(bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`, 'undefined');
 	}
+	const key = `_el$${bind.id}`;
+	if (!bag.host(key, elVar)) return null;
 	return inheritOriginLoc(
-		b.stmt(b.assignment('=', b.id(bag.local(`_el$${bind.id}`)), hostVarNode(elVar))),
+		b.stmt(b.assignment('=', b.id(bag.local(key)), hostVarNode(elVar))),
 		bindingOrigin(bind),
 	);
 }
@@ -18633,6 +18915,9 @@ function emitBindingMount(bind, elVar, bag) {
 	const st = (node) => inheritOriginLoc(node, org);
 	const el = () => hostVarNode(elVar);
 	const local = (key) => b.id(bag.local(key));
+	const hostKey = `_el$${bind.id}`;
+	const mountHost = () =>
+		bag.host(hostKey, elVar) ? [b.stmt(b.assignment('=', local(hostKey), el()))] : [];
 	const V = () => b.id('_v');
 	// The tokens that NAME this binding's lowering carry the authored attribute
 	// name; everything else in the call maps to the value expression.
@@ -18650,10 +18935,7 @@ function emitBindingMount(bind, elVar, bag) {
 		return st(b.stmt(b.call('_$markNativeChangeDiagnosticStatic', el())));
 	}
 	if (bind.kind === 'nativeChangeRuntime') {
-		return [
-			st(b.stmt(b.assignment('=', local(`_el$${bind.id}`), el()))),
-			st(b.stmt(b.call('_$queueNativeChangeDiagnostic', el()))),
-		];
+		return [...mountHost().map(st), st(b.stmt(b.call('_$queueNativeChangeDiagnostic', el())))];
 	}
 	switch (bind.kind) {
 		case 'textOnlyChild': {
@@ -18675,7 +18957,7 @@ function emitBindingMount(bind, elVar, bag) {
 				b.block([
 					b.const('_v', bind.expr),
 					b.stmt(b.call('_$setDangerouslySetInnerHTML', el(), V())),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					...mountHost(),
 					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
 				]),
 			);
@@ -18704,7 +18986,7 @@ function emitBindingMount(bind, elVar, bag) {
 			return st(
 				b.block([
 					b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', el(), sources)),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					...mountHost(),
 				]),
 			);
 		}
@@ -18713,14 +18995,11 @@ function emitBindingMount(bind, elVar, bag) {
 				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
 			);
 			return st(
-				b.block([
-					b.stmt(b.call('_$setFormControlSources', el(), sources)),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
-				]),
+				b.block([b.stmt(b.call('_$setFormControlSources', el(), sources)), ...mountHost()]),
 			);
 		}
 		case 'hostCommit': {
-			const elLocal = local(`_el$${bind.id}`);
+			const hostMount = mountHost();
 			const propsLocal = local(`_host$${bind.id}`);
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
 				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
@@ -18751,7 +19030,7 @@ function emitBindingMount(bind, elVar, bag) {
 			);
 			return st(
 				b.block([
-					b.stmt(b.assignment('=', elLocal, el())),
+					...hostMount,
 					b.stmt(
 						b.assignment(
 							'=',
@@ -18794,7 +19073,7 @@ function emitBindingMount(bind, elVar, bag) {
 				b.block([
 					b.const('_v', bind.expr),
 					b.stmt(b.call(callee(), el(), nameLit(), V())),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					...mountHost(),
 					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
 				]),
 			);
@@ -18811,12 +19090,7 @@ function emitBindingMount(bind, elVar, bag) {
 			// update must re-run every render to reassert drift (React's
 			// controlled contract). Not in DEFERRABLE_MOUNT_KINDS: the mount
 			// runs inside the hydration window and arms the element.
-			return st(
-				b.block([
-					b.stmt(b.call(callee(), el(), bind.expr)),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
-				]),
-			);
+			return st(b.block([b.stmt(b.call(callee(), el(), bind.expr)), ...mountHost()]));
 		}
 		case 'autoFocus': {
 			// Mount-only (React ignores later autoFocus changes); the focus
@@ -18826,11 +19100,7 @@ function emitBindingMount(bind, elVar, bag) {
 		case 'class': {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
 			// to setAttribute. Compile-time choice, zero runtime branching.
-			const body = [
-				b.const('_v', bind.expr),
-				b.stmt(b.call(callee(), el(), V())),
-				b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
-			];
+			const body = [b.const('_v', bind.expr), b.stmt(b.call(callee(), el(), V())), ...mountHost()];
 			if (!bind.fresh) body.push(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())));
 			return st(b.block(body));
 		}
@@ -18839,7 +19109,7 @@ function emitBindingMount(bind, elVar, bag) {
 				b.block([
 					b.const('_v', bind.expr),
 					b.stmt(b.call(callee(), el(), V(), undefinedNode())),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					...mountHost(),
 					b.stmt(b.assignment('=', local(`_sty$${bind.id}`), V())),
 				]),
 			);
@@ -18862,7 +19132,7 @@ function emitBindingMount(bind, elVar, bag) {
 					: [];
 			// Register the mount locals BEFORE the cleanup closure resolves their
 			// bag letters (letter() throws for a never-mounted field).
-			const elLocal = local(`_el$${bind.id}`);
+			const hostMount = mountHost();
 			const spLocal = local(`_sp$${bind.id}`);
 			const cleanup = b.arrow(
 				[],
@@ -18889,7 +19159,7 @@ function emitBindingMount(bind, elVar, bag) {
 				b.block([
 					b.const('_v', bind.expr),
 					b.stmt(b.call('_$setSpread', el(), V(), undefinedNode(), b.id('__s'), ...flags)),
-					b.stmt(b.assignment('=', elLocal, el())),
+					...hostMount,
 					b.stmt(b.assignment('=', spLocal, V())),
 					cleanupsPush(cleanup),
 				]),
@@ -18903,7 +19173,7 @@ function emitBindingMount(bind, elVar, bag) {
 				b.assignment('=', b.member(el(), slotKeyLiteral(bind), true), value),
 			);
 			if (bind.mountOnly) return st(slotAssign);
-			return [st(b.stmt(b.assignment('=', local(`_el$${bind.id}`), el()))), st(slotAssign)];
+			return [...mountHost().map(st), st(slotAssign)];
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
@@ -18913,7 +19183,7 @@ function emitBindingMount(bind, elVar, bag) {
 				b.block([
 					b.const('_v', bind.expr),
 					b.stmt(b.call(callee(), el(), nameLit(), V(), undefinedNode())),
-					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					...mountHost(),
 					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
 				]),
 			);
@@ -18953,6 +19223,7 @@ function emitBindingMount(bind, elVar, bag) {
 			// cleanup read because updates re-point it. Assigning both bag locals inside
 			// the queue call evaluates each mount value once while avoiding throwaway
 			// temporaries; Suspense still receives the exact ref/target pair.
+			const initializeHost = bag.host(hostKey, elVar);
 			return st(
 				b.block([
 					b.stmt(
@@ -18960,7 +19231,7 @@ function emitBindingMount(bind, elVar, bag) {
 							'_$queueRefAttach',
 							b.id('__s'),
 							b.assignment('=', local(`_ref$${bind.id}`), bind.expr),
-							b.assignment('=', local(`_el$${bind.id}`), el()),
+							initializeHost ? b.assignment('=', local(hostKey), el()) : local(hostKey),
 						),
 					),
 					cleanupsPush(
@@ -20255,8 +20526,21 @@ function emitElementHtml(
 			// is unreachable from the output: the key's map position resolves to
 			// the HANDLER expression, and the name itself emits nothing.
 			registerExactOrigin(ctx, attr.name, attr.name?.end, [`'${slotKey}'`, `"${slotKey}"`]);
-			if (capture) ctx.capturedEvents.add(eventName);
-			else ctx.delegatedEvents.add(eventName);
+			if (capture) {
+				ctx.capturedEvents.add(eventName);
+				if (ctx.currentComponentOwner !== null) {
+					ctx.currentComponentOwner.capturedEvents.add(eventName);
+				} else {
+					ctx.unownedCapturedEvents.add(eventName);
+				}
+			} else {
+				ctx.delegatedEvents.add(eventName);
+				if (ctx.currentComponentOwner !== null) {
+					ctx.currentComponentOwner.delegatedEvents.add(eventName);
+				} else {
+					ctx.unownedDelegatedEvents.add(eventName);
+				}
+			}
 			// Hot-path optimisation: `() => fn(arg, …)` arrows with zero params get
 			// compiled to a `{ fn, args }` bundle so the runtime can identity-diff
 			// fn + each arg and skip the property reassignment when nothing
@@ -22705,10 +22989,41 @@ function bodyContainsJsx(node) {
 
 /** @param {TemplateIR} ast */
 function allocTemplate(ctx, ast, ns = 0, frag = 0) {
+	const { html, origins } = serializeTemplateIr(ast);
+	const intern = !ctx.hmr && !ctx.dev && !ctx.profile;
+	const bucket = intern ? ctx.internedTemplates.get(html) : undefined;
+	const existing = Array.isArray(bucket)
+		? bucket.find((template) => template.ns === ns && template.frag === frag)
+		: bucket?.ns === ns && bucket.frag === frag
+			? bucket
+			: undefined;
+	if (existing !== undefined) {
+		if (ctx.inspect && origins !== null && existing.origins !== null) {
+			for (const origin of origins) {
+				const canonical = existing.origins.find(
+					(entry) =>
+						entry.kind === origin.kind && entry.start === origin.start && entry.end === origin.end,
+				);
+				if (canonical !== undefined) {
+					registerOriginAlias(
+						ctx,
+						{ start: origin.srcStart, end: origin.srcEnd },
+						{ start: canonical.srcStart },
+					);
+				}
+			}
+		}
+		return existing.name;
+	}
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	const { html, origins } = serializeTemplateIr(ast);
-	ctx.hoistedTemplates.push({ name, ast, html, ns, frag, origins });
+	const template = { name, ast, html, ns, frag, origins };
+	ctx.hoistedTemplates.push(template);
+	if (intern) {
+		if (bucket === undefined) ctx.internedTemplates.set(html, template);
+		else if (Array.isArray(bucket)) bucket.push(template);
+		else ctx.internedTemplates.set(html, [bucket, template]);
+	}
 	return name;
 }
 
