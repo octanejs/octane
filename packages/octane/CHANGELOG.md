@@ -1,5 +1,33 @@
 # octane
 
+## 0.1.31
+
+### Patch Changes
+
+- 80a9c7e: Compiler-inferred component memoization now admits destructured props
+  parameters. `function Child({ rows })` is the same one-props snapshot as
+  `function Child(props)`, so production call sites of such components gain the
+  whole-region dependency cache and skip the child entirely when their props are
+  reference-stable — patterns that evaluate expressions of their own (defaults,
+  computed keys), bind `current`, or use array destructuring still fall back.
+  Call-site eligibility is also no longer vetoed body-wide by an unrelated
+  `ref.current` or live-import member read elsewhere in the parent: the reads
+  that actually flow into a site (directly or laundered through a local) still
+  reject that site, everything else keeps its region.
+- 62d7f13: Compiler-inferred component memoization now admits spread bags on host
+  elements. `<path d={e.d} {...e.attrs}>` inside a component body no longer
+  disqualifies that component's region cache or its keyed-list caches: a host
+  spread is one runtime-diffed binding whose bag is reachable only from
+  dependencies the region guard already witnesses, so skipping on unchanged
+  dependencies is exactly the no-op a re-entry would have been. Re-entries keep
+  full spread semantics — changed keys apply, vanished keys clear, and
+  spread-supplied refs and event handlers attach, swap, and detach as before.
+  Spreads on component tags keep failing closed: they build the child's props
+  snapshot, which cached call sites must never construct from a getter-bearing
+  bag.
+- 16df26e: Skip unchanged keyed rows containing nested host-only lists or conditionals
+  while preserving imported dependency invalidation and structured row ownership.
+
 ## 0.1.30
 
 ### Patch Changes

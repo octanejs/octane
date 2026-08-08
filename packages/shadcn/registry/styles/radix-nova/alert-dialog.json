@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/radix@0.1.29"
+    "@octanejs/radix@0.1.30"
   ],
   "registryDependencies": [
     "@octane/button",

@@ -1,5 +1,15 @@
 # @octanejs/mcp-server
 
+## 0.2.14
+
+### Patch Changes
+
+- 7a6fba3: Expose the new `svg-dashboard` benchmark suite through the MCP server: a
+  hand-rolled-SVG observability dashboard rendered byte-identically by octane,
+  react, solid, and svelte fixtures, stressing path-`d`/transform churn, keyed
+  reconciliation inside `<svg>`, foreignObject namespace push/pop, portal
+  tooltips into an SVG overlay, and the `createElement` icon de-opt path.
+
 ## 0.2.13
 
 ### Patch Changes
