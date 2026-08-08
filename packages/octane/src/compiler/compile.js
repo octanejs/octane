@@ -3466,9 +3466,11 @@ function containsComponentCallOrControlFlow(stmts) {
 }
 
 /**
- * A host-only conditional can share its keyed row's immutable item/dependency
- * proof, but entering that conditional still needs the row's active scope. Keep
- * components and every other control-flow boundary on their existing path.
+ * A host-only conditional can share its containing row's immutable
+ * item/dependency proof, including through a narrowly proven nested keyed list.
+ * Entering either construct still needs the row's active scope. Lists without a
+ * conditional, components, opaque list expressions, and every other
+ * control-flow boundary remain on their existing path.
  */
 function hasOnlyHostConditionalItemBodies(stmts) {
 	let hasConditional = false;
@@ -3497,6 +3499,28 @@ function hasOnlyHostConditionalItemBodies(stmts) {
 		}
 		if (type === 'IfStatement' || type === 'JSXIfExpression') {
 			hasConditional = true;
+		} else if (type === 'JSXForExpression') {
+			const declaration = node.left;
+			const item = declaration?.declarations?.[0]?.id;
+			const key = unwrapTsExpr(node.key);
+			if (
+				node.await === true ||
+				node.index != null ||
+				node.nativeArrayMap !== undefined ||
+				declaration?.type !== 'VariableDeclaration' ||
+				declaration.declarations?.length !== 1 ||
+				item?.type !== 'Identifier' ||
+				!isAutoMemoCalculationDependency(node.right) ||
+				key?.type !== 'MemberExpression' ||
+				key.computed === true ||
+				key.optional === true ||
+				key.object?.type !== 'Identifier' ||
+				key.object.name !== item.name ||
+				key.property?.type !== 'Identifier'
+			) {
+				disallowed = true;
+				return;
+			}
 		} else if (
 			type === 'ForStatement' ||
 			type === 'ForInStatement' ||
@@ -3506,7 +3530,6 @@ function hasOnlyHostConditionalItemBodies(stmts) {
 			type === 'TryStatement' ||
 			type === 'SwitchStatement' ||
 			type === 'ActivityStatement' ||
-			type === 'JSXForExpression' ||
 			type === 'JSXTryExpression' ||
 			type === 'JSXSwitchExpression' ||
 			type === 'JSXActivityExpression' ||
@@ -22794,7 +22817,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// survivor shortcut has no compiler-cache epoch cell to consult).
 		if (itemMemoContextAware && autoMemoDeps === null) itemMemo = false;
 		const hostPure = !hasParentClosure && !hasHook && !hasNestedComp && !hasRenderCall;
-		const conditionalHostDepEligible =
+		const structuredHostDepEligible =
 			ctx.autoMemo === true &&
 			hasNestedComp &&
 			hasParentClosure &&
@@ -22802,14 +22825,24 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!hasRenderCall &&
 			node.nativeArrayMap === undefined &&
 			autoMemoDeps !== null &&
-			autoMemoDeps.every((name) => seenDeps.has(name)) &&
+			autoMemoDeps.every((name) => seenDeps.has(name) || ctx.importedNames.has(name)) &&
 			!containsAutoMemoContextRead(bodyAst, ctx) &&
 			hasOnlyHostConditionalItemBodies(subStmts);
+		if (structuredHostDepEligible) {
+			// The whole-list cache already witnesses imported projections. A row
+			// survivor now makes the same decision independently, so its existing
+			// dependency tuple must witness those live bindings as well.
+			for (const name of autoMemoDeps) {
+				if (seenDeps.has(name)) continue;
+				seenDeps.add(name);
+				depNames.push(name);
+			}
+		}
 		const hostDepEligible =
 			!hostPure &&
 			!hasHook &&
 			hasParentClosure &&
-			(!hasNestedComp || conditionalHostDepEligible) &&
+			(!hasNestedComp || structuredHostDepEligible) &&
 			!hasRenderCall;
 		if (itemMemo && itemMemoWitnesses.length > 0) {
 			pure = hostPure;
@@ -22819,7 +22852,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			pure = hostPure || (itemMemo && depNames.length === 0);
 			depEligible = !pure && !hasHook && (hostDepEligible || (itemMemo && depNames.length > 0));
 		}
-		requiresScope = depEligible && conditionalHostDepEligible;
+		requiresScope = depEligible && structuredHostDepEligible;
 		depNames.sort();
 	}
 
