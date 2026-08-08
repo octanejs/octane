@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**68 publishable package(s), including 54 framework binding(s) and 3 framework integration(s).**
+**69 publishable package(s), including 55 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -31,6 +31,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.26` | 3 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.28` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.30` | 42 |
+| `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.1` | 2 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.26` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.12` | 1 |
 | `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.14` | 2 |

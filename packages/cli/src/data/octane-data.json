@@ -193,6 +193,20 @@
       "verified": "2026-07-09"
     },
     {
+      "name": "@octanejs/livestore",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "@livestore/react", "version": "0.4.0" },
+      "surface": "Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages.",
+      "divergences": [
+        "ReactApi and withReactApi retain their historical upstream names but attach Octane hooks.",
+        "The public query error label identifies octane; LiveStore framework-toolkit 0.4.0 still records its internal refresh-reason renderer tag as react.",
+        "React Strict Mode double invocation is not emulated."
+      ],
+      "ssr": "Supported at the binding boundary: server rendering reads existing synchronous state without running passive subscriptions or browser-only store work; client Suspense and hydration are covered separately.",
+      "verified": "2026-08-02"
+    },
+    {
       "name": "@octanejs/lucide",
       "version": "0.1.26",
       "category": "UI and interaction",
@@ -797,6 +811,7 @@
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@floating-ui/react": "@octanejs/floating-ui",
     "@lexical/react": "@octanejs/lexical",
+    "@livestore/react": "@octanejs/livestore",
     "@mantine/hooks": "@octanejs/mantine-hooks",
     "@mdx-js/react": "@octanejs/mdx",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",

@@ -569,6 +569,37 @@ describe('useTransition — async actions (React 19)', () => {
 });
 
 describe('useTransition — the old screen stays whole', () => {
+	it('keeps each committed screen whole across successive suspended transitions', async () => {
+		for (const label of ['first', 'second']) {
+			const initial = deferred<string>();
+			const next = deferred<string>();
+			const log = createLog();
+			initial.resolve(`${label}-zero`);
+			await Promise.resolve();
+			const r = mount(TransitionOutsideBoundary, {
+				load: (step: number) => (step === 0 ? initial.promise : next.promise),
+				log: log.push,
+			});
+			await act(() => {});
+			expect(r.find('#shell').textContent).toBe('shell-0');
+			expect(r.find('#value').textContent).toBe(`${label}-zero`);
+			expect(log.drain()).toEqual(['effect:0']);
+
+			r.click('#bump');
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			expect(r.find('#shell').textContent).toBe('shell-0');
+			expect(r.find('#value').textContent).toBe(`${label}-zero`);
+			await act(() => {});
+			expect(log.drain()).toEqual([]);
+
+			await act(() => next.resolve(`${label}-one`));
+			expect(r.find('#shell').textContent).toBe('shell-1');
+			expect(r.find('#value').textContent).toBe(`${label}-one`);
+			expect(log.drain()).toEqual(['effect:1']);
+			r.unmount();
+		}
+	});
+
 	it('a parent that renders in place does not update before its suspended child', async () => {
 		const first = deferred<string>();
 		const second = deferred<string>();

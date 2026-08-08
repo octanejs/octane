@@ -4,7 +4,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/core/worklets.ts"
+  ],
   "engines": {
     "node": ">=22.22.2"
   },

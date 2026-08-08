@@ -19,6 +19,7 @@
     "packages": [
       "@octanejs/tanstack-ai",
       "@octanejs/apollo-client",
+      "@octanejs/livestore",
       "@octanejs/dexie",
       "@octanejs/tanstack-query",
       "@octanejs/tanstack-router",

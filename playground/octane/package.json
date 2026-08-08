@@ -15,8 +15,14 @@
     "debug-tsx": "pnpm run debug-volar"
   },
   "dependencies": {
+    "@livestore/adapter-web": "catalog:default",
+    "@livestore/common": "catalog:default",
+    "@livestore/livestore": "catalog:default",
+    "@livestore/utils": "catalog:default",
+    "@opentelemetry/api": "catalog:default",
     "@octanejs/aria": "workspace:*",
     "@octanejs/cmdk": "workspace:*",
+    "@octanejs/livestore": "workspace:*",
     "@octanejs/lucide": "workspace:*",
     "@octanejs/mantine-hooks": "workspace:*",
     "@octanejs/mobx": "workspace:*",

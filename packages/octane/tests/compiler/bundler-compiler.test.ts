@@ -951,8 +951,8 @@ export function App(p) @{
 			hmr: false,
 			dev: false,
 		});
-		expect(client?.code).toContain('_$tryBlock(');
-		expect(client?.code).toContain(', true);');
+		expect(client?.code).toContain('_$errorBlock(');
+		expect(client?.code).not.toContain('_$tryBlock(');
 		expect(client?.code).not.toContain('ErrorBoundary');
 
 		const server = compiler.transform(source, '/project/src/App.tsrx', {
@@ -972,6 +972,7 @@ export function App(p) @{ <Boundary fallback={p.fallback}><span>ok</span></Bound
 		);
 		expect(dynamic?.code).toContain('ErrorBoundary as Boundary');
 		expect(dynamic?.code).toContain('_$componentSlot(');
+		expect(dynamic?.code).not.toContain('_$errorBlock(');
 		expect(dynamic?.code).not.toContain('_$tryBlock(');
 
 		const mixedSource = `import { ErrorBoundary as Boundary } from 'octane';
@@ -981,7 +982,7 @@ export function App(p) @{ <><Boundary fallback={<span>static</span>}><span>ok</s
 			dev: false,
 		});
 		expect(mixed?.code).toContain('ErrorBoundary as Boundary');
-		expect(mixed?.code).toContain('_$tryBlock(');
+		expect(mixed?.code).toContain('_$errorBlock(');
 		expect(mixed?.code).toContain('_$componentSlot(');
 
 		const mixedServer = compiler.transform(mixedSource, '/project/src/MixedBoundary.tsrx', {
@@ -1000,7 +1001,51 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 		);
 		expect(asyncFallback?.code).toContain('ErrorBoundary as Boundary');
 		expect(asyncFallback?.code).toContain('_$componentSlot(');
+		expect(asyncFallback?.code).not.toContain('_$errorBlock(');
 		expect(asyncFallback?.code).not.toContain('_$tryBlock(');
+
+		const ordinaryTry = compiler.transform(
+			`export function App(p) @{ @try { <span>ok</span> } @catch (error) { <span>{String(error)}</span> } }`,
+			'/project/src/OrdinaryTry.tsrx',
+			{ hmr: false, dev: false },
+		);
+		expect(ordinaryTry?.code).toContain('_$tryBlock(');
+		expect(ordinaryTry?.code).not.toContain('_$errorBlock(');
+	});
+
+	it('preserves proven single-host roots through exact production memo wrappers only', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const source = `
+import { memo as remember } from 'octane';
+import { External } from './external';
+function Host(props) @{ <li>{props.label as string}</li> }
+function Optional(props) @{ if (!props.visible) return null; <li>{props.label as string}</li> }
+const indirect = remember;
+export const Stable = remember(Host);
+export const Nullable = remember(Optional);
+export const Compared = remember(Host, () => true);
+export const Imported = remember(External);
+export const Indirect = indirect(Host);
+`;
+		const id = '/project/src/MemoRoots.tsrx';
+		const production = compiler.transform(source, id, { hmr: false, dev: false });
+		expect(production?.code).toMatch(
+			/Stable\s*=\s*(?:\/\*[^*]*\*\/\s*)?_\$__s\(remember\(Host\)\)/,
+		);
+		expect(production?.code).toMatch(/Nullable\s*=\s*remember\(Optional\)/);
+		expect(production?.code).toMatch(/Compared\s*=\s*remember\(Host,\s*\(\)\s*=>\s*true\)/);
+		expect(production?.code).toMatch(/Imported\s*=\s*remember\(External\)/);
+		expect(production?.code).toMatch(/Indirect\s*=\s*indirect\(Host\)/);
+
+		for (const options of [
+			{ hmr: false, dev: true },
+			{ hmr: 'vite' as const, dev: true },
+			{ hmr: false, dev: false, profile: true },
+			{ environment: 'server' as const, hmr: false, dev: false },
+		]) {
+			const output = compiler.transform(source, id, options);
+			expect(output?.code).not.toMatch(/_\$__s\(remember\(Host\)\)/);
+		}
 	});
 
 	it('applies profiling metadata only to client transforms', () => {

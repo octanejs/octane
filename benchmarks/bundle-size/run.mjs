@@ -29,6 +29,7 @@
 // Run:  node benchmarks/bundle-size/run.mjs
 process.env.NODE_ENV = 'production';
 
+import assert from 'node:assert/strict';
 import { build } from 'vite';
 import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
@@ -67,6 +68,13 @@ const SETS = [
 		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue'],
 	},
 ];
+const APP_BUDGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-budgets.json'), 'utf8'));
+const JSX_BUDGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'jsx-budgets.json'), 'utf8'));
+assert.deepEqual(
+	Object.keys(APP_BUDGETS).sort(),
+	SETS.map(({ prefix }) => (prefix ? prefix.slice(0, -1) : 'rows')).sort(),
+	'full-application budgets must cover every benchmark set exactly once',
+);
 
 const gz = (buf) => gzipSync(buf, { level: zc.Z_BEST_COMPRESSION }).length;
 const br = (buf) =>
@@ -179,6 +187,44 @@ for (const set of SETS)
 		});
 		entry.meta.files.push(...files.map((f) => ({ ...f, set: px || 'js' })));
 	}
+function appendBudgetOperations(operations, budget, name, prefix = '') {
+	assert.deepEqual(
+		Object.keys(budget).sort(),
+		['app', 'framework', 'total'],
+		`${name}: full-application budget must cover application, framework, and total bytes`,
+	);
+	for (const [bucket, operation] of [
+		['app', 'app'],
+		['framework', 'fw'],
+		['total', 'js'],
+	]) {
+		assert.deepEqual(
+			Object.keys(budget[bucket]).sort(),
+			['brotli', 'gzip', 'raw'],
+			`${name}/${bucket}: full-application budget must cover raw, gzip, and brotli bytes`,
+		);
+		for (const metric of ['raw', 'gzip', 'brotli']) {
+			const bytes = budget[bucket][metric];
+			assert.equal(
+				Number.isSafeInteger(bytes) && bytes > 0,
+				true,
+				`${name}/${bucket}: invalid committed ${metric} byte budget`,
+			);
+			operations[prefix + operation + '_' + metric] = val(bytes);
+		}
+	}
+}
+
+const tsrxBudgetOps = {};
+for (const { prefix } of SETS) {
+	const name = prefix ? prefix.slice(0, -1) : 'rows';
+	appendBudgetOperations(tsrxBudgetOps, APP_BUDGETS[name], name, prefix);
+}
+targets.push({ name: 'octane-tsrx-budget', ops: tsrxBudgetOps });
+
+const jsxBudgetOps = {};
+appendBudgetOperations(jsxBudgetOps, JSX_BUDGETS, 'rows-jsx');
+targets.push({ name: 'octane-jsx-budget', ops: jsxBudgetOps });
 
 const payload = { suite: 'bundle-size', iterations: 1, targets };
 

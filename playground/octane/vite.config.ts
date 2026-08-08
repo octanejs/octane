@@ -60,6 +60,7 @@ export default defineConfig({
 			'@octanejs/shadcn',
 			'@octanejs/radix',
 			'@octanejs/lucide',
+			'@octanejs/livestore',
 			'@octanejs/rainbowkit',
 			'@octanejs/tanstack-query',
 			'@octanejs/wagmi',

@@ -1,0 +1,78 @@
+{
+  "name": "@octanejs/livestore",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "LiveStore bindings for Octane, ported from @livestore/react over LiveStore's framework-neutral core.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/livestore"
+  },
+  "main": "src/mod.ts",
+  "module": "src/mod.ts",
+  "types": "src/mod.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/mod.ts",
+    "./experimental": "./src/experimental/mod.ts"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts && vitest run --config vitest.ssr.config.ts",
+    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs"
+  },
+  "dependencies": {
+    "@livestore/common": "catalog:default",
+    "@livestore/framework-toolkit": "catalog:default",
+    "@livestore/livestore": "catalog:default",
+    "@livestore/utils": "catalog:default",
+    "@opentelemetry/api": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@livestore/adapter-web": "catalog:default",
+    "@livestore/utils-dev": "catalog:livestore-react-oracle",
+    "@opentelemetry/sdk-trace-base": "catalog:livestore-react-oracle",
+    "@testing-library/dom": "catalog:livestore-react-oracle",
+    "@testing-library/react": "catalog:livestore-react-oracle",
+    "@types/react": "catalog:livestore-react-oracle",
+    "@types/react-dom": "catalog:livestore-react-oracle",
+    "@types/react-window": "catalog:livestore-react-oracle",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "jsdom": "catalog:livestore-react-oracle",
+    "octane": "workspace:*",
+    "react": "catalog:livestore-react-oracle",
+    "react-dom": "catalog:livestore-react-oracle",
+    "react-window": "catalog:livestore-react-oracle",
+    "vite": "catalog:livestore-react-oracle",
+    "vitest": "catalog:default"
+  }
+}

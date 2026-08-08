@@ -1,0 +1,15 @@
+{
+  "upstream": {
+    "package": "@livestore/react",
+    "version": "0.4.0"
+  },
+  "surface": "Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages.",
+  "divergences": [
+    "ReactApi and withReactApi retain their historical upstream names but attach Octane hooks.",
+    "The public query error label identifies octane; LiveStore framework-toolkit 0.4.0 still records its internal refresh-reason renderer tag as react.",
+    "React Strict Mode double invocation is not emulated."
+  ],
+  "ssr": "Supported at the binding boundary: server rendering reads existing synchronous state without running passive subscriptions or browser-only store work; client Suspense and hydration are covered separately.",
+  "verified": "2026-08-02",
+  "docs": ["docs/livestore-port.md", "packages/livestore/UPSTREAM.md"]
+}

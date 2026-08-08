@@ -1,0 +1,2 @@
+# @livestore/react
+
