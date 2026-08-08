@@ -30,6 +30,13 @@ import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.js
 import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
 import svgDashboard from '../../../benchmarks/baselines/local/svg-dashboard.json';
 import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
+import asyncComposition from '../../../benchmarks/baselines/local/async-composition.json';
+import ssrHttp from '../../../benchmarks/baselines/local/ssr-http.json';
+import tanstackStart from '../../../benchmarks/baselines/local/tanstack-start.json';
+import threeBundleSize from '../../../benchmarks/baselines/local/three-bundle-size.json';
+import threeRenderer from '../../../benchmarks/baselines/local/three-renderer.json';
+import weatherAppLighthouse from '../../../benchmarks/baselines/local/weather-app-lighthouse.json';
+import weatherApp from '../../../benchmarks/baselines/local/weather-app.json';
 
 // `score` is charted when present; older checked-in baselines fall back to
 // `median`. Other stats vary by suite, so they stay optional.
@@ -94,6 +101,9 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
 	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
+	// The weather-app fixtures publish plain `vue` (same 3.6 pin). Color follows
+	// the entity, and the two Vue keys never appear on the same card.
+	{ key: 'vue', label: 'Vue 3.6', color: '#e06ec4' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
@@ -206,6 +216,33 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 			'clearCompleted',
 			'destroy25',
 		],
+	),
+	frameworkCard(
+		weatherApp,
+		'weather-app',
+		'weather-app',
+		'A real weather dashboard — cold start to interactive, keyed forecast churn, and async city search with error and recovery flows. The DOM-census counters in the baseline are diagnostics and stay out of the chart.',
+		{
+			initial_ready: 'cold ready',
+			forecast_cycle: 'forecast churn',
+			search_city: 'search city',
+			search_error: 'search error',
+			search_recover: 'search recover',
+		},
+		['initial_ready', 'forecast_cycle', 'search_city', 'search_error', 'search_recover'],
+	),
+	frameworkCard(
+		weatherAppLighthouse,
+		'weather-app-lighthouse',
+		'weather-app — Lighthouse',
+		'Desktop Lighthouse lab metrics for the same weather app — first and largest contentful paint, speed index, and total blocking time. Cumulative layout shift is unitless and omitted from the millisecond chart.',
+		{
+			first_contentful_paint: 'FCP',
+			largest_contentful_paint: 'LCP',
+			speed_index: 'speed index',
+			total_blocking_time: 'TBT',
+		},
+		['first_contentful_paint', 'largest_contentful_paint', 'speed_index', 'total_blocking_time'],
 	),
 	frameworkCard(
 		chatStream,
@@ -365,6 +402,136 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		series,
 		rows,
 		iterations: b.iterations,
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Head-to-head targets — suites whose roster is a specific stack rather than
+// the whole field: octane against React on real HTTP servers, composed async
+// trees and TanStack Start, plus the Three.js renderer column. These stay off
+// the home summary, which aggregates only the full-roster cards above.
+// ---------------------------------------------------------------------------
+export const TARGET_CARDS: BenchCard[] = [
+	frameworkCard(
+		asyncComposition,
+		'async-composition',
+		'async-composition',
+		'Composed async use() trees — Octane\u2019s compiled parallel-use batching against React\u2019s render-and-suspend loop. The wave, call and span counts in the baseline are deterministic diagnostics and stay out of the chart.',
+		{ init: 'initial render', update: 'update' },
+		['init', 'update'],
+	),
+	frameworkCard(
+		ssrHttp,
+		'ssr-http',
+		'ssr-http',
+		'Real production HTTP servers rendering the news page — renderer import, cold spawn/listen/first-byte, and streamed shell and completion times over HTTP for staggered and all-fast Suspense.',
+		{
+			import_renderer: 'import renderer',
+			cold_spawn_to_listen: 'cold spawn\u2192listen',
+			cold_listen_to_first_byte: 'cold listen\u2192first byte',
+			cold_spawn_to_first_byte: 'cold spawn\u2192first byte',
+			http_shell_staggered: 'staggered shell',
+			http_total_staggered: 'staggered complete',
+			http_shell_allfast: 'all-fast shell',
+			http_total_allfast: 'all-fast complete',
+		},
+	),
+];
+
+{
+	const b = tanstackStart as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane-minimal', label: 'Octane Start (minimal server)', color: VARIANT_COLORS.tuned },
+		{ key: 'octane-nitro', label: 'Octane Start (nitro)', color: VARIANT_COLORS.dark },
+		{ key: 'react', label: 'React (TanStack Start)', color: '#1e93b0' },
+	];
+	TARGET_CARDS.push({
+		id: 'tanstack-start',
+		title: 'tanstack-start',
+		description:
+			'The same TanStack Start app served by React and by the Octane port — cold start to first byte, warm TTFB and completion for the posts and deferred routes, the deferred stream tail, and sequential home requests.',
+		series,
+		rows: rowsFor(b, series, {
+			cold_spawn_to_listen: 'cold spawn\u2192listen',
+			cold_listen_to_first_byte: 'cold listen\u2192first byte',
+			cold_spawn_to_first_byte: 'cold spawn\u2192first byte',
+			warm_ttfb_posts: 'warm TTFB /posts',
+			warm_total_posts: 'warm total /posts',
+			warm_ttfb_deferred: 'warm TTFB /deferred',
+			warm_total_deferred: 'warm total /deferred',
+			warm_stream_tail_deferred: 'deferred stream tail',
+			warm_seq_request_home: 'sequential home requests',
+		}),
+		iterations: b.iterations,
+	});
+}
+
+// The imperative Three.js column is the no-framework control, so it wears the
+// control blue (react-uncompiled\u2019s slot — the two never share a card).
+const THREE_SERIES = {
+	octane: { label: 'Octane Three', color: VARIANT_COLORS.tuned },
+	r3f: { label: 'React Three Fiber 9', color: '#1e93b0' },
+	plain: { label: 'Plain Three.js', color: '#4bafe7' },
+} as const;
+
+{
+	const b = threeRenderer as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane', ...THREE_SERIES.octane },
+		{ key: 'r3f-9.6.1', ...THREE_SERIES.r3f },
+		{ key: 'plain-three', ...THREE_SERIES.plain },
+	];
+	TARGET_CARDS.push({
+		id: 'three-renderer',
+		title: 'three-renderer',
+		description:
+			'Object lifecycle at 1,000 meshes — mount, update, reorder, unmount, reconstruct with dispose, a frame with 1,000 subscribers, and raycast events — for the Octane Three renderer, React Three Fiber, and hand-written Three.js.',
+		series,
+		rows: rowsFor(b, series, {
+			mount_1k: 'mount 1k',
+			update_1k: 'update 1k',
+			reorder_1k: 'reorder 1k',
+			unmount_tree_1k: 'unmount 1k',
+			reconstruct_dispose_1k: 'reconstruct + dispose 1k',
+			frame_1k_subscribers: 'frame, 1k subscribers',
+			raycast_event: 'raycast event',
+		}),
+		iterations: b.iterations,
+	});
+}
+
+// three-bundle-size targets are named `<renderer>-<scene>` — regroup into one
+// row per scene with one gzip-bytes column per renderer.
+{
+	const b = threeBundleSize as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane', ...THREE_SERIES.octane },
+		{ key: 'r3f', ...THREE_SERIES.r3f },
+		{ key: 'plain', ...THREE_SERIES.plain },
+	];
+	const byName = new Map(b.targets.map((t) => [t.name, t]));
+	const rows: BenchRow[] = (
+		[
+			['min', 'minimal scene'],
+			['full', 'full helpers'],
+		] as const
+	).map(([scene, label]) => {
+		const row: BenchRow = { op: label };
+		for (const s of series) {
+			const target = byName.get(`${s.key}-${scene}`);
+			if (target) row[s.key] = statValue(target.ops.js_gzip);
+		}
+		return row;
+	});
+	TARGET_CARDS.push({
+		id: 'three-bundle-size',
+		title: 'three-bundle-size',
+		description:
+			'Shipped gzip JavaScript for a minimal scene and a helpers-heavy scene across the three renderers.',
+		series,
+		rows,
+		iterations: b.iterations,
+		format: 'bytes',
 	});
 }
 
