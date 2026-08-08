@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.24",
-    "@octanejs/lucide@0.1.25"
+    "@octanejs/aria@0.0.25",
+    "@octanejs/lucide@0.1.26"
   ],
   "registryDependencies": [
     "@octane/types",
