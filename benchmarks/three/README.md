@@ -14,7 +14,8 @@ isolate renderer/reconciler work from GPU and driver variance:
 - reconstruction of 1,000 constructor-backed intrinsic objects plus observed
   disposal, using the same catalogue-registration form in both bindings;
 - the same reconstruction through each binding's component-form `extend`, so
-  wrapper-component ownership remains visible as a separate cost;
+  constructor-backed registration and owner-free compilation remain separately
+  measurable;
 - 1,000 frame subscribers, averaged across 20 manual frames that each update
   the same complete scene and camera matrices, including direct Three;
 - 40 overlapping raycast targets, averaged across 20 native pointer events.
@@ -27,6 +28,12 @@ update commits; asynchronously scheduled disposal is then drained and verified
 outside the timed section so event-loop wakeups are not attributed to
 reconciliation. `unmount_tree_1k` measures clearing the rendered tree; it
 intentionally excludes each framework's delayed root-registry cleanup.
+
+Every runtime operation has a same-run ratio guard requiring Octane to be at
+least as fast as React Three Fiber. Cross-origin-isolated production pages retain
+high-resolution browser timers, and the normal and quick runners keep 20 and 10
+measured samples respectively so sub-millisecond operations have more stable
+comparison data.
 
 ## Bundle operations
 

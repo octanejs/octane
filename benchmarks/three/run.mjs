@@ -73,6 +73,10 @@ async function runTarget(browser, target) {
 	page.on('pageerror', (error) => errors.push(`pageerror: ${String(error)}`));
 	await page.goto(target.url, { waitUntil: 'load' });
 	await page.waitForFunction(() => globalThis.__threeBench?.ready === true);
+	gate(
+		await page.evaluate(() => globalThis.crossOriginIsolated),
+		`${target.name} requires cross-origin isolation for high-resolution timing`,
+	);
 	const results = {};
 	const checksums = {};
 	for (const op of OPS) {

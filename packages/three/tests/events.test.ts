@@ -146,6 +146,187 @@ describe('Three ray and pointer events', () => {
 		expect(log[0].point[2]).toBeCloseTo(1.5);
 	});
 
+	it('keeps custom raycast intersection targets isolated between interactive objects', async () => {
+		const { canvas, root } = await createEventRoot();
+		let front: THREE.Mesh | null = null;
+		let rear: THREE.Mesh | null = null;
+		const initialLengths: number[] = [];
+		const hits: string[] = [];
+
+		root.render(
+			EventScene,
+			emptySceneProps({
+				frontRef: (object: THREE.Mesh | null) => (front = object),
+				rearRef: (object: THREE.Mesh | null) => (rear = object),
+				onFrontPointerDown: () => hits.push('front'),
+				onRearPointerDown: () => hits.push('rear'),
+			}),
+		);
+		for (const object of [front!, rear!]) {
+			object.raycast = function (
+				this: THREE.Mesh,
+				raycaster: THREE.Raycaster,
+				intersections: THREE.Intersection[],
+			): void {
+				initialLengths.push(intersections.length);
+				intersections.length = 0;
+				THREE.Mesh.prototype.raycast.call(this, raycaster, intersections);
+			};
+		}
+		prepareRaycast(root.store.getState());
+
+		dispatchPointer(canvas, 'pointerdown', 50, 50);
+
+		expect(initialLengths).toEqual([0, 0]);
+		expect(hits).toEqual(['front', 'rear']);
+	});
+
+	it('reflects native-event cancellation and custom property changes across ordered hits', async () => {
+		const { canvas, root } = await createEventRoot();
+		const observed: Array<{
+			handler: string;
+			defaultPrevented: boolean;
+			customAtomic: unknown;
+			removedAtomic: unknown;
+			addedAtomic: unknown;
+		}> = [];
+		let customAtomic = 'before';
+		const record = (handler: string, event: ThreeEvent<MouseEvent>) => {
+			const properties = event as unknown as Record<string, unknown>;
+			observed.push({
+				handler,
+				defaultPrevented: event.defaultPrevented,
+				customAtomic: properties.customAtomic,
+				removedAtomic: properties.removedAtomic,
+				addedAtomic: properties.addedAtomic,
+			});
+		};
+
+		root.render(
+			EventScene,
+			emptySceneProps({
+				onFrontClick(event: ThreeEvent<MouseEvent>) {
+					record('front', event);
+					event.nativeEvent.preventDefault();
+					customAtomic = 'after';
+					Reflect.deleteProperty(event.nativeEvent, 'removedAtomic');
+					Object.defineProperty(event.nativeEvent, 'addedAtomic', {
+						configurable: true,
+						enumerable: true,
+						value: 'added',
+					});
+				},
+				onRearClick(event: ThreeEvent<MouseEvent>) {
+					record('rear', event);
+				},
+			}),
+		);
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointerdown', 50, 50);
+
+		const nativeEvent = new MouseEvent('click', {
+			bubbles: true,
+			cancelable: true,
+			clientX: 50,
+			clientY: 50,
+		});
+		Object.defineProperties(nativeEvent, {
+			offsetX: { configurable: true, enumerable: true, value: 50 },
+			offsetY: { configurable: true, enumerable: true, value: 50 },
+			pointerId: { configurable: true, enumerable: true, value: 1 },
+			customAtomic: { configurable: true, enumerable: true, get: () => customAtomic },
+			removedAtomic: { configurable: true, enumerable: true, value: 'removed' },
+		});
+		canvas.dispatchEvent(nativeEvent);
+
+		expect(observed).toEqual([
+			{
+				handler: 'front',
+				defaultPrevented: false,
+				customAtomic: 'before',
+				removedAtomic: 'removed',
+				addedAtomic: undefined,
+			},
+			{
+				handler: 'rear',
+				defaultPrevented: true,
+				customAtomic: 'after',
+				removedAtomic: undefined,
+				addedAtomic: 'added',
+			},
+		]);
+	});
+
+	it('keeps inherited native-event values as enumerable own properties on every hit', async () => {
+		const { canvas, root } = await createEventRoot();
+		const observed: Array<{ own: boolean; enumerable: boolean; copied: unknown }> = [];
+		const record = (event: ThreeEvent<PointerEvent>) => {
+			const descriptor = Object.getOwnPropertyDescriptor(event, 'clientX');
+			observed.push({
+				own: Object.prototype.hasOwnProperty.call(event, 'clientX'),
+				enumerable: descriptor?.enumerable === true,
+				copied: { ...event }.clientX,
+			});
+		};
+
+		root.render(
+			EventScene,
+			emptySceneProps({
+				onFrontPointerDown: record,
+				onRearPointerDown: record,
+			}),
+		);
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointerdown', 50, 50);
+
+		expect(observed).toEqual([
+			{ own: true, enumerable: true, copied: 50 },
+			{ own: true, enumerable: true, copied: 50 },
+		]);
+	});
+
+	it('preserves changing inherited properties on custom native event subclasses', async () => {
+		const { canvas, root } = await createEventRoot();
+		const observed: unknown[] = [];
+		let inheritedAtomic = 'before';
+
+		class MutableMouseEvent extends MouseEvent {}
+		Object.defineProperty(MutableMouseEvent.prototype, 'inheritedAtomic', {
+			configurable: true,
+			enumerable: true,
+			get: () => inheritedAtomic,
+		});
+
+		root.render(
+			EventScene,
+			emptySceneProps({
+				onFrontClick(event: ThreeEvent<MouseEvent>) {
+					observed.push((event as unknown as Record<string, unknown>).inheritedAtomic);
+					inheritedAtomic = 'after';
+				},
+				onRearClick(event: ThreeEvent<MouseEvent>) {
+					observed.push((event as unknown as Record<string, unknown>).inheritedAtomic);
+				},
+			}),
+		);
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointerdown', 50, 50);
+
+		const nativeEvent = new MutableMouseEvent('click', {
+			bubbles: true,
+			clientX: 50,
+			clientY: 50,
+		});
+		Object.defineProperties(nativeEvent, {
+			offsetX: { configurable: true, enumerable: true, value: 50 },
+			offsetY: { configurable: true, enumerable: true, value: 50 },
+			pointerId: { configurable: true, enumerable: true, value: 1 },
+		});
+		canvas.dispatchEvent(nativeEvent);
+
+		expect(observed).toEqual(['before', 'after']);
+	});
+
 	it('keeps propagation and hover transitions inside the ordered hit sequence', async () => {
 		const { canvas, root } = await createEventRoot();
 		const propagation: string[] = [];

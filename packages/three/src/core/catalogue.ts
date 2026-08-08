@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import {
 	defineUniversalComponent,
+	markUniversalHostComponent,
 	type UniversalComponent,
 	universalPlan,
 	universalProps,
@@ -261,6 +262,7 @@ export function extend<T extends Catalogue | ConstructorRepresentation>(
 		(props) => universalValue(plan, [universalProps([['spread', props]])]),
 		{ module: '@octanejs/three' },
 	);
+	markUniversalHostComponent(component, THREE_RENDERER_ID, plan);
 	constructorComponents.set(objects, component);
 	return component as UniversalComponent<any>;
 }

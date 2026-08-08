@@ -57,8 +57,12 @@ import {
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	markUniversalHostComponent,
 	memo,
+	universalFor,
+	universalHostComponentLeafPlan,
 	universalPlan,
+	universalProps,
 	universalValue,
 	useState,
 } from 'octane/universal/native';
@@ -68,14 +72,31 @@ const renderer = 'profile-proof';
 const plan = universalPlan(renderer, {
 	kind: 'host',
 	type: 'counter',
-	bindings: [['value', 0]],
+	propsSlot: 0,
 });
 const scheduled = [];
 let update;
+const ProfiledHost = markUniversalHostComponent(
+	defineUniversalComponent(renderer, function ProfiledHost(props) {
+		return universalValue(plan, [universalProps([['spread', props]])]);
+	}),
+	renderer,
+	plan,
+);
 const Counter = defineUniversalComponent(renderer, function ProfiledCounter() {
 	const [count, setCount] = useState(0, 'count');
 	update = setCount;
-	return universalValue(plan, [count]);
+	return universalFor(
+		[count],
+		() => 'counter',
+		(value) => [value],
+		null,
+		true,
+		true,
+		ProfiledHost,
+		universalHostComponentLeafPlan(renderer, ProfiledHost, '["value"]'),
+		'["value"]',
+	);
 });
 
 if (__OCTANE_PROFILE_ENABLED__) {
@@ -88,11 +109,23 @@ if (__OCTANE_PROFILE_ENABLED__) {
 		column: 0,
 		kind: 'component',
 	});
+	__profileComponent(ProfiledHost, {
+		id: 'profile-proof#ProfiledHost',
+		name: 'ProfiledHost',
+		file: 'profile-proof.tsrx',
+		line: 2,
+		column: 0,
+		kind: 'component',
+	});
 }
 
 const WrappedCounter = memo(Counter);
 const container = createObjectContainer(renderer);
-const root = createUniversalRoot(container, createObjectDriver(renderer), {
+const objectDriver = createObjectDriver(renderer);
+const root = createUniversalRoot(container, {
+	...objectDriver,
+	capabilities: { ...objectDriver.capabilities, compilerLeafProps: true },
+}, {
 	scheduleMicrotask(callback) {
 		scheduled.push(callback);
 	},
@@ -142,15 +175,18 @@ globalThis.renderedValue = container.children[0].props.value;
 		expect(
 			enabled.inputs.some((input) => /packages\/octane\/src\/profiling\.ts$/.test(input)),
 		).toBe(true);
-		expect(
-			enabled.context.__OCTANE_PROFILER__?.getEvents().map((event) => ({
-				component: event.component,
-				phase: event.phase,
-				causes: event.causes.map((cause) => cause.type),
-			})),
-		).toEqual([
+		const profileEvents = enabled.context.__OCTANE_PROFILER__?.getEvents().map((event) => ({
+			component: event.component,
+			phase: event.phase,
+			causes: event.causes.map((cause) => cause.type),
+		}));
+		expect(profileEvents?.filter((event) => event.component === 'ProfiledCounter')).toEqual([
 			{ component: 'ProfiledCounter', phase: 'mount', causes: ['mount'] },
 			{ component: 'ProfiledCounter', phase: 'update', causes: ['state'] },
+		]);
+		expect(profileEvents?.filter((event) => event.component === 'ProfiledHost')).toEqual([
+			{ component: 'ProfiledHost', phase: 'mount', causes: ['mount'] },
+			{ component: 'ProfiledHost', phase: 'update', causes: ['parent'] },
 		]);
 	});
 

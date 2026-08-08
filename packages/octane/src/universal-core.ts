@@ -26,6 +26,7 @@ const UNIVERSAL_VALUE = Symbol.for('octane.universal.value');
 const UNIVERSAL_LIST = Symbol.for('octane.universal.list');
 const UNIVERSAL_COMPONENT = Symbol.for('octane.universal.component');
 const UNIVERSAL_COMPONENT_VALUE = Symbol.for('octane.universal.component-value');
+const UNIVERSAL_HOST_COMPONENT = Symbol('octane.universal.host-component');
 const UNIVERSAL_PROPS = Symbol.for('octane.universal.props');
 const UNIVERSAL_CHILDREN = Symbol.for('octane.universal.children');
 const UNIVERSAL_IF = Symbol.for('octane.universal.if');
@@ -44,6 +45,8 @@ const UNIVERSAL_COMPONENT_REVISION = Symbol('octane.universal.component-revision
 const NO_CHILDREN = Symbol('octane.universal.no-children');
 const NO_KEY = Symbol('octane.universal.no-key');
 const NO_PENDING_PASSIVE_ERROR = Symbol('octane.universal.no-pending-passive-error');
+
+let HAS_UNIVERSAL_HOST_COMPONENTS = false;
 
 /** Structured-clone protocol version used by experimental transported roots. */
 export const UNIVERSAL_TRANSPORT_PROTOCOL_VERSION = 1 as const;
@@ -194,6 +197,13 @@ export type UniversalComponent<P = any> = ((
 	readonly [UNIVERSAL_COMPONENT]: UniversalRendererMetadata;
 };
 
+interface UniversalHostComponentMetadata<P = any> {
+	readonly component: UniversalComponent<P>;
+	readonly renderer: string;
+	readonly plan: UniversalPlan;
+	readonly specializations: Map<string, UniversalPlan>;
+}
+
 export type UniversalPropEntry =
 	readonly ['set', name: string, value: unknown] | readonly ['spread', value: unknown];
 
@@ -242,6 +252,9 @@ export interface UniversalForValue {
 	readonly empty: (() => UniversalRenderable) | null;
 	readonly ownerless: boolean;
 	readonly compact: boolean;
+	readonly hostComponent?: UniversalComponent<any>;
+	readonly leafPlan?: UniversalPlan;
+	readonly leafSignature?: string;
 }
 
 export interface UniversalTryValue {
@@ -1541,8 +1554,42 @@ export function universalFor<T>(
 	empty: (() => UniversalRenderable) | null = null,
 	ownerless = false,
 	compact = false,
+	hostComponent?: UniversalComponent<any>,
+	leafPlan?: UniversalPlan,
+	leafSignature?: string,
 ): UniversalForValue {
-	return { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact };
+	if (leafSignature !== undefined) {
+		return {
+			$$kind: UNIVERSAL_FOR,
+			items,
+			key,
+			render,
+			empty,
+			ownerless,
+			compact,
+			...(hostComponent === undefined ? null : { hostComponent }),
+			...(leafPlan === undefined ? null : { leafPlan }),
+			leafSignature,
+		};
+	}
+	if (leafPlan !== undefined) {
+		return hostComponent === undefined
+			? { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, leafPlan }
+			: {
+					$$kind: UNIVERSAL_FOR,
+					items,
+					key,
+					render,
+					empty,
+					ownerless,
+					compact,
+					hostComponent,
+					leafPlan,
+				};
+	}
+	return hostComponent === undefined
+		? { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact }
+		: { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, hostComponent };
 }
 
 export function universalTry(
@@ -1651,6 +1698,112 @@ export function defineUniversalComponent<P>(
 		value: Object.freeze({ id: renderer, module: metadata?.module, target: 'universal' }),
 	});
 	return render as UniversalComponent<P>;
+}
+
+/** Certify a binding-owned component that only forwards its props to one host. */
+export function markUniversalHostComponent<P>(
+	component: UniversalComponent<P>,
+	renderer: string,
+	plan: UniversalPlan,
+): UniversalComponent<P> {
+	assertRendererId(renderer, 'markUniversalHostComponent renderer');
+	if (getComponentMetadata(component).id !== renderer) {
+		throw new Error('A universal host component and its renderer must match.');
+	}
+	if ((component as any)[UNIVERSAL_HMR] !== undefined) {
+		throw new Error('A hot-reloadable component cannot be certified as a universal host.');
+	}
+	if (
+		plan?.$$kind !== UNIVERSAL_PLAN ||
+		plan.renderer !== renderer ||
+		plan.root.kind !== 'host' ||
+		plan.root.type === '#text' ||
+		plan.root.propsSlot !== 0 ||
+		(plan.root.children?.length ?? 0) !== 0 ||
+		(plan.root.bindings?.length ?? 0) !== 0 ||
+		Object.keys(plan.root.props ?? {}).length !== 0
+	) {
+		throw new TypeError('A universal host component requires one matching forwarded-props host.');
+	}
+	const existing = (component as any)[UNIVERSAL_HOST_COMPONENT] as
+		UniversalHostComponentMetadata<P> | undefined;
+	if (existing !== undefined) {
+		if (
+			existing.component === component &&
+			existing.renderer === renderer &&
+			existing.plan === plan
+		) {
+			return component;
+		}
+		throw new Error('A universal host component cannot change its certified host plan.');
+	}
+	Object.defineProperty(component, UNIVERSAL_HOST_COMPONENT, {
+		value: Object.freeze({ component, renderer, plan, specializations: new Map() }),
+	});
+	HAS_UNIVERSAL_HOST_COMPONENTS = true;
+	return component;
+}
+
+function trustedUniversalHostComponent(
+	component: UniversalComponent<any>,
+	renderer: string,
+): UniversalHostComponentMetadata | null {
+	if (
+		!HAS_UNIVERSAL_HOST_COMPONENTS ||
+		(typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	) {
+		return null;
+	}
+	const metadata = (component as any)[UNIVERSAL_HOST_COMPONENT] as
+		UniversalHostComponentMetadata | undefined;
+	return metadata !== undefined &&
+		metadata.component === component &&
+		metadata.renderer === renderer &&
+		(component as any)[UNIVERSAL_HMR] === undefined
+		? metadata
+		: null;
+}
+
+function parseUniversalHostComponentSignature(signature: string): readonly string[] {
+	const names: unknown = JSON.parse(signature);
+	if (
+		!Array.isArray(names) ||
+		new Set(names).size !== names.length ||
+		names.some(
+			(name) =>
+				typeof name !== 'string' ||
+				name === '__proto__' ||
+				name === 'key' ||
+				name === 'ref' ||
+				name === 'children' ||
+				name === 'attach' ||
+				name.startsWith('on'),
+		)
+	) {
+		throw new TypeError('A universal host component requires safe, unique ordinary prop names.');
+	}
+	return names;
+}
+
+/** Compiler ABI: resolve one certified adapter's immutable leaf plan once per list. */
+export function universalHostComponentLeafPlan(
+	renderer: string,
+	component: UniversalComponent<any>,
+	signature: string,
+): UniversalPlan | undefined {
+	const host = trustedUniversalHostComponent(component, renderer);
+	if (host === null) return undefined;
+	let plan = host.specializations.get(signature);
+	if (plan === undefined) {
+		const names = parseUniversalHostComponentSignature(signature);
+		plan = universalPlan(renderer, {
+			kind: 'host',
+			type: (host.plan.root as UniversalHostPlan).type,
+			bindings: names.map((name, index) => [name, index] as const),
+		});
+		host.specializations.set(signature, plan);
+	}
+	return plan;
 }
 
 export const UNIVERSAL_HMR: unique symbol = Symbol.for('octane.universal.hmr');
@@ -2164,10 +2317,14 @@ function renderLazyLeafItem(
 		}
 		return rendered;
 	} finally {
-		ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
+		if (ACTIVE_UNIVERSAL_WARM_PLANS.length !== warmPlanCheckpoint) {
+			ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
+		}
 		CURRENT_LAZY_LEAF_OWNER = previousScope;
-		CURRENT_OWNER = previousOwner;
-		scope.attempt.owner = previousAttemptOwner;
+		if (scope.owner !== null) {
+			CURRENT_OWNER = previousOwner;
+			scope.attempt.owner = previousAttemptOwner;
+		}
 	}
 }
 
@@ -2204,6 +2361,14 @@ function materializeComponentValue(
 	const parent = CURRENT_OWNER;
 	if (parent === null) throw new Error('A nested universal component requires an owner.');
 	const normalized = normalizePropsValue(value.props);
+	const host = trustedUniversalHostComponent(value.component, expectedRenderer);
+	if (host !== null) {
+		// Certified adapters cannot own hooks or context; the ordinary host
+		// materializer still classifies their refs, callbacks, events, and children.
+		const nodes = materializeNode(host.plan.root, [normalized], expectedRenderer, path);
+		if (value.hasKey) nodes[0].key = normalizeUniversalKey(value.key);
+		return nodes;
+	}
 	const key = value.hasKey ? value.key : null;
 	const attempt = currentAttempt();
 	const record = findClaimableChildRecord(parent, value.component, path, key);
@@ -2557,6 +2722,35 @@ function materializeOwnerlessLeafValue(
 	};
 }
 
+function materializeRawUniversalListValue(
+	list: UniversalForValue,
+	value: UniversalRenderable,
+	renderer: string,
+): UniversalRenderable {
+	if (
+		list.leafPlan !== undefined &&
+		(list.hostComponent === undefined ||
+			list.leafSignature === undefined ||
+			trustedUniversalHostComponent(list.hostComponent, renderer) !== null)
+	) {
+		return universalValue(list.leafPlan, value as readonly unknown[]);
+	}
+	if (list.leafSignature === undefined) return value;
+	if (list.hostComponent === undefined) {
+		throw new TypeError('A specialized universal host list requires its original component.');
+	}
+	const values = value as readonly unknown[];
+	const names = parseUniversalHostComponentSignature(list.leafSignature);
+	if (names.length !== values.length) {
+		throw new TypeError('A universal host component signature and its values must match.');
+	}
+	return universalComponent(
+		renderer,
+		list.hostComponent,
+		universalProps(names.map((name, index) => ['set', name, values[index]] as const)),
+	);
+}
+
 function materializeValue(
 	value: unknown,
 	expectedRenderer: string,
@@ -2668,10 +2862,19 @@ function materializeValue(
 	if ((value as UniversalForValue)?.$$kind === UNIVERSAL_FOR) {
 		const list = value as UniversalForValue;
 		const output: BlueprintNode[] = [];
-		const keys = new Set<UniversalKey>();
+		const certifiedHost =
+			list.hostComponent === undefined ||
+			trustedUniversalHostComponent(list.hostComponent, expectedRenderer) !== null;
 		const compilerLeafProps =
-			list.ownerless && currentAttempt().root.driverCapabilities().compilerLeafProps === true;
-		if (list.ownerless && list.compact && currentAttempt().root.canCompactCompilerLeafProps()) {
+			list.ownerless &&
+			certifiedHost &&
+			currentAttempt().root.driverCapabilities().compilerLeafProps === true;
+		if (
+			list.ownerless &&
+			list.compact &&
+			certifiedHost &&
+			currentAttempt().root.canCompactCompilerLeafProps()
+		) {
 			const attempt = currentAttempt();
 			const parent = CURRENT_OWNER!;
 			const lazyOwnerScope: LazyLeafOwnerScope = {
@@ -2683,63 +2886,96 @@ function materializeValue(
 			};
 			const compactKeys: UniversalKey[] = [];
 			const compactValues: (readonly unknown[])[] = [];
+			let compactSeenKeys: Set<UniversalKey> | null = null;
+			let previousNumericKey = Number.NEGATIVE_INFINITY;
 			let compactOwners: Array<UniversalOwnerRecord | undefined> | null = null;
-			let compactPlan: UniversalPlan | null = null;
-			let compactHost: UniversalHostPlan | null = null;
+			const rawLeafValues = list.leafPlan !== undefined;
+			let compactPlan: UniversalPlan | null = list.leafPlan ?? null;
+			let compactHost: UniversalHostPlan | null =
+				compactPlan === null ? null : ownerlessLeafHostPlan(compactPlan);
+			if (compactPlan !== null) {
+				if (compactPlan.renderer !== expectedRenderer) {
+					throw new Error(
+						`Universal renderer mismatch: root expects ${JSON.stringify(expectedRenderer)} but the plan targets ${JSON.stringify(compactPlan.renderer)}.`,
+					);
+				}
+				if (compactHost === null) {
+					throw new Error(
+						'Compact universal lists require one stable intrinsic leaf plan per item.',
+					);
+				}
+			}
 			let compactIndex = 0;
 			for (const item of list.items) {
 				const itemIndex = compactIndex++;
 				const itemKey = list.key(item, itemIndex);
-				if (keys.has(itemKey)) {
-					throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
+				if (
+					compactSeenKeys === null &&
+					typeof itemKey === 'number' &&
+					itemKey > previousNumericKey
+				) {
+					previousNumericKey = itemKey;
+				} else {
+					const seen = (compactSeenKeys ??= new Set(compactKeys));
+					if (seen.has(itemKey)) {
+						throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
+					}
+					seen.add(itemKey);
 				}
-				keys.add(itemKey);
 				const rendered = renderLazyLeafItem(lazyOwnerScope, list.render, item, itemIndex, itemKey);
 				if (lazyOwnerScope.owner !== null) {
 					(compactOwners ??= [])[itemIndex] = lazyOwnerScope.owner.record;
 				}
-				if ((rendered as UniversalPlanValue)?.$$kind !== UNIVERSAL_VALUE) {
-					throw new Error(
-						'Compact universal lists require one compiler-proven intrinsic leaf host per item.',
-					);
+				let values: readonly unknown[];
+				if (rawLeafValues) {
+					values = rendered as readonly unknown[];
+				} else {
+					if ((rendered as UniversalPlanValue)?.$$kind !== UNIVERSAL_VALUE) {
+						throw new Error(
+							'Compact universal lists require one compiler-proven intrinsic leaf host per item.',
+						);
+					}
+					const planValue = rendered as UniversalPlanValue;
+					if (planValue.plan !== compactPlan) {
+						if (planValue.plan.renderer !== expectedRenderer) {
+							throw new Error(
+								`Universal renderer mismatch: root expects ${JSON.stringify(expectedRenderer)} but the plan targets ${JSON.stringify(planValue.plan.renderer)}.`,
+							);
+						}
+						if (compactPlan !== null) {
+							throw new Error(
+								'Compact universal lists require one stable intrinsic leaf plan per item.',
+							);
+						}
+						compactPlan = planValue.plan;
+						compactHost = ownerlessLeafHostPlan(compactPlan);
+					}
+					if (planValue.key !== null || compactHost === null) {
+						throw new Error(
+							'Compact universal lists require one stable intrinsic leaf plan per item.',
+						);
+					}
+					values = planValue.values;
 				}
-				const planValue = rendered as UniversalPlanValue;
-				if (planValue.plan.renderer !== expectedRenderer) {
-					throw new Error(
-						`Universal renderer mismatch: root expects ${JSON.stringify(expectedRenderer)} but the plan targets ${JSON.stringify(planValue.plan.renderer)}.`,
-					);
-				}
-				if (compactPlan !== null && compactPlan !== planValue.plan) {
-					throw new Error(
-						'Compact universal lists require one stable intrinsic leaf plan per item.',
-					);
-				}
-				const host: UniversalHostPlan | null =
-					compactPlan === null ? ownerlessLeafHostPlan(planValue.plan) : compactHost;
-				if (planValue.key !== null || host === null) {
-					throw new Error(
-						'Compact universal lists require one stable intrinsic leaf plan per item.',
-					);
-				}
-				if (compactPlan === null) {
-					compactPlan = planValue.plan;
-					compactHost = host;
-					if (host.props !== undefined) {
-						for (const name of Object.keys(host.props)) {
-							if (isRendererRegion(host.props[name])) {
-								markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
-							}
+				const host = compactHost!;
+				if (itemIndex === 0 && host.props !== undefined) {
+					for (const name of Object.keys(host.props)) {
+						if (isRendererRegion(host.props[name])) {
+							markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 						}
 					}
 				}
-				for (const [, slot] of host.bindings ?? []) {
-					const binding = planValue.values[slot];
-					if (typeof binding === 'object' && binding !== null && isRendererRegion(binding)) {
-						markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
+				const bindings = host.bindings;
+				if (bindings !== undefined) {
+					for (let bindingIndex = 0; bindingIndex < bindings.length; bindingIndex++) {
+						const binding = values[bindings[bindingIndex][1]];
+						if (typeof binding === 'object' && binding !== null && isRendererRegion(binding)) {
+							markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
+						}
 					}
 				}
 				compactKeys.push(itemKey);
-				compactValues.push(planValue.values);
+				compactValues.push(values);
 			}
 			if (compactIndex === 0 && list.empty !== null) {
 				return materializeScoped(CURRENT_OWNER!, [...path, 'for-empty'], null, list.empty);
@@ -2768,6 +3004,7 @@ function materializeValue(
 		}
 		const parent = CURRENT_OWNER!;
 		const attempt = currentAttempt();
+		const keys = new Set<UniversalKey>();
 		const lazyOwnerScope: LazyLeafOwnerScope | null = compilerLeafProps
 			? {
 					attempt,
@@ -2784,7 +3021,14 @@ function materializeValue(
 			if (keys.has(itemKey)) throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
 			keys.add(itemKey);
 			if (compilerLeafProps) {
-				const rendered = renderLazyLeafItem(lazyOwnerScope!, list.render, item, itemIndex, itemKey);
+				const rawOutput = renderLazyLeafItem(
+					lazyOwnerScope!,
+					list.render,
+					item,
+					itemIndex,
+					itemKey,
+				);
+				const rendered = materializeRawUniversalListValue(list, rawOutput, expectedRenderer);
 				const itemOwner = lazyOwnerScope!.owner ?? parent;
 				const leaf = materializeOwnerlessLeafValue(
 					rendered,
@@ -2822,9 +3066,13 @@ function materializeValue(
 				output.push(nodes[0]);
 			} else {
 				output.push(
-					...materializeScoped(parent, [...path, 'for'], itemKey, () =>
-						list.render(item, itemIndex),
-					),
+					...materializeScoped(parent, [...path, 'for'], itemKey, () => {
+						return materializeRawUniversalListValue(
+							list,
+							list.render(item, itemIndex),
+							expectedRenderer,
+						);
+					}),
 				);
 			}
 		}
@@ -7515,10 +7763,21 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const commands: UniversalHostCommand[] = [];
 		for (const { list, records, start } of matches) {
 			const host = list.host!;
+			const bindings = host.bindings;
+			const lastBinding =
+				bindings === undefined || bindings.length === 0 ? null : bindings[bindings.length - 1][0];
 			for (let index = 0; index < list.keys.length; index++) {
 				const record = records[start + index];
 				const hostProps = list.props[index]!;
-				if (shallowPropsEqual(record.props, hostProps, list.propCount)) continue;
+				if (
+					(lastBinding === null ||
+						!Object.prototype.hasOwnProperty.call(record.props, lastBinding) ||
+						!Object.prototype.hasOwnProperty.call(hostProps, lastBinding) ||
+						Object.is(record.props[lastBinding], hostProps[lastBinding])) &&
+					shallowPropsEqual(record.props, hostProps, list.propCount)
+				) {
+					continue;
+				}
 				const kind = this.driver.updates?.classify(host.type, record.props, hostProps) ?? 'update';
 				const frozenProps = Object.freeze(hostProps);
 				if (kind === 'update') {

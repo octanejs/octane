@@ -143,6 +143,15 @@ const POINTER_MOVE_LISTENERS = [
 	'onPointerLeave',
 ] as const;
 
+const POINTER_HOVER_LISTENERS = [
+	'onPointerOver',
+	'onPointerEnter',
+	'onPointerOut',
+	'onPointerLeave',
+] as const;
+
+const STANDARD_MESH_RAYCAST = THREE.Mesh.prototype.raycast;
+
 const NATIVE_EVENT_NAMES: Readonly<Record<keyof Events, true>> = Object.freeze({
 	onClick: true,
 	onContextMenu: true,
@@ -220,9 +229,7 @@ export function createEvents(store: RootStore): {
 	}
 
 	function filterPointerEvents(objects: THREE.Object3D[]): THREE.Object3D[] {
-		return objects.filter((object) =>
-			POINTER_MOVE_LISTENERS.some((name) => getThreeEventListener(object, name) !== undefined),
-		);
+		return objects.filter((object) => hasThreeEventListeners(object, POINTER_MOVE_LISTENERS));
 	}
 
 	function intersect(
@@ -235,53 +242,89 @@ export function createEvents(store: RootStore): {
 		const eventObjects = filter
 			? filter(rootState.internal.interaction)
 			: rootState.internal.interaction;
+		let sharedEventStore: RootStore | undefined;
+		let singleEventStore = true;
+		let previousEventStore: RootStore | undefined;
 
 		// Each event layer computes its ray lazily, once, for this native event.
 		for (const object of eventObjects) {
 			const objectStore = getThreeEventStore(object);
-			if (objectStore !== undefined) objectStore.getState().raycaster.camera = undefined!;
+			if (objectStore === undefined) {
+				singleEventStore = false;
+				continue;
+			}
+			if (sharedEventStore === undefined) sharedEventStore = objectStore;
+			else if (sharedEventStore !== objectStore) singleEventStore = false;
+			if (objectStore !== previousEventStore) {
+				objectStore.getState().raycaster.camera = undefined!;
+				previousEventStore = objectStore;
+			}
 		}
 
 		if (!rootState.previousRoot) {
 			rootState.events.compute?.(event, rootState);
 		}
 
-		function handleRaycast(object: THREE.Object3D): THREE.Intersection<THREE.Object3D>[] {
+		const rawHits: THREE.Intersection<THREE.Object3D>[] = [];
+		for (const object of eventObjects) {
 			const objectStore = getThreeEventStore(object);
-			if (objectStore === undefined) return [];
+			if (objectStore === undefined) continue;
+			if (objectStore !== sharedEventStore) singleEventStore = false;
 			const state = objectStore.getState();
-			if (!state.events.enabled || state.raycaster.camera === null) return [];
+			if (!state.events.enabled || state.raycaster.camera === null) continue;
 
 			if (state.raycaster.camera === undefined) {
 				state.events.compute?.(event, state, state.previousRoot?.getState());
 				if (state.raycaster.camera === undefined) state.raycaster.camera = null!;
 			}
 
-			if (!state.raycaster.camera) return [];
-			const intersections: THREE.Intersection<THREE.Object3D>[] = [];
-			raycastLiveObject(state.raycaster, object, intersections);
-			return intersections.filter((intersection) => isThreeEventHitLive(intersection.object));
+			if (!state.raycaster.camera) continue;
+			const sharesHitArray =
+				Object.getPrototypeOf(object) === THREE.Mesh.prototype &&
+				!Object.prototype.hasOwnProperty.call(object, 'raycast') &&
+				THREE.Mesh.prototype.raycast === STANDARD_MESH_RAYCAST &&
+				object.children.length === 0;
+			const objectHits = sharesHitArray ? rawHits : [];
+			const firstHit = objectHits.length;
+			raycastLiveObject(state.raycaster, object, objectHits);
+			let retainedHits = firstHit;
+			for (let index = firstHit; index < objectHits.length; index++) {
+				const hit = objectHits[index];
+				if (!isThreeEventHitLive(hit.object)) continue;
+				if (singleEventStore && getThreeEventStore(hit.object) !== sharedEventStore) {
+					singleEventStore = false;
+				}
+				if (sharesHitArray) rawHits[retainedHits++] = hit;
+				else rawHits.push(hit);
+			}
+			if (sharesHitArray) rawHits.length = retainedHits;
 		}
 
-		let hits = eventObjects
-			.flatMap(handleRaycast)
-			.sort((left, right) => {
-				const leftStore = findEventStore(left.object);
-				const rightStore = findEventStore(right.object);
-				if (leftStore === undefined || rightStore === undefined) {
-					return left.distance - right.distance;
-				}
-				return (
-					rightStore.getState().events.priority - leftStore.getState().events.priority ||
-					left.distance - right.distance
-				);
-			})
-			.filter((item) => {
-				const id = makeIntersectionId(item as Intersection);
-				if (duplicates.has(id)) return false;
-				duplicates.add(id);
-				return true;
-			});
+		rawHits.sort(
+			singleEventStore
+				? (left, right) => left.distance - right.distance
+				: (left, right) => {
+						const leftStore = findEventStore(left.object);
+						const rightStore = findEventStore(right.object);
+						if (leftStore === undefined || rightStore === undefined) {
+							return left.distance - right.distance;
+						}
+						return (
+							rightStore.getState().events.priority - leftStore.getState().events.priority ||
+							left.distance - right.distance
+						);
+					},
+		);
+
+		let hitCount = 0;
+		for (const hit of rawHits) {
+			const id = makeIntersectionId(hit as Intersection);
+			if (duplicates.has(id)) continue;
+			duplicates.add(id);
+			rawHits[hitCount++] = hit;
+		}
+		rawHits.length = hitCount;
+		let hits = rawHits;
 
 		if (rootState.events.filter !== undefined) {
 			hits = rootState.events.filter(hits, rootState);
@@ -347,10 +390,13 @@ export function createEvents(store: RootStore): {
 		intersections: Intersection[],
 		event: DomEvent,
 		delta: number,
-		callback: (event: ThreeEvent<DomEvent>) => void,
+		callback: (event: ThreeEvent<DomEvent>, retainPointerCapture: () => void) => void,
 	): Intersection[] {
 		if (intersections.length === 0) return intersections;
 		const localState = { stopped: false };
+		let nativeProperties: Record<string, unknown> | undefined;
+		let ownNativeProperties: string[] | undefined;
+		let reusableNativeProperties = false;
 
 		for (const hit of intersections) {
 			const eventStore = findEventStore(hit.object);
@@ -359,18 +405,27 @@ export function createEvents(store: RootStore): {
 			const { raycaster, pointer, camera, internal } = state;
 			const unprojectedPoint = new THREE.Vector3(pointer.x, pointer.y, 0).unproject(camera);
 
-			const captureIdentity = createPointerCaptureIdentity(hit);
+			let captureIdentity: ReturnType<typeof createPointerCaptureIdentity> | undefined;
+			const ensurePointerCaptureIdentity = () => {
+				if (captureIdentity !== undefined) return captureIdentity;
+				captureIdentity = createPointerCaptureIdentity(hit);
+				registerPointerCaptureFacade(target, captureIdentity);
+				registerPointerCaptureFacade(currentTarget, captureIdentity);
+				return captureIdentity;
+			};
 			const hasPointerCapture = (pointerId: number): boolean =>
-				internal.capturedMap.get(pointerId)?.has(captureIdentity.eventObject) ?? false;
+				internal.capturedMap.get(pointerId)?.has(captureIdentity?.eventObject ?? hit.eventObject) ??
+				false;
 
 			const setPointerCapture = (pointerId: number): void => {
+				const identity = ensurePointerCaptureIdentity();
 				const target = event.target as Element;
-				const capture = { intersection: captureIdentity.intersection, target };
+				const capture = { intersection: identity.intersection, target };
 				setInternalPointerCapture(
 					internal.capturedMap,
-					captureIdentity.eventObject,
+					identity.eventObject,
 					capture,
-					captureIdentity,
+					identity,
 					pointerId,
 				);
 				target.setPointerCapture(pointerId);
@@ -381,25 +436,73 @@ export function createEvents(store: RootStore): {
 				if (captures !== undefined) {
 					releaseInternalPointerCapture(
 						internal.capturedMap,
-						captureIdentity.eventObject,
+						captureIdentity?.eventObject ?? hit.eventObject,
 						captures,
 						pointerId,
 					);
 				}
 			};
 
-			const nativeProperties: Record<string, unknown> = {};
-			// Native event values commonly live on the prototype; enumerate both own
-			// and inherited atomics while leaving methods on nativeEvent.
-			for (const property in event) {
-				const value = event[property as keyof DomEvent];
-				if (typeof value !== 'function') nativeProperties[property] = value;
+			if (nativeProperties === undefined) {
+				nativeProperties = {};
+				const prototype = Object.getPrototypeOf(event);
+				reusableNativeProperties =
+					(typeof PointerEvent !== 'undefined' && prototype === PointerEvent.prototype) ||
+					(typeof MouseEvent !== 'undefined' && prototype === MouseEvent.prototype) ||
+					(typeof WheelEvent !== 'undefined' && prototype === WheelEvent.prototype);
+				// Inherited native-event getters are stable during this dispatch. Snapshot
+				// ordinary event prototypes once; custom subclasses can expose changing
+				// inherited getters and retain the complete per-hit extraction.
+				for (const property in event) {
+					const value = event[property as keyof DomEvent];
+					if (typeof value !== 'function') nativeProperties[property] = value;
+				}
+				// The native event exposes dozens of inherited fields. Building this
+				// snapshot dynamically puts it in dictionary mode; clone it once so
+				// the per-hit spreads retain a compact, reusable property shape.
+				nativeProperties = { ...nativeProperties };
+				ownNativeProperties = Object.keys(event);
+			} else if (!reusableNativeProperties) {
+				nativeProperties = {};
+				for (const property in event) {
+					const value = event[property as keyof DomEvent];
+					if (typeof value !== 'function') nativeProperties[property] = value;
+				}
+			} else {
+				for (const property of ownNativeProperties!) {
+					if (Object.prototype.propertyIsEnumerable.call(event, property)) continue;
+					delete nativeProperties[property];
+
+					if (Object.prototype.hasOwnProperty.call(event, property)) continue;
+					let prototype = Object.getPrototypeOf(event);
+					while (prototype !== null) {
+						const descriptor = Object.getOwnPropertyDescriptor(prototype, property);
+						if (descriptor !== undefined) {
+							if (descriptor.enumerable) {
+								const value = event[property as keyof DomEvent];
+								if (typeof value !== 'function') nativeProperties[property] = value;
+							}
+							break;
+						}
+						prototype = Object.getPrototypeOf(prototype);
+					}
+				}
+
+				ownNativeProperties = Object.keys(event);
+				for (const property of ownNativeProperties) {
+					const value = event[property as keyof DomEvent];
+					if (typeof value === 'function') delete nativeProperties[property];
+					else nativeProperties[property] = value;
+				}
+				if ('defaultPrevented' in nativeProperties) {
+					nativeProperties.defaultPrevented = event.defaultPrevented;
+				}
+				if ('cancelBubble' in nativeProperties) nativeProperties.cancelBubble = event.cancelBubble;
+				if ('returnValue' in nativeProperties) nativeProperties.returnValue = event.returnValue;
 			}
 
 			const target = { hasPointerCapture, setPointerCapture, releasePointerCapture };
 			const currentTarget = { hasPointerCapture, setPointerCapture, releasePointerCapture };
-			registerPointerCaptureFacade(target, captureIdentity);
-			registerPointerCaptureFacade(currentTarget, captureIdentity);
 
 			const raycastEvent = {
 				...hit,
@@ -430,7 +533,7 @@ export function createEvents(store: RootStore): {
 				nativeEvent: event,
 			} as unknown as ThreeEvent<DomEvent>;
 
-			callback(raycastEvent);
+			callback(raycastEvent, ensurePointerCaptureIdentity);
 			if (localState.stopped) break;
 		}
 		return intersections;
@@ -458,20 +561,17 @@ export function createEvents(store: RootStore): {
 
 		if (isPointerMove) cancelPointer(hits);
 
-		function onIntersect(data: ThreeEvent<DomEvent>): void {
+		function onIntersect(data: ThreeEvent<DomEvent>, retainPointerCapture: () => void): void {
 			const { eventObject } = data;
 			const eventStore = findEventStore(eventObject) ?? store;
 
 			if (isPointerMove) {
-				const hasHoverHandler =
-					getThreeEventListener(eventObject, 'onPointerOver') !== undefined ||
-					getThreeEventListener(eventObject, 'onPointerEnter') !== undefined ||
-					getThreeEventListener(eventObject, 'onPointerOut') !== undefined ||
-					getThreeEventListener(eventObject, 'onPointerLeave') !== undefined;
+				const hasHoverHandler = hasThreeEventListeners(eventObject, POINTER_HOVER_LISTENERS);
 				if (hasHoverHandler) {
 					const id = makeIntersectionId(data);
 					const hovered = internal.hovered.get(id);
 					if (hovered === undefined) {
+						retainPointerCapture();
 						internal.hovered.set(id, data);
 						invokeListener(eventStore, getThreeEventListener(eventObject, 'onPointerOver'), data);
 						invokeListener(eventStore, getThreeEventListener(eventObject, 'onPointerEnter'), data);

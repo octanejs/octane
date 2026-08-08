@@ -1830,7 +1830,7 @@ export function Scene() @{
 			hmr: false,
 		}).code;
 		expect(output).toMatch(/__octaneUniversalFor\(\s*items/);
-		expect(output).toMatch(/,\s*null,\s*true,\s*true\s*\)/);
+		expect(output).toMatch(/,\s*null,\s*true,\s*true,\s*void 0,\s*\w+\s*\)/);
 		const hmrOutput = compile(source, '/src/PureList.object.tsrx', {
 			renderer,
 			hmr: true,
@@ -2148,7 +2148,7 @@ export function Scene() @{
 			renderer,
 			hmr: false,
 		}).code;
-		expect(output).toMatch(/,\s*null,\s*true,\s*true\s*\)/);
+		expect(output).toMatch(/,\s*null,\s*true,\s*true,\s*void 0,\s*\w+\s*\)/);
 		output = output.replace(
 			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
