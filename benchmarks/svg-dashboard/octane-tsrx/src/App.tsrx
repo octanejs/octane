@@ -228,7 +228,7 @@ function IconLayer({ icons }: { icons: IconRow[] }) @{
 // subtrees arrive as descriptor props built by App, which only re-renders on
 // topo/charts commits — so ui commits touch just these few bindings.
 function Viewport({ defs, layers }: { defs: OctaneNode; layers: OctaneNode }) @{
-	const [ui, setUi] = useState(initialUi());
+	const [ui, setUi] = useState(initialUi);
 	const overlayRef = useRef<Element | null>(null);
 	bindSetters({ setUi });
 
@@ -246,8 +246,8 @@ function Viewport({ defs, layers }: { defs: OctaneNode; layers: OctaneNode }) @{
 }
 
 export default function App() @{
-	const [topo, setTopo] = useState(initialTopo());
-	const [charts, setCharts] = useState(initialCharts());
+	const [topo, setTopo] = useState(initialTopo);
+	const [charts, setCharts] = useState(initialCharts);
 	bindSetters({ setTopo, setCharts });
 
 	<Viewport
