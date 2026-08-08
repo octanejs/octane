@@ -705,10 +705,12 @@ export function createRootStore(invalidate: Invalidate, advance: Advance): RootS
 				subscribe(ref, priority, subscriptionStore) {
 					const internal = get().internal;
 					if (priority > 0) internal.priority++;
-					internal.subscribers = [
-						...internal.subscribers,
-						{ ref, priority, store: subscriptionStore },
-					].sort((left, right) => left.priority - right.priority);
+					const previous = internal.subscribers;
+					const subscribers = [...previous, { ref, priority, store: subscriptionStore }];
+					if (previous.length !== 0 && !(previous[previous.length - 1].priority <= priority)) {
+						subscribers.sort((left, right) => left.priority - right.priority);
+					}
+					internal.subscribers = subscribers;
 					return () => {
 						const current = get().internal;
 						if (priority > 0) current.priority--;

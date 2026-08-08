@@ -8,6 +8,7 @@ import {
 	MESH_COUNT,
 	baseItems,
 	captureIdentities,
+	createRenderer,
 	disposalCount,
 	eventItems,
 	resetDisposals,
@@ -18,6 +19,7 @@ import {
 
 const canvas = document.getElementById('bench');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Missing benchmark canvas.');
+const renderer = createRenderer(canvas);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
 camera.position.z = 5;
@@ -104,10 +106,11 @@ canvas.addEventListener('pointermove', (event) => {
 async function prepare(op) {
 	clear(true);
 	resetDisposals();
+	renderer.resetRenderCalls();
 	frameCalls = frameChecksum = eventCalls = eventChecksum = 0;
 	identities = new Map();
 	if (op === 'mount_1k') return;
-	if (op === 'reconstruct_dispose_1k') {
+	if (op === 'reconstruct_dispose_1k' || op === 'reconstruct_component_dispose_1k') {
 		mountDisposable(0);
 		resetDisposals();
 		identities = captureIdentities(scene);
@@ -141,10 +144,12 @@ async function run(op) {
 			scene.add(child);
 		}
 	} else if (op === 'unmount_tree_1k') clear();
-	else if (op === 'reconstruct_dispose_1k') mountDisposable(1);
-	else if (op === 'frame_1k_subscribers') {
+	else if (op === 'reconstruct_dispose_1k' || op === 'reconstruct_component_dispose_1k') {
+		mountDisposable(1);
+	} else if (op === 'frame_1k_subscribers') {
 		for (let index = 0; index < FRAME_REPS; index++) {
 			for (const callback of frameCallbacks) callback();
+			renderer.render(scene, camera);
 		}
 	} else if (op === 'raycast_event') {
 		const bounds = canvas.getBoundingClientRect();
@@ -169,6 +174,7 @@ globalThis.__threeBench = {
 		return snapshotScene(scene, identities, {
 			frameCalls,
 			frameChecksum,
+			frameRenderCalls: renderer.renderCalls,
 			eventCalls,
 			eventChecksum,
 			disposalCount: disposalCount(),

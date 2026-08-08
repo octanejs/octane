@@ -19,6 +19,8 @@ import {
 	__profileTrackComponent,
 } from './profiling.js';
 
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
 const UNIVERSAL_PLAN = Symbol.for('octane.universal.plan');
 const UNIVERSAL_VALUE = Symbol.for('octane.universal.value');
 const UNIVERSAL_LIST = Symbol.for('octane.universal.list');
@@ -1691,7 +1693,9 @@ export function hmrUniversalComponent<P>(
 			}
 			meta.component = next;
 			meta.revision++;
-			__profileComponentSource(wrapper, next);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__profileComponentSource(wrapper, next);
+			}
 			if ((next as any).__warm === undefined) delete (wrapper as any).__warm;
 			else (wrapper as any).__warm = (next as any).__warm;
 			for (const owner of owners) {
@@ -1699,7 +1703,9 @@ export function hmrUniversalComponent<P>(
 					owners.delete(owner);
 					continue;
 				}
-				__profileSchedule(owner, 'hmr');
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+					__profileSchedule(owner, 'hmr');
+				}
 				owner.root.schedule();
 			}
 		},
@@ -1717,7 +1723,9 @@ export function hmrUniversalComponent<P>(
 		[UNIVERSAL_HMR]: { value: meta },
 		[UNIVERSAL_COMPONENT_REVISION]: { get: () => meta.revision },
 	});
-	__profileComponentSource(wrapper, component);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__profileComponentSource(wrapper, component);
+	}
 	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
 	return wrapper;
 }
@@ -2092,11 +2100,19 @@ function executeOwner(
 		CURRENT_OWNER = owner;
 		attempt.owner = owner;
 		const component = owner.record.component;
-		if (component !== null) __profileTrackComponent(owner.record, component);
+		if (
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			component !== null
+		) {
+			__profileTrackComponent(owner.record, component);
+		}
 		const profileFrame =
-			component === null
-				? null
-				: __profileBeginRender(owner.record, component, owner.record.mounted);
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			component !== null
+				? __profileBeginRender(owner.record, component, owner.record.mounted)
+				: null;
 		let didThrow = false;
 		let thrown: unknown;
 		try {
@@ -2106,7 +2122,9 @@ function executeOwner(
 			thrown = error;
 			throw error;
 		} finally {
-			__profileEndRender(profileFrame, didThrow, thrown);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__profileEndRender(profileFrame, didThrow, thrown);
+			}
 			ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
 			CURRENT_OWNER = previousOwner;
 			attempt.owner = previousAttemptOwner;
@@ -3732,11 +3750,13 @@ function enqueueUniversalHookUpdate(
 
 function scheduleOwner(owner: UniversalOwnerRecord, slot?: unknown): void {
 	if (owner.disposed) return;
-	__profileSchedule(
-		owner,
-		'state',
-		typeof slot === 'symbol' || typeof slot === 'number' ? slot : undefined,
-	);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__profileSchedule(
+			owner,
+			'state',
+			typeof slot === 'symbol' || typeof slot === 'number' ? slot : undefined,
+		);
+	}
 	owner.root.scheduleOwned(owner);
 }
 
@@ -5156,7 +5176,9 @@ export function memo<P>(
 	Object.defineProperty(wrapper, UNIVERSAL_COMPONENT_REVISION, {
 		get: () => universalComponentRevision(component),
 	});
-	__profileComponentSource(wrapper, component);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__profileComponentSource(wrapper, component);
+	}
 	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
 	return wrapper;
 }
@@ -7424,8 +7446,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			attempt.owner.record !== this.owner ||
 			this.treeFeatures !== 0 ||
 			attempt.treeFeatures !== 0 ||
-			attempt.retryThenables.size !== 0 ||
-			!this.stableAttemptOwnersEqual(attempt)
+			attempt.retryThenables.size !== 0
 		) {
 			return null;
 		}
@@ -7480,7 +7501,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			return recordIndex === records.length;
 		};
-		if (!pairChildren(this.rootRecord.children, blueprint.children) || !sawCompactList) {
+		if (
+			!pairChildren(this.rootRecord.children, blueprint.children) ||
+			!sawCompactList ||
+			!this.stableAttemptOwnersEqual(attempt)
+		) {
 			return null;
 		}
 
@@ -8114,33 +8139,44 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		) => {
 			const oldPhysical = physicalRecords(oldRecords);
 			const newPhysical = physicalDrafts(newDrafts);
-			const desiredIds = new Set(newPhysical.map((entry) => entry.id));
+			if (oldPhysical.length === 0 && newPhysical.length === 0) return;
+			const desiredIds = new Set<number>();
+			for (const entry of newPhysical) desiredIds.add(entry.id);
+			const previousIds = new Set<number>();
 			for (const old of oldPhysical) {
+				previousIds.add(old.id);
 				if (!desiredIds.has(old.id)) {
 					removes.push({ op: 'remove', parent: sourceParentId, id: old.id });
 				}
 			}
-			const previousIds = new Set(oldPhysical.map((entry) => entry.id));
-			const current = forceMove
-				? []
-				: oldPhysical.filter((entry) => desiredIds.has(entry.id)).map((entry) => entry.id);
+			let oldIndex = 0;
+			const movedIds = new Set<number>();
+			// Unplaced survivors retain their original order. Advance through that
+			// suffix instead of searching and splicing an ever-growing placed prefix.
 			for (let index = 0; index < newPhysical.length; index++) {
 				const id = newPhysical[index].id;
-				if (current[index] === id) continue;
-				const currentIndex = current.indexOf(id);
-				const before = current[index] ?? endAnchor;
-				if (currentIndex === -1) {
-					placements.push({
-						op: forceMove && previousIds.has(id) ? 'move' : 'insert',
-						parent: parentId,
-						id,
-						before,
-					});
-				} else {
-					current.splice(currentIndex, 1);
-					placements.push({ op: 'move', parent: parentId, id, before });
+				let currentId: number | undefined;
+				if (!forceMove) {
+					while (oldIndex < oldPhysical.length) {
+						const candidate = oldPhysical[oldIndex].id;
+						if (desiredIds.has(candidate) && !movedIds.has(candidate)) {
+							currentId = candidate;
+							break;
+						}
+						oldIndex++;
+					}
+					if (currentId === id) {
+						oldIndex++;
+						continue;
+					}
 				}
-				current.splice(index, 0, id);
+				const before = currentId ?? endAnchor;
+				if (previousIds.has(id)) {
+					placements.push({ op: 'move', parent: parentId, id, before });
+					if (!forceMove) movedIds.add(id);
+				} else {
+					placements.push({ op: 'insert', parent: parentId, id, before });
+				}
 			}
 		};
 		if (topologyChanged) {

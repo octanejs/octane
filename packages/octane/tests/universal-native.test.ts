@@ -50,6 +50,110 @@ describe('host-neutral universal entry', () => {
 		expect(container.children).toEqual([]);
 	});
 
+	it('keeps universal profiling absent from normal bundles and active only when enabled', async () => {
+		const source = `
+import {
+	createObjectContainer,
+	createObjectDriver,
+	createUniversalRoot,
+	defineUniversalComponent,
+	memo,
+	universalPlan,
+	universalValue,
+	useState,
+} from 'octane/universal/native';
+import { __profileComponent, profiler } from 'octane/profiling';
+
+const renderer = 'profile-proof';
+const plan = universalPlan(renderer, {
+	kind: 'host',
+	type: 'counter',
+	bindings: [['value', 0]],
+});
+const scheduled = [];
+let update;
+const Counter = defineUniversalComponent(renderer, function ProfiledCounter() {
+	const [count, setCount] = useState(0, 'count');
+	update = setCount;
+	return universalValue(plan, [count]);
+});
+
+if (__OCTANE_PROFILE_ENABLED__) {
+	profiler.start({ timeline: false });
+	__profileComponent(Counter, {
+		id: 'profile-proof#ProfiledCounter',
+		name: 'ProfiledCounter',
+		file: 'profile-proof.tsrx',
+		line: 1,
+		column: 0,
+		kind: 'component',
+	});
+}
+
+const WrappedCounter = memo(Counter);
+const container = createObjectContainer(renderer);
+const root = createUniversalRoot(container, createObjectDriver(renderer), {
+	scheduleMicrotask(callback) {
+		scheduled.push(callback);
+	},
+});
+root.render(WrappedCounter, undefined);
+update(1);
+scheduled.shift()();
+globalThis.renderedValue = container.children[0].props.value;
+`;
+		const run = async (enabled: boolean) => {
+			const result = await build({
+				stdin: {
+					contents: source,
+					resolveDir: resolve(import.meta.dirname, '..'),
+					sourcefile: 'universal-profile-proof.ts',
+				},
+				bundle: true,
+				define: { __OCTANE_PROFILE_ENABLED__: JSON.stringify(enabled) },
+				format: 'iife',
+				metafile: true,
+				minify: true,
+				platform: 'neutral',
+				target: 'esnext',
+				treeShaking: true,
+				write: false,
+			});
+			const context: {
+				renderedValue?: number;
+				__OCTANE_PROFILER__?: typeof import('../src/profiling.js').profiler;
+			} = {};
+			runInNewContext(result.outputFiles[0].text, context);
+			return {
+				context,
+				inputs: Object.keys(Object.values(result.metafile!.outputs)[0].inputs),
+			};
+		};
+
+		const disabled = await run(false);
+		expect(disabled.context.renderedValue).toBe(1);
+		expect(disabled.context.__OCTANE_PROFILER__).toBeUndefined();
+		expect(
+			disabled.inputs.some((input) => /packages\/octane\/src\/profiling\.ts$/.test(input)),
+		).toBe(false);
+
+		const enabled = await run(true);
+		expect(enabled.context.renderedValue).toBe(1);
+		expect(
+			enabled.inputs.some((input) => /packages\/octane\/src\/profiling\.ts$/.test(input)),
+		).toBe(true);
+		expect(
+			enabled.context.__OCTANE_PROFILER__?.getEvents().map((event) => ({
+				component: event.component,
+				phase: event.phase,
+				causes: event.causes.map((cause) => cause.type),
+			})),
+		).toEqual([
+			{ component: 'ProfiledCounter', phase: 'mount', causes: ['mount'] },
+			{ component: 'ProfiledCounter', phase: 'update', causes: ['state'] },
+		]);
+	});
+
 	it('bundles the public native entry without DOM or React runtime modules', async () => {
 		const result = await build({
 			stdin: {

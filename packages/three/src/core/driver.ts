@@ -573,6 +573,447 @@ function prepareUpdateOnlyBatch(
 	};
 }
 
+interface AcceptedFlatBatchResult {
+	failed: boolean;
+	error: unknown;
+}
+
+function retainFlatBatchError(result: AcceptedFlatBatchResult, error: unknown): void {
+	if (result.failed) return;
+	result.failed = true;
+	result.error = error;
+}
+
+function finishFlatRootBatch(
+	container: ThreeHostContainer,
+	batch: UniversalHostBatch,
+	result: AcceptedFlatBatchResult,
+): void {
+	if (container.environment.recordCommits !== false) {
+		try {
+			container.commits.push(batch);
+		} catch (error) {
+			retainFlatBatchError(result, error);
+		}
+	}
+	try {
+		container.environment.invalidate?.();
+	} catch (error) {
+		retainFlatBatchError(result, error);
+	}
+	if (result.failed) throw result.error;
+}
+
+/**
+ * A flat, callback-free root has no attachment, portal, visibility, or
+ * interaction relationships to simulate. Verify the live graph first so public
+ * Object3D mutations still fall back to the full synchronizing driver.
+ */
+function getFlatRootInstances(container: ThreeHostContainer): readonly ThreeHostInstance[] | null {
+	const state = container[THREE_DRIVER_STATE];
+	const count = state.rootChildren.length;
+	if (
+		count === 0 ||
+		state.instances.size !== count ||
+		state.portalTargets.size !== 0 ||
+		state.portalChildren.size !== 0 ||
+		container.scene.parent !== null ||
+		container.scene.children.length !== count
+	) {
+		return null;
+	}
+
+	const store = container.environment.store;
+	if (store !== undefined) {
+		const interaction = store.getState().internal;
+		if (
+			interaction.interaction.length !== 0 ||
+			interaction.initialHits.length !== 0 ||
+			interaction.hovered.size !== 0 ||
+			interaction.capturedMap.size !== 0
+		) {
+			return null;
+		}
+	}
+
+	const direct = state.directInstances;
+	if (direct !== null && direct.length !== count) return null;
+	const instances = direct ?? new Array<ThreeHostInstance>(count);
+	for (let index = 0; index < count; index++) {
+		const instance =
+			direct === null ? state.instances.get(state.rootChildren[index]) : direct[index];
+		if (
+			instance === undefined ||
+			instance.id !== state.rootChildren[index] ||
+			instance.parent !== null ||
+			instance.children.length !== 0 ||
+			!instance.visible ||
+			instance.events.size !== 0 ||
+			instance.lifecycles.size !== 0 ||
+			instance.localCallbacks.size !== 0 ||
+			instance.localCleanups.size !== 0 ||
+			instance.store !== store ||
+			instance.physical?.kind !== 'object3d' ||
+			instance.physical.object !== instance.object ||
+			instance.physical.parent !== container.scene ||
+			instance.object.parent !== container.scene ||
+			instance.object.visible !== (instance.props.visible !== false) ||
+			container.scene.children[index] !== instance.object
+		) {
+			return null;
+		}
+		if (direct === null) (instances as ThreeHostInstance[])[index] = instance;
+	}
+	return instances;
+}
+
+/**
+ * Recreate root Object3D leaves without cloning the complete logical graph.
+ * All replacements are constructed while the transaction remains rejectable;
+ * abort disposes only those unpublished replacements.
+ */
+function prepareFlatRootRecreationBatch(
+	container: ThreeHostContainer,
+	batch: UniversalHostBatch,
+): UniversalPreparedHostBatch | null {
+	const state = container[THREE_DRIVER_STATE];
+	const count = state.rootChildren.length;
+	if (
+		count === 0 ||
+		batch.commands.length !== count ||
+		batch.commands[0]?.op !== 'recreate' ||
+		batch.commands[count - 1]?.op !== 'recreate'
+	) {
+		return null;
+	}
+	const instances = getFlatRootInstances(container);
+	if (instances === null) return null;
+
+	const constructors = new Map<string, Function>();
+	for (let index = 0; index < count; index++) {
+		const command = batch.commands[index];
+		const instance = instances[index];
+		if (
+			command.op !== 'recreate' ||
+			command.id !== instance.id ||
+			command.type !== instance.type ||
+			!instance.owned ||
+			command.props.attach != null
+		) {
+			return null;
+		}
+		let Constructor = constructors.get(command.type);
+		if (Constructor === undefined) {
+			const resolved = resolveThreeConstructor(command.type);
+			if (
+				resolved === null ||
+				(resolved !== THREE.Object3D && !(resolved.prototype instanceof THREE.Object3D))
+			) {
+				return null;
+			}
+			Constructor = resolved;
+			constructors.set(command.type, Constructor);
+		}
+		if (instance.object.constructor !== Constructor) return null;
+	}
+
+	const replacements: StagedObject[] = [];
+	try {
+		for (let index = 0; index < count; index++) {
+			const command = batch.commands[index] as Extract<
+				UniversalHostCommand,
+				{ readonly op: 'recreate' }
+			>;
+			const replacement = stageObject(container, command.type, command.props);
+			replacements.push(replacement);
+			if (!isObject3D(replacement.object) || replacement.type !== instances[index].type) {
+				throw new Error(`@octanejs/three: Recreate type mismatch for ${command.id}.`);
+			}
+		}
+	} catch (error) {
+		for (const replacement of replacements) disposeOwnedNow(replacement.object);
+		throw error;
+	}
+
+	let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
+	return {
+		apply() {
+			if (status !== 'prepared') return;
+			status = 'applied';
+			const result: AcceptedFlatBatchResult = { failed: false, error: undefined };
+			const previousObjects = new Array<THREE.Object3D>(count);
+
+			for (let index = 0; index < count; index++) {
+				try {
+					const instance = instances[index];
+					const previousObject = instance.object as THREE.Object3D;
+					const previousProps = instance.props;
+					const replacement = replacements[index];
+					const command = batch.commands[index] as Extract<
+						UniversalHostCommand,
+						{ readonly op: 'recreate' }
+					>;
+					previousObjects[index] = previousObject;
+					OBJECT_INSTANCES.delete(previousObject);
+					instance.object = replacement.object;
+					instance.owned = replacement.owned;
+					instance.props = command.props;
+					instance.type = replacement.type;
+					OBJECT_INSTANCES.set(replacement.object, instance);
+					previousObject.visible = previousProps.visible !== false;
+					enqueueDisposal(container, previousObject);
+				} catch (error) {
+					retainFlatBatchError(result, error);
+				}
+			}
+
+			for (let index = 0; index < count; index++) {
+				try {
+					instances[index].physical = null;
+					container.scene.remove(previousObjects[index]);
+				} catch (error) {
+					retainFlatBatchError(result, error);
+				}
+			}
+
+			for (let index = 0; index < count; index++) {
+				try {
+					const instance = instances[index];
+					container.scene.add(instance.object);
+					instance.physical = {
+						kind: 'object3d',
+						object: instance.object,
+						parent: container.scene,
+					};
+					instance.object.visible = instance.props.visible !== false;
+				} catch (error) {
+					retainFlatBatchError(result, error);
+				}
+			}
+			finishFlatRootBatch(container, batch, result);
+		},
+		abort() {
+			if (status !== 'prepared') return;
+			status = 'aborted';
+			for (const replacement of replacements) disposeOwnedNow(replacement.object);
+		},
+	};
+}
+
+/** Reorder a root-only mesh list in linear time, including ordinary prop updates. */
+function prepareFlatRootReorderBatch(
+	container: ThreeHostContainer,
+	batch: UniversalHostBatch,
+): UniversalPreparedHostBatch | null {
+	const state = container[THREE_DRIVER_STATE];
+	const count = state.rootChildren.length;
+	if (
+		count < 2 ||
+		state.directInstances === null ||
+		batch.commands.length === 0 ||
+		batch.commands[batch.commands.length - 1]?.op !== 'move'
+	) {
+		return null;
+	}
+	const instances = getFlatRootInstances(container);
+	if (instances === null) return null;
+
+	const positions = new Map<number, number>();
+	const previous = new Int32Array(count);
+	const next = new Int32Array(count);
+	for (let index = 0; index < count; index++) {
+		const instance = instances[index];
+		if (!instance.directLeaf) return null;
+		positions.set(instance.id, index);
+		previous[index] = index - 1;
+		next[index] = index + 1 === count ? -1 : index + 1;
+	}
+	let first = 0;
+	let last = count - 1;
+	let updates = 0;
+	const updated = new Set<number>();
+	while (updates < batch.commands.length && batch.commands[updates].op === 'update') {
+		const command = batch.commands[updates] as Extract<
+			UniversalHostCommand,
+			{ readonly op: 'update' }
+		>;
+		const position = positions.get(command.id);
+		if (position === undefined || updated.has(command.id)) return null;
+		const instance = instances[position];
+		const descriptor = Object.getOwnPropertyDescriptor(instance.object, 'name');
+		if (
+			descriptor === undefined ||
+			!('value' in descriptor) ||
+			descriptor.writable !== true ||
+			instance.object.position.fromArray !== THREE_VECTOR3_FROM_ARRAY ||
+			!isDirectMeshProps(command.props)
+		) {
+			return null;
+		}
+		updated.add(command.id);
+		updates++;
+	}
+	if (updates === batch.commands.length) return null;
+
+	for (let index = updates; index < batch.commands.length; index++) {
+		const command = batch.commands[index];
+		if (command.op !== 'move' || command.parent !== null) return null;
+		const moved = positions.get(command.id);
+		const before = command.before === null ? -1 : positions.get(command.before);
+		if (moved === undefined || before === undefined || moved === before) return null;
+
+		const preceding = previous[moved];
+		const following = next[moved];
+		if (preceding === -1) first = following;
+		else next[preceding] = following;
+		if (following === -1) last = preceding;
+		else previous[following] = preceding;
+
+		if (before === -1) {
+			previous[moved] = last;
+			next[moved] = -1;
+			if (last === -1) first = moved;
+			else next[last] = moved;
+			last = moved;
+		} else {
+			const beforePrevious = previous[before];
+			previous[moved] = beforePrevious;
+			next[moved] = before;
+			previous[before] = moved;
+			if (beforePrevious === -1) first = moved;
+			else next[beforePrevious] = moved;
+		}
+	}
+
+	const ordered = new Array<ThreeHostInstance>(count);
+	for (let index = 0, position = first; index < count; index++, position = next[position]) {
+		if (position === -1) return null;
+		ordered[index] = instances[position];
+	}
+
+	let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
+	return {
+		apply() {
+			if (status !== 'prepared') return;
+			status = 'applied';
+			const result: AcceptedFlatBatchResult = { failed: false, error: undefined };
+			for (let index = 0; index < updates; index++) {
+				try {
+					const command = batch.commands[index] as Extract<
+						UniversalHostCommand,
+						{ readonly op: 'update' }
+					>;
+					const instance = instances[positions.get(command.id)!];
+					const previousProps = instance.props as DirectMeshProps;
+					const nextProps = command.props as DirectMeshProps;
+					instance.props = nextProps;
+					if (previousProps.name !== nextProps.name) instance.object.name = nextProps.name;
+					const previousPosition = previousProps.position;
+					const nextPosition = nextProps.position;
+					if (
+						previousPosition[0] !== nextPosition[0] ||
+						previousPosition[1] !== nextPosition[1] ||
+						previousPosition[2] !== nextPosition[2]
+					) {
+						instance.object.position.fromArray(nextPosition);
+					}
+				} catch (error) {
+					retainFlatBatchError(result, error);
+				}
+			}
+
+			try {
+				state.directInstances = ordered;
+				for (let index = 0; index < count; index++) {
+					state.rootChildren[index] = ordered[index].id;
+				}
+			} catch (error) {
+				retainFlatBatchError(result, error);
+			}
+			try {
+				for (let index = 0; index < count; index++) {
+					container.scene.children[index] = ordered[index].object;
+				}
+			} catch (error) {
+				retainFlatBatchError(result, error);
+			}
+			finishFlatRootBatch(container, batch, result);
+		},
+		abort() {
+			if (status === 'prepared') status = 'aborted';
+		},
+	};
+}
+
+/** Clear a callback-free, root-only Object3D list without a scene-wide clone. */
+function prepareFlatRootRemovalBatch(
+	container: ThreeHostContainer,
+	batch: UniversalHostBatch,
+): UniversalPreparedHostBatch | null {
+	const state = container[THREE_DRIVER_STATE];
+	const count = state.rootChildren.length;
+	if (
+		count === 0 ||
+		batch.commands.length !== count * 2 ||
+		batch.commands[0]?.op !== 'remove' ||
+		batch.commands[batch.commands.length - 1]?.op !== 'destroy'
+	) {
+		return null;
+	}
+	const instances = getFlatRootInstances(container);
+	if (instances === null) return null;
+	for (let index = 0; index < count; index++) {
+		const remove = batch.commands[index];
+		const destroy = batch.commands[count + index];
+		if (
+			remove.op !== 'remove' ||
+			remove.parent !== null ||
+			remove.id !== instances[index].id ||
+			destroy.op !== 'destroy' ||
+			destroy.id !== remove.id
+		) {
+			return null;
+		}
+	}
+
+	let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
+	return {
+		apply() {
+			if (status !== 'prepared') return;
+			status = 'applied';
+			const result: AcceptedFlatBatchResult = { failed: false, error: undefined };
+			state.directInstances = null;
+			state.rootChildren.length = 0;
+			for (const instance of instances) {
+				try {
+					instance.physical = null;
+					container.scene.remove(instance.object);
+				} catch (error) {
+					retainFlatBatchError(result, error);
+				}
+			}
+			for (const instance of instances) {
+				try {
+					instance.object.visible = instance.props.visible !== false;
+					if (instance.owned && instance.type !== 'primitive' && instance.props.dispose !== null) {
+						enqueueDisposal(container, instance.object);
+					}
+					OBJECT_INSTANCES.delete(instance.object);
+					instance.store = undefined;
+					instance.parent = undefined;
+					state.instances.delete(instance.id);
+				} catch (error) {
+					retainFlatBatchError(result, error);
+				}
+			}
+			finishFlatRootBatch(container, batch, result);
+		},
+		abort() {
+			if (status === 'prepared') status = 'aborted';
+		},
+	};
+}
+
 function isPortalParent(parent: ParentId): parent is UniversalPortalTargetHandle {
 	return (
 		parent !== null &&
@@ -1395,6 +1836,12 @@ export function createThreeDriver(
 			if (directLeafMount !== null) return directLeafMount;
 			const updateOnly = prepareUpdateOnlyBatch(container, batch);
 			if (updateOnly !== null) return updateOnly;
+			const flatRecreation = prepareFlatRootRecreationBatch(container, batch);
+			if (flatRecreation !== null) return flatRecreation;
+			const flatReorder = prepareFlatRootReorderBatch(container, batch);
+			if (flatReorder !== null) return flatReorder;
+			const flatRemoval = prepareFlatRootRemovalBatch(container, batch);
+			if (flatRemoval !== null) return flatRemoval;
 			const simulation = cloneSimulation(state);
 			const rootChildren = [...state.rootChildren];
 			const portalChildren = clonePortalChildren(state);

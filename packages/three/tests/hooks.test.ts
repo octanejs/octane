@@ -5,6 +5,7 @@ import { createThreeContainer, createThreeDriver } from '../src/core/driver.js';
 import {
 	buildGraph,
 	getRootState,
+	useFrame,
 	useStore,
 	type Instance,
 	type ObjectMap,
@@ -76,6 +77,37 @@ describe('Three hooks and graph helpers', () => {
 		expect(() => root.render(Scene, undefined)).toThrow(
 			'R3F: Hooks can only be used within the Canvas component!',
 		);
+	});
+
+	it('keeps the last accepted frame callback when a replacement render fails', async () => {
+		const frames: string[] = [];
+		const Scene = defineUniversalComponent(
+			'three',
+			(props: { callback: () => void; fail: boolean }) => {
+				useFrame(props.callback);
+				if (props.fail) throw new Error('frame callback render rejected');
+				return null;
+			},
+		);
+		const initial = () => frames.push('initial');
+		const rejected = () => frames.push('rejected');
+		const accepted = () => frames.push('accepted');
+		const root = await createThreeTestRenderer(Scene, { callback: initial, fail: false });
+
+		try {
+			root.advanceFrames(1);
+			expect(() => root.update(Scene, { callback: rejected, fail: true })).toThrow(
+				'frame callback render rejected',
+			);
+			root.advanceFrames(1);
+			expect(frames).toEqual(['initial', 'initial']);
+
+			root.update(Scene, { callback: accepted, fail: false });
+			root.advanceFrames(1);
+			expect(frames).toEqual(['initial', 'initial', 'accepted']);
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('selects root state, exposes managed handles, and keeps frame callbacks current', async () => {
