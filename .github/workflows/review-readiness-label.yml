@@ -3,13 +3,14 @@ name: Review readiness label
 on:
   issue_comment:
     types: [created, edited]
-  check_run:
+  workflow_run:
+    workflows: [Review feedback signal]
     types: [completed]
 
 concurrency:
-  # A Cursor check on a fork commit does not carry a pull request number, so
-  # use its head SHA to serialize duplicate completion deliveries.
-  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.check_run.head_sha }}
+  # A review-feedback completion reconciles every labelled pull request, so
+  # serialize those global passes while keeping comment commands per PR.
+  group: ${{ github.workflow }}-${{ github.event.issue.number || 'review-feedback' }}
   cancel-in-progress: false
 
 jobs:
@@ -17,12 +18,9 @@ jobs:
     name: update label
     if: >-
       (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
-      (github.event_name == 'check_run' &&
-        github.event.check_run.app.slug == 'cursor' &&
-        github.event.check_run.name == 'Cursor Bugbot')
+      github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     permissions:
-      checks: read
       issues: read
       pull-requests: write
 
@@ -33,11 +31,9 @@ jobs:
           script: |
             const READY = "READY FOR REVIEW";
             const WITHDRAWN = "REVIEW WITHDRAWN";
-            const CURSOR_LOGIN = "cursor";
-            const CURSOR_FINDING = "<!-- BUGBOT_BUG_ID:";
             const { owner, repo } = context.repo;
 
-            async function unresolvedCursorThreads(number) {
+            async function unresolvedReviewThreads(number) {
               const unresolved = [];
               let after = null;
               let hasNextPage;
@@ -52,8 +48,6 @@ jobs:
                             isResolved
                             comments(first: 1) {
                               nodes {
-                                author { login }
-                                body
                                 url
                               }
                             }
@@ -72,11 +66,7 @@ jobs:
 
                 for (const thread of threads.nodes) {
                   const first = thread.comments.nodes[0];
-                  if (
-                    !thread.isResolved &&
-                    first?.author?.login === CURSOR_LOGIN &&
-                    (first.body ?? "").includes(CURSOR_FINDING)
-                  ) {
+                  if (!thread.isResolved && first) {
                     unresolved.push(first.url);
                   }
                 }
@@ -87,7 +77,7 @@ jobs:
               return unresolved;
             }
 
-            async function openPullsAtHead(headSha) {
+            async function openReadyPulls() {
               const matches = [];
               let after = null;
               let hasNextPage;
@@ -97,7 +87,10 @@ jobs:
                   `query ($owner: String!, $repo: String!, $after: String) {
                     repository(owner: $owner, name: $repo) {
                       pullRequests(first: 100, after: $after, states: OPEN) {
-                        nodes { number headRefOid }
+                        nodes {
+                          number
+                          labels(first: 100) { nodes { name } }
+                        }
                         pageInfo { hasNextPage endCursor }
                       }
                     }
@@ -107,7 +100,9 @@ jobs:
                 const pulls = result.repository.pullRequests;
                 matches.push(
                   ...pulls.nodes
-                    .filter((pull) => pull.headRefOid === headSha)
+                    .filter((pull) =>
+                      pull.labels.nodes.some((label) => label.name === READY),
+                    )
                     .map((pull) => pull.number),
                 );
                 hasNextPage = pulls.pageInfo.hasNextPage;
@@ -149,15 +144,14 @@ jobs:
             }
 
             try {
-              if (context.eventName === "check_run") {
-                const headSha = context.payload.check_run.head_sha;
-                const numbers = await openPullsAtHead(headSha);
+              if (context.eventName === "workflow_run") {
+                const numbers = await openReadyPulls();
                 for (const number of numbers) {
                   const state = await pullState(number);
                   if (!state.isOpen || !state.hasLabel) {
                     continue;
                   }
-                  const unresolved = await unresolvedCursorThreads(number);
+                  const unresolved = await unresolvedReviewThreads(number);
                   if (unresolved.length === 0) {
                     continue;
                   }
@@ -167,8 +161,8 @@ jobs:
                     continue;
                   }
                   core.notice(
-                    `Removed ${READY} from #${number}: ${unresolved.length} unresolved Cursor ` +
-                      `finding${unresolved.length === 1 ? " remains" : "s remain"}. ` +
+                    `Removed ${READY} from #${number}: ${unresolved.length} unresolved review ` +
+                      `thread${unresolved.length === 1 ? " remains" : "s remain"}. ` +
                       unresolved.join(", "),
                   );
                 }
@@ -195,14 +189,14 @@ jobs:
               }
 
               if (command === READY) {
-                const unresolved = await unresolvedCursorThreads(number);
+                const unresolved = await unresolvedReviewThreads(number);
                 if (unresolved.length > 0) {
                   if (state.hasLabel) {
                     await removeReady(number);
                   }
                   core.notice(
-                    `Did not apply ${READY} to #${number}: ${unresolved.length} unresolved Cursor ` +
-                      `finding${unresolved.length === 1 ? " remains" : "s remain"}. ` +
+                    `Did not apply ${READY} to #${number}: ${unresolved.length} unresolved review ` +
+                      `thread${unresolved.length === 1 ? " remains" : "s remain"}. ` +
                       unresolved.join(", "),
                   );
                   return;
