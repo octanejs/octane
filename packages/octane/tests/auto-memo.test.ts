@@ -2393,6 +2393,176 @@ describe('compiler-owned component-region memoization', () => {
 		expectCompilerRegion(reassignedClean);
 	});
 
+	it('caches regions whose host elements take spread bags', () => {
+		// A host spread is one runtime-diffed binding over a bag reachable only
+		// from deps the region guard already witnesses — the same immutable-
+		// snapshot read as a member-read attribute, so it cannot make a skip
+		// observable. Component-tag spreads instead build a child's props
+		// snapshot (getters run, prop names are hidden) and keep failing closed.
+		const admitted = [
+			`function Child(props) @{ <div class={props.cls} {...props.attrs}>{props.label}</div> }`,
+			// The svg-dashboard Topology shape: keyed rows spreading per-item bags.
+			`function Child({ topo }) @{
+				<g class="t">
+					@for (const e of topo.edges; key e.id) {
+						<path class={e.cls} d={e.d} {...e.attrs}></path>
+					}
+				</g>
+			 }`,
+		];
+		for (const child of admitted) {
+			const code = compile(
+				`${child}\nexport function App(props) @{ <Child cls={props.cls} attrs={props.attrs} label={props.label} topo={props.topo} /> }`,
+				'auto-memo-host-spread.tsrx',
+				{ hmr: false, autoMemo: true },
+			).code;
+			expectCompilerRegion(code);
+		}
+
+		// The tsx dialect's map-lowered keyed rows earn their list cache the same
+		// way (JSXSpreadAttribute instead of SpreadAttribute). mapSlot guards
+		// carry an extra native-receiver clause, so assert the cache pieces
+		// directly rather than through the componentSlot-shaped helper.
+		const tsxCode = compile(
+			`export function Rows(props) {
+				return (
+					<ul>
+						{props.rows.map((r) => (
+							<li key={r.id} className={r.cls} {...r.attrs}>{r.label}</li>
+						))}
+					</ul>
+				);
+			}`,
+			'auto-memo-host-spread.tsx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		expect(tsxCode).toContain('__memoCommitted');
+		expect(tsxCode).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
+
+		const rejected = [
+			// A component-tag spread nested in the callee body…
+			`function Inner(props) @{ <b>{props.v}</b> }
+			 function Child(props) @{ <div><Inner {...props.bag} /></div> }
+			 export function App(props) @{ <Child bag={props.bag} /> }`,
+			// …and at the call site itself (callSiteOk) keep ordinary entry.
+			`function Child(props) @{ <div>{props.v}</div> }
+			 export function App(props) @{ <Child {...props.bag} /> }`,
+			// The spread ARGUMENT still walks under every other rule: accessors,
+			// computed members, and ref reads inside it keep failing closed.
+			`function Child(props) @{ <div {...{ get a() { return props.source.current; } }}></div> }
+			 export function App(props) @{ <Child source={props.source} /> }`,
+			`function Child(props) @{ <div {...props.bags[props.k]}></div> }
+			 export function App(props) @{ <Child bags={props.bags} k={props.k} /> }`,
+			// A statically witnessed ref keeps its pinned rejection; a bag
+			// alongside does not rescue it.
+			`function Child(props) @{ <div ref={props.refObj} {...props.attrs}></div> }
+			 export function App(props) @{ <Child refObj={props.refObj} attrs={props.attrs} /> }`,
+		];
+		for (const source of rejected) {
+			const code = compile(source, 'auto-memo-host-spread-fallback.tsrx', {
+				hmr: false,
+				autoMemo: true,
+			}).code;
+			expectNoCompilerRegion(code);
+		}
+	});
+
+	it('re-diffs and skips host spread bags through a cached region', () => {
+		const source = `
+			function SpreadRows({ rows }) @{
+				<ul id="auto-memo-spread-rows">
+					@for (const item of rows; key item.id) {
+						<li data-id={item.id} {...item.attrs}>{item.label as string}</li>
+					}
+				</ul>
+			}
+			export function App(props) @{
+				<div>
+					<span id="auto-memo-spread-version">{props.version as string}</span>
+					<SpreadRows rows={props.rows} />
+				</div>
+			}
+		`;
+		// The scenario below must exercise the cached path, so pin that this
+		// exact fixture earns its regions under the same compile options.
+		expectCompilerRegion(
+			compile(source, 'auto-memo-host-spread-runtime.tsrx', { hmr: false, dev: false }).code,
+		);
+		const client = loadCompiledFixtureSource(source, {
+			id: 'auto-memo-host-spread-runtime.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+
+		type Bag = Record<string, unknown>;
+		const events: string[] = [];
+		const firstRef: { current: Element | null } = { current: null };
+		const rows1 = [
+			{
+				id: 1,
+				label: 'alpha',
+				attrs: {
+					'data-x': 'a1',
+					title: 'first',
+					onClick: () => events.push('bag:1'),
+					ref: firstRef,
+				} as Bag,
+			},
+			{ id: 2, label: 'beta', attrs: { 'data-x': 'b1' } as Bag },
+		];
+		const root = mount(client.App, { version: 'v0', rows: rows1 });
+		const rowsBefore = root.findAll('#auto-memo-spread-rows > li');
+		expect(rowsBefore.map((row) => row.getAttribute('data-x'))).toEqual(['a1', 'b1']);
+		expect(rowsBefore[0]!.getAttribute('title')).toBe('first');
+		expect(firstRef.current).toBe(rowsBefore[0]);
+		root.click('[data-x="a1"]');
+		expect(events).toEqual(['bag:1']);
+
+		// Unchanged deps: the region skips. Under the immutable-snapshot
+		// contract an in-place bag mutation is invisible while `rows` keeps its
+		// identity — the same bail React.memo performs — and the bag's ref and
+		// handler stay live on the same node.
+		rows1[1]!.attrs['data-mutated'] = 'yes';
+		root.update(client.App, { version: 'v1', rows: rows1 });
+		expect(root.find('#auto-memo-spread-version')!.textContent).toBe('v1');
+		const rowsSkipped = root.findAll('#auto-memo-spread-rows > li');
+		expect(rowsSkipped[0]).toBe(rowsBefore[0]);
+		expect(rowsSkipped[1]!.hasAttribute('data-mutated')).toBe(false);
+		expect(firstRef.current).toBe(rowsBefore[0]);
+		root.click('[data-x="a1"]');
+		expect(events).toEqual(['bag:1', 'bag:1']);
+
+		// Changed deps: the region re-enters and re-diffs each bag — a changed
+		// key applies, a vanished key clears, and a swapped ref detaches the old
+		// holder before attaching the new. Keyed survivors keep DOM identity.
+		const secondRef: { current: Element | null } = { current: null };
+		const rows2 = [
+			{
+				id: 1,
+				label: 'alpha',
+				attrs: {
+					'data-x': 'a2',
+					onClick: () => events.push('bag:2'),
+					ref: secondRef,
+				} as Bag,
+			},
+			{ id: 2, label: 'beta', attrs: { 'data-x': 'b1' } as Bag },
+		];
+		root.update(client.App, { version: 'v2', rows: rows2 });
+		const rowsAfter = root.findAll('#auto-memo-spread-rows > li');
+		expect(rowsAfter[0]).toBe(rowsBefore[0]);
+		expect(rowsAfter[1]).toBe(rowsBefore[1]);
+		expect(rowsAfter[0]!.getAttribute('data-x')).toBe('a2');
+		expect(rowsAfter[0]!.hasAttribute('title')).toBe(false);
+		expect(firstRef.current).toBe(null);
+		expect(secondRef.current).toBe(rowsAfter[0]);
+		root.click('[data-x="a2"]');
+		expect(events).toEqual(['bag:1', 'bag:1', 'bag:2']);
+
+		root.unmount();
+		expect(secondRef.current).toBe(null);
+	});
+
 	it('judges each component in a module on its own imported reads', () => {
 		// Every component is analysed against its own body. Both declaration
 		// orders are checked because a verdict leaking from one component to the

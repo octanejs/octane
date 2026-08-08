@@ -4330,6 +4330,10 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 function containsAutoMemoUnsafeStructure(stmts) {
 	let found = false;
 	const seen = new WeakSet();
+	// Spread bags on HOST elements, marked admissible by the owning element's
+	// visit below. Parents walk before their attributes, so membership is
+	// decided before the spread node itself is reached.
+	const hostSpreads = new WeakSet();
 	function walk(n) {
 		if (found || !n) return;
 		if (Array.isArray(n)) {
@@ -4361,12 +4365,28 @@ function containsAutoMemoUnsafeStructure(stmts) {
 			t === 'YieldExpression' ||
 			t === 'ThrowStatement' ||
 			t === 'TryStatement' ||
-			t === 'JSXTryExpression' ||
-			t === 'SpreadAttribute' ||
-			t === 'JSXSpreadAttribute'
+			t === 'JSXTryExpression'
 		) {
 			found = true;
 			return;
+		}
+		if (t === 'SpreadAttribute' || t === 'JSXSpreadAttribute') {
+			// A HOST element's spread bag is one setSpread binding re-diffed on every
+			// region entry. Its argument is composed of deps the region guard already
+			// witnesses (unwitnessed names fail closed independently), so a skip is
+			// the no-op a re-entry would have been — the same immutable-snapshot
+			// argument that admits `class={e.cls}` member reads; runtime keys the
+			// walk cannot see (ref/on*/value) diff per entry with full parity to
+			// their direct-attribute forms. A COMPONENT tag's spread instead builds
+			// the child's props snapshot (getter evaluation, hidden prop names) and
+			// stays rejected, matching the callSiteOk exclusion — which
+			// isAutoMemoPropsParam's rest admission relies on. The argument still
+			// walks below: accessors, computed members, and ref reads inside it keep
+			// failing closed.
+			if (!hostSpreads.has(n)) {
+				found = true;
+				return;
+			}
 		}
 		if (t === 'UnaryExpression' && n.operator === 'delete') {
 			found = true;
@@ -4434,6 +4454,13 @@ function containsAutoMemoUnsafeStructure(stmts) {
 			) {
 				found = true;
 				return;
+			}
+			if (!isComponentTag(n)) {
+				for (const attr of n.attributes || n.openingElement?.attributes || []) {
+					if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+						hostSpreads.add(attr);
+					}
+				}
 			}
 		}
 		for (const key in n) {

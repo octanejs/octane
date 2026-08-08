@@ -1549,7 +1549,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 2.7,
-    "note": "Fresh-but-value-identical snapshot republish: octane walks every binding's prev-guard where solid's fine-grained graph skips at the signal layer. Observed 1.78x, 2026-08-07; this pins the diff-skip walk cost across ~2,400 elements from drifting further."
+    "note": "Fresh-but-value-identical snapshot republish: octane walks every binding's prev-guard where solid's fine-grained graph skips at the signal layer. Observed 1.78x, 2026-08-07; this pins the diff-skip walk cost from drifting further. Observed 0.36x, 2026-08-08, after the autoMemo host-spread admission: the unchanged topology/icon subtrees now bail on identity, so the walk covers only the republished charts strip."
   },
   {
     "suite": "svg-dashboard",
@@ -1557,7 +1557,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 2.5,
-    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening."
+    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
   },
   {
     "suite": "svg-dashboard",
@@ -1565,7 +1565,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 2.3,
-    "note": "960 tiny ui commits (viewBox + root transform only). Measures per-commit flush overhead with the dashboard subtrees isolated behind reference-stable descriptor props. Observed 1.53x, 2026-08-07; regression here means the children-prop bail-out stopped engaging."
+    "note": "960 tiny ui commits (viewBox + root transform only). Measures per-commit flush overhead with the dashboard subtrees isolated behind reference-stable descriptor props. Observed 1.53x, 2026-08-07; regression here means the children-prop bail-out stopped engaging. Since the autoMemo host-spread + destructured-props admissions (2026-08-08), the compiler-owned call-site regions also bail on the colocated shape: an inline-App probe (all three domains in App, subtrees as direct children) ran pan_zoom at 134.0 ms without the spread admission (Topology re-walk per commit) and 0.6 ms with it."
   },
   {
     "suite": "svg-dashboard",
@@ -1573,7 +1573,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.7,
-    "note": "Observed 0.32x, 2026-08-07. Octane's per-commit overhead beats react's memo-cascade by 3x on viewport-only writes; approaching 0.7x means either octane's ui-commit path bloated or the descriptor-prop bail-out weakened."
+    "note": "Observed 0.32x, 2026-08-07. Octane's per-commit overhead beats react's memo-cascade by 3x on viewport-only writes; approaching 0.7x means either octane's ui-commit path bloated or the descriptor-prop bail-out weakened. The compiler-owned call-site regions now also cover host-spread callees (Topology's {...e.attrs} rows), so the Viewport descriptor-prop shape is a fixture choice rather than the only isolation keeping this op flat."
   },
   {
     "suite": "svg-dashboard",
