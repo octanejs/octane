@@ -22,6 +22,7 @@ const { configureShardedProjects, default: shardedVitestConfig } = await import(
 	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
 );
 const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
+const releaseWorkflow = readFileSync(path.join(REPO, '.github/workflows/release.yml'), 'utf8');
 const draftWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/draft-agent-prs.yml'),
 	'utf8',
@@ -177,6 +178,19 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('test'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('examples'), /\[ "\$FULL_CI" = false \]/);
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);
+	});
+
+	test('accepts the generated Octane version source as release metadata', () => {
+		const generatedVersionAllowance = /file\.filename === "packages\/octane\/src\/version\.ts"/;
+
+		assert.match(
+			stepScript(workflow, 'Identify a generated Changesets release change'),
+			generatedVersionAllowance,
+		);
+		assert.match(
+			stepScript(releaseWorkflow, 'Record lightweight release pull request checks'),
+			generatedVersionAllowance,
+		);
 	});
 
 	test('keeps cheap parity validation universal and full execution on Node 24', () => {
