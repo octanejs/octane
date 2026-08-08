@@ -253,8 +253,8 @@ runtime cost separately. App-shaped
 sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
 service and formatting modules count as app code in both framework builds.
 
-`bundle-reachability` builds twenty independent public-entry feature fixtures
-across twenty-seven production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-one independent public-entry feature fixtures
+across twenty-eight production builds with the production Octane compiler,
 disabled HMR/profiling, and normalized esbuild minification. The seven package
 side-effect fixtures each run through both Vite and esbuild. Each measured IIFE
 executes unchanged in an isolated jsdom realm; its visible DOM, interaction,
@@ -269,7 +269,10 @@ the component-owned-effects entry verifies that unused sibling styles, delegated
 events, and ViewTransition initialization disappear while retained styles and
 click handlers remain live.
 
-The two static-root fixtures deliberately measure different public contracts.
+The generated SPA scenario loads the actual CLI entry and complete landing-page
+templates without maintaining duplicate fixture sources; its compiled bundle
+must render the public page while excluding the reusable-root runtime. The two
+static-root fixtures deliberately measure different public contracts.
 `root-static-specialized` matches an application's disposable top-level
 `createRoot(container).render(ImportedComponent)` entry, allowing the production
 compiler to specialize the root. `root-static` retains an escaped, reusable
@@ -280,7 +283,7 @@ real and must not be disguised as the specialized entry.
 ceilings for every feature. Budgets leave about 3% deterministic headroom, with
 small byte-aligned allowances for tiny isolated entries. Each scenario publishes
 its committed ceiling as a
-same-run `*-budget` reference target, so eighty-one `maxRatio: 1` entries in
+same-run `*-budget` reference target, so eighty-four `maxRatio: 1` entries in
 `baselines/ratios.json` enforce all three metrics in the existing weekly/manual
 Bench CI workflow. Run the complete executable and byte guard directly with:
 

@@ -71,7 +71,11 @@ describe('octane init', () => {
 		// A wired-up bundler still serves nothing without a page and an entry to
 		// mount, so `vite` has to have something to open.
 		expect(read(root, 'index.html')).toContain('<script type="module" src="/src/main.ts">');
-		expect(read(root, 'src/main.ts')).toContain('createRoot');
+		// This disposable root must not be retained: its chained mount lets
+		// production builds discard the generic reusable-root machinery.
+		expect(read(root, 'src/main.ts')).toContain(
+			'createRoot(document.getElementById("root")!).render(App)',
+		);
 		expect(read(root, 'src/App.tsrx')).toContain('export function App()');
 		// The SSR-only files belong to the other mode.
 		expect(existsSync(path.join(root, 'octane.config.ts'))).toBe(false);

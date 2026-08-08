@@ -593,12 +593,12 @@ export const indexHtml = (mode) => (mode === 'fullstack' ? SSR_INDEX_HTML : SPA_
 /**
  * The client bootstrap, `spa` only. `render(App)` is the body-and-props
  * overload, which keeps the entry plain TypeScript with no JSX pragma to carry.
+ * Chaining the disposable mount lets eligible builds omit reusable-root machinery.
  */
 export const clientEntry = `import { createRoot } from "octane";
 import { App } from "./App.tsrx";
 
-const root = createRoot(document.getElementById("root")!);
-root.render(App);
+createRoot(document.getElementById("root")!).render(App);
 `;
 
 /**
