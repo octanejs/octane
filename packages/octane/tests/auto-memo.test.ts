@@ -2316,7 +2316,39 @@ describe('compiler-owned component-region memoization', () => {
 		// Laundering the read through locals — directly, transitively, or via a
 		// reassignment whose write site the declaration no longer accounts for —
 		// still keeps ordinary entry semantics for the sites that consume them.
+		// The pattern side of a declaration can carry the read itself (a
+		// `current` binding, a default reading a live import), and hazards can
+		// route through nested-block or loop declarations before reaching a
+		// top-level local; all of these must taint like their expression forms.
 		const launderedLocals = [
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const { current: el } = props.refObj;
+				<Child value={el} />
+			 }`,
+			`import { cell } from './live';
+			 function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const { label = cell.value } = props;
+				<Child value={label} />
+			 }`,
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				let latest = null;
+				for (const sample of props.refObj.current.samples) {
+					latest = sample;
+				}
+				<Child value={latest} />
+			 }`,
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				let out = null;
+				if (props.enabled) {
+					const grabbed = props.refObj.current;
+					out = grabbed;
+				}
+				<Child value={out} />
+			 }`,
 			`function Child(props) @{ <div>{props.value}</div> }
 			 export function App(props) @{
 				const first = props.refObj.current;

@@ -4221,13 +4221,21 @@ function containsImportedMemberRead(root, importedNames) {
  *     while the import's identity (the only thing a dep can hold) stays
  *     fixed.
  *
- * A name is tainted when such a read reaches its value through the
- * declaration initializer, any assignment's right-hand side, or a for-of /
- * for-in feed — directly or through another tainted local (fixed point, so
- * declaration order and arrow-hoisted back-references cannot hide a hazard).
- * Props params and same-module function declarations never taint: the former
- * are the witnessed snapshot itself, the latter are immutable identities
- * whose render-time CALLS the per-site render-call gate already rejects.
+ * A name is tainted when such a read reaches its value through ANY feed —
+ * declaration initializers at every nesting depth, destructuring patterns
+ * that carry the read themselves (`const { current: el } = ref`, a default or
+ * computed key reading a ref or live import), assignment right-hand sides, or
+ * a for-of/for-in source — directly or through another tainted local (fixed
+ * point, so declaration order and arrow-hoisted back-references cannot hide a
+ * hazard). Nested and loop-scoped names are not component locals, so tainting
+ * them is inert at call sites directly (unknown names already fail closed),
+ * but it is what lets a hazard PROPAGATE through them into a top-level local
+ * (`let out; for (const x of ref.current.items) out = x`). Shadowing is
+ * folded by name — an inner binding's hazard taints its outer namesake —
+ * which only ever declines more. Props params and same-module function
+ * declarations never taint: the former are the witnessed snapshot itself, the
+ * latter are immutable identities whose render-time CALLS the per-site
+ * render-call gate already rejects.
  *
  * The direct forms of these reads inside a call site's own props are rejected
  * per site (containsAutoMemoUnsafeStructure / containsImportedMemberRead);
@@ -4243,7 +4251,21 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 		const names = new Set();
 		collectBindings(pattern, names);
 		if (names.size === 0) return;
-		const direct = containsDeferredRefRead(rhs) || containsImportedMemberRead(rhs, importedNames);
+		// The pattern side can carry the read itself: a `current`/computed
+		// binding key destructures ref contents off the source, and a default's
+		// expression evaluates at destructure time. Both walks descend the whole
+		// pattern, so nested shapes and defaults are covered together.
+		const direct =
+			containsDeferredRefRead(rhs) ||
+			containsImportedMemberRead(rhs, importedNames) ||
+			containsDeferredRefRead(pattern) ||
+			containsImportedMemberRead(pattern, importedNames);
+		// Default expressions inside the pattern read values too; their free
+		// identifiers (which include the pattern's own bound names — inert
+		// self-loops) join the clean-source union.
+		const frees = direct
+			? null
+			: [...collectFreeIdentifiers(rhs, []), ...collectFreeIdentifiers(pattern, [])];
 		for (const name of names) {
 			if (hazards.has(name)) continue;
 			if (direct) {
@@ -4253,18 +4275,14 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 			}
 			let set = sourceFrees.get(name);
 			if (set === undefined) sourceFrees.set(name, (set = new Set()));
-			for (const id of collectFreeIdentifiers(rhs, [])) set.add(id);
+			for (const id of frees) set.add(id);
 		}
 	};
-	for (const stmt of stmts) {
-		if (stmt.type !== 'VariableDeclaration') continue;
-		for (const d of stmt.declarations || []) feed(d.id, d.init);
-	}
-	// Assignment/loop feeds anywhere in the body, including nested functions:
-	// a deferred write targets a PREVIOUS render's binding and can never leak
-	// into the next render's dep snapshot, but walking uniformly is cheaper
-	// than proving which writes are deferred, and only hazardous right-hand
-	// sides taint anyway.
+	// One walk feeds every binding form at every depth, including inside
+	// nested function values: a deferred write targets a PREVIOUS render's
+	// binding and can never leak into the next render's dep snapshot, but
+	// walking uniformly is cheaper than proving which writes are deferred, and
+	// only hazardous sources taint anyway.
 	const seen = new WeakSet();
 	(function walk(n) {
 		if (!n) return;
@@ -4274,14 +4292,19 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 		}
 		if (typeof n !== 'object' || !n.type || seen.has(n)) return;
 		seen.add(n);
-		if (n.type === 'AssignmentExpression' && n.left?.type !== 'MemberExpression') {
+		if (n.type === 'VariableDeclaration') {
+			for (const d of n.declarations || []) feed(d.id, d.init);
+		} else if (n.type === 'AssignmentExpression' && n.left?.type !== 'MemberExpression') {
 			feed(n.left, n.right);
-		} else if (
-			(n.type === 'ForOfStatement' || n.type === 'ForInStatement') &&
-			n.left &&
-			n.left.type !== 'VariableDeclaration'
-		) {
-			feed(n.left, n.right);
+		} else if ((n.type === 'ForOfStatement' || n.type === 'ForInStatement') && n.left) {
+			// The loop source feeds the bound names whether the left declares
+			// (`for (const x of src)` — declarator inits are null, so the
+			// declaration arm above cannot see src) or reuses an outer binding.
+			if (n.left.type === 'VariableDeclaration') {
+				for (const d of n.left.declarations || []) feed(d.id, n.right);
+			} else {
+				feed(n.left, n.right);
+			}
 		}
 		for (const key in n) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
