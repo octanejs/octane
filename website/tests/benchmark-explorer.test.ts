@@ -55,10 +55,11 @@ describe('benchmark explorer — bar chart', () => {
 describe('benchmark explorer — heatmap', () => {
 	it('excludes null cells from the grid, rendering them as "—"', async () => {
 		const { container } = await mountExplorer();
-		// HOME_SUMMARY has three gaps: async-waterfall/Vue, streaming-ssr/Svelte,
-		// streaming-ssr/Vue. They render as neutral "—" cells, not colored ones.
+		// HOME_SUMMARY has six gaps: async-waterfall/Vue, streaming-ssr/Svelte,
+		// streaming-ssr/Vue, and svg-dashboard/Preact/Ripple/Vue. They render as
+		// neutral "—" cells, not colored ones.
 		const nullCells = container.querySelectorAll('.bx-cell-null');
-		expect(nullCells.length).toBe(3);
+		expect(nullCells.length).toBe(6);
 		nullCells.forEach((cell) => expect(cell.textContent!.trim()).toBe('—'));
 	});
 
@@ -70,7 +71,7 @@ describe('benchmark explorer — heatmap', () => {
 		fireEvent.click(seg('vs fastest'));
 
 		// Mode B: every suite row now has exactly one outlined 1× winner.
-		await waitFor(() => expect(container.querySelectorAll('.bx-cell-fastest').length).toBe(15));
+		await waitFor(() => expect(container.querySelectorAll('.bx-cell-fastest').length).toBe(16));
 		container
 			.querySelectorAll('.bx-cell-fastest')
 			.forEach((cell) => expect(cell.textContent!.trim()).toBe('1×'));

@@ -115,7 +115,11 @@ describe('website routes', () => {
 
 		for (const card of FRAMEWORK_CARDS) {
 			const keys = card.series.map((series) => series.key);
-			expect(keys, card.id).toContain('preact');
+			if (card.id === 'svg-dashboard') {
+				expect(keys).toEqual(['octane-tsrx', 'react', 'solid', 'svelte']);
+			} else {
+				expect(keys, card.id).toContain('preact');
+			}
 			if (card.id === 'streaming-ssr') {
 				expect(keys, card.id).not.toContain('svelte');
 			} else {
@@ -123,7 +127,9 @@ describe('website routes', () => {
 			}
 
 			for (const row of card.rows) {
-				expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
+				if (card.id !== 'svg-dashboard') {
+					expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
+				}
 				if (card.id !== 'streaming-ssr') {
 					expect(typeof row.svelte, `${card.id}/${row.op}/svelte`).toBe('number');
 				}
@@ -138,6 +144,18 @@ describe('website routes', () => {
 		expect(memoWall.series.map((series) => series.key)).toEqual(
 			expect.arrayContaining(['react', 'react-uncompiled']),
 		);
+		const jsFramework = FRAMEWORK_CARDS.find((card) => card.id === 'js-framework')!;
+		const jsFrameworkDeopt = OCTANE_CARDS.find((card) => card.id === 'js-framework-deopt')!;
+		expect(jsFrameworkDeopt.rows.map((row) => row.op)).toEqual(
+			jsFramework.rows.map((row) => row.op),
+		);
+		for (const row of jsFrameworkDeopt.rows) {
+			for (const series of jsFrameworkDeopt.series) {
+				expect(typeof row[series.key], `${jsFrameworkDeopt.id}/${row.op}/${series.key}`).toBe(
+					'number',
+				);
+			}
+		}
 		for (const card of FRAMEWORK_CARDS) {
 			if (card.id !== 'memo-wall') {
 				expect(
