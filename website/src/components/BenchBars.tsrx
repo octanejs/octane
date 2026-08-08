@@ -43,10 +43,14 @@ function fmtBytes(value: unknown): string {
 	return Math.round(n) + ' B';
 }
 
-// Bar labels drop trailing version tokens ("React 19" → "React") — the full
-// versioned label stays in the data table header.
+// Bar labels drop framework versions while preserving meaningful qualifiers:
+// "React 19 + Compiler" becomes "React + Compiler", while an explicitly
+// uncompiled control remains visibly distinct. Full labels stay in the table.
 function shortLabel(label: string): string {
-	return label.replace(/\s+[\d][\d.]*.*$/, '');
+	return label.replace(
+		/\s+[\d][\d.]*(?:\s+beta)?(?=\s+(?:\+ Compiler|\(uncompiled control\))|$)/,
+		'',
+	).replace(' (uncompiled control)', ' (uncompiled)');
 }
 
 // The picker's synthetic first entry — no suite has an operation named this.

@@ -3,14 +3,14 @@
 //
 // Ops measured per target:
 //   - mount             — initial render of all 100 components
-//   - bump_shallow      — bump C1; in hook frameworks this cascades through
-//                         C1→C100 (99 component re-renders). In signal
-//                         frameworks (solid, ripple) only the single `{v}`
-//                         text expression inside C1 recomputes.
-//   - bump_middle       — bump C51; ~50 cascading renders for hooks, 1 expr
-//                         for signals.
-//   - bump_deep         — bump C91; ~10 cascading renders for hooks, 1 expr
-//                         for signals.
+//   - bump_shallow      — bump C1; uncached hook updates can cascade through
+//                         C1→C100, while React Compiler can skip unchanged
+//                         descendants. Signal frameworks recompute only C1's
+//                         `{v}` text expression without re-rendering its body.
+//   - bump_middle       — bump C51; up to ~50 uncached descendants, fewer with
+//                         compiler memoization, or one signal expression.
+//   - bump_deep         — bump C91; up to ~10 uncached descendants, fewer with
+//                         compiler memoization, or one signal expression.
 //   - bump_sweep        — bump all 10 stateful nodes, flushing after EACH
 //                         (flush-on-every-change); 10 separate commits.
 //   - bump_sweep_batched— bump all 10, then a SINGLE flush; the framework's
@@ -518,16 +518,18 @@ const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
 			console.log();
 		}
 
-		// Cascade-cost ratio: bump_shallow / bump_deep. Hook frameworks pay ~10x
-		// more for shallow than deep (99 cascading renders vs 10). Signal
-		// frameworks should pay roughly the same for both. This ratio quantifies
-		// the cascade-vs-targeted-update axis the bench was built to expose.
+		// Cascade-cost ratio: bump_shallow / bump_deep. An uncached hook chain can
+		// approach ~10x (99 descendants vs 10); React Compiler can skip unchanged
+		// children, while signal frameworks update only the text expression. This
+		// ratio distinguishes raw cascades, compiler reuse, and targeted updates.
 		console.log('cascade ratio (bump_shallow / bump_deep, signal frameworks should be near 1.0):');
 		for (const c of cols) {
 			const r = all[c];
 			const deep = scoreOf(r.bump_deep);
 			const ratioStr = deep === 0 ? '—' : (scoreOf(r.bump_shallow) / deep).toFixed(2) + 'x';
-			console.log(`  ${c.padEnd(14)} ${ratioStr}  (hooks expect ~10x, signals ~1x)`);
+			console.log(
+				`  ${c.padEnd(14)} ${ratioStr}  (uncached hooks ~10x; compiled React can skip descendants; signals ~1x)`,
+			);
 		}
 
 		// Coalescing benefit: batched (1 flush) vs per-bump (10 flushes) for the

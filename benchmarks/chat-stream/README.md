@@ -70,8 +70,8 @@ sample, so scaling is more conversation, not artificial repetition.
 - `comments_conv` — comment-node DOM weight at steady state (marker tripwire).
 
 The `bundle-size` suite builds these apps too (`chat_*` ops) and the octane
-source is in the `codegen-size` corpus. React's column runs its dev-mode
-transform under the vite dev server (same caveat as every suite).
+source is in the `codegen-size` corpus. React's column uses a production build
+with React Compiler enabled, served through Vite's production preview.
 
 Native **Preact** (`:5262`) and runes-mode **Svelte 5** (`:5273`) fixtures use
 the same deterministic corpus and window contract. Their state is immutable at

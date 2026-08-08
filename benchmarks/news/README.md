@@ -42,8 +42,9 @@ authored twice to compare its two dialects over one core:
   the bench's `vite.config.js` carries a tiny inline `.tsrx`→Ripple transform.
 - **Solid 2.0** — `@tsrx/solid` + `vite-plugin-solid` (`@solidjs/web`
   `renderToString` + `hydrate`, a hydratable two-build Vite drives per-request).
-- **React 19** — `@tsrx/react` (`react-dom/server` `renderToString` +
-  `react-dom/client` `hydrateRoot`; one JSX transform serves both, no two-build).
+- **React 19 + React Compiler** — `@tsrx/react` lowers `.tsrx` to automatic-
+  runtime JavaScript, then React Compiler optimizes both production builds
+  (`react-dom/server` `renderToString` + `react-dom/client` `hydrateRoot`).
 - **Preact** — native JSX, `preact-render-to-string`, and core `hydrate()`.
 - **Svelte 5** — runes-mode SFCs, buffered `svelte/server` `render()`, and the
   public `hydrate()` API with recovery disabled for a strict adoption gate.

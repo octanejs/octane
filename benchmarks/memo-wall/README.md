@@ -37,8 +37,8 @@ Ripple's version puts the leaf probe in a reactive text expression, keys its
 benchmarks/memo-wall/
 ├── octane-tsrx/   # Vite app, dev :5206 — octane authored in .tsrx
 ├── octane-jsx/    # Vite app, dev :5207 — same app authored in React-style .tsx
-├── react/         # Vite app, dev :5208 (React 19, production mode)
-├── react-compiler/ # :5226; same React source + official React Compiler 1.0.0
+├── react/         # :5208; React 19 without the compiler (`react-uncompiled` control)
+├── react-compiler/ # :5226; canonical `react`: React 19 + React Compiler 1.0.0
 ├── solid/         # Vite app, dev :5182 (Solid 2.0 — no wall; fine-grained probes)
 ├── ripple/        # Vite app, dev :5225 (fine-grained creation/text probes)
 ├── vue-vapor/     # Vite app, dev :5223 (Vue 3.6 Vapor — no wall; fine-grained probes)
@@ -94,10 +94,11 @@ how `<Row>` is put on screen:
   object identity.
 
 For React the A/B distinction collapses (JSX IS `createElement`); both walls
-are kept so the op list and DOM stay identical across targets. The vanilla
-column uses ordinary `@vitejs/plugin-react`. The `react-compiler` column shares
-that exact source and adds Vite's official `reactCompilerPreset()` backed by
-`babel-plugin-react-compiler@1.0.0`, so the comparison differs only by the
+are kept so the op list and DOM stay identical across targets. The canonical
+`react` column uses Vite's official `reactCompilerPreset()` backed by
+`babel-plugin-react-compiler@1.0.0`, like every other React benchmark. The
+`react-uncompiled` control shares that exact source but uses ordinary
+`@vitejs/plugin-react` without the compiler, so the comparison isolates the
 production compiler. React Compiler caches the `.map`, imported helper call,
 and their JSX regions by the inferred `items` dependency.
 
@@ -160,7 +161,8 @@ repetition counts are recorded in each target's result metadata.
 Native **Preact** (`:5267`) uses `memo` and core context. **Svelte 5** (`:5278`)
 reports compiler-granular behavior: component-creation probes run once, context
 consumers update selectively, and object keys recreate exactly one changed row.
-The production **React Compiler** comparison runs at `:5226`.
+The canonical **React 19 + React Compiler** target runs at `:5226`; its
+explicitly uncompiled control runs at `:5208`.
 
 ## Running
 
@@ -202,8 +204,8 @@ per-operation counts.
   PURE path enters only the changed item helper; wall B also performs the 999
   successful prop bails around the single miss. This is the intended "one
   change amid a wall" workload, not a pure single-row-render cost.
-- Vanilla React `parent_rerender_equal` recreates or reconciles 1000 row
-  descriptions. Both Octane dialects skip wall A's unchanged keyed list; JSX
+- The uncompiled React control's `parent_rerender_equal` recreates or reconciles
+  1000 row descriptions. Both Octane dialects skip wall A's unchanged keyed list; JSX
   retains its descriptor-wrapper overhead. Unchanged wall-B helper output can
   also be cached, while changed inputs exercise descriptor reconciliation.
   React Compiler caches both the `.map` and imported helper call. The
