@@ -871,6 +871,8 @@ interface TransitionSwapDriver {
 	commit: typeof commitOffscreen;
 	dispose: typeof disposeWip;
 	splice: typeof spliceWipCapture;
+	begin: typeof beginTransitionAttempt;
+	end: typeof endTransitionAttempt;
 }
 
 let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
@@ -881,6 +883,8 @@ function ensureTransitionSwapDriver(): void {
 		commit: commitOffscreen,
 		dispose: disposeWip,
 		splice: spliceWipCapture,
+		begin: beginTransitionAttempt,
+		end: endTransitionAttempt,
 	};
 }
 
@@ -2838,11 +2842,14 @@ function drainQueue(): { err: any } | null {
 				block.drainStamp = drainId;
 				block.drainRenders = 1;
 			}
-			const attempt = beginTransitionAttempt(block);
+			// An urgent render can install its first Suspense driver. Pair both
+			// hooks with the same captured driver rather than rereading it after render.
+			const transitionSwap = TRANSITION_SWAP_DRIVER;
+			const attempt = transitionSwap === null ? null : transitionSwap.begin(block);
 			try {
 				renderBlock(block);
 			} finally {
-				endTransitionAttempt(attempt);
+				if (transitionSwap !== null) transitionSwap.end(attempt);
 			}
 		} catch (err) {
 			try {

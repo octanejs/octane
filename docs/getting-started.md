@@ -115,6 +115,30 @@ The Vite setup above gives you these same app-level features. The
 [build tools guide](https://octanejs.dev/docs/build-tools) covers SPA, SSR,
 client/server targets, HMR, and config in depth.
 
+### Custom esbuild integrations
+
+When integrating the Octane compiler into a custom esbuild pipeline, explicitly
+disable profiling in normal production bundles:
+
+```js
+import { build } from 'esbuild';
+
+await build({
+	entryPoints: ['./src/main.ts'],
+	bundle: true,
+	define: {
+		'process.env.NODE_ENV': JSON.stringify('production'),
+		__OCTANE_PROFILE_ENABLED__: 'false',
+	},
+});
+```
+
+Without this definition, esbuild cannot remove the inactive profiling recorder
+and devtools runtime. For an intentional profiling build, compile with
+`profile: true` and set `__OCTANE_PROFILE_ENABLED__` to `'true'`. The official
+Vite, Rspack, and Rsbuild integrations configure this reserved define
+automatically; do not override it when using those integrations.
+
 ## Mount
 
 ```ts

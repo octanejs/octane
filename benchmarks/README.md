@@ -253,6 +253,17 @@ runtime cost separately. App-shaped
 sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
 service and formatting modules count as app code in both framework builds.
 
+`bundle-size/app-budgets.json` independently caps all four complete Octane TSRX
+applications. Each set has separate application, framework, and total raw, gzip,
+and brotli ceilings: thirty-six deterministic limits in total. The harness
+publishes those committed values as one same-run `octane-tsrx-budget` target,
+and thirty-six `maxRatio: 1` guards enforce them alongside the existing
+cross-framework comparisons. Ceilings retain at least 32 bytes of headroom and
+are rounded to 32-byte boundaries, so small changes in another framework cannot
+hide Octane application or runtime growth. Refresh a ceiling only with a
+reviewed explanation and a production measurement using the pinned CI Node
+version.
+
 `bundle-reachability` builds twenty-one independent public-entry feature fixtures
 across twenty-eight production builds with the production Octane compiler,
 disabled HMR/profiling, and normalized esbuild minification. The seven package

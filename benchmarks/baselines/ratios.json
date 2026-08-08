@@ -645,24 +645,24 @@
     "op": "app_gzip",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 1.2,
-    "note": "Deterministic TSX/TSRX application-code gzip: 2791 / 2347 = 1.1892x on 2026-07-19. Keeping this separate prevents a framework-size win from hiding generated app-code growth."
+    "maxRatio": 1.24,
+    "note": "TSX/TSRX application gzip under CI Node 24 on 2026-08-08: 2915 / 2372 = 1.229x. The July fixture snapshot is obsolete; an independent exact TSRX application-byte budget prevents runtime savings from hiding generated-code growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.47,
-    "note": "Rows TOTAL gzip vs ripple, same app, normalized minify. Optional Hydrate/ViewTransition and checked-restoration capabilities reduce the current runtime to 18545 bytes. The resulting 18545 / 12814 = 1.447x record is guarded at 1.47x."
+    "maxRatio": 1.75,
+    "note": "Rows total gzip versus Ripple under CI Node 24 on 2026-08-08: optimized 23280 / 13347 = 1.744x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.28,
-    "note": "Rows TOTAL gzip vs solid, same app, normalized minify. The current deterministic record measured 18545 / 14732 = 1.259x on 2026-07-18; the ceiling remains 1.28x."
+    "maxRatio": 1.68,
+    "note": "Rows total gzip versus Solid under CI Node 24 on 2026-08-08: optimized 23280 / 13958 = 1.668x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "codegen-size",
@@ -712,88 +712,88 @@
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.19,
-    "note": "Rows APP-CODE gzip vs solid, normalized minify. The current deterministic record measured 2355 / 1991 = 1.183x on 2026-07-17; the ceiling is rebaselined to 1.19x."
+    "maxRatio": 1.2,
+    "note": "Rows application gzip versus Solid under CI Node 24 on 2026-08-08: 2372 / 1990 = 1.192x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.59,
-    "note": "TodoMVC APP-CODE gzip vs solid, normalized minify. The current deterministic record measured 2046 / 1292 = 1.584x on 2026-07-18; the ceiling remains 1.59x."
+    "maxRatio": 1.61,
+    "note": "TodoMVC application gzip versus Solid under CI Node 24 on 2026-08-08: 2071 / 1292 = 1.603x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.21,
-    "note": "TodoMVC APP-CODE gzip vs ripple, normalized minify. The current deterministic record measured 2046 / 1696 = 1.206x on 2026-07-18; the ceiling remains 1.21x."
+    "maxRatio": 1.28,
+    "note": "TodoMVC application gzip versus Ripple on 2026-08-08: CI Node 24 measures 2071 / 1645 = 1.259x and supported Node 26 measures 2067 / 1624 = 1.273x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.26,
-    "note": "chat-stream APP-CODE gzip vs solid, normalized minify. The current deterministic record measured 2630 / 2103 = 1.251x on 2026-07-17; the ceiling is rebaselined to 1.26x."
+    "maxRatio": 1.3,
+    "note": "Chat-stream application gzip versus Solid under CI Node 24 on 2026-08-08: 2716 / 2103 = 1.291x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.13,
-    "note": "chat-stream APP-CODE gzip vs ripple, normalized minify. The current deterministic record measured 2630 / 2336 = 1.126x on 2026-07-17; the ceiling is rebaselined to 1.13x."
+    "maxRatio": 1.17,
+    "note": "Chat-stream application gzip versus Ripple under CI Node 24 on 2026-08-08: 2716 / 2335 = 1.163x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.03,
-    "note": "Rows TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 18545 / 18281 = 1.014x on 2026-07-18; the ceiling remains 1.03x."
+    "maxRatio": 1.28,
+    "note": "Rows total gzip versus Svelte 5 under CI Node 24 on 2026-08-08: optimized 23280 / 18325 = 1.270x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.03,
-    "note": "Rows APP-CODE production gzip vs Svelte 5, normalized minify. The current deterministic record measured 2355 / 2301 = 1.023x on 2026-07-17; the ceiling is rebaselined to 1.03x."
+    "maxRatio": 1.04,
+    "note": "Rows application gzip versus Svelte 5 under CI Node 24 on 2026-08-08: 2372 / 2300 = 1.031x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.07,
-    "note": "TodoMVC TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 19744 / 18481 = 1.068x on 2026-07-18; the ceiling remains 1.07x."
+    "maxRatio": 1.31,
+    "note": "TodoMVC total gzip versus Svelte 5 under CI Node 24 on 2026-08-08: optimized 24153 / 18530 = 1.303x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.36,
-    "note": "TodoMVC APP-CODE production gzip vs Svelte 5, normalized minify. The current deterministic record measured 2046 / 1511 = 1.354x on 2026-07-18; the ceiling remains 1.36x."
+    "maxRatio": 1.39,
+    "note": "TodoMVC application gzip versus Svelte 5 on 2026-08-08: CI Node 24 measures 2071 / 1511 = 1.371x and supported Node 26 measures 2067 / 1497 = 1.381x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.04,
-    "note": "chat-stream TOTAL production gzip vs Svelte 5, normalized minify. Optional checked/radio restoration keeps the unused graph out of this fixture; the current record is 19753 / 19123 = 1.033x on 2026-07-18, within the 1.04x ceiling."
+    "maxRatio": 1.3,
+    "note": "Chat-stream total gzip versus Svelte 5 under CI Node 24 on 2026-08-08: optimized 24767 / 19164 = 1.292x. The July ceiling predates shipped held-screen/Suspense correctness (#379, #386, #405); exact application, framework, and total budgets independently reject future growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.16,
-    "note": "chat-stream APP-CODE production gzip vs Svelte 5, normalized minify. The current deterministic record measured 2630 / 2279 = 1.154x on 2026-07-17; the ceiling is rebaselined to 1.16x."
+    "maxRatio": 1.2,
+    "note": "Chat-stream application gzip versus Svelte 5 under CI Node 24 on 2026-08-08: 2716 / 2279 = 1.192x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
@@ -818,6 +818,294 @@
     "reference": "react",
     "maxRatio": 0.56,
     "note": "Weather app FRAMEWORK production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition and checked-restoration capabilities measured 33179 / 60434 = 0.549x on 2026-07-18; the tight deterministic ceiling catches a feature graph being retained again."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "fw_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "fw_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "fw_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Rows total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_app_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_app_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_fw_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_fw_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_fw_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_js_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_js_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "todo_js_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "TodoMVC total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_app_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_app_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_fw_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_fw_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_fw_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_js_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_js_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "chat_js_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Chat-stream total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_app_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_app_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_fw_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_fw_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_fw_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_js_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_js_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_js_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Weather-app total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
   },
   {
     "suite": "weather-app-lighthouse",

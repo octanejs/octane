@@ -609,8 +609,8 @@ export async function verifyDist(pkgDir) {
 	// esbuild in bundle mode is the resolver (a real parser, not a regex, and it
 	// follows dynamic import() literals too): each dist module is its own entry,
 	// bare specifiers stay external (they are declared dependencies, present at
-	// install time), and *.json covers the `../package.json` attribute import
-	// (package.json is always included in the tarball).
+	// install time), and JSON modules remain external so any future package
+	// metadata imports retain their import-attribute semantics.
 	const jsFiles = readdirSync(dist, { recursive: true })
 		.filter((f) => f.endsWith('.js'))
 		.map((f) => join(dist, f));
@@ -636,7 +636,7 @@ export async function verifyDist(pkgDir) {
 
 // Import each published entry point in a fresh plain-Node process — the same
 // resolution a consumer gets, catching anything static analysis can't (a module
-// that throws at init, a bad package.json attribute import, …).
+// that throws at init or depends on unsupported Node module semantics).
 export function smokeDist(pkgDir) {
 	const pkg = readPackage(pkgDir);
 	const entries = publishedRuntimeEntries(pkg.publishConfig.exports);
