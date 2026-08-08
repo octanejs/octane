@@ -47,6 +47,7 @@ export const BENCHMARK_SUITES = [
 	'weather-app-lighthouse',
 	'chat-stream',
 	'streamdown-hosted',
+	'svg-dashboard',
 	'dbmon',
 	'recursive-context',
 	'signal-favoring',

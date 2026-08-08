@@ -1,0 +1,14 @@
+{
+  "name": "octane-svg-dashboard-benchmarks",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "svg-dashboard benchmark umbrella - hand-rolled SVG observability dashboard rendered by octane/react/solid/svelte fixtures, driven by run.mjs.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:long": "node run.mjs 40"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}
