@@ -131,6 +131,10 @@ export function playAutoGesture(host: HTMLElement, options: AutoGestureOptions):
 		});
 
 	async function run(): Promise<void> {
+		// Nothing to play. Without this the `do`/`while` below never reaches an
+		// `await`, so it spins synchronously and no timer or event can ever set
+		// `stopped` — the tab hangs rather than doing nothing.
+		if (steps.length === 0) return;
 		await wait(startDelayMs);
 		do {
 			for (const step of steps) {

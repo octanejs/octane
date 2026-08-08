@@ -206,6 +206,28 @@ describe('automatic gesture playback', () => {
 		expect(events.at(-1)).toBe('pointerup');
 	});
 
+	it('does nothing, rather than hanging, when given no steps', async () => {
+		// `steps: []` type-checks. Without a guard the playback loop never reaches
+		// an `await`, so it spins synchronously and neither a timer nor `stop()`
+		// can ever break it — the tab hangs. Fake timers make that observable:
+		// `runAllTimersAsync` cannot settle against a loop that never yields.
+		vi.useFakeTimers();
+		const host = document.createElement('div');
+		document.body.append(host);
+
+		const playback = playAutoGesture(host, {
+			steps: [],
+			loop: true,
+			showPointer: false,
+			startDelayMs: 0,
+			stopOnUserInput: false,
+		});
+
+		await vi.runAllTimersAsync();
+		expect(playback.stop).toBeTypeOf('function');
+		playback.stop();
+	});
+
 	it('keeps driving an example on a browser that refuses `new Touch()`', async () => {
 		// Safari declares `Touch` and throws `Illegal constructor` when you call
 		// it, while still shipping the legacy `document.createTouch` factory and
