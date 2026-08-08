@@ -4390,6 +4390,9 @@ function renderBlockInner(block: Block): void {
 		)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		if (!renderCompleted) {
+			// A suspended or throwing keyed survivor already received its next item.
+			// Its incomplete body must run on retry instead of taking a stale pure bail.
+			if (block.forSlot !== null) block.forSlot.cachedDeps = null;
 			effectEventTarget.length = effectEventCheckpoint;
 			effectEventActionTarget.length = effectEventActionCheckpoint;
 		}

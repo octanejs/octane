@@ -69,9 +69,10 @@ sample, so scaling is more conversation, not artificial repetition.
   state round-trip (the value prop reasserts from state).
 - `comments_conv` — comment-node DOM weight at steady state (marker tripwire).
 
-The `bundle-size` suite builds these apps too (`chat_*` ops) and the octane
-source is in the `codegen-size` corpus. React's column uses a production build
-with React Compiler enabled, served through Vite's production preview.
+The `bundle-size` suite builds these apps too (`chat_*` ops), and the Octane
+source is in the `codegen-size` corpus. The suite runner builds every framework
+in production mode before starting its preview server; React's production build
+also enables React Compiler.
 
 Native **Preact** (`:5262`) and runes-mode **Svelte 5** (`:5273`) fixtures use
 the same deterministic corpus and window contract. Their state is immutable at
@@ -83,3 +84,18 @@ the conversation/message boundary and timed commits finish before returning.
 node benchmarks/bench.mjs chat-stream       # via the suite runner (starts servers)
 node benchmarks/bench.mjs --quick chat-stream
 ```
+
+The separate, untimed production-work gate uses Chromium precise coverage to
+check that one token update in a 200-message history rerenders only the changed
+message. It also verifies unchanged message identity and content, the updated
+reply, and an unrelated controlled-composer update:
+
+```bash
+CHAT_STREAM_WORK=1 pnpm --filter octane-tsrx-chat-stream build
+pnpm --filter octane-tsrx-chat-stream preview
+pnpm --dir benchmarks/chat-stream bench:work
+```
+
+`TARGET_URL` overrides the preview address, and `WORK_JSON` saves the measured
+counts. The work build is deliberately unminified; the normal benchmark keeps
+its minified production bundle.

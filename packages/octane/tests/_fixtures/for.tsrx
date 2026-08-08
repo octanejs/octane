@@ -1,6 +1,7 @@
 import {
 	Activity as ActivitySentinel,
 	createContext,
+	normalizeClass,
 	type OctaneNode,
 	startTransition,
 	use,
@@ -570,6 +571,124 @@ export function NestedConditionalTransition(props: {
 			<span id="nested-transition-fallback">{'loading'}</span>
 		}
 	</div>
+}
+
+interface NestedProjectedSegment {
+	id: number;
+	label: string;
+	code: boolean;
+}
+
+interface NestedProjectedGroup {
+	id: number;
+	label: string;
+	segments: NestedProjectedSegment[];
+}
+
+export function NestedProjectedHostList(props: {
+	groups: NestedProjectedGroup[];
+	prefix: string;
+	onPick: (groupId: number, segmentId: number, prefix: string) => void;
+}) @{
+	const prefix = props.prefix;
+	const onPick = props.onPick;
+	<section id="nested-projected-list">
+		@for (const group of props.groups; key group.id) {
+			<article class="nested-projected-group" data-projected-group={'' + group.id}>
+				<h3>{prefix + ':' + group.label}</h3>
+				<ul>
+					@for (const segment of group.segments; key segment.id) {
+						@if (segment.code) {
+							<li class="nested-projected-code" data-projected-segment={'' + segment.id}>
+								<button onClick={() => onPick(group.id, segment.id, prefix)}>
+									{prefix + ':' + normalizeClass(segment.label)}
+								</button>
+								<input class="nested-projected-input" defaultValue={segment.label} />
+							</li>
+						} @else {
+							<li class="nested-projected-text" data-projected-segment={'' + segment.id}>
+								<button onClick={() => onPick(group.id, segment.id, prefix)}>
+									{prefix + ':' + normalizeClass(segment.label)}
+								</button>
+							</li>
+						}
+					} @empty {
+						<li class="nested-projected-empty">{prefix + ':' + group.label + ':empty'}</li>
+					}
+				</ul>
+			</article>
+		}
+	</section>
+}
+
+export function NestedProjectedHostBoundary(props: {
+	groups: NestedProjectedGroup[];
+	prefix: string;
+	onPick: (groupId: number, segmentId: number, prefix: string) => void;
+}) @{
+	@try {
+		<NestedProjectedHostList groups={props.groups} prefix={props.prefix} onPick={props.onPick} />
+	} @pending {
+		<span id="nested-projected-pending">{'loading'}</span>
+	} @catch (error, reset) {
+		<button
+			id="nested-projected-retry"
+			onClick={reset}
+		>{(error as Error).message as string}</button>
+	}
+}
+
+export function NestedProjectedMethodList(props: {
+	groups: Array<{ id: number; segments: Array<{ id: number; read: () => string }> }>;
+	prefix: string;
+}) @{
+	const prefix = props.prefix;
+	<section id="nested-projected-method-list">
+		@for (const group of props.groups; key group.id) {
+			<article>
+				@for (const segment of group.segments; key segment.id) {
+					@if (segment.id > 0) {
+						<span class="nested-projected-method">{prefix + ':' + segment.read()}</span>
+					}
+				}
+			</article>
+		}
+	</section>
+}
+
+function NestedProjectedContextProbe(props: {
+	label: string;
+	onRef: (element: HTMLSpanElement | null) => void;
+}) @{
+	const value = use(FastRowContext);
+	<span class="nested-projected-context" ref={props.onRef}>{value + ':' + props.label}</span>
+}
+
+export function NestedProjectedOpaqueList(props: {
+	groups: NestedProjectedGroup[];
+	value: string;
+	visible: boolean;
+	onRef: (element: HTMLSpanElement | null) => void;
+}) @{
+	const visible = props.visible;
+	const onRef = props.onRef;
+	<FastRowContext.Provider value={props.value}>
+		<section id="nested-projected-opaque-list">
+			@for (const group of props.groups; key group.id) {
+				<article>
+					@for (const segment of group.segments; key segment.id) {
+						@if (visible) {
+							<Activity mode={readNestedConditionalActivityMode()}>
+								<NestedProjectedContextProbe label={normalizeClass(segment.label)} onRef={onRef} />
+							</Activity>
+						} @else {
+							<span class="nested-projected-opaque-placeholder">{'hidden'}</span>
+						}
+					}
+				</article>
+			}
+		</section>
+	</FastRowContext.Provider>
 }
 
 interface NestedReorderGroup {
