@@ -3,6 +3,7 @@
   "version": "0.0.10",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "octane": {
     "hookSlots": {
       "manual": [
@@ -47,6 +48,7 @@
     "@types/lodash.debounce": "4.0.9",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",

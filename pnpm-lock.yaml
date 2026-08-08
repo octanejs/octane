@@ -1047,9 +1047,33 @@ importers:
 
   benchmarks/bundle-size:
     dependencies:
+      '@octanejs/aria':
+        specifier: workspace:*
+        version: link:../../packages/aria
+      '@octanejs/base-ui':
+        specifier: workspace:*
+        version: link:../../packages/base-ui
+      '@octanejs/floating-ui':
+        specifier: workspace:*
+        version: link:../../packages/floating-ui
+      '@octanejs/mantine-hooks':
+        specifier: workspace:*
+        version: link:../../packages/mantine-hooks
+      '@octanejs/motion':
+        specifier: workspace:*
+        version: link:../../packages/motion
+      '@octanejs/radix':
+        specifier: workspace:*
+        version: link:../../packages/radix
+      '@octanejs/usehooks-ts':
+        specifier: workspace:*
+        version: link:../../packages/usehooks-ts
       '@octanejs/zustand':
         specifier: workspace:*
         version: link:../../packages/zustand
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
       jsdom:
         specifier: catalog:default
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -4249,6 +4273,9 @@ importers:
       '@floating-ui/react':
         specifier: catalog:default
         version: 0.27.19(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -4530,6 +4557,9 @@ importers:
       '@types/react':
         specifier: catalog:default
         version: 19.2.17
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -4599,6 +4629,9 @@ importers:
         specifier: catalog:default
         version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
     devDependencies:
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -5997,6 +6030,9 @@ importers:
       '@types/react-dom':
         specifier: catalog:default
         version: 19.2.3(@types/react@19.2.17)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
       octane:
         specifier: workspace:*
         version: link:../octane

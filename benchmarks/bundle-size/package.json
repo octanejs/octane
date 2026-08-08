@@ -8,7 +8,15 @@
     "bench": "node run.mjs"
   },
   "dependencies": {
+    "@octanejs/aria": "workspace:*",
+    "@octanejs/base-ui": "workspace:*",
+    "@octanejs/floating-ui": "workspace:*",
+    "@octanejs/mantine-hooks": "workspace:*",
+    "@octanejs/motion": "workspace:*",
+    "@octanejs/radix": "workspace:*",
+    "@octanejs/usehooks-ts": "workspace:*",
     "@octanejs/zustand": "workspace:*",
+    "esbuild": "catalog:default",
     "jsdom": "catalog:default",
     "octane": "workspace:*",
     "vite": "catalog:default"

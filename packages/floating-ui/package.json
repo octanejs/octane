@@ -3,6 +3,7 @@
   "version": "0.1.28",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=22.22.2"
   },
@@ -49,6 +50,7 @@
   },
   "devDependencies": {
     "@floating-ui/react": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
