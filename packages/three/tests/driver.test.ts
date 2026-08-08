@@ -31,6 +31,29 @@ function createRoot(scene = new THREE.Scene(), environment: ThreeHostEnvironment
 	return { container, root, scene };
 }
 
+function createRootReorderScene() {
+	const mesh = universalPlan('three', {
+		kind: 'host',
+		type: 'mesh',
+		propsSlot: 0,
+	});
+	return defineUniversalComponent(
+		'three',
+		(props: { order: readonly string[]; position: number }) =>
+			universalList(props.order, (name) =>
+				universalKey(
+					name,
+					universalValue(mesh, [
+						universalProps([
+							['set', 'name', name],
+							['set', 'position', [props.position, 0, 0]],
+						]),
+					]),
+				),
+			),
+	);
+}
+
 describe('Three universal driver', () => {
 	it('preserves real child objects and order while recreating a parent under one descriptor', () => {
 		const meshPlan = universalPlan('three', {
@@ -1255,6 +1278,70 @@ describe('Three universal driver', () => {
 		expect(scene.children.map((object) => object.position.x)).toEqual([40, 20, 10, 30]);
 		for (const object of scene.children) expect(object).toBe(objects.get(object.name));
 		expect(refLog).toEqual([]);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('honors scene placement overrides installed after directly mounting root meshes', () => {
+		const Scene = createRootReorderScene();
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { order: ['a', 'b', 'c'], position: 0 });
+		const objects = new Map(scene.children.map((object) => [object.name, object]));
+		const observed: string[] = [];
+		const originalAdd = scene.add;
+		const originalRemove = scene.remove;
+		Object.defineProperties(scene, {
+			add: {
+				configurable: true,
+				value(...children: THREE.Object3D[]) {
+					for (const child of children) observed.push(`add:${child.name}`);
+					return originalAdd.apply(this, children);
+				},
+			},
+			remove: {
+				configurable: true,
+				value(...children: THREE.Object3D[]) {
+					for (const child of children) observed.push(`remove:${child.name}`);
+					return originalRemove.apply(this, children);
+				},
+			},
+		});
+
+		root.render(Scene, { order: ['c', 'a', 'b'], position: 4 });
+
+		expect(scene.children.map((object) => object.name)).toEqual(['c', 'a', 'b']);
+		expect(scene.children.map((object) => object.position.x)).toEqual([4, 4, 4]);
+		for (const object of scene.children) expect(object).toBe(objects.get(object.name));
+		expect(observed).toEqual(['add:c', 'remove:c', 'add:a', 'remove:a', 'add:b', 'remove:b']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('observes scene placement overrides installed after a root reorder is prepared', () => {
+		const Scene = createRootReorderScene();
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { order: ['a', 'b', 'c'], position: 0 });
+		const prepared = root.prepare(Scene, { order: ['b', 'c', 'a'], position: 2 });
+		if (prepared.status !== 'prepared') throw new Error('Expected a prepared root reorder.');
+		const observed: string[] = [];
+		const originalAdd = scene.add;
+		Object.defineProperty(scene, 'add', {
+			configurable: true,
+			value(...children: THREE.Object3D[]) {
+				for (const child of children) observed.push(child.name);
+				return originalAdd.apply(this, children);
+			},
+		});
+		expect(scene.children.map((object) => object.name)).toEqual(['a', 'b', 'c']);
+		expect(observed).toEqual([]);
+
+		prepared.commit();
+
+		expect(scene.children.map((object) => object.name)).toEqual(['b', 'c', 'a']);
+		expect(scene.children.map((object) => object.position.x)).toEqual([2, 2, 2]);
+		expect(observed).toEqual(['b', 'c', 'a']);
 
 		root.unmount();
 		container.flushDisposals();

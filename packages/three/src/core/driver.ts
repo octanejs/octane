@@ -996,6 +996,9 @@ function prepareFlatRootReorderBatch(
 	}
 	const instances = getFlatRootInstances(container);
 	if (instances === null) return null;
+	const scene = container.scene;
+	const children = scene.children;
+	const reorderSilently = canSilentlyMutateRootScene(scene, true);
 
 	const positions = new Map<number, number>();
 	const previous = new Int32Array(count);
@@ -1111,12 +1114,25 @@ function prepareFlatRootReorderBatch(
 			} catch (error) {
 				retainFlatBatchError(result, error);
 			}
-			try {
-				for (let index = 0; index < count; index++) {
-					container.scene.children[index] = ordered[index].object;
+			if (
+				reorderSilently &&
+				scene.children === children &&
+				children.length === count &&
+				canSilentlyMutateRootScene(scene, true)
+			) {
+				try {
+					for (let index = 0; index < count; index++) children[index] = ordered[index].object;
+				} catch (error) {
+					retainFlatBatchError(result, error);
 				}
-			} catch (error) {
-				retainFlatBatchError(result, error);
+			} else {
+				for (const instance of ordered) {
+					try {
+						scene.add(instance.object);
+					} catch (error) {
+						retainFlatBatchError(result, error);
+					}
+				}
 			}
 			finishFlatRootBatch(container, batch, result);
 		},
