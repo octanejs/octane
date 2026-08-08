@@ -40,8 +40,8 @@
 // Servers must be running first (production preview recommended):
 //   pnpm --filter octane-tsrx-memowall-bench preview   # :5206
 //   pnpm --filter octane-jsx-memowall-bench  preview   # :5207
-//   pnpm --filter react-memowall-bench       preview   # :5208
-//   pnpm --filter react-compiler-memowall-bench preview # :5226
+//   pnpm --filter react-memowall-bench       preview   # :5208 uncompiled control
+//   pnpm --filter react-compiler-memowall-bench preview # :5226 canonical React
 // (swap `preview` → `dev` for the unminified dev build).
 //
 // Usage:  node run.mjs [iter]   # default 20
@@ -64,8 +64,8 @@ const TARGETS = process.env.TARGETS
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5206/' },
 			{ name: 'octane-jsx', url: 'http://localhost:5207/' },
-			{ name: 'react', url: 'http://localhost:5208/' },
-			{ name: 'react-compiler', url: 'http://localhost:5226/' },
+			{ name: 'react', url: 'http://localhost:5226/' },
+			{ name: 'react-uncompiled', url: 'http://localhost:5208/' },
 			{ name: 'solid', url: 'http://localhost:5182/' },
 			{ name: 'ripple', url: 'http://localhost:5225/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5223/' },

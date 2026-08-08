@@ -13,6 +13,10 @@ import { flushSync } from 'react-dom';
 
 let nextId = 1;
 
+function allocateTodoId() {
+	return nextId++;
+}
+
 function TodoApp() {
 	const [todos, setTodos] = useState([]);
 	const [filter, setFilter] = useState('all');
@@ -23,7 +27,7 @@ function TodoApp() {
 		const input = e.target;
 		const title = input.value.trim();
 		if (title === '') return;
-		flushSync(() => setTodos((t) => [...t, { id: nextId++, title, completed: false }]));
+		flushSync(() => setTodos((t) => [...t, { id: allocateTodoId(), title, completed: false }]));
 		input.value = '';
 	}, []);
 	const toggle = (id) =>

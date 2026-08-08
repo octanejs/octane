@@ -316,8 +316,8 @@
     "op": "parent_rerenders",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.95,
-    "note": "Twenty unrelated parent re-renders across 512 selector-based subscribers with the store untouched, gated on every subscriber still showing the correct total and the new generation. Octane keeps one identity for a capture-free selector, so the selection is reused: verified full and quick runs measured 0.59x (0.586-0.597 across three quick runs), against 1.20x when that identity churns per render. 0.95x leaves roughly 60% headroom over the observed ratio while still failing if the selection is recomputed per render. The deterministic companion signal is meta.selectorCallsDuringRerenders, which is 0 rather than 10,240 while meta.subscriberRendersDuringRerenders stays at 10,240."
+    "maxRatio": 1.5,
+    "note": "Twenty unrelated parent re-renders across 512 selector-based subscribers with the store untouched, gated on every subscriber still showing the correct total and the new generation. Octane and React Compiler both stabilize the capture-free selector, avoiding selector recomputation across 10,240 subscriber renders and snapshot reads. A verified normal eight-iteration run measured 0.98345x with zero selector calls for both frameworks; 1.5x retains scheduling-noise headroom while guarding against renewed selector recomputation or an Octane render-pass regression."
   },
   {
     "suite": "hydration-interactivity",
@@ -397,7 +397,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.5,
-    "note": "Cold production mount of both 1000-row walls (2000 rows total): Octane and React are currently near parity (~0.95x); 1.5 leaves standard noise headroom while catching a structural mount regression."
+    "note": "Cold production mount of both 1000-row walls (2000 rows total): Octane and React Compiler are near parity (~0.96x); 1.5 leaves standard noise headroom while catching a structural mount regression."
   },
   {
     "suite": "memo-wall",
@@ -405,7 +405,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; if dependency-scoped reuse breaks this rises toward the vanilla React memo-wall cost."
+    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; the compiled React reference also caches its list, and the committed pairing measures ~0.16x."
   },
   {
     "suite": "memo-wall",
@@ -413,23 +413,23 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1,
-    "note": "Wall B is the value-position control: 1000 fresh createElement descriptors absorbed by the childSlot memo bail. Paired run measured 0.81x on 2026-07-26 (it was 1.22x before per-descriptor allocation was cut); 1.0 keeps noise headroom while a return to the old descriptor cost breaches it."
+    "note": "Both Octane and React Compiler cache the unchanged immutable descriptor region. The canonical compiled pairing measures ~0.16x; 1.0 catches a return to unnecessary descriptor reconciliation without depending on the separately displayed uncompiled control."
   },
   {
     "suite": "memo-wall",
     "op": "one_change_B",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.95,
-    "note": "One changed row amid wall B's 999 successful value-comparing bails. Paired run measured 0.73x on 2026-07-26 (1.08x before); 0.95 bounds a regression back toward per-descriptor reflective work."
+    "maxRatio": 1.4,
+    "note": "One changed row amid wall B's 999 successful value-comparing bails. With the immutable-region optimization and React Compiler enabled, the normal 20-iteration pairing measures ~1.21x; 1.4 leaves modest browser headroom while the deterministic work gates continue to protect the changed-row path."
   },
   {
     "suite": "memo-wall",
     "op": "ctx_through_wall_B",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.6,
-    "note": "Provider bump above wall B: rebuild 1000 descriptors, bail all 1000, refresh only the 1000 leaves. Paired runs measured 0.44-0.48x on 2026-07-26 (0.56x before); 0.6 stays above run-to-run spread while still breaching if the per-descriptor cost returns."
+    "maxRatio": 0.85,
+    "note": "Provider bump above the cached immutable wall B refreshes its 1000 leaves without replaying unchanged descriptors. The React Compiler pairing measures ~0.70x; 0.85 leaves modest browser headroom while still catching a context-refresh regression."
   },
   {
     "suite": "memo-wall",

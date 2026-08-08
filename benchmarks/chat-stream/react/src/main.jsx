@@ -9,6 +9,12 @@ import { initialConversations, nextReply, userMessage, segText } from './data.js
 // updates flush synchronously (flushSync) so the harness's timed window
 // captures the commit.
 
+// Keep benchmark instrumentation outside the component body so React Compiler
+// can optimize the component while the harness still receives current handlers.
+function exposeBenchmarkHook(name, handler) {
+	window[name] = handler;
+}
+
 function ChatApp() {
 	const [convs, setConvs] = useState(initialConversations);
 	const [active, setActive] = useState(0);
@@ -30,7 +36,7 @@ function ChatApp() {
 		});
 	};
 
-	window.__pump = (k) => {
+	exposeBenchmarkHook('__pump', (k) => {
 		if (streamingId === null) return 0;
 		const msg = convs[active].messages.find((m) => m.id === streamingId);
 		if (msg === undefined) return 0;
@@ -46,14 +52,15 @@ function ChatApp() {
 			if (done === msg.total) setStreamingId(null);
 		});
 		return msg.total - done;
-	};
-	window.__reset = () =>
+	});
+	exposeBenchmarkHook('__reset', () =>
 		flushSync(() => {
 			setConvs(initialConversations());
 			setActive(0);
 			setDraft('');
 			setStreamingId(null);
-		});
+		}),
+	);
 
 	const conv = convs[active];
 

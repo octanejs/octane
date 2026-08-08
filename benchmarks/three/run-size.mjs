@@ -12,6 +12,7 @@ import { chromium } from 'playwright';
 import { build } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { threeRenderers } from '@octanejs/three/config';
+import { reactCompiler } from '../react-compiler.mjs';
 
 const ROOT = import.meta.dirname;
 const OUT_ROOT = path.join(ROOT, 'dist-size');
@@ -77,7 +78,7 @@ try {
 				target.plugins === 'octane'
 					? [octane({ renderers: threeRenderers })]
 					: target.plugins === 'react'
-						? [react()]
+						? [react(), reactCompiler()]
 						: [],
 			define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 			build: {

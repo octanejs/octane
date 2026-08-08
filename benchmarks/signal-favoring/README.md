@@ -6,14 +6,16 @@ one measures the **signal vs hook update cascade** along a deep linear chain.
 
 The bench is named honestly: it has a structural bias toward fine-grained
 reactivity (Solid, Ripple, Svelte, Vue Vapor) over hook-based reactivity
-(React, Preact, Octane). When
-state changes at a mid-chain node, signal frameworks re-evaluate **only the text
-expression that read the signal** — they don't re-render any component bodies.
-Hook frameworks re-render the owning component, which cascades through every
-descendant unless wrapped in `memo`.
+(React, Preact, Octane). When state changes at a mid-chain node, signal frameworks
+re-evaluate **only the text expression that read the signal** — they don't
+re-render any component bodies. Hook frameworks re-render the owning component;
+without memoization, that cascades through every descendant. React Compiler
+caches eligible unchanged child elements automatically, so the React column can
+skip descendant work even though its stateful owner still re-renders.
 
 The point of the bench is not to declare a winner — it's to **quantify how much
-the cascade actually costs** in absolute terms. Often less than you'd expect.
+the cascade, compiler-assisted avoidance, or fine-grained update actually costs**
+in absolute terms. Often less than you'd expect.
 
 ## Layout
 
@@ -22,7 +24,7 @@ benchmarks/signal-favoring/
 ├── octane-tsrx/       # Vite app, dev :5190 — octane authored in .tsrx
 ├── octane-jsx/        # Vite app, dev :5194 — same app authored in React-style .tsx
 ├── solid/             # Vite app, dev :5191 (Solid 2.0 beta)
-├── react/             # Vite app, dev :5192 (React 19)
+├── react/             # Vite app, dev :5192 (React 19 + React Compiler)
 ├── ripple/            # Vite app, dev :5193
 ├── vue-vapor/         # Vite app, dev :5183 — Vue 3.6 Vapor: 100 SFCs, one per chain
 │                      #   link (Vue is one component per SFC); bumps return nextTick()
@@ -53,7 +55,7 @@ Each stateful component owns its own counter via the framework's native primitiv
 | ---------------- | ------------------------ | ---------------------------------------------------------------------- |
 | **octane-tsrx**  | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
 | **octane-jsx**   | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
-| **react**        | `useState`               | re-render of `CN`, cascade through `CN+1 .. C100`                      |
+| **react**        | `useState`               | re-render of `CN`; React Compiler skips eligible unchanged descendants |
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
 | **ripple**     | `track()`                | re-evaluate the `{v}` text expression in `CN`; descendants untouched   |
 | **vue-vapor**  | `shallowRef`             | re-run the `{{ v }}` text renderEffect in `CN`; descendants untouched  |
@@ -82,13 +84,14 @@ recreating descendants.
 ## Measurements
 
 - **MOUNT** — initial render of all 100 components.
-- **BUMP_SHALLOW** — `__bumpAt1()`. Hook frameworks cascade through 99 components;
-  signal frameworks update one text node. This is the bench's worst case for
-  hooks.
-- **BUMP_MIDDLE** — `__bumpAt51()`. Hook frameworks cascade through ~50
-  components.
-- **BUMP_DEEP** — `__bumpAt91()`. Hook frameworks cascade through ~10 components.
-  As the depth gets closer to the leaf, the cost converges with signal frameworks.
+- **BUMP_SHALLOW** — `__bumpAt1()`. An uncached hook cascade can visit 99
+  descendants; React Compiler can reuse eligible child elements, while signal
+  frameworks update one text node without re-rendering its component.
+- **BUMP_MIDDLE** — `__bumpAt51()`. An uncached hook cascade can visit ~50
+  descendants; compiled React can again skip unchanged children.
+- **BUMP_DEEP** — `__bumpAt91()`. An uncached hook cascade can visit ~10
+  descendants. As the depth approaches the leaf, less descendant work remains
+  for either compiler memoization or fine-grained reactivity to avoid.
 - **BUMP_SWEEP** — bump every stateful component, flushing after EACH bump (10
   separate commits). The no-coalescing worst case.
 - **BUMP_SWEEP_BATCHED** — the same 10 bumps in ONE flush, queued ANCESTOR-first
@@ -107,8 +110,9 @@ quantization floor.
 
 The harness also prints three derived ratios per target:
 
-- **cascade ratio** — `bump_shallow / bump_deep`. Hook frameworks land around 10×
-  (99 vs 10 cascading renders); signal frameworks near 1×.
+- **cascade ratio** — `bump_shallow / bump_deep`. An uncached hook chain trends
+  toward 10× (99 vs 10 descendants); React Compiler can lower that ratio by
+  skipping eligible descendants, while signal frameworks remain near 1×.
 - **coalescing ratio** — `bump_sweep_batched / bump_sweep`. How much one flush
   saves over ten; further below 1× = bigger batching win.
 - **order-sensitivity ratio** — `bump_sweep_reverse / bump_sweep_batched` (on

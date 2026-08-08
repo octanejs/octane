@@ -37,17 +37,17 @@ describe('benchmark explorer — bar chart', () => {
 			.filter((series) => typeof defaultRow[series.key] === 'number')
 			.toSorted((a, b) => (defaultRow[a.key] as number) - (defaultRow[b.key] as number))[0]!.label;
 		expect(barLabels()[0]).toBe(expectedFastest);
-		expect(barLabels()).toContain('React 19');
+		expect(barLabels()).toContain('React 19 + Compiler');
 	});
 
 	it('drops a framework from the chart when its chip is toggled off', async () => {
 		const { barLabels, chip } = await mountExplorer();
-		expect(barLabels()).toContain('React 19');
+		expect(barLabels()).toContain('React 19 + Compiler');
 		const before = barLabels().length;
 
-		fireEvent.click(chip('React 19'));
+		fireEvent.click(chip('React 19 + Compiler'));
 
-		await waitFor(() => expect(barLabels()).not.toContain('React 19'));
+		await waitFor(() => expect(barLabels()).not.toContain('React 19 + Compiler'));
 		expect(barLabels().length).toBe(before - 1);
 	});
 });

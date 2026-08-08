@@ -20,8 +20,13 @@ import './styles.css';
 
 let renders = 0;
 
-function App() {
+// Preserve exact render diagnostics without preventing component compilation.
+function recordRender() {
 	renders++;
+}
+
+function App() {
+	recordRender();
 	const [rows, setRows] = useState([]);
 
 	useEffect(() => {

@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { reactCompiler } from '../../react-compiler.mjs';
 
 export default defineConfig({
-	plugins: [react()],
+	plugins: [react(), reactCompiler()],
 	// Tauri serves the build from a custom protocol, so asset URLs stay relative.
 	base: './',
 	build: {

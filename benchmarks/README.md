@@ -21,6 +21,16 @@ capability gaps stay explicit: Svelte's public server renderer is buffered, so
 fake stream. `codegen-size`, `dbmon-deopt`, and `js-framework-deopt` remain
 Octane-only by design.
 
+### React Compiler
+
+Every primary React benchmark uses the production React Compiler 1.0 through
+Vite's official React Compiler preset. The shared
+[`react-compiler.mjs`](react-compiler.mjs) integration also compiles server,
+Worker, and `.tsrx` fixtures, so SSR comparisons receive the same treatment as
+browser-rendered React. The memo-wall suite additionally keeps an explicitly
+labeled uncompiled React control to isolate the compiler's effect without
+changing the primary compiled React comparison.
+
 ## Quick start
 
 ```bash

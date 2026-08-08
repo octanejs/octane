@@ -134,9 +134,12 @@ export function mountContextIslandPage(count: number): ContextIslandPage {
 	const reactRoot = createReactRoot(container);
 	const h = React.createElement;
 	let setThemeState!: (theme: string) => void;
+	function exposeThemeSetter(setter: (theme: string) => void) {
+		setThemeState = setter;
+	}
 	function App() {
 		const [theme, setTheme] = React.useState('t0');
-		setThemeState = setTheme;
+		exposeThemeSetter(setTheme);
 		return h(
 			BenchTheme,
 			{ value: theme },
