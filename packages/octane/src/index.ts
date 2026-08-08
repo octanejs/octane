@@ -189,6 +189,7 @@ export {
 	keyedForBlock,
 	mapSlot,
 	ifBlock,
+	errorBlock,
 	tryBlock,
 	switchBlock,
 	activityBlock,

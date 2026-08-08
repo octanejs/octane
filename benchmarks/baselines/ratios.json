@@ -626,19 +626,75 @@
   },
   {
     "suite": "bundle-size",
-    "op": "js_gzip",
+    "op": "app_raw",
     "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 1.82,
-    "note": "Deterministic TSX/TSRX total-gzip gap. Two clean production runs on 2026-07-19 were byte-identical at 33765 / 18754 = 1.8004x; 1.82 catches retained runtime graph growth while allowing improvements."
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_gzip",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_brotli",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "fw_raw",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
   },
   {
     "suite": "bundle-size",
     "op": "fw_gzip",
     "target": "octane-jsx",
-    "reference": "octane-tsrx",
-    "maxRatio": 1.9,
-    "note": "Deterministic TSX/TSRX framework-gzip gap: 30974 / 16407 = 1.8879x on 2026-07-19. This isolates the generic descriptor/runtime graph from application code."
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "fw_brotli",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_raw",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_gzip",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_brotli",
+    "target": "octane-jsx",
+    "reference": "octane-jsx-budget",
+    "maxRatio": 1,
+    "note": "Rows JSX total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
   },
   {
     "suite": "bundle-size",

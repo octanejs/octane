@@ -69,6 +69,7 @@ const SETS = [
 	},
 ];
 const APP_BUDGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-budgets.json'), 'utf8'));
+const JSX_BUDGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'jsx-budgets.json'), 'utf8'));
 assert.deepEqual(
 	Object.keys(APP_BUDGETS).sort(),
 	SETS.map(({ prefix }) => (prefix ? prefix.slice(0, -1) : 'rows')).sort(),
@@ -186,10 +187,7 @@ for (const set of SETS)
 		});
 		entry.meta.files.push(...files.map((f) => ({ ...f, set: px || 'js' })));
 	}
-const budgetOps = {};
-for (const { prefix } of SETS) {
-	const name = prefix ? prefix.slice(0, -1) : 'rows';
-	const budget = APP_BUDGETS[name];
+function appendBudgetOperations(operations, budget, name, prefix = '') {
 	assert.deepEqual(
 		Object.keys(budget).sort(),
 		['app', 'framework', 'total'],
@@ -212,11 +210,21 @@ for (const { prefix } of SETS) {
 				true,
 				`${name}/${bucket}: invalid committed ${metric} byte budget`,
 			);
-			budgetOps[prefix + operation + '_' + metric] = val(bytes);
+			operations[prefix + operation + '_' + metric] = val(bytes);
 		}
 	}
 }
-targets.push({ name: 'octane-tsrx-budget', ops: budgetOps });
+
+const tsrxBudgetOps = {};
+for (const { prefix } of SETS) {
+	const name = prefix ? prefix.slice(0, -1) : 'rows';
+	appendBudgetOperations(tsrxBudgetOps, APP_BUDGETS[name], name, prefix);
+}
+targets.push({ name: 'octane-tsrx-budget', ops: tsrxBudgetOps });
+
+const jsxBudgetOps = {};
+appendBudgetOperations(jsxBudgetOps, JSX_BUDGETS, 'rows-jsx');
+targets.push({ name: 'octane-jsx-budget', ops: jsxBudgetOps });
 
 const payload = { suite: 'bundle-size', iterations: 1, targets };
 

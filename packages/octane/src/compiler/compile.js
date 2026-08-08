@@ -1309,10 +1309,10 @@ function annotatePureLazyCalls(ast) {
 }
 
 /**
- * Lower the exact imported `<ErrorBoundary>` builtin to the same tryBlock IR
- * as `@try/@catch` when its fallback is statically compilable. This removes the
- * generic component/children dispatcher while preserving the public JSX API.
- * Dynamic props, spreads, keys, and shadowed imports stay on the runtime path.
+ * Lower the exact imported `<ErrorBoundary>` builtin to catch-only boundary IR
+ * when its fallback is statically compilable. Client output uses errorBlock;
+ * server output keeps the existing ssrTry wire contract. Dynamic props,
+ * spreads, keys, and shadowed imports stay on the generic runtime path.
  */
 function lowerImportedErrorBoundaries(ast) {
 	const boundaryLocals = new Set();
@@ -7515,7 +7515,11 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// `const el = <App/>`) to createElement(...) before printing — esrap
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
-			const lowered = stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx);
+			const lowered = markSingleRootMemoInitializers(
+				stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx),
+				ctx,
+				memoImportNames,
+			);
 			// Top-level passthrough (imports, plain consts/functions): already a
 			// rewritten statement node — embedded directly in the module AST.
 			bodyNodes.push(lowered);
@@ -10940,6 +10944,43 @@ function stripNonReferenceText(source) {
 function singleRootInitializer(ctx, component) {
 	ctx.runtimeNeeded.add('__s');
 	return markPure(b.call('_$__s', component));
+}
+
+// An exact public memo wrapper preserves the already-proven host output of its
+// immutable local component. Stamp only the fresh compiler-owned wrapper:
+// probing arbitrary component metadata would invoke observable getters, and
+// dev/HMR, custom comparators, imported components, and renderer units remain
+// deliberately opaque.
+function markSingleRootMemoInitializers(node, ctx, memoImportNames) {
+	if (ctx.hmr || ctx.dev || ctx.profile || memoImportNames.size === 0) return node;
+	const exported = node.type === 'ExportNamedDeclaration';
+	const declaration = exported ? node.declaration : node;
+	if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') return node;
+	let changed = false;
+	const declarations = declaration.declarations.map((item) => {
+		const init = item.init;
+		const wrapped = init?.arguments?.[0];
+		if (
+			item.id?.type !== 'Identifier' ||
+			!ctx.defaultMemoBindings.has(item.id.name) ||
+			init?.type !== 'CallExpression' ||
+			init.callee?.type !== 'Identifier' ||
+			!memoImportNames.has(init.callee.name) ||
+			init.arguments.length !== 1 ||
+			wrapped?.type !== 'Identifier' ||
+			!ctx.moduleFunctionDeclarations.has(wrapped.name) ||
+			ctx.componentInfo.get(wrapped.name)?.singleRoot !== true ||
+			ctx._universalRuntimeUnitsByBinding.has(item.id.name) ||
+			ctx._universalRuntimeUnitsByBinding.has(wrapped.name)
+		) {
+			return item;
+		}
+		changed = true;
+		return { ...item, init: inheritOriginLoc(singleRootInitializer(ctx, init), init) };
+	});
+	if (!changed) return node;
+	const next = { ...declaration, declarations };
+	return exported ? { ...node, declaration: next } : next;
 }
 
 function finalizeComponentInitializers(ctx, bodyNodes) {
@@ -18807,8 +18848,11 @@ function planJsx(
 	for (const tc of tryCalls) {
 		const slotIndex = tc.slotIndex;
 		const org = tc.origin ?? planOrigin;
-		ctx.runtimeNeeded.add('tryBlock');
-		registerDirectiveOrigin(ctx, org, ['_$tryBlock', tc.tryHelper]);
+		const catchOnly =
+			tc.propagateSuspense && tc.pendingHelper === 'null' && tc.catchHelper !== 'null';
+		const boundaryHelper = catchOnly ? 'errorBlock' : 'tryBlock';
+		ctx.runtimeNeeded.add(boundaryHelper);
+		registerDirectiveOrigin(ctx, org, [rtAlias(boundaryHelper), tc.tryHelper]);
 		registerClauseOrigin(ctx, tc.handlerKeyword, [tc.catchHelper]);
 		registerClauseOrigin(ctx, tc.pendingKeyword, [tc.pendingHelper]);
 		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
@@ -18816,24 +18860,25 @@ function planJsx(
 		const tryAnchor = anchorNodeFor(tc, 'tryAnchor');
 		const tryEnv = envNodeFor(tc);
 		const trailing = [];
-		if (tryAnchor || tryEnv || tc.propagateSuspense) trailing.push(tryAnchor || undefinedNode());
-		if (tryEnv || tc.propagateSuspense) trailing.push(tryEnv || undefinedNode());
-		if (tc.propagateSuspense) trailing.push(b.literal(true));
+		if (tryAnchor || tryEnv || (!catchOnly && tc.propagateSuspense)) {
+			trailing.push(tryAnchor || undefinedNode());
+		}
+		if (tryEnv || (!catchOnly && tc.propagateSuspense)) trailing.push(tryEnv || undefinedNode());
+		if (!catchOnly && tc.propagateSuspense) trailing.push(b.literal(true));
+		const boundaryArgs = [
+			b.id('__s'),
+			b.literal(slotIndex),
+			hostNodeFor(`_tryHost$${tc.id}`),
+			helperRefNode(tc.tryHelper),
+			inheritOriginLoc(helperRefNode(tc.catchHelper), tc.handlerKeyword),
+		];
+		if (!catchOnly) {
+			boundaryArgs.push(inheritOriginLoc(helperRefNode(tc.pendingHelper), tc.pendingKeyword));
+		}
 		pushAfterStmt(
 			tc.id,
 			org,
-			b.stmt(
-				b.call(
-					'_$tryBlock',
-					b.id('__s'),
-					b.literal(slotIndex),
-					hostNodeFor(`_tryHost$${tc.id}`),
-					helperRefNode(tc.tryHelper),
-					inheritOriginLoc(helperRefNode(tc.catchHelper), tc.handlerKeyword),
-					inheritOriginLoc(helperRefNode(tc.pendingHelper), tc.pendingKeyword),
-					...trailing,
-				),
-			),
+			b.stmt(b.call(rtAlias(boundaryHelper), ...boundaryArgs, ...trailing)),
 		);
 	}
 	for (const sc of ctx._switchCalls) {

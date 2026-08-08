@@ -2777,6 +2777,24 @@ function sortWaveByDepth(wave: Block[]): Block[] {
 	return wave;
 }
 
+// Hidden-owner scheduling is optional: roots without Suspense or hidden
+// Activity must not retain either feature's concrete reveal implementation.
+interface ScheduledVisibilityDriver {
+	find: typeof findHiddenRenderOwner;
+	reveal: typeof attemptHiddenReveal;
+	rehide: typeof rehideActivityAfterDescendantRender;
+}
+
+let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
+
+function ensureScheduledVisibilityDriver(): void {
+	SCHEDULED_VISIBILITY_DRIVER ??= {
+		find: findHiddenRenderOwner,
+		reveal: attemptHiddenReveal,
+		rehide: rehideActivityAfterDescendantRender,
+	};
+}
+
 // Drain QUEUE. Order ancestors before descendants so a parent's cascade coalesces
 // queued descendants regardless of the order their setStates ran. The flush is
 // synchronous, so we sort and drain the LIVE array in place — no per-flush snapshot
@@ -2808,7 +2826,8 @@ function drainQueue(): { err: any } | null {
 		}
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
-		const hiddenOwner = findHiddenRenderOwner(block, true);
+		const visibilityDriver = SCHEDULED_VISIBILITY_DRIVER;
+		const hiddenOwner = visibilityDriver === null ? null : visibilityDriver.find(block, true);
 		let hiddenActivity: ActivitySlot | null = null;
 		let hiddenTry: TrySlot | null = null;
 		if (hiddenOwner !== null) {
@@ -2827,7 +2846,7 @@ function drainQueue(): { err: any } | null {
 			// retries the render; if it no longer suspends (an external store flipped
 			// before the suspending promise resolved), the boundary reveals now.
 			if (hiddenTry !== null) {
-				attemptHiddenReveal(hiddenTry, block.pendingMode ?? 'urgent');
+				visibilityDriver!.reveal(hiddenTry, block.pendingMode ?? 'urgent');
 				continue;
 			}
 			// Guarded render-phase updates (derived state) converge in a couple of
@@ -2881,7 +2900,7 @@ function drainQueue(): { err: any } | null {
 			// A descendant render can replace an Activity's direct host root. The
 			// Activity itself did not render, so reapply its visual hide after the
 			// complete attempt (including a captured error or Suspense retry).
-			if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
+			if (hiddenActivity !== null) visibilityDriver!.rehide(hiddenActivity);
 		}
 	}
 	QUEUE.length = 0;
@@ -4965,7 +4984,7 @@ function unmountScopeChildrenAndSlotsOnly(scope: Scope, detachDom: boolean): voi
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
 			const val = slots[i];
-			if ((val.__flags & SLOT_FLAG_TEARDOWN) !== 0) val.__teardown(val);
+			if ((val.__flags & SLOT_FLAG_TEARDOWN) !== 0) val.__teardown(val, detachDom);
 			// Read __kind ONCE per slot — the property access is megamorphic across
 			// six slot shapes, so caching the local saves three repeat IC walks.
 			const k = val.__kind;
@@ -5004,50 +5023,12 @@ function unmountScopeChildrenAndSlotsOnly(scope: Scope, detachDom: boolean): voi
 				// unmountBlock's deoptNode hook).
 				if (val.hostNode != null) detachDeoptTreeRefs(val.hostNode, null);
 			} else {
-				// componentSlotSlot | portalSlotSlot | trySlotSlot
+				// componentSlotSlot | portalSlotSlot | optional boundary slots
 				// Portal DOM lives in a FOREIGN target — the root-level batched clear
 				// never reaches it, so portals must always self-detach individually.
 				const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 				if (val.block) unmountBlock(val.block, childDetach);
-				// A pending trySlot keeps its hidden `tryBlock` ALIVE beside the visible
-				// fallback. Tear that persistent block down explicitly so its effects,
-				// subscriptions, portals, and non-ref cleanups cannot outlive the boundary.
-				// Its refs already cycled to null when the fallback appeared, so suppress
-				// only the duplicate permanent detach while doing the full teardown.
-				if (k === 'trySlotSlot') {
-					discardOffscreenCapture(val.stagedCapture);
-					val.stagedCapture = null;
-					val.stagedEffectDeps = null;
-					const hadDetachedRefs = val.detachedRefs !== null;
-					val.detachedRefs = null;
-					val.pendingThenable = null;
-					if (val.tryBlock && val.tryBlock !== val.block) {
-						const hiddenTry = val.tryBlock;
-						let suppressedRefs: SuspenseRefEntry[] | null = null;
-						if (hadDetachedRefs) {
-							suppressedRefs = [];
-							collectVisibleSubtreeRefs(hiddenTry, suppressedRefs);
-						}
-						showTryBlock(val);
-						withRefDetachSuppression(suppressedRefs, () => {
-							unmountBlock(hiddenTry, true);
-						});
-						val.tryBlock = null;
-					}
-					// Unmounted while holding for a transition — leave the entangled group
-					// so staged siblings aren't left waiting on a boundary that's now gone.
-					abandonHeldTransition(val);
-					// Cancel any in-flight transition-fallback timeout so the callback
-					// can't fire after the slot's owning scope is gone.
-					if (val.transitionTimeoutId !== null) {
-						clearTimeout(val.transitionTimeoutId);
-						val.transitionTimeoutId = null;
-					}
-					// The DevTools boundary registry follows the TrySlot lifetime.
-					// Reset through the shared branch mutation point so profile
-					// builds remove this slot from the registry on teardown.
-					setTryBranch(val, -1);
-				} else if (k === 'portalSlotSlot' && val.target) {
+				if (k === 'portalSlotSlot' && val.target) {
 					unregisterDelegationTarget(val.target);
 				}
 			}
@@ -19276,8 +19257,42 @@ function releaseHiddenText(text: Text): void {
 	}
 }
 
+// Keep Suspense-specific teardown out of the always-live generic slot walk.
+// The visible arm must still unmount before its preserved hidden primary.
+function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
+	if (state.block !== null) unmountBlock(state.block, detachDom);
+	discardOffscreenCapture(state.stagedCapture);
+	state.stagedCapture = null;
+	state.stagedEffectDeps = null;
+	const hadDetachedRefs = state.detachedRefs !== null;
+	state.detachedRefs = null;
+	state.pendingThenable = null;
+	if (state.tryBlock !== null && state.tryBlock !== state.block) {
+		const hiddenTry = state.tryBlock;
+		let suppressedRefs: SuspenseRefEntry[] | null = null;
+		if (hadDetachedRefs) {
+			suppressedRefs = [];
+			collectVisibleSubtreeRefs(hiddenTry, suppressedRefs);
+		}
+		showTryBlock(state);
+		withRefDetachSuppression(suppressedRefs, () => {
+			unmountBlock(hiddenTry, true);
+		});
+		state.tryBlock = null;
+	}
+	abandonHeldTransition(state);
+	if (state.transitionTimeoutId !== null) {
+		clearTimeout(state.transitionTimeoutId);
+		state.transitionTimeoutId = null;
+	}
+	setTryBranch(state, -1);
+	state.block = null;
+}
+
 interface TrySlot {
 	__kind: 'trySlotSlot';
+	__flags: typeof SLOT_FLAG_TEARDOWN;
+	__teardown: typeof teardownTrySlot;
 	start: Comment;
 	end: Comment;
 	// -1 init, 0 catch, 1 try (resolved), 2 pending
@@ -19366,11 +19381,39 @@ interface TrySlot {
 	reset: () => void;
 }
 
-// Single mutation point for `TrySlot.branch`. The bare assignment is the hot
+/** Catch-only JSX boundaries never preserve a hidden Suspense primary. */
+interface ErrorSlot {
+	__kind: 'errorSlotSlot';
+	__flags: typeof SLOT_FLAG_TEARDOWN;
+	__teardown: typeof teardownErrorSlot;
+	start: Comment;
+	end: Comment;
+	branch: -1 | 0 | 1 | 2;
+	block: Block | null;
+	tryBody: ComponentBody;
+	catchBody: ComponentBody;
+	env: any[] | undefined;
+	hasResolved: boolean;
+	err: any;
+	detachedRefs: null;
+	domParent: Node;
+	parentBlock: Block;
+	idState: RootIdState;
+	passthrough: boolean;
+	reset: () => void;
+}
+
+function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
+	if (state.block !== null) unmountBlock(state.block, detachDom);
+	state.block = null;
+	setTryBranch(state, -1);
+}
+
+// Single mutation point for boundary branches. The bare assignment is the hot
 // path; the devtools probe is fully behind the profile gate (dead-code
 // eliminated in non-profile builds), so this adds only a boolean-guarded call
 // over the plain assignment and no allocation/closure when unobserved.
-function setTryBranch(slot: TrySlot, next: -1 | 0 | 1 | 2): void {
+function setTryBranch(slot: TrySlot | ErrorSlot, next: -1 | 0 | 1 | 2): void {
 	slot.branch = next;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		if (next === -1) {
@@ -19504,6 +19547,221 @@ function renderPassthroughTry(state: TrySlot): void {
 	}
 }
 
+/**
+ * Exact imported JSX ErrorBoundary lowering. Unlike @try, these boundaries
+ * only catch application errors: suspension belongs to an enclosing Suspense.
+ * Keeping their state independent lets catch-only applications discard the
+ * hidden-primary, transition-hold, and off-screen rendering implementations.
+ */
+export function errorBlock(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	tryBody: ComponentBody,
+	catchBody: ComponentBody,
+	anchor?: Node | null,
+	env?: any[],
+): () => void {
+	const parentBlock = parentScope.block;
+	const hydration = activeHydration();
+	let state = parentScope.slots[slotKey] as ErrorSlot | undefined;
+	if (state === undefined) {
+		const passthrough = hydration?.passthroughRanges === true;
+		const open = passthrough ? null : (hydration?.resolveOpen(anchor, domParent) ?? null);
+		let start: Comment;
+		let end: Comment;
+		if (passthrough) {
+			start = document.createComment('passthrough-try');
+			end = document.createComment('/passthrough-try');
+		} else if (open !== null) {
+			start = open;
+			end = hydration!.close(open);
+		} else {
+			start = document.createComment('try');
+			end = document.createComment('/try');
+			domParent.insertBefore(start, anchor ?? null);
+			domParent.insertBefore(end, anchor ?? null);
+		}
+		let newState: ErrorSlot;
+		newState = {
+			__kind: 'errorSlotSlot',
+			__flags: SLOT_FLAG_TEARDOWN,
+			__teardown: teardownErrorSlot,
+			start,
+			end,
+			branch: -1,
+			block: null,
+			tryBody,
+			catchBody,
+			env,
+			hasResolved: false,
+			err: null,
+			detachedRefs: null,
+			domParent,
+			parentBlock,
+			idState: parentBlock.idState,
+			passthrough,
+			reset: () => requestReset(newState),
+		};
+		parentScope.slots[slotKey] = newState;
+		registerSlot(parentScope, newState);
+		state = newState;
+	} else {
+		state.tryBody = tryBody;
+		state.catchBody = catchBody;
+		state.env = env;
+	}
+
+	if (state.branch === 0) {
+		const caught = state.block!;
+		caught.body = state.catchBody;
+		caught.props = { err: state.err, reset: state.reset };
+		caught.extra = state.env;
+		renderBlock(caught);
+		return state.reset;
+	}
+
+	if (state.branch === 1 && state.block !== null) {
+		const current = state.block;
+		current.body = state.tryBody;
+		current.extra = state.env;
+		try {
+			renderBlock(current);
+		} catch (error) {
+			if (isHostContextRequest(error) || isSuspenseException(error)) throw error;
+			switchErrorToCatch(state, error);
+		}
+		return state.reset;
+	}
+
+	if (state.block !== null) {
+		const previous = state.block;
+		state.block = null;
+		unmountBlock(previous);
+		if (state.parentBlock.disposed || state.block !== null) return state.reset;
+	}
+	setTryBranch(state, 1);
+	let start: Node | null = null;
+	let end: Node | null = null;
+	if (!state.passthrough) {
+		const cursor = state.start.nextSibling;
+		if (hydration !== null && hydration.isOpen(cursor)) {
+			start = cursor;
+			end = hydration.close(cursor);
+			hydration.node = start.nextSibling;
+		} else {
+			start = document.createComment('try-b');
+			end = document.createComment('/try-b');
+			state.domParent.insertBefore(start, state.end);
+			state.domParent.insertBefore(end, state.end);
+			if (hydration !== null) {
+				hydration.markFresh(start);
+				hydration.markFresh(end);
+			}
+		}
+	}
+	const body = createBlock(
+		'control-flow',
+		state.parentBlock,
+		state.domParent,
+		start,
+		end,
+		state.tryBody,
+		undefined,
+		state.env,
+	);
+	body.idState = state.idState;
+	(body as any).$$tryHandler = (error: unknown) => switchErrorToCatch(state!, error);
+	state.block = body;
+	try {
+		renderBlock(body);
+		state.hasResolved = true;
+	} catch (error) {
+		if (isHostContextRequest(error) || isSuspenseException(error)) throw error;
+		const adoptServerCatch = hydration?.isRejection(error) === true;
+		switchErrorToCatch(
+			state,
+			error,
+			adoptServerCatch && start !== null ? start : undefined,
+			adoptServerCatch && end !== null ? end : undefined,
+		);
+	}
+	return state.reset;
+}
+
+function switchErrorToCatch(
+	state: ErrorSlot,
+	error: any,
+	adoptedStart?: Node,
+	adoptedEnd?: Node,
+): void {
+	const hydration = activeHydration();
+	const adopting = adoptedStart !== undefined && adoptedEnd !== undefined;
+	const previous = state.block;
+	if (previous !== null) {
+		state.block = null;
+		unmountBlock(previous, !adopting);
+		if (state.parentBlock.disposed || state.block !== null) return;
+	}
+	const rejection = hydration?.isRejection(error) === true;
+	const caughtError = rejection ? error.reason : error;
+	state.hasResolved = false;
+	setTryBranch(state, 0);
+	state.err = caughtError;
+	let start: Node | null = null;
+	let end: Node | null = null;
+	if (!state.passthrough) {
+		start = adoptedStart ?? document.createComment('catch-b');
+		end = adoptedEnd ?? document.createComment('/catch-b');
+		if (!adopting) {
+			if (hydration !== null) {
+				if (hydration.isClose(state.end)) {
+					removeRange(state.start.nextSibling, state.end);
+					hydration.node = state.end;
+				}
+				hydration.markFresh(start);
+				hydration.markFresh(end);
+			}
+			state.domParent.insertBefore(start, state.end);
+			state.domParent.insertBefore(end, state.end);
+		} else if (hydration !== null) {
+			hydration.node = start.nextSibling;
+		}
+	}
+	const caught = createBlock(
+		'control-flow',
+		state.parentBlock,
+		state.domParent,
+		start,
+		end,
+		state.catchBody,
+		{ err: caughtError, reset: state.reset },
+		state.env,
+	);
+	caught.idState = state.idState;
+	state.block = caught;
+	try {
+		if (!adopting && !state.passthrough && hydration !== null) {
+			hydration.suspend(() => renderBlock(caught));
+		} else {
+			renderBlock(caught);
+		}
+	} catch (nextError) {
+		const rethrowsReason = rejection && Object.is(nextError, caughtError);
+		if (state.block !== null) {
+			unmountBlock(state.block, !(adopting && rethrowsReason));
+			state.block = null;
+		}
+		const propagated = rethrowsReason ? error : nextError;
+		if (CURRENT_BLOCK !== null && (rethrowsReason || findTryHandler(state.parentBlock) !== null)) {
+			throw propagated;
+		}
+		const parent = findTryHandler(state.parentBlock);
+		if (parent !== null) parent(propagated);
+		else console.error('catch body threw, no outer tryBlock:', nextError);
+	}
+}
+
 export function tryBlock(
 	parentScope: Scope,
 	slotKey: number,
@@ -19555,6 +19813,8 @@ export function tryBlock(
 		let newState: TrySlot;
 		newState = {
 			__kind: 'trySlotSlot',
+			__flags: SLOT_FLAG_TEARDOWN,
+			__teardown: teardownTrySlot,
 			start,
 			end,
 			branch: -1,
@@ -19920,6 +20180,9 @@ function handleSuspense(
 	// retry, neither of which has committed content to keep whole).
 	journalCheckpoint = -1,
 ): void {
+	// Ordinary roots do not need hidden-subtree ancestry walks. Install this
+	// capability before the first boundary can preserve a suspended primary.
+	ensureScheduledVisibilityDriver();
 	// Transition-priority suspends on an ALREADY-committed try block keep the
 	// prior DOM visible — matches React's `useTransition` contract that the
 	// previous screen stays mounted until the new tree is fully ready. We also
@@ -21497,7 +21760,7 @@ export function useDeferredValue<T>(value: T, ...rest: any[]): T {
 	return s.current;
 }
 
-function requestReset(state: TrySlot): void {
+function requestReset(state: TrySlot | ErrorSlot): void {
 	if (state.parentBlock.disposed || state.branch !== 0) return;
 	// React parity for catch reset(): don't synchronously re-run the try body.
 	// Rewind slot state and schedule the parent — sibling setState calls in
@@ -22399,6 +22662,7 @@ export function activityBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
+	if (mode === 'hidden') ensureScheduledVisibilityDriver();
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	const wantHidden = mode === 'hidden';
