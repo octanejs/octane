@@ -43,6 +43,22 @@ export const HOME_SUMMARY: BenchCard = {
 			'vue-vapor': 1.4835252389642104,
 		},
 		{
+			op: 'weather-app',
+			'octane-tsrx': 1,
+			react: 1.266323042693476,
+			preact: 1.353766384351486,
+			solid: 1.1342379468942232,
+			svelte: 0.9485618664070963,
+		},
+		{
+			op: 'weather-app-lighthouse',
+			'octane-tsrx': 1,
+			react: 0.9996733289781274,
+			preact: 0.7975309525150063,
+			solid: 0.8299742559835969,
+			svelte: 0.8251639678323414,
+		},
+		{
 			op: 'chat-stream',
 			'octane-tsrx': 1,
 			react: 3.602823130812655,

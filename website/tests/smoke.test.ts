@@ -18,6 +18,7 @@ import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
 	OCTANE_CARDS,
+	TARGET_CARDS,
 	type BenchCard,
 } from '../src/content/benchmarks.ts';
 import { createHomeSummary } from '../src/content/home-benchmark.ts';
@@ -346,7 +347,9 @@ describe('website routes', () => {
 		const mobileToggle = container.querySelector('.benchpage-sidebar-toggle');
 		expect(container.querySelectorAll('.benchpage-sidebar-toggle')).toHaveLength(1);
 		expect(mobileToggle?.textContent).toContain('Benchmarks');
-		expect(BENCH_SECTIONS.length).toBe(3 + FRAMEWORK_CARDS.length + OCTANE_CARDS.length);
+		expect(BENCH_SECTIONS.length).toBe(
+			4 + FRAMEWORK_CARDS.length + TARGET_CARDS.length + OCTANE_CARDS.length,
+		);
 		for (const section of BENCH_SECTIONS) {
 			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
 			const target = container.querySelector(`#${section.id}`)!;
