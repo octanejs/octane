@@ -28,6 +28,7 @@ import recursiveContext from '../../../benchmarks/baselines/local/recursive-cont
 import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.json';
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
 import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
+import svgDashboard from '../../../benchmarks/baselines/local/svg-dashboard.json';
 import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
 
 // `score` is charted when present; older checked-in baselines fall back to
@@ -153,6 +154,19 @@ function frameworkCard(
 	};
 }
 
+const JS_FRAMEWORK_SHARED_OPS = [
+	'run',
+	'replace',
+	'add',
+	'update',
+	'select',
+	'swap',
+	'remove',
+	'runlots',
+	'select_lots',
+	'clear',
+];
+
 // ---------------------------------------------------------------------------
 // Octane vs the field — one card per cross-framework suite.
 // ---------------------------------------------------------------------------
@@ -165,18 +179,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		undefined,
 		// Keep only shared timings; insertion/fragment diagnostics in Octane's
 		// baseline are not measured by the reference frameworks.
-		[
-			'run',
-			'replace',
-			'add',
-			'update',
-			'select',
-			'swap',
-			'remove',
-			'runlots',
-			'select_lots',
-			'clear',
-		],
+		JS_FRAMEWORK_SHARED_OPS,
 	),
 	frameworkCard(
 		todoMvc,
@@ -217,6 +220,39 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 			type160: 'type 160 chars',
 		},
 		['streamFine', 'streamCoarse', 'appendHistory', 'switchConv', 'type160'],
+	),
+	frameworkCard(
+		svgDashboard,
+		'svg-dashboard',
+		'svg-dashboard',
+		'A hand-rolled SVG observability dashboard — path and transform churn, keyed reconciliation inside SVG, foreignObject labels, portal tooltips, runtime icons, and style/spread updates.',
+		{
+			charts_tick: 'chart tick',
+			tick_sparse: 'sparse tick',
+			drag_nodes: 'drag nodes',
+			pan_zoom: 'pan and zoom',
+			select_toggle: 'toggle selection',
+			topology_churn: 'topology churn',
+			label_churn: 'label churn',
+			tooltip_swarm: 'tooltip swarm',
+			icon_swap: 'icon swap',
+			series_toggle: 'series toggle',
+			style_spread_pulse: 'style/spread pulse',
+		},
+		[
+			'mount',
+			'charts_tick',
+			'tick_sparse',
+			'drag_nodes',
+			'pan_zoom',
+			'select_toggle',
+			'topology_churn',
+			'label_churn',
+			'tooltip_swarm',
+			'icon_swap',
+			'series_toggle',
+			'style_spread_pulse',
+		],
 	),
 	frameworkCard(
 		jsFrameworkReorder,
@@ -355,7 +391,9 @@ export const OCTANE_CARDS: BenchCard[] = [];
 		description:
 			'The same 1,000-row app authored four ways: tuned .tsrx, React-style naive .tsrx and .tsx, and plain-.ts createElement with no compiler involvement (the shape every binding produces).',
 		series,
-		rows: rowsFor(b, series),
+		// The tuned fixture also emits deterministic diagnostics that the naive
+		// fixtures do not. Keep this comparison to operations measured by all four.
+		rows: rowsFor(b, series, undefined, JS_FRAMEWORK_SHARED_OPS),
 		iterations: b.iterations,
 	});
 }
