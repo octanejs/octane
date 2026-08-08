@@ -825,15 +825,183 @@ describe('Pull request labels', () => {
 });
 
 describe('Review readiness label', () => {
-	test('handles only pull request comments with permission to update pull request labels', () => {
+	const READY = 'READY FOR REVIEW';
+	const HEAD_SHA = 'f'.repeat(40);
+
+	function cursorThread({ resolved = false } = {}) {
+		return {
+			isResolved: resolved,
+			comments: {
+				nodes: [
+					{
+						author: { login: 'cursor' },
+						body: '<!-- BUGBOT_BUG_ID: finding -->',
+						url: 'https://github.com/octanejs/octane/pull/487#discussion_r1',
+					},
+				],
+			},
+		};
+	}
+
+	async function runReadiness({
+		eventName = 'issue_comment',
+		body = READY,
+		labels = [],
+		threads = [],
+		headSha = HEAD_SHA,
+		matchingPulls = [{ number: 487, headRefOid: HEAD_SHA }],
+		removeErrorStatus,
+	} = {}) {
+		const added = [];
+		const removed = [];
+		const notices = [];
+		const failures = [];
+		const pull = {
+			state: 'open',
+			labels: labels.map((name) => ({ name })),
+		};
+		const github = {
+			graphql: async (query) => {
+				if (query.includes('pullRequests(first: 100')) {
+					return {
+						repository: {
+							pullRequests: {
+								nodes: matchingPulls,
+								pageInfo: { hasNextPage: false, endCursor: null },
+							},
+						},
+					};
+				}
+				if (query.includes('reviewThreads(first: 100')) {
+					return {
+						repository: {
+							pullRequest: {
+								reviewThreads: {
+									nodes: threads,
+									pageInfo: { hasNextPage: false, endCursor: null },
+								},
+							},
+						},
+					};
+				}
+				throw new Error('unexpected GraphQL query');
+			},
+			rest: {
+				pulls: {
+					get: async () => ({ data: pull }),
+				},
+				issues: {
+					addLabels: async ({ labels: names }) => {
+						added.push(...names);
+						pull.labels.push(...names.map((name) => ({ name })));
+					},
+					removeLabel: async ({ name }) => {
+						if (removeErrorStatus) {
+							const error = new Error(`remove failed with ${removeErrorStatus}`);
+							error.status = removeErrorStatus;
+							throw error;
+						}
+						removed.push(name);
+						pull.labels = pull.labels.filter((label) => label.name !== name);
+					},
+				},
+			},
+		};
+		const context = {
+			eventName,
+			repo: { owner: 'octanejs', repo: 'octane' },
+			payload:
+				eventName === 'check_run'
+					? { check_run: { head_sha: headSha } }
+					: { issue: { number: 487 }, comment: { body } },
+		};
+		const core = {
+			notice: (message) => notices.push(message),
+			setFailed: (message) => failures.push(message),
+		};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			stepScript(reviewReadinessWorkflow, 'Reconcile review readiness'),
+		);
+
+		await execute(github, context, core);
+		return { added, removed, notices, failures };
+	}
+
+	test('uses writable default-branch events without checking out pull request code', () => {
 		assert.match(
 			reviewReadinessWorkflow,
 			/on:\n {2}issue_comment:\n {4}types: \[created, edited\]/,
 		);
-		assert.match(reviewReadinessWorkflow, /^ {4}if: github\.event\.issue\.pull_request$/m);
+		assert.match(reviewReadinessWorkflow, /check_run:\n {4}types: \[completed\]/);
+		assert.match(
+			reviewReadinessWorkflow,
+			/github\.event_name == 'issue_comment' && github\.event\.issue\.pull_request/,
+		);
+		assert.match(reviewReadinessWorkflow, /github\.event\.check_run\.app\.slug == 'cursor'/);
+		assert.match(reviewReadinessWorkflow, /^ {6}checks: read$/m);
 		assert.match(reviewReadinessWorkflow, /^ {6}issues: read$/m);
 		assert.match(reviewReadinessWorkflow, /^ {6}pull-requests: write$/m);
 		assert.doesNotMatch(reviewReadinessWorkflow, /actions\/checkout/);
+	});
+
+	test('applies readiness when Cursor has no current unresolved findings', async () => {
+		const result = await runReadiness({
+			threads: [cursorThread({ resolved: true })],
+		});
+
+		assert.deepEqual(result.added, [READY]);
+		assert.deepEqual(result.removed, []);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('refuses readiness while a current Cursor finding is unresolved', async () => {
+		const result = await runReadiness({ threads: [cursorThread()] });
+
+		assert.deepEqual(result.added, []);
+		assert.deepEqual(result.removed, []);
+		assert.match(result.notices.join('\n'), /Did not apply READY FOR REVIEW/);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('removes readiness when Cursor completes with an unresolved finding', async () => {
+		const result = await runReadiness({
+			eventName: 'check_run',
+			labels: [READY],
+			threads: [cursorThread()],
+		});
+
+		assert.deepEqual(result.added, []);
+		assert.deepEqual(result.removed, [READY]);
+		assert.match(result.notices.join('\n'), /Removed READY FOR REVIEW/);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('treats a concurrently removed readiness label as already absent', async () => {
+		const result = await runReadiness({
+			eventName: 'check_run',
+			labels: [READY],
+			threads: [cursorThread()],
+			removeErrorStatus: 404,
+		});
+
+		assert.deepEqual(result.added, []);
+		assert.deepEqual(result.removed, []);
+		assert.match(result.notices.join('\n'), /already absent/);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('still fails when readiness removal returns another API error', async () => {
+		const result = await runReadiness({
+			eventName: 'check_run',
+			labels: [READY],
+			threads: [cursorThread()],
+			removeErrorStatus: 500,
+		});
+
+		assert.match(result.failures.join('\n'), /remove failed with 500/);
 	});
 });
 
