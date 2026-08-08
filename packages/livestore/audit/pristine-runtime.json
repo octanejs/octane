@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "project": "livestore-pristine",
+  "roots": ["packages/livestore/upstream"],
+  "files": [
+    "packages/livestore/upstream/src/useClientDocument.test.tsx",
+    "packages/livestore/upstream/src/useQuery.test.tsx",
+    "packages/livestore/upstream/src/useRcResource.test.tsx",
+    "packages/livestore/upstream/src/useStore.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:34fb5006e48d731e",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument kv client document overwrites value (Schema.Any, no partial merge)"
+    },
+    {
+      "id": "runtime:f7e5c201d8aee418",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument otel should update the data based on component key strictMode={ strictMode: false }"
+    },
+    {
+      "id": "runtime:e2663ead34d74c42",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument otel should update the data based on component key strictMode={ strictMode: true }"
+    },
+    {
+      "id": "runtime:56f037f9d86ea9bd",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument should update the data based on component key"
+    },
+    {
+      "id": "runtime:a4dd897eb2740470",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument should update the data reactively - via raw store commit"
+    },
+    {
+      "id": "runtime:6e5002f844054bfc",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument should update the data reactively - via setState"
+    },
+    {
+      "id": "runtime:3d14d0e227e60b11",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument should work for a larger app"
+    },
+    {
+      "id": "runtime:e26fcc53ca252945",
+      "file": "packages/livestore/upstream/src/useClientDocument.test.tsx",
+      "fullName": "useClientDocument should work for a useClientDocument query chained with a useTemporary query"
+    },
+    {
+      "id": "runtime:d32074ff2a55b7f9",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) derives a fresh LiveQuery per Store instance"
+    },
+    {
+      "id": "runtime:08abb275c8df67a5",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) filtered dependency query"
+    },
+    {
+      "id": "runtime:1fdb01d386b03a8e",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) same `useQuery` hook invoked with different queries"
+    },
+    {
+      "id": "runtime:4facd07fb2ee0192",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) should work for a list with react-window"
+    },
+    {
+      "id": "runtime:93f971da53a1332b",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) should work with signal"
+    },
+    {
+      "id": "runtime:689435e01e31694f",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) simple"
+    },
+    {
+      "id": "runtime:9960befeb039165f",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) supports query builders directly"
+    },
+    {
+      "id": "runtime:3ee16eaf1a30fa8f",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: false }) union of different result types with useQuery"
+    },
+    {
+      "id": "runtime:668681813cb93337",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) derives a fresh LiveQuery per Store instance"
+    },
+    {
+      "id": "runtime:167d3e6d4cf5c19a",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) filtered dependency query"
+    },
+    {
+      "id": "runtime:424e2224abb0e693",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) same `useQuery` hook invoked with different queries"
+    },
+    {
+      "id": "runtime:96a5129ec19ffb51",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) should work for a list with react-window"
+    },
+    {
+      "id": "runtime:a1ee481ac878402c",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) should work with signal"
+    },
+    {
+      "id": "runtime:1419be9a0a8d43da",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) simple"
+    },
+    {
+      "id": "runtime:0e75ca2aa47b5089",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) supports query builders directly"
+    },
+    {
+      "id": "runtime:8ae7fad3ebb1d5b5",
+      "file": "packages/livestore/upstream/src/useQuery.test.tsx",
+      "fullName": "useQuery (strictMode={ strictMode: true }) union of different result types with useQuery"
+    },
+    {
+      "id": "runtime:3fbf509fc2a73aa0",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should create a stateful entity using make and call cleanup on unmount"
+    },
+    {
+      "id": "runtime:70084b8ef75237f6",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should dispose the previous entity when the scope changes (key unchanged)"
+    },
+    {
+      "id": "runtime:0b957a65cea363c2",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should dispose the previous instance when the key changes"
+    },
+    {
+      "id": "runtime:89e7ba37f4fc12cf",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should handle rapid key changes correctly"
+    },
+    {
+      "id": "runtime:3ca5a99cc09a8f0c",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should isolate entities created with the same key but different scopes"
+    },
+    {
+      "id": "runtime:6a885c3750a4a8bd",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should not dispose the entity until all consumers unmount"
+    },
+    {
+      "id": "runtime:4987a4c587c7e06a",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should not reuse a cached entity after the scope is replaced"
+    },
+    {
+      "id": "runtime:9d2b5011a862f0b7",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should reuse the same entity when the key remains unchanged"
+    },
+    {
+      "id": "runtime:7022644176bb2536",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: false }) should share the entity across components within the same scope"
+    },
+    {
+      "id": "runtime:9c57dd82f2649181",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should create a stateful entity using make and call cleanup on unmount"
+    },
+    {
+      "id": "runtime:95f958ac62236c2a",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should dispose the previous entity when the scope changes (key unchanged)"
+    },
+    {
+      "id": "runtime:5d3e74af43111e71",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should dispose the previous instance when the key changes"
+    },
+    {
+      "id": "runtime:80766ce6418923da",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should handle rapid key changes correctly"
+    },
+    {
+      "id": "runtime:d7545dc37b6f10c0",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should isolate entities created with the same key but different scopes"
+    },
+    {
+      "id": "runtime:c9c8678b63fdc763",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should not dispose the entity until all consumers unmount"
+    },
+    {
+      "id": "runtime:a64aee58666fbd41",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should not reuse a cached entity after the scope is replaced"
+    },
+    {
+      "id": "runtime:f483048d1b27d7e3",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should reuse the same entity when the key remains unchanged"
+    },
+    {
+      "id": "runtime:2aef7e0bc37b890c",
+      "file": "packages/livestore/upstream/src/useRcResource.test.tsx",
+      "fullName": "useRcResource (strictMode={ strictMode: true }) should share the entity across components within the same scope"
+    },
+    {
+      "id": "runtime:47b140e1f1eb45c5",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore does not block useActionState transitions from committing"
+    },
+    {
+      "id": "runtime:6167e550252ebcba",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore does not re-suspend on subsequent renders when store is already loaded"
+    },
+    {
+      "id": "runtime:8461192c35b8e7d7",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore handles switching between different storeId values"
+    },
+    {
+      "id": "runtime:6241c667d75b98d3",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore should return the same promise instance for concurrent getOrLoadStore calls"
+    },
+    {
+      "id": "runtime:134bb7e229c56390",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore throws when store loading fails"
+    },
+    {
+      "id": "runtime:e4c3e44481b870a4",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore works in 'non-strict mode'"
+    },
+    {
+      "id": "runtime:b811294012edf0b0",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore works in 'strict mode'"
+    },
+    {
+      "id": "runtime:a28317ee9edd231e",
+      "file": "packages/livestore/upstream/src/useStore.test.tsx",
+      "fullName": "experimental useStore works with Suspense boundary"
+    }
+  ],
+  "snapshots": 0
+}

@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 54 `@octanejs/*` framework bindings.
+The central status table for the 55 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -31,6 +31,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/i18next`](#octanejsi18next) | `react-i18next@17.0.9` | Complete runtime port of react-i18next 17.0.9: useTranslation, I18nextProvider/context, Trans/TransWithoutContext, IcuTrans/IcuTransWithoutContext, Translation, the withTranslation/withSSR HOCs, useSSR, namespace reporting, initialization/default helpers, and the root ICU helper exports over the unchanged i18next core. | Trans children that must be inspected are passed in prop position (`children={<>…</>}`) or through `defaults` + `components`; natural .tsrx block children are opaque compiled render bodies and fall back with a development warning; Suspense uses octane's `use(thenable)` instead of throwing a Promise; withTranslation's `withRef` option uses octane's ref-as-prop model; class components are unsupported; The React/Babel-specific `icu.macro` subpath is not shipped; the runtime IcuTrans APIs are fully supported | Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open. | 2026-07-13 |
 | [`@octanejs/jotai`](#octanejsjotai) | `jotai@2.20.2` | Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`. | `jotai/babel/*` (React-specific compile-time plugins) is not shipped | No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests. | 2026-07-21 |
 | [`@octanejs/lexical`](#octanejslexical) | `@lexical/react@0.46.0` | 35 of 39 `@lexical/react` modules ported: composer + contexts, the editable surface, plain/rich text, and the full plugin/menu set (history, lists + check-list, links, tables, markdown shortcuts, the typeahead/node-menu/context-menu family, draggable-block, character-limit, …) plus the `useLexical*` hooks. | Positioning uses `@floating-ui/dom` instead of `@floating-ui/react`; The class-based `LexicalErrorBoundary` becomes an octane error boundary; `forwardRef` becomes ref-as-prop | No dedicated SSR/hydration tests. | 2026-07-09 |
+| [`@octanejs/livestore`](#octanejslivestore) | `@livestore/react@0.4.0` | Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages. | ReactApi and withReactApi retain their historical upstream names but attach Octane hooks; The public query error label identifies octane; LiveStore framework-toolkit 0.4.0 still records its internal refresh-reason renderer tag as react; React Strict Mode double invocation is not emulated | Supported at the binding boundary: server rendering reads existing synchronous state without running passive subscriptions or browser-only store work; client Suspense and hydration are covered separately. | 2026-08-02 |
 | [`@octanejs/lucide`](#octanejslucide) | `lucide-react@1.24.0` | Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports. | Icon refs are normal Octane `ref` props rather than React `forwardRef` components; Event callbacks receive native DOM events rather than React synthetic events | Supported and tested: icons and provider defaults render through `octane/server`, and client hydration adopts the server-rendered SVG element. | 2026-07-13 |
 | [`@octanejs/mantine-hooks`](#octanejsmantine-hooks) | `@mantine/hooks@9.5.0` | Complete @mantine/hooks 9.5.0 runtime export surface: state, timing, storage, viewport, input, focus, pointer, observer, hotkey, scrolling, collapse, drag, splitter, mask, and utility hooks. | Hooks use Octane's compiler-injected hook slots and runtime lifecycle instead of React's dispatcher; DOM subscriptions receive native browser events; React is retained only as a source-compatibility type vocabulary for refs, events, actions, and CSS properties; it is not loaded at runtime | Dedicated Node-mode coverage verifies deterministic state-hook output and guarded media-query initial values without a browser. DOM-only effects remain inert during server rendering. | 2026-07-28 |
 | [`@octanejs/mdx`](#octanejsmdx) | `@mdx-js/mdx@3.1.1` | The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context. The octane website runs on it. | `useMDXComponents` drops upstream's `useMemo` referential-stability wrapper so the call is valid in both server and client runtimes (same observable mapping) | Full SSR + hydration coverage — server-compiled documents render via `renderToString` and hydrate byte-for-byte (`ssr.test.ts`, `hydration.test.ts`). | 2026-07-17 |
@@ -313,6 +314,24 @@ SSR / hydration: No dedicated SSR/hydration tests.
 Scope/evidence last checked: 2026-07-09.
 
 - Not ported (4 modules, with reasons): `LexicalCollaborationPlugin` (real-time Yjs collaboration needs a two-peer harness), `LexicalExtensionComposer`/`LexicalExtensionEditorComposer` (the newer extension API wraps a React-only subsystem), and `LexicalTreeView` (wraps the `@lexical/devtools-core` React component).
+
+## @octanejs/livestore
+
+[`packages/livestore`](../packages/livestore) `0.0.1` — ports `@livestore/react@0.4.0`. Status data: [`packages/livestore/status.json`](../packages/livestore/status.json).
+
+Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages.
+
+Known divergences:
+
+- ReactApi and withReactApi retain their historical upstream names but attach Octane hooks.
+- The public query error label identifies octane; LiveStore framework-toolkit 0.4.0 still records its internal refresh-reason renderer tag as react.
+- React Strict Mode double invocation is not emulated.
+
+SSR / hydration: Supported at the binding boundary: server rendering reads existing synchronous state without running passive subscriptions or browser-only store work; client Suspense and hydration are covered separately.
+
+Scope/evidence last checked: 2026-08-02.
+
+See also: [`docs/livestore-port.md`](livestore-port.md), [`packages/livestore/UPSTREAM.md`](../packages/livestore/UPSTREAM.md)
 
 ## @octanejs/lucide
 
