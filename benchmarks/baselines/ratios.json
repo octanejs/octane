@@ -240,6 +240,78 @@
     "note": "The public Zustand hook binding with a real vanilla store and update; deterministic production brotli bytes must not exceed the committed same-run budget."
   },
   {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "server-hooks",
+    "reference": "server-hooks-budget",
+    "maxRatio": 1,
+    "note": "Executable public server hook and escaping helpers without Hydrate, streaming, or DOM-table retention; deterministic production raw bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "server-hooks",
+    "reference": "server-hooks-budget",
+    "maxRatio": 1,
+    "note": "Executable public server hook and escaping helpers without Hydrate, streaming, or DOM-table retention; deterministic production gzip bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "server-hooks",
+    "reference": "server-hooks-budget",
+    "maxRatio": 1,
+    "note": "Executable public server hook and escaping helpers without Hydrate, streaming, or DOM-table retention; deterministic production brotli bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "server-render",
+    "reference": "server-render-budget",
+    "maxRatio": 1,
+    "note": "Executable public buffered server rendering without unrelated Hydrate or streaming initialization; deterministic production raw bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "server-render",
+    "reference": "server-render-budget",
+    "maxRatio": 1,
+    "note": "Executable public buffered server rendering without unrelated Hydrate or streaming initialization; deterministic production gzip bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "server-render",
+    "reference": "server-render-budget",
+    "maxRatio": 1,
+    "note": "Executable public buffered server rendering without unrelated Hydrate or streaming initialization; deterministic production brotli bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "component-owned-effects",
+    "reference": "component-owned-effects-budget",
+    "maxRatio": 1,
+    "note": "Live component events and scoped styles without an unused sibling's ViewTransition driver, delegated event, or stylesheet; deterministic production raw bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "component-owned-effects",
+    "reference": "component-owned-effects-budget",
+    "maxRatio": 1,
+    "note": "Live component events and scoped styles without an unused sibling's ViewTransition driver, delegated event, or stylesheet; deterministic production gzip bytes must remain within the committed budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "component-owned-effects",
+    "reference": "component-owned-effects-budget",
+    "maxRatio": 1,
+    "note": "Live component events and scoped styles without an unused sibling's ViewTransition driver, delegated event, or stylesheet; deterministic production brotli bytes must remain within the committed budget."
+  },
+  {
     "suite": "universal-leaf-update",
     "op": "leaf_update_ms",
     "target": "siblings-4000",
@@ -573,8 +645,8 @@
     "op": "gzip",
     "target": "compiled",
     "reference": "source",
-    "maxRatio": 1.04,
-    "note": "gzip(minified compiled corpus) vs gzip(source corpus). The committed 2026-07-15 record was stale: a clean base build measured 24526 compiled bytes, while the current compiler reduces that to 24397. The resulting 24397 / 23519 = 1.037x record is guarded at 1.04x."
+    "maxRatio": 1.06,
+    "note": "The former 24397 / 23519 corpus record became invalid when its supposedly fixed behavioral fixtures changed; canonical main now measures 26666 / 24713 = 1.079x on those same current files. Lifetime-invariant callbacks, immutable-host aliases, and exact template interning reduce the reviewed current corpus to about 26130 / 24713 = 1.057x, guarded below the unchanged-base compiler at 1.06x."
   },
   {
     "suite": "codegen-size",

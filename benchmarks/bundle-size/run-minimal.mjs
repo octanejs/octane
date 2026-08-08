@@ -27,6 +27,9 @@ const existingScenarios = [
 	['hydrate-root', 'tsrx'],
 	['deferred-hydration', 'tsrx'],
 	['suspense-transition', 'tsrx'],
+	['server-hooks', 'ts'],
+	['server-render', 'ts'],
+	['component-owned-effects', 'ts'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -284,15 +287,30 @@ async function buildScenario(scenario, entry) {
 try {
 	for (const scenario of scenarios) {
 		const { id, name } = scenario;
+		const serverScenario = id.startsWith('server-');
 		const entry = path.join(fixtures, `${id}.${scenario.extension}`);
 		const { code, modules, runtimeExports } = await buildScenario(scenario, entry);
 		for (const [label, pattern] of forbidden) {
+			if (serverScenario && label === 'server runtime') continue;
 			const leaked = modules.find((id) => pattern.test(id));
 			assert.equal(leaked, undefined, `${name}: ${label} reached the production bundle: ${leaked}`);
 		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
+		const hasServerRuntime = modules.some((module) =>
+			module.endsWith('/packages/octane/src/runtime.server.ts'),
+		);
 		const hasVanillaStore = modules.some((id) => /\/node_modules\/zustand\//.test(id));
-		if (id === 'capture-only' || id === 'binding-vanilla' || id === 'binding-floating-ui') {
+		if (serverScenario) {
+			assert.equal(hasServerRuntime, true, `${name}: public server import omitted its runtime`);
+			assert.equal(hasRuntime, false, `${name}: unrelated client runtime reached server entry`);
+			if (id === 'server-hooks') {
+				assert.equal(
+					modules.some((id) => id.endsWith('/packages/octane/src/dom-tables.js')),
+					false,
+					`${name}: unrelated DOM namespace tables reached isolated server helpers`,
+				);
+			}
+		} else if (id === 'capture-only' || id === 'binding-vanilla' || id === 'binding-floating-ui') {
 			assert.equal(hasRuntime, false, `${name}: unrelated client runtime reached isolated entry`);
 		} else if (id !== 'binding-motion' && id !== 'binding-aria') {
 			assert.equal(hasRuntime, true, `${name}: executable feature omitted the client runtime`);
@@ -313,6 +331,12 @@ try {
 				runtimeExports.includes('createRoot'),
 				true,
 				`${name}: the reusable public root was replaced by the disposable contract`,
+			);
+		} else if (name === 'component-owned-effects') {
+			assert.equal(
+				runtimeExports.includes('__vtSeen'),
+				false,
+				`${name}: an unused sibling retained the optional ViewTransition runtime`,
 			);
 		}
 		if (id === 'binding-vanilla' || id === 'binding-hooks') {
@@ -356,6 +380,7 @@ try {
 					id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
 				),
 				hasRuntime,
+				hasServerRuntime,
 				hasVanillaStore,
 				...(scenario.package ? { bundler: scenario.bundler, package: scenario.package } : null),
 				...(id.startsWith('root-static') ? { runtimeExports } : null),

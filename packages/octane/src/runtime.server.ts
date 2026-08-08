@@ -132,7 +132,9 @@ type AttributeNamespace = ParserNamespace | 'opaque';
 // Public string descriptors are HTML-ASCII-case-insensitive. Keep foreign
 // namespace inference on the same contract even though the shared table stores
 // SVG's canonical mixed-case spellings (for example foreignObject/clipPath).
-const SVG_ONLY_LOWERCASE_TAGS = new Set(Array.from(SVG_ONLY_TAGS, (tag) => tag.toLowerCase()));
+const SVG_ONLY_LOWERCASE_TAGS = /* @__PURE__ */ new Set(
+	/* @__PURE__ */ Array.from(SVG_ONLY_TAGS, (tag) => tag.toLowerCase()),
+);
 
 interface SsrElementContext {
 	tag: string;
@@ -3333,8 +3335,12 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 	'Hydrate',
 );
 
-Object.defineProperty(hydrate, '__octanePermanentStatic', { value: PermanentStaticHydrate });
-export const Hydrate: ServerComponent = hydrate;
+function initializeHydrateComponent(): ServerComponent {
+	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: PermanentStaticHydrate });
+	return hydrate;
+}
+
+export const Hydrate: ServerComponent = /* @__PURE__ */ initializeHydrateComponent();
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
@@ -6560,43 +6566,46 @@ export function ssrTry(
 // boundary errored (hydration client-renders it via mismatch recovery). A
 // truthy second argument removes only a server-owned permanent-static sentinel,
 // retaining its already-flushed fallback because no client graph can recover it.
-const STREAM_RUNTIME_JS =
-	'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
-	// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
-	// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
-	'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
-	'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
-	'window.$OCTRC=function(id,nc){' +
-	"var t=d.querySelector('template[" +
-	STREAM_BOUNDARY_ATTR +
-	"=\"'+id+'\"]');" +
-	"var s=d.querySelector('[" +
-	STREAM_SEGMENT_ATTR +
-	"=\"'+id+'\"]');" +
-	'if(!s)return;if(!t){s.remove();return;}' +
-	'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
-	'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
-	'var sd=c.querySelector("script[' +
-	STREAM_SEED_ATTR +
-	']");' +
-	'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
-	'if(nc)c=c.firstElementChild;' +
-	'var n=t.nextSibling,depth=1;' +
-	'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
-	'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
-	'n.parentNode.removeChild(n);n=x;}' +
-	'var p=t.parentNode;' +
-	'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
-	'p.replaceChild(d.createComment("' +
-	STREAM_SEED_COMMENT +
-	'"+id),t);' +
-	's.parentNode.removeChild(s);};' +
-	'window.$OCTRX=function(id,so){' +
-	"var t=d.querySelector('template[" +
-	STREAM_BOUNDARY_ATTR +
-	"=\"'+id+'\"]');" +
-	'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
-	'})();';
+let STREAM_RUNTIME_JS: string | undefined;
+function streamRuntimeJs(): string {
+	return (STREAM_RUNTIME_JS ??=
+		'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
+		// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
+		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
+		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
+		'window.$OCTRC=function(id,nc){' +
+		"var t=d.querySelector('template[" +
+		STREAM_BOUNDARY_ATTR +
+		"=\"'+id+'\"]');" +
+		"var s=d.querySelector('[" +
+		STREAM_SEGMENT_ATTR +
+		"=\"'+id+'\"]');" +
+		'if(!s)return;if(!t){s.remove();return;}' +
+		'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
+		'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
+		'var sd=c.querySelector("script[' +
+		STREAM_SEED_ATTR +
+		']");' +
+		'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
+		'if(nc)c=c.firstElementChild;' +
+		'var n=t.nextSibling,depth=1;' +
+		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
+		'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
+		'n.parentNode.removeChild(n);n=x;}' +
+		'var p=t.parentNode;' +
+		'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
+		'p.replaceChild(d.createComment("' +
+		STREAM_SEED_COMMENT +
+		'"+id),t);' +
+		's.parentNode.removeChild(s);};' +
+		'window.$OCTRX=function(id,so){' +
+		"var t=d.querySelector('template[" +
+		STREAM_BOUNDARY_ATTR +
+		"=\"'+id+'\"]');" +
+		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
+		'})();');
+}
 
 interface StreamSink {
 	/**
@@ -7061,7 +7070,7 @@ async function runStream(
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
-		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
+		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
 	try {
 		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;

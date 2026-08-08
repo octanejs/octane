@@ -5,6 +5,8 @@ import {
 	ComputeCount,
 	ConditionalMemo,
 	EarlyReturnMemo,
+	GeneratedCallbackAcrossSuspend,
+	GeneratedCallbackIdentity,
 	MemoAcrossSuspend,
 	NanDep,
 	NullDepsIdentity,
@@ -94,6 +96,49 @@ describe('inline hook-memo behavior', () => {
 		r.click('#fire');
 		expect(log.drain()).toEqual(['cb:1']);
 		r.unmount();
+	});
+
+	it('keeps generated callbacks and transitive captures stable while their state remains live', async () => {
+		const observed: Array<[() => void, () => void]> = [];
+		const root = mount(GeneratedCallbackIdentity, {
+			observe: (increment: () => void, forward: () => void) => {
+				observed.push([increment, forward]);
+			},
+		});
+		const [increment, forward] = observed[0];
+
+		root.click('#generated');
+		expect(root.find('#generated').textContent).toBe('count=1');
+		expect(observed.at(-1)).toEqual([increment, forward]);
+
+		await act(() => increment());
+		expect(root.find('#generated').textContent).toBe('count=2');
+		expect(observed.at(-1)).toEqual([increment, forward]);
+		root.unmount();
+	});
+
+	it('preserves generated callback identity across a suspended render and its replay', async () => {
+		const observed: Array<() => void> = [];
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((complete) => {
+			resolve = complete;
+		});
+		const root = mount(GeneratedCallbackAcrossSuspend, {
+			observe: (callback: () => void) => observed.push(callback),
+			promise,
+		});
+		expect(root.html()).toContain('loading');
+		expect(observed).toHaveLength(1);
+		const first = observed[0];
+
+		await act(() => resolve('ready'));
+		expect(root.find('#resumed').textContent).toBe('ready:0');
+		expect(observed.at(-1)).toBe(first);
+
+		root.click('#resumed');
+		expect(root.find('#resumed').textContent).toBe('ready:1');
+		expect(observed.at(-1)).toBe(first);
+		root.unmount();
 	});
 
 	it('publishes immediately: a memo computed before a suspension is not recomputed on replay', async () => {

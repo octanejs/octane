@@ -90,6 +90,46 @@ export function CallbackIdentity({ log }: { log: (entry: string) => void }) @{
 	</div>
 }
 
+export function GeneratedCallbackIdentity({
+	observe,
+}: {
+	observe: (increment: () => void, forward: () => void) => void;
+}) @{
+	const [count, setCount] = useState(0);
+	const increment = () => setCount((current) => current + 1);
+	const forward = () => increment();
+	observe(increment, forward);
+	<button id="generated" onClick={forward}>{'count=' + count}</button>
+}
+
+function GeneratedSuspendingReader({
+	observe,
+	promise,
+}: {
+	observe: (callback: () => void) => void;
+	promise: Promise<string>;
+}) @{
+	const [count, setCount] = useState(0);
+	const increment = () => setCount((current) => current + 1);
+	observe(increment);
+	const value = use(promise);
+	<button id="resumed" onClick={increment}>{value + ':' + count}</button>
+}
+
+export function GeneratedCallbackAcrossSuspend({
+	observe,
+	promise,
+}: {
+	observe: (callback: () => void) => void;
+	promise: Promise<string>;
+}) @{
+	@try {
+		<GeneratedSuspendingReader observe={observe} promise={promise} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
 function SuspendingReader({
 	log,
 	promise,
