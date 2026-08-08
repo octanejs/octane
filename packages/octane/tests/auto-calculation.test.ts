@@ -13,6 +13,7 @@ import {
 	callTsxCallableProjection,
 	TsxDerivedIdentity,
 	TsxLiveReceiverCalculation,
+	TsxUnstablePrefixedHook,
 } from './_fixtures/tsx-auto-memo.tsx';
 
 // A derived `const` whose initializer reaches a render-time call is cached on
@@ -195,6 +196,21 @@ describe('auto-calculation — React-style return components', () => {
 
 		root.click('#tsx-receiver-tick');
 		expect(root.find('#tsx-receiver-value').textContent).not.toBe(second);
+		root.unmount();
+	});
+
+	it('keeps an imported uppercase UNSTABLE_ custom hook live after a built-in hook', () => {
+		const root = mount(TsxUnstablePrefixedHook);
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('0');
+
+		root.click('#tsx-unstable-hook-increment');
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('1');
+
+		root.click('#tsx-unstable-hook-tick');
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('1');
+
+		root.click('#tsx-unstable-hook-increment');
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('2');
 		root.unmount();
 	});
 

@@ -1,7 +1,7 @@
 /** @jsxImportSource octane */
 
 import { useContext, useEffect, useState } from 'octane';
-import { projectRows } from './auto-calculation-helpers';
+import { projectRows, UNSTABLE_useProjectedCounter } from './auto-calculation-helpers';
 import { AutoMemoChild, AutoMemoContext } from './auto-memo-child.tsrx';
 
 type Row = { id: number; label: string };
@@ -280,6 +280,23 @@ export function TsxDerivedIdentity() {
 			</button>
 			<span id="tsx-derived-identity">{derivedIdentity(visible)}</span>
 			<span id="tsx-derived-values">{visible.join(',')}</span>
+		</section>
+	);
+}
+
+export function TsxUnstablePrefixedHook() {
+	const [tick, setTick] = useState(0);
+	const state = UNSTABLE_useProjectedCounter();
+
+	return (
+		<section>
+			<button id="tsx-unstable-hook-tick" onClick={() => setTick(tick + 1)}>
+				{tick}
+			</button>
+			<button id="tsx-unstable-hook-increment" onClick={state.increment}>
+				increment
+			</button>
+			<span id="tsx-unstable-hook-value">{state.value}</span>
 		</section>
 	);
 }
