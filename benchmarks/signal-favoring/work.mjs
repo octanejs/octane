@@ -20,6 +20,7 @@ const METRICS = [
 	'childSlot',
 	'createElement',
 	'setText',
+	'useBatch',
 	'unmountBlock',
 	'unmountScope',
 ];
@@ -200,16 +201,16 @@ try {
 }
 
 console.log(
-	'Operation              | render | full | void | lite | child | descriptors | text | unmount block/scope',
+	'Operation              | render | full | void | lite | child | descriptors | text | warm | unmount block/scope',
 );
 console.log(
-	'-----------------------+--------+------+------+------+-------+-------------+------+--------------------',
+	'-----------------------+--------+------+------+------+-------+-------------+------+------+--------------------',
 );
 for (const target of TARGETS) {
 	for (const op of OPS) {
 		const c = results[target.name][op.name];
 		console.log(
-			`${`${target.name}.${op.name}`.padEnd(22)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${String(c.setText).padStart(4)} | ${c.unmountBlock}/${c.unmountScope}`,
+			`${`${target.name}.${op.name}`.padEnd(22)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${String(c.setText).padStart(4)} | ${String(c.useBatch).padStart(4)} | ${c.unmountBlock}/${c.unmountScope}`,
 		);
 	}
 }

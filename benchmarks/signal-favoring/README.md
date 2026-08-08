@@ -167,8 +167,10 @@ two fully-warmed sample sets are combined for TSX/TSRX ratio guards.
 counters, which would change the program presented to the compiler. It caps
 blocks, aggregate component-slot dispatch, child slots, descriptors, and
 teardown work at the current production levels while allowing every count to
-fall. Every row requires live production-bundle coverage. C1/C51/C91 must still
-perform exactly one text write, and the ancestor-first batch exactly ten.
+fall. It also forbids fetch-warming registrations in this fully synchronous
+component tree. Every row requires live production-bundle coverage. C1/C51/C91
+must still perform exactly one text write, and the ancestor-first batch exactly
+ten.
 
 The TSX chain's private, hookless components reuse their existing compiled host
 renderers through lightweight component slots. Its shallow update is limited to

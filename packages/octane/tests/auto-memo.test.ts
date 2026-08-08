@@ -1733,6 +1733,126 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it.each([
+		{ shape: 'direct', shared: 'dynamic' },
+		{ shape: 'nested', shared: '[dynamic]' },
+		{
+			shape: 'fragment-wrapped',
+			shared: "[createElement(Fragment, { key: 'wrapper' }, dynamic)]",
+		},
+	])(
+		're-reads $shape derived renderable array getters on later parent renders',
+		({ shape, shared }) => {
+			const source = `
+			import { Fragment, createContext, createElement, useState } from 'octane';
+
+			let label = 'initial';
+			const dynamic = [];
+			Object.defineProperty(dynamic, '0', {
+				configurable: true,
+				enumerable: true,
+				get() {
+					return createElement(Row, { key: 'row', label });
+				},
+			});
+			const shared = ${shared};
+			const Context = createContext(null);
+
+			function Row(props) @{
+				<span id="derived-accessor-row">{props.label as string}</span>
+			}
+
+			function selectRows(items) {
+				return shared;
+			}
+
+			export function App() @{
+				const [items] = useState([0]);
+				const [tick, setTick] = useState(0);
+				const rows = selectRows(items);
+				<section>
+					<button
+						id="derived-accessor-update"
+						onClick={() => {
+							label = 'updated';
+							setTick(tick + 1);
+						}}
+					>{tick as number}</button>
+					<Context.Provider value={null}>
+						<div id="derived-accessor-rows">{rows}</div>
+					</Context.Provider>
+				</section>
+			}
+		`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `derived-${shape}-array-accessor.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const root = mount(client.App);
+			const row = root.find('#derived-accessor-row');
+			expect(row.textContent).toBe('initial');
+
+			root.click('#derived-accessor-update');
+			expect(root.find('#derived-accessor-row')).toBe(row);
+			expect(row.textContent).toBe('updated');
+			root.unmount();
+		},
+	);
+
+	it.each([
+		{
+			shape: 'deferred component props',
+			entry: '<Row key="row" label={use(Theme)} />',
+		},
+		{
+			shape: 'deferred host children',
+			entry: '<span key="row" id="derived-scoped-row">{use(Theme)}</span>',
+		},
+	])('keeps $shape inside derived renderable arrays reactive to context', ({ shape, entry }) => {
+		const source = `
+			import { createContext, use, useState } from 'octane';
+
+			const Theme = createContext('initial');
+
+			function Row(props) @{
+				<span id="derived-scoped-row">{props.label as string}</span>
+			}
+
+			const shared = [${entry}];
+			function selectRows(items) {
+				return shared;
+			}
+
+			export function App() @{
+				const [items] = useState([0]);
+				const [theme, setTheme] = useState('initial');
+				const rows = selectRows(items);
+				<section>
+					<button id="derived-scoped-update" onClick={() => setTheme('updated')}>
+						{'update context'}
+					</button>
+					<Theme.Provider value={theme}>
+						<div id="derived-scoped-rows">{rows}</div>
+					</Theme.Provider>
+				</section>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: `derived-${shape.replaceAll(' ', '-')}.tsrx`,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App);
+		const row = root.find('#derived-scoped-row');
+		expect(row.textContent).toBe('initial');
+
+		root.click('#derived-scoped-update');
+		expect(root.find('#derived-scoped-row')).toBe(row);
+		expect(row.textContent).toBe('updated');
+		root.unmount();
+	});
+
 	it('reads inherited sparse-array getters once without skipping their callback index', () => {
 		const events: string[] = [];
 		const first = { id: 1, label: 'first' };

@@ -1,6 +1,7 @@
 /** @jsxImportSource octane */
 
 import { useContext, useEffect, useState } from 'octane';
+import { projectRows, UNSTABLE_useProjectedCounter } from './auto-calculation-helpers';
 import { AutoMemoChild, AutoMemoContext } from './auto-memo-child.tsrx';
 
 type Row = { id: number; label: string };
@@ -247,4 +248,84 @@ export function TsxImpureRowsApp() {
 			</ul>
 		</section>
 	);
+}
+
+const derivedIdentities = new WeakMap<object, number>();
+let nextDerivedIdentity = 0;
+
+function derivedIdentity(value: object): string {
+	let identity = derivedIdentities.get(value);
+	if (identity === undefined) {
+		identity = ++nextDerivedIdentity;
+		derivedIdentities.set(value, identity);
+	}
+	return `derived-${identity}`;
+}
+
+export function TsxDerivedIdentity() {
+	const [items, setItems] = useState([{ id: 1, n: 1 }]);
+	const [tick, setTick] = useState(0);
+	const visible = projectRows(items);
+
+	return (
+		<section>
+			<button id="tsx-derived-tick" onClick={() => setTick(tick + 1)}>
+				{tick}
+			</button>
+			<button
+				id="tsx-derived-add"
+				onClick={() => setItems([...items, { id: items.length + 1, n: items.length + 1 }])}
+			>
+				add
+			</button>
+			<span id="tsx-derived-identity">{derivedIdentity(visible)}</span>
+			<span id="tsx-derived-values">{visible.join(',')}</span>
+		</section>
+	);
+}
+
+export function TsxUnstablePrefixedHook() {
+	const [tick, setTick] = useState(0);
+	const state = UNSTABLE_useProjectedCounter();
+
+	return (
+		<section>
+			<button id="tsx-unstable-hook-tick" onClick={() => setTick(tick + 1)}>
+				{tick}
+			</button>
+			<button id="tsx-unstable-hook-increment" onClick={state.increment}>
+				increment
+			</button>
+			<span id="tsx-unstable-hook-value">{state.value}</span>
+		</section>
+	);
+}
+
+export function TsxLiveReceiverCalculation() {
+	const [source] = useState(() => {
+		let next = 0;
+		return { read: () => `reading-${++next}` };
+	});
+	const [tick, setTick] = useState(0);
+	const reading = source.read();
+
+	return (
+		<section>
+			<button id="tsx-receiver-tick" onClick={() => setTick(tick + 1)}>
+				{tick}
+			</button>
+			<span id="tsx-receiver-value">{reading}</span>
+		</section>
+	);
+}
+
+function TsxCallableProjection(props: { rows: ReadonlyArray<{ id: number; n: number }> }) {
+	const visible = projectRows(props.rows);
+	return <span id="tsx-callable-values">{visible.join(',')}</span>;
+}
+
+export function callTsxCallableProjection(props: {
+	rows: ReadonlyArray<{ id: number; n: number }>;
+}) {
+	return TsxCallableProjection(props);
 }
