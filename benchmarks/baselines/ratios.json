@@ -1110,5 +1110,341 @@
     "reference": "octane-tsrx",
     "maxRatio": 1.5,
     "note": "Metaframework-overhead guard: the vite-plugin + adapter-cloudflare worker vs the raw octane worker measured 1.06x cold on 2026-07-20 (38ms vs 36ms). A breach means the app-core/adapter layer grew a workerd cold-start cost, independent of the renderer."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-base-ui-vite",
+    "reference": "binding-base-ui-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Base UI Separator; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-base-ui-vite",
+    "reference": "binding-base-ui-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Base UI Separator; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-base-ui-vite",
+    "reference": "binding-base-ui-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Base UI Separator; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-base-ui-esbuild",
+    "reference": "binding-base-ui-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Base UI Separator; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-base-ui-esbuild",
+    "reference": "binding-base-ui-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Base UI Separator; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-base-ui-esbuild",
+    "reference": "binding-base-ui-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Base UI Separator; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-aria-vite",
+    "reference": "binding-aria-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the public Aria separator and its real browser focus/transition bootstrap; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-aria-vite",
+    "reference": "binding-aria-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the public Aria separator and its real browser focus/transition bootstrap; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-aria-vite",
+    "reference": "binding-aria-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the public Aria separator and its real browser focus/transition bootstrap; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-aria-esbuild",
+    "reference": "binding-aria-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the public Aria separator and its real browser focus/transition bootstrap; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-aria-esbuild",
+    "reference": "binding-aria-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the public Aria separator and its real browser focus/transition bootstrap; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-aria-esbuild",
+    "reference": "binding-aria-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the public Aria separator and its real browser focus/transition bootstrap; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-motion-vite",
+    "reference": "binding-motion-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Motion animate engine; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-motion-vite",
+    "reference": "binding-motion-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Motion animate engine; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-motion-vite",
+    "reference": "binding-motion-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Motion animate engine; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-motion-esbuild",
+    "reference": "binding-motion-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Motion animate engine; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-motion-esbuild",
+    "reference": "binding-motion-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Motion animate engine; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-motion-esbuild",
+    "reference": "binding-motion-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Motion animate engine; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-radix-vite",
+    "reference": "binding-radix-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Radix Separator namespace; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-radix-vite",
+    "reference": "binding-radix-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Radix Separator namespace; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-radix-vite",
+    "reference": "binding-radix-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the selected public Radix Separator namespace; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-radix-esbuild",
+    "reference": "binding-radix-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Radix Separator namespace; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-radix-esbuild",
+    "reference": "binding-radix-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Radix Separator namespace; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-radix-esbuild",
+    "reference": "binding-radix-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the selected public Radix Separator namespace; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-floating-ui-vite",
+    "reference": "binding-floating-ui-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing standalone public floating positioning without Octane interaction providers; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-floating-ui-vite",
+    "reference": "binding-floating-ui-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing standalone public floating positioning without Octane interaction providers; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-floating-ui-vite",
+    "reference": "binding-floating-ui-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing standalone public floating positioning without Octane interaction providers; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-floating-ui-esbuild",
+    "reference": "binding-floating-ui-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing standalone public floating positioning without Octane interaction providers; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-floating-ui-esbuild",
+    "reference": "binding-floating-ui-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing standalone public floating positioning without Octane interaction providers; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-floating-ui-esbuild",
+    "reference": "binding-floating-ui-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing standalone public floating positioning without Octane interaction providers; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-mantine-hooks-vite",
+    "reference": "binding-mantine-hooks-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the interactive public Mantine counter; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-mantine-hooks-vite",
+    "reference": "binding-mantine-hooks-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the interactive public Mantine counter; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-mantine-hooks-vite",
+    "reference": "binding-mantine-hooks-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the interactive public Mantine counter; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-mantine-hooks-esbuild",
+    "reference": "binding-mantine-hooks-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the interactive public Mantine counter; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-mantine-hooks-esbuild",
+    "reference": "binding-mantine-hooks-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the interactive public Mantine counter; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-mantine-hooks-esbuild",
+    "reference": "binding-mantine-hooks-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the interactive public Mantine counter; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-usehooks-ts-vite",
+    "reference": "binding-usehooks-ts-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the interactive public usehooks-ts counter; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-usehooks-ts-vite",
+    "reference": "binding-usehooks-ts-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the interactive public usehooks-ts counter; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-usehooks-ts-vite",
+    "reference": "binding-usehooks-ts-vite-budget",
+    "maxRatio": 1,
+    "note": "A real vite production bundle executing the interactive public usehooks-ts counter; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-usehooks-ts-esbuild",
+    "reference": "binding-usehooks-ts-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the interactive public usehooks-ts counter; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-usehooks-ts-esbuild",
+    "reference": "binding-usehooks-ts-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the interactive public usehooks-ts counter; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-usehooks-ts-esbuild",
+    "reference": "binding-usehooks-ts-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the interactive public usehooks-ts counter; deterministic brotli bytes must not exceed its committed same-run budget."
   }
 ]
