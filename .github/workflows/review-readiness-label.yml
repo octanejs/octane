@@ -15,7 +15,8 @@ jobs:
     if: github.event.issue.pull_request
     runs-on: ubuntu-latest
     permissions:
-      issues: write
+      issues: read
+      pull-requests: write
 
     steps:
       - name: Apply the latest review readiness command
