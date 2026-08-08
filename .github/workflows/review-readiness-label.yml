@@ -3,78 +3,235 @@ name: Review readiness label
 on:
   issue_comment:
     types: [created, edited]
+  check_run:
+    types: [completed]
 
 concurrency:
-  # Keep label updates for the same pull request from racing.
-  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  # A Cursor check on a fork commit does not carry a pull request number, so
+  # use its head SHA to serialize duplicate completion deliveries.
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.check_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
   update:
     name: update label
-    if: github.event.issue.pull_request
+    if: >-
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
+      (github.event_name == 'check_run' &&
+        github.event.check_run.app.slug == 'cursor' &&
+        github.event.check_run.name == 'Cursor Bugbot')
     runs-on: ubuntu-latest
     permissions:
+      checks: read
       issues: read
       pull-requests: write
 
     steps:
-      - name: Apply the latest review readiness command
+      - name: Reconcile review readiness
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const READY = "READY FOR REVIEW";
             const WITHDRAWN = "REVIEW WITHDRAWN";
+            const CURSOR_LOGIN = "cursor";
+            const CURSOR_FINDING = "<!-- BUGBOT_BUG_ID:";
             const { owner, repo } = context.repo;
-            const issue_number = context.payload.issue.number;
 
-            // Commands are case-sensitive standalone lines, so they can be
-            // accompanied by an explanation without matching ordinary prose.
-            const commands = context.payload.comment.body
-              .split(/\r?\n/)
-              .map((line) => line.trim())
-              .filter((line) => line === READY || line === WITHDRAWN);
-            const command = commands.at(-1);
-            if (!command) {
-              return;
+            async function unresolvedCursorThreads(number) {
+              const unresolved = [];
+              let after = null;
+              let hasNextPage;
+
+              do {
+                const result = await github.graphql(
+                  `query ($owner: String!, $repo: String!, $number: Int!, $after: String) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequest(number: $number) {
+                        reviewThreads(first: 100, after: $after) {
+                          nodes {
+                            isResolved
+                            comments(first: 1) {
+                              nodes {
+                                author { login }
+                                body
+                                url
+                              }
+                            }
+                          }
+                          pageInfo { hasNextPage endCursor }
+                        }
+                      }
+                    }
+                  }`,
+                  { owner, repo, number, after },
+                );
+                const threads = result.repository.pullRequest?.reviewThreads;
+                if (!threads) {
+                  return [];
+                }
+
+                for (const thread of threads.nodes) {
+                  const first = thread.comments.nodes[0];
+                  if (
+                    !thread.isResolved &&
+                    first?.author?.login === CURSOR_LOGIN &&
+                    (first.body ?? "").includes(CURSOR_FINDING)
+                  ) {
+                    unresolved.push(first.url);
+                  }
+                }
+                hasNextPage = threads.pageInfo.hasNextPage;
+                after = threads.pageInfo.endCursor;
+              } while (hasNextPage);
+
+              return unresolved;
             }
 
-            // Refetch because another comment-driven run may have changed the
-            // labels since this event was queued.
-            const { data: issue } = await github.rest.issues.get({
-              owner,
-              repo,
-              issue_number,
-            });
-            const labels = issue.labels.map((label) =>
-              typeof label === "string" ? label : label.name,
-            );
-            const hasLabel = labels.includes(READY);
+            async function openPullsAtHead(headSha) {
+              const matches = [];
+              let after = null;
+              let hasNextPage;
 
-            try {
-              if (command === READY && !hasLabel) {
-                await github.rest.issues.addLabels({
-                  owner,
-                  repo,
-                  issue_number,
-                  labels: [READY],
-                });
-                core.notice(`Applied ${READY} to #${issue_number}.`);
-              } else if (command === WITHDRAWN && hasLabel) {
+              do {
+                const result = await github.graphql(
+                  `query ($owner: String!, $repo: String!, $after: String) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequests(first: 100, after: $after, states: OPEN) {
+                        nodes { number headRefOid }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                  }`,
+                  { owner, repo, after },
+                );
+                const pulls = result.repository.pullRequests;
+                matches.push(
+                  ...pulls.nodes
+                    .filter((pull) => pull.headRefOid === headSha)
+                    .map((pull) => pull.number),
+                );
+                hasNextPage = pulls.pageInfo.hasNextPage;
+                after = pulls.pageInfo.endCursor;
+              } while (hasNextPage);
+
+              return matches;
+            }
+
+            async function pullState(number) {
+              const { data: pull } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: number,
+              });
+              return {
+                isOpen: pull.state === "open",
+                hasLabel: pull.labels.some((label) => label.name === READY),
+              };
+            }
+
+            async function removeReady(number) {
+              try {
                 await github.rest.issues.removeLabel({
                   owner,
                   repo,
-                  issue_number,
+                  issue_number: number,
                   name: READY,
                 });
-                core.notice(`Removed ${READY} from #${issue_number}.`);
-              } else {
-                core.notice(
-                  `${READY} is already ${hasLabel ? "applied to" : "absent from"} #${issue_number}.`,
-                );
+                return true;
+              } catch (error) {
+                // GitHub documents 404 when the label no longer exists. That
+                // is the desired end state if another actor won the race.
+                if (error.status === 404) {
+                  return false;
+                }
+                throw error;
               }
+            }
+
+            try {
+              if (context.eventName === "check_run") {
+                const headSha = context.payload.check_run.head_sha;
+                const numbers = await openPullsAtHead(headSha);
+                for (const number of numbers) {
+                  const state = await pullState(number);
+                  if (!state.isOpen || !state.hasLabel) {
+                    continue;
+                  }
+                  const unresolved = await unresolvedCursorThreads(number);
+                  if (unresolved.length === 0) {
+                    continue;
+                  }
+                  const removed = await removeReady(number);
+                  if (!removed) {
+                    core.notice(`${READY} was already absent from #${number}.`);
+                    continue;
+                  }
+                  core.notice(
+                    `Removed ${READY} from #${number}: ${unresolved.length} unresolved Cursor ` +
+                      `finding${unresolved.length === 1 ? " remains" : "s remain"}. ` +
+                      unresolved.join(", "),
+                  );
+                }
+                return;
+              }
+
+              const number = context.payload.issue.number;
+              // Commands are case-sensitive standalone lines, so they can be
+              // accompanied by an explanation without matching ordinary prose.
+              const commands = context.payload.comment.body
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter((line) => line === READY || line === WITHDRAWN);
+              const command = commands.at(-1);
+              if (!command) {
+                return;
+              }
+
+              // Refetch because another run may have changed the labels since
+              // this event was queued.
+              const state = await pullState(number);
+              if (!state.isOpen) {
+                return;
+              }
+
+              if (command === READY) {
+                const unresolved = await unresolvedCursorThreads(number);
+                if (unresolved.length > 0) {
+                  if (state.hasLabel) {
+                    await removeReady(number);
+                  }
+                  core.notice(
+                    `Did not apply ${READY} to #${number}: ${unresolved.length} unresolved Cursor ` +
+                      `finding${unresolved.length === 1 ? " remains" : "s remain"}. ` +
+                      unresolved.join(", "),
+                  );
+                  return;
+                }
+                if (!state.hasLabel) {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: number,
+                    labels: [READY],
+                  });
+                  core.notice(`Applied ${READY} to #${number}.`);
+                  return;
+                }
+              } else if (state.hasLabel) {
+                const removed = await removeReady(number);
+                core.notice(
+                  removed
+                    ? `Removed ${READY} from #${number}.`
+                    : `${READY} was already absent from #${number}.`,
+                );
+                return;
+              }
+
+              core.notice(
+                `${READY} is already ${state.hasLabel ? "applied to" : "absent from"} #${number}.`,
+              );
             } catch (error) {
               core.setFailed(
-                `Could not update ${READY} on #${issue_number}: ${error.message}`,
+                `Could not reconcile ${READY}: ${error.message}`,
               );
             }
