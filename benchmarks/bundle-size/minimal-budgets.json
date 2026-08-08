@@ -4,6 +4,11 @@
     "gzip": 1728,
     "brotli": 1536
   },
+  "cli-spa-starter": {
+    "raw": 80736,
+    "gzip": 27936,
+    "brotli": 24768
+  },
   "root-static-specialized": {
     "raw": 49760,
     "gzip": 16736,

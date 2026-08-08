@@ -26,6 +26,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "cli-spa-starter",
+    "reference": "cli-spa-starter-budget",
+    "maxRatio": 1,
+    "note": "The CLI-generated disposable SPA entry and complete landing page retain compiler-proven root specialization; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "cli-spa-starter",
+    "reference": "cli-spa-starter-budget",
+    "maxRatio": 1,
+    "note": "The CLI-generated disposable SPA entry and complete landing page retain compiler-proven root specialization; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "cli-spa-starter",
+    "reference": "cli-spa-starter-budget",
+    "maxRatio": 1,
+    "note": "The CLI-generated disposable SPA entry and complete landing page retain compiler-proven root specialization; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "root-static-specialized",
     "reference": "root-static-specialized-budget",
     "maxRatio": 1,

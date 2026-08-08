@@ -6,6 +6,14 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		prevented: true,
 		bubbled: false,
 	},
+	'cli-spa-starter': {
+		page: true,
+		title: 'octane',
+		quickStart: 'Quick start',
+		quickStartHref: 'https://octanejs.dev/docs/quick-start',
+		links: 4,
+		styled: true,
+	},
 	'root-static': {
 		text: 'Octane',
 		cleaned: true,
@@ -133,7 +141,7 @@ export async function verifyScenario(id, code) {
 	});
 	const { window } = dom;
 	const container = window.document.createElement('div');
-	container.id = 'octane-reachability-root';
+	container.id = id === 'cli-spa-starter' ? 'root' : 'octane-reachability-root';
 	window.document.body.appendChild(container);
 	const focusBefore = window.HTMLElement.prototype.focus;
 	const listeners = { document: new Set(), body: new Set(), window: new Set() };

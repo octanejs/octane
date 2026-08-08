@@ -63,7 +63,11 @@ describe('octane create', () => {
 		expect(JSON.parse(read(app, 'package.json')).name).toBe('my-app');
 		expect(read(app, 'vite.config.ts')).toContain('from "octane/compiler/vite"');
 		expect(read(app, 'index.html')).toContain('<script type="module" src="/src/main.ts">');
-		expect(read(app, 'src/main.ts')).toContain('createRoot');
+		// The starter never reuses its root, so a chained mount lets production
+		// builds discard the generic reusable-root machinery.
+		expect(read(app, 'src/main.ts')).toContain(
+			'createRoot(document.getElementById("root")!).render(App)',
+		);
 		expect(read(app, 'src/App.tsrx')).toContain('export function App()');
 		// The landing page is the app: it links into the documentation rather than
 		// leaving a placeholder to delete, and it mounts standalone, because this

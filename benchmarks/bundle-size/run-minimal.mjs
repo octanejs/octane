@@ -11,6 +11,7 @@ import { build as buildEsbuild } from 'esbuild';
 import { createOctaneCompiler } from 'octane/compiler/bundler';
 import { octane } from 'octane/compiler/vite';
 import { build as buildVite } from 'vite';
+import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +21,7 @@ const budgetFile = path.join(directory, 'minimal-budgets.json');
 const budgets = JSON.parse(fs.readFileSync(budgetFile, 'utf8'));
 const existingScenarios = [
 	['capture-only', 'ts'],
+	['cli-spa-starter', 'ts'],
 	['root-static-specialized', 'ts'],
 	['root-static', 'tsrx'],
 	['hooks-state', 'tsrx'],
@@ -187,6 +189,39 @@ assert.deepEqual(
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
 
+function cliStarterPlugin(entry) {
+	const component = path.join(fixtures, 'cli-spa-starter-App.tsrx');
+	return {
+		name: 'octane-reachability-generated-cli-starter',
+		enforce: 'pre',
+		resolveId(source, importer) {
+			if (source === entry) return entry;
+			if (source === './App.tsrx' && importer === entry) return component;
+			return null;
+		},
+		load(id) {
+			if (id === component) return appComponent('spa');
+			if (id !== entry) return null;
+			return `${clientEntry}
+export function run(container) {
+	const page = container.querySelector('main.page');
+	const title = page?.querySelector('h1');
+	const quickStart = container.querySelector('a[href="https://octanejs.dev/docs/quick-start"]');
+	const scopedStyle = document.head.querySelector('style[data-octane]');
+	return {
+		page: page !== null,
+		title: title?.textContent,
+		quickStart: quickStart?.querySelector('.link-title')?.textContent,
+		quickStartHref: quickStart?.getAttribute('href'),
+		links: container.querySelectorAll('a').length,
+		styled: scopedStyle?.textContent?.includes('.page') ?? false,
+	};
+}
+`;
+		},
+	};
+}
+
 async function buildScenario(scenario, entry) {
 	if (scenario.bundler === 'esbuild') {
 		const result = await buildEsbuild({
@@ -245,7 +280,10 @@ async function buildScenario(scenario, entry) {
 		root: directory,
 		mode: 'production',
 		logLevel: 'error',
-		plugins: [octane({ hmr: false })],
+		plugins: [
+			...(scenario.id === 'cli-spa-starter' ? [cliStarterPlugin(entry)] : []),
+			octane({ hmr: false }),
+		],
 		define: productionDefines,
 		build: {
 			write: false,
@@ -315,7 +353,7 @@ try {
 		} else if (id !== 'binding-motion' && id !== 'binding-aria') {
 			assert.equal(hasRuntime, true, `${name}: executable feature omitted the client runtime`);
 		}
-		if (id === 'root-static-specialized') {
+		if (id === 'root-static-specialized' || id === 'cli-spa-starter') {
 			assert.equal(
 				runtimeExports.includes('__createVoidRoot'),
 				true,
@@ -383,7 +421,7 @@ try {
 				hasServerRuntime,
 				hasVanillaStore,
 				...(scenario.package ? { bundler: scenario.bundler, package: scenario.package } : null),
-				...(id.startsWith('root-static') ? { runtimeExports } : null),
+				...(id.startsWith('root-static') || id === 'cli-spa-starter' ? { runtimeExports } : null),
 				snapshot,
 			},
 		});
