@@ -1125,7 +1125,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) — the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
+    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) \u2014 the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
   },
   {
     "suite": "tanstack-start",
@@ -1141,7 +1141,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) — per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
+    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) \u2014 per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
   },
   {
     "suite": "tanstack-start",
@@ -1518,5 +1518,234 @@
     "reference": "binding-usehooks-ts-esbuild-budget",
     "maxRatio": 1,
     "note": "A real esbuild production bundle executing the interactive public usehooks-ts counter; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "mount",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.3,
+    "note": "Full dashboard mount (~2,400 SVG elements incl. 150 createElementNS de-opt icons and 120 foreignObject labels). Observed 0.82x, 2026-08-07; the namespace-flagged template clone must keep octane at least react-competitive on SVG creation."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "mount",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.8,
+    "note": "Observed 0.49x, 2026-08-07. Solid pays per-template SVG cloning plus store setup at this scale; a jump toward 0.8x means octane's SVG mount path (template parse cache, flag-3 resolution, icon de-opt creation) regressed relative to a fine-grained baseline."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "charts_tick",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.3,
+    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 \u2014 octane must not fall behind react at bulk d-churn."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "tick_sparse",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 2.7,
+    "note": "Fresh-but-value-identical snapshot republish: octane walks every binding's prev-guard where solid's fine-grained graph skips at the signal layer. Observed 1.78x, 2026-08-07; this pins the diff-skip walk cost across ~2,400 elements from drifting further."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "drag_nodes",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.5,
+    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "pan_zoom",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 2.3,
+    "note": "960 tiny ui commits (viewBox + root transform only). Measures per-commit flush overhead with the dashboard subtrees isolated behind reference-stable descriptor props. Observed 1.53x, 2026-08-07; regression here means the children-prop bail-out stopped engaging."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "pan_zoom",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.7,
+    "note": "Observed 0.32x, 2026-08-07. Octane's per-commit overhead beats react's memo-cascade by 3x on viewport-only writes; approaching 0.7x means either octane's ui-commit path bloated or the descriptor-prop bail-out weakened."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "select_toggle",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.9,
+    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 \u2014 octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "topology_churn",
+    "target": "octane-tsrx",
+    "reference": "svelte",
+    "maxRatio": 1.4,
+    "note": "Keyed churn inside <svg>: -30/+30 nodes with edges/icons/foreignObject labels plus survivor rotation (LIS moves). Observed 0.93x vs svelte's keyed each, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "label_churn",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 2.1,
+    "note": "480 foreignObject insert/removals per sample \u2014 the SVG\u2192HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "tooltip_swarm",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.8,
+    "note": "360 portal commits per sample into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "icon_swap",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.2,
+    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path \u2014 a cliff-width tripwire, not a win claim. Observed 0.79x, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "style_spread_pulse",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 3,
+    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 \u2014 octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "elements_full",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "svg_elements_full",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "foreignobject_html_full",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "defs_full",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "elements_full",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "svg_elements_full",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "foreignobject_html_full",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "defs_full",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "elements_full",
+    "target": "octane-tsrx",
+    "reference": "svelte",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "svg_elements_full",
+    "target": "octane-tsrx",
+    "reference": "svelte",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "foreignobject_html_full",
+    "target": "octane-tsrx",
+    "reference": "svelte",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "defs_full",
+    "target": "octane-tsrx",
+    "reference": "svelte",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Semantic control: the fixtures must render byte-identical SVG (the harness also md5-compares a canonical DOM serialization). Pinned 1.0 exactly, 2026-08-07."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "text_full",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Octane and react agree on text-node structure (one node per bound text position). Pinned exactly, 2026-08-07; solid/svelte legitimately differ (extra anchors), so they are not pinned."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "nodes_full",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.3,
+    "note": "Total node count differs only by octane's loop/portal comment markers (2,900 vs 2,645 = 1.10x, 2026-08-07). Loose ceiling so marker-elision regressions surface without pinning marker counts."
   }
 ]

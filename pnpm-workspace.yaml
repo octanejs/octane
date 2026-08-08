@@ -42,6 +42,8 @@ packages:
   - benchmarks/chat-stream/*
   - benchmarks/streamdown-hosted
   - benchmarks/streamdown-hosted/*
+  - benchmarks/svg-dashboard
+  - benchmarks/svg-dashboard/*
   - benchmarks/tauri-shell
   - benchmarks/tauri-shell/*
   - benchmarks/tanstack-start
@@ -408,7 +410,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-
+  - octane@0.1.29
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

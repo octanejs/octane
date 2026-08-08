@@ -173,6 +173,24 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Hand-rolled-SVG observability dashboard (no chart libs): path-d and
+		// transform churn, keyed reconcile inside <svg>, foreignObject labels,
+		// portal tooltip overlay, and a createElement icon layer (octane's
+		// de-opt path). The harness byte-compares the DOM against a Node-side
+		// replay of the shared ops module and cross-hashes DOM parity across
+		// all four fixtures before timing anything.
+		name: 'svg-dashboard',
+		cwd: 'svg-dashboard',
+		servers: [
+			{ filter: 'octane-tsrx-svg-dashboard-bench', port: 5302 },
+			{ filter: 'react-svg-dashboard-bench', port: 5303 },
+			{ filter: 'solid-svg-dashboard-bench', port: 5304 },
+			{ filter: 'svelte-svg-dashboard-bench', port: 5305 },
+		],
+		iter: { normal: 20, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'dbmon',
 		cwd: 'dbmon',
 		servers: [
