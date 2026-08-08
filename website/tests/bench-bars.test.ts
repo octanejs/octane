@@ -44,6 +44,29 @@ describe('benchmark card bars', () => {
 	// js-framework: every framework measured on every operation.
 	const card = FRAMEWORK_CARDS[0];
 
+	it('keeps DOM-node census operations out of js-framework benchmark charts', async () => {
+		const nodeOperations = [
+			'nodes_1k',
+			'elements_1k',
+			'text_1k',
+			'comments_1k',
+			'empty_text_1k',
+			'whitespace_text_1k',
+		];
+		const deoptCard = OCTANE_CARDS.find((candidate) => candidate.id === 'js-framework-deopt')!;
+
+		for (const benchmark of [card, deoptCard]) {
+			const { container, unmount } = await mountCard(benchmark);
+			const operations = Array.from(container.querySelectorAll('.bench-op'), (button) =>
+				button.textContent!.trim(),
+			);
+
+			expect(operations).toContain('run');
+			for (const operation of nodeOperations) expect(operations).not.toContain(operation);
+			unmount();
+		}
+	});
+
 	it('opens on the overall summary: one ranked geomean bar per framework', async () => {
 		const { container, barLabels, barValues, opButton } = await mountCard(card);
 
