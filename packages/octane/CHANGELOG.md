@@ -1,5 +1,70 @@
 # octane
 
+## 0.1.30
+
+### Patch Changes
+
+- 10011bb: Reduce temporary allocations during keyed list reorders by safely reusing
+  bounded numeric scratch buffers across reconciliations.
+- 081fa1e: Avoid reconciling unchanged compiler-cached renderable children while preserving
+  context and hidden-tree effect lifecycles, cache safe derived values in
+  hook-using JSX components, and omit fetch-warming scaffolding from component
+  trees proven to contain no asynchronous work.
+- 60004f0: Reduce component-render bookkeeping when mounting compiler-certified keyed host
+  rows while preserving ordinary DOM insertion, hydration, row identity,
+  delegated events, lifecycle behavior, and existing public APIs.
+- 27758f5: Skip unchanged keyed-list rows in production when their nested conditional
+  content contains only host elements and every captured dependency is stable.
+  Preserve conditional ownership, hydration, transitions, and existing keyed
+  selection behavior while avoiding redundant DOM updates in TodoMVC-shaped apps.
+- 136b0e3: Reduce server-runtime initialization retention and production compiler output while preserving
+  hydration, streaming, component-owned events and styles, View Transitions, and callback identity.
+- d69ab86: Reduce server-rendered HTML escaping time and temporary allocations while
+  preserving iterable snapshots, text security, streaming output, and hydration.
+- 1a27e19: Update only the previously selected and newly selected keyed-list rows when the
+  production compiler can prove that a row's selection depends solely on its own
+  key. Preserve component rerenders, immutable updates, and existing lifecycle
+  behavior without requiring a new public API.
+- 7f6a134: Preserve compiler-hook registration and TanStack Start client hydration when
+  their bootstrap entrypoints are imported for side effects in production bundles,
+  while keeping unrelated package modules tree-shakeable.
+- ce68bb8: Stop rebuilding a component's children when an unrelated context updates.
+
+  A component's children resolve lazily, in the scope they render in, so the
+  compiler wraps each one in a thunk that builds its element and its props object
+  on demand. That thunk was rebuilt whenever a single global context epoch moved,
+  and the epoch moved on every provider value change anywhere in the tree. A
+  rebuild re-runs the thunk, so the props object came back new, and with it every
+  inline callback and object literal written at that call site, even though the
+  component that authored them never rendered again.
+
+  Anything keyed on those identities churned: `useEffect`, `useCallback`, and
+  `useMemo` dependency arrays compared unequal every time, and `memo()` on such a
+  child could not bail out. Where one of those effects wrote state that fed the
+  same provider, the cycle never converged. `@octanejs/radix` `Form` hit exactly
+  that: a `Form.Message` with a function `match` re-registered and unregistered its
+  matcher forever, one round per frame, for as long as the form stayed mounted.
+
+  The rebuild is now keyed on the contexts a record actually read while resolving.
+  Reads are collected during resolution and re-checked against their context's
+  version, so a record that reads no context is never rebuilt by a provider update
+  and keeps the props it was given. The resolving scope is still honoured for
+  records that do read context, which is what keeps one shared descriptor from
+  serving two providers, and a lazily read context value still refreshes on the
+  render after it changes.
+
+  Scope alone no longer forces a rebuild either. Host classification resolves a
+  child in the parent block before the child block renders it, so the two scopes
+  alternate every render; combined with the check above that alternation was
+  re-creating props on its own.
+
+- fbe0d39: Enforce Strong-mode render purity inside lazy state initializers, linked-state
+  reconcilers, and their source/value equality callbacks without restricting
+  deferred work or compatibility-mode applications.
+- 9fa0b47: Reduce production JSX rendering overhead for compiler-proven nested components
+  while preserving authored component returns, hooks, context, hydration, and
+  existing public APIs.
+
 ## 0.1.29
 
 ### Patch Changes

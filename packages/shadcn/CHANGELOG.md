@@ -1,5 +1,31 @@
 # @octanejs/shadcn
 
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies [79bd931]
+- Updated dependencies [faaa53a]
+- Updated dependencies [121ab45]
+- Updated dependencies [10011bb]
+- Updated dependencies [081fa1e]
+- Updated dependencies [60004f0]
+- Updated dependencies [27758f5]
+- Updated dependencies [136b0e3]
+- Updated dependencies [d69ab86]
+- Updated dependencies [1a27e19]
+- Updated dependencies [7f6a134]
+- Updated dependencies [694ba09]
+- Updated dependencies [ce68bb8]
+- Updated dependencies [fbe0d39]
+- Updated dependencies [9fa0b47]
+  - @octanejs/aria@0.0.24
+  - @octanejs/base-ui@0.1.28
+  - @octanejs/radix@0.1.29
+  - octane@0.1.30
+  - @octanejs/lucide@0.1.25
+  - @octanejs/sonner@0.1.25
+
 ## 0.0.14
 
 ### Patch Changes

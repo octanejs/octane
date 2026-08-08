@@ -1,5 +1,12 @@
 # @octanejs/mcp-server
 
+## 0.2.13
+
+### Patch Changes
+
+- 25c82b0: Expose the deterministic minimal-import bundle reachability benchmark through
+  the MCP server.
+
 ## 0.2.12
 
 ### Patch Changes
