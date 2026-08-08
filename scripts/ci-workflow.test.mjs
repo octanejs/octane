@@ -950,7 +950,8 @@ describe('Review readiness label', () => {
 			reviewReadinessWorkflow,
 			/github\.event_name == 'issue_comment' && github\.event\.issue\.pull_request/,
 		);
-		assert.match(reviewReadinessWorkflow, /github\.event\.workflow_run\.conclusion == 'success'/);
+		assert.match(reviewReadinessWorkflow, /github\.event_name == 'workflow_run'/);
+		assert.doesNotMatch(reviewReadinessWorkflow, /github\.event\.workflow_run\.conclusion/);
 		assert.match(reviewReadinessWorkflow, /^ {6}issues: read$/m);
 		assert.match(reviewReadinessWorkflow, /^ {6}pull-requests: write$/m);
 		assert.doesNotMatch(reviewReadinessWorkflow, /actions\/checkout/);
