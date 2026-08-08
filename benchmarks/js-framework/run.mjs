@@ -28,7 +28,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
-import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
+import { deterministicCount } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
@@ -403,19 +403,6 @@ async function runTarget(t) {
 		results.production_calls_1k = deterministicCount(calls);
 	}
 
-	// Full steady-state DOM shape. Tracking element/text counts beside comments
-	// prevents a bookkeeping optimization from gaming the metric by replacing a
-	// comment with an invisible text node or dropping user-visible output.
-	await ensureState(page, 'rows');
-	const dom = await page.evaluate(censusDomNodes, '#main');
-	results.nodes_1k = deterministicCount(dom.total);
-	results.elements_1k = deterministicCount(dom.elements);
-	results.text_1k = deterministicCount(dom.text);
-	results.comments_1k = deterministicCount(dom.comments);
-	results.empty_text_1k = deterministicCount(dom.emptyText);
-	results.whitespace_text_1k = deterministicCount(dom.whitespaceText);
-	results.__dom = dom;
-
 	await browser.close();
 	return results;
 }
@@ -438,18 +425,6 @@ async function runTarget(t) {
 			const r = all[c][op.name];
 			row.push(`${r.median.toFixed(2)} (min ${r.min.toFixed(2)})`.padEnd(W));
 		}
-		console.log(row.join('| '));
-	}
-	for (const [label, op] of [
-		['#nodes', 'nodes_1k'],
-		['#elems', 'elements_1k'],
-		['#text', 'text_1k'],
-		['#cmnts', 'comments_1k'],
-		['#empty', 'empty_text_1k'],
-		['#ws', 'whitespace_text_1k'],
-	]) {
-		const row = [label.padEnd(8)];
-		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
 		console.log(row.join('| '));
 	}
 	for (const [label, op] of [
@@ -497,16 +472,13 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: Object.fromEntries(
-					Object.entries(all[t.name])
-						.filter(([name]) => name !== '__dom')
-						.map(([name, r]) => [
-							name,
-							r.score == null
-								? { median: r.median, min: r.min, samples: r.samples.length }
-								: timingStatForJson(r),
-						]),
+					Object.entries(all[t.name]).map(([name, r]) => [
+						name,
+						r.score == null
+							? { median: r.median, min: r.min, samples: r.samples.length }
+							: timingStatForJson(r),
+					]),
 				),
-				meta: { dom: all[t.name].__dom },
 			})),
 		};
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

@@ -54,6 +54,43 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: '1',
 		cleaned: true,
 	},
+	'binding-base-ui': {
+		role: 'separator',
+		orientation: 'vertical',
+		cleaned: true,
+	},
+	'binding-aria': {
+		id: 'minimal-aria',
+		'aria-label': 'Sections',
+		role: 'separator',
+		'aria-orientation': 'vertical',
+	},
+	'binding-motion': {
+		opacity: '0.25',
+		stoppable: true,
+		cleaned: true,
+	},
+	'binding-radix': {
+		role: 'separator',
+		orientation: 'vertical',
+		dataOrientation: 'vertical',
+		cleaned: true,
+	},
+	'binding-floating-ui': {
+		x: 20,
+		y: 30,
+		placement: 'bottom',
+	},
+	'binding-mantine-hooks': {
+		before: '2',
+		after: '3',
+		cleaned: true,
+	},
+	'binding-usehooks-ts': {
+		before: '4',
+		after: '5',
+		cleaned: true,
+	},
 });
 
 /**
@@ -80,6 +117,22 @@ export async function verifyScenario(id, code) {
 	const container = window.document.createElement('div');
 	container.id = 'octane-reachability-root';
 	window.document.body.appendChild(container);
+	const focusBefore = window.HTMLElement.prototype.focus;
+	const listeners = { document: new Set(), body: new Set(), window: new Set() };
+	if (id === 'binding-aria') {
+		Object.defineProperty(window, 'PointerEvent', { configurable: true, value: window.MouseEvent });
+		for (const [target, key] of [
+			[window.document, 'document'],
+			[window.document.body, 'body'],
+			[window, 'window'],
+		]) {
+			const add = target.addEventListener.bind(target);
+			target.addEventListener = (type, ...args) => {
+				listeners[key].add(type);
+				return add(type, ...args);
+			};
+		}
+	}
 
 	const handleError = (event) => {
 		failures.push(event.error ?? new Error(event.message ?? 'Uncaught browser error'));
@@ -94,6 +147,27 @@ export async function verifyScenario(id, code) {
 
 	try {
 		window.eval(code);
+		if (id === 'binding-aria') {
+			window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
+			assert.notEqual(
+				window.HTMLElement.prototype.focus,
+				focusBefore,
+				`${id}: public package import lost its global browser focus patch`,
+			);
+			for (const type of ['keydown', 'keyup', 'click', 'pointerdown', 'pointermove', 'pointerup']) {
+				assert.equal(
+					listeners.document.has(type),
+					true,
+					`${id}: missing document ${type} listener`,
+				);
+			}
+			for (const type of ['focus', 'blur']) {
+				assert.equal(listeners.window.has(type), true, `${id}: missing window ${type} listener`);
+			}
+			for (const type of ['transitionrun', 'transitionend']) {
+				assert.equal(listeners.body.has(type), true, `${id}: missing body ${type} listener`);
+			}
+		}
 		const scenario = window.__OCTANE_REACHABILITY__;
 		assert.equal(
 			typeof scenario?.run,

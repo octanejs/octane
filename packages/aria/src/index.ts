@@ -2,6 +2,9 @@
 // upstream monopackage index (.react-spectrum/packages/react-aria/exports/index.ts) and
 // grow area-by-area with the migration plan (docs/aria-migration-plan.md).
 
+// Keep global transition tracking reachable when unused behavior hooks are tree-shaken.
+import './utils/runAfterTransition';
+
 // button
 export { useButton } from './button/useButton';
 export { useToggleButton } from './button/useToggleButton';
