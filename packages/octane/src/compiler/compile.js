@@ -4144,11 +4144,12 @@ function containsDeferredRefRead(root) {
 	return found;
 }
 
-// Both probes visit the identical node set, so one pass answers both. The ref
-// probe loses its early exit; it finds nothing in 97% of components anyway.
+// Imported component tags rendered anywhere in the body — the auto-memo
+// region's runtime witnesses. (Deferred-ref reads are no longer collected
+// body-wide here: they gate per call site and per local through
+// collectAutoMemoLocalHazards.)
 function scanComponentBody(root, importedNames) {
 	const importedComponents = new Set();
-	let readsDeferredRef = false;
 	const seen = new WeakSet();
 	function walk(node) {
 		if (!node || typeof node !== 'object') return;
@@ -4158,7 +4159,6 @@ function scanComponentBody(root, importedNames) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
-		if (!readsDeferredRef && isDeferredRefRead(node)) readsDeferredRef = true;
 		const imported = importedComponentTag(node, importedNames);
 		if (imported !== null) importedComponents.add(imported);
 		for (const key in node) {
@@ -4167,7 +4167,7 @@ function scanComponentBody(root, importedNames) {
 		}
 	}
 	walk(root);
-	return { importedComponents, readsDeferredRef };
+	return { importedComponents };
 }
 
 // A JSX member chain bottoms out at a JSXIdentifier, so the base test below
@@ -4201,6 +4201,130 @@ function containsImportedMemberRead(root, importedNames) {
 	}
 	walk(root);
 	return found;
+}
+
+/**
+ * Component locals whose values a region's dependency tuple cannot witness.
+ *
+ * A region dep on a LOCAL compares the local's per-render value. Locals
+ * re-initialize on every body entry, so a plain value local — however it is
+ * conditionally reassigned during render — is always an exact witness of
+ * itself. What it CANNOT witness is a value drawn from mutable state whose
+ * container identity hides the drift:
+ *
+ *   - a ref read (`.current` / any computed member — `isDeferredRefRead`'s
+ *     definition): ref contents mutate outside render without scheduling one,
+ *     and a stable-identity closure (`useCallback(() => ref.current, [])`)
+ *     hands a skipped subtree a LIVE read whose changes nothing witnesses —
+ *     so the classification descends into nested function values;
+ *   - an imported binding's member read: a live import's property can move
+ *     while the import's identity (the only thing a dep can hold) stays
+ *     fixed.
+ *
+ * A name is tainted when such a read reaches its value through ANY feed —
+ * declaration initializers at every nesting depth, destructuring patterns
+ * that carry the read themselves (`const { current: el } = ref`, a default or
+ * computed key reading a ref or live import), assignment right-hand sides, or
+ * a for-of/for-in source — directly or through another tainted local (fixed
+ * point, so declaration order and arrow-hoisted back-references cannot hide a
+ * hazard). Nested and loop-scoped names are not component locals, so tainting
+ * them is inert at call sites directly (unknown names already fail closed),
+ * but it is what lets a hazard PROPAGATE through them into a top-level local
+ * (`let out; for (const x of ref.current.items) out = x`). Shadowing is
+ * folded by name — an inner binding's hazard taints its outer namesake —
+ * which only ever declines more. Props params and same-module function
+ * declarations never taint: the former are the witnessed snapshot itself, the
+ * latter are immutable identities whose render-time CALLS the per-site
+ * render-call gate already rejects.
+ *
+ * The direct forms of these reads inside a call site's own props are rejected
+ * per site (containsAutoMemoUnsafeStructure / containsImportedMemberRead);
+ * this set covers the same reads laundered through a local.
+ */
+function collectAutoMemoLocalHazards(stmts, importedNames) {
+	const hazards = new Set();
+	// name -> union of free identifiers across its clean value sources; a name
+	// with a directly hazardous source moves to `hazards` and leaves this map.
+	const sourceFrees = new Map();
+	const feed = (pattern, rhs) => {
+		if (!rhs) return;
+		const names = new Set();
+		collectBindings(pattern, names);
+		if (names.size === 0) return;
+		// The pattern side can carry the read itself: a `current`/computed
+		// binding key destructures ref contents off the source, and a default's
+		// expression evaluates at destructure time. Both walks descend the whole
+		// pattern, so nested shapes and defaults are covered together.
+		const direct =
+			containsDeferredRefRead(rhs) ||
+			containsImportedMemberRead(rhs, importedNames) ||
+			containsDeferredRefRead(pattern) ||
+			containsImportedMemberRead(pattern, importedNames);
+		// Default expressions inside the pattern read values too; their free
+		// identifiers (which include the pattern's own bound names — inert
+		// self-loops) join the clean-source union.
+		const frees = direct
+			? null
+			: [...collectFreeIdentifiers(rhs, []), ...collectFreeIdentifiers(pattern, [])];
+		for (const name of names) {
+			if (hazards.has(name)) continue;
+			if (direct) {
+				hazards.add(name);
+				sourceFrees.delete(name);
+				continue;
+			}
+			let set = sourceFrees.get(name);
+			if (set === undefined) sourceFrees.set(name, (set = new Set()));
+			for (const id of frees) set.add(id);
+		}
+	};
+	// One walk feeds every binding form at every depth, including inside
+	// nested function values: a deferred write targets a PREVIOUS render's
+	// binding and can never leak into the next render's dep snapshot, but
+	// walking uniformly is cheaper than proving which writes are deferred, and
+	// only hazardous sources taint anyway.
+	const seen = new WeakSet();
+	(function walk(n) {
+		if (!n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n !== 'object' || !n.type || seen.has(n)) return;
+		seen.add(n);
+		if (n.type === 'VariableDeclaration') {
+			for (const d of n.declarations || []) feed(d.id, d.init);
+		} else if (n.type === 'AssignmentExpression' && n.left?.type !== 'MemberExpression') {
+			feed(n.left, n.right);
+		} else if ((n.type === 'ForOfStatement' || n.type === 'ForInStatement') && n.left) {
+			// The loop source feeds the bound names whether the left declares
+			// (`for (const x of src)` — declarator inits are null, so the
+			// declaration arm above cannot see src) or reuses an outer binding.
+			if (n.left.type === 'VariableDeclaration') {
+				for (const d of n.left.declarations || []) feed(d.id, n.right);
+			} else {
+				feed(n.left, n.right);
+			}
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	})(stmts);
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const [name, free] of sourceFrees) {
+			for (const id of free) {
+				if (!hazards.has(id)) continue;
+				hazards.add(name);
+				sourceFrees.delete(name);
+				changed = true;
+				break;
+			}
+		}
+	}
+	return hazards;
 }
 
 function containsAutoMemoUnsafeStructure(stmts) {
@@ -4319,6 +4443,54 @@ function containsAutoMemoUnsafeStructure(stmts) {
 	}
 	for (const s of stmts) walk(s);
 	return found;
+}
+
+/**
+ * Can this props parameter stand in for autoMemo's "one ordinary props
+ * snapshot"? A bare Identifier always can. A destructuring ObjectPattern can
+ * when destructuring it evaluates NO expressions and reads NOTHING mutable:
+ * every binding it introduces is already a component local
+ * (collectComponentLocals walks patterns), so the body's free-identifier and
+ * capture analysis is complete for it — the pattern itself is the only part
+ * those walks never see, because they take the body root, not the params.
+ *
+ * Fail closed on exactly the shapes whose evaluation escapes that analysis or
+ * reads outside the snapshot:
+ *   - defaults (`{ a = expr }`): `expr` evaluates at destructure time, and its
+ *     reads are invisible to the body walks;
+ *   - computed keys (`{ [k]: v }`): same, for the key expression;
+ *   - a `current` binding at any depth: the same mutable-ref hazard the body
+ *     walk rejects for ObjectPattern declarations (a ref's identity is not a
+ *     complete witness for its contents);
+ *   - array patterns: destructuring runs the iterator protocol, which is
+ *     arbitrary user code on a non-Array prop;
+ *   - rest (`...rest`) with anything but a plain Identifier target.
+ * Rest itself is admitted: object rest is an engine-level own-property copy of
+ * the same snapshot, and spread-bearing call sites never receive a region
+ * anyway (callSiteOk excludes them), so a getter-bearing props object cannot
+ * reach a cached region.
+ */
+function isAutoMemoPropsParam(param) {
+	if (param == null) return false;
+	if (param.type === 'Identifier') return true;
+	if (param.type !== 'ObjectPattern') return false;
+	const admissible = (pattern) => {
+		if (pattern == null || pattern.type !== 'ObjectPattern') return false;
+		for (const p of pattern.properties || []) {
+			if (p.type === 'RestElement') {
+				if (p.argument?.type !== 'Identifier') return false;
+				continue;
+			}
+			if (p.type !== 'Property' || p.computed) return false;
+			const key = p.key?.name ?? p.key?.value;
+			if (key === 'current') return false;
+			const value = p.value;
+			if (value?.type === 'Identifier') continue;
+			if (!admissible(value)) return false;
+		}
+		return true;
+	};
+	return admissible(param);
 }
 
 /**
@@ -6953,6 +7125,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 				eligible: false,
 				autoMemoSafe: false,
 				autoMemoCallsitesSafe: true,
+				autoMemoLocalHazards: null,
 				autoMemoCaptures: [],
 				autoMemoComponentDeps: [],
 				autoMemoImportedComponents: [],
@@ -6985,16 +7158,26 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		if (compNode.body.render) stmts.push(compNode.body.render);
 		const root = b.block(stmts);
 		const free = collectFreeIdentifiers(root, locals);
-		const { importedComponents: autoMemoImportedComponents, readsDeferredRef } = scanComponentBody(
+		const { importedComponents: autoMemoImportedComponents } = scanComponentBody(
 			root,
 			ctx.importedNames,
 		);
-		// Both proofs below ask this of the same root. Kept lazy because the
-		// short-circuits ahead of each use skip it entirely for some components.
+		// The callee-side proof below asks this of the same root. Kept lazy because
+		// the short-circuits ahead of its use skip it entirely for some components.
 		let importedMemberRead = null;
 		const readsImportedMember = () =>
 			(importedMemberRead ??= containsImportedMemberRead(root, ctx.importedNames));
-		let autoMemoCallsitesSafe = !readsDeferredRef && !readsImportedMember();
+		// Call-site regions inside this body are gated per site: the site's own
+		// props are walked directly (containsAutoMemoUnsafeStructure /
+		// containsImportedMemberRead over the JSX node), and ref/imported-member
+		// reads laundered through a body local are carried by this hazard set —
+		// a site whose free identifiers touch a tainted local falls back. The
+		// free-name loop below still vetoes the whole body for names no dep can
+		// witness at all (boundary wrappers, namespaces, ambient module state).
+		const autoMemoLocalHazards = ctx.autoMemo
+			? collectAutoMemoLocalHazards(stmts, ctx.importedNames)
+			: null;
+		let autoMemoCallsitesSafe = true;
 		for (const name of free) {
 			if (
 				ctx._octaneBoundaryNames.has(name) ||
@@ -7008,13 +7191,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 				break;
 			}
 		}
-		// autoMemo's first proof is intentionally narrower than lite eligibility.
-		// It models a pure component as a function of one ordinary props snapshot;
-		// destructuring/default/rest parameters can be admitted once their evaluation
-		// is included in the shared dependency/purity analysis.
+		// autoMemo models a pure component as a function of one ordinary props
+		// snapshot. A destructuring param is that same snapshot read once at
+		// entry, admitted only while the pattern evaluates no expressions of its
+		// own — see isAutoMemoPropsParam for the exact fail-closed shapes
+		// (defaults, computed keys, `current`, array patterns).
 		const ordinaryPropsParam =
 			(compNode.params?.length ?? 0) <= 1 &&
-			(compNode.params?.length !== 1 || compNode.params[0]?.type === 'Identifier');
+			(compNode.params?.length !== 1 || isAutoMemoPropsParam(compNode.params[0]));
 		let autoMemoSafe =
 			ordinaryPropsParam &&
 			!containsRenderCall(stmts, ctx) &&
@@ -7052,6 +7236,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		}
 		info.autoMemoSafe = autoMemoSafe;
 		info.autoMemoCallsitesSafe = autoMemoCallsitesSafe;
+		info.autoMemoLocalHazards = autoMemoLocalHazards;
 		info.autoMemoCaptures = autoMemoSafe ? autoMemoCaptures.sort() : [];
 		info.autoMemoComponentDeps = autoMemoSafe ? autoMemoComponentDeps.sort() : [];
 		info.autoMemoImportedComponents = autoMemoSafe ? [...autoMemoImportedComponents].sort() : [];
@@ -10854,11 +11039,13 @@ function compileComponent(node, ctx, options) {
 	// locals.
 	const prevLocals = ctx.currentComponentLocals;
 	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
+	const prevAutoMemoLocalHazards = ctx.currentAutoMemoLocalHazards;
 	const prevKnownStr = ctx.knownStringLocals;
 	const prevProfileComponentId = ctx.currentProfileComponentId;
 	const previousComponentOwner = ctx.currentComponentOwner;
 	ctx.currentComponentLocals = collectComponentLocals(node);
 	ctx.currentAutoMemoCallsitesSafe = ctx.componentInfo.get(name)?.autoMemoCallsitesSafe !== false;
+	ctx.currentAutoMemoLocalHazards = ctx.componentInfo.get(name)?.autoMemoLocalHazards ?? null;
 	ctx.knownStringLocals = collectKnownStringLocals(node);
 	ctx.currentComponentOwner = owner;
 	if (ctx.profile) ctx.currentProfileComponentId = profileComponentId(ctx, name, node);
@@ -10876,6 +11063,7 @@ function compileComponent(node, ctx, options) {
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
+		ctx.currentAutoMemoLocalHazards = prevAutoMemoLocalHazards;
 		ctx.knownStringLocals = prevKnownStr;
 		ctx.currentProfileComponentId = prevProfileComponentId;
 		ctx.currentComponentOwner = previousComponentOwner;
@@ -14243,11 +14431,13 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
 	const prevLocals = ctx.currentComponentLocals;
 	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
+	const prevAutoMemoLocalHazards = ctx.currentAutoMemoLocalHazards;
 	const prevMapTemps = ctx.currentMapTemps;
 	const mapTemps = [];
 	ctx._valueDirectiveLowering = lowerBodyValueDirective;
 	ctx.currentComponentLocals = collectComponentLocals(node);
 	ctx.currentAutoMemoCallsitesSafe = ctx.componentInfo.get(name)?.autoMemoCallsitesSafe !== false;
+	ctx.currentAutoMemoLocalHazards = ctx.componentInfo.get(name)?.autoMemoLocalHazards ?? null;
 	ctx.currentMapTemps = mapTemps;
 	let newStatements;
 	try {
@@ -14295,6 +14485,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
+		ctx.currentAutoMemoLocalHazards = prevAutoMemoLocalHazards;
 		ctx.currentMapTemps = prevMapTemps;
 	}
 	if (
@@ -21898,7 +22089,13 @@ function makeCompCall(
 					}
 					for (const name of free) {
 						if (name === compName) continue;
-						if (ctx.importNamespaceNames.has(name)) {
+						if (
+							ctx.importNamespaceNames.has(name) ||
+							// A local laundering a ref or live-import member read (see
+							// collectAutoMemoLocalHazards) — its per-render value is not a
+							// complete witness, so the site keeps ordinary entry semantics.
+							ctx.currentAutoMemoLocalHazards?.has(name) === true
+						) {
 							depsSafe = false;
 						} else if (ctx.currentComponentLocals.has(name) || ctx.importedNames.has(name)) {
 							if (!callsiteDeps.coveredRoots.has(name)) deps.add(name);

@@ -18,6 +18,18 @@ function Rows(props) @{
 	</ul>
 }
 
+// The destructured-param twin of Rows: `{ items }` is the same one-props
+// snapshot read at entry, so the caller's region caches this list by the same
+// dependency — while context refreshes and child state must behave exactly as
+// they do for the props-object form above.
+function DestructuredRows({ items }: { items: { id: number; label: string }[] }) @{
+	<ul id="auto-memo-rows-destructured">
+		@for (const item of items; key item.id) {
+			<AutoMemoChild id={'d' + item.id} label={item.label} />
+		}
+	</ul>
+}
+
 // The imported child owns a custom comparator. The compiler-owned region must
 // fall back, so the explicit comparator remains observable.
 function CustomRows() @{
@@ -84,6 +96,7 @@ export function AutoMemoApp() @{
 		>{'item + context'}</button>
 		<AutoMemoContext.Provider value={theme}>
 			<Rows items={items} />
+			<DestructuredRows items={items} />
 		</AutoMemoContext.Provider>
 		<ReturnedValue value={theme} />
 		<CustomRows />

@@ -129,6 +129,10 @@ describe('compiler-owned component-region memoization', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
 		expect(root.find('.own-1').textContent).toBe('t0:a:0');
+		// The destructured-param twin renders through the same cached-region
+		// machinery and must be behaviorally indistinguishable from the
+		// props-object form throughout this scenario.
+		expect(root.find('.own-d1').textContent).toBe('t0:a:0');
 		expect(trailingVersion(root.find('.custom').textContent)).toBe(initialOpaqueVersion);
 		expect(trailingVersion(root.find('.returned-opaque-a').textContent)).toBe(initialOpaqueVersion);
 
@@ -143,13 +147,17 @@ describe('compiler-owned component-region memoization', () => {
 
 		root.click('.own-1');
 		expect(root.find('.own-1').textContent).toBe('t0:a:1');
+		root.click('.own-d1');
+		expect(root.find('.own-d1').textContent).toBe('t0:a:1');
 
 		root.click('#auto-context');
 		expect(root.find('.own-1').textContent).toBe('t0!:a:1');
+		expect(root.find('.own-d1').textContent).toBe('t0!:a:1');
 		expect(root.find('#auto-returned').textContent).toBe('returned t0!');
 
 		root.click('#auto-item');
 		expect(root.find('.own-1').textContent).toBe('t0!:a!:1');
+		expect(root.find('.own-d1').textContent).toBe('t0!:a!:1');
 
 		// A dependency miss and Provider change can commit in the same render. The
 		// changed row re-enters through the keyed list, while the unchanged row must
@@ -157,6 +165,8 @@ describe('compiler-owned component-region memoization', () => {
 		root.click('#auto-item-context');
 		expect(root.find('.own-1').textContent).toBe('t0!!:a!!:1');
 		expect(root.find('.own-2').textContent).toBe('t0!!:b:0');
+		expect(root.find('.own-d1').textContent).toBe('t0!!:a!!:1');
+		expect(root.find('.own-d2').textContent).toBe('t0!!:b:0');
 
 		root.unmount();
 	});
@@ -2237,6 +2247,150 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expect(transitiveCapture.match(/const __memoDep[\w$]* = \(?live\)?;/g)).toHaveLength(2);
+	});
+
+	it('memoizes destructured-props callees while pattern-evaluating shapes fall back', () => {
+		// A destructuring param is the same one-props snapshot as `(props)`,
+		// read once at entry, so these callees earn the region cache.
+		const admitted = [
+			`function Child({ rows }) @{ <ul>@for (const r of rows; key r.id) { <li>{r.label}</li> }</ul> }`,
+			`function Child({ rows: list }) @{ <div>{list.length}</div> }`,
+			`function Child({ data: { rows } }) @{ <div>{rows.length}</div> }`,
+			`function Child({ label, ...rest }) @{ <div>{label + rest.suffix}</div> }`,
+		];
+		for (const child of admitted) {
+			const code = compile(
+				`${child}\nexport function App(props) @{ <Child rows={props.rows} label={props.label} data={props.data} /> }`,
+				'auto-memo-destructured.tsrx',
+				{ hmr: false, autoMemo: true },
+			).code;
+			expectCompilerRegion(code);
+			expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot/);
+		}
+
+		// Patterns that evaluate expressions of their own (defaults, computed
+		// keys), read mutable ref contents (`current`), or run the iterator
+		// protocol (array patterns) keep ordinary entry semantics.
+		const rejected = [
+			`import { fallback } from './live'; function Child({ label = fallback }) @{ <div>{label}</div> }`,
+			`import { field } from './live'; function Child({ [field]: value }) @{ <div>{value}</div> }`,
+			`function Child({ current }) @{ <div>{current}</div> }`,
+			`function Child({ box: { current } }) @{ <div>{current}</div> }`,
+			`function Child({ pair: [a, b] }) @{ <div>{a + b}</div> }`,
+			`function Child({ label }, extra) @{ <div>{label}</div> }`,
+		];
+		for (const child of rejected) {
+			// The caller passes only site-clean props, so a fallback here is the
+			// CALLEE pattern's verdict, not a call-site rejection.
+			const code = compile(
+				`${child}\nexport function App(props) @{ <Child label={props.label} box={props.box} pair={props.pair} /> }`,
+				'auto-memo-destructured-fallback.tsrx',
+				{ hmr: false, autoMemo: true },
+			).code;
+			expectNoCompilerRegion(code);
+		}
+	});
+
+	it('scopes ref and live-import laundering to the call sites that read it', () => {
+		// A ref read elsewhere in the body must not veto an unrelated call site:
+		// the site's own props are walked directly, and reads laundered through a
+		// local are carried by the per-local hazard set.
+		const unrelatedRefRead = compile(
+			`import { useRef } from 'octane';
+			 function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const overlayRef = useRef(null);
+				<div>
+					<span ref={overlayRef}>{(overlayRef.current !== null ? 'y' : 'n') as string}</span>
+					<Child value={props.value} />
+				</div>
+			 }`,
+			'auto-memo-hazard-unrelated.tsrx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		expectCompilerRegion(unrelatedRefRead);
+		expect(unrelatedRefRead).toMatch(
+			/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[\w$]*\([^;]*, Child,/,
+		);
+
+		// Laundering the read through locals — directly, transitively, or via a
+		// reassignment whose write site the declaration no longer accounts for —
+		// still keeps ordinary entry semantics for the sites that consume them.
+		// The pattern side of a declaration can carry the read itself (a
+		// `current` binding, a default reading a live import), and hazards can
+		// route through nested-block or loop declarations before reaching a
+		// top-level local; all of these must taint like their expression forms.
+		const launderedLocals = [
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const { current: el } = props.refObj;
+				<Child value={el} />
+			 }`,
+			`import { cell } from './live';
+			 function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const { label = cell.value } = props;
+				<Child value={label} />
+			 }`,
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				let latest = null;
+				for (const sample of props.refObj.current.samples) {
+					latest = sample;
+				}
+				<Child value={latest} />
+			 }`,
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				let out = null;
+				if (props.enabled) {
+					const grabbed = props.refObj.current;
+					out = grabbed;
+				}
+				<Child value={out} />
+			 }`,
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const first = props.refObj.current;
+				const second = first + 1;
+				<Child value={second} />
+			 }`,
+			`import { cell } from './live';
+			 function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				const base = cell.value;
+				const derived = base + 1;
+				<Child value={derived} />
+			 }`,
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				let value = props.base;
+				if (props.useOverlay) value = props.refObj.current;
+				<Child value={value} />
+			 }`,
+		];
+		for (const source of launderedLocals) {
+			const code = compile(source, 'auto-memo-hazard-laundered.tsrx', {
+				hmr: false,
+				autoMemo: true,
+			}).code;
+			expectNoCompilerRegion(code);
+		}
+
+		// A conditionally reassigned plain-value local stays a complete witness
+		// of itself — locals re-initialize on every body entry — so the site
+		// keeps its region.
+		const reassignedClean = compile(
+			`function Child(props) @{ <div>{props.value}</div> }
+			 export function App(props) @{
+				let value = props.base;
+				if (props.flip) value = props.other;
+				<Child value={value} />
+			 }`,
+			'auto-memo-hazard-clean-reassign.tsrx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		expectCompilerRegion(reassignedClean);
 	});
 
 	it('judges each component in a module on its own imported reads', () => {
