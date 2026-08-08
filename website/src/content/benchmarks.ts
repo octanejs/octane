@@ -86,8 +86,8 @@ export interface BenchCard {
 const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'octane-tsrx', label: 'Octane (.tsrx)', color: '#ff415a' },
 	{ key: 'octane-jsx', label: 'Octane (.tsx)', color: '#c98500' },
-	{ key: 'react', label: 'React 19', color: '#1e93b0' },
-	{ key: 'react-compiler', label: 'React Compiler 1.0', color: '#4bafe7' },
+	{ key: 'react', label: 'React 19 + Compiler', color: '#1e93b0' },
+	{ key: 'react-uncompiled', label: 'React 19 (uncompiled control)', color: '#4bafe7' },
 	{ key: 'preact', label: 'Preact 10', color: '#7478fb' },
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
@@ -162,6 +162,21 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		'js-framework',
 		'js-framework',
 		'krausest-style table operations over 1,000 rows — create, replace, partial update, select, swap, remove, clear.',
+		undefined,
+		// Keep only shared timings; insertion/fragment diagnostics in Octane's
+		// baseline are not measured by the reference frameworks.
+		[
+			'run',
+			'replace',
+			'add',
+			'update',
+			'select',
+			'swap',
+			'remove',
+			'runlots',
+			'select_lots',
+			'clear',
+		],
 	),
 	frameworkCard(
 		todoMvc,
@@ -225,7 +240,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		memoWall,
 		'memo-wall',
 		'memo-wall',
-		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. React Compiler is shown separately from vanilla React; Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
+		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. The primary React entry uses React Compiler; an additional, explicitly uncompiled React control isolates the compiler’s effect. Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
 	),
 	frameworkCard(
 		recursiveContext,

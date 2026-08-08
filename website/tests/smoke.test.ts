@@ -131,17 +131,19 @@ describe('website routes', () => {
 		}
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
-		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
-		expect(summaryKeys).not.toContain('react-compiler');
+		expect(summaryKeys).toEqual(expect.arrayContaining(['react', 'preact', 'svelte']));
+		expect(summaryKeys).not.toContain('react-uncompiled');
 
 		const memoWall = FRAMEWORK_CARDS.find((card) => card.id === 'memo-wall')!;
-		expect(memoWall.series.map((series) => series.key)).toContain('react-compiler');
+		expect(memoWall.series.map((series) => series.key)).toEqual(
+			expect.arrayContaining(['react', 'react-uncompiled']),
+		);
 		for (const card of FRAMEWORK_CARDS) {
 			if (card.id !== 'memo-wall') {
 				expect(
 					card.series.map((series) => series.key),
 					card.id,
-				).not.toContain('react-compiler');
+				).not.toContain('react-uncompiled');
 			}
 		}
 	});
@@ -239,6 +241,9 @@ describe('website routes', () => {
 		const explorer = container.querySelector('section.explorer')!;
 		expect(explorer).toBeTruthy();
 		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
+		expect(explorer.querySelector('.explorer-sub')?.textContent).toContain(
+			'Every primary React comparison uses the official React Compiler.',
+		);
 		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
 		const bx = explorer.querySelector('.bx')!;
 		expect(bx).toBeTruthy();
@@ -281,6 +286,12 @@ describe('website routes', () => {
 		const { container } = await renderRoute('/benchmarks');
 
 		expect(container.querySelector('main .benchpage')).toBeTruthy();
+		expect(container.querySelector('.benchpage-sub')?.textContent).toContain(
+			'Every primary React comparison uses the official React Compiler;',
+		);
+		expect(container.querySelector('.benchpage-sub')?.textContent).toContain(
+			'memo-wall also shows an explicitly uncompiled control.',
+		);
 		expect(container.querySelector('.recharts-wrapper')).toBeNull();
 		expect(container.querySelector('.bench-plot-shell')).toBeNull();
 		const sections = [

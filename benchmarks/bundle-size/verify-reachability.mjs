@@ -44,6 +44,24 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		transition: 'next',
 		cleaned: true,
 	},
+	'server-hooks': {
+		first: 0,
+		second: 2,
+		escaped: '&lt;Octane &amp; SSR&gt;',
+	},
+	'server-render': {
+		html: '<main id="minimal-server">Octane</main>',
+		css: '',
+	},
+	'component-owned-effects': {
+		text: 'retained',
+		clicks: 1,
+		clickRegistered: true,
+		auxclickRegistered: false,
+		retainedStyle: true,
+		unusedStyle: false,
+		cleaned: true,
+	},
 	'binding-vanilla': {
 		before: 0,
 		after: 1,

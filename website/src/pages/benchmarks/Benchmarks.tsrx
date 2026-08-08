@@ -74,7 +74,8 @@ export function Benchmarks() @{
 					<p class="benchpage-sub">
 						{'Benchmark score in milliseconds per operation — lower is better. Every chart is the ' +
 							'checked-in baseline from the repo’s own suites: same apps, same hardware, ' +
-							'same run. Reproduce them with '}
+							'same run. Every primary React comparison uses the official React Compiler; ' +
+							'memo-wall also shows an explicitly uncompiled control. Reproduce them with '}
 						<code>pnpm bench:all</code>
 						{', and see '}
 						<a
@@ -101,11 +102,12 @@ export function Benchmarks() @{
 				<section class="benchpage-section" aria-labelledby="bench-frameworks">
 					<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
 					<p class="benchpage-note">
-						Octane compiled from .tsrx and .tsx, against React 19 (with a separate React Compiler
-						comparison where available), Preact 10, Solid, Svelte 5, Ripple and Vue Vapor — each
-						framework’s fixture written the way its docs recommend. The ranked chips on each card
-						are that suite’s one-line reading: every framework’s geometric mean across the card’s
-						operations, relative to Octane, fastest first.
+						Octane compiled from .tsrx and .tsx, against React 19 with the official React Compiler,
+						Preact 10, Solid, Svelte 5, Ripple and Vue Vapor — each framework’s fixture written the
+						way its docs recommend. React Compiler is enabled for every primary React comparison;
+						memo-wall also includes a clearly labeled uncompiled React control. The ranked chips on
+						each card are that suite’s one-line reading: every framework’s geometric mean across the
+						card’s operations, relative to Octane, fastest first.
 					</p>
 					<div class="benchpage-grid">
 						@for (const card of FRAMEWORK_CARDS; key card.id) {

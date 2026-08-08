@@ -8,19 +8,24 @@ const EMPTY_STATE = {
 	mounted: false,
 };
 
+// Keep the shared host's observable benchmark hooks compiler-compatible.
+function exposeBenchmarkHook(name, handler) {
+	window[name] = handler;
+}
+
 export function mountBenchmark(Renderer) {
 	function App() {
 		const [state, setState] = useState(EMPTY_STATE);
 
-		window.__renderMarkdown = (content, mode = 'static') => {
+		exposeBenchmarkHook('__renderMarkdown', (content, mode = 'static') => {
 			flushSync(() => setState({ content, mode, mounted: true }));
-		};
-		window.__unmountMarkdown = () => {
+		});
+		exposeBenchmarkHook('__unmountMarkdown', () => {
 			flushSync(() => setState((current) => ({ ...current, mounted: false })));
-		};
-		window.__reset = () => {
+		});
+		exposeBenchmarkHook('__reset', () => {
 			flushSync(() => setState(EMPTY_STATE));
-		};
+		});
 
 		return (
 			<div className="bench-shell">
