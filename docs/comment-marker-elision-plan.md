@@ -1,6 +1,7 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0-M6 LANDED (2026-07-13; see each phase's note). Follow-up to the
+Status: M0-M7 LANDED (M0-M6 2026-07-13, M7 2026-08-09; see each phase's
+note). Follow-up to the
 website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
@@ -486,11 +487,51 @@ in the framework chunk (the app chunk shrinks by 2 B); the JSX fixture grows
 gzip. This is the counted-marker parser, ownership proof, and no-op guard cost;
 normal app codegen is effectively unchanged.
 
+### M7 — Transitive single-root proof (static multi-hole component children)
+
+**M7 LANDED 2026-08-09 — compiler-only.** The definition-site single-root
+proof (`info.singleRoot`) now resolves `@if`/`@else` bodies through a fixed
+point: a void `@{}` body whose sole root is an `@if` tree where every
+reachable arm renders exactly one plain host OR one qualifying same-module
+component call (bare identifier tag, no key/spread/children, callee proven
+single-root — `collectSingleRootIfDeps`) is stamped single-root, in the same
+pass that already made autoMemo purity transitive. That closes the static
+multi-hole host case for proven callees:
+`<div class="n"><Node/><Node/></div>` (the spa-navigation bench's recursive
+`Node`, whose `@else` arm is a component) previously minted a `comp`/`/comp`
+pair per child slot because the callee failed the host-only proof; both slots
+now take the existing anchorless all-component-children emission +
+componentSlot singleRoot regime. Zero runtime changes: promotion,
+`replaceSharedBlockBoundary` repointing, the first-flip promotion to one
+durable pair, transitions, and Suspense probing all predate this. SSR
+emission and hydration adoption are untouched (client-mount elision only, the
+M1/M2/M4 doctrine); the module-tail `$$singleRoot` stamps carry the widened
+proof to cross-module `2`-sentinel call sites for free.
+
+- Landing measurement (spa-navigation, 1024-leaf route census):
+  octane-tsrx **4,093 → 1** comment (react 0 / solid 2,046), elements/text
+  exactly equal (2,052/1,025) — the census is now emitted as deterministic
+  `*_deep` ops with five ratio guards. Same-run medians: nav_mount
+  1.80 → **1.00 ms** (0.67x solid, 0.91x react), nav_deep 3.10 → **1.70**
+  (0.80x solid), nav_teardown 1.60 → **0.80** (fewer nodes to detach).
+  Work-gate call counts unchanged by construction.
+- Declines stay conservative: fragment/dynamic/member/keyed/spread/children
+  arms, missing `@else` (empty-capable), local shadows, imported or unproven
+  callees, and unresolved cycles all keep the marker pair.
+- Found while testing (pre-existing, dev-only, NOT this change): a hookless
+  lite child that mounts EMPTY inside an anchorless all-component host loses
+  its position when it later renders content (lands after its siblings) —
+  lite has no range and the inner `@if`'s insertion anchor is null. Tracked
+  as a spawned fix task; prod is unaffected (autoMemo forces the slot path).
+
 **Still open (small or order-constrained — diminishing returns):**
 
 1. Multi-hole hosts: the remaining ~684 empty anchors on `/` are
    order-bearing (`<g>{a}{b}</g>` — siblings need stable positions); eliding
-   them needs per-hole neighbor bookkeeping. Biggest remaining bucket.
+   them needs per-hole neighbor bookkeeping. Biggest remaining bucket for
+   VALUE holes; static component children are M7-covered when the callee
+   proof holds. `@switch`-root bodies and optimistic self-recursive arms are
+   natural M7 extensions.
 2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
 3. Sole-root `@switch` construct inherit + children-render-fn /
    value-position sole roots (M3 leftovers).
@@ -501,7 +542,7 @@ normal app codegen is effectively unchanged.
 
 ### Ordering & measured effect
 
-M0 → M1 → M2 → M3 → M4 → M5 → M6. M1-M5 remove ranges at the
+M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7. M1-M5 and M7 remove ranges at the
 compiler/runtime source for client-created content; M6 complements them by
 compacting redundant ranges that must remain explicit in the SSR wire format.
 The original home-page report's 40-opening wrapper prefix fell to 19 before
