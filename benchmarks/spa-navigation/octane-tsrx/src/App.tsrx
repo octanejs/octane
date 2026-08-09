@@ -13,16 +13,34 @@ import { useState } from 'octane';
 const D = 10; // 1024 leaves, 1023 interior nodes
 const NESTED_D = 5; // 32 leaves, 31 interior nodes
 
-let _setRoute = null;
-export function navigate(route) {
+type Route = 'a' | 'b' | 'a/x' | 'a/y';
+
+interface PathProps {
+	path: string;
+}
+
+interface NodeProps extends PathProps {
+	depth: number;
+}
+
+interface NestedLayoutProps {
+	section: 'x' | 'y';
+}
+
+interface RouteProps {
+	route: Route;
+}
+
+let _setRoute: ((route: Route) => void) | null = null;
+export function navigate(route: Route) {
 	if (_setRoute) _setRoute(route);
 }
 
-function Leaf(props) @{
+function Leaf(props: PathProps) @{
 	<span class="leaf">{props.path as string}</span>
 }
 
-function Node(props) @{
+function Node(props: NodeProps) @{
 	@if (props.depth > 0) {
 		<div class="n">
 			<Node depth={props.depth - 1} path={props.path + 'L'} />
@@ -59,7 +77,7 @@ function SectionY() @{
 
 // The nested layout survives an x -> y navigation: same component, same
 // position, so only its routed child is replaced.
-function NestedLayout(props) @{
+function NestedLayout(props: NestedLayoutProps) @{
 	<div class="layout" data-layout="a">
 		<div class="outlet-inner">
 			@if (props.section === 'x') {
@@ -71,7 +89,7 @@ function NestedLayout(props) @{
 	</div>
 }
 
-export default function App(props) @{
+export default function App(props: RouteProps) @{
 	const [route, setRoute] = useState(props.route);
 	_setRoute = setRoute;
 	<div class="shell">

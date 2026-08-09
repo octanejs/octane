@@ -1,3 +1,5 @@
+/** @jsxImportSource octane */
+
 import { useState } from 'octane';
 
 // JSX twin of octane-tsrx's App.tsrx over the same octane core: same routes,
@@ -6,16 +8,34 @@ import { useState } from 'octane';
 const D = 10; // 1024 leaves, 1023 interior nodes
 const NESTED_D = 5; // 32 leaves, 31 interior nodes
 
-let _setRoute = null;
-export function navigate(route) {
+type Route = 'a' | 'b' | 'a/x' | 'a/y';
+
+interface PathProps {
+	path: string;
+}
+
+interface NodeProps extends PathProps {
+	depth: number;
+}
+
+interface NestedLayoutProps {
+	section: 'x' | 'y';
+}
+
+interface RouteProps {
+	route: Route;
+}
+
+let _setRoute: ((route: Route) => void) | null = null;
+export function navigate(route: Route) {
 	if (_setRoute) _setRoute(route);
 }
 
-function Leaf(props) {
+function Leaf(props: PathProps) {
 	return <span className="leaf">{props.path}</span>;
 }
 
-function Node(props) {
+function Node(props: NodeProps) {
 	if (props.depth > 0) {
 		return (
 			<div className="n">
@@ -59,7 +79,7 @@ function SectionY() {
 	);
 }
 
-function NestedLayout(props) {
+function NestedLayout(props: NestedLayoutProps) {
 	return (
 		<div className="layout" data-layout="a">
 			<div className="outlet-inner">{props.section === 'x' ? <SectionX /> : <SectionY />}</div>
@@ -67,13 +87,13 @@ function NestedLayout(props) {
 	);
 }
 
-function Outlet(props) {
+function Outlet(props: RouteProps) {
 	if (props.route === 'a') return <PageA />;
 	if (props.route === 'b') return <PageB />;
 	return <NestedLayout section={props.route === 'a/x' ? 'x' : 'y'} />;
 }
 
-export default function App(props) {
+export default function App(props: RouteProps) {
 	const [route, setRoute] = useState(props.route);
 	_setRoute = setRoute;
 	return (

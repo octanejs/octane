@@ -7,7 +7,8 @@
   "scripts": {
     "bench": "node run.mjs",
     "bench:work": "node work.mjs",
-    "bench:long": "node run.mjs 40"
+    "bench:long": "node run.mjs 40",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "playwright": "catalog:default"
