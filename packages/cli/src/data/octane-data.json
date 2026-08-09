@@ -189,6 +189,18 @@
       "verified": "2026-07-13"
     },
     {
+      "name": "@octanejs/inertia",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "@inertiajs/react", "version": "3.6.1" },
+      "surface": "Octane Inertia 3.6.1 adapter foundation: framework-neutral router, HTTP client, progress, and server exports reuse @inertiajs/core unchanged; page, remember, poll, prefetch, form-state, router-submit, direct-HTTP, precognition, and layout-property hooks are ported to Octane.",
+      "divergences": [
+        "React, ReactDOM, StrictMode, forwardRef, and synthetic events are not runtime dependencies; the Octane adapter uses Octane roots, refs-as-props, and native events."
+      ],
+      "ssr": "The framework-neutral Inertia server entry is exposed. Hook initialization is request-local and covered in the server runtime; Octane page rendering and hydration are completed by the adapter SSR unit.",
+      "verified": "2026-07-30"
+    },
+    {
       "name": "@octanejs/jotai",
       "version": "0.1.29",
       "category": "Shared state",
@@ -850,6 +862,7 @@
     "@base-ui-components/react": "@octanejs/base-ui",
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@floating-ui/react": "@octanejs/floating-ui",
+    "@inertiajs/react": "@octanejs/inertia",
     "@lexical/react": "@octanejs/lexical",
     "@livestore/react": "@octanejs/livestore",
     "@mantine/hooks": "@octanejs/mantine-hooks",

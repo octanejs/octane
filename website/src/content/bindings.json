@@ -25,6 +25,7 @@
       "@octanejs/tanstack-router",
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
+      "@octanejs/inertia",
       "@octanejs/nuqs"
     ]
   },

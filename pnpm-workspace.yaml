@@ -160,6 +160,8 @@ catalogs:
     viem: 2.55.10
     wagmi: 3.7.4
     '@graphql-typed-document-node/core': ^3.2.0
+    '@inertiajs/core': 3.6.1
+    '@inertiajs/react': 3.6.1
     '@lucide/icons': 1.24.0
     '@phosphor-icons/core': 2.1.1
     '@babel/core': 7.29.7
@@ -374,6 +376,7 @@ catalogs:
     d3-voronoi: ^1.1.4
     'decimal.js-light': ^2.5.1
     'es-toolkit': ^1.49.0
+    'laravel-precognition': ^2.0.0
     eventemitter3: ^5.0.4
     fast-equals: ^5.4.1
     immer: ^11.1.15

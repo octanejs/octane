@@ -1,0 +1,73 @@
+{
+  "name": "@inertiajs/react",
+  "version": "3.6.1",
+  "license": "MIT",
+  "description": "The React adapter for Inertia.js",
+  "contributors": [
+    "Jonathan Reinink <jonathan@reinink.ca>",
+    "Sebastian De Deyne <sebastiandedeyne@gmail.com>"
+  ],
+  "homepage": "https://inertiajs.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inertiajs/inertia.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/inertiajs/inertia/issues"
+  },
+  "files": [
+    "dist",
+    "types",
+    "resources"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./types/server.d.ts",
+      "import": "./dist/server.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "server": [
+        "types/server.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "pnpm clean && ./build.js && tsc",
+    "build:with-deps": "./build.js --with-deps",
+    "clean": "rm -rf types && rm -rf dist",
+    "dev": "pnpx concurrently -c \"#ffcf00,#3178c6\" \"pnpm dev:build\" \"pnpm dev:types\" --names build,types",
+    "dev:build": "./build.js --watch",
+    "dev:types": "tsc --watch --preserveWatchOutput",
+    "es2022-check": "pnpm build:with-deps && es-check es2022 \"dist/index.js\" --checkFeatures --module --noCache --verbose"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "axios": "^1.17.0",
+    "es-check": "^9.6.1",
+    "esbuild": "^0.28.1",
+    "esbuild-node-externals": "^1.23.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^6.0.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@inertiajs/core": "workspace:*",
+    "es-toolkit": "^1.33.0",
+    "laravel-precognition": "^2.0.0"
+  }
+}

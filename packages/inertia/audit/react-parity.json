@@ -1,0 +1,205 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/inertiajs/inertia.git",
+    "version": "3.6.1",
+    "commit": "68b13b662d7a6ecdd504026ee18733192b0c7d73",
+    "sourceRoot": "packages/react",
+    "testRoot": "tests",
+    "license": "MIT",
+    "integrity": "sha256:15742c04ce626d9f02d78be4c0550dc95a221410e47e1688ebc060a0d7fd2d47",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/inertia/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/inertia/tests/adapted"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 2,
+    "uniqueIdentities": 2,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5966e99698b5f8099e3ef2e62625cc31f3a3e60305f1def8d4066c6cd9f98824"
+    }
+  },
+  "lanes": [
+    {
+      "id": "inertia-adapted-use-page",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "inertia-adapted",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Cited adapted usePage cases against packages/inertia/upstream/src/usePage.ts at the pinned commit. Upstream ships no unit suite for this module.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/inertia/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/inertia/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "6944ba5e9a9d2d2fcefd07cdec708aa7c39faaf68564c40138180703f1244c62"
+        },
+        {
+          "path": "packages/inertia/tests/adapted/use-page.test.ts",
+          "role": "support",
+          "sha256": "d29ff55e734997bfdb60c618c290efdc3ea3bba5593065d3a189975b8b1e9879"
+        },
+        {
+          "path": "packages/inertia/tests/_fixtures/page-provider.tsrx",
+          "role": "support",
+          "sha256": "29f535ea46ee9bbdf505ecb9d712ed2181bf4f4eac651ad5ccbbd6d60f972c7f"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "d446728cc3750311d1333dd0ace2e1a6b204484769999d2574c89467a91f268b"
+        }
+      ]
+    },
+    {
+      "id": "inertia-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "inertia-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same usePage fixture runs through Octane and @inertiajs/react@3.6.1 via the shared differential rig.",
+      "files": [
+        {
+          "path": "packages/inertia/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "79e02b9aa2a1531332f6fbfaa9af82266da47892f02d3526d72a96eb8fc2e2e1",
+          "cases": [
+            {
+              "id": "differential:use-page",
+              "testName": "usePage: mount and page swap render byte-identical",
+              "fullName": "differential: @octanejs/inertia vs @inertiajs/react 3.6.1 usePage: mount and page swap render byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/inertia/tests/_fixtures/use-page-diff.tsrx",
+          "role": "support",
+          "sha256": "de7b09a8b39559d008db1ce44697754a4ab9c2ba40a6597ec0e09fc524cf5327"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "packages/inertia/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "cac818480214c96c8f15a1fa0e2d18a4d8c16569fe7244930e5c3415adefeca9"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "d446728cc3750311d1333dd0ace2e1a6b204484769999d2574c89467a91f268b"
+        }
+      ]
+    },
+    {
+      "id": "inertia-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "inertia-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Port-authored React declaration probes against @inertiajs/react@3.6.1 with tsc.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/inertia/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/inertia/typetests/pristine/types.test-d.ts",
+          "role": "test",
+          "sha256": "54d5df375da0bdbd13f68aedf302602dbdddc0b85eede30a5ee0b302561d6051",
+          "cases": [
+            {
+              "id": "types:pristine",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/inertia/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "5a943d352a83f1679530a12c3aafe7a74c77355572b06d69cedb410760b8dd7f"
+        },
+        {
+          "path": "packages/inertia/typetests/assertions.md",
+          "role": "support",
+          "sha256": "0069653116e765e51b4f578f6f3364dc19528e8f55f53961672443290a307a30"
+        }
+      ]
+    },
+    {
+      "id": "inertia-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "inertia-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Matching Octane public probes against @octanejs/inertia with tsrx-tsc. Permitted transformations are listed in typetests/assertions.md.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/inertia/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/inertia/typetests/adapted/types.test-d.ts",
+          "role": "test",
+          "sha256": "c4d62c7af2e053048b3f4498eb9954757f4bd4f7f3a98742776b8279a30cf865",
+          "cases": [
+            {
+              "id": "types:adapted",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/inertia/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "10d7595dbc3f15d29014f1e19a5b56867631718a93c3c0fd2c71717236608d92"
+        },
+        {
+          "path": "packages/inertia/typetests/assertions.md",
+          "role": "support",
+          "sha256": "0069653116e765e51b4f578f6f3364dc19528e8f55f53961672443290a307a30"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

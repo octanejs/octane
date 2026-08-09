@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**71 publishable package(s), including 57 framework binding(s) and 3 framework integration(s).**
+**72 publishable package(s), including 58 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -30,6 +30,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.31` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.29` | 1 |
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.27` | 3 |
+| `@octanejs/inertia` | [`packages/inertia`](../packages/inertia) | framework binding | `0.0.1` | 3 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.29` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.31` | 42 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.2` | 2 |

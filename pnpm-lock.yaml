@@ -69,6 +69,12 @@ catalogs:
     '@graphql-typed-document-node/core':
       specifier: ^3.2.0
       version: 3.2.0
+    '@inertiajs/core':
+      specifier: 3.6.1
+      version: 3.6.1
+    '@inertiajs/react':
+      specifier: 3.6.1
+      version: 3.6.1
     '@internationalized/date':
       specifier: ^3.12.2
       version: 3.12.2
@@ -627,6 +633,9 @@ catalogs:
     jsdom:
       specifier: ^30.0.1
       version: 30.0.1
+    laravel-precognition:
+      specifier: ^2.0.0
+      version: 2.0.0
     lexical:
       specifier: 0.46.0
       version: 0.46.0
@@ -4559,6 +4568,46 @@ importers:
       react-i18next:
         specifier: catalog:default
         version: 17.0.9(i18next@26.3.6(typescript@5.9.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
+  packages/inertia:
+    dependencies:
+      '@inertiajs/core':
+        specifier: catalog:default
+        version: 3.6.1(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))
+      es-toolkit:
+        specifier: catalog:default
+        version: 1.49.0
+      laravel-precognition:
+        specifier: catalog:default
+        version: 2.0.0(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))
+    devDependencies:
+      '@inertiajs/react':
+        specifier: catalog:default
+        version: 3.6.1(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@octanejs/testing-library':
+        specifier: workspace:*
+        version: link:../testing-library
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.56(react@19.2.7)
+      '@types/react':
+        specifier: catalog:default
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: catalog:default
+        version: 19.2.3(@types/react@19.2.17)
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -9482,6 +9531,20 @@ packages:
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [x64]
     os: [win32]
+
+  '@inertiajs/core@3.6.1':
+    resolution: {integrity: sha512-h6+qqkKfpcoZvxWENy/F5yyiD00PIm8lK+ruQkt6HGk4d3N0LMS9GeUbWVQ4+TDZzIxP/vQLurPktnYvDhYeew==}
+    peerDependencies:
+      axios: ^1.15.2
+    peerDependenciesMeta:
+      axios:
+        optional: true
+
+  '@inertiajs/react@3.6.1':
+    resolution: {integrity: sha512-z5TJIj80TmLqhJE6FD6RwfmbcYPFuMT63orrXayLW084yYAKLye4i9aeeCt6+mDxC1hMMP16Uf68ePiLtl0saA==}
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
 
   '@inquirer/external-editor@1.0.3':
     resolution: {integrity: sha512-RWbSrDiYmO4LbejWY7ttpxczuwQyZLBUyygsA9Nsv95hpzUWwnNTVQmAq3xuh7vNwCp07UTmE5i11XAEExx4RA==}
@@ -18840,6 +18903,14 @@ packages:
   kubernetes-types@1.30.0:
     resolution: {integrity: sha512-Dew1okvhM/SQcIa2rcgujNndZwU8VnSapDgdxlYoB84ZlpAD43U6KLAFqYo17ykSFGHNPrg0qry0bP+GJd9v7Q==}
 
+  laravel-precognition@2.0.0:
+    resolution: {integrity: sha512-dmA4HGc9m+TsVNsJs9/XQBI8u6j7coilN+qKkBuhuXQzH3HypwS/c5dFQ4UqUGjBbcxIM7zdk91kM/SRZwIvWQ==}
+    peerDependencies:
+      axios: ^1.4.0
+    peerDependenciesMeta:
+      axios:
+        optional: true
+
   latest-version@7.0.0:
     resolution: {integrity: sha512-KvNT4XqAMzdcL6ka6Tl3i2lYeFDgXNCuIX+xNx6ZMVR1dFq+idXd9FLKNMOIx0t9mJ9/HudyX4oZWXZQ0UJHeg==}
     engines: {node: '>=14.16'}
@@ -26733,6 +26804,24 @@ snapshots:
 
   '@img/sharp-win32-x64@0.34.5':
     optional: true
+
+  '@inertiajs/core@3.6.1(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))':
+    dependencies:
+      '@jridgewell/trace-mapping': 0.3.31
+      es-toolkit: 1.49.0
+      laravel-precognition: 2.0.0(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))
+    optionalDependencies:
+      axios: 1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+
+  '@inertiajs/react@3.6.1(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@inertiajs/core': 3.6.1(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))
+      es-toolkit: 1.49.0
+      laravel-precognition: 2.0.0(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2))
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+    transitivePeerDependencies:
+      - axios
 
   '@inquirer/external-editor@1.0.3(@types/node@24.13.3)':
     dependencies:
@@ -38331,6 +38420,12 @@ snapshots:
   kolorist@1.8.0: {}
 
   kubernetes-types@1.30.0: {}
+
+  laravel-precognition@2.0.0(axios@1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)):
+    dependencies:
+      es-toolkit: 1.49.0
+    optionalDependencies:
+      axios: 1.18.1(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
 
   latest-version@7.0.0:
     dependencies:
