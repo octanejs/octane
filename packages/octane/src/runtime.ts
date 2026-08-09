@@ -577,6 +577,14 @@ export interface Block extends Scope {
 	 * (the host-element-with-component-children renderer). Null for every other Block.
 	 */
 	deoptNode: Node | null;
+	/**
+	 * True when a de-opt descriptor carrying a `ref` was stamped anywhere in this
+	 * block's subtree. Set at stamp time and propagated up the parentBlock chain
+	 * (monotone — never cleared). Gates the teardown ref-detach walk over
+	 * `deoptNode`: a region that never stamped a ref has nothing to detach, so
+	 * the per-DOM-node descriptor scan is skipped entirely.
+	 */
+	deoptRefs: boolean;
 	/** Set on item Blocks: pointer to the enclosing for-block's slot. */
 	forSlot: ForSlot | null;
 	/** Item position within the enclosing for-block. 0 for non-item blocks. */
@@ -4369,6 +4377,8 @@ class BlockImpl {
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
 	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
 	deoptNode: Node | null;
+	// A de-opt descriptor with a `ref` was stamped in this subtree (see Block).
+	deoptRefs: boolean;
 	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
 	slots: any[];
@@ -4441,6 +4451,7 @@ class BlockImpl {
 		this.effectEventRenderVersion = 0;
 		this.effectEventCompletedVersion = 0;
 		this.deoptNode = null;
+		this.deoptRefs = false;
 		this.slots = [];
 		this.forSlot = null;
 		this.prevSibling = null;
@@ -5078,10 +5089,28 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 	// (batchClearItems, clearChildContent) remove the DOM themselves, but the
 	// teardown is just as permanent. Before unmountScope: a deleted host's ref
 	// detaches before its component descendants' cleanups (React's pre-order
-	// deletion walk).
-	if (block.deoptNode !== null) detachDeoptTreeRefs(block.deoptNode, null);
+	// deletion walk). `deoptRefs` gates the walk: it is set (and propagated up
+	// the parentBlock chain) whenever a descriptor carrying a ref is stamped
+	// anywhere in this block's subtree, so a ref-free region skips the
+	// whole-DOM descriptor scan.
+	if (block.deoptNode !== null && block.deoptRefs) detachDeoptTreeRefs(block.deoptNode, null);
+	// When THIS call removes the block's entire DOM range below, descendants must
+	// not detach their own ranges first: every non-portal descendant's DOM lies
+	// inside this range (portals always self-detach — unmountScopeChildrenAndSlotsOnly
+	// forces their flag), so one wholesale removal replaces O(nodes) removeChild
+	// calls, and every deletion cleanup observes the subtree still attached —
+	// React's commitDeletionEffects order, which runs all destroys before it
+	// detaches the single host. A cleanup that itself moves or removes the
+	// block's markers forfeits the removal (the loop below guards on the live
+	// parent), exactly as it would have forfeited its own range before.
+	const removesOwnDom =
+		detachDom &&
+		(block.kind === 'root' ||
+			(block.startMarker !== null &&
+				block.endMarker !== null &&
+				block.startMarker.parentNode !== null));
 	// Depth-first cleanup of all scopes reachable from this block.
-	unmountScope(block, detachDom);
+	unmountScope(block, detachDom && !removesOwnDom);
 	if (!detachDom) return;
 	// Remove DOM range.
 	if (block.startMarker && block.endMarker) {
@@ -16371,11 +16400,32 @@ export function positionalChildren(children: any[]): any[] {
 	return children;
 }
 
+// Whether ANY de-opt descriptor carrying a `ref` was ever stamped (monotone).
+// Gates every detachDeoptTreeRefs walk: an app that never puts a ref on a
+// de-opt element never pays the per-DOM-node descriptor scan on teardown.
+let DEOPT_REFS_STAMPED = false;
+
+// Record a stamped de-opt ref on its owner block and every ancestor, so the
+// teardown walk over any enclosing `deoptNode` region knows refs may be below.
+// The early exit bounds repeat stamping: the chain above the first flagged
+// block is already flagged.
+function noteDeoptRef(block: Block): void {
+	DEOPT_REFS_STAMPED = true;
+	let b: Block | null = block;
+	while (b !== null && !b.deoptRefs) {
+		b.deoptRefs = true;
+		b = b.parentBlock;
+	}
+}
+
 // Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
 // setAttribute + `$$type` delegated-event slots + deferred ref attach).
 function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
 	if (name === 'ref') {
-		if (v != null) queueRefAttach(ownerBlock, v, el);
+		if (v != null) {
+			noteDeoptRef(ownerBlock);
+			queueRefAttach(ownerBlock, v, el);
+		}
 	} else if (name === 'className' || name === 'class') {
 		setDeoptClass(el, v);
 	} else if (name === 'style') {
@@ -23212,6 +23262,9 @@ function detachDeoptTreeRefs(
 	ownerScope?: Scope,
 	uncommitted: UncommittedRefAttaches | null = null,
 ): void {
+	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
+	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
+	if (!DEOPT_REFS_STAMPED) return;
 	const ref = getDeoptDesc(node)?.props?.ref;
 	if (ref != null) {
 		if (out !== null) {
@@ -24819,8 +24872,9 @@ function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
 			// Pure-host de-opt item (deoptItemBody with no component descendants):
 			// nothing to unmount scope-wise, but its subtree may carry stamped refs
 			// that must not keep pointing at the batch-removed DOM. Guarded so the
-			// common template-row clear stays a single null check.
-			if (b.deoptNode !== null) detachDeoptTreeRefs(b.deoptNode, null);
+			// common template-row clear stays a single null check; `deoptRefs`
+			// additionally skips the subtree scan for ref-free items.
+			if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
 			b.disposed = true;
 		}
 	}
