@@ -1,5 +1,19 @@
 # @octanejs/three
 
+## 0.1.25
+
+### Patch Changes
+
+- 3152f0b: Reduce universal keyed-scene reconciliation and Three renderer lifecycle and
+  frame-subscriber overhead while preserving object identity, transactional
+  cleanup, and priority ordering.
+- Updated dependencies [d453832]
+- Updated dependencies [3152f0b]
+- Updated dependencies [1c44117]
+- Updated dependencies [cbd55ca]
+- Updated dependencies [cdb501c]
+  - octane@0.1.32
+
 ## 0.1.24
 
 ### Patch Changes

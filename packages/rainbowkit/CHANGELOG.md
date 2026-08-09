@@ -1,5 +1,18 @@
 # @octanejs/rainbowkit
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [d453832]
+- Updated dependencies [3152f0b]
+- Updated dependencies [1c44117]
+- Updated dependencies [cbd55ca]
+- Updated dependencies [cdb501c]
+  - octane@0.1.32
+  - @octanejs/tanstack-query@0.1.31
+  - @octanejs/wagmi@0.0.12
+
 ## 0.0.11
 
 ### Patch Changes

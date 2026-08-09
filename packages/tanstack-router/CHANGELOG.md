@@ -1,5 +1,17 @@
 # @octanejs/tanstack-router
 
+## 0.1.31
+
+### Patch Changes
+
+- d453832: Reduce server-rendering overhead and managed document metadata while preserving streaming, hydration, and router asset identity.
+- Updated dependencies [d453832]
+- Updated dependencies [3152f0b]
+- Updated dependencies [1c44117]
+- Updated dependencies [cbd55ca]
+- Updated dependencies [cdb501c]
+  - octane@0.1.32
+
 ## 0.1.30
 
 ### Patch Changes

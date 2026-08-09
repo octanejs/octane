@@ -1,5 +1,17 @@
 # @octanejs/tanstack-table
 
+## 0.1.29
+
+### Patch Changes
+
+- Updated dependencies [d453832]
+- Updated dependencies [3152f0b]
+- Updated dependencies [1c44117]
+- Updated dependencies [cbd55ca]
+- Updated dependencies [cdb501c]
+  - octane@0.1.32
+  - @octanejs/tanstack-store@0.0.26
+
 ## 0.1.28
 
 ### Patch Changes
