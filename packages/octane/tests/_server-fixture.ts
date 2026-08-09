@@ -51,10 +51,20 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
 	);
 
+	// `export function X` must stay a real function *declaration*: compiled
+	// modules reference exported components by name after the declaration (the
+	// compiler's module tail stamps `X.$$singleRoot = true;`, and sibling
+	// components call each other directly). Strip only the `export ` keyword
+	// here and register the exports at the end of the module — declarations
+	// hoist, so end-of-module registration is safe and also observes any later
+	// reassignment of the binding.
+	const functionExports: string[] = [];
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
-		(_match: string, asyncKeyword: string | undefined, name: string) =>
-			`__exports.${name} = ${asyncKeyword ?? ''}function ${name}`,
+		(_match: string, asyncKeyword: string | undefined, name: string) => {
+			functionExports.push(name);
+			return `${asyncKeyword ?? ''}function ${name}`;
+		},
 	);
 	code = code.replace(
 		/export\s+(const|let|var)\s+(\w+)\s*=/g,
@@ -66,6 +76,10 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 		throw new Error(
 			`Compiled fixture ${id} contains an import/export shape the shared loader cannot evaluate.`,
 		);
+	}
+
+	for (const name of functionExports) {
+		code += `\n__exports.${name} = ${name};`;
 	}
 
 	const evaluate = new Function(
