@@ -26,6 +26,7 @@ import news from '../../../benchmarks/baselines/local/news.json';
 import portalSwarm from '../../../benchmarks/baselines/local/portal-swarm.json';
 import recursiveContext from '../../../benchmarks/baselines/local/recursive-context.json';
 import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.json';
+import spaNavigation from '../../../benchmarks/baselines/local/spa-navigation.json';
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
 import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
 import svgDashboard from '../../../benchmarks/baselines/local/svg-dashboard.json';
@@ -329,6 +330,19 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		'recursive-context',
 		'recursive-context',
 		'A deep recursive tree driven by context updates — mount, root and partial updates, unmount.',
+	),
+	frameworkCard(
+		spaNavigation,
+		'spa-navigation',
+		'spa-navigation',
+		'Full-page client navigation — routed-subtree teardown and mount while the app shell survives, including nested-layout reuse and a 6× CPU-throttled route swap.',
+		{
+			nav_deep: 'deep route swap',
+			nav_teardown: 'deep → nested',
+			nav_mount: 'nested → deep',
+			nav_nested: 'nested route swap',
+			nav_deep_6x: 'deep route swap (6× CPU)',
+		},
 	),
 	frameworkCard(
 		signalFavoring,

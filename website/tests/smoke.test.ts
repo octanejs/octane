@@ -167,20 +167,22 @@ describe('website routes', () => {
 			const keys = card.series.map((series) => series.key);
 			if (card.id === 'svg-dashboard') {
 				expect(keys).toEqual(['octane-tsrx', 'react', 'solid', 'svelte']);
+			} else if (card.id === 'spa-navigation') {
+				expect(keys).toEqual(['octane-tsrx', 'octane-jsx', 'react', 'solid', 'vue-vapor']);
 			} else {
 				expect(keys, card.id).toContain('preact');
 			}
-			if (card.id === 'streaming-ssr') {
+			if (card.id === 'streaming-ssr' || card.id === 'spa-navigation') {
 				expect(keys, card.id).not.toContain('svelte');
 			} else {
 				expect(keys, card.id).toContain('svelte');
 			}
 
 			for (const row of card.rows) {
-				if (card.id !== 'svg-dashboard') {
+				if (card.id !== 'svg-dashboard' && card.id !== 'spa-navigation') {
 					expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
 				}
-				if (card.id !== 'streaming-ssr') {
+				if (card.id !== 'streaming-ssr' && card.id !== 'spa-navigation') {
 					expect(typeof row.svelte, `${card.id}/${row.op}/svelte`).toBe('number');
 				}
 			}

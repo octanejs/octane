@@ -126,6 +126,13 @@ export const HOME_SUMMARY: BenchCard = {
 			'vue-vapor': 1.089363136548616,
 		},
 		{
+			op: 'spa-navigation',
+			'octane-tsrx': 1,
+			react: 0.7876095285861537,
+			solid: 0.8564444703063577,
+			'vue-vapor': 1.1893337025984867,
+		},
+		{
 			op: 'signal-favoring',
 			'octane-tsrx': 1,
 			react: 2.959092712040432,
