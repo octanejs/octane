@@ -3949,6 +3949,24 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'mobx-differential',
+					include: ['packages/mobx/tests/differential/**/*.test.ts'],
+					globalSetup: ['packages/mobx/tests/differential/_setup.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mobx$/,
+							replacement: resolve(import.meta.dirname, 'packages/mobx/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'mobx-ssr',
 					include: ['packages/mobx/tests/ssr/**/*.test.ts'],
 					environment: 'node',

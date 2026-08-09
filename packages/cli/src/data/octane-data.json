@@ -307,7 +307,7 @@
         "React-specific batching, prop-types validation, React DevTools integration, and useDebugValue output are omitted."
       ],
       "ssr": "enableStaticRendering(true) renders observed components without creating a Reaction or retaining observable subscriptions.",
-      "verified": "2026-07-28"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/motion",
