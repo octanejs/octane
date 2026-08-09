@@ -39,6 +39,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'act',
 		'activityBlock',
 		'addTransitionType',
+		'attachBehaviorRoot',
 		'attachRef',
 		'bag0',
 		'bag1',
@@ -204,6 +205,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'never',
 		'visible',
 	],
+	'./behavior': ['attachBehaviorRoot'],
 	'./react/server': ['OctaneCompat'],
 	'./server': [
 		'Activity',
