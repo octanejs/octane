@@ -5,6 +5,7 @@
 // demos. Sources are imported with Vite's `?raw` so the Source tab shows the
 // exact file on disk rather than a copy that can rot.
 import { CommandMenu } from './demos/CommandMenu.tsrx';
+import { AnimeJsDemo } from './demos/AnimeJs.tsrx';
 import { Conditional } from './demos/Conditional.tsrx';
 import { Counter } from './demos/Counter.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
@@ -23,6 +24,7 @@ import { WagmiDemo } from './demos/Wagmi.tsrx';
 import { UseHooksTsDemo } from './demos/UseHooksTs.tsrx';
 
 import commandMenuSource from './demos/CommandMenu.tsrx?raw';
+import animeJsSource from './demos/AnimeJs.tsrx?raw';
 import conditionalSource from './demos/Conditional.tsrx?raw';
 import counterSource from './demos/Counter.tsrx?raw';
 import dynamicSource from './demos/Dynamic.tsrx?raw';
@@ -101,6 +103,12 @@ export const GROUPS: readonly DemoGroup[] = [
 		id: 'components',
 		label: 'Components',
 		demos: [
+			{
+				id: 'animejs',
+				title: 'Anime.js',
+				Component: AnimeJsDemo,
+				source: animeJsSource,
+			},
 			{
 				id: 'cmdk',
 				title: 'Command menu',

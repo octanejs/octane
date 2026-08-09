@@ -489,6 +489,9 @@ catalogs:
     '@wry/trie':
       specifier: ^0.5.0
       version: 0.5.0
+    animejs:
+      specifier: 4.5.0
+      version: 4.5.0
     aria-hidden:
       specifier: ^1.2.6
       version: 1.2.6
@@ -4026,6 +4029,28 @@ importers:
         specifier: catalog:default
         version: 24.13.3
 
+  packages/animejs:
+    dependencies:
+      animejs:
+        specifier: catalog:default
+        version: 4.5.0(@types/three@0.172.0)(three@0.172.0)
+    devDependencies:
+      '@octanejs/three':
+        specifier: workspace:*
+        version: link:../three
+      '@types/three':
+        specifier: catalog:default
+        version: 0.172.0
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      three:
+        specifier: catalog:default
+        version: 0.172.0
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/apollo-client:
     dependencies:
       '@graphql-typed-document-node/core':
@@ -6591,6 +6616,9 @@ importers:
       '@livestore/utils':
         specifier: catalog:default
         version: 0.4.0(63345b1f437bd31f8b3d7223d3dcd0ec)
+      '@octanejs/animejs':
+        specifier: workspace:*
+        version: link:../../packages/animejs
       '@octanejs/aria':
         specifier: workspace:*
         version: link:../../packages/aria
@@ -6633,6 +6661,9 @@ importers:
       '@octanejs/tanstack-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-query
+      '@octanejs/three':
+        specifier: workspace:*
+        version: link:../../packages/three
       '@octanejs/usehooks-ts':
         specifier: workspace:*
         version: link:../../packages/usehooks-ts
@@ -6660,6 +6691,9 @@ importers:
       tailwind-merge:
         specifier: catalog:default
         version: 3.6.0
+      three:
+        specifier: catalog:default
+        version: 0.172.0
     devDependencies:
       '@tailwindcss/vite':
         specifier: catalog:default
@@ -14845,6 +14879,17 @@ packages:
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
+
+  animejs@4.5.0:
+    resolution: {integrity: sha512-NQimYX+lz8WaXonGS9zVVoviCIAjONeJayxacUditaivYLqyXgGjFKjuyl0aUUhFKm5MriX9ty1TGovNzoJQWA==}
+    peerDependencies:
+      '@types/three': '>=0.150.0'
+      three: '>=0.150.0'
+    peerDependenciesMeta:
+      '@types/three':
+        optional: true
+      three:
+        optional: true
 
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
@@ -32988,6 +33033,11 @@ snapshots:
       fast-uri: 3.1.4
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+
+  animejs@4.5.0(@types/three@0.172.0)(three@0.172.0):
+    optionalDependencies:
+      '@types/three': 0.172.0
+      three: 0.172.0
 
   ansi-align@3.0.1:
     dependencies:

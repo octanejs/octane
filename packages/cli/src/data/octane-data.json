@@ -1,6 +1,25 @@
 {
   "bindings": [
     {
+      "name": "@octanejs/animejs",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "animejs",
+        "version": "4.5.0",
+        "source": "https://github.com/juliangarnier/anime/tree/v4.5.0",
+        "license": "MIT"
+      },
+      "surface": "Anime.js is re-exported unchanged; `useAnimeScope` binds scoped DOM animation setup, refresh, dependency recreation, and cleanup to Octane, and `@octanejs/animejs/adapters/three` exposes Anime.js's official Three adapter.",
+      "divergences": [
+        "`useAnimeScope` is an Octane-native lifecycle helper; it is not an upstream Anime.js API.",
+        "Only the root and `adapters/three` entry points are re-exported; other Anime.js subpaths are explicit gaps whose APIs remain available from the supported root where upstream exposes them there.",
+        "The Three adapter mutates raw objects while `@octanejs/three` retains frame-loop ownership; demand and never loops require explicit invalidation or advancement."
+      ],
+      "ssr": "Supported. The hook returns inert refs during server rendering and creates no Anime.js scope until its client effect runs.",
+      "verified": "2026-07-30"
+    },
+    {
       "name": "@octanejs/apollo-client",
       "version": "0.1.26",
       "category": "AI, data, and routing",
@@ -888,6 +907,7 @@
     "@visx/wordcloud": "@octanejs/visx",
     "@visx/xychart": "@octanejs/visx",
     "@visx/zoom": "@octanejs/visx",
+    "animejs": "@octanejs/animejs",
     "cmdk": "@octanejs/cmdk",
     "dexie-react-hooks": "@octanejs/dexie",
     "framer-motion": "@octanejs/motion",

@@ -1,0 +1,73 @@
+{
+  "name": "@octanejs/animejs",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "./src/adapters/three.ts"
+  ],
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Anime.js bindings for Octane with scoped lifecycle cleanup and Three.js adapter support.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/animejs"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapters/three": "./src/adapters/three.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project animejs --project animejs-ssr",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "dependencies": {
+    "animejs": "catalog:default"
+  },
+  "peerDependencies": {
+    "@types/three": ">=0.156.0",
+    "octane": "workspace:*",
+    "three": ">=0.156.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/three": {
+      "optional": true
+    },
+    "three": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@octanejs/three": "workspace:*",
+    "@types/three": "catalog:default",
+    "octane": "workspace:*",
+    "three": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

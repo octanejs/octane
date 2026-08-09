@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noEmitOnError": true,
+    "noErrorTruncation": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": ["node"],
+    "strict": true
+  },
+  "include": ["./src/", "./tests/types/"],
+  "exclude": ["node_modules", "dist"]
+}

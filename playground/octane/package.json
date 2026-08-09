@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Playground for octane — the template-clone renderer, compiled through octane/compiler.",
   "scripts": {
-    "dev": "vite --host",
-    "build": "vite build",
-    "preview": "vite preview --host",
+    "dev": "vite --configLoader runner --host",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview --configLoader runner --host",
     "debug-all": "node ../../scripts/debug-mode.js all octane/compiler",
     "debug-client": "node ../../scripts/debug-mode.js client octane/compiler",
     "debug-ssr": "node ../../scripts/debug-mode.js server octane/compiler",
@@ -20,6 +20,7 @@
     "@livestore/livestore": "catalog:default",
     "@livestore/utils": "catalog:default",
     "@opentelemetry/api": "catalog:default",
+    "@octanejs/animejs": "workspace:*",
     "@octanejs/aria": "workspace:*",
     "@octanejs/cmdk": "workspace:*",
     "@octanejs/livestore": "workspace:*",
@@ -34,6 +35,7 @@
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",
     "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/three": "workspace:*",
     "@octanejs/wagmi": "workspace:*",
     "@wagmi/connectors": "catalog:default",
     "@octanejs/usehooks-ts": "workspace:*",
@@ -41,7 +43,8 @@
     "clsx": "catalog:default",
     "octane": "workspace:*",
     "rxjs": "catalog:default",
-    "tailwind-merge": "catalog:default"
+    "tailwind-merge": "catalog:default",
+    "three": "catalog:default"
   },
   "devDependencies": {
     "@tailwindcss/vite": "catalog:default",

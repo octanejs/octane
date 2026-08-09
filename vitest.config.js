@@ -831,6 +831,50 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'animejs',
+					include: ['packages/animejs/tests/**/*.test.ts'],
+					exclude: ['packages/animejs/tests/ssr.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/animejs$/,
+							replacement: resolve(import.meta.dirname, 'packages/animejs/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/animejs\/adapters\/three$/,
+							replacement: resolve(import.meta.dirname, 'packages/animejs/src/adapters/three.ts'),
+						},
+					],
+					dedupe: ['three'],
+				},
+			},
+			{
+				test: {
+					name: 'animejs-ssr',
+					include: ['packages/animejs/tests/ssr.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/animejs$/,
+							replacement: resolve(import.meta.dirname, 'packages/animejs/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-hotkeys',
 					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
 					environment: 'jsdom',

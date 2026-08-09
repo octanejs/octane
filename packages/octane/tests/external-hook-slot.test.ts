@@ -650,6 +650,7 @@ describe('manifest-declared manual hook slots', () => {
 			})
 			.sort();
 		expect(declared).toEqual([
+			'animejs',
 			'aria',
 			'base-ui',
 			'devtools',
