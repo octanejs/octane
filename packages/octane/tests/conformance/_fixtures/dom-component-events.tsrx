@@ -16,10 +16,70 @@ export function SvgImageEvents(props) @{
 	</svg>
 }
 
-// NOTE: <link> is hoisted document metadata in octane (lifted into <head> by the
-// compiler), so the test queries document.head for it.
+// React keeps links with resource lifecycle handlers in their authored DOM
+// position so capture and bubble events still reach their logical ancestors.
 export function LinkEvents(props) @{
-	<link href="http://example.org/link" onLoad={props.onLoad} onError={props.onError} />
+	<link
+		rel="preload"
+		as="style"
+		href="http://example.org/link"
+		onLoad={props.onLoad}
+		onError={props.onError}
+	/>
+}
+
+export function LoadOnlyLink(props: { handler: (event: Event) => void }) @{
+	<link rel="preload" as="style" href="http://example.org/load-only" onLoad={props.handler} />
+}
+
+export function ErrorOnlyLink(props: { handler: (event: Event) => void }) @{
+	<link rel="preload" as="style" href="http://example.org/error-only" onError={props.handler} />
+}
+
+export function CaptureOnlyLink(props: { handler: (event: Event) => void }) @{
+	<link
+		rel="canonical"
+		href="http://example.org/capture-only"
+		onLoadCapture={props.handler}
+		onErrorCapture={props.handler}
+	/>
+}
+
+type ResourceEventHandlers = {
+	onLoad?: (event: Event) => void;
+	onLoadCapture?: (event: Event) => void;
+	onError?: (event: Event) => void;
+	onErrorCapture?: (event: Event) => void;
+};
+
+export function LinkSpreadEvents(props: { handlers: ResourceEventHandlers }) @{
+	<link href="http://example.org/spread-link" {...props.handlers} />
+}
+
+export function NestedLinkEvents(props: {
+	ancestor: ResourceEventHandlers;
+	target: ResourceEventHandlers;
+}) @{
+	<>
+		<link rel="canonical" href="http://example.org/canonical-link" />
+		<div
+			class="link-parent"
+			onLoad={props.ancestor.onLoad}
+			onLoadCapture={props.ancestor.onLoadCapture}
+			onError={props.ancestor.onError}
+			onErrorCapture={props.ancestor.onErrorCapture}
+		>
+			<link
+				rel="preload"
+				as="style"
+				href="http://example.org/nested-link"
+				onLoad={props.target.onLoad}
+				onLoadCapture={props.target.onLoadCapture}
+				onError={props.target.onError}
+				onErrorCapture={props.target.onErrorCapture}
+			/>
+		</div>
+	</>
 }
 
 // Nested-roots ordering — outer app hosts the inner root's container.
