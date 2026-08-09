@@ -82,6 +82,8 @@ export const BENCHMARK_SUITES = [
 	'lynx-list',
 	'universal-leaf-update',
 	'lynx-render',
+	'lynx-table',
+	'lynx-table-web',
 	'lynx-bundle-size',
 	'codegen-size',
 	'compiler-throughput',

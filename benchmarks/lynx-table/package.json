@@ -1,0 +1,17 @@
+{
+  "name": "octane-lynx-table-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Unified table benchmark for Octane on Lynx: deterministic wire-cost gates (command counts, commit bytes) plus a Lynx-for-Web Chromium harness with vendored ReactLynx and Vue Lynx reference bundles.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:web": "node web/run-web.mjs",
+    "build:app": "node scripts/build-app.mjs"
+  },
+  "dependencies": {
+    "@lynx-js/web-core": "0.22.2",
+    "playwright": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

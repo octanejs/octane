@@ -287,6 +287,37 @@ describe('universal compiler target', () => {
 		expect(optionalValidation).toEqual(baseline);
 	});
 
+	it('lowers static class arrays and literal children out of the slot array', () => {
+		// `['row', on && 'danger']` composes clsx-style to a string, so when every
+		// element is statically string-or-falsy the compiler emits the composed
+		// string expression: the slot value becomes a primitive (stable across
+		// renders on transported roots) instead of a fresh array per render.
+		// All-literal arrays and string-literal children leave the slot array
+		// entirely and ride the frozen plan.
+		const source =
+			"export function Row({ selected }) @{ <view class={['row', selected && 'danger']}><text class={['col', 'label']}>{'x'}</text></view> }";
+		const compiled = compile(source, '/src/Row.object.tsrx', { hmr: false, renderer });
+		const values = callsByImportedName(compiled.code, 'octane/universal').get('universalValue');
+		expect(values).toHaveLength(1);
+		const elements = values![0].arguments[1].elements;
+		expect(elements).toHaveLength(1);
+		expect(elements[0].type).toBe('BinaryExpression');
+		expect(compiled.code).toContain('"kind": "text", "value": "x"');
+		expect(compiled.code).toContain('"class": "col label"');
+
+		// Values outside the static string-or-falsy shape keep the authored
+		// array and the runtime's general composition.
+		const dynamic = compile(
+			"export function Row({ extra }) @{ <view class={['row', extra]} /> }",
+			'/src/Row.object.tsrx',
+			{ hmr: false, renderer },
+		);
+		const dynamicValues = callsByImportedName(dynamic.code, 'octane/universal').get(
+			'universalValue',
+		);
+		expect(dynamicValues![0].arguments[1].elements[0].type).toBe('ArrayExpression');
+	});
+
 	it('carries frozen runtime/thread metadata without changing emitted code by default', () => {
 		const source = 'export function Scene() @{ <view id="root" /> }';
 		const baseline = compile(source, '/src/Scene.object.tsrx', { hmr: false, renderer });
@@ -3927,11 +3958,10 @@ describe('universal nested boundary ownership', () => {
 		container.dispatchEvent(mesh, 'pointerdown', 'one');
 
 		root.render(SceneWithEvent, { handler: (payload) => log.push(`second:${payload}`) });
+		// A replaced handler closure keeps its stable listener ID, so no wire
+		// re-announcement is emitted — yet dispatch must reach the new closure.
 		const replacement = container.commits[1].commands.find((command) => command.op === 'event');
-		expect(replacement).toMatchObject({
-			op: 'event',
-			listener: { id: (firstCommand as any).listener.id },
-		});
+		expect(replacement).toBeUndefined();
 		container.dispatchEvent(mesh.id, 'pointerdown', 'two');
 
 		root.render(SceneWithEvent, { handler: null });

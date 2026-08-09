@@ -1,0 +1,388 @@
+{
+  "suite": "lynx-table",
+  "iterations": 2,
+  "targets": [
+    {
+      "name": "octane-lynx",
+      "ops": {
+        "create_commands_1k": {
+          "score": 16000,
+          "median": 16000,
+          "min": 16000,
+          "mean": 16000,
+          "p95": 16000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_commands_1k": {
+          "score": 100,
+          "median": 100,
+          "min": 100,
+          "mean": 100,
+          "p95": 100,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_commands_1k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_bytes_1k": {
+          "score": 225,
+          "median": 225,
+          "min": 225,
+          "mean": 225,
+          "p95": 225,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commits_1k": {
+          "score": 50,
+          "median": 50,
+          "min": 50,
+          "mean": 50,
+          "p95": 50,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commands_1k": {
+          "score": 5000,
+          "median": 5000,
+          "min": 5000,
+          "mean": 5000,
+          "p95": 5000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commits_1k": {
+          "score": 30,
+          "median": 30,
+          "min": 30,
+          "mean": 30,
+          "p95": 30,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commands_1k": {
+          "score": 60,
+          "median": 60,
+          "min": 60,
+          "mean": 60,
+          "p95": 60,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "create_commands_10k": {
+          "score": 160000,
+          "median": 160000,
+          "min": 160000,
+          "mean": 160000,
+          "p95": 160000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_commands_10k": {
+          "score": 1000,
+          "median": 1000,
+          "min": 1000,
+          "mean": 1000,
+          "p95": 1000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_commands_10k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_bytes_10k": {
+          "score": 225,
+          "median": 225,
+          "min": 225,
+          "mean": 225,
+          "p95": 225,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commits_10k": {
+          "score": 50,
+          "median": 50,
+          "min": 50,
+          "mean": 50,
+          "p95": 50,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commands_10k": {
+          "score": 50000,
+          "median": 50000,
+          "min": 50000,
+          "mean": 50000,
+          "p95": 50000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commits_10k": {
+          "score": 30,
+          "median": 30,
+          "min": 30,
+          "mean": 30,
+          "p95": 30,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commands_10k": {
+          "score": 60,
+          "median": 60,
+          "min": 60,
+          "mean": 60,
+          "p95": 60,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        }
+      },
+      "meta": {
+        "rows_1k": {
+          "rows": 1000,
+          "createdElements": 7042,
+          "createBytes": 1034598,
+          "update10thBytes": 6974,
+          "updateStormBytes": 279692,
+          "selectStormBytes": 6920
+        },
+        "rows_10k": {
+          "rows": 10000,
+          "createdElements": 70042,
+          "createBytes": 10572838,
+          "update10thBytes": 70055,
+          "updateStormBytes": 2791042,
+          "selectStormBytes": 6960
+        }
+      }
+    },
+    {
+      "name": "changed-rows-model",
+      "ops": {
+        "create_commands_1k": {
+          "score": 16000,
+          "median": 16000,
+          "min": 16000,
+          "mean": 16000,
+          "p95": 16000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_commands_1k": {
+          "score": 100,
+          "median": 100,
+          "min": 100,
+          "mean": 100,
+          "p95": 100,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_commands_1k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_bytes_1k": {
+          "score": 2048,
+          "median": 2048,
+          "min": 2048,
+          "mean": 2048,
+          "p95": 2048,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commits_1k": {
+          "score": 50,
+          "median": 50,
+          "min": 50,
+          "mean": 50,
+          "p95": 50,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commands_1k": {
+          "score": 5000,
+          "median": 5000,
+          "min": 5000,
+          "mean": 5000,
+          "p95": 5000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commits_1k": {
+          "score": 30,
+          "median": 30,
+          "min": 30,
+          "mean": 30,
+          "p95": 30,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commands_1k": {
+          "score": 60,
+          "median": 60,
+          "min": 60,
+          "mean": 60,
+          "p95": 60,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "create_commands_10k": {
+          "score": 160000,
+          "median": 160000,
+          "min": 160000,
+          "mean": 160000,
+          "p95": 160000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_commands_10k": {
+          "score": 1000,
+          "median": 1000,
+          "min": 1000,
+          "mean": 1000,
+          "p95": 1000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_commands_10k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_bytes_10k": {
+          "score": 2048,
+          "median": 2048,
+          "min": 2048,
+          "mean": 2048,
+          "p95": 2048,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commits_10k": {
+          "score": 50,
+          "median": 50,
+          "min": 50,
+          "mean": 50,
+          "p95": 50,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update_storm_commands_10k": {
+          "score": 50000,
+          "median": 50000,
+          "min": 50000,
+          "mean": 50000,
+          "p95": 50000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commits_10k": {
+          "score": 30,
+          "median": 30,
+          "min": 30,
+          "mean": 30,
+          "p95": 30,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_storm_commands_10k": {
+          "score": 60,
+          "median": 60,
+          "min": 60,
+          "mean": 60,
+          "p95": 60,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        }
+      },
+      "meta": {}
+    }
+  ],
+  "harnessExit": 0
+}

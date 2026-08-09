@@ -485,7 +485,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster \u2192 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
+    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster → 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
   },
   {
     "suite": "memo-wall",
@@ -613,7 +613,7 @@
     "target": "news-50/octane-tsrx",
     "reference": "news-50/react",
     "maxRatio": 1.2,
-    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x \u2192 octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
+    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x → octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
   },
   {
     "suite": "ssr-throughput",
@@ -622,7 +622,7 @@
     "reference": "deopt-page/octane-fast",
     "minRatio": 1.2,
     "maxRatio": 4.0,
-    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
+    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio→1) or a runaway deopt (ratio>4) both surface."
   },
   {
     "suite": "bundle-size",
@@ -1440,6 +1440,102 @@
     "note": "Deterministic source-level allocation gate: a 12-cell visible window over 1,000 logical rows currently allocates 0.012x as many physical cell roots as an eager one-cell-per-row model. The 0.02 ceiling catches loss of bounded native recycling without relying on timing."
   },
   {
+    "suite": "lynx-table",
+    "op": "select_commands_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "Deterministic wire gate: a select moves one .danger class between two rows, so its commit must carry ~2 update commands. Measured exactly 2 = 1.0x the changed-rows floor on 2026-08-08 (was 3000 = 1500x before value-semantic slot equality). A breach means the wire payload is scaling with tree size again."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "select_bytes_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "Absolute serialized-commit budget at the CI (quick) scale: model pins 2048 bytes and the measured select commit is 225 bytes on 2026-08-08 (was 237787 before the fix). Label text never rides a select commit, so this is deterministic."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update10th_commands_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "Update-every-10th rewrites ceil(rows/10) labels; the commit must carry one text update per changed row. Measured exactly 100 = 1.0x the floor on 2026-08-08 (was 3100: every row's class array plus two event re-binds per row crossed on every commit)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update_storm_commands_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "Storm gate at the CI (quick) scale: 50 ticks x 100 changed rows = 5000 commands, measured exactly 1.0x the floor on 2026-08-08 (was 155000 before value-semantic slot equality)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update_storm_commits_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "One commit per storm tick is the ceiling in the synchronous counter harness: 50 ticks -> 50 commits at the CI scale, measured exactly on 2026-08-08. More commits than ticks would mean a scheduling regression splits one tick's update across commits."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "select_storm_commands_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "30 select ticks x 2 changed rows = 60 commands at the CI scale, measured exactly 1.0x the floor on 2026-08-08 (was 90000 before the fix)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "select_commands_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "Same gate at 10k rows: measured exactly 2 commands on 2026-08-08 (was 30000 before the fix). Point-update wire cost must stay independent of table size."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "select_bytes_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "Absolute serialized-commit budget: the model pins 2048 bytes and the measured select commit is 225 bytes on 2026-08-08 (was 2406468 = 2.4MB before the fix, byte-identical to the captured production payload that motivated this suite)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update10th_commands_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "Same gate at 10k rows: measured exactly 1000 = 1.0x the floor on 2026-08-08 (was 31000 before the fix)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update_storm_commands_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "Storm regression gate (the coalescing trap): 50 ticks x 1000 changed rows must stay ~50000 commands. Measured exactly 1.0x the floor on 2026-08-08 (was 1550000 before the fix). The synchronous harness acks instantly, so commits-per-tick stays 1 here; the asynchronous latest-state coalescing contract is pinned in universal-transport.test.ts."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update_storm_commits_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "One commit per storm tick is the ceiling in the synchronous counter harness (see the 1k twin); measured exactly 50/50 on 2026-08-08."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "select_storm_commands_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1.5,
+    "note": "30 select ticks x 2 changed rows = 60 commands, measured exactly 1.0x the floor on 2026-08-08 (was 900000 before the fix)."
+  },
+  {
     "suite": "lynx-bundle-size",
     "op": "bundle_gzip",
     "target": "octane-ifr",
@@ -1501,7 +1597,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) \u2014 the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
+    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) — the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
   },
   {
     "suite": "tanstack-start",
@@ -1517,7 +1613,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) \u2014 per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
+    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) — per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
   },
   {
     "suite": "tanstack-start",
@@ -1917,7 +2013,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.3,
-    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 \u2014 octane must not fall behind react at bulk d-churn."
+    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 — octane must not fall behind react at bulk d-churn."
   },
   {
     "suite": "svg-dashboard",
@@ -1933,7 +2029,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 2.5,
-    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
+    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) — a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
   },
   {
     "suite": "svg-dashboard",
@@ -1957,7 +2053,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 0.9,
-    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 \u2014 octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
+    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 — octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
   },
   {
     "suite": "svg-dashboard",
@@ -1973,7 +2069,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 2.1,
-    "note": "480 foreignObject insert/removals per sample \u2014 the SVG\u2192HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
+    "note": "480 foreignObject insert/removals per sample — the SVG→HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
   },
   {
     "suite": "svg-dashboard",
@@ -1981,7 +2077,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.8,
-    "note": "360 portal commits per sample into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting."
+    "note": "360 portal commits per sample into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 — octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting."
   },
   {
     "suite": "svg-dashboard",
@@ -1989,7 +2085,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.2,
-    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path \u2014 a cliff-width tripwire, not a win claim. Observed 0.79x, 2026-08-07."
+    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path — a cliff-width tripwire, not a win claim. Observed 0.79x, 2026-08-07."
   },
   {
     "suite": "svg-dashboard",
@@ -1997,7 +2093,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 3,
-    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 \u2014 octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
+    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 — octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
   },
   {
     "suite": "svg-dashboard",

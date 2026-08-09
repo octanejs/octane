@@ -73,6 +73,7 @@ import {
 	type LynxLifecycleDataRecord,
 } from './core/lifecycle-data.js';
 import { createLynxElementPAPI, type LynxElementPAPI, type LynxElementRef } from './core/papi.js';
+import { LYNX_PROFILE, lynxWireProfile } from './core/profiling.js';
 import {
 	createLynxMainThreadWorkletRegistry,
 	installLynxMainThreadWorkletRegistry,
@@ -1958,6 +1959,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		// tokens can be resolved until background confirms listener ownership. It
 		// must never be offered to an already-populated background container again.
 		const candidateFirstTree = provisional ? firstTree : null;
+		const startedPrepare = LYNX_PROFILE ? performance.now() : 0;
 		try {
 			prepared = prepareLynxHostBatch(
 				record.container,
@@ -1978,14 +1980,22 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		if (provisional) active = record;
+		if (LYNX_PROFILE) {
+			const profile = lynxWireProfile();
+			profile.prepareMs += performance.now() - startedPrepare;
+			profile.commits += 1;
+			profile.commands += message.batch.commands.length;
+		}
 		let applyFailed = false;
 		let applyError: unknown;
+		const startedApply = LYNX_PROFILE ? performance.now() : 0;
 		try {
 			prepared.apply();
 		} catch (error) {
 			applyFailed = true;
 			applyError = error;
 		}
+		if (LYNX_PROFILE) lynxWireProfile().applyMs += performance.now() - startedApply;
 		if (!prepared.mutationStarted) {
 			prepared.abort();
 			if (provisional) {
@@ -2012,6 +2022,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				disposeAvailableFirstTree();
 			}
 		}
+		const startedAck = LYNX_PROFILE ? performance.now() : 0;
 		const handles = acknowledgementHandles(driver, record.container, prepared, message.batch);
 		const acknowledgement: LynxTransportAcknowledgement = {
 			...identity,
@@ -2025,6 +2036,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		};
 		try {
 			dispatch(acknowledgement);
+			if (LYNX_PROFILE) lynxWireProfile().ackMs += performance.now() - startedAck;
 		} catch (error) {
 			// ContextProxy may deliver the acknowledgement (and reentrant calls) before
 			// reporting a dispatch failure. Release those activations before owner state.
@@ -2220,8 +2232,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	function receive(event: LynxContextProxyEvent): void {
 		if (closed) return;
 		let message: ReturnType<typeof validateLynxBackgroundOutboundMessage>;
+		const startedValidate = LYNX_PROFILE ? performance.now() : 0;
 		try {
 			message = validateLynxBackgroundOutboundMessage(event.data);
+			if (LYNX_PROFILE) lynxWireProfile().validateMs += performance.now() - startedValidate;
 		} catch (error) {
 			const normalized = report(error, 'Octane Lynx received a malformed outbound message.');
 			const identity = recoverIdentity(event.data);

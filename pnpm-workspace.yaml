@@ -28,6 +28,7 @@ packages:
   - benchmarks/ssr-workerd/*
   - benchmarks/codegen-size
   - benchmarks/lynx-render
+  - benchmarks/lynx-table
   - benchmarks/bundle-size
   - benchmarks/three
   - benchmarks/async-waterfall

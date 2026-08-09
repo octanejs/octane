@@ -3475,6 +3475,84 @@ function createLogicalRecord(id: number, blueprint: BlueprintNode): LogicalRecor
 	};
 }
 
+/**
+ * Cross-realm plain-object test — the universal-side twin of
+ * `packages/lynx/src/core/plain-object.ts`.
+ *
+ * A transported renderer can hand either side values built with a foreign
+ * `Object.prototype` (an engine main thread hosted in an iframe realm, an
+ * Electron process split, `node:vm`), so an identity test against this realm's
+ * prototype misclassifies every structurally plain value that crossed a
+ * boundary. Accept a null prototype, or any prototype one hop from null — the
+ * shape of every realm's `Object.prototype`; class and built-in instances are
+ * still rejected. `value` must already be a non-null, non-array object.
+ */
+export function hasCrossRealmPlainPrototype(value: object): boolean {
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === null || Object.getPrototypeOf(prototype) === null;
+}
+
+/**
+ * Whether a host prop value is unchanged — THE definition of "equal" for
+ * deciding whether a committed host prop needs an update command.
+ *
+ * Identity is the fast path but cannot be the whole answer: on a transported
+ * root every object-valued prop is re-encoded through `cloneSerializableValue`
+ * each render, so two renders of the same value never share identity, and an
+ * identity-only diff emits an update for every object-carrying host in the
+ * tree on every commit — wire cost proportional to tree size instead of
+ * change size. Equality is therefore the value semantics the wire itself
+ * preserves: primitives by `Object.is`, arrays and plain records (from any
+ * realm — see `hasCrossRealmPlainPrototype`) element-by-element, to a bounded
+ * depth. The default depth of 2 covers the compiler's slot shapes — class
+ * arrays, style records, and one level of nesting inside them — while deeper
+ * or exotic values (class instances, functions, handles) fall back to
+ * identity, so a pathological tree never turns the per-prop diff into an
+ * unbounded walk.
+ */
+export function sameUniversalHostPropValue(left: unknown, right: unknown, depth = 2): boolean {
+	if (Object.is(left, right)) return true;
+	if (depth === 0) return false;
+	if (typeof left !== 'object' || typeof right !== 'object' || left === null || right === null) {
+		return false;
+	}
+	if (Array.isArray(left)) {
+		if (!Array.isArray(right) || left.length !== right.length) return false;
+		for (let index = 0; index < left.length; index++) {
+			if (!sameUniversalHostPropValue(left[index], right[index], depth - 1)) return false;
+		}
+		return true;
+	}
+	if (Array.isArray(right)) return false;
+	if (!hasCrossRealmPlainPrototype(left) || !hasCrossRealmPlainPrototype(right)) return false;
+	if (
+		Object.getOwnPropertySymbols(left).length !== 0 ||
+		Object.getOwnPropertySymbols(right).length !== 0
+	) {
+		return false;
+	}
+	let leftCount = 0;
+	for (const key in left) {
+		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
+		leftCount++;
+		if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+		if (
+			!sameUniversalHostPropValue(
+				(left as Record<string, unknown>)[key],
+				(right as Record<string, unknown>)[key],
+				depth - 1,
+			)
+		) {
+			return false;
+		}
+	}
+	let rightCount = 0;
+	for (const key in right) {
+		if (Object.prototype.hasOwnProperty.call(right, key)) rightCount++;
+	}
+	return leftCount === rightCount;
+}
+
 function shallowPropsEqual(
 	left: Readonly<Record<string, unknown>>,
 	right: Readonly<Record<string, unknown>>,
@@ -3484,7 +3562,10 @@ function shallowPropsEqual(
 	for (const key in left) {
 		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
 		leftCount++;
-		if (!Object.prototype.hasOwnProperty.call(right, key) || !Object.is(left[key], right[key])) {
+		if (
+			!Object.prototype.hasOwnProperty.call(right, key) ||
+			!sameUniversalHostPropValue(left[key], right[key])
+		) {
 			return false;
 		}
 	}
@@ -5536,8 +5617,7 @@ function cloneSerializableValue(
 		if (Array.isArray(value)) {
 			return Object.freeze(value.map((entry) => cloneSerializableValue(entry, seen)));
 		}
-		const prototype = Object.getPrototypeOf(value);
-		if (prototype !== Object.prototype && prototype !== null) {
+		if (!hasCrossRealmPlainPrototype(value)) {
 			throw new TypeError(
 				`Serializable host values require plain objects, received ${Object.prototype.toString.call(value)}.`,
 			);
@@ -8539,9 +8619,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					const listener = previous?.listener ?? nextListener++;
 					const committed = { ...event, listener };
 					nextEvents.set(type, committed);
+					// A fresh handler closure is not a wire change: the listener ID it
+					// dispatches through is stable, and the dispatch table below rebinds
+					// to the newest closure whether or not a command is emitted. Only
+					// what the host can observe — a new listener, its priority, or its
+					// owning scope — re-announces the binding.
 					const changed =
 						previous === undefined ||
-						previous.handler !== event.handler ||
 						previous.priority !== event.priority ||
 						previous.owner !== event.owner;
 					if (isVisible && (!wasVisible || changed)) {
@@ -8585,6 +8669,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					const previous = previousCallbacks.get(type);
 					const listener = previous?.listener ?? nextListener++;
 					nextCallbacks.set(type, { ...callback, listener });
+					// Unlike events, a host callback's closure identity is observable:
+					// an attach callback re-runs (detach + attach) when its handler is
+					// replaced, so a changed closure must re-announce.
 					if (
 						previous === undefined ||
 						previous.handler !== callback.handler ||

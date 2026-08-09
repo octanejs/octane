@@ -1,0 +1,54 @@
+.page {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	background-color: #fff;
+}
+.title {
+	font-size: 14px;
+	font-weight: bold;
+	margin: 4px;
+}
+.toolbar {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+.btn {
+	background-color: #e8e8e8;
+	border-radius: 3px;
+	margin: 2px;
+	padding: 4px 8px;
+}
+.btn-text {
+	font-size: 11px;
+	color: #222;
+}
+.rows {
+	display: flex;
+	flex-direction: column;
+}
+.row {
+	display: flex;
+	flex-direction: row;
+	height: 18px;
+	align-items: center;
+}
+.danger {
+	background-color: #f2dede;
+}
+.col-id {
+	width: 60px;
+	font-size: 11px;
+	color: #333;
+}
+.col-label {
+	flex: 1;
+	font-size: 11px;
+	color: #111;
+}
+.col-remove {
+	width: 30px;
+	font-size: 11px;
+	color: #c00;
+}

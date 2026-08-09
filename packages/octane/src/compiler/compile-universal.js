@@ -2483,6 +2483,85 @@ function compilePlainPropsObjectAst(attributes, state, origin) {
 	return inheritGeneratedOrigin(b.object(entries), origin);
 }
 
+/**
+ * Lower a `class={[…]}` array literal to its clsx-composed string when every
+ * element is statically a string or falsy.
+ *
+ * The runtime composes class arrays clsx-style, so `['row', on && 'danger']`
+ * is only ever observed as `'row'` or `'row danger'` — but as a slot value the
+ * array is rebuilt on every render, and on a transported root each rebuild is
+ * re-encoded, making the hottest per-row prop a fresh allocation per render.
+ * Emitting the string-building expression instead makes the slot value a
+ * primitive: identity-comparable, allocation-free, and byte-identical in the
+ * background and main-thread programs (so first-screen adoption still sees
+ * the same tree). An all-literal array folds further, into a static plan prop
+ * with no slot at all. Anything not statically string-or-falsy (spreads,
+ * nested arrays, objects, expressions with non-literal truthy arms) keeps the
+ * authored array slot and the runtime's general composition.
+ *
+ * Returns `{ staticValue }` for a fully static class, `{ expression }` for a
+ * string-building lowering, or `null` to keep the authored value.
+ */
+function loweredHostClassAst(expression, state) {
+	if (expression.type !== 'ArrayExpression') return null;
+	const elements = expression.elements ?? [];
+	if (elements.length === 0) return { staticValue: '' };
+	/** @type {({ static: string } | { test: any, value: string })[]} */
+	const parts = [];
+	for (const element of elements) {
+		if (element == null || element.type === 'SpreadElement') return null;
+		if (element.type === 'Literal' && typeof element.value === 'string') {
+			if (element.value !== '') parts.push({ static: element.value });
+			continue;
+		}
+		if (
+			element.type === 'LogicalExpression' &&
+			element.operator === '&&' &&
+			element.right.type === 'Literal' &&
+			typeof element.right.value === 'string' &&
+			element.right.value !== ''
+		) {
+			parts.push({ test: element.left, value: element.right.value });
+			continue;
+		}
+		return null;
+	}
+	// The first part must be a literal so every later piece can join with an
+	// unconditional leading space.
+	if (parts.length !== 0 && parts[0].static === undefined) return null;
+	let composed = null;
+	let pendingStatic = '';
+	const flushStatic = () => {
+		if (pendingStatic === '') return;
+		const literal = b.literal(pendingStatic, JSON.stringify(pendingStatic));
+		composed = composed === null ? literal : b.binary('+', composed, literal);
+		pendingStatic = '';
+	};
+	for (const part of parts) {
+		if (part.static !== undefined) {
+			pendingStatic += pendingStatic === '' && composed === null ? part.static : ` ${part.static}`;
+			continue;
+		}
+		flushStatic();
+		const spaced = ` ${part.value}`;
+		composed = b.binary(
+			'+',
+			composed,
+			inheritGeneratedOrigin(
+				b.conditional(
+					dynamicExpressionAst(part.test, state),
+					b.literal(spaced, JSON.stringify(spaced)),
+					b.literal('', '""'),
+				),
+				part.test,
+			),
+		);
+	}
+	if (composed === null) return { staticValue: pendingStatic };
+	flushStatic();
+	return { expression: inheritGeneratedOrigin(composed, expression) };
+}
+
 function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 	if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 		throw universalError(
@@ -2504,11 +2583,32 @@ function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 	if (value.type === 'Literal') return { name, staticValue: value.value };
 	if (value.type === 'JSXExpressionContainer') {
 		if (!value.expression || value.expression.type === 'JSXEmptyExpression') return null;
+		if (name === 'class') {
+			const lowered = loweredHostClassAst(value.expression, state);
+			if (lowered !== null) {
+				if (lowered.expression === undefined) return { name, staticValue: lowered.staticValue };
+				const slot = context.values.length;
+				context.values.push(lowered.expression);
+				return { name, slot };
+			}
+		}
+		if (value.expression.type === 'Literal' && isStaticPropLiteral(value.expression.value)) {
+			return { name, staticValue: value.expression.value };
+		}
 		const slot = context.values.length;
 		context.values.push(mainThreadHostValueAst(name, value.expression, state));
 		return { name, slot };
 	}
 	throw universalError(state.filename, attribute, `unsupported value for host attribute ${name}.`);
+}
+
+/**
+ * Literal values that can ride the frozen plan instead of a per-render slot.
+ * `null` stays a slot: it is a legal "no handler" value for event props, whose
+ * erasure in main-thread first-screen programs happens at the slot site.
+ */
+function isStaticPropLiteral(value) {
+	return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
 function addDynamicAst(context, expression) {
@@ -2978,6 +3078,16 @@ function compileChildAst(node, context, state) {
 	}
 	if (node.type === 'JSXExpressionContainer') {
 		if (!node.expression || node.expression.type === 'JSXEmptyExpression') return [];
+		// A string-literal child is authored text with braces around it: fold it
+		// into the plan like JSXText, so the constant stops riding every render's
+		// slot array. Renderers without host text keep the renderable-hole slot.
+		if (
+			node.expression.type === 'Literal' &&
+			typeof node.expression.value === 'string' &&
+			state.renderer.text === 'host'
+		) {
+			return [withPlanOrigin({ kind: 'text', value: node.expression.value }, node)];
+		}
 		return [addDynamicAst(context, dynamicExpressionAst(node.expression, state))];
 	}
 	if (node.type === 'JSXElement' || node.type === 'Element') {

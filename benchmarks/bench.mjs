@@ -585,6 +585,38 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Native Lynx table wire cost (Node-only): drives the cross-framework
+		// krausest table app through the real dual-thread path via real tap tokens
+		// and reports deterministic per-operation command counts and serialized
+		// commit bytes against a changed-rows semantic floor. The wire payload of a
+		// point update must scale with the change, not the tree. Wall-clock lives
+		// in the separate Lynx-for-Web harness (lynx-table-web) and is ungated.
+		name: 'lynx-table',
+		cwd: 'lynx-table',
+		servers: [],
+		iter: { normal: 2, quick: 1 },
+		runs: [
+			{
+				script: 'run.mjs',
+				args: (n) => [String(n)],
+				env: (iter, quick) => ({ LYNX_TABLE_SCALES: quick ? '1000' : '1000,10000' }),
+			},
+		],
+	},
+	{
+		// Lynx-for-Web wall clock (headless Chromium): serves the octane table
+		// app and the vendored ReactLynx / Vue Lynx reference bundles into a
+		// <lynx-view> and drives real clicks through one shared page driver.
+		// Timing is host-bound and carries no ratio guards — the deterministic
+		// wire gates live in `lynx-table` — but the recorded medians feed the
+		// site's cross-framework Lynx chart. Iterations map to fresh-page reps.
+		name: 'lynx-table-web',
+		cwd: 'lynx-table',
+		servers: [],
+		iter: { normal: 3, quick: 1 },
+		runs: [{ script: 'web/run-web.mjs', args: (n) => ['--reps', String(n)] }],
+	},
+	{
 		// Production Rspeedy preview/IFR bundles (Node-only): decodes both real
 		// compiler graphs, verifies semantic markers, and reports deterministic
 		// encoded and per-thread bytes. This is build evidence, not native timing.

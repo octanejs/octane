@@ -1763,6 +1763,18 @@ importers:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  benchmarks/lynx-table:
+    dependencies:
+      '@lynx-js/web-core':
+        specifier: 0.22.2
+        version: 0.22.2(@lynx-js/css-serializer@0.1.6)(tslib@2.8.1)
+      playwright:
+        specifier: catalog:default
+        version: 1.61.1
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/memo-wall:
     dependencies:
       playwright:
