@@ -672,6 +672,7 @@ describe('manifest-declared manual hook slots', () => {
 			'react-error-boundary',
 			'remix-router',
 			'rxjs',
+			'solana-react',
 			'styled-components',
 			'stylex',
 			'tanstack-query',

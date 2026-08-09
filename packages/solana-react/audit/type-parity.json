@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/solana-react/upstream/src",
+  "adaptedRoot": "packages/solana-react/typetests",
+  "inventories": {
+    "upstream": "packages/solana-react/audit/pristine-types.json",
+    "adapted": "packages/solana-react/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/solana-react/audit/upstream-typetests/tsconfig.json",
+      "sourcePolicy": "byte-exact pinned upstream typetests for every adapted or pristine-only disposition"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/solana-react/typetests/tsconfig.json",
+      "sourcePolicy": "structurally equivalent after permitted import-root and query-type-package transformations for every adapted disposition"
+    }
+  },
+  "fileDispositions": [
+    {
+      "path": "__typetests__/useClient-typetest.ts",
+      "disposition": "adapted",
+      "rationale": "ClientProvider/useClient are on the Octane public boundary; one-for-one adapted under typetests/__typetests__/."
+    },
+    {
+      "path": "__typetests__/useClientCapability-typetest.ts",
+      "disposition": "adapted",
+      "rationale": "useClientCapability is on the Octane public boundary; one-for-one adapted under typetests/__typetests__/."
+    },
+    {
+      "path": "query/__typetests__/useRequestQuery-typetest.ts",
+      "disposition": "adapted",
+      "rationale": "useRequestQuery is ported over @octanejs/tanstack-query; one-for-one adapted under typetests/query/__typetests__/."
+    },
+    {
+      "path": "__typetests__/selectedWalletAccountContextProvider-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Selected-wallet React context is replaced by structural createWalletStore; pristine lane still typechecks the upstream artifact against React, and adaptedEvidence pins the Octane replacement types.",
+      "adaptedEvidence": ["packages/solana-react/typetests/wallet-transaction-typetest.ts"]
+    },
+    {
+      "path": "__typetests__/useSignIn-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Sign-in hooks are replaced by createTransactionExecutor; pristine lane retains the upstream typetest, adaptedEvidence pins the Octane executor types.",
+      "adaptedEvidence": ["packages/solana-react/typetests/wallet-transaction-typetest.ts"]
+    },
+    {
+      "path": "__typetests__/useSignAndSendTransaction-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Sign-and-send hooks are replaced by createTransactionExecutor; pristine lane retains the upstream typetest, adaptedEvidence pins the Octane executor types.",
+      "adaptedEvidence": ["packages/solana-react/typetests/wallet-transaction-typetest.ts"]
+    },
+    {
+      "path": "__typetests__/useSignTransaction-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Sign-transaction hooks are replaced by createTransactionExecutor; pristine lane retains the upstream typetest, adaptedEvidence pins the Octane executor types.",
+      "adaptedEvidence": ["packages/solana-react/typetests/wallet-transaction-typetest.ts"]
+    },
+    {
+      "path": "__typetests__/useRequest-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "useRequest is not ported; request UI goes through useRequestQuery. Pristine lane retains the upstream typetest for the unported surface.",
+      "adaptedEvidence": [
+        "packages/solana-react/typetests/query/__typetests__/useRequestQuery-typetest.ts"
+      ]
+    },
+    {
+      "path": "query/__typetests__/useSubscriptionQuery-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Streamed TanStack subscription adapter is deferred for this pin; pristine lane still typechecks the upstream artifact.",
+      "adaptedEvidence": []
+    },
+    {
+      "path": "query/__typetests__/useTrackedDataQuery-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Streamed TanStack tracked-data adapter is deferred for this pin; pristine lane still typechecks the upstream artifact.",
+      "adaptedEvidence": []
+    },
+    {
+      "path": "__typetests__/useSubscription-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Non-TanStack subscription hook is deferred with the streamed query surface; pristine lane still typechecks the upstream artifact.",
+      "adaptedEvidence": []
+    },
+    {
+      "path": "__typetests__/useTrackedData-typetest.ts",
+      "disposition": "pristine-only",
+      "rationale": "Non-TanStack tracked-data hook is deferred with the streamed query surface; pristine lane still typechecks the upstream artifact.",
+      "adaptedEvidence": []
+    },
+    {
+      "path": "__typetests__/useAction-typetest.ts",
+      "disposition": "out-of-scope",
+      "rationale": "Internal upstream helper; not exported by @octanejs/solana-react."
+    },
+    {
+      "path": "swr/__typetests__/useRequestSWR-typetest.ts",
+      "disposition": "out-of-scope",
+      "rationale": "Octane has no SWR binding."
+    },
+    {
+      "path": "swr/__typetests__/useSubscriptionSWR-typetest.ts",
+      "disposition": "out-of-scope",
+      "rationale": "Octane has no SWR binding."
+    },
+    {
+      "path": "swr/__typetests__/useTrackedDataSWR-typetest.ts",
+      "disposition": "out-of-scope",
+      "rationale": "Octane has no SWR binding."
+    }
+  ],
+  "permittedTransformations": [
+    {
+      "kind": "formatting",
+      "rule": "TypeScript printer output must remain structurally identical"
+    },
+    {
+      "kind": "import-root",
+      "rule": "relative upstream hook imports retarget Octane src/hooks/useClient or src/query"
+    },
+    {
+      "kind": "query-type-package",
+      "rule": "@tanstack/react-query UseQueryResult imports become @octanejs/tanstack-query"
+    },
+    {
+      "kind": "negative-control",
+      "rule": "Matching @ts-expect-error controls must reject the same invalid call shapes on both sides"
+    }
+  ],
+  "divergences": []
+}

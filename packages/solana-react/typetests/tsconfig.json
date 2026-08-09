@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "./public-api.test-d.ts",
+    "./wallet-transaction-typetest.ts",
+    "./__typetests__/**/*-typetest.ts",
+    "./query/__typetests__/**/*-typetest.ts"
+  ]
+}

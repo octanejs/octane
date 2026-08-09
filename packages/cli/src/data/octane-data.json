@@ -477,6 +477,27 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/solana-react",
+      "version": "0.0.1",
+      "category": "Web3",
+      "upstream": {
+        "package": "@solana/react",
+        "version": "7.0.0",
+        "source": "https://github.com/anza-xyz/kit",
+        "license": "MIT"
+      },
+      "surface": "Octane-native client provider/store hooks, a validated private Wallet Standard adapter, explicit-action transaction orchestration, and a TanStack Query-backed request hook. Applications import framework-neutral operations directly from @solana/kit@7.0.0.",
+      "divergences": [
+        "@solana/react/swr is excluded because Octane has no SWR binding.",
+        "Wallet APIs are deliberately structural and narrower because upstream selected-wallet exports leak React and @wallet-standard/react public types.",
+        "useSubscriptionQuery and useTrackedDataQuery are deferred pending streamed-query lifecycle characterization.",
+        "Upstream sign-in/message/transaction hooks are represented by a generation-safe explicit transaction executor rather than hidden React runtime code.",
+        "ClientProvider accepts only a resolved client; thenables throw at mount rather than suspending."
+      ],
+      "ssr": "Client state is server-readable. Wallet discovery is inert during SSR and activates only when a browser registry is explicitly attached after hydration.",
+      "verified": "2026-07-29"
+    },
+    {
       "name": "@octanejs/sonner",
       "version": "0.1.27",
       "category": "UI and interaction",
@@ -839,6 +860,7 @@
     "@react-rxjs/utils": "@octanejs/rxjs",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",
+    "@solana/react": "@octanejs/solana-react",
     "@streamdown/cjk": "@octanejs/streamdown",
     "@streamdown/code": "@octanejs/streamdown",
     "@streamdown/math": "@octanejs/streamdown",
