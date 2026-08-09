@@ -6503,6 +6503,9 @@ importers:
         specifier: 4.0.8
         version: 4.0.8
     devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.56(react@19.2.7)
       '@types/lodash.debounce':
         specifier: 4.0.9
         version: 4.0.9

@@ -919,13 +919,34 @@ export default defineConfig({
 				test: {
 					name: 'usehooks-ts',
 					include: ['packages/usehooks-ts/tests/**/*.test.ts'],
-					exclude: ['packages/usehooks-ts/tests/ssr.test.ts'],
+					exclude: [
+						'packages/usehooks-ts/tests/ssr.test.ts',
+						'packages/usehooks-ts/tests/differential/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
 					// inside the test body; keep the same 30s headroom as the other binding
 					// hydration projects so a loaded CI shard does not hit the 5s default.
 					testTimeout: 30_000,
 					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/usehooks-ts$/,
+							replacement: resolve(import.meta.dirname, 'packages/usehooks-ts/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'usehooks-ts-differential',
+					include: ['packages/usehooks-ts/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/usehooks-ts/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],
