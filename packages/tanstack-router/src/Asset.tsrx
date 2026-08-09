@@ -10,6 +10,8 @@ export type AssetProps =
 		target: 'head' | 'body';
 	};
 
+type ManagedAssetProps = AssetProps & { managedKey?: string };
+
 const MANAGED_KEY_ATTR = 'data-tsr-managed-key';
 
 function attributeName(name: string) {
@@ -51,16 +53,17 @@ function findManagedElement(parent: HTMLElement, key: string) {
 	return undefined;
 }
 
-function mountAsset(props: AssetProps) {
+function mountAsset(props: ManagedAssetProps) {
 	const parent =
 		props.target === 'head' ? document.head : document.body;
-	const existing = findManagedElement(parent, props.assetKey);
+	const managedKey = props.managedKey ?? props.assetKey;
+	const existing = findManagedElement(parent, managedKey);
 	if (existing) {
 		return () => existing.remove();
 	}
 
 	const element = document.createElement(props.tag);
-	element.setAttribute(MANAGED_KEY_ATTR, props.assetKey);
+	element.setAttribute(MANAGED_KEY_ATTR, managedKey);
 	setAttributes(element, props.attrs);
 	if (typeof props.children === 'string') {
 		element.textContent = props.children;
@@ -72,10 +75,12 @@ function mountAsset(props: AssetProps) {
 export function Asset(props: AssetProps) @{
 	const router = useRouter();
 	const hydrated = useHydrated();
+	const managedKey = (props as ManagedAssetProps).managedKey ?? props.assetKey;
 
 	if (!(isServer ?? router.isServer)) {
 		useLayoutEffect(() => mountAsset(props), [
 			props.assetKey,
+			managedKey,
 			props.attrs,
 			props.children,
 			props.tag,
@@ -83,38 +88,37 @@ export function Asset(props: AssetProps) @{
 		]);
 	}
 
-	@if ((isServer ?? router.isServer) || props.target === 'body' && !hydrated) {
-		@switch (props.tag) {
-			@case 'title': {
-				<title {...props.attrs} data-tsr-managed-key={props.assetKey}>
-					{props.children ?? '' as string}
-				</title>
-			}
-			@case 'meta': {
-				<meta {...props.attrs} data-tsr-managed-key={props.assetKey} />
-			}
-			@case 'link': {
-				<link {...props.attrs} data-tsr-managed-key={props.assetKey} />
-			}
-			@case 'style': {
-				{createElement('style', {
-					...props.attrs,
-					'data-tsr-managed-key': props.assetKey,
-					dangerouslySetInnerHTML: { __html: props.children ?? '' },
-				})}
-			}
-			@case 'script': {
-				<script
-					{...props.attrs}
-					data-tsr-managed-key={props.assetKey}
-					dangerouslySetInnerHTML={{ __html: props.children ?? '' }}
-				/>
-			}
-			@default: {
-				<></>
-			}
+	const visibleTag =
+		(isServer ?? router.isServer) || props.target === 'body' && !hydrated ? props.tag : undefined;
+
+	@switch (visibleTag) {
+		@case 'title': {
+			<title {...props.attrs} data-tsr-managed-key={managedKey}>
+				{props.children ?? '' as string}
+			</title>
 		}
-	} @else {
-		<></>
+		@case 'meta': {
+			<meta {...props.attrs} data-tsr-managed-key={managedKey} />
+		}
+		@case 'link': {
+			<link {...props.attrs} data-tsr-managed-key={managedKey} />
+		}
+		@case 'style': {
+			{createElement('style', {
+				...props.attrs,
+				'data-tsr-managed-key': managedKey,
+				dangerouslySetInnerHTML: { __html: props.children ?? '' },
+			})}
+		}
+		@case 'script': {
+			<script
+				{...props.attrs}
+				data-tsr-managed-key={managedKey}
+				dangerouslySetInnerHTML={{ __html: props.children ?? '' }}
+			/>
+		}
+		@default: {
+			<></>
+		}
 	}
 }

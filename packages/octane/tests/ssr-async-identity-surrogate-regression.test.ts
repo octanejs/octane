@@ -86,4 +86,40 @@ describe('SSR async identity string encoding', () => {
 			expect(result.html).toContain(`data-label="${label}">${label}:${value}</span>`);
 		}
 	});
+
+	it('keeps long keys distinct when their shared prefix contains delimiters and lone surrogates', async () => {
+		const mod = evalServer(
+			`import { use } from 'octane';
+			 export function App(props) @{
+				<main>
+					@for (const item of props.items; key item.key) {
+						const value = use(item.promise);
+						<span data-label={item.label}>{item.label + ':' + value as string}</span>
+					}
+				</main>
+			 }`,
+			'ssr-long-async-identity-surrogates.tsrx',
+		);
+		const prefix = '|@component-key:\u0000'.repeat(5);
+		const cases = [
+			['lone-high', prefix + '\ud800', 'HIGH'],
+			['replacement', prefix + '\ufffd', 'REPLACEMENT'],
+			['lone-low', prefix + '\udc00', 'LOW'],
+			['pair', prefix + '\ud800\udc00', 'PAIR'],
+			['same-prefix', prefix + 'a', 'FIRST'],
+			['same-prefix-longer', prefix + 'aa', 'SECOND'],
+		] as const;
+
+		const result = await prerender(mod.App, {
+			items: cases.map(([label, key, value]) => ({
+				label,
+				key,
+				promise: Promise.resolve(value),
+			})),
+		});
+
+		for (const [label, , value] of cases) {
+			expect(result.html).toContain(`data-label="${label}">${label}:${value}</span>`);
+		}
+	});
 });

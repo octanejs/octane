@@ -9,3 +9,7 @@ export function getAssetKey(scope: 'head' | 'body', asset: RouterManagedTag, ind
 		inlineCss,
 	})}`;
 }
+
+export function getManagedAssetKey(scope: 'head' | 'body', owner: string, index: number) {
+	return `${scope}:${owner}:${index.toString(36)}`;
+}

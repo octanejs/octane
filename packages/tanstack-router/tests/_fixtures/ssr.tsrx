@@ -10,7 +10,9 @@ import {
 	createRootRoute,
 	createRoute,
 	createRouter,
+	routerContext,
 } from '@octanejs/tanstack-router';
+import type { AnyRouter } from '@tanstack/router-core';
 
 function RootDocument() @{
 	<Html lang="en">
@@ -23,6 +25,29 @@ function RootDocument() @{
 			<Scripts />
 		</Body>
 	</Html>
+}
+
+function MultipleManagerDocument() @{
+	<Html lang="en">
+		<Head>
+			<HeadContent />
+			<HeadContent />
+		</Head>
+		<Body class="document-body">
+			<Outlet />
+			<Scripts />
+			<Scripts />
+		</Body>
+	</Html>
+}
+
+export function ManagedHeadOwners(props: { router: AnyRouter; secondary: boolean }) @{
+	<routerContext.Provider value={props.router}>
+		<HeadContent />
+		@if (props.secondary) {
+			<HeadContent />
+		}
+	</routerContext.Provider>
 }
 
 function IndexPage() @{
@@ -40,10 +65,11 @@ export function makeSsrRouter(
 	options: {
 		routeSsr?: boolean | 'data-only';
 		scrollRestoration?: boolean;
+		multipleManagers?: boolean;
 	} = {},
 ) {
 	const rootRoute = createRootRoute({
-		component: RootDocument,
+		component: options.multipleManagers ? MultipleManagerDocument : RootDocument,
 		head: () => ({
 			meta: [
 				{ title: 'Octane Router SSR' },
