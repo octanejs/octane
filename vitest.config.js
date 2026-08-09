@@ -1573,6 +1573,37 @@ export default defineConfig({
 					name: 'wagmi',
 					include: ['packages/wagmi/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					exclude: ['packages/wagmi/tests/differential/**/*.test.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/wagmi$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wagmi\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/wagmi/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Keep outside react-parity testExecution while provenance is
+				// recorded-unverified: react-parity:check only validates that
+				// lane, so ordinary shards must still execute the differential.
+				test: {
+					name: 'wagmi-differential',
+					include: ['packages/wagmi/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					// Dual-runtime mount + async mock connect can exceed Vitest's 5s
+					// default under full-suite shard contention (same headroom as
+					// dnd-kit-differential).
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globalSetup: ['packages/wagmi/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

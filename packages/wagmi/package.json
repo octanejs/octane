@@ -36,7 +36,7 @@
     "./chains": "./src/chains.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project wagmi"
+    "test": "vitest run --root ../.. --project wagmi --project wagmi-differential"
   },
   "dependencies": {
     "@octanejs/tanstack-query": "workspace:*",
@@ -48,7 +48,9 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@tanstack/react-query": "catalog:default",
     "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
