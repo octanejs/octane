@@ -3606,6 +3606,32 @@ export default defineConfig({
 						'!packages/react-error-boundary/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					exclude: ['packages/react-error-boundary/tests/differential/**/*.test.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/react-error-boundary$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/react-error-boundary/src/index.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				// Keep outside react-parity ownership while provenance is
+				// recorded-unverified: check.mjs only validates that lane, and
+				// a wholly-owned testExecution group would omit this project
+				// from ordinary shards with no CI executor left.
+				test: {
+					name: 'react-error-boundary-differential',
+					include: ['packages/react-error-boundary/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/react-error-boundary/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

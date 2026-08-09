@@ -392,7 +392,7 @@
         "Server rendering that must match upstream error propagation uses the explicit @octanejs/react-error-boundary/server entry."
       ],
       "ssr": "The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/react-map-gl",
