@@ -1,6 +1,7 @@
 import { createStartHandler, defaultStreamHandler } from './server.js';
+import { withAssetsFallthrough } from './assets-fallback.js';
 
-const fetch = createStartHandler(defaultStreamHandler);
+const fetch = withAssetsFallthrough(createStartHandler(defaultStreamHandler));
 
 export function createServerEntry(entry) {
 	return {
