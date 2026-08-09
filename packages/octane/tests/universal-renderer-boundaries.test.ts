@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoot, flushSync, type ComponentBody } from '../src/index.js';
+import {
+	createElement,
+	createRoot,
+	flushSync,
+	useContext as useDomContext,
+	type ComponentBody,
+} from '../src/index.js';
+import { createContext as createNativeContext } from '../src/universal-native.js';
+import * as UniversalRuntime from '../src/universal.js';
 import {
 	createObjectContainer,
 	createObjectDriver,
@@ -154,6 +162,64 @@ async function flushBridgeWork(): Promise<void> {
 }
 
 describe('compiler-owned renderer child regions', () => {
+	it('renders renderer-local context providers through DOM owners without replacing their children', () => {
+		const Theme = createNativeContext('default');
+		const Reader = () =>
+			createElement('span', { className: 'renderer-local-theme' }, useDomContext(Theme as any));
+		const Provider = ({ theme }: { theme: string }) =>
+			createElement(Theme.Provider as any, { value: theme }, createElement(Reader, null));
+		const mounted = mount(Provider as unknown as ComponentBody<{ theme: string }>, {
+			theme: 'dark',
+		});
+
+		try {
+			const label = mounted.find('.renderer-local-theme');
+			expect(label.textContent).toBe('dark');
+			mounted.update(Provider as unknown as ComponentBody<{ theme: string }>, {
+				theme: 'light',
+			});
+			expect(mounted.find('.renderer-local-theme')).toBe(label);
+			expect(label.textContent).toBe('light');
+		} finally {
+			mounted.unmount();
+		}
+	});
+
+	it('settles DOM-owned universal work using the active host scheduler automatically', () => {
+		const bridged = objectRoot();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'bridged',
+			bindings: [['version', 0]],
+		});
+		let setDomVersion!: (value: number) => void;
+		const BridgedScene = defineUniversalComponent('object', (props: { version: number }) =>
+			universalValue(plan, [props.version]),
+		);
+		const mounted = mount(UniversalSchedulerBridgeApp, {
+			root: bridged.root,
+			component: BridgedScene,
+			captureUpdate(update: (value: number) => void) {
+				setDomVersion = update;
+			},
+			onUniversalLayout() {},
+		});
+
+		try {
+			const hostRuntime = UniversalRuntime as typeof UniversalRuntime & {
+				getUniversalHostFlusher?: () => typeof flushSync | undefined;
+			};
+			const result = flushUniversalSync(() => {
+				setDomVersion(1);
+				return 'settled';
+			}, hostRuntime.getUniversalHostFlusher?.());
+			expect(result).toBe('settled');
+			expect(bridged.container.children[0].props.version).toBe(1);
+		} finally {
+			mounted.unmount();
+		}
+	});
+
 	it('settles direct and DOM-owned universal cascades in one host scheduler boundary', () => {
 		const direct = objectRoot();
 		const bridged = objectRoot();

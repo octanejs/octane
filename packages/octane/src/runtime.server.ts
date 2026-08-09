@@ -76,6 +76,7 @@ import {
 	markComponentFlags,
 } from './component-flags.js';
 import { formatServerError } from './error-codes.server.generated.js';
+import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
@@ -616,6 +617,9 @@ export function createElement(
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
+	if (typeof type === 'function' && isRendererContext(type)) {
+		registerServerRendererContextProvider(renderServerContextProvider);
+	}
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
 	let kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
@@ -3655,23 +3659,29 @@ export interface Context<T> {
 
 export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {
-		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
-		scope.$$ctxValues.set(ctx, props.value);
-		const children = props.children;
-		if (children == null) return '';
-		// `.tsrx` threads children as a render function (call it directly). `.tsx`
-		// `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Provider, {}, …)`,
-		// so children arrive as a descriptor / array / primitive — render whichever
-		// shape through the generic child serializer (the same path every other
-		// descriptor child uses), or direct-JSX provider SSR would drop its content.
-		return typeof children === 'function'
-			? (children(undefined, scope) ?? '')
-			: ssrChild(children, scope);
+		return renderServerContextProvider(ctx, props, scope);
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.Provider = ctx;
 	return ctx;
+}
+
+function renderServerContextProvider(
+	context: unknown,
+	props: { value: unknown; children?: unknown },
+	renderScope: object,
+): string {
+	const scope = renderScope as SSRScope;
+	if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
+	scope.$$ctxValues.set(context, props.value);
+	const children = props.children;
+	if (children == null) return '';
+	// `.tsrx` children are render functions; `.tsx` children are descriptors,
+	// arrays, or primitives and must keep the ordinary server serializer.
+	return typeof children === 'function'
+		? (children(undefined, scope) ?? '')
+		: ssrChild(children, scope);
 }
 
 function readContext<T>(ctx: Context<T>): T {

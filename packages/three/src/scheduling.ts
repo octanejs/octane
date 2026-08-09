@@ -1,6 +1,10 @@
 import * as Octane from 'octane';
-import { flushSync as clientFlushSync } from 'octane';
-import { flushUniversalAct, flushUniversalSync, type UniversalSyncFlusher } from 'octane/universal';
+import {
+	flushUniversalAct,
+	flushUniversalSync,
+	getUniversalHostFlusher,
+	type UniversalSyncFlusher,
+} from 'octane/universal';
 
 export type Act = typeof import('octane').act;
 type FlushSync = typeof import('octane').flushSync;
@@ -67,7 +71,7 @@ function runClientAct<T>(callback: () => T | Promise<T>, clientAct: Act): Promis
 
 /** Flushes both the DOM scheduler and mounted universal Three roots. */
 export const flushSync: FlushSync = (callback) => {
-	return flushUniversalSync(callback, clientFlushSync);
+	return flushUniversalSync(callback, getUniversalHostFlusher());
 };
 
 /** R3F-compatible test helper backed by Octane's client scheduler when available. */
@@ -78,7 +82,7 @@ export const act: Act = (callback) => {
 	const clientAct = Reflect.get(Octane, 'act') as Act | undefined;
 	if (typeof clientAct === 'function') return runClientAct(callback, clientAct);
 	try {
-		return Promise.resolve(runActCallback(callback, clientFlushSync));
+		return Promise.resolve(runActCallback(callback, getUniversalHostFlusher()));
 	} catch (error) {
 		return Promise.reject(error);
 	}

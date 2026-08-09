@@ -44,10 +44,12 @@ built entry is then loaded in Chromium and must produce one real named Three
 `Mesh`; full-catalogue entries must additionally prove that the Three namespace
 was retained.
 
-Octane Three currently registers its built-in Three namespace when a root is
-created, so its minimal result truthfully includes that implementation choice.
-The paired full entry makes the cost visible instead of assuming catalogue
-tree-shaking that the current runtime does not provide.
+Compiled Three scenes register only the built-in constructors their authored
+intrinsics use, and constructor-form `extend` registers only its own class.
+Direct roots therefore let unused Three exports and the DOM renderer tree-shake
+from minimal applications. The full-catalogue entries explicitly retain the
+complete Three namespace. Both Octane gzip results have same-run ratio guards
+requiring them to be no larger than their React Three Fiber counterparts.
 
 Run through the unified harness:
 
