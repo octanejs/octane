@@ -205,7 +205,7 @@
         "The React/Babel-specific `icu.macro` subpath is not shipped; the runtime IcuTrans APIs are fully supported."
       ],
       "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/inertia",

@@ -282,17 +282,14 @@ describe('CI workflow aggregation', () => {
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
 
-		// The manifest runner owns all required lanes in one process. Execution
-		// reports prove exact identities, so only explicit validation collects.
-		assert.match(
+		// The manifest runner owns all required lanes in one process, including
+		// recorded-unverified manifests. Execution reports prove exact identities,
+		// so only explicit --validate-only skips lane execution.
+		assert.match(reactParityCheck, /\[HARNESS_PATH, 'run-required', '--manifest', relativeFile\]/);
+		assert.doesNotMatch(
 			reactParityCheck,
 			/manifest\.provenance\.verification === 'verified' \? 'run-required' : 'validate'/,
 		);
-		assert.match(
-			reactParityCheck,
-			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
-		);
-		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
 		assert.doesNotMatch(reactParityCheck, /'--lane'/);
 		const executionMarker = "} else {\n\tif (action === 'run-required'";
 		const executionStart = reactParityHarness.indexOf(executionMarker);

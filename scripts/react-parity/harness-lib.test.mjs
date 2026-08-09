@@ -250,13 +250,18 @@ test('validates exact focused Vitest identities from the execution report', () =
 	);
 });
 
-test('selects every available required lane for aggregate execution', () => {
+test('selects every available required lane for recorded-unverified aggregate execution', () => {
 	const value = manifest();
 	value.lanes.push(
 		{ ...value.lanes[0], id: 'differential', type: 'differential' },
 		{ ...value.lanes[0], id: 'optional', oracle: 'optional' },
 		{ ...value.lanes[0], id: 'unavailable', available: false },
 	);
+	assert.deepEqual(
+		requiredExecutableLanes(value).map((lane) => lane.id),
+		['adapted', 'differential'],
+	);
+	value.provenance.verification = 'verified';
 	assert.deepEqual(
 		requiredExecutableLanes(value).map((lane) => lane.id),
 		['adapted', 'differential'],

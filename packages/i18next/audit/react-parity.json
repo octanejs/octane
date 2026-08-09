@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/i18next/react-i18next.git",
+    "version": "17.0.9",
+    "commit": "8b4a9ea139b73309471737e5ba9c423f82d5c0cc",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:3c306a9b58244804feb98b80951b9c1b9963e525bb6dc77e67ec766c2b702301",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/i18next/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/i18next/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e8e139c7d33a948ad914236e662293864634f765f21042a11af0dd9306c3b13c"
+    }
+  },
+  "lanes": [
+    {
+      "id": "i18next-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same .tsrx fixture against react-i18next 17.0.9 on React and @octanejs/i18next on Octane, comparing provider, hook, Trans, and language-subscription output at mount and across language changes.",
+      "files": [
+        {
+          "path": "packages/i18next/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "366321a3ca5429d3f4427b803a91ccc8aac3f2e0fca8edb11f55e138ff18f14b",
+          "cases": [
+            {
+              "id": "differential:i18next-runtime",
+              "testName": "matches hook, provider, Trans, and language subscription output",
+              "fullName": "differential: @octanejs/i18next vs react-i18next matches hook, provider, Trans, and language subscription output"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/tests/_fixtures/runtime-diff.tsrx",
+          "role": "support",
+          "sha256": "29c985249b8999c8cc0d810ca2de57a7e36d48fe5a9facff33bb2bdfba3f8173"
+        },
+        {
+          "path": "packages/i18next/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "5037534f070272f3a4fade3c98c8bc642fef34cdc88cd6e77a1402995b81664b"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "d7fa628d6c73b41f1b93f8e1f61826a0212ae93e725c87155078cb71cc26be56"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

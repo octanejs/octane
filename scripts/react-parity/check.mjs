@@ -147,8 +147,10 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
 		if (!validateOnly) {
-			const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
-			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
+			// Execute every available required lane regardless of verification
+			// status. recorded-unverified means incomplete upstream evidence, not
+			// "skip registered oracles" — otherwise a failing required lane is inert.
+			execFileSync(process.execPath, [HARNESS_PATH, 'run-required', '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',
 			});
