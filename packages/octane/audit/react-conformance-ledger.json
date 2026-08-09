@@ -13630,11 +13630,11 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Executable evidence in “fires onLoad/onError on a (head-hoisted) <link> element” covers the supported public DOM outcome.",
+      "rationale": "Executable evidence in “keeps a <link> with onLoad/onError inline and fires both handlers” covers the supported public DOM outcome.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/dom-component-events.test.ts",
-          "testName": "fires onLoad/onError on a (head-hoisted) <link> element",
+          "testName": "keeps a <link> with onLoad/onError inline and fires both handlers",
           "modes": ["client", "production-compile"]
         }
       ]
@@ -25252,11 +25252,11 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Executable evidence in “fires onLoad/onError on a (head-hoisted) <link> element” covers the supported public DOM outcome.",
+      "rationale": "Executable evidence in “keeps a <link> with onLoad/onError inline and fires both handlers” covers the supported public DOM outcome.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/dom-component-events.test.ts",
-          "testName": "fires onLoad/onError on a (head-hoisted) <link> element",
+          "testName": "keeps a <link> with onLoad/onError inline and fires both handlers",
           "modes": ["client", "production-compile"]
         }
       ]

@@ -14705,11 +14705,16 @@ function requiresTemplateNormalization(node, parentNs = 'html', allowHeadHoists 
 	const tag = jsxTagName(node) || elementTagName(node);
 	const selfNs = typeof tag === 'string' ? nsForSelf(tag, parentNs) : parentNs;
 	if (tag === 'head') return true;
-	// meta/link are document resources in every namespace. Only title is
+	// Meta and eligible links are document resources in every namespace. Only title is
 	// ambiguous across an opaque component boundary (HTML document title vs SVG
 	// accessibility title), so suppressing the recursive title classification
 	// must not accidentally suppress the other singleton kinds.
-	if (selfNs !== 'svg' && HOISTABLE_HEAD_TAGS.has(tag) && (tag !== 'title' || allowHeadHoists))
+	if (
+		selfNs !== 'svg' &&
+		HOISTABLE_HEAD_TAGS.has(tag) &&
+		(tag !== 'title' || allowHeadHoists) &&
+		(tag !== 'link' || isHoistableHeadElementNode(node))
+	)
 		return true;
 
 	const childNs =
@@ -16334,14 +16339,15 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 // Hoisted document metadata (<title>/<meta>/<link>) — React-19 model
 // ===========================================================================
 //
-// `<title>`, `<meta>`, `<link>` rendered ANYWHERE in a component are NOT body
-// DOM: like `<style>` (→ CSS), they are lifted to the document head — emitted as
+// `<title>`, `<meta>`, and eligible `<link>` elements rendered in a component are
+// NOT body DOM: like `<style>` (→ CSS), they are lifted to the document head as
 // a `headBlock(__s, …)` call on the client (creates/adopts/updates/removes the
 // element in document.head, reactively, tied to the owning scope's lifecycle)
 // and an `ssrHeadEl(…)` call on the server (serializes into render().head,
 // prefixed with a `<!--key-->` marker the client headBlock adopts on hydration).
 // Lifting them out of the body-root set also collapses the remaining single body
 // element to the single-root path (no `<octane-frag>`).
+// Links with explicit `onLoad`/`onError` remain in their authored DOM position.
 
 const HOISTABLE_HEAD_TAGS = new Set(['title', 'meta', 'link']);
 
@@ -16359,7 +16365,21 @@ function isHeadElementNode(n) {
 
 /** @param {any} n @returns {boolean} */
 function isHoistableHeadElementNode(n) {
-	return Boolean(n && n.type === 'JSXElement' && HOISTABLE_HEAD_TAGS.has(jsxTagName(n)));
+	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return false;
+	const tag = jsxTagName(n) || elementTagName(n);
+	if (!HOISTABLE_HEAD_TAGS.has(tag)) return false;
+	if (tag !== 'link') return true;
+
+	// React keeps links with explicit load/error handlers in their authored DOM
+	// position, preserving resource-event propagation through logical ancestors.
+	// Spread keys remain unknowable here and keep the existing head-hoist path.
+	const attrs = n.attributes || n.openingElement?.attributes || [];
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		const name = jsxAttrRawName(attr);
+		if (name === 'onLoad' || name === 'onError') return false;
+	}
+	return true;
 }
 
 // Deterministic per-element key bridging the client `headBlock` (its scope-state
@@ -16603,8 +16623,8 @@ function headElementArgNodes(node, index, ctx) {
 		// refs/key have no head semantics; `class` is the CSS-scoping stamp
 		// (meaningless on title/meta/link) — drop them. EVENTS pass through: a
 		// hoisted element lives in document.head, outside every delegation root,
-		// so the client headBlock attaches on* props as DIRECT listeners
-		// (`<link onLoad={…}>` — React parity); the server ssrHeadEl skips them.
+		// so the client headBlock attaches spread-provided on* props as DIRECT
+		// listeners; the server ssrHeadEl skips them.
 		if (attrName === 'key' || attrName === 'ref' || attrName === 'class') continue;
 		const val = a.value;
 		if (val == null) {
@@ -16682,7 +16702,7 @@ function emitHeadServer(headNodes, ctx) {
  *     (ForOfStatement) so it takes the keyed forBlock/ssrBlock fast path
  *   - JSXElement → `Element` (with `<Fragment ref>` expanded to a
  *     FragmentStart/…/FragmentEnd sequence, `<Activity>` lowered to an
- *     ActivityStatement, `<title>/<meta>/<link>` hoisted as `HeadHoist`,
+ *     ActivityStatement, eligible `<title>/<meta>/<link>` hoisted as `HeadHoist`,
  *     and `<head>` rejected)
  *   - Fragments (`<>…</>`, Tsx/Tsrx) → flattened (children inlined)
  *   - JSXStyleElement → dropped (its CSS is handled by the scoping pipeline)
@@ -16804,11 +16824,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 						'document.head automatically, React-19-style.',
 				);
 			}
-			// `<title>`/`<meta>`/`<link>` → hoist to the document-head channel (NOT
+			// `<title>`/`<meta>`/eligible `<link>` → hoist to the document-head channel (NOT
 			// body DOM). Kept in `out` as a synthetic node so planJsx / ssrCompileBody
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
-			// (server). Lifted from wherever they appear in the output — EXCEPT an
-			// SVG `<title>`, which is the SVG tooltip element and stays in place.
+			// (server). SVG `<title>` and explicit resource-handler links stay inline.
 			if (isHoistableHeadElementNode(n) && !(inSvg && jsxTagName(n) === 'title')) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
@@ -17341,7 +17360,7 @@ function planJsx(
 	const _prevElemLocs = ctx._elemLocs;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
 	const allNodes = normalizeChildren(jsxNodesRaw, parentNs === 'svg', ctx);
-	// Partition hoisted `<title>`/`<meta>`/`<link>` out of the BODY-root set:
+	// Partition hoisted `<title>`/`<meta>`/eligible `<link>` out of the BODY-root set:
 	// `jsxNodes` (the body) drives single/multi-root + the template, while head
 	// elements are mounted out-of-band into document.head. Excluding them (like
 	// `<style>`) is what collapses a `<title> + <style> + <div>` page to single-root.

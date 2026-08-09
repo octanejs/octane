@@ -12299,9 +12299,10 @@ export function setSpread(
 const _injectedStyles = new Set<string>();
 
 // ---------------------------------------------------------------------------
-// Hoisted document metadata (React-19-shape) — `<title>`, `<meta>`, `<link>`
-// rendered ANYWHERE in a component are lifted to <document.head> by the compiler
-// emitting one `headBlock(scope, slot, key, tag, attrs, text)` call per element
+// Hoisted document metadata (React-19-shape) — `<title>`, `<meta>`, and `<link>`
+// are lifted to <document.head>, except links with explicit `onLoad`/`onError`
+// handlers, which stay inline. The compiler emits one
+// `headBlock(scope, slot, key, tag, attrs, text)` call per hoisted element
 // (instead of placing it in the body template). Because octane re-invokes a
 // component body on every render, this call recurs each render: the element is
 // created/adopted ONCE (held in `scope.slots[slot]`; `key` is the content hash for
@@ -12315,8 +12316,19 @@ const _injectedStyles = new Set<string>();
 
 interface HeadSlot {
 	el: Element;
-	/** Direct listeners for on* props — head elements sit outside delegation roots. */
+	/** Direct listeners keyed by prop name so capture and bubble phases stay independent. */
 	handlers?: Map<string, EventListener>;
+}
+
+function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | null): void {
+	const handlers = state.handlers;
+	if (handlers === undefined) return;
+	for (const [name, listener] of handlers) {
+		if (attrs !== null && name in attrs) continue;
+		const event = eventSlot(name)!;
+		state.el.removeEventListener(event.type, listener, event.capture);
+		handlers.delete(name);
+	}
 }
 
 // Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
@@ -12390,11 +12402,13 @@ export function headBlock(
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
 		(scope.cleanups ??= []).push(() => {
+			removeHeadEventListeners(state!, null);
 			state!.el.remove();
 			scope.slots[slot] = undefined;
 		});
 	}
 	const el = state.el;
+	if (state.handlers !== undefined) removeHeadEventListeners(state, attrs);
 	if (attrs !== null) {
 		for (const k in attrs) {
 			// Hoisted head elements live in document.head — OUTSIDE every delegation
@@ -12404,14 +12418,18 @@ export function headBlock(
 			if (ev !== null) {
 				const v = attrs[k];
 				const listener = process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v;
-				const hs = (state.handlers ??= new Map<string, EventListener>());
-				const prevH = hs.get(ev.type);
-				if (prevH) el.removeEventListener(ev.type, prevH, ev.capture);
+				const hs = state.handlers;
+				const prevH = hs?.get(k);
+				if (prevH === listener) continue;
+				if (prevH !== undefined) el.removeEventListener(ev.type, prevH, ev.capture);
 				if (typeof listener === 'function') {
 					el.addEventListener(ev.type, listener as EventListener, ev.capture);
-					hs.set(ev.type, listener as EventListener);
+					(hs ?? (state.handlers = new Map<string, EventListener>())).set(
+						k,
+						listener as EventListener,
+					);
 				} else {
-					hs.delete(ev.type);
+					hs?.delete(k);
 				}
 				continue;
 			}
@@ -12451,6 +12469,7 @@ export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementD
 		// before returning the inline descriptor for this pass.
 		const state = scope.slots[slot] as HeadSlot | undefined;
 		if (state !== undefined) {
+			removeHeadEventListeners(state, null);
 			state.el.remove();
 			scope.slots[slot] = undefined;
 		}

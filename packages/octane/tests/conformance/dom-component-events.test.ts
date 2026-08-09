@@ -5,6 +5,11 @@ import {
 	SourceError,
 	SvgImageEvents,
 	LinkEvents,
+	LoadOnlyLink,
+	ErrorOnlyLink,
+	CaptureOnlyLink,
+	LinkSpreadEvents,
+	NestedLinkEvents,
 	OuterApp,
 	InnerApp,
 	TapClick,
@@ -51,14 +56,8 @@ describe('ReactDOMComponent — non-bubbling resource events', () => {
 
 	// Per ReactDOMComponent-test.js:1992 — should receive a load event on <link> elements
 	// Per ReactDOMComponent-test.js:2010 — should receive an error event on <link> elements
-	// GAP: octane hoists <link> into document.head (headBlock), which sits
-	// OUTSIDE every event-delegation target (delegation roots are createRoot
-	// containers + portal targets) — the capture-phase delegated error/load
-	// listener never sees events fired on the hoisted element, so onLoad/onError
-	// on a <link> never fire. React attaches to the element and both fire.
-	// Runtime location: headBlock hoisting + registerDelegationTarget
-	// (runtime.ts) — hoisted head elements need direct listeners.
-	it('fires onLoad/onError on a (head-hoisted) <link> element', () => {
+	// React keeps links with resource event handlers in their authored position.
+	it('keeps a <link> with onLoad/onError inline and fires both handlers', () => {
 		const calls: string[] = [];
 		const before = document.head.querySelectorAll('link').length;
 		const r = mount(LinkEvents, {
@@ -66,20 +65,239 @@ describe('ReactDOMComponent — non-bubbling resource events', () => {
 			onError: () => calls.push('error'),
 		});
 		try {
-			const links = document.head.querySelectorAll('link');
-			const link = links[links.length - 1];
-			expect(links.length).toBe(before + 1);
+			const link = r.container.querySelector('link[href="http://example.org/link"]');
+			expect(link).not.toBeNull();
+			expect(document.head.querySelectorAll('link')).toHaveLength(before);
 			const loadEvent = document.createEvent('Event');
 			loadEvent.initEvent('load', false, false);
-			link.dispatchEvent(loadEvent);
+			link!.dispatchEvent(loadEvent);
 			expect(calls).toEqual(['load']);
 			const errorEvent = document.createEvent('Event');
 			errorEvent.initEvent('error', false, false);
-			link.dispatchEvent(errorEvent);
+			link!.dispatchEvent(errorEvent);
 			expect(calls).toEqual(['load', 'error']);
 		} finally {
 			r.unmount();
 		}
+	});
+
+	// Per ReactDOMComponent-test.js:1992/:2010 — either resource handler
+	// independently prevents an otherwise hoistable link from moving to <head>.
+	it.each([
+		{ event: 'load', href: 'http://example.org/load-only', component: LoadOnlyLink },
+		{ event: 'error', href: 'http://example.org/error-only', component: ErrorOnlyLink },
+	])('keeps a <link> with only an on$event handler inline', ({ event, href, component }) => {
+		const calls: string[] = [];
+		const r = mount(component, { handler: (received: Event) => calls.push(received.type) });
+		try {
+			const selector = `link[href="${href}"]`;
+			const link = r.container.querySelector(selector);
+			expect(link).not.toBeNull();
+			expect(document.head.querySelector(selector)).toBeNull();
+			link!.dispatchEvent(new Event(event, { bubbles: false }));
+			expect(calls).toEqual([event]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMComponent-test.js:1992/:2010 — capture-only listeners do not
+	// disable resource hoisting, but remain live on the hoisted link.
+	it('keeps capture-only resource links hoisted and delivers both events', () => {
+		const calls: string[] = [];
+		const r = mount(CaptureOnlyLink, { handler: (event: Event) => calls.push(event.type) });
+		try {
+			const selector = 'link[href="http://example.org/capture-only"]';
+			expect(r.container.querySelector(selector)).toBeNull();
+			const link = document.head.querySelector(selector);
+			expect(link).not.toBeNull();
+			link!.dispatchEvent(new Event('load', { bubbles: false }));
+			link!.dispatchEvent(new Event('error', { bubbles: false }));
+			expect(calls).toEqual(['load', 'error']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMComponent-test.js:1992/:2010 and
+	// ReactDOMEventPropagation-test.js:983/:1015 — resource handlers keep their
+	// authored DOM position and propagate through capture and bubble ancestors.
+	it('propagates nested link load/error through the authored ancestor while metadata stays hoisted', () => {
+		const calls: string[] = [];
+		const handlers = (location: string) => ({
+			onLoad: () => calls.push(`load:${location}:bubble`),
+			onLoadCapture: () => calls.push(`load:${location}:capture`),
+			onError: () => calls.push(`error:${location}:bubble`),
+			onErrorCapture: () => calls.push(`error:${location}:capture`),
+		});
+		const r = mount(NestedLinkEvents, {
+			ancestor: handlers('ancestor'),
+			target: handlers('target'),
+		});
+		try {
+			const parent = r.find('.link-parent');
+			const link = parent.querySelector('link[href="http://example.org/nested-link"]');
+			expect(link).not.toBeNull();
+			expect(document.head.querySelector('link[href="http://example.org/nested-link"]')).toBeNull();
+			expect(
+				document.head.querySelector(
+					'link[rel="canonical"][href="http://example.org/canonical-link"]',
+				),
+			).not.toBeNull();
+
+			link!.dispatchEvent(new Event('load', { bubbles: false }));
+			link!.dispatchEvent(new Event('error', { bubbles: false }));
+			expect(calls).toEqual([
+				'load:ancestor:capture',
+				'load:target:capture',
+				'load:target:bubble',
+				'load:ancestor:bubble',
+				'error:ancestor:capture',
+				'error:target:capture',
+				'error:target:bubble',
+				'error:ancestor:bubble',
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMEventPropagation-test.js:983/:1015 — stopping an inline
+	// resource event at its target prevents the ancestor bubble handler.
+	it('honors stopPropagation for nested link load/error target handlers', () => {
+		const calls: string[] = [];
+		const stop = (event: Event) => {
+			calls.push(`${event.type}:target:bubble`);
+			event.stopPropagation();
+		};
+		const r = mount(NestedLinkEvents, {
+			ancestor: {
+				onLoad: () => calls.push('load:ancestor:bubble'),
+				onLoadCapture: () => calls.push('load:ancestor:capture'),
+				onError: () => calls.push('error:ancestor:bubble'),
+				onErrorCapture: () => calls.push('error:ancestor:capture'),
+			},
+			target: {
+				onLoad: stop,
+				onLoadCapture: () => calls.push('load:target:capture'),
+				onError: stop,
+				onErrorCapture: () => calls.push('error:target:capture'),
+			},
+		});
+		try {
+			const link = r.container.querySelector('link[href="http://example.org/nested-link"]');
+			expect(link).not.toBeNull();
+			link!.dispatchEvent(new Event('load', { bubbles: false }));
+			link!.dispatchEvent(new Event('error', { bubbles: false }));
+			expect(calls).toEqual([
+				'load:ancestor:capture',
+				'load:target:capture',
+				'load:target:bubble',
+				'error:ancestor:capture',
+				'error:target:capture',
+				'error:target:bubble',
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMComponent-test.js:1992/:2010 — removed resource handlers
+	// must stop receiving events when a later prop spread omits them.
+	it('removes hoisted link onLoad/onError handlers omitted from an updated spread', () => {
+		const calls: string[] = [];
+		const r = mount(LinkSpreadEvents, {
+			handlers: {
+				onLoad: () => calls.push('load'),
+				onError: () => calls.push('error'),
+			},
+		});
+		try {
+			const link = document.head.querySelector('link[href="http://example.org/spread-link"]')!;
+			link.dispatchEvent(new Event('load'));
+			link.dispatchEvent(new Event('error'));
+			expect(calls).toEqual(['load', 'error']);
+
+			r.update(LinkSpreadEvents, { handlers: {} });
+			expect(document.head.querySelector('link[href="http://example.org/spread-link"]')).toBe(link);
+			link.dispatchEvent(new Event('load'));
+			link.dispatchEvent(new Event('error'));
+			expect(calls).toEqual(['load', 'error']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMComponent-test.js:1992/:2010 — capture and bubble handlers
+	// on the same resource event are independent props across updates.
+	it('replaces hoisted link load/error capture and bubble handlers without stale callbacks', () => {
+		const calls: string[] = [];
+		const handlers = (version: string) => ({
+			onLoad: () => calls.push(`${version}:load:bubble`),
+			onLoadCapture: () => calls.push(`${version}:load:capture`),
+			onError: () => calls.push(`${version}:error:bubble`),
+			onErrorCapture: () => calls.push(`${version}:error:capture`),
+		});
+		const r = mount(LinkSpreadEvents, { handlers: handlers('first') });
+		try {
+			const link = document.head.querySelector('link[href="http://example.org/spread-link"]')!;
+			link.dispatchEvent(new Event('load'));
+			link.dispatchEvent(new Event('error'));
+			expect(calls).toEqual([
+				'first:load:capture',
+				'first:load:bubble',
+				'first:error:capture',
+				'first:error:bubble',
+			]);
+
+			const replacement = handlers('second');
+			r.update(LinkSpreadEvents, { handlers: replacement });
+			link.dispatchEvent(new Event('load'));
+			link.dispatchEvent(new Event('error'));
+			expect(calls).toEqual([
+				'first:load:capture',
+				'first:load:bubble',
+				'first:error:capture',
+				'first:error:bubble',
+				'second:load:capture',
+				'second:load:bubble',
+				'second:error:capture',
+				'second:error:bubble',
+			]);
+
+			r.update(LinkSpreadEvents, { handlers: replacement });
+			link.dispatchEvent(new Event('load'));
+			link.dispatchEvent(new Event('error'));
+			expect(calls.slice(-4)).toEqual([
+				'second:load:capture',
+				'second:load:bubble',
+				'second:error:capture',
+				'second:error:bubble',
+			]);
+			expect(calls).toHaveLength(12);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMComponent-test.js:1992/:2010 — unmounting a resource must
+	// disconnect its event props even if consumer code retains its DOM node.
+	it('stops hoisted link load/error capture and bubble handlers after unmount', () => {
+		const calls: string[] = [];
+		const r = mount(LinkSpreadEvents, {
+			handlers: {
+				onLoad: () => calls.push('load:bubble'),
+				onLoadCapture: () => calls.push('load:capture'),
+				onError: () => calls.push('error:bubble'),
+				onErrorCapture: () => calls.push('error:capture'),
+			},
+		});
+		const link = document.head.querySelector('link[href="http://example.org/spread-link"]')!;
+		r.unmount();
+		expect(link.isConnected).toBe(false);
+		link.dispatchEvent(new Event('load'));
+		link.dispatchEvent(new Event('error'));
+		expect(calls).toEqual([]);
 	});
 });
 
@@ -147,10 +365,6 @@ describe('ReactDOMComponent — iOS tap highlight', () => {
 	});
 
 	// Per ReactDOMComponent-test.js:3832 — adds onclick handler to a portal root
-	// GAP: same Safari workaround on the portal TARGET (React stamps onclick on
-	// the portal container). Octane registers the target for delegation but
-	// leaves target.onclick untouched. Runtime location:
-	// registerDelegationTarget (runtime.ts ~4107).
 	it('stamps a noop onclick property on a portal root', () => {
 		const portalContainer = document.createElement('div');
 		document.body.appendChild(portalContainer);
