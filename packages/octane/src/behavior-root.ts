@@ -499,7 +499,7 @@ function ensureObserver(root: RootRecord): void {
 		// final containment before cleanup so a move preserves its live adoption.
 		for (const record of [...root.behaviors]) reconcileBehavior(record);
 	});
-	root.observer.observe(root.container, { childList: true, subtree: true });
+	root.observer.observe(root.container, { attributes: true, childList: true, subtree: true });
 }
 
 function targetElement(event: Event): Element | null {

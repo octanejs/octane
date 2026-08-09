@@ -168,6 +168,104 @@ describe('behavior-only roots', () => {
 		expect(section.firstElementChild).toBe(streamed);
 	});
 
+	it('adopts existing elements when externally patched attributes toggle selector eligibility', async () => {
+		container.innerHTML =
+			'<section data-owner="stream"><button id="action" aria-label="Original">Action</button></section>';
+		const section = container.firstElementChild!;
+		const button = section.firstElementChild!;
+		const originalMarkup = container.innerHTML;
+		const cleaned: Element[] = [];
+		const adopted = vi.fn((element: Element) => () => cleaned.push(element));
+		const root = attach();
+		const registration = root.registerBehavior({ target: '[data-action]', adopt: adopted });
+		await registration.ready;
+		expect(adopted).not.toHaveBeenCalled();
+
+		button.setAttribute('data-action', 'annotation');
+		await vi.waitFor(() => expect(adopted).toHaveBeenCalledOnce());
+		expect(adopted.mock.calls[0]?.[0]).toBe(button);
+
+		button.removeAttribute('data-action');
+		await vi.waitFor(() => expect(cleaned).toEqual([button]));
+
+		button.setAttribute('data-action', 'annotation');
+		await vi.waitFor(() => expect(adopted).toHaveBeenCalledTimes(2));
+		button.removeAttribute('data-action');
+		await vi.waitFor(() => expect(cleaned).toEqual([button, button]));
+		registration.dispose();
+
+		expect(cleaned).toEqual([button, button]);
+		expect(container.innerHTML).toBe(originalMarkup);
+		expect(container.firstElementChild).toBe(section);
+		expect(section.firstElementChild).toBe(button);
+	});
+
+	it.each([
+		{
+			change: 'an existing element changes class',
+			selector: '.is-interactive',
+			mutateAncestor: false,
+			className: 'is-interactive',
+		},
+		{
+			change: 'an unchanged descendant gains an attribute-selected ancestor',
+			selector: '[data-enabled] [data-action]',
+			mutateAncestor: true,
+			attribute: 'data-enabled',
+		},
+		{
+			change: 'an unchanged descendant gains a class-selected ancestor',
+			selector: '.is-enabled [data-action]',
+			mutateAncestor: true,
+			className: 'is-enabled',
+		},
+	])(
+		'updates existing behavior when $change',
+		async ({ selector, mutateAncestor, attribute, className }) => {
+			container.innerHTML =
+				'<section class="external" data-owner="stream"><button id="action" class="stable" data-action>Action</button></section>';
+			const section = container.firstElementChild!;
+			const button = section.firstElementChild!;
+			const originalMarkup = container.innerHTML;
+			const owner = Symbol('external stream');
+			const cleaned: Element[] = [];
+			const adopted = vi.fn((element: Element) => () => cleaned.push(element));
+			const root = attach();
+			root.registerExternalRange(section, { owner });
+			const behavior = root.registerBehavior({ owner, target: selector, adopt: adopted });
+			await behavior.ready;
+			expect(adopted).not.toHaveBeenCalled();
+
+			const patched = mutateAncestor ? section : button;
+			const enable = () => {
+				if (attribute) patched.setAttribute(attribute, '');
+				else patched.classList.add(className!);
+			};
+			const disable = () => {
+				if (attribute) patched.removeAttribute(attribute);
+				else patched.classList.remove(className!);
+			};
+
+			enable();
+			await vi.waitFor(() => expect(adopted).toHaveBeenCalledOnce());
+			expect(adopted.mock.calls[0]?.[0]).toBe(button);
+
+			disable();
+			await vi.waitFor(() => expect(cleaned).toEqual([button]));
+
+			enable();
+			await vi.waitFor(() => expect(adopted).toHaveBeenCalledTimes(2));
+			disable();
+			await vi.waitFor(() => expect(cleaned).toEqual([button, button]));
+			behavior.dispose();
+
+			expect(cleaned).toEqual([button, button]);
+			expect(container.innerHTML).toBe(originalMarkup);
+			expect(container.firstElementChild).toBe(section);
+			expect(section.firstElementChild).toBe(button);
+		},
+	);
+
 	it('updates :empty behavior when streamed mutations add or remove only text nodes', async () => {
 		container.innerHTML = '<section id="streamed-text"></section>';
 		const range = container.firstElementChild!;

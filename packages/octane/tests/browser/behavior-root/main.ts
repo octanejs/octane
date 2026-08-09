@@ -104,6 +104,22 @@ async function mountStreaming(): Promise<void> {
 	await root.ready;
 }
 
+async function mountChangingSelectors(): Promise<void> {
+	root = attachBehaviorRoot(shell);
+	root.registerExternalRange(external, { owner: 'stream' });
+	root.registerExternalRange(nested, { owner: 'nested' });
+	registerActions('stream', '#initial-widget[data-enhanced-action]', {
+		id: 'attribute-actions',
+	});
+	registerActions('stream', '#annotation-link.interactive-annotation', {
+		id: 'class-actions',
+	});
+	registerActions('nested', '#nested-range[data-live] #nested-widget', {
+		id: 'ancestor-actions',
+	});
+	await root.ready;
+}
+
 async function appendStreamedMarkup(chunks: StreamChunk[]): Promise<void> {
 	const stream = new ReadableStream<StreamChunk>({
 		start(controller) {
@@ -263,6 +279,7 @@ const harness = {
 	},
 	handoffNestedOwner,
 	mountAbortedInteractions,
+	mountChangingSelectors,
 	mountPendingInteractions,
 	mountPendingRange,
 	mountStreaming,

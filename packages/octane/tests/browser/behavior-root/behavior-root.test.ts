@@ -253,6 +253,95 @@ for (const [name, engine] of [
 			]);
 		});
 
+		it('updates existing owned widgets as element and ancestor attributes change', async () => {
+			const page = await openPage();
+			await page.evaluate(() => window.__behaviorRootBrowser.mountChangingSelectors());
+			const before = await page.evaluate(() => window.__behaviorRootBrowser.state());
+			expect(before.adoptions).toEqual([]);
+
+			await page.evaluate(() => {
+				document.querySelector('#initial-widget')!.setAttribute('data-enhanced-action', 'ready');
+				document.querySelector('#annotation-link')!.classList.add('interactive-annotation');
+				document.querySelector('#nested-range')!.setAttribute('data-live', 'true');
+			});
+			await page.waitForFunction(() => window.__behaviorRootBrowser.state().adoptions.length === 3);
+			await page.locator('#initial-widget').click();
+			await page.locator('#annotation-link').click();
+			await page.locator('#nested-widget').click();
+
+			const adopted = await page.evaluate(() => window.__behaviorRootBrowser.state());
+			expect(adopted.identity).toEqual(before.identity);
+			expect(adopted.adoptions.toSorted()).toEqual([
+				'annotation-link',
+				'initial-widget',
+				'nested-widget',
+			]);
+			expect(adopted.interactions).toEqual([
+				expect.objectContaining({
+					id: 'initial-widget',
+					original: true,
+					owner: 'stream',
+					trusted: true,
+				}),
+				expect.objectContaining({
+					id: 'annotation-link',
+					original: true,
+					owner: 'stream',
+					trusted: true,
+				}),
+				expect.objectContaining({
+					id: 'nested-widget',
+					original: true,
+					owner: 'nested',
+					trusted: true,
+				}),
+			]);
+
+			await page.evaluate(() => {
+				document.querySelector('#initial-widget')!.removeAttribute('data-enhanced-action');
+				document.querySelector('#annotation-link')!.classList.remove('interactive-annotation');
+				document.querySelector('#nested-range')!.removeAttribute('data-live');
+			});
+			await page.waitForFunction(() => window.__behaviorRootBrowser.state().cleanups.length === 3);
+			const released = await page.evaluate(() => window.__behaviorRootBrowser.state());
+			expect(released.cleanups.toSorted()).toEqual(adopted.adoptions.toSorted());
+			expect(released.identity).toEqual(before.identity);
+			await page.locator('#initial-widget').click();
+			await page.locator('#nested-widget').click();
+			expect(
+				(await page.evaluate(() => window.__behaviorRootBrowser.state())).interactions,
+			).toEqual(adopted.interactions);
+
+			await page.evaluate(() => {
+				document.querySelector('#initial-widget')!.setAttribute('data-enhanced-action', 'again');
+			});
+			await page.waitForFunction(
+				() =>
+					window.__behaviorRootBrowser.state().adoptions.filter((id) => id === 'initial-widget')
+						.length === 2,
+			);
+			await page.locator('#initial-widget').click();
+			const readopted = await page.evaluate(() => window.__behaviorRootBrowser.state());
+			expect(readopted.interactions.at(-1)).toMatchObject({
+				id: 'initial-widget',
+				nativeDispatches: 3,
+				original: true,
+				owner: 'stream',
+				trusted: true,
+			});
+			await page.evaluate(() => {
+				document.querySelector('#initial-widget')!.removeAttribute('data-enhanced-action');
+			});
+			await page.waitForFunction(
+				() =>
+					window.__behaviorRootBrowser.state().cleanups.filter((id) => id === 'initial-widget')
+						.length === 2,
+			);
+			expect((await page.evaluate(() => window.__behaviorRootBrowser.state())).identity).toEqual(
+				before.identity,
+			);
+		});
+
 		it('preserves streaming and genuine queued interactions before and after range readiness', async () => {
 			const page = await openPage();
 			await page.evaluate(() => window.__behaviorRootBrowser.mountPendingRange());
