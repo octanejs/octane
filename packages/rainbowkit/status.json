@@ -12,10 +12,12 @@
     "rainbowTheme is an explicitly documented Octane-only purple/rounded preset; it is not an upstream RainbowKit export."
   ],
   "ssr": "The provider and controls emit deterministic disconnected markup without browser wallet access. Connector discovery and live Wagmi state become authoritative after hydration; no hydrated UI state authorizes wallet actions.",
-  "verified": "2026-07-29",
+  "verified": "2026-08-02",
   "provenance": {
     "source": "https://github.com/rainbow-me/rainbowkit",
-    "license": "MIT"
+    "license": "MIT",
+    "commit": "03360ee924cfa6af13ff1d623b356bf5a170348e",
+    "verification": "recorded-unverified"
   },
   "supportedExports": [
     "RainbowKitProvider",
