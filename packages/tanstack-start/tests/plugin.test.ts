@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Plugin, PluginOption } from 'vite';
-import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
+import { build, type Plugin, type PluginOption } from 'vite';
+import { cloudflareExternals, tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
 
 function flattenPlugins(options: Array<PluginOption>): Array<Plugin> {
 	const plugins: Array<Plugin> = [];
@@ -28,6 +28,71 @@ describe('TanStack Start Vite integration', () => {
 
 		expect(compilerIndex).toBeGreaterThanOrEqual(0);
 		expect(generatorIndex).toBeGreaterThan(compilerIndex);
+	});
+});
+
+describe('cloudflare externals', () => {
+	const plugin = cloudflareExternals() as Plugin;
+
+	it('externalizes cloudflare: specifiers in the server environment only', () => {
+		const applyToEnvironment = plugin.applyToEnvironment as (environment: {
+			name: string;
+		}) => boolean;
+		expect(applyToEnvironment({ name: 'ssr' })).toBe(true);
+		expect(applyToEnvironment({ name: 'client' })).toBe(false);
+
+		const resolveId = plugin.resolveId as (id: string) => unknown;
+		expect(resolveId('cloudflare:workers')).toEqual({
+			id: 'cloudflare:workers',
+			external: true,
+		});
+		expect(resolveId('cloudflare:email')).toEqual({
+			id: 'cloudflare:email',
+			external: true,
+		});
+	});
+
+	it('leaves other specifiers to the normal resolver', () => {
+		const plugin = cloudflareExternals() as Plugin;
+		const resolveId = plugin.resolveId as (id: string) => unknown;
+
+		expect(resolveId('vite')).toBeUndefined();
+		expect(resolveId('./relative.js')).toBeUndefined();
+	});
+
+	it('keeps cloudflare: imports external in a real server build', async () => {
+		const plugin = cloudflareExternals() as Plugin;
+		const result = (await build({
+			configFile: false,
+			logLevel: 'silent',
+			build: {
+				write: false,
+				ssr: true,
+				rollupOptions: { input: 'virtual:entry' },
+			},
+			plugins: [
+				{
+					name: 'test-server-entry',
+					resolveId(id) {
+						if (id === 'virtual:entry') return id;
+					},
+					load(id) {
+						if (id === 'virtual:entry') {
+							return 'import * as cf from "cloudflare:workers"; export default cf.env;';
+						}
+					},
+				},
+				plugin,
+			],
+		})) as unknown as {
+			output: Array<{ type: string; code?: string }>;
+		};
+
+		const code = result.output
+			.filter((entry) => entry.type === 'chunk' && entry.code !== undefined)
+			.map((entry) => entry.code!)
+			.join('\n');
+		expect(code).toContain('cloudflare:workers');
 	});
 });
 

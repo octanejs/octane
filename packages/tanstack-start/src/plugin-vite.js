@@ -27,6 +27,26 @@ const WORKSPACE_SOURCE_INCLUDES = [
 	'@octanejs/tanstack-start > @tanstack/router-core/isServer',
 ];
 
+// Cloudflare-targeted deployments: `cloudflare:*` modules (e.g.
+// `cloudflare:workers` for bindings) are provided by the workerd runtime,
+// not npm. Externalize them in the server build so the bundle builds
+// standalone; workerd resolves them at runtime. This plugin only
+// externalizes server-runtime modules — it does not provide a local
+// Cloudflare runtime or deployment integration. Opt-in by composition:
+// a non-Cloudflare target that imports `cloudflare:` should fail the
+// build, not defer the error to runtime.
+export function cloudflareExternals() {
+	return {
+		name: 'octanejs-tanstack-start:cloudflare-externals',
+		applyToEnvironment: (environment) => environment.name === START_ENVIRONMENT_NAMES.server,
+		resolveId(id) {
+			if (id.startsWith('cloudflare:')) {
+				return { id, external: true };
+			}
+		},
+	};
+}
+
 export function tanstackStart(options) {
 	const { octane: octaneOptions, ...startOptions } = options ?? {};
 	validateOctaneCompilerOptions(octaneOptions);

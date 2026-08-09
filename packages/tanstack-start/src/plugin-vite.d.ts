@@ -26,6 +26,15 @@ export type TanStackOctaneStartViteInputConfig = TanStackStartViteInputConfig & 
 	octane?: OctaneCompilerOptions;
 };
 
+/**
+ * Externalize `cloudflare:*` modules (e.g. `cloudflare:workers`) in the
+ * server build. Compose this for Cloudflare-targeted deployments, where
+ * the workerd runtime provides those modules at runtime. It only
+ * externalizes server-runtime modules; it does not provide a local
+ * Cloudflare runtime or deployment integration.
+ */
+export declare function cloudflareExternals(): PluginOption;
+
 export declare function tanstackStart(
 	options?: TanStackOctaneStartViteInputConfig,
 ): Array<PluginOption>;
