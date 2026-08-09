@@ -280,6 +280,7 @@ instead of hydrating or rendering the externally managed range:
 
 ```ts
 import { attachBehaviorRoot } from 'octane/behavior';
+import { articleStream } from './article-stream.js';
 
 const lifetime = new AbortController();
 const root = attachBehaviorRoot(document.querySelector('#app')!, {
@@ -293,6 +294,7 @@ root.registerExternalRange(document.querySelector('#article')!, {
 });
 
 let activateAnnotation: (event: Event, element: Element) => void;
+let observeAnnotation: (element: Element, signal: AbortSignal) => () => void;
 
 root.registerBehavior({
 	id: 'article-annotations',
@@ -301,6 +303,7 @@ root.registerBehavior({
 	events: ['click'],
 	ready: import('./annotations.js').then((module) => {
 		activateAnnotation = module.activateAnnotation;
+		observeAnnotation = module.observeAnnotation;
 	}),
 	adopt(element, { signal }) {
 		return observeAnnotation(element, signal);
