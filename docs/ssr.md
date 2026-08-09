@@ -36,6 +36,14 @@ The server build must compile components with the Octane compiler in
 `mode: 'server'` (`@octanejs/vite-plugin` handles this automatically; SSR module
 loading through Vite picks the server transform automatically).
 
+If another renderer or an independent stream owns part of the server-rendered
+DOM, use a permanent-static `<Hydrate split={false} when={never()}>` boundary to
+preserve that range and `attachBehaviorRoot` from `octane/behavior` to attach
+behavior without claiming reconciliation ownership. The
+[behavior-only roots and external ownership guide](./deferred-hydration.md#behavior-only-roots-and-external-ownership)
+covers range readiness, nested owners, delegated native interactions, and
+disposal.
+
 ### Run an SSG script directly
 
 When a server or SSG entry runs outside Vite, preload Octane's compiler before

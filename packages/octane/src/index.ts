@@ -2,6 +2,10 @@
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
 export { initializeHydrationEventCapture } from './hydration/event-capture.js';
+// Keep external DOM ownership separate from the reconciling runtime so
+// behavior-only consumers never retain component or hydration machinery.
+export { attachBehaviorRoot } from './behavior-root.js';
+export type * from './behavior-root.js';
 
 // Profiling's application API and compiler ABI live at `octane/profiling`;
 // neither belongs on the React-shaped main namespace.

@@ -21,6 +21,12 @@ Direct Node or Bun server scripts can preload `octane/compiler/register` to
 compile imported Octane components without going through Vite. See the
 [SSR guide](https://github.com/octanejs/octane/blob/main/docs/ssr.md#run-an-ssg-script-directly).
 
+Applications that stream or update their own server-rendered DOM can import
+`attachBehaviorRoot` from `octane/behavior`. Behavior-only roots attach native
+interactions and disposable behavior without creating a component root or
+taking ownership of the existing markup. See the
+[external ownership guide](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#behavior-only-roots-and-external-ownership).
+
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 

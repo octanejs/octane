@@ -864,6 +864,142 @@ For compiler constraints, nesting behavior, event details, and the full procedur
 context, read the
 [deferred hydration guide](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md).
 
+<h2 id="behavior-only-roots">Behavior-only roots and external ownership</h2>
+
+Sometimes another system owns the HTML: a streaming renderer appends paragraphs, a
+content platform replaces article sections, or a separate application controls a
+widget. `attachBehaviorRoot` adds client behavior to those existing elements without
+rendering, hydrating, reconciling, or taking ownership of their markup.
+
+Choose the ownership model before deciding how to make the page interactive:
+
+| Approach                                 | Who owns the DOM?        | What runs on the client?                       |
+| ---------------------------------------- | ------------------------ | ---------------------------------------------- |
+| `hydrateRoot(container, App)`            | Octane's component tree. | The hydrated components, effects, and events.  |
+| `<Hydrate when={visible()}>`             | Octane after activation. | The deferred component tree when it activates. |
+| `<Hydrate split={false} when={never()}>` | The server or a stream.  | No descendant component tree or handlers.      |
+| `attachBehaviorRoot(container)`          | The existing owner.      | Only the explicitly registered behaviors.      |
+
+The last two approaches work together: keep an externally owned server range static,
+then attach only the independent behavior it actually needs.
+
+### Keep the streamed HTML permanently static
+
+Use the exact two-attribute form below when Octane should render a range on the server
+but never create its descendant component graph on the client:
+
+```tsrx
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+
+export function ArticleShell() @{
+	<main id="article-shell">
+		<Hydrate split={false} when={never()}>
+			<article id="streamed-article">
+				<a href="#annotation" data-annotation>Open annotation</a>
+			</article>
+		</Hydrate>
+	</main>
+}
+```
+
+The server emits the children without a wrapper; the client preserves those exact nodes
+without evaluating, hydrating, or reconciling them. `Hydrate` and `never` must be
+direct imports, although locally renamed imports are supported, and the opening tag
+must have exactly `split={false}` and `when={never()}`. Extra attributes, spreads, or
+indirect values fall back to ordinary deferred-hydration behavior. Component event
+handlers inside this permanently static range do not run because their client
+component tree does not exist.
+
+### Attach behavior without claiming the DOM
+
+Use the focused `octane/behavior` entry when this is all the client needs. It does not
+pull in the component runtime, compiler, or server renderer. The same API and public
+types are also available from `octane` when an application already uses that entry.
+
+```ts
+import { attachBehaviorRoot } from 'octane/behavior';
+import { articleStream } from './article-stream.js';
+
+const page = new AbortController();
+const shell = document.querySelector<HTMLElement>('#article-shell')!;
+const article = shell.querySelector<HTMLElement>('#streamed-article')!;
+const owner = Symbol('article stream');
+
+const root = attachBehaviorRoot(shell, { signal: page.signal });
+
+root.registerExternalRange(article, {
+	owner,
+	ready: articleStream.allReady,
+});
+
+let openAnnotation: (event: Event, element: Element) => void;
+let observeAnnotation: (element: Element, signal: AbortSignal) => () => void;
+
+const annotations = root.registerBehavior({
+	id: 'article-annotations',
+	owner,
+	target: '[data-annotation]',
+	events: ['click'],
+	ready: import('./annotations.js').then((module) => {
+		openAnnotation = module.openAnnotation;
+		observeAnnotation = module.observeAnnotation;
+	}),
+	adopt(element, { signal }) {
+		return observeAnnotation(element, signal);
+	},
+	handleEvent(event, element) {
+		openAnnotation(event, element);
+	},
+});
+
+await root.ready;
+
+// Remove this behavior independently while retaining its existing markup.
+annotations.dispose();
+
+// Dispose every range and behavior, again preserving the container's DOM.
+root.dispose();
+```
+
+`registerExternalRange` identifies who owns a subtree and can wait for that owner's
+stream to finish. `registerBehavior` adopts existing selector matches and discovers
+matching elements added later; its optional `ready` promise waits for client code or
+other preparation. A behavior can also target one `Element` directly. Removing a match,
+moving it outside the root, or changing its closest owner aborts its per-element signal
+and runs the returned cleanup exactly once. The external owner remains free to stream,
+replace, or move its own DOM throughout.
+
+### Coordinate ownership, readiness, and native events
+
+External ranges and roots are scoped to their original document. A registered range
+must belong to its root's container; strictly nested ranges are allowed, and the
+closest range determines which owner-constrained behaviors apply. Claiming the same
+element for another owner throws unless `{ replace: true }` explicitly transfers
+ownership. A replacement whose signal is already aborted never displaces a healthy
+owner. Disposing a separately managed nested root immediately restores eligible
+behavior from its surviving ancestor.
+
+Named behaviors can declare already-registered `dependencies` and mutually exclusive
+`conflicts`. Adoption waits for those dependencies, the behavior's own `ready` promise,
+and its closest external range. `root.ready` snapshots the ranges, registrations, and
+asynchronous adoptions that are active when you read it; each range and behavior also
+exposes its own `ready`, `signal`, and idempotent `dispose()`. An underlying readiness
+failure preserves its original error, while cancellation settles promptly even when
+third-party preparation never finishes.
+
+Delegated event listeners start immediately, before asynchronous behavior is ready. If
+an interaction arrives during that wait, the eventual `handleEvent` receives the exact
+same original native `Event`, including its genuine `isTrusted` value. Octane does not
+redispatch the event, invent trust, repeat a link navigation or form submission, or
+restore transient user activation after it expires. Code requiring transient activation
+must execute synchronously during the original browser event.
+
+Attaching a second root to the same live container requires `{ replace: true }`; the
+previous root is disposed without deleting the DOM. `root.dispose()` and parent-signal
+aborts preserve existing markup by default. Pass `root.dispose({ preserveDOM: false })`
+only when clearing the container is explicitly intended.
+
 <h2 id="responsive-updates">Responsive updates and actions</h2>
 
 Some updates should feel immediate, such as typing. Others may reveal UI that needs to
@@ -1342,6 +1478,10 @@ handlers; return here when you have a specific problem to solve.
 				{' / '}
 				<code>hydrateRoot</code>
 				<span>Start a client tree or adopt server HTML.</span>
+			</li>
+			<li>
+				<code>attachBehaviorRoot</code>
+				<span>Attach behavior to existing DOM without rendering or taking ownership.</span>
 			</li>
 			<li>
 				<code>preload</code>

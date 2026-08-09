@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Octane externally owned behavior roots</title>
+	</head>
+	<body>
+		<main id="behavior-shell" data-protected="server-shell">
+			<section id="external-range" data-protected="server-range">
+				<article id="streamed-text">Server-rendered text</article>
+				<button id="initial-widget" type="button" data-stream-action data-pending-action>
+					Initial widget
+				</button>
+				<a id="annotation-link" href="#annotation" data-pending-action>Annotation</a>
+				<form id="repeated-form" action="#submitted">
+					<button id="submit-action" type="submit" data-pending-action>Submit</button>
+				</form>
+				<svg id="external-svg" width="20" height="20">
+					<g id="external-svg-group"><circle cx="10" cy="10" r="5" /></g>
+				</svg>
+				<math id="external-math"
+					><mrow id="external-math-row"><mi>x</mi></mrow></math
+				>
+				<section id="nested-range">
+					<button id="nested-widget" type="button" data-stream-action>Nested widget</button>
+				</section>
+			</section>
+		</main>
+		<script type="module" src="/main.ts"></script>
+	</body>
+</html>

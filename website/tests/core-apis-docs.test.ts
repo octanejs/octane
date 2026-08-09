@@ -54,6 +54,14 @@ describe('Core APIs documentation', () => {
 		// heading→registry direction itself: an `<h2>` no entry names is missing
 		// from this table of contents and from what the MCP server serves.
 		expectRegisteredHeadings(container, coreDoc);
+		expect(container.querySelector('h2#behavior-only-roots')?.textContent).toBe(
+			'Behavior-only roots and external ownership',
+		);
+		expect(toc.querySelector('a[href="#behavior-only-roots"]')?.textContent).toContain(
+			'Behavior-only roots and external ownership',
+		);
+		expect(container.textContent).toContain('same original native');
+		expect(container.textContent).toContain('preserveDOM');
 
 		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(7);
 		expect(container.querySelectorAll('[data-demo]')).toHaveLength(9);
@@ -114,6 +122,10 @@ describe('Core APIs documentation', () => {
 			'<Hydrate when={visible({ rootMargin:',
 			'<Hydrate when={idle()} split={false}>',
 			'<Hydrate when={interaction()} prefetch={idle()}>',
+			'<Hydrate split={false} when={never()}>',
+			"import { attachBehaviorRoot } from 'octane/behavior';",
+			'root.registerExternalRange(article,',
+			'root.registerBehavior({',
 			'const [isPending, startTransition] = useTransition();',
 			'const deferredQuery = useDeferredValue(query);',
 			'<ViewTransition enter="notice-in" exit="notice-out">',
@@ -137,6 +149,11 @@ describe('Core APIs documentation', () => {
 		expect(groupedApiCodeCount('isChildrenBlock')).toBe(3);
 		expect(
 			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'Hydrate'),
+		).toBe(true);
+		expect(
+			apiRows.some(
+				(row) => row.querySelector(':scope > code')?.textContent === 'attachBehaviorRoot',
+			),
 		).toBe(true);
 		expect(
 			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'useLinkedState'),

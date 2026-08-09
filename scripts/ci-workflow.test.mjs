@@ -326,6 +326,15 @@ describe('CI workflow aggregation', () => {
 		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
 	});
 
+	test('installs WebKit only for the cross-browser integration lane', () => {
+		const heavyIntegration = jobSource('heavy_integration');
+
+		assert.match(
+			heavyIntegration,
+			/- name: Install Playwright WebKit for cross-browser ownership coverage\n\s+if: \$\{\{ matrix\.lane == 'browser' \}\}\n\s+run: pnpm --filter octane exec playwright install --with-deps webkit/,
+		);
+	});
+
 	test('derives sharded projects generically from execution-group ownership', () => {
 		const projects = configureShardedProjects([
 			{ test: { name: 'ordinary', include: ['ordinary/**/*.test.ts'] } },
