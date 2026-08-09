@@ -1,11 +1,12 @@
-import { createElement, useEffect, useState } from 'octane';
+import { createElement, useEffect, useId, useState } from 'octane';
 import { isServer } from '@tanstack/router-core/isServer';
 import type { RouterManagedTag } from '@tanstack/router-core';
-import { getAssetKey } from './assetKeys.ts';
+import { getAssetKey, getManagedAssetKey } from './assetKeys.ts';
 import { useRouter } from './context.ts';
 import { useScripts } from './scriptContentUtils.ts';
 
 export function Scripts() @{
+	const owner = useId();
 	const router = useRouter();
 	const scripts = useScripts();
 	const [hydrating, setHydrating] = useState(true);
@@ -34,7 +35,7 @@ export function Scripts() @{
 			return createElement('script', {
 				...script.attrs,
 				key: assetKey,
-				'data-tsr-managed-key': assetKey,
+				'data-tsr-managed-key': getManagedAssetKey('body', owner, index),
 				dangerouslySetInnerHTML: { __html: script.children ?? '' },
 			});
 		})}

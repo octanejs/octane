@@ -1610,8 +1610,18 @@ export function encodeAsyncIdentityString(value: string): string {
 
 function asyncIdentityKey(value: unknown, objectIs: boolean, positionFallback?: string): string {
 	switch (typeof value) {
-		case 'string':
+		case 'string': {
+			if (value.length > 64 && RESOLVED !== null) {
+				const ids = RESOLVED.asyncIdentities;
+				let id = ids.get(value);
+				if (id === undefined) {
+					id = RESOLVED.nextAsyncIdentity++;
+					ids.set(value, id);
+				}
+				return 't' + id.toString(36);
+			}
 			return 's' + encodeAsyncIdentityString(value);
+		}
 		case 'number':
 			return 'n' + (objectIs && Object.is(value, -0) ? '-0' : String(value));
 		case 'bigint':
@@ -5172,7 +5182,7 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
-	/** Render-local stable ids for non-primitive control/list keys. */
+	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
 	asyncPositionIdentities: Map<string, number>;

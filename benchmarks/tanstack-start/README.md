@@ -32,7 +32,8 @@ in the markup and are compared).
 ```bash
 pnpm --filter tanstack-start-bench build   # builds all three targets
 pnpm --filter tanstack-start-bench compare # structural gate (must pass first)
-pnpm --filter tanstack-start-bench test:e2e# behavioral gate, one spec × both
+pnpm --filter tanstack-start-bench test:e2e # behavioral gate, one spec × both
+pnpm --filter tanstack-start-bench bench:work # deterministic production HTML/asset gate
 node run.mjs [iterations] [--no-build]     # perf harness (see below)
 node ../bench.mjs --quick tanstack-start   # via the unified runner
 ```
@@ -44,6 +45,12 @@ node ../bench.mjs --quick tanstack-start   # via the unified runner
   node for node. **Currently 10/10 route×flavor checks PASS.**
 - `e2e/bench.spec.ts` runs identical journeys against both servers with a
   clean-console gate. **Currently 8/8 pass.**
+- `work.mjs` requests all five production routes from React, Octane minimal,
+  and Octane Nitro. It verifies their visible navigation, loader content, 404
+  status, initial state, and genuinely streamed deferred values before applying
+  deterministic raw/gzip HTML budgets and compact, unique managed-asset key
+  limits to both Octane deployments. Set `START_WORK_TARGET_DIR` to run the
+  gate against an immutable copy of the three production outputs.
 
 Both correctness gates are fully green, including DOM-identity preservation
 across client child navigation (verified by `remount-probe.mjs`; an earlier
@@ -73,7 +80,29 @@ milliseconds while cold spawns cost ~100ms. Sub-2ms warm ops still carry
 ~10-15% RME on a developer machine — treat small warm deltas as noise and
 directions/multipliers ≥1.5x as signal.
 
-## Results & attribution (2026-07-20, Apple Silicon dev machine, Node 24)
+### Deterministic response-work gate
+
+The production work gate deliberately remains separate from timed samples:
+
+| route       | maximum HTML bytes | maximum gzip bytes |
+| ----------- | -----------------: | -----------------: |
+| `/`         |             11,000 |              1,900 |
+| `/posts`    |             17,000 |              2,500 |
+| `/deferred` |             14,000 |              2,900 |
+
+Router-managed head/body attributes must also remain unique within each
+document and no longer than 96 characters. These budgets protect the
+user-observable response rather than private renderer helper names. The full
+logical asset identity still controls reconciliation and effect invalidation;
+the shorter, owner-scoped DOM identity is only for hydration adoption.
+
+Deferred responses must emit the initial shell separately, omit unresolved
+content from that shell, and deliver both delayed values after their configured
+asynchronous floor. The regular structural and browser gates continue to verify
+complete HTML parity, hydration, retained parent state, client navigation, and
+live streamed content.
+
+## Historical baseline & attribution (2026-07-20, Apple Silicon dev machine, Node 24)
 
 Read together with [ssr-http](../ssr-http/README.md) (the raw-renderer layer),
 the measured attribution chain for "why is Octane's TTFB slower than React

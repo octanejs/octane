@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'octane/server';
 import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
 import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
 import { RouterServer, renderRouterToStream, renderRouterToString } from '../../src/ssr/server';
@@ -41,6 +42,60 @@ describe('@octanejs/tanstack-router SSR', () => {
 		expect(normalizedHtml).toContain('globalThis.__octaneRouterSsr=true');
 		expect(normalizedHtml).not.toContain('document.currentScript.remove()');
 		expect(normalizedHtml).toContain('</script></div></body></html>');
+	});
+
+	it("keeps independently rendered document managers from claiming one another's assets", async () => {
+		const router = makeSsrRouter({ multipleManagers: true });
+		attachRouterServerSsrUtils({ router, manifest: undefined });
+		await router.load();
+		await router.serverSsr.dehydrate();
+
+		const response = await renderRouterToString({
+			router,
+			responseHeaders: new Headers({ 'content-type': 'text/html' }),
+			App: RouterServer,
+		});
+		const html = await response.text();
+		const titleKeys = Array.from(
+			html.matchAll(/<title\b[^>]*data-tsr-managed-key="([^"]+)"[^>]*>/g),
+			(match) => match[1],
+		);
+		const entryKeys = Array.from(
+			html.matchAll(
+				/<script\b(?=[^>]*src="\/entry\.js")(?=[^>]*data-tsr-managed-key="([^"]+)")[^>]*>/g,
+			),
+			(match) => match[1],
+		);
+
+		expect(titleKeys).toHaveLength(2);
+		expect(new Set(titleKeys).size).toBe(2);
+		expect(entryKeys).toHaveLength(2);
+		expect(new Set(entryKeys).size).toBe(2);
+		expect(html).toContain('nonce="octane-csp"');
+	});
+
+	it('keeps document metadata and nonce-protected scripts in clean static markup', async () => {
+		const router = makeSsrRouter();
+		attachRouterServerSsrUtils({ router, manifest: undefined });
+		await router.load();
+		await router.serverSsr.dehydrate();
+
+		try {
+			const { html } = renderToStaticMarkup(
+				RouterServer as any,
+				{ router },
+				{
+					nonce: 'octane-csp',
+				},
+			);
+			expect(html).toContain('>Octane Router SSR</title>');
+			expect(html).toContain('name="description"');
+			expect(html).toContain('src="/entry.js"');
+			expect(html).toContain('nonce="octane-csp"');
+			expect(html).not.toContain('<!--');
+		} finally {
+			router.serverSsr.cleanup();
+		}
 	});
 
 	// Per TanStack/router PR #7847 snapshot 753f919e,
