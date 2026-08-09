@@ -42,7 +42,9 @@ function genRippleNew() {
 	// (TSRX hoists function declarations, but ordering keeps the file readable).
 	for (let i = N; i >= 1; i--) {
 		if (i === N) {
-			out += `function C${i}(props) @{ <span class='leaf'>${i}</span> }\n`;
+			out += `function C${i}(props) @{ <span class={props.kind}>${i}</span> }\n`;
+		} else if (i === N - 1) {
+			out += `function C${i}({ kind }) @{ <div class={kind}>${i} <C${i + 1} kind="leaf" /></div> }\n`;
 		} else if (isStateful(i)) {
 			out += `function C${i}(props) @{\n`;
 			out += `  const [v, set] = useState(0);\n`;
@@ -50,7 +52,8 @@ function genRippleNew() {
 			out += `  <div class='c'>${i}:{v as number} <C${i + 1} /></div>\n`;
 			out += `}\n`;
 		} else {
-			out += `function C${i}(props) @{ <div class='c'>${i} <C${i + 1} /></div> }\n`;
+			const childProps = i === N - 2 ? ' kind="c"' : '';
+			out += `function C${i}(props) @{ <div class='c'>${i} <C${i + 1}${childProps} /></div> }\n`;
 		}
 	}
 	out += '\nexport default function App(props) @{ <C1 /> }\n';

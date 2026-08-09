@@ -46,18 +46,18 @@ export function bumpAt91() {
 }
 
 function C100(props) @{
-	<span class="leaf">100</span>
+	<span class={props.kind}>100</span>
 }
-function C99(props) @{
-	<div class="c">
+function C99({ kind }) @{
+	<div class={kind}>
 		99
-		<C100 />
+		<C100 kind="leaf" />
 	</div>
 }
 function C98(props) @{
 	<div class="c">
 		98
-		<C99 />
+		<C99 kind="c" />
 	</div>
 }
 function C97(props) @{
