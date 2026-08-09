@@ -50,6 +50,7 @@ export const BENCHMARK_SUITES = [
 	'svg-dashboard',
 	'dbmon',
 	'recursive-context',
+	'spa-navigation',
 	'signal-favoring',
 	'news',
 	'hydration-interactivity',

@@ -226,6 +226,22 @@ const SUITES = [
 		],
 	},
 	{
+		name: 'spa-navigation',
+		cwd: 'spa-navigation',
+		servers: [
+			{ filter: 'octane-tsrx-spa-navigation-bench', port: 5310 },
+			{ filter: 'octane-jsx-spa-navigation-bench', port: 5311 },
+			{ filter: 'react-spa-navigation-bench', port: 5312 },
+			{ filter: 'solid-spa-navigation-bench', port: 5313 },
+			{ filter: 'vue-vapor-spa-navigation-bench', port: 5314 },
+		],
+		iter: { normal: 20, quick: 3 },
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'signal-favoring',
 		cwd: 'signal-favoring',
 		servers: [

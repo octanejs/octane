@@ -6,6 +6,8 @@ packages:
   - benchmarks/js-framework/*
   - benchmarks/recursive-context
   - benchmarks/recursive-context/*
+  - benchmarks/spa-navigation
+  - benchmarks/spa-navigation/*
   - benchmarks/signal-favoring
   - benchmarks/signal-favoring/*
   - benchmarks/dbmon

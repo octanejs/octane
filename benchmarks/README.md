@@ -188,6 +188,7 @@ internally, get their own baseline and guard namespace.
 | `svg-dashboard` | svg-dashboard | octane-tsrx, react, solid, svelte | hand-rolled SVG observability dashboard: path-d/transform churn, keyed reconcile inside `<svg>`, foreignObject labels, portal tooltip overlay, createElement icon de-opt; byte-exact Node-replay + cross-flavor DOM-parity gates |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
+| `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
 | `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
 | `news` | news | none (builds) | SSR + hydration, per-target |
 | `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, and Vue Vapor |
