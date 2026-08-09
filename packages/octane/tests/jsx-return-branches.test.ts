@@ -13,6 +13,7 @@ import {
 	Split,
 	StampList,
 	Tree,
+	UnstableGuard,
 } from './_fixtures/jsx-return-branches.tsx';
 
 // React-style conditional RETURNS (`if (c) return <A/>; return <B/>;`) must
@@ -120,6 +121,23 @@ describe('conditional JSX returns', () => {
 		expect(m.findAll('.stamp').map((n) => n.textContent)).toEqual(['a', '(empty)']);
 		m.update(StampList as any, { first: 'c', second: 'd' });
 		expect(m.findAll('.stamp').map((n) => n.textContent)).toEqual(['c', 'd']);
+		m.unmount();
+	});
+
+	it('keeps unstable_use* hook state on the component scope across branch flips', () => {
+		// The hook sits BEHIND the early return: whatever compilation strategy is
+		// chosen, its state belongs to the component and must survive the branch
+		// flipping away and back.
+		const m = mount(UnstableGuard as any, { ready: true });
+		expect(m.find('.ready').textContent).toBe('n:0');
+		m.click('.ready');
+		expect(m.find('.ready').textContent).toBe('n:1');
+
+		m.update(UnstableGuard as any, { ready: false });
+		expect(m.find('.pending')).toBeTruthy();
+
+		m.update(UnstableGuard as any, { ready: true });
+		expect(m.find('.ready').textContent).toBe('n:1'); // state preserved
 		m.unmount();
 	});
 

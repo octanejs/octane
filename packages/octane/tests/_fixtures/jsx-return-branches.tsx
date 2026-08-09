@@ -109,6 +109,24 @@ export function StampList(props: { first: string; second: string }) {
 	);
 }
 
+// An `unstable_use*`-named custom hook BEHIND an early return: its slot-keyed
+// state lives on the component scope and must survive branch flips, exactly
+// like a plain `use*` hook there.
+function unstable_useCounter() {
+	const [n, setN] = useState(0);
+	return [n, setN] as const;
+}
+
+export function UnstableGuard(props: { ready: boolean }) {
+	if (!props.ready) return <p className="pending">pending</p>;
+	const [n, setN] = unstable_useCounter();
+	return (
+		<div className="ready" onClick={() => setN(n + 1)}>
+			{'n:' + n}
+		</div>
+	);
+}
+
 // A `use*`-named function returning JSX is a HOOK, not a component — it must
 // keep returning a renderable value to its caller.
 export function useBadgeIcon(kind: string) {

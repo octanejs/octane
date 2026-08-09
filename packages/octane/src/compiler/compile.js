@@ -23328,7 +23328,9 @@ function jsxArmRoot(node) {
  */
 function containsHookCall(node) {
 	const seen = new WeakSet();
-	const isHookName = (name) => name === 'use' || /^use[A-Z0-9_]/.test(name);
+	// The shared convention (HOOK_NAME_CONVENTION_RE) — covers `use`, `useX`,
+	// and the `unstable_`/`UNSTABLE_` prefixed forms.
+	const isHookName = isHookCalleeName;
 	const walk = (value) => {
 		if (value == null || typeof value !== 'object') return false;
 		if (Array.isArray(value)) {
