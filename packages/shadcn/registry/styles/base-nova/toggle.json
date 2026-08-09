@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.29",
+    "@octanejs/base-ui@0.1.30",
     "class-variance-authority"
   ],
   "registryDependencies": [
