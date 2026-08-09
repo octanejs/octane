@@ -4962,6 +4962,56 @@ function isSingleHostIfRoot(node) {
 }
 
 /**
+ * Local (non-transitive) anchorless-append shape of a lite component's body
+ * root, for the all-component-children emission (see emitElementHtml and
+ * makeCompCall's anchorlessAppendSafe). A componentSlotLite call with no
+ * anchor keeps NO positional record — its body inserts at `endMarker = null`
+ * (appendChild). The one runtime state that loses a position entirely is a
+ * root-position branch slot taking the NULL-BODY arm (an `@if` with no
+ * `@else`): the empty arm records a null anchor and mints nothing, so content
+ * rendered by a later toggle appends AFTER every later sibling. Every arm
+ * WITH a body leaves a durable boundary on mount (a single host self-marks;
+ * anything else — including empty component output, whose slot still mints
+ * its own comment pair — gets the branch pair minted around it), so we admit:
+ *   - one plain host root (the element is the boundary), and
+ *   - an @if with a FULL @else chain whose every arm is exactly one plain
+ *     host, one component tag (safe unless it lowers to an unsafe lite slot —
+ *     resolved transitively via `edges` by the componentInfo fixpoint), or a
+ *     nested chain of the same shape.
+ * Everything else (missing @else, @switch/@for/hole/fragment roots,
+ * multi-node arms) returns null: the call site keeps its `<!>` anchor.
+ * Note every admitted shape renders at least one node in every state, which
+ * is what keeps each mounted arm's boundary derivable.
+ *
+ * Returns { edges: string[] } when the shape qualifies, else null.
+ */
+function anchorlessRootShape(node) {
+	let render = null;
+	if (node?.body?.type === 'JSXCodeBlock') render = node.body.render;
+	else if (node?.body?.body?.length === 1 && node.body.body[0]?.type === 'ReturnStatement')
+		render = node.body.body[0].argument;
+	if (render == null) return null;
+	if (isPlainHostRoot(render)) return { edges: [] };
+	const edges = [];
+	const armOk = (arm) => {
+		const out = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+		if (out.length !== 1) return false;
+		const n = out[0];
+		if (isIfDirective(n)) return chainOk(n);
+		if (isPlainHostRoot(n)) return true;
+		if ((n.type === 'Element' || n.type === 'JSXElement') && isComponentTag(n)) {
+			const name = tagBindingName(n);
+			if (name != null) edges.push(name);
+			return true;
+		}
+		return false;
+	};
+	const chainOk = (ifNode) =>
+		ifNode.alternate != null && armOk(ifNode.consequent) && armOk(ifNode.alternate);
+	return isIfDirective(render) && chainOk(render) ? { edges } : null;
+}
+
+/**
  * True when an @for item is one direct host root on the wire.
  *
  * This is deliberately narrower than the client-only singleRoot proof below:
@@ -7436,6 +7486,32 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 				info.autoMemoImportedComponents = [...importedComponents].sort();
 				info.autoMemoMayReadContext = mayReadContext;
 				autoMemoCapturesChanged = true;
+			}
+		}
+	}
+	// Anchorless append-safety for componentSlotLite call sites (see
+	// anchorlessRootShape for the shape rules and the hazard). Optimistic
+	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
+	// components stay safe; a locally-unsafe shape drains through its
+	// dependents, so declaration order and recursion do not matter (same scheme
+	// as the autoMemo loop above). An edge to a non-lite or cross-module callee
+	// is safe outright — its componentSlot mints its own positional markers.
+	for (const [, info] of ctx.componentInfo) {
+		info.anchorlessRootShape = anchorlessRootShape(info.node);
+		info.anchorlessRootSafe = info.anchorlessRootShape !== null;
+	}
+	let anchorlessChanged = true;
+	while (anchorlessChanged) {
+		anchorlessChanged = false;
+		for (const [, info] of ctx.componentInfo) {
+			if (!info.anchorlessRootSafe) continue;
+			for (const name of info.anchorlessRootShape.edges) {
+				const dep = ctx.componentInfo.get(name);
+				if (dep !== undefined && dep.eligible === true && dep.anchorlessRootSafe !== true) {
+					info.anchorlessRootSafe = false;
+					anchorlessChanged = true;
+					break;
+				}
 			}
 		}
 	}
@@ -21121,7 +21197,9 @@ function emitElementHtml(
 		// (componentSlot/Lite with no anchor → appendChild). Restricted to the
 		// all-component case so hydration's adopt cursor can simply descend into the
 		// host's child stream (host.firstChild); mixed static+component children keep
-		// their placeholders, where the cursor would otherwise mis-track.
+		// their placeholders, where the cursor would otherwise mis-track. The branch
+		// below still declines the elision when a child's own lowering cannot hold
+		// its position (see cc.anchorlessAppendSafe).
 		let allComponentChildren = children.length > 0;
 		for (const c of children) {
 			if (!(c.type === 'Element' && isComponentTag(c))) {
@@ -21129,8 +21207,57 @@ function emitElementHtml(
 				break;
 			}
 		}
-		for (let childI = 0; childI < children.length; childI++) {
-			const child = children[childI];
+		if (allComponentChildren) {
+			// Two phases: build every record first, because the append-vs-anchor
+			// choice depends on how each call site actually lowers
+			// (cc.anchorlessAppendSafe) and is all-or-nothing — anchoring only the
+			// unsafe child would desync hydration, whose adopt walk counts one
+			// logical sibling per child against the SAME server HTML in both
+			// regimes. Records are pushed in source order; only the anchor
+			// assignment waits for the decision. The LAST child is exempt from the
+			// safety check: nothing follows it inside the host, so content it
+			// appends on a later render is already at its source position.
+			const ccs = [];
+			for (const child of children) {
+				const cc = makeCompCall(
+					child,
+					ctx,
+					componentName,
+					inlinedSubs,
+					bindings,
+					forCalls,
+					ifCalls,
+					compCalls,
+					childNs,
+					cssHash,
+				);
+				cc.hostPath = path;
+				compCalls.push(cc);
+				ccs.push(cc);
+			}
+			let anchorless = true;
+			for (let i = 0; i < ccs.length - 1; i++) {
+				if (!ccs[i].anchorlessAppendSafe) {
+					anchorless = false;
+					break;
+				}
+			}
+			if (!anchorless) {
+				// A `<!>` anchor at each child's source-order position, exactly the
+				// mixed-children regime below: the slot mounts BEFORE its anchor, so
+				// a child that grows content after an empty mount keeps its place.
+				for (const cc of ccs) {
+					cc.anchorPath = [...path, childIdx];
+					appendTemplatePart(html, '<!>', 'anchor');
+					childIdx++;
+				}
+			}
+		}
+		// Mixed static+component children — walked in order. The all-component
+		// branch above already consumed every child, so it walks nothing.
+		const walkChildren = allComponentChildren ? [] : children;
+		for (let childI = 0; childI < walkChildren.length; childI++) {
+			const child = walkChildren[childI];
 			const prevBaked = prevBakedText;
 			prevBakedText = false;
 			if (child.type === 'FragmentStart') {
@@ -21228,22 +21355,15 @@ function emitElementHtml(
 						cssHash,
 					);
 					cc.hostPath = path;
-					if (allComponentChildren) {
-						// All-component children: append to the host in source order (no
-						// `<!>` placeholder, no anchor). Hydration adopts from the cursor
-						// descending into the host (see componentSlot/Lite).
-						compCalls.push(cc);
-					} else {
-						// Emit a `<!>` anchor at the component's source-order position so
-						// componentSlot inserts BEFORE this anchor — preserving sibling
-						// order when a Component appears before static-element/text
-						// siblings. Without this, the slot's start/end markers get
-						// appended to the parent host AFTER the static template content.
-						cc.anchorPath = [...path, childIdx];
-						compCalls.push(cc);
-						appendTemplatePart(html, '<!>', 'anchor');
-						childIdx++;
-					}
+					// Emit a `<!>` anchor at the component's source-order position so
+					// componentSlot inserts BEFORE this anchor — preserving sibling
+					// order when a Component appears before static-element/text
+					// siblings. Without this, the slot's start/end markers get
+					// appended to the parent host AFTER the static template content.
+					cc.anchorPath = [...path, childIdx];
+					compCalls.push(cc);
+					appendTemplatePart(html, '<!>', 'anchor');
+					childIdx++;
 				} else {
 					const childHtml = emitElementHtml(
 						child,
@@ -22261,6 +22381,18 @@ function makeCompCall(
 		}
 	}
 
+	// Append-safety for the anchorless all-component-children emission (see
+	// emitElementHtml). Only a componentSlotLite lowering can lose its
+	// position (no markers, no anchor, no record) — and only when the callee's
+	// body root can take a null-arm branch; anchorlessRootSafe carries that
+	// transitive proof (see anchorlessRootShape). Every non-lite lowering
+	// self-positions: componentSlot mints its marker pair, and the singleRoot
+	// regimes keep the root element from mount. (A staticFragmentRenderer fold
+	// registers only for single-plain-host-root callees, so its authored
+	// info's shape proof holds.)
+	const anchorlessAppendSafe =
+		!liteEligible || ctx.componentInfo?.get(compName)?.anchorlessRootSafe === true;
+
 	return {
 		id,
 		compNode,
@@ -22268,6 +22400,7 @@ function makeCompCall(
 		hostPath: null,
 		keyExpr,
 		liteEligible,
+		anchorlessAppendSafe,
 		autoMemoDeps,
 		autoMemoDepNodes,
 		autoMemoWitnesses,
