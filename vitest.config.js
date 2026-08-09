@@ -2370,6 +2370,29 @@ export default defineConfig({
 						'!packages/phosphor-icons/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					exclude: ['packages/phosphor-icons/tests/differential/**/*.test.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/phosphor-icons$/,
+							replacement: resolve(import.meta.dirname, 'packages/phosphor-icons/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/phosphor-icons\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/phosphor-icons/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'phosphor-icons-differential',
+					include: ['packages/phosphor-icons/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/phosphor-icons/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

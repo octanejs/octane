@@ -5176,6 +5176,9 @@ importers:
       '@phosphor-icons/react':
         specifier: catalog:default
         version: 2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.56(react@19.2.7)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
