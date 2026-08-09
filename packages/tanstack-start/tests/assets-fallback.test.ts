@@ -20,6 +20,22 @@ describe('withAssetsFallthrough', () => {
 
 		expect(response).toBe(asset);
 	});
+	it('preserves the original SSR 404 when the ASSETS binding also misses', async () => {
+		const notFound = new Response('rendered not found', {
+			status: 404,
+			headers: { 'content-type': 'text/html' },
+		});
+		const assets = { fetch: async () => new Response('asset not found', { status: 404 }) };
+		const wrapped = withAssetsFallthrough(async () => notFound);
+
+		const response = await wrapped(new Request('https://example.com/missing-page'), {
+			ASSETS: assets,
+		});
+
+		expect(response).toBe(notFound);
+		expect(await response.text()).toBe('rendered not found');
+		expect(response.headers.get('content-type')).toBe('text/html');
+	});
 
 	it('returns the original 404 when no ASSETS binding exists', async () => {
 		const notFound = new Response('not found', { status: 404 });

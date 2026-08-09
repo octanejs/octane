@@ -10,8 +10,12 @@ export function withAssetsFallthrough(fetch) {
 		}
 		const request = args[0];
 		const env = args[1] ?? {};
-		if (env.ASSETS) {
-			return env.ASSETS.fetch(request);
+		if (!env.ASSETS) {
+			return response;
+		}
+		const assetResponse = await env.ASSETS.fetch(request);
+		if (assetResponse.status !== 404) {
+			return assetResponse;
 		}
 		return response;
 	};
