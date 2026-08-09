@@ -5,6 +5,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import bundleSizeBaseline from '../../benchmarks/baselines/local/bundle-size.json';
+import threeRendererBaseline from '../../benchmarks/baselines/local/three-renderer.json';
+import weatherAppLighthouseBaseline from '../../benchmarks/baselines/local/weather-app-lighthouse.json';
 import { getRouter } from '../src/router.ts';
 import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
@@ -104,6 +106,53 @@ describe('website routes', () => {
 				)?.[op];
 				expect(row[series.key], `${row.op}/${series.key}`).toBe(stat?.score ?? stat?.median);
 			}
+		}
+	});
+
+	it('distinguishes simulated and observed Lighthouse paint measurements', () => {
+		const lighthouse = FRAMEWORK_CARDS.find((card) => card.id === 'weather-app-lighthouse')!;
+		const expectedRows = [
+			['simulated FCP', 'first_contentful_paint'],
+			['observed FCP', 'observed_first_contentful_paint'],
+			['simulated LCP', 'largest_contentful_paint'],
+			['observed LCP', 'observed_largest_contentful_paint'],
+			['speed index', 'speed_index'],
+			['TBT', 'total_blocking_time'],
+		] as const;
+		const targets = new Map(
+			weatherAppLighthouseBaseline.targets.map((target) => [target.name, target]),
+		);
+
+		expect(lighthouse.rows.map((row) => row.op)).toEqual(expectedRows.map(([label]) => label));
+		expect(lighthouse.description).toContain('desktop-network model');
+		expect(lighthouse.description).toContain('unthrottled browser trace');
+		for (const [index, [, op]] of expectedRows.entries()) {
+			const row = lighthouse.rows[index];
+			for (const series of lighthouse.series) {
+				const target = targets.get(series.key);
+				const stat = (
+					target?.ops as Record<string, { score?: number; median: number }> | undefined
+				)?.[op];
+				expect(stat, `${row.op}/${series.key}`).toBeDefined();
+				expect(row[series.key], `${row.op}/${series.key}`).toBe(stat?.score ?? stat?.median);
+			}
+		}
+	});
+
+	it('labels checked-in Three component reconstruction and disposal measurements', () => {
+		const threeRenderer = TARGET_CARDS.find((card) => card.id === 'three-renderer')!;
+		const row = threeRenderer.rows.find(
+			(candidate) => candidate.op === 'reconstruct component + dispose 1k',
+		);
+		const targets = new Map(threeRendererBaseline.targets.map((target) => [target.name, target]));
+
+		expect(row).toBeDefined();
+		for (const series of threeRenderer.series) {
+			const target = targets.get(series.key);
+			const stat = (target?.ops as Record<string, { score?: number; median: number }> | undefined)
+				?.reconstruct_component_dispose_1k;
+			expect(stat, series.key).toBeDefined();
+			expect(row?.[series.key], series.key).toBe(stat?.score ?? stat?.median);
 		}
 	});
 
@@ -315,6 +364,7 @@ describe('website routes', () => {
 		expect(container.querySelector('.bench-plot-shell')).toBeNull();
 		const sections = [
 			{ id: 'bench-frameworks', cards: FRAMEWORK_CARDS },
+			{ id: 'bench-targets', cards: TARGET_CARDS },
 			{ id: 'bench-internal', cards: OCTANE_CARDS },
 		];
 		for (const { id, cards } of sections) {
@@ -337,6 +387,26 @@ describe('website routes', () => {
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
 			}
 		}
+		const lighthouse = container.querySelector('#bench-weather-app-lighthouse')!;
+		expect(
+			Array.from(lighthouse.querySelectorAll('tbody th[scope="row"]')).map((row) =>
+				row.textContent?.trim(),
+			),
+		).toEqual([
+			'simulated FCP',
+			'observed FCP',
+			'simulated LCP',
+			'observed LCP',
+			'speed index',
+			'TBT',
+		]);
+		const threeRenderer = container.querySelector('#bench-three-renderer')!;
+		expect(
+			Array.from(threeRenderer.querySelectorAll('tbody th[scope="row"]')).map((row) =>
+				row.textContent?.trim(),
+			),
+		).toContain('reconstruct component + dispose 1k');
+
 		// The left sidebar scroll-spy lists every section plus a nested row per
 		// benchmark card, and each link's anchor target exists in the document: a
 		// section heading for level-2 rows, an anchored card wrapper for level-3 rows.
