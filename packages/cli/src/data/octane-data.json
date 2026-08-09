@@ -478,7 +478,7 @@
         "@react-rxjs/dom is omitted because octane batches updates without ReactDOM.unstable_batchedUpdates."
       ],
       "ssr": "useSyncExternalStore supplies the state snapshot during server rendering; browser-only ReactDOM batching helpers are intentionally absent.",
-      "verified": "2026-07-30"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/shadcn",
