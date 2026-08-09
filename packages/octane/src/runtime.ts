@@ -104,6 +104,7 @@ import {
 	isRendererStreamToken,
 	rendererRangeClose,
 } from './stream-protocol.js';
+import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
 
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 
@@ -6502,63 +6503,74 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	// provider the context object, then retain `.Provider` as an identity alias
 	// for existing code and React 18-shaped libraries.
 	const ctx = function ProviderBody(props, scope) {
-		// Stash on the scope (not block) so siblings of the Provider don't see it.
-		// $$ctxValues is pre-initialised to null on every Scope/Block so this
-		// assignment is a hidden-class-stable update (not a late stamp).
-		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
-		// Bump the context version when an EXISTING value actually changes. This
-		// runs before children() below, so the memo bailout downstream already
-		// sees the new version when the cascade reaches it. First-set is NOT a
-		// change: adding a Provider always creates a fresh scope for its
-		// descendants, so a memoized consumer can't carry pre-Provider state — it's
-		// always freshly mounted within the Provider's scope and reads the value
-		// directly (no memo bailout to invalidate). (Bumping on first-set would
-		// over-invalidate every memo'd consumer of this context elsewhere.)
-		if (scope.$$ctxValues.has(ctx) && !Object.is(scope.$$ctxValues.get(ctx), props.value)) {
-			ctx.$$version++;
-			COMPILER_CACHE_CONTEXT_EPOCH++;
-		}
-		scope.$$ctxValues.set(ctx, props.value);
-		// Children between the Provider tags reach us in one of two shapes:
-		//   - a compiled render-body FUNCTION — the `.tsrx` `{props.children}` lowering;
-		//   - an element descriptor / renderable — a React-style `.tsx` parent, where
-		//     `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Ctx.Provider,
-		//     { value }, …children)` and `createElement` mirrors the positional children
-		//     into `props.children` (a descriptor, an array, or text — never a function).
-		// `childrenAsBody` normalizes either shape to a callable body, so both dialects
-		// render their children inside the Provider's scope (and thus under its context).
-		//
-		// The two dialects both claim `scope.slots[0]` — a compiled body stores its binding
-		// bag there, while the descriptor path's `childSlot(scope, 0, …)` stores a childSlot
-		// record. A parent that wraps its children conditionally (common in ported React
-		// bindings) flips between them across renders, so the incoming dialect would read the
-		// outgoing one's record as its own and corrupt the tree. Remount the children on a
-		// flip instead: the two sides are structurally different code, which is the same
-		// contract React gives an element-type change.
-		if (props.children != null) {
-			// Steady state is one map read and an integer compare — the write happens only on the
-			// first render and on an actual flip.
-			const dialect = typeof props.children === 'function' ? 1 : 2;
-			const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
-			if (previous !== dialect) {
-				if (previous !== undefined) {
-					resetScopeChildren(scope);
-					// The reset runs user cleanups, so it can throw into the enclosing boundary and
-					// switch it to its catch arm — which disposes this block. Rendering children
-					// into a disposed block writes into the catch range, so bail out here, as every
-					// other mid-render teardown site does after `unmountBlock`.
-					if (scope.block.disposed) return;
-				}
-				ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
-			}
-			childrenAsBody(props.children)(undefined, scope, undefined);
-		}
+		return renderClientContextProvider(ctx, props, scope);
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
 	ctx.Provider = ctx;
 	return ctx;
+}
+
+/** Renderer-boundary adapter; ordinary DOM roots never retain this by themselves. */
+export function renderClientContextProvider<T>(
+	context: unknown,
+	props: { value: unknown; children?: unknown },
+	renderScope: object,
+): void {
+	const ctx = context as Context<T>;
+	const scope = renderScope as Scope;
+	// Stash on the scope (not block) so siblings of the Provider don't see it.
+	// $$ctxValues is pre-initialised to null on every Scope/Block so this
+	// assignment is a hidden-class-stable update (not a late stamp).
+	if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
+	// Bump the context version when an EXISTING value actually changes. This
+	// runs before children() below, so the memo bailout downstream already
+	// sees the new version when the cascade reaches it. First-set is NOT a
+	// change: adding a Provider always creates a fresh scope for its
+	// descendants, so a memoized consumer can't carry pre-Provider state — it's
+	// always freshly mounted within the Provider's scope and reads the value
+	// directly (no memo bailout to invalidate). (Bumping on first-set would
+	// over-invalidate every memo'd consumer of this context elsewhere.)
+	if (scope.$$ctxValues.has(ctx) && !Object.is(scope.$$ctxValues.get(ctx), props.value)) {
+		ctx.$$version++;
+		COMPILER_CACHE_CONTEXT_EPOCH++;
+	}
+	scope.$$ctxValues.set(ctx, props.value);
+	// Children between the Provider tags reach us in one of two shapes:
+	//   - a compiled render-body FUNCTION — the `.tsrx` `{props.children}` lowering;
+	//   - an element descriptor / renderable — a React-style `.tsx` parent, where
+	//     `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Ctx.Provider,
+	//     { value }, …children)` and `createElement` mirrors the positional children
+	//     into `props.children` (a descriptor, an array, or text — never a function).
+	// `childrenAsBody` normalizes either shape to a callable body, so both dialects
+	// render their children inside the Provider's scope (and thus under its context).
+	//
+	// The two dialects both claim `scope.slots[0]` — a compiled body stores its binding
+	// bag there, while the descriptor path's `childSlot(scope, 0, …)` stores a childSlot
+	// record. A parent that wraps its children conditionally (common in ported React
+	// bindings) flips between them across renders, so the incoming dialect would read the
+	// outgoing one's record as its own and corrupt the tree. Remount the children on a
+	// flip instead: the two sides are structurally different code, which is the same
+	// contract React gives an element-type change.
+	if (props.children != null) {
+		// Steady state is one map read and an integer compare — the write happens only on the
+		// first render and on an actual flip.
+		const dialect = typeof props.children === 'function' ? 1 : 2;
+		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
+		if (previous !== dialect) {
+			if (previous !== undefined) {
+				resetScopeChildren(scope);
+				// The reset runs user cleanups, so it can throw into the enclosing boundary and
+				// switch it to its catch arm — which disposes this block. Rendering children
+				// into a disposed block writes into the catch range, so bail out here, as every
+				// other mid-render teardown site does after `unmountBlock`.
+				if (scope.block.disposed) return;
+			}
+			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
+		}
+		childrenAsBody(props.children)(undefined, scope, undefined);
+	}
 }
 
 /**
@@ -15035,6 +15047,9 @@ export function createElement<P>(
 	props?: P,
 	...children: any[]
 ): ElementDescriptor<P> {
+	if (typeof type === 'function' && isRendererContext(type)) {
+		registerClientRendererBridge(renderClientContextProvider, flushSync);
+	}
 	const src = (props ?? null) as any;
 	const hasKey = hasElementConfigKey(src);
 	const key = hasKey ? '' + src.key : null;

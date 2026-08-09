@@ -1404,16 +1404,16 @@
     "op": "js_gzip",
     "target": "octane-min",
     "reference": "r3f-min",
-    "maxRatio": 2.4,
-    "note": "Minimal direct-root production gzip, with built bundles executed and scene-checked in Chromium. The refreshed observable-scene baseline recorded 305165 / 188008 = 1.62x on 2026-07-17."
+    "maxRatio": 1.0,
+    "note": "Minimal direct-root production gzip must not exceed React Three Fiber; each built bundle renders and verifies the same real Mesh in Chromium."
   },
   {
     "suite": "three-bundle-size",
     "op": "js_gzip",
     "target": "octane-full",
     "reference": "r3f-full",
-    "maxRatio": 1.8,
-    "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. The refreshed observable-scene baseline recorded 304757 / 250306 = 1.22x on 2026-07-17."
+    "maxRatio": 1.0,
+    "note": "Full-catalogue production gzip must not exceed React Three Fiber; each built bundle verifies the complete Three namespace and the same real Mesh in Chromium."
   },
   {
     "suite": "react-hosted-islands",

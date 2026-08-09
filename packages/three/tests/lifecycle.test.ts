@@ -10,9 +10,11 @@ import {
 	universalProps,
 	universalValue,
 } from 'octane/universal';
+import { registerThreeIntrinsic } from '../src/core/catalogue.js';
 import { createThreeContainer, createThreeDriver } from '../src/core/driver.js';
 
 function createRoot() {
+	registerThreeIntrinsic('Group', THREE.Group);
 	const scene = new THREE.Scene();
 	const container = createThreeContainer({
 		scene,

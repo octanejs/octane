@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
+import { TorusKnotGeometry } from 'three';
 import { events as createPointerEvents } from '../src/index.js';
+import { createThreeObject } from '../src/core/catalogue.js';
 import type { EventManager, Renderer, RootState } from '../src/core/index.js';
 import { mount, type MountResult } from '../../octane/tests/_helpers.js';
 import {
@@ -110,6 +112,21 @@ describe('Canvas', () => {
 	afterEach(() => {
 		mounted?.unmount();
 		vi.unstubAllGlobals();
+	});
+
+	it('registers the full Three catalogue only when a measured client Canvas becomes active', async () => {
+		const { factory } = rendererHarness();
+		const createRareGeometry = () => createThreeObject('torusKnotGeometry', {});
+		expect(createRareGeometry).toThrow('Call extend({ TorusKnotGeometry })');
+
+		mounted = mount(EmptyCanvasApp, { gl: factory, onCreated: undefined });
+		expect(createRareGeometry).toThrow('Call extend({ TorusKnotGeometry })');
+
+		ControlledResizeObserver.instances[0].emit({ width: 240, height: 160 });
+		await flushCanvasWork();
+		const { object } = createRareGeometry();
+		expect(object).toBeInstanceOf(TorusKnotGeometry);
+		object.dispose();
 	});
 
 	it('waits for positive layout, then mounts and resizes one retained Three scene', async () => {

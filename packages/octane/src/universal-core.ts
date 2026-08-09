@@ -18,6 +18,7 @@ import {
 	__profileSchedule,
 	__profileTrackComponent,
 } from './profiling.js';
+import { getRendererHostFlusher } from './renderer-bridge.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -9946,6 +9947,11 @@ function flushUniversalPassiveWave(): void {
 export type UniversalSyncFlusher = <T>(run: () => T) => T;
 
 const INLINE_UNIVERSAL_FLUSHER: UniversalSyncFlusher = (run) => run();
+
+/** Discover a mounted owner scheduler without retaining the owner renderer. */
+export function getUniversalHostFlusher(): UniversalSyncFlusher | undefined {
+	return getRendererHostFlusher();
+}
 
 function runUniversalSyncBoundary<T>(
 	run: () => T,

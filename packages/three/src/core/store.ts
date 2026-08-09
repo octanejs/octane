@@ -6,13 +6,8 @@
  * components. Zustand remains the framework-neutral storage primitive.
  */
 import * as THREE from 'three';
-import {
-	createContext,
-	useContext,
-	useRef,
-	useSyncExternalStore,
-	withSlot,
-} from 'octane/universal';
+import { useContext, useRef, useSyncExternalStore, withSlot } from 'octane/universal';
+import { createContext } from 'octane/universal/native';
 import { createStore as createVanillaStore, type StoreApi } from 'zustand/vanilla';
 import type {
 	DomEvent,

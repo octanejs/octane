@@ -11,6 +11,7 @@ import {
 	universalValue,
 } from 'octane/universal';
 import { applyProps, extend } from '@octanejs/three';
+import { registerThreeIntrinsic, registerThreeNamespace } from '../src/core/catalogue.js';
 import {
 	createThreeContainer,
 	createThreeDriver,
@@ -19,6 +20,13 @@ import {
 } from '../src/core/driver.js';
 
 function createRoot(scene = new THREE.Scene(), environment: ThreeHostEnvironment = {}) {
+	registerThreeIntrinsic('BoxGeometry', THREE.BoxGeometry);
+	registerThreeIntrinsic('Color', THREE.Color);
+	registerThreeIntrinsic('Group', THREE.Group);
+	registerThreeIntrinsic('Mesh', THREE.Mesh);
+	registerThreeIntrinsic('MeshBasicMaterial', THREE.MeshBasicMaterial);
+	registerThreeIntrinsic('Object3D', THREE.Object3D);
+	registerThreeIntrinsic('SphereGeometry', THREE.SphereGeometry);
 	const container = createThreeContainer({
 		scene,
 		environment: {
@@ -735,6 +743,120 @@ describe('Three universal driver', () => {
 
 		root.unmount();
 		container.flushDisposals();
+	});
+
+	it('rejects overridden Three value-class setters before attaching into the committed value', () => {
+		class UnsafeVector extends THREE.Vector3 {
+			child: unknown = { leaf: {} };
+
+			override fromArray(array: ArrayLike<number>, offset = 0): this {
+				super.fromArray(array, offset);
+				this.child = null;
+				return this;
+			}
+		}
+		class UnsafeVectorParent extends THREE.Object3D {
+			readonly offset = new UnsafeVector();
+		}
+		extend({ UnsafeVectorParent });
+		const colorPlan = universalPlan('three', {
+			kind: 'host',
+			type: 'color',
+			propsSlot: 0,
+		});
+		const parentPlan = universalPlan('three', {
+			kind: 'host',
+			type: 'unsafeVectorParent',
+			propsSlot: 0,
+			children: [{ kind: 'slot', slot: 1 }],
+		});
+		const Scene = defineUniversalComponent('three', (props: { child: boolean }) =>
+			universalValue(parentPlan, [
+				universalProps(props.child ? [['set', 'offset', [1, 2, 3]]] : []),
+				universalList(props.child ? ['child'] : [], (key) =>
+					universalKey(
+						key,
+						universalValue(colorPlan, [
+							universalProps([
+								['set', 'args', ['white']],
+								['set', 'attach', 'offset-child-leaf'],
+							]),
+						]),
+					),
+				),
+			]),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { child: false });
+		const parent = scene.children[0] as UnsafeVectorParent;
+		const originalChild = parent.offset.child;
+
+		expect(() => root.prepare(Scene, { child: true })).toThrow(
+			/custom setter makes its final parent shape uncertain/,
+		);
+		expect(parent.offset.toArray()).toEqual([0, 0, 0]);
+		expect(parent.offset.child).toBe(originalChild);
+		expect(parent.children).toEqual([]);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('accepts safe Three value setters from selective and complete constructor catalogues', () => {
+		const verifyAttachment = (
+			createBounds: () => THREE.Box2 | THREE.Box3,
+			values: [THREE.Vector2, THREE.Vector2] | [THREE.Vector3, THREE.Vector3],
+		) => {
+			class TrustedBoundsParent extends THREE.Object3D {
+				readonly bounds = createBounds();
+			}
+			extend({ TrustedBoundsParent });
+			const colorPlan = universalPlan('three', {
+				kind: 'host',
+				type: 'color',
+				propsSlot: 0,
+			});
+			const parentPlan = universalPlan('three', {
+				kind: 'host',
+				type: 'trustedBoundsParent',
+				propsSlot: 0,
+				children: [{ kind: 'slot', slot: 1 }],
+			});
+			const Scene = defineUniversalComponent('three', (props: { child: boolean }) =>
+				universalValue(parentPlan, [
+					universalProps(props.child ? [['set', 'bounds', values]] : []),
+					universalList(props.child ? ['child'] : [], (key) =>
+						universalKey(
+							key,
+							universalValue(colorPlan, [
+								universalProps([
+									['set', 'args', ['white']],
+									['set', 'attach', 'bounds-min'],
+								]),
+							]),
+						),
+					),
+				]),
+			);
+			const { container, root, scene } = createRoot();
+			root.render(Scene, { child: false });
+			const parent = scene.children[0] as TrustedBoundsParent;
+
+			expect(() => root.render(Scene, { child: true })).not.toThrow();
+			expect(parent.bounds.min).toBeInstanceOf(THREE.Color);
+
+			root.unmount();
+			container.flushDisposals();
+		};
+
+		registerThreeIntrinsic('Box3', THREE.Box3);
+		verifyAttachment(
+			() => new THREE.Box3(),
+			[new THREE.Vector3(-1, -2, -3), new THREE.Vector3(1, 2, 3)],
+		);
+
+		registerThreeNamespace();
+		verifyAttachment(() => new THREE.Box2(), [new THREE.Vector2(-1, -2), new THREE.Vector2(1, 2)]);
 	});
 
 	it('rejects behavior-changing method and accessor writes before mutation', () => {

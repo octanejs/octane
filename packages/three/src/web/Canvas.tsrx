@@ -2,6 +2,7 @@ import { useInsertionEffect, useLayoutEffect, useRef, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { createUniversalHostBoundary } from 'octane/universal';
 import type { RendererRegion } from 'octane/universal';
+import { registerThreeNamespace } from '../core/catalogue.js';
 import type { ComputeFunction, DomEvent } from '../core/events.js';
 import { createRoot, createThreeBoundaryMount } from '../core/root.js';
 import type { RenderProps, ThreeBoundaryMount, ThreeRoot } from '../core/root.js';
@@ -208,6 +209,7 @@ export function Canvas({
 		let cancelled = false;
 		let root = rootRef.current;
 		if (root === null) {
+			registerThreeNamespace();
 			root = createRoot(canvas);
 			rootRef.current = root;
 		}

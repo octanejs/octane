@@ -26,7 +26,6 @@ import {
 } from './store.js';
 import {
 	createThreeObject,
-	registerThreeNamespace,
 	resolveThreeConstructor,
 	THREE_RENDERER_ID,
 	type ConstructorRepresentation,
@@ -1858,7 +1857,6 @@ export function applyProps<T extends object>(
 export function createThreeDriver(
 	renderer = THREE_RENDERER_ID,
 ): UniversalHostDriver<ThreeHostContainer, object> {
-	registerThreeNamespace();
 	return {
 		id: renderer,
 		capabilities: {
