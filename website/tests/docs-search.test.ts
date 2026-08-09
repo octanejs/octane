@@ -130,6 +130,24 @@ describe('docs search ranking', () => {
 		expect(top.id).toBe('deferred-hydration');
 	});
 
+	it('deep links behavior-root API and external-ownership searches to their guide', async () => {
+		const index = await loadSearchIndex();
+
+		for (const query of [
+			'attachBehaviorRoot',
+			'octane/behavior',
+			'registerExternalRange',
+			'external ownership',
+			'permanent static',
+		]) {
+			const [top] = searchDocs(index, query);
+
+			expect(top, query).toBeDefined();
+			expect(top.slug, query).toBe('core-apis');
+			expect(top.id, query).toBe('behavior-only-roots');
+		}
+	});
+
 	it('deep links Strong-mode searches to the build configuration guide', async () => {
 		const index = await loadSearchIndex();
 		const [top] = searchDocs(index, 'strong mode');

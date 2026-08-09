@@ -35,6 +35,7 @@
     "./tsrx-spread": "./src/tsrx-spread.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
+    "./behavior": "./src/behavior-root.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./static": "./src/static/index.ts",
@@ -84,6 +85,10 @@
       "./hydration": {
         "types": "./dist/hydration/index.d.ts",
         "default": "./dist/hydration/index.js"
+      },
+      "./behavior": {
+        "types": "./dist/behavior-root.d.ts",
+        "default": "./dist/behavior-root.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

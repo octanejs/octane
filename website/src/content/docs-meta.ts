@@ -164,6 +164,22 @@ export const docsMeta: DocMeta[] = [
 			},
 			{ id: 'async-ui', title: 'Loading data and code' },
 			{ id: 'deferred-hydration', title: 'Deferred hydration' },
+			{
+				id: 'behavior-only-roots',
+				title: 'Behavior-only roots and external ownership',
+				searchTerms: [
+					'attachBehaviorRoot',
+					'octane/behavior',
+					'registerExternalRange',
+					'registerBehavior',
+					'external ownership',
+					'externally owned DOM',
+					'behavior-only root',
+					'permanent static',
+					'streamed DOM',
+					'preserveDOM',
+				],
+			},
 			{ id: 'responsive-updates', title: 'Responsive updates and actions' },
 			{
 				id: 'use-transition',
