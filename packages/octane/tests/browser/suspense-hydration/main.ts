@@ -12,6 +12,7 @@ import {
 	DirectRootRefUnmountApp,
 	SuspensePreservationApp,
 } from '../../_fixtures/suspense-preserves-dom.tsrx';
+import { FastHostControlledList } from '../../_fixtures/for.tsrx';
 
 type Controls = {
 	urgent(next: string): void;
@@ -244,6 +245,58 @@ function mountDirectRefUnmountCase(): void {
 	};
 }
 
+function mountFocusRestorationCase(): void {
+	const container = document.querySelector('#suspense-root') as HTMLElement;
+	const initialRows = [
+		{ id: 1, label: 'first field' },
+		{ id: 2, label: 'selected browser value' },
+		{ id: 3, label: 'third field' },
+		{ id: 4, label: 'fourth field' },
+	];
+	const root = createRoot(container);
+	root.render(FastHostControlledList, { items: initialRows });
+	flushSync(() => {});
+	const scroller = container.querySelector('#fast-host-controlled-list') as HTMLElement;
+	scroller.style.height = '36px';
+	scroller.style.overflow = 'auto';
+	for (const control of scroller.querySelectorAll<HTMLInputElement>('.fast-host-controlled-row')) {
+		control.style.display = 'block';
+		control.style.height = '32px';
+	}
+	const input = container.querySelectorAll<HTMLInputElement>('.fast-host-controlled-row')[1]!;
+	input.focus();
+	input.setSelectionRange(2, 9);
+	scroller.scrollTop = 7;
+
+	function snapshot() {
+		return {
+			inputSame: container.querySelectorAll('.fast-host-controlled-row')[2] === input,
+			inputConnected: input.isConnected,
+			activeValue: (document.activeElement as HTMLInputElement | null)?.value ?? '',
+			selectionStart: input.selectionStart,
+			selectionEnd: input.selectionEnd,
+			scrollTop: scroller.scrollTop,
+			values: Array.from(
+				container.querySelectorAll<HTMLInputElement>('.fast-host-controlled-row'),
+				(element) => element.value,
+			),
+			globalFailures: globalFailures.slice(),
+		};
+	}
+
+	window.__suspenseHydration = {
+		kind: 'focus-restoration',
+		urgent() {
+			flushSync(() => root.render(FastHostControlledList, { items: initialRows.toReversed() }));
+		},
+		resolve() {},
+		unmount() {
+			root.unmount();
+		},
+		snapshot,
+	};
+}
+
 function mountReactBaselineCase(): void {
 	const container = document.querySelector('#suspense-root') as HTMLElement;
 	const routeB = deferred<string>();
@@ -305,12 +358,14 @@ function mountReactBaselineCase(): void {
 if (testCase === 'hydration') mountHydrationCase();
 else if (testCase === 'suspense') mountSuspenseCase();
 else if (testCase === 'direct-ref-unmount') mountDirectRefUnmountCase();
+else if (testCase === 'focus-restoration') mountFocusRestorationCase();
 else if (testCase === 'react-baseline') mountReactBaselineCase();
 
 declare global {
 	interface Window {
 		__suspenseHydration: {
-			kind: 'hydration' | 'suspense' | 'react-baseline' | 'direct-ref-unmount';
+			kind:
+				'hydration' | 'suspense' | 'react-baseline' | 'direct-ref-unmount' | 'focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;
 			urgent?: () => void;

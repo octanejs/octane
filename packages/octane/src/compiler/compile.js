@@ -578,6 +578,9 @@ function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	const isCustom =
 		(namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-');
 	const lower = attrName.toLowerCase();
+	// The client emitter intercepts autoFocus before this shared helper; only SSR
+	// bakes its initial browser autofocus attribute.
+	if (!isCustom && attrName === 'autoFocus') return lv ? ' autofocus=""' : '';
 	// class/className compose clsx-style at every apply site. Literal false/null
 	// drop above/below; every other literal writes the normalized class string.
 	if (attrName === 'class') {
@@ -642,6 +645,7 @@ function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
 	if (isCustom || attrName.startsWith('aria-') || attrName.startsWith('data-')) return false;
 	const lower = attrName.toLowerCase();
 	return !(
+		attrName === 'autoFocus' ||
 		isEnumeratedBooleanAttr(lower) ||
 		BOOLEAN_ATTR_PROPS.has(lower) ||
 		MUST_USE_PROPERTY_PROPS.has(lower) ||
@@ -9059,15 +9063,6 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			continue;
 		}
 		if (isEventAttrName(rawAttrName)) {
-			bindDiscardedAttributeValue(attr.value);
-			continue;
-		}
-		// `autoFocus` never serializes (React DOM server parity — the client
-		// focuses at its mount commit; custom elements keep raw props).
-		if (
-			rawAttrName === 'autoFocus' &&
-			!((selfNs === 'html' || selfNs === 'opaque') && tag.includes('-'))
-		) {
 			bindDiscardedAttributeValue(attr.value);
 			continue;
 		}

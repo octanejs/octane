@@ -1,3 +1,5 @@
+import { createElement, useLayoutEffect } from 'octane';
+
 // ============================================================================
 // DOM attribute matrix fixtures — ports of ReactDOMAttribute-test.js +
 // DOMPropertyOperations-test.js (+ the empty-string src/href/action core from
@@ -159,4 +161,74 @@ export function AutoFocusInput(props) @{
 }
 export function AutoFocusBare(props) @{
 	<input id="afb" autoFocus />
+}
+
+export function AutoFocusButton() @{
+	<button id="af-button" autoFocus>{'button'}</button>
+}
+
+export function AutoFocusSelect() @{
+	<select id="af-select" autoFocus>
+		<option>{'option'}</option>
+	</select>
+}
+
+export function AutoFocusTextarea() @{
+	<textarea id="af-textarea" autoFocus />
+}
+
+export function AutoFocusUnsupported() @{
+	<div>
+		<div id="af-div" tabIndex={0} autoFocus />
+		<a id="af-anchor" href="#autofocus" autoFocus>{'link'}</a>
+		<svg id="af-svg" tabIndex={0} autoFocus>
+			<circle id="af-circle" autoFocus />
+		</svg>
+	</div>
+}
+
+export function AutoFocusCustom(props) @{
+	<my-autofocus-element id="af-custom" tabIndex={0} autoFocus={props.v} />
+}
+
+export function AutoFocusSpread(props) @{
+	<input id="af-spread" {...props.attributes} />
+}
+
+export function AutoFocusMixed(props) @{
+	<input id="af-mixed" {...props.before} autoFocus={props.direct} {...props.after} />
+}
+
+export function AutoFocusDescriptor(props) {
+	return createElement('input', { id: 'af-descriptor', ...props.attributes });
+}
+
+export function LowercaseAutoFocus(props) @{
+	<input id="af-lowercase" autofocus={props.value} />
+}
+
+export function AutoFocusMultiple() @{
+	<div>
+		<input id="af-first" autoFocus />
+		<input id="af-second" autoFocus />
+	</div>
+}
+
+export function AutoFocusInserted(props) @{
+	<div>
+		@if (props.show) {
+			<input id="af-inserted" autoFocus={props.focus} />
+		}
+	</div>
+}
+
+export function AutoFocusLayout(props) @{
+	useLayoutEffect(() => {
+		props.observe(document.activeElement?.id ?? '');
+		document.getElementById('af-layout-target')?.focus();
+	}, [props.observe]);
+	<div>
+		<input id="af-layout-input" autoFocus />
+		<button id="af-layout-target">{'target'}</button>
+	</div>
 }

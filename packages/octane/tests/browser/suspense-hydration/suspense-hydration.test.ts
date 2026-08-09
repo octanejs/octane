@@ -176,6 +176,29 @@ async function expectUrgentPreservation(shape: 'same' | 'swap'): Promise<void> {
 }
 
 describe.sequential('real-browser Suspense and async hydration evidence', () => {
+	it('restores focused input and its selected text after a keyed DOM reorder', async () => {
+		await openCase('case=focus-restoration');
+		const before = await snapshot();
+		expect(before.activeValue).toBe('selected browser value');
+		expect([before.selectionStart, before.selectionEnd]).toEqual([2, 9]);
+		expect(before.scrollTop).toBe(7);
+
+		await page!.evaluate(() => window.__suspenseHydration.urgent!());
+		const after = await snapshot();
+		expect(after.values).toEqual([
+			'fourth field',
+			'third field',
+			'selected browser value',
+			'first field',
+		]);
+		expect(after.inputSame).toBe(true);
+		expect(after.inputConnected).toBe(true);
+		expect(after.activeValue).toBe('selected browser value');
+		expect([after.selectionStart, after.selectionEnd]).toEqual([2, 9]);
+		expect(after.scrollTop).toBe(7);
+		expect(after.globalFailures).toEqual([]);
+	});
+
 	it('contains async hydration recovery and preserves an interactive outside sibling', async () => {
 		const page = await openCase('case=hydration');
 		let state = await snapshot();
@@ -332,7 +355,8 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 declare global {
 	interface Window {
 		__suspenseHydration: {
-			kind: 'hydration' | 'suspense' | 'react-baseline' | 'direct-ref-unmount';
+			kind:
+				'hydration' | 'suspense' | 'react-baseline' | 'direct-ref-unmount' | 'focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;
 			urgent?: () => void;
