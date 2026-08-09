@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { ErrorBoundary, use, useState } from 'octane';
 
 // Hydration recovery for @try/@catch: the server rendered the SUCCESS arm, but on
 // the client the try body throws during hydration (the website analogue: a route
@@ -84,5 +84,52 @@ export function NestedPage(props) @{
 			<div class="outer-err">{'outer:' + err.message}</div>
 		}
 		<p id="after">after</p>
+	</div>
+}
+
+interface JsxBoundaryProps {
+	state: { failed: boolean };
+}
+
+type BoundaryReset = () => void;
+
+export function JsxBoundaryPage(props: JsxBoundaryProps) @{
+	<div id="jsx-boundary-page">
+		<h1 id="jsx-before">{'before'}</h1>
+		<ErrorBoundary
+			fallback={(error: unknown, reset: BoundaryReset) => <button
+				id="jsx-boundary-error"
+				onClick={() => {
+					props.state.failed = false;
+					reset();
+				}}
+			>
+				{'caught:' + (error as Error).message}
+			</button>}
+		>
+			<Inner boom={props.state.failed} />
+		</ErrorBoundary>
+		<p id="jsx-after">{'after'}</p>
+	</div>
+}
+
+interface JsxRejectedBoundaryProps {
+	promise: Promise<unknown>;
+}
+
+function JsxRejectedValue(props: JsxRejectedBoundaryProps) @{
+	const value = use(props.promise);
+	<span id="jsx-rejected-value">{String(value) as string}</span>
+}
+
+export function JsxRejectedBoundaryPage(props: JsxRejectedBoundaryProps) @{
+	<div id="jsx-rejected-page">
+		<ErrorBoundary
+			fallback={(error: unknown) =>
+				<span id="jsx-rejected-error" data-kind={typeof error}>{String(error) as string}</span>}
+		>
+			<JsxRejectedValue promise={props.promise} />
+		</ErrorBoundary>
+		<p id="jsx-rejected-after">{'after'}</p>
 	</div>
 }

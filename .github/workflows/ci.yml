@@ -140,6 +140,7 @@ jobs:
                   file.filename.endsWith("/package.json") ||
                   file.filename === "docs/bindings-status.md" ||
                   file.filename === "docs/packages.md" ||
+                  file.filename === "packages/octane/src/version.ts" ||
                   file.filename.startsWith("packages/shadcn/registry/") ||
                   file.filename === "packages/cli/src/data/octane-data.json" ||
                   file.filename ===

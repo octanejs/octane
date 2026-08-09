@@ -18,7 +18,7 @@ import type {
 	ValueBase,
 } from '@react-types/shared';
 import { NumberFormatter, NumberParser } from '@internationalized/number';
-import { useCallback, useMemo, useState } from 'octane';
+import { useCallback, useLinkedState, useMemo, useState } from 'octane';
 
 import type { FocusableProps } from '../../interactions/useFocusable';
 
@@ -111,6 +111,12 @@ export interface NumberFieldStateOptions extends NumberFieldProps {
 	locale: string;
 }
 
+interface NumberFieldInputSource {
+	value: number;
+	locale: string;
+	formatOptions: Intl.NumberFormatOptions | undefined;
+}
+
 /**
  * Provides state management for a number field component. Number fields allow users to enter a
  * number, and increment or decrement the value using stepper buttons.
@@ -169,16 +175,59 @@ export function useNumberFieldState(...args: any[]): NumberFieldState {
 		subSlot(slot, 'number'),
 	);
 	let [initialValue] = useState(numberValue, subSlot(slot, 'initial'));
-	let [inputValue, setInputValue] = useState(
-		() =>
-			isNaN(numberValue) ? '' : new NumberFormatter(locale, formatOptions).format(numberValue),
-		subSlot(slot, 'input'),
-	);
-
-	let numberParser = useMemo(
-		() => new NumberParser(locale, formatOptions),
+	const providedFormatOptions = formatOptions;
+	// Normalize parser rounding options before linked-source comparison or formatting.
+	let [numberParser, normalizedFormatOptions] = useMemo(
+		() => {
+			let normalizedOptions = formatOptions;
+			if (
+				normalizedOptions?.roundingIncrement != null &&
+				normalizedOptions.roundingIncrement !== 1 &&
+				(normalizedOptions.minimumFractionDigits == null ||
+					normalizedOptions.maximumFractionDigits == null)
+			) {
+				const fractionDigits =
+					normalizedOptions.minimumFractionDigits ?? normalizedOptions.maximumFractionDigits ?? 0;
+				normalizedOptions = {
+					...normalizedOptions,
+					minimumFractionDigits: normalizedOptions.minimumFractionDigits ?? fractionDigits,
+					maximumFractionDigits: normalizedOptions.maximumFractionDigits ?? fractionDigits,
+				};
+			}
+			return [new NumberParser(locale, normalizedOptions), normalizedOptions] as const;
+		},
 		[locale, formatOptions],
 		subSlot(slot, 'parser'),
+	);
+	formatOptions = normalizedFormatOptions;
+	let [inputValue, setInputValue] = useLinkedState<NumberFieldInputSource, string>(
+		{ value: numberValue, locale, formatOptions },
+		(source, previous) => {
+			if (isNaN(source.value)) {
+				return '';
+			}
+
+			// React formats initial currencies before their parser normalizes rounding digits.
+			let options =
+				previous === undefined &&
+				providedFormatOptions?.style === 'currency' &&
+				providedFormatOptions.minimumFractionDigits == null &&
+				providedFormatOptions.maximumFractionDigits == null
+					? providedFormatOptions
+					: source.formatOptions;
+			if (previous !== undefined) {
+				const numberingSystem = numberParser.getNumberingSystem(previous.value);
+				options = { ...source.formatOptions, numberingSystem };
+			}
+			return new NumberFormatter(source.locale, options).format(source.value);
+		},
+		{
+			sourceEqual: (previous, next) =>
+				Object.is(previous.value, next.value) &&
+				previous.locale === next.locale &&
+				isEqualFormatOptions(previous.formatOptions, next.formatOptions),
+		},
+		subSlot(slot, 'input'),
 	);
 	let numberingSystem = useMemo(
 		() => numberParser.getNumberingSystem(inputValue),
@@ -208,26 +257,6 @@ export function useNumberFieldState(...args: any[]): NumberFieldState {
 	let clampStep = step !== undefined && !isNaN(step) ? step : 1;
 	if (intlOptions.style === 'percent' && (step === undefined || isNaN(step))) {
 		clampStep = 0.01;
-	}
-
-	// Update the input value when the number value or format options change. This is done
-	// in a useEffect so that the controlled behavior is correct and we only update the
-	// textfield after prop changes.
-	let [prevValue, setPrevValue] = useState(numberValue, subSlot(slot, 'prevValue'));
-	let [prevLocale, setPrevLocale] = useState(locale, subSlot(slot, 'prevLocale'));
-	let [prevFormatOptions, setPrevFormatOptions] = useState(
-		formatOptions,
-		subSlot(slot, 'prevFormat'),
-	);
-	if (
-		!Object.is(numberValue, prevValue) ||
-		locale !== prevLocale ||
-		!isEqualFormatOptions(formatOptions, prevFormatOptions)
-	) {
-		setInputValue(format(numberValue));
-		setPrevValue(numberValue);
-		setPrevLocale(locale);
-		setPrevFormatOptions(formatOptions);
 	}
 
 	let parsedValue = useMemo(

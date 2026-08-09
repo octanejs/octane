@@ -1,15 +1,16 @@
 // /benchmarks — the checked-in runtime, SSR, async, and size baselines, charted
 // as deterministic plain-div bar cards (the same bar view the explorer uses).
-// Three sections: the normalized at-a-glance explorer (the same linked bar/heatmap
+// Four sections: the normalized at-a-glance explorer (the same linked bar/heatmap
 // component the home page stages, fed the matrix recomputed from FRAMEWORK_CARDS so
 // it can never drift from the cards below), then the cross-framework comparisons,
-// then the octane-internal de-opt ("authoring cliff") suites. All numbers are the
+// then the head-to-head stack targets, then the octane-internal de-opt
+// ("authoring cliff") suites. All numbers are the
 // checked-in benchmark scores; the page cannot drift from the repo because the
 // JSON is imported at build time.
 import { BenchBars } from '../../components/BenchBars.tsrx';
 import { BenchmarkExplorer } from '../../components/BenchmarkExplorer.tsrx';
 import { OnThisPage } from '../../components/OnThisPage.tsrx';
-import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../../content/benchmarks.ts';
+import { FRAMEWORK_CARDS, OCTANE_CARDS, TARGET_CARDS } from '../../content/benchmarks.ts';
 import { createHomeSummary } from '../../content/home-benchmark.ts';
 import { useAnimatedMobileNavigation } from '../../hooks/use-animated-mobile-navigation.ts';
 import { useTitle } from '../../hooks/use-title.ts';
@@ -31,6 +32,8 @@ export const BENCH_SECTIONS: readonly { id: string; title: string; level?: 2 | 3
 	...FRAMEWORK_CARDS.map(
 		(card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const }),
 	),
+	{ id: 'bench-targets', title: 'Head-to-head targets' },
+	...TARGET_CARDS.map((card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const })),
 	{ id: 'bench-internal', title: 'The authoring cliff' },
 	...OCTANE_CARDS.map((card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const })),
 ];
@@ -74,7 +77,8 @@ export function Benchmarks() @{
 					<p class="benchpage-sub">
 						{'Benchmark score in milliseconds per operation — lower is better. Every chart is the ' +
 							'checked-in baseline from the repo’s own suites: same apps, same hardware, ' +
-							'same run. Reproduce them with '}
+							'same run. Every primary React comparison uses the official React Compiler; ' +
+							'memo-wall also shows an explicitly uncompiled control. Reproduce them with '}
 						<code>pnpm bench:all</code>
 						{', and see '}
 						<a
@@ -101,14 +105,38 @@ export function Benchmarks() @{
 				<section class="benchpage-section" aria-labelledby="bench-frameworks">
 					<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
 					<p class="benchpage-note">
-						Octane compiled from .tsrx and .tsx, against React 19 (with a separate React Compiler
-						comparison where available), Preact 10, Solid, Svelte 5, Ripple and Vue Vapor — each
-						framework’s fixture written the way its docs recommend. The ranked chips on each card
-						are that suite’s one-line reading: every framework’s geometric mean across the card’s
-						operations, relative to Octane, fastest first.
+						Octane compiled from .tsrx and .tsx, against React 19 with the official React Compiler,
+						Preact 10, Solid, Svelte 5, Ripple and Vue Vapor — each framework’s fixture written the
+						way its docs recommend. React Compiler is enabled for every primary React comparison;
+						memo-wall also includes a clearly labeled uncompiled React control. The ranked chips on
+						each card are that suite’s one-line reading: every framework’s geometric mean across the
+						card’s operations, relative to Octane, fastest first.
 					</p>
 					<div class="benchpage-grid">
 						@for (const card of FRAMEWORK_CARDS; key card.id) {
+							<div
+								class="benchpage-anchor"
+								id={cardAnchor(card)}
+								role="group"
+								aria-label={card.title}
+							>
+								<BenchBars card={card} />
+							</div>
+						}
+					</div>
+				</section>
+
+				<section class="benchpage-section" aria-labelledby="bench-targets">
+					<h2 id="bench-targets" class="benchpage-h2">Head-to-head targets</h2>
+					<p class="benchpage-note">
+						Suites whose roster is a specific stack rather than the whole field: Octane against
+						React on real HTTP servers, composed async trees and the same TanStack Start app, and
+						the Octane Three renderer against React Three Fiber and hand-written Three.js. These
+						cards stay out of the at-a-glance grid above, which aggregates only the full-roster
+						suites.
+					</p>
+					<div class="benchpage-grid">
+						@for (const card of TARGET_CARDS; key card.id) {
 							<div
 								class="benchpage-anchor"
 								id={cardAnchor(card)}

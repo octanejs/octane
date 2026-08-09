@@ -13,6 +13,9 @@ import {
 import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
 import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
+import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
+import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
+import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -46,6 +49,21 @@ try {
 	verifyPortTestClassifications(REPO);
 } catch (error) {
 	errors.push(`react-hook-form test classifications are invalid: ${error.message}`);
+}
+try {
+	verifyLivestoreTypes(REPO);
+} catch (error) {
+	errors.push(`livestore type evidence is invalid: ${error.message}`);
+}
+try {
+	verifySolanaReactTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/solana-react type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyLivestoreTestClassifications(REPO);
+} catch (error) {
+	errors.push(`livestore test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

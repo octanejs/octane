@@ -1,8 +1,9 @@
 {
   "name": "@octanejs/radix",
-  "version": "0.1.28",
+  "version": "0.1.31",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=22.22.2"
   },

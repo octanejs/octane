@@ -6,6 +6,8 @@ import { join, resolve } from 'node:path';
 // expected union from the workspace manifests, so publishing a new binding
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
+	'@gsap/react': '@octanejs/gsap',
+	animejs: '@octanejs/animejs',
 	'usehooks-ts': '@octanejs/usehooks-ts',
 	zustand: '@octanejs/zustand',
 	valtio: '@octanejs/valtio',
@@ -14,6 +16,7 @@ export const KNOWN_BINDINGS = {
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',
 	'@apollo/client': '@octanejs/apollo-client',
+	'@solana/react': '@octanejs/solana-react',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
@@ -119,8 +122,10 @@ export const KNOWN_BINDINGS = {
 	'@react-rxjs/utils': '@octanejs/rxjs',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
+	'@inertiajs/react': '@octanejs/inertia',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
+	'@livestore/react': '@octanejs/livestore',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.
@@ -143,6 +148,7 @@ export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
 
 export const KNOWN_VANILLA_CORES = {
 	'@apollo/client': '@apollo/client',
+	'@solana/react': '@solana/kit',
 	'@tanstack/react-query': '@tanstack/query-core',
 	wagmi: '@wagmi/core',
 	'@tanstack/react-table': '@tanstack/table-core',
@@ -160,6 +166,7 @@ export const KNOWN_VANILLA_CORES = {
 	jotai: 'jotai/vanilla',
 	'@lexical/react': 'lexical',
 	'@tiptap/react': '@tiptap/core',
+	'@livestore/react': '@livestore/livestore',
 };
 
 export const REACT_API_MAP = {

@@ -181,7 +181,7 @@ const ROOT_OBJECT_STORES = new WeakMap<object, RootStore>();
 interface PointerCaptureIdentity {
 	eventObject: THREE.Object3D;
 	intersection: Intersection;
-	pointerIds: Set<number>;
+	pointerIds: Set<number> | null;
 }
 
 const POINTER_CAPTURE_IDENTITIES = new WeakMap<object, PointerCaptureIdentity>();
@@ -196,7 +196,7 @@ const POINTER_CAPTURE_TARGET_IDENTITIES = new WeakMap<
 
 /** Create the mutable identity cell used by an event's pointer-capture facade. */
 export function createPointerCaptureIdentity(intersection: Intersection): PointerCaptureIdentity {
-	return { eventObject: intersection.eventObject, intersection, pointerIds: new Set() };
+	return { eventObject: intersection.eventObject, intersection, pointerIds: null };
 }
 
 /** Associate a public capture facade with its renderer-owned identity cell. */
@@ -230,7 +230,7 @@ function pointerCaptureIdentityObjects(identity: PointerCaptureIdentity): Set<TH
 }
 
 function indexPointerCaptureIdentity(identity: PointerCaptureIdentity): void {
-	if (identity.pointerIds.size === 0) return;
+	if (identity.pointerIds === null || identity.pointerIds.size === 0) return;
 	for (const object of pointerCaptureIdentityObjects(identity)) {
 		const identities = ACTIVE_POINTER_CAPTURE_IDENTITIES.get(object);
 		if (identities === undefined) {
@@ -256,14 +256,21 @@ function activatePointerCaptureIdentity(
 	pointerId: number,
 ): void {
 	POINTER_CAPTURE_TARGET_IDENTITIES.set(capture, identity);
-	if (identity.pointerIds.has(pointerId)) return;
-	identity.pointerIds.add(pointerId);
-	if (identity.pointerIds.size === 1) indexPointerCaptureIdentity(identity);
+	const pointerIds = (identity.pointerIds ??= new Set());
+	if (pointerIds.has(pointerId)) return;
+	pointerIds.add(pointerId);
+	if (pointerIds.size === 1) indexPointerCaptureIdentity(identity);
 }
 
 function deactivatePointerCaptureIdentity(capture: PointerCaptureTarget, pointerId: number): void {
 	const identity = POINTER_CAPTURE_TARGET_IDENTITIES.get(capture);
-	if (identity === undefined || !identity.pointerIds.delete(pointerId)) return;
+	if (
+		identity === undefined ||
+		identity.pointerIds === null ||
+		!identity.pointerIds.delete(pointerId)
+	) {
+		return;
+	}
 	if (identity.pointerIds.size === 0) unindexPointerCaptureIdentity(identity);
 }
 
@@ -276,7 +283,7 @@ function transferPointerCaptureIdentity(
 	const eventObject = identity.eventObject === previous ? next : identity.eventObject;
 	if (intersection === identity.intersection && eventObject === identity.eventObject) return;
 
-	const active = identity.pointerIds.size > 0;
+	const active = identity.pointerIds !== null && identity.pointerIds.size > 0;
 	if (active) unindexPointerCaptureIdentity(identity);
 	identity.eventObject = eventObject;
 	identity.intersection = intersection;
@@ -548,6 +555,7 @@ export function createPortalStore(initialState: RootState): RootStore {
 
 /** Walk a portal chain to the one root that owns scheduling and native events. */
 export function getInitialRootStore(store: RootStore): RootStore {
+	if (store.getState().previousRoot === undefined) return store;
 	const seen = new Set<RootStore>();
 	let current = store;
 	while (current.getState().previousRoot !== undefined) {
@@ -705,10 +713,12 @@ export function createRootStore(invalidate: Invalidate, advance: Advance): RootS
 				subscribe(ref, priority, subscriptionStore) {
 					const internal = get().internal;
 					if (priority > 0) internal.priority++;
-					internal.subscribers = [
-						...internal.subscribers,
-						{ ref, priority, store: subscriptionStore },
-					].sort((left, right) => left.priority - right.priority);
+					const previous = internal.subscribers;
+					const subscribers = [...previous, { ref, priority, store: subscriptionStore }];
+					if (previous.length !== 0 && !(previous[previous.length - 1].priority <= priority)) {
+						subscribers.sort((left, right) => left.priority - right.priority);
+					}
+					internal.subscribers = subscribers;
 					return () => {
 						const current = get().internal;
 						if (priority > 0) current.priority--;

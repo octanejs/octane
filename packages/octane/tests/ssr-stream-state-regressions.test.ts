@@ -253,6 +253,38 @@ const mod = evalServer(
 			<main>{rows}</main>
 		}
 
+		export function LongKeySwitch(props) @{
+			const [flipped, setFlipped] = useState(false);
+			if (!flipped) setFlipped(true);
+			const child = flipped
+				? <SharedValue key={props.secondKey} label="b" promise={props.b} />
+				: <SharedValue key={props.firstKey} label="a" promise={props.a} />;
+			<main>{child}</main>
+		}
+
+		export function LongKeyedArraySwitch(props) @{
+			const [flipped, setFlipped] = useState(false);
+			if (!flipped) setFlipped(true);
+			const rows = flipped
+				? [
+					<SharedValue key={props.secondKey} label="b" promise={props.b} />,
+					<SharedValue key={props.firstKey} label="a" promise={props.a} />,
+				]
+				: [
+					<SharedValue key={props.firstKey} label="a" promise={props.a} />,
+					<SharedValue key={props.secondKey} label="b" promise={props.b} />,
+				];
+			<main>{rows}</main>
+		}
+
+		export function LongKeyedBoundaries(props) @{
+			<main>
+				@for (const row of props.items; key row.key) {
+					<SharedBoundary label={row.label} promise={row.promise} />
+				}
+			</main>
+		}
+
 		export function LateOuterCatch(props) @{
 			@try {
 				@try {
@@ -488,6 +520,79 @@ describe('SSR stream state regressions', () => {
 			['b', 'b:B'],
 			['a', 'a:A'],
 		]);
+	});
+
+	it('keeps distinct long descriptor keys isolated when a render-phase retry replaces the child', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const prefix = 'same-prefix:'.repeat(8);
+		let finished = false;
+		const rendering = prerender(mod.LongKeySwitch, {
+			a: first.promise,
+			b: second.promise,
+			firstKey: prefix + '\ud800',
+			secondKey: prefix + '\ufffd',
+		}).then((result) => {
+			finished = true;
+			return result;
+		});
+
+		first.resolve('A');
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(finished).toBe(false);
+		second.resolve('B');
+		const result = await rendering;
+		expect(result.html).toContain('data-label="b">b:B</span>');
+		expect(result.html).not.toContain('b:A');
+	});
+
+	it('preserves long keyed descriptor values when a render-phase retry reverses the array', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const prefix = 'same-prefix:'.repeat(8);
+		const rendering = prerender(mod.LongKeyedArraySwitch, {
+			a: first.promise,
+			b: second.promise,
+			firstKey: prefix + 'first',
+			secondKey: prefix + 'second',
+		});
+		first.resolve('A');
+		second.resolve('B');
+
+		const result = await rendering;
+		const labels = [...result.html.matchAll(/data-label="([ab])"[^>]*>([ab]:[AB])/g)].map(
+			(match) => [match[1], match[2]],
+		);
+		expect(labels).toEqual([
+			['b', 'b:B'],
+			['a', 'a:A'],
+		]);
+	});
+
+	it('reveals out-of-order streamed boundaries under distinct long keyed items', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const prefix = 'same-prefix:'.repeat(8);
+		const output = collector();
+		ServerRuntime.renderToPipeableStream(mod.LongKeyedBoundaries, {
+			items: [
+				{ key: prefix + 'first', label: 'a', promise: first.promise },
+				{ key: prefix + 'second', label: 'b', promise: second.promise },
+			],
+		}).pipe(output.destination);
+
+		second.resolve('B');
+		await vi.waitFor(() => {
+			expect(output.chunks.some((chunk) => chunk.includes('b:B'))).toBe(true);
+		});
+		first.resolve('A');
+		await output.ended;
+
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('[data-label="a"]')?.textContent).toBe('a:A');
+		expect(container.querySelector('[data-label="b"]')?.textContent).toBe('b:B');
+		container.remove();
+		resetStreamRuntimeGlobals();
 	});
 
 	it('keeps a late content error inside its already-flushed Suspense boundary', async () => {

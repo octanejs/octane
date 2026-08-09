@@ -11,6 +11,7 @@ type HydrationBinding =
 	| 'docusaurus'
 	| 'rainbowkit'
 	| 'react-map-gl'
+	| 'solana-react'
 	| 'testing-library';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
@@ -47,6 +48,15 @@ function bindingAliases(binding: HydrationBinding) {
 			{
 				find: /^@octanejs\/remix-router$/,
 				replacement: resolve(repositoryRoot, 'packages/remix-router/src/index.ts'),
+			},
+		];
+	}
+
+	if (binding === 'solana-react') {
+		return [
+			{
+				find: /^@octanejs\/solana-react$/,
+				replacement: resolve(source, 'index.ts'),
 			},
 		];
 	}

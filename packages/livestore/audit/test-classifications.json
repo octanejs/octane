@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/livestore/tests/conformance/live-list.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Keyed LiveList identity/index/metadata coverage is Octane list integration evidence unpaired against the upstream React-window suite and is not React-parity ownership."
+    },
+    {
+      "path": "packages/livestore/tests/conformance/query-resource.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane reference-counted query resource cleanup across concurrent consumers; not an adapted upstream-suite identity."
+    },
+    {
+      "path": "packages/livestore/tests/conformance/registry-context.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Covers StoreRegistryProvider context, explicit override, and missing-context errors for the Octane port surface outside the adapted upstream useStore cases."
+    },
+    {
+      "path": "packages/livestore/tests/conformance/sync-status.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Sync-status subscription switching and hydration are Octane external-store contracts unpaired as adapted upstream-suite cases."
+    },
+    {
+      "path": "packages/livestore/tests/document-sync.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted cases from pinned @livestore/react 0.4.0 useClientDocument suite with upstream citations."
+    },
+    {
+      "path": "packages/livestore/tests/lifecycle.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted cases from pinned @livestore/react 0.4.0 useRcResource/useStore suites with upstream citations, including useActionState transition commit."
+    },
+    {
+      "path": "packages/livestore/tests/package-contract.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the published Octane package namespace and dependency closure; it is not used as React-parity evidence."
+    },
+    {
+      "path": "packages/livestore/tests/query.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted cases from pinned @livestore/react 0.4.0 useQuery suite with upstream citations."
+    },
+    {
+      "path": "packages/livestore/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "SSR/server rendering contract for the Octane binding; not React-parity ownership."
+    },
+    {
+      "path": "packages/livestore/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned @livestore/react 0.4.0 Vitest suite against React after vendored-byte verification."
+    }
+  ]
+}

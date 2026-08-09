@@ -256,6 +256,42 @@ function AdjacentPanels(props) @{
 	</main>
 }
 
+// Declare the synchronous bridges before their callees so warm reachability
+// must propagate through both forward same-module references.
+interface SyncWarmProps {
+	load: (key: string, version: number) => Promise<string>;
+	version: number;
+}
+
+function SyncWarmOuter(props: SyncWarmProps) @{
+	<section class="sync-warm-outer">
+		<SyncWarmInner load={props.load} version={props.version} />
+	</section>
+}
+
+function SyncWarmInner(props: SyncWarmProps) @{
+	<div class="sync-warm-inner">
+		<SyncWarmLeaf load={props.load} version={props.version} />
+	</div>
+}
+
+function SyncWarmLeaf(props: SyncWarmProps) @{
+	const value = use(props.load('sync-warm-leaf', props.version));
+	<span class="sync-warm-leaf">{value as string}</span>
+}
+
+function SyncWarmDirect(props: SyncWarmProps) @{
+	const value = use(props.load('sync-warm-direct', props.version));
+	<span class="sync-warm-direct">{value as string}</span>
+}
+
+function SyncWarmBranches(props: SyncWarmProps) @{
+	<main>
+		<SyncWarmDirect load={props.load} version={props.version} />
+		<SyncWarmOuter load={props.load} version={props.version} />
+	</main>
+}
+
 function VersionedPanel(props) @{
 	const value = use(props.load(props.resource, props.version));
 	<span class={props.resource}>{value as string}</span>
@@ -394,6 +430,16 @@ export function AdjacentPanelsHost(props) @{
 			}
 		} @pending {
 			<div class="fallback">{'panels-loading'}</div>
+		}
+	</>
+}
+
+export function SyncWarmBranchesHost(props: SyncWarmProps) @{
+	<>
+		@try {
+			<SyncWarmBranches load={props.load} version={props.version} />
+		} @pending {
+			<div class="fallback">{'sync-warm-loading'}</div>
 		}
 	</>
 }

@@ -86,27 +86,28 @@ descriptors — the cross-module signaling channel exists.
 
 ### M0 — Measurement first (same doctrine as the size plan)
 
-- **`comments_1k` op in the js-framework harness**: after the `run` op (1,000
-  rows), count comment nodes in-page. Deterministic per framework → works
-  with `--compare` AND cross-framework ratio guards (solid/ripple also use
-  marker comments — honest comparison). Record baselines.
-- **Deterministic DOM-weight benchmarks**: measure comment-node weight in the
-  js-framework harness and ratio system. Keep performance thresholds out of
-  correctness suites so implementation-preserving marker changes do not
-  require browser-test churn.
+The historical js-framework DOM census was later retired; structural coverage
+continues in TodoMVC, chat-stream, and portal-swarm.
+
+- **Historical `comments_1k` op in the js-framework harness**: after the `run`
+  op (1,000 rows), counted comment nodes in-page and recorded baselines.
+- **Historical js-framework DOM-weight benchmarks**: measured comment-node
+  weight in its harness and ratio system. Keep performance thresholds out of
+  correctness suites so implementation-preserving marker changes do not require
+  browser-test churn.
 - **Behavioral hydration coverage**: render representative wrapper, keyed,
   Suspense, and de-opt fixtures through SSR and hydration; assert DOM adoption,
   state, identity, events, and mismatch diagnostics rather than marker spelling.
 
 **M0 LANDED 2026-07-09.** Three layers, all green in both compile modes:
 
-- `comments_1k` op in the js-framework harness (payload now carries every
-  collected op). Recorded: **octane-tsrx 3 · octane-jsx 3 · react 0 ·
-  ripple 0 · solid 0** — the 1,000-row grid is already almost marker-free
-  (forBlock singleRoot at work), so this op is a singleRoot-regression
-  TRIPWIRE (+1 comment fails the absolute compare), not a ratio (references
-  are 0 — no ratio guard possible). Wrapper/de-opt weight is tracked by the
-  broader DOM-weight benchmarks and validated behaviorally during hydration.
+- Historical `comments_1k` op in the js-framework harness. Recorded:
+  **octane-tsrx 3 · octane-jsx 3 · react 0 · ripple 0 · solid 0** — the
+  1,000-row grid was already almost marker-free (forBlock singleRoot at work),
+  so this op was a singleRoot-regression TRIPWIRE (+1 comment failed the
+  absolute compare), not a ratio (references were 0 — no ratio guard was
+  possible). Wrapper/de-opt weight remains tracked by the broader DOM-weight
+  benchmarks and validated behaviorally during hydration.
 - Historical per-route measurements at landing: `/` 2,123 · `/docs` 379 ·
   `/benchmarks` **17,381** (the 12 recharts cards; the M2 number) ·
   `/playground` 185. Current DOM-weight regression coverage lives in the
@@ -337,9 +338,10 @@ equivalent to a range marker.
 The same js-framework fixture authored through the generic return-JSX paths
 lost its cliff: the naive TSRX variant went from 2,003 comments to **2**, and
 the naive JSX variant from 4,003 to **2**, matching the tuned fixture's DOM
-shape. Solid and Svelte are still reported separately by the harness because
-their compiled output deliberately uses extra text/comment nodes in several
-fixtures; element and meaningful-text equality is the semantic comparison.
+shape. Solid and Svelte were reported separately in this historical census
+because their compiled output deliberately uses extra text/comment nodes in
+several fixtures; element and meaningful-text equality was the semantic
+comparison.
 
 The attribution and changes are deliberately narrow:
 
@@ -369,14 +371,15 @@ The attribution and changes are deliberately narrow:
   `<Activity>` ranges, multi-root keyed items, order-bearing value-hole
   anchors, and adjacent-text SSR separators also remain load-bearing.
 
-`benchmarks/lib/dom-nodes.mjs` is the regression surface: js-framework,
-TodoMVC, chat-stream, and portal-swarm now emit deterministic `nodes_*`,
+`benchmarks/lib/dom-nodes.mjs` remains the regression surface for TodoMVC,
+chat-stream, and portal-swarm. TodoMVC and chat-stream emit deterministic `nodes_*`,
 `elements_*`, `text_*`, `comments_*`, `empty_text_*`, and
 `whitespace_text_*` operations plus comment-payload/parent histograms in
-`meta.dom`. Ratio guards cap total nodes while requiring Octane's visible
-element/text counts to equal React's. Portal-swarm records both the fixture
-root and whole-body census so target-side portal ranges cannot disappear from
-the accounting.
+`meta.dom`; the js-framework census and its DOM-weight ratio guards were
+retired. Remaining ratio guards cap total nodes while requiring Octane's
+visible element/text counts to equal React's. Portal-swarm records both the
+fixture root and whole-body census so target-side portal ranges cannot
+disappear from the accounting.
 
 The implementation plan was ordered by invariant risk: instrument first;
 reuse already-owned anchors/ranges; extend the existing single-root proof;
@@ -518,7 +521,8 @@ coextensive wrapper stack.
 - Perf: same-session A/B on js-framework/dbmon/effectful-list. Expected
   neutral-to-positive (fewer DOM nodes, shorter walks); the singleRoot item
   precedent showed no cost. Memory is where wins may show (dbmon).
-- Ratchet: `comments_1k` and the deterministic DOM-weight ratio guards tighten per phase.
+- Ratchet: deterministic DOM-weight ratio guards tighten per phase in the
+  remaining structural benchmark suites.
 
 ## 6. Open questions
 

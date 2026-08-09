@@ -1,9 +1,9 @@
-import { createElement, useEffect } from 'octane';
+import { createElement, useEffect, useId } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';
 import { Asset } from './Asset.tsrx';
 import type { AssetProps } from './Asset.tsrx';
-import { getAssetKey } from './assetKeys.ts';
+import { getAssetKey, getManagedAssetKey } from './assetKeys.ts';
 import { useTags } from './headContentUtils.ts';
 import { useHydrated } from './ClientOnly.tsrx';
 
@@ -12,6 +12,7 @@ export interface HeadContentProps {
 }
 
 export function HeadContent(props: HeadContentProps) @{
+	const owner = useId();
 	const tags = useTags(props.assetCrossOrigin);
 	const hydrated = useHydrated();
 
@@ -27,15 +28,17 @@ export function HeadContent(props: HeadContentProps) @{
 			? tags.filter((tag) => tag.tag !== 'link' || tag.attrs?.[DEV_STYLES_ATTR] !== true)
 			: tags;
 	<>
-		{filteredTags.map(
-			(tag, index) => // `key` is lifted out of props by createElement (React semantics); the
+		{filteredTags.map((tag, index) => {
+			const assetKey = getAssetKey('head', tag, index);
+			// `key` is lifted out of props by createElement (React semantics); the
 			// explicit type argument admits it alongside the AssetProps shape.
-			createElement<AssetProps & { key?: string }>(Asset, {
+			return createElement<AssetProps & { key?: string; managedKey?: string }>(Asset, {
 				...tag,
-				assetKey: getAssetKey('head', tag, index),
+				assetKey,
+				managedKey: getManagedAssetKey('head', owner, index),
 				target: 'head',
-				key: getAssetKey('head', tag, index),
-			}),
-		)}
+				key: assetKey,
+			});
+		})}
 	</>
 }

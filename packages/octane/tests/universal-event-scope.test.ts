@@ -460,6 +460,72 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('preserves mixed keyed survivors and insertions before untouched scope siblings', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['label', 0]],
+		});
+		const markerPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'marker',
+			bindings: [['label', 0]],
+		});
+		let apply!: (ids: string[]) => void;
+		const Rows = defineUniversalComponent('object', () => {
+			const [ids, setIds] = useState(['a', 'b', 'c', 'd', 'e'], 'mixed-ids');
+			apply = setIds;
+			return ids.map((id) => universalValue(rowPlan, [id], id));
+		});
+		const Shell = defineUniversalComponent('object', () => [
+			universalValue(markerPlan, ['prefix']),
+			universalComponent('object', Rows),
+			universalValue(markerPlan, ['suffix']),
+		]);
+
+		root.render(Shell, undefined);
+		const [prefix, rowA, rowB, rowC, rowD, rowE, suffix] = container.children;
+
+		flushUniversalSync(() => apply(['e', 'x', 'c', 'y', 'a', 'z']));
+		expect(container.children.map((child) => child.props.label)).toEqual([
+			'prefix',
+			'e',
+			'x',
+			'c',
+			'y',
+			'a',
+			'z',
+			'suffix',
+		]);
+		expect(container.children[0]).toBe(prefix);
+		expect(container.children[1]).toBe(rowE);
+		expect(container.children[3]).toBe(rowC);
+		expect(container.children[5]).toBe(rowA);
+		expect(container.children[7]).toBe(suffix);
+		expect(container.children).not.toContain(rowB);
+		expect(container.children).not.toContain(rowD);
+		const rowZ = container.children[6];
+
+		flushUniversalSync(() => apply(['z', 'e', 'w', 'a']));
+		expect(container.children.map((child) => child.props.label)).toEqual([
+			'prefix',
+			'z',
+			'e',
+			'w',
+			'a',
+			'suffix',
+		]);
+		expect(container.children[0]).toBe(prefix);
+		expect(container.children[1]).toBe(rowZ);
+		expect(container.children[2]).toBe(rowE);
+		expect(container.children[4]).toBe(rowA);
+		expect(container.children[5]).toBe(suffix);
+		expect(container.children).not.toContain(rowC);
+		root.unmount();
+	});
+
 	it('anchors structural scope changes before later siblings inside a host parent', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

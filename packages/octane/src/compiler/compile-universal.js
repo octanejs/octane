@@ -1811,6 +1811,62 @@ function collectComponentNames(ast) {
 	return names;
 }
 
+function collectOwnerFreeThreeHostComponents(ast, state, development) {
+	if (
+		development ||
+		state.hmr ||
+		state.profile ||
+		state.renderer.id !== 'three' ||
+		state.renderer.module !== '@octanejs/three/renderer'
+	) {
+		return null;
+	}
+
+	const constructors = new Set();
+	for (const statement of ast.body ?? []) {
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.importKind === 'type' ||
+			statement.source?.value !== '@octanejs/three'
+		) {
+			continue;
+		}
+		for (const specifier of statement.specifiers ?? []) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				(specifier.imported?.name ?? specifier.imported?.value) === 'extend' &&
+				typeof specifier.local?.name === 'string'
+			) {
+				constructors.add(specifier.local.name);
+			}
+		}
+	}
+	if (constructors.size === 0) return null;
+
+	const names = new Set();
+	for (const statement of ast.body ?? []) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const binding of declaration.declarations ?? []) {
+			const call = binding.init;
+			if (
+				binding.id?.type === 'Identifier' &&
+				call?.type === 'CallExpression' &&
+				call.optional !== true &&
+				call.callee?.type === 'Identifier' &&
+				constructors.has(call.callee.name) &&
+				call.arguments?.length === 1 &&
+				call.arguments[0]?.type !== 'SpreadElement'
+			) {
+				names.add(binding.id.name);
+			}
+		}
+	}
+	return names.size === 0 ? null : { names, lexical: createLexicalAnalysis(ast) };
+}
+
 function addPatternNames(pattern, names) {
 	if (!pattern) return;
 	if (pattern.type === 'Identifier') {
@@ -1966,32 +2022,52 @@ function isOwnerFreeForAttribute(attribute) {
 	);
 }
 
-function ownerFreeForHost(node) {
+function ownerFreeForLeaf(node) {
 	if (node.empty != null) return null;
 	if (!isOwnerFreeForExpression(node.right) || !isOwnerFreeForExpression(node.key)) return null;
 	const body = (node.body?.body ?? []).filter(
 		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
 	);
 	if (body.length !== 1) return null;
-	const host = body[0];
+	const leaf = body[0];
+	if (leaf.type !== 'JSXElement' && leaf.type !== 'Element') return null;
 	if (
-		(host.type !== 'JSXElement' && host.type !== 'Element') ||
-		isComponentElement(host) ||
-		jsxName(host) === 'Activity'
-	) {
-		return null;
-	}
-	const type = jsxName(host);
-	if (type === null || !/^[a-z]/.test(type)) return null;
-	if (
-		(host.children ?? []).some(
+		(leaf.children ?? []).some(
 			(child) => child.type !== 'JSXText' || normalizeJsxText(child.value ?? '') !== '',
 		)
 	) {
 		return null;
 	}
-	const attributes = host.openingElement?.attributes ?? host.attributes ?? [];
-	return attributes.every(isOwnerFreeForAttribute) ? host : null;
+	const attributes = leaf.openingElement?.attributes ?? leaf.attributes ?? [];
+	return attributes.every(isOwnerFreeForAttribute) ? leaf : null;
+}
+
+function ownerFreeForHost(node) {
+	const host = ownerFreeForLeaf(node);
+	if (host === null || isComponentElement(host) || jsxName(host) === 'Activity') return null;
+	const type = jsxName(host);
+	return type !== null && /^[a-z]/.test(type) ? host : null;
+}
+
+function ownerFreeForThreeHostComponent(node, state) {
+	const trusted = state.ownerFreeThreeHostComponents;
+	if (trusted == null) return null;
+	const component = ownerFreeForLeaf(node);
+	if (component === null || !isComponentElement(component)) return null;
+	const attributes = component.openingElement?.attributes ?? component.attributes ?? [];
+	const attributesSeen = new Set();
+	for (const attribute of attributes) {
+		const attributeKey = attributeName(attribute);
+		if (attributeKey === '__proto__' || attributesSeen.has(attributeKey)) return null;
+		attributesSeen.add(attributeKey);
+	}
+	const name = component.openingElement?.name ?? component.name;
+	if (name?.type !== 'JSXIdentifier' || !trusted.names.has(name.name)) return null;
+	const binding = trusted.lexical.resolveBinding(
+		trusted.lexical.nodeScopes.get(name) ?? trusted.lexical.rootScope,
+		name.name,
+	);
+	return binding?.scope === trusted.lexical.rootScope ? component : null;
 }
 
 function allocPlan(state, root, origin = null) {
@@ -2407,6 +2483,85 @@ function compilePlainPropsObjectAst(attributes, state, origin) {
 	return inheritGeneratedOrigin(b.object(entries), origin);
 }
 
+/**
+ * Lower a `class={[…]}` array literal to its clsx-composed string when every
+ * element is statically a string or falsy.
+ *
+ * The runtime composes class arrays clsx-style, so `['row', on && 'danger']`
+ * is only ever observed as `'row'` or `'row danger'` — but as a slot value the
+ * array is rebuilt on every render, and on a transported root each rebuild is
+ * re-encoded, making the hottest per-row prop a fresh allocation per render.
+ * Emitting the string-building expression instead makes the slot value a
+ * primitive: identity-comparable, allocation-free, and byte-identical in the
+ * background and main-thread programs (so first-screen adoption still sees
+ * the same tree). An all-literal array folds further, into a static plan prop
+ * with no slot at all. Anything not statically string-or-falsy (spreads,
+ * nested arrays, objects, expressions with non-literal truthy arms) keeps the
+ * authored array slot and the runtime's general composition.
+ *
+ * Returns `{ staticValue }` for a fully static class, `{ expression }` for a
+ * string-building lowering, or `null` to keep the authored value.
+ */
+function loweredHostClassAst(expression, state) {
+	if (expression.type !== 'ArrayExpression') return null;
+	const elements = expression.elements ?? [];
+	if (elements.length === 0) return { staticValue: '' };
+	/** @type {({ static: string } | { test: any, value: string })[]} */
+	const parts = [];
+	for (const element of elements) {
+		if (element == null || element.type === 'SpreadElement') return null;
+		if (element.type === 'Literal' && typeof element.value === 'string') {
+			if (element.value !== '') parts.push({ static: element.value });
+			continue;
+		}
+		if (
+			element.type === 'LogicalExpression' &&
+			element.operator === '&&' &&
+			element.right.type === 'Literal' &&
+			typeof element.right.value === 'string' &&
+			element.right.value !== ''
+		) {
+			parts.push({ test: element.left, value: element.right.value });
+			continue;
+		}
+		return null;
+	}
+	// The first part must be a literal so every later piece can join with an
+	// unconditional leading space.
+	if (parts.length !== 0 && parts[0].static === undefined) return null;
+	let composed = null;
+	let pendingStatic = '';
+	const flushStatic = () => {
+		if (pendingStatic === '') return;
+		const literal = b.literal(pendingStatic, JSON.stringify(pendingStatic));
+		composed = composed === null ? literal : b.binary('+', composed, literal);
+		pendingStatic = '';
+	};
+	for (const part of parts) {
+		if (part.static !== undefined) {
+			pendingStatic += pendingStatic === '' && composed === null ? part.static : ` ${part.static}`;
+			continue;
+		}
+		flushStatic();
+		const spaced = ` ${part.value}`;
+		composed = b.binary(
+			'+',
+			composed,
+			inheritGeneratedOrigin(
+				b.conditional(
+					dynamicExpressionAst(part.test, state),
+					b.literal(spaced, JSON.stringify(spaced)),
+					b.literal('', '""'),
+				),
+				part.test,
+			),
+		);
+	}
+	if (composed === null) return { staticValue: pendingStatic };
+	flushStatic();
+	return { expression: inheritGeneratedOrigin(composed, expression) };
+}
+
 function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 	if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 		throw universalError(
@@ -2428,11 +2583,32 @@ function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 	if (value.type === 'Literal') return { name, staticValue: value.value };
 	if (value.type === 'JSXExpressionContainer') {
 		if (!value.expression || value.expression.type === 'JSXEmptyExpression') return null;
+		if (name === 'class') {
+			const lowered = loweredHostClassAst(value.expression, state);
+			if (lowered !== null) {
+				if (lowered.expression === undefined) return { name, staticValue: lowered.staticValue };
+				const slot = context.values.length;
+				context.values.push(lowered.expression);
+				return { name, slot };
+			}
+		}
+		if (value.expression.type === 'Literal' && isStaticPropLiteral(value.expression.value)) {
+			return { name, staticValue: value.expression.value };
+		}
 		const slot = context.values.length;
 		context.values.push(mainThreadHostValueAst(name, value.expression, state));
 		return { name, slot };
 	}
 	throw universalError(state.filename, attribute, `unsupported value for host attribute ${name}.`);
+}
+
+/**
+ * Literal values that can ride the frozen plan instead of a per-render slot.
+ * `null` stays a slot: it is a legal "no handler" value for event props, whose
+ * erasure in main-thread first-screen programs happens at the slot site.
+ */
+function isStaticPropLiteral(value) {
+	return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
 function addDynamicAst(context, expression) {
@@ -2710,6 +2886,55 @@ function rewriteSetupStatementAst(statement, state) {
 	return rewritten === null ? [] : [rewritten];
 }
 
+function compileOwnerFreeForHostAst(host, state, itemBinding, indexBinding) {
+	const context = { values: [] };
+	const plan = allocPlan(state, compileHostElementAst(host, context, state), host);
+	return {
+		plan: generatedIdentifier(plan, host),
+		render: generatedArrow(
+			[itemBinding, indexBinding],
+			inheritGeneratedOrigin(b.array(context.values), host),
+			host,
+		),
+	};
+}
+
+function compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, indexBinding) {
+	const attributes = component.openingElement?.attributes ?? component.attributes ?? [];
+	const names = [];
+	const values = [];
+	for (const attribute of attributes) {
+		const name = attributeName(attribute);
+		const value = attribute.value;
+		const expression =
+			value === null
+				? inheritGeneratedOrigin(b.literal(true), attribute)
+				: value.type === 'Literal'
+					? inheritGeneratedOrigin(b.literal(value.value), value)
+					: mainThreadHostValueAst(name, value.expression, state);
+		names.push(name);
+		values.push(expression);
+	}
+	const helper = (state.helpers.hostComponentLeafPlan ??= allocName(
+		state,
+		'__octaneUniversalHostComponentLeafPlan',
+	));
+	const signature = JSON.stringify(names);
+	return {
+		plan: generatedCall(
+			helper,
+			[b.literal(state.renderer.id), jsxNameExpressionAst(component, state), b.literal(signature)],
+			component,
+		),
+		render: generatedArrow(
+			[itemBinding, indexBinding],
+			inheritGeneratedOrigin(b.array(values), component),
+			component,
+		),
+		signature: inheritGeneratedOrigin(b.literal(signature), component),
+	};
+}
+
 function compileForAst(node, context, state) {
 	if (node.await) {
 		throw universalError(
@@ -2730,18 +2955,43 @@ function compileForAst(node, context, state) {
 		node.index ?? generatedIdentifier(allocName(state, '__octaneUniversalIndex'), node);
 	assertNoResidualTemplate(node.right, state, '@for source');
 	assertNoResidualTemplate(node.key, state, '@for key');
+	const host = !state.hmr ? ownerFreeForHost(node) : null;
+	const component = host === null ? ownerFreeForThreeHostComponent(node, state) : null;
+	const compactHost =
+		host === null ? null : compileOwnerFreeForHostAst(host, state, itemBinding, indexBinding);
+	const compactComponent =
+		component === null
+			? null
+			: compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, indexBinding);
 	const args = [
 		rewriteSourceAst(node.right, state),
 		generatedArrow([itemBinding, indexBinding], rewriteSourceAst(node.key, state), node.key),
-		compileBlockValueAst(
-			node.body?.body ?? [],
-			state,
-			[itemBinding, indexBinding],
-			node.body ?? node,
-		),
+		compactHost?.render ??
+			compactComponent?.render ??
+			compileBlockValueAst(
+				node.body?.body ?? [],
+				state,
+				[itemBinding, indexBinding],
+				node.body ?? node,
+			),
 	];
-	if (!state.hmr && ownerFreeForHost(node) !== null) {
-		args.push(b.literal(null, 'null'), b.literal(true), b.literal(true));
+	if (host !== null) {
+		args.push(
+			b.literal(null, 'null'),
+			b.literal(true),
+			b.literal(true),
+			inheritGeneratedOrigin(b.unary('void', b.literal(0)), host),
+			compactHost.plan,
+		);
+	} else if (component !== null) {
+		args.push(
+			b.literal(null, 'null'),
+			b.literal(true),
+			b.literal(true),
+			jsxNameExpressionAst(component, state),
+			compactComponent.plan,
+			compactComponent.signature,
+		);
 	} else if (node.empty) {
 		args.push(compileBlockValueAst(node.empty?.body ?? [], state, [], node.empty));
 	}
@@ -2828,6 +3078,16 @@ function compileChildAst(node, context, state) {
 	}
 	if (node.type === 'JSXExpressionContainer') {
 		if (!node.expression || node.expression.type === 'JSXEmptyExpression') return [];
+		// A string-literal child is authored text with braces around it: fold it
+		// into the plan like JSXText, so the constant stops riding every render's
+		// slot array. Renderers without host text keep the renderable-hole slot.
+		if (
+			node.expression.type === 'Literal' &&
+			typeof node.expression.value === 'string' &&
+			state.renderer.text === 'host'
+		) {
+			return [withPlanOrigin({ kind: 'text', value: node.expression.value }, node)];
+		}
 		return [addDynamicAst(context, dynamicExpressionAst(node.expression, state))];
 	}
 	if (node.type === 'JSXElement' || node.type === 'Element') {
@@ -3048,6 +3308,9 @@ function universalHelperImportAst(state, extraPairs = [], origin = null) {
 		['universalPlan', state.helpers.plan],
 		['universalValue', state.helpers.value],
 		['universalComponent', state.helpers.nestedComponent],
+		...(state.helpers.hostComponentLeafPlan === undefined
+			? []
+			: [['universalHostComponentLeafPlan', state.helpers.hostComponentLeafPlan]]),
 		['universalProps', state.helpers.props],
 		['universalIf', state.helpers.if],
 		['universalSwitch', state.helpers.switch],
@@ -3696,6 +3959,11 @@ export function compileUniversal(
 		componentNames: collectComponentNames(ast),
 		runtimeImports: new Map(),
 	};
+	state.ownerFreeThreeHostComponents = collectOwnerFreeThreeHostComponents(
+		ast,
+		state,
+		options.dev === true,
+	);
 	state.helpers.component = allocName(state, '__octaneDefineUniversalComponent');
 	state.helpers.plan = allocName(state, '__octaneUniversalPlan');
 	state.helpers.value = allocName(state, '__octaneUniversalValue');

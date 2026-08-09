@@ -1,4 +1,5 @@
 import * as Octane from 'octane';
+import { flushSync as clientFlushSync } from 'octane';
 import { flushUniversalAct, flushUniversalSync, type UniversalSyncFlusher } from 'octane/universal';
 
 export type Act = typeof import('octane').act;
@@ -66,14 +67,15 @@ function runClientAct<T>(callback: () => T | Promise<T>, clientAct: Act): Promis
 
 /** Flushes both the DOM scheduler and mounted universal Three roots. */
 export const flushSync: FlushSync = (callback) => {
-	const clientFlushSync = Reflect.get(Octane, 'flushSync') as FlushSync | undefined;
 	return flushUniversalSync(callback, clientFlushSync);
 };
 
 /** R3F-compatible test helper backed by Octane's client scheduler when available. */
 export const act: Act = (callback) => {
+	// The server entry has flushSync but deliberately does not export act. Keep
+	// this optional namespace lookup inside the cold test-only export so bundles
+	// using only flushSync can still remove the rest of Octane's public surface.
 	const clientAct = Reflect.get(Octane, 'act') as Act | undefined;
-	const clientFlushSync = Reflect.get(Octane, 'flushSync') as FlushSync | undefined;
 	if (typeof clientAct === 'function') return runClientAct(callback, clientAct);
 	try {
 		return Promise.resolve(runActCallback(callback, clientFlushSync));

@@ -1,0 +1,169 @@
+{
+    "name": "@solana/react",
+    "version": "7.0.0",
+    "description": "React hooks for building Solana apps",
+    "homepage": "https://www.solanakit.com/api#solanareact",
+    "exports": {
+        ".": {
+            "edge-light": {
+                "import": "./dist/index.node.mjs",
+                "require": "./dist/index.node.cjs"
+            },
+            "workerd": {
+                "import": "./dist/index.node.mjs",
+                "require": "./dist/index.node.cjs"
+            },
+            "browser": {
+                "import": "./dist/index.browser.mjs",
+                "require": "./dist/index.browser.cjs"
+            },
+            "node": {
+                "import": "./dist/index.node.mjs",
+                "require": "./dist/index.node.cjs"
+            },
+            "react-native": "./dist/index.native.mjs",
+            "types": "./dist/types/index.d.ts"
+        },
+        "./swr": {
+            "edge-light": {
+                "import": "./dist/swr.node.mjs",
+                "require": "./dist/swr.node.cjs"
+            },
+            "workerd": {
+                "import": "./dist/swr.node.mjs",
+                "require": "./dist/swr.node.cjs"
+            },
+            "browser": {
+                "import": "./dist/swr.browser.mjs",
+                "require": "./dist/swr.browser.cjs"
+            },
+            "node": {
+                "import": "./dist/swr.node.mjs",
+                "require": "./dist/swr.node.cjs"
+            },
+            "react-native": "./dist/swr.native.mjs",
+            "types": "./dist/types/swr.d.ts"
+        },
+        "./query": {
+            "edge-light": {
+                "import": "./dist/query.node.mjs",
+                "require": "./dist/query.node.cjs"
+            },
+            "workerd": {
+                "import": "./dist/query.node.mjs",
+                "require": "./dist/query.node.cjs"
+            },
+            "browser": {
+                "import": "./dist/query.browser.mjs",
+                "require": "./dist/query.browser.cjs"
+            },
+            "node": {
+                "import": "./dist/query.node.mjs",
+                "require": "./dist/query.node.cjs"
+            },
+            "react-native": "./dist/query.native.mjs",
+            "types": "./dist/types/query.d.ts"
+        }
+    },
+    "browser": {
+        "./dist/index.node.cjs": "./dist/index.browser.cjs",
+        "./dist/index.node.mjs": "./dist/index.browser.mjs",
+        "./dist/swr.node.cjs": "./dist/swr.browser.cjs",
+        "./dist/swr.node.mjs": "./dist/swr.browser.mjs",
+        "./dist/query.node.cjs": "./dist/query.browser.cjs",
+        "./dist/query.node.mjs": "./dist/query.browser.mjs"
+    },
+    "main": "./dist/index.node.cjs",
+    "module": "./dist/index.node.mjs",
+    "react-native": "./dist/index.native.mjs",
+    "types": "./dist/types/index.d.ts",
+    "type": "commonjs",
+    "files": [
+        "./dist/",
+        "./src/"
+    ],
+    "sideEffects": false,
+    "keywords": [
+        "blockchain",
+        "solana",
+        "web3"
+    ],
+    "scripts": {
+        "compile:docs": "typedoc",
+        "compile:js": "tsup --config build-scripts/tsup.config.package.ts",
+        "compile:typedefs": "tsc -p ./tsconfig.declarations.json",
+        "dev": "NODE_OPTIONS=\"--no-experimental-webstorage\" jest -c ../../node_modules/@solana/test-config/jest-dev.config.js --rootDir . --watch",
+        "prepublishOnly": "pnpm pkg delete devDependencies",
+        "publish-impl": "npm view $npm_package_name@$npm_package_version > /dev/null 2>&1 || (pnpm publish --tag ${PUBLISH_TAG:-canary} --access public --no-git-checks && (([ -n \"${GITHUB_OUTPUT:-}\" ] && echo 'published=true' >> \"$GITHUB_OUTPUT\") || true) && (([ \"$PUBLISH_TAG\" != \"canary\" ] && ../build-scripts/maybe-tag-latest.ts --token \"$GITHUB_TOKEN\" $npm_package_name@$npm_package_version) || true))",
+        "publish-packages": "pnpm prepublishOnly && pnpm publish-impl",
+        "style:fix": "pnpm eslint --fix src && pnpm prettier --log-level warn --ignore-unknown --write ./*",
+        "test:lint": "TERM_OVERRIDE=\"${TURBO_HASH:+dumb}\" TERM=${TERM_OVERRIDE:-$TERM} jest -c ../../node_modules/@solana/test-config/jest-lint.config.js --rootDir . --silent",
+        "test:prettier": "TERM_OVERRIDE=\"${TURBO_HASH:+dumb}\" TERM=${TERM_OVERRIDE:-$TERM} jest -c ../../node_modules/@solana/test-config/jest-prettier.config.js --rootDir . --silent",
+        "test:treeshakability:browser": "agadoo dist/index.browser.mjs && agadoo dist/swr.browser.mjs && agadoo dist/query.browser.mjs",
+        "test:treeshakability:native": "agadoo dist/index.native.mjs && agadoo dist/swr.native.mjs && agadoo dist/query.native.mjs",
+        "test:treeshakability:node": "agadoo dist/index.node.mjs && agadoo dist/swr.node.mjs && agadoo dist/query.node.mjs",
+        "test:typecheck": "tsc --noEmit",
+        "test:unit:browser": "NODE_OPTIONS=\"--no-experimental-webstorage\" TERM_OVERRIDE=\"${TURBO_HASH:+dumb}\" TERM=${TERM_OVERRIDE:-$TERM} jest -c ../../node_modules/@solana/test-config/jest-unit.config.browser.js --rootDir . --silent",
+        "test:unit:node": "NODE_OPTIONS=\"--no-experimental-webstorage\" TERM_OVERRIDE=\"${TURBO_HASH:+dumb}\" TERM=${TERM_OVERRIDE:-$TERM} jest -c ../../node_modules/@solana/test-config/jest-unit.config.node.js --rootDir . --silent"
+    },
+    "author": "Solana Labs Maintainers <maintainers@solanalabs.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/anza-xyz/kit"
+    },
+    "bugs": {
+        "url": "https://github.com/anza-xyz/kit/issues"
+    },
+    "browserslist": [
+        "supports bigint and not dead",
+        "maintained node versions"
+    ],
+    "dependencies": {
+        "@solana/promises": "workspace:*",
+        "@solana/signers": "workspace:*",
+        "@solana/subscribable": "workspace:*",
+        "@solana/transaction-messages": "workspace:*",
+        "@solana/transactions": "workspace:*",
+        "@solana/wallet-standard-features": "^1.4.0",
+        "@wallet-standard/base": "^1.1.0",
+        "@wallet-standard/errors": "^0.1.2",
+        "@wallet-standard/react": "^1.0.1",
+        "@wallet-standard/ui": "^1.0.1",
+        "@wallet-standard/ui-registry": "^1.0.1"
+    },
+    "devDependencies": {
+        "@solana/eslint-config": "workspace:*",
+        "@solana/kit": "workspace:*",
+        "@tanstack/react-query": "^5.0.0",
+        "@testing-library/react": "^16.3.2",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "@types/react-test-renderer": "^19.1.0",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7",
+        "react-error-boundary": "^5.0.0",
+        "react-test-renderer": "^19.2.7",
+        "swr": "^2.0.0"
+    },
+    "peerDependencies": {
+        "@solana/kit": "workspace:*",
+        "@tanstack/react-query": "^5.0.0",
+        "react": ">=18",
+        "swr": "^2.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@tanstack/react-query": {
+            "optional": true
+        },
+        "react": {
+            "optional": true
+        },
+        "swr": {
+            "optional": true
+        }
+    },
+    "engines": {
+        "node": ">=20.18.0"
+    }
+}

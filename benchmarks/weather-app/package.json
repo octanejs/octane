@@ -7,6 +7,8 @@
   "scripts": {
     "bench": "node run.mjs",
     "bench:lighthouse": "node lighthouse.mjs",
+    "bench:delivery": "node delivery.mjs",
+    "bench:work": "node work.mjs",
     "bench:long": "node run.mjs 16"
   },
   "dependencies": {

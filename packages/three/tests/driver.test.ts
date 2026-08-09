@@ -31,6 +31,29 @@ function createRoot(scene = new THREE.Scene(), environment: ThreeHostEnvironment
 	return { container, root, scene };
 }
 
+function createRootReorderScene() {
+	const mesh = universalPlan('three', {
+		kind: 'host',
+		type: 'mesh',
+		propsSlot: 0,
+	});
+	return defineUniversalComponent(
+		'three',
+		(props: { order: readonly string[]; position: number }) =>
+			universalList(props.order, (name) =>
+				universalKey(
+					name,
+					universalValue(mesh, [
+						universalProps([
+							['set', 'name', name],
+							['set', 'position', [props.position, 0, 0]],
+						]),
+					]),
+				),
+			),
+	);
+}
+
 describe('Three universal driver', () => {
 	it('preserves real child objects and order while recreating a parent under one descriptor', () => {
 		const meshPlan = universalPlan('three', {
@@ -784,6 +807,671 @@ describe('Three universal driver', () => {
 		container.flushDisposals();
 	});
 
+	it('keeps staged root replacements private and disposes abandoned replacements exactly once', () => {
+		const constructed: FlatPreparedResource[] = [];
+		const disposals: string[] = [];
+		class FlatPreparedResource extends THREE.Object3D {
+			constructor(id: string, generation: number) {
+				super();
+				this.name = `${id}:${generation}`;
+				constructed.push(this);
+			}
+
+			dispose() {
+				disposals.push(this.name);
+			}
+		}
+		extend({ FlatPreparedResource });
+		const resource = universalPlan('three', {
+			kind: 'host',
+			type: 'flatPreparedResource',
+			propsSlot: 0,
+		});
+		const refValues = new Map<string, FlatPreparedResource | null>();
+		const refA = (value: FlatPreparedResource | null) => refValues.set('a', value);
+		const refB = (value: FlatPreparedResource | null) => refValues.set('b', value);
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalList(['a', 'b'], (id) =>
+				universalKey(
+					id,
+					universalValue(resource, [
+						universalProps([
+							['set', 'args', [id, props.generation]],
+							['set', 'ref', id === 'a' ? refA : refB],
+						]),
+					]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+
+		root.render(Scene, { generation: 0 });
+		const original = [...scene.children] as FlatPreparedResource[];
+		const descriptors = original.map((object) => getThreeInstance(object));
+		const abandoned = root.prepare(Scene, { generation: 1 });
+		expect(scene.children).toEqual(original);
+		expect(container.instanceCount).toBe(2);
+		expect(constructed.slice(2).every((object) => getThreeInstance(object) === null)).toBe(true);
+		expect(refValues.get('a')).toBe(original[0]);
+		expect(refValues.get('b')).toBe(original[1]);
+		expect(disposals).toEqual([]);
+
+		abandoned.abort();
+		abandoned.abort();
+		expect(disposals).toEqual(['a:1', 'b:1']);
+		expect(scene.children).toEqual(original);
+		expect(original.map((object) => getThreeInstance(object))).toEqual(descriptors);
+
+		root.render(Scene, { generation: 2 });
+		const replacement = [...scene.children] as FlatPreparedResource[];
+		expect(replacement.map((object) => object.name)).toEqual(['a:2', 'b:2']);
+		expect(replacement[0]).not.toBe(original[0]);
+		expect(replacement[1]).not.toBe(original[1]);
+		expect(replacement.map((object) => getThreeInstance(object))).toEqual(descriptors);
+		expect(original.map((object) => getThreeInstance(object))).toEqual([null, null]);
+		expect(refValues.get('a')).toBe(replacement[0]);
+		expect(refValues.get('b')).toBe(replacement[1]);
+		expect(disposals).toEqual(['a:1', 'b:1']);
+
+		container.flushDisposals();
+		expect(disposals).toEqual(['a:1', 'b:1', 'a:0', 'b:0']);
+		root.unmount();
+		container.flushDisposals();
+		expect(disposals).toEqual(['a:1', 'b:1', 'a:0', 'b:0', 'a:2', 'b:2']);
+	});
+
+	it('keeps committed root objects intact when a later replacement constructor fails', () => {
+		const disposals: string[] = [];
+		class FlatFailingResource extends THREE.Object3D {
+			constructor(id: string, generation: number) {
+				super();
+				this.name = `${id}:${generation}`;
+				if (id === 'b' && generation === 1) throw new Error('replacement construction failed');
+			}
+
+			dispose() {
+				disposals.push(this.name);
+			}
+		}
+		extend({ FlatFailingResource });
+		const resource = universalPlan('three', {
+			kind: 'host',
+			type: 'flatFailingResource',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalList(['a', 'b'], (id) =>
+				universalKey(
+					id,
+					universalValue(resource, [universalProps([['set', 'args', [id, props.generation]]])]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+
+		root.render(Scene, { generation: 0 });
+		const committed = [...scene.children];
+		expect(() => root.prepare(Scene, { generation: 1 })).toThrow('replacement construction failed');
+		expect(disposals).toEqual(['a:1']);
+		expect(scene.children).toEqual(committed);
+		expect(container.instanceCount).toBe(2);
+		expect(committed.every((object) => getThreeInstance(object) !== null)).toBe(true);
+		expect(container.commits).toHaveLength(1);
+
+		root.render(Scene, { generation: 2 });
+		expect(scene.children.map((object) => object.name)).toEqual(['a:2', 'b:2']);
+		container.flushDisposals();
+		expect(disposals).toEqual(['a:1', 'a:0', 'b:0']);
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('finishes an accepted root reconstruction after a child removal listener throws', () => {
+		const disposals: string[] = [];
+		class FlatAcceptedReplacement extends THREE.Object3D {
+			constructor(id: string, generation: number) {
+				super();
+				this.name = `${id}:${generation}`;
+			}
+
+			dispose() {
+				disposals.push(this.name);
+			}
+		}
+		extend({ FlatAcceptedReplacement });
+		const replacement = universalPlan('three', {
+			kind: 'host',
+			type: 'flatAcceptedReplacement',
+			propsSlot: 0,
+		});
+		const refValues = new Map<string, FlatAcceptedReplacement | null>();
+		const refA = (value: FlatAcceptedReplacement | null) => refValues.set('a', value);
+		const refB = (value: FlatAcceptedReplacement | null) => refValues.set('b', value);
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalList(['a', 'b'], (id) =>
+				universalKey(
+					id,
+					universalValue(replacement, [
+						universalProps([
+							['set', 'args', [id, props.generation]],
+							['set', 'ref', id === 'a' ? refA : refB],
+						]),
+					]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { generation: 0 });
+		const original = [...scene.children];
+		let shouldFail = true;
+		original[0].addEventListener('removed', () => {
+			if (!shouldFail) return;
+			shouldFail = false;
+			throw new Error('accepted child removal failed');
+		});
+
+		expect(() => root.render(Scene, { generation: 1 })).toThrow('accepted child removal failed');
+		expect(scene.children.map((object) => object.name)).toEqual(['a:1', 'b:1']);
+		expect(container.instanceCount).toBe(2);
+		expect(original.map((object) => getThreeInstance(object))).toEqual([null, null]);
+		expect(refValues.get('a')).toBe(scene.children[0]);
+		expect(refValues.get('b')).toBe(scene.children[1]);
+		expect(container.commits).toHaveLength(2);
+		expect(disposals).toEqual([]);
+
+		container.flushDisposals();
+		expect(disposals).toEqual(['a:0', 'b:0']);
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('delivers child lifecycle events while replacing constructor-backed root objects', () => {
+		const events: string[] = [];
+		class FlatObservedReplacement extends THREE.Object3D {
+			constructor(id: string, generation: number) {
+				super();
+				this.name = `${id}:${generation}`;
+				if (generation !== 0) {
+					this.addEventListener('added', () => events.push(`added:${this.name}`));
+				}
+			}
+		}
+		extend({ FlatObservedReplacement });
+		const observed = universalPlan('three', {
+			kind: 'host',
+			type: 'flatObservedReplacement',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalList(['a', 'b'], (id) =>
+				universalKey(
+					id,
+					universalValue(observed, [universalProps([['set', 'args', [id, props.generation]]])]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { generation: 0 });
+		for (const child of scene.children) {
+			child.addEventListener('removed', () => events.push(`removed:${child.name}`));
+		}
+
+		root.render(Scene, { generation: 1 });
+		expect(scene.children.map((child) => child.name)).toEqual(['a:1', 'b:1']);
+		expect(events).toEqual(['removed:a:0', 'removed:b:0', 'added:a:1', 'added:b:1']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('uses public scene placement overrides while mounting and replacing root objects', () => {
+		const operations: string[] = [];
+		class ObservedScene extends THREE.Scene {
+			override add(...objects: THREE.Object3D[]): this {
+				for (const object of objects) operations.push(`add:${object.name}`);
+				return super.add(...objects);
+			}
+
+			override remove(...objects: THREE.Object3D[]): this {
+				for (const object of objects) operations.push(`remove:${object.name}`);
+				return super.remove(...objects);
+			}
+		}
+		class FlatOverriddenReplacement extends THREE.Object3D {
+			constructor(id: string, generation: number) {
+				super();
+				this.name = `${id}:${generation}`;
+			}
+		}
+		extend({ FlatOverriddenReplacement });
+		const observed = universalPlan('three', {
+			kind: 'host',
+			type: 'flatOverriddenReplacement',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalList(['a', 'b'], (id) =>
+				universalKey(
+					id,
+					universalValue(observed, [universalProps([['set', 'args', [id, props.generation]]])]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot(new ObservedScene());
+		root.render(Scene, { generation: 0 });
+		expect(operations).toEqual(['add:a:0', 'add:b:0']);
+		operations.length = 0;
+
+		root.render(Scene, { generation: 1 });
+		expect(scene.children.map((child) => child.name)).toEqual(['a:1', 'b:1']);
+		expect(operations).toEqual(['remove:a:0', 'remove:b:0', 'add:a:1', 'add:b:1']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('observes scene placement overrides installed after a root mesh mount is prepared', () => {
+		const mesh = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', () =>
+			universalValue(mesh, [
+				universalProps([
+					['set', 'name', 'prepared-mesh'],
+					['set', 'position', [1, 0, 0]],
+				]),
+			]),
+		);
+		const { container, root, scene } = createRoot();
+		const observed: string[] = [];
+		const prepared = root.prepare(Scene, undefined);
+		if (prepared.status !== 'prepared') throw new Error('Expected a prepared root mount.');
+		const add = scene.add;
+		Object.defineProperty(scene, 'add', {
+			configurable: true,
+			value(object: THREE.Object3D) {
+				observed.push(object.name);
+				return add.call(this, object);
+			},
+		});
+
+		prepared.commit();
+		expect(scene.children.map((child) => child.name)).toEqual(['prepared-mesh']);
+		expect(observed).toEqual(['prepared-mesh']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('observes child listeners and scene overrides installed after reconstruction is prepared', () => {
+		const constructed: FlatLateObservedReplacement[] = [];
+		const observed: string[] = [];
+		class FlatLateObservedReplacement extends THREE.Object3D {
+			constructor(id: string, generation: number) {
+				super();
+				this.name = `${id}:${generation}`;
+				constructed.push(this);
+			}
+		}
+		extend({ FlatLateObservedReplacement });
+		const resource = universalPlan('three', {
+			kind: 'host',
+			type: 'flatLateObservedReplacement',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalList(['a', 'b'], (id) =>
+				universalKey(
+					id,
+					universalValue(resource, [universalProps([['set', 'args', [id, props.generation]]])]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { generation: 0 });
+		const originals = [...scene.children];
+		const prepared = root.prepare(Scene, { generation: 1 });
+		if (prepared.status !== 'prepared') throw new Error('Expected a prepared reconstruction.');
+		const replacements = constructed.slice(2);
+		originals[0].addEventListener('removed', () => observed.push('removed:a:0'));
+		replacements[1].addEventListener('added', () => observed.push('added:b:1'));
+
+		prepared.commit();
+		expect(scene.children).toEqual(replacements);
+		expect(observed).toEqual(['removed:a:0', 'added:b:1']);
+
+		const second = root.prepare(Scene, { generation: 2 });
+		if (second.status !== 'prepared') throw new Error('Expected a second prepared reconstruction.');
+		const remove = scene.remove;
+		Object.defineProperty(scene, 'remove', {
+			configurable: true,
+			value(object: THREE.Object3D) {
+				observed.push(`override:${object.name}`);
+				return remove.call(this, object);
+			},
+		});
+		second.commit();
+		expect(scene.children.map((object) => object.name)).toEqual(['a:2', 'b:2']);
+		expect(observed).toEqual(['removed:a:0', 'added:b:1', 'override:a:1', 'override:b:1']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('completes accepted root cleanup and ownership release after a child listener throws', () => {
+		const disposals: string[] = [];
+		class FlatAcceptedRemoval extends THREE.Object3D {
+			constructor(id: string) {
+				super();
+				this.name = id;
+			}
+
+			dispose() {
+				disposals.push(this.name);
+			}
+		}
+		extend({ FlatAcceptedRemoval });
+		const removable = universalPlan('three', {
+			kind: 'host',
+			type: 'flatAcceptedRemoval',
+			propsSlot: 0,
+		});
+		const refValues = new Map<string, FlatAcceptedRemoval | null>();
+		const refA = (value: FlatAcceptedRemoval | null) => refValues.set('a', value);
+		const refB = (value: FlatAcceptedRemoval | null) => refValues.set('b', value);
+		const Scene = defineUniversalComponent('three', (props: { present: boolean }) =>
+			universalList(props.present ? ['a', 'b'] : [], (id) =>
+				universalKey(
+					id,
+					universalValue(removable, [
+						universalProps([
+							['set', 'args', [id]],
+							['set', 'ref', id === 'a' ? refA : refB],
+						]),
+					]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { present: true });
+		const original = [...scene.children];
+		let shouldFail = true;
+		original[0].addEventListener('removed', () => {
+			if (!shouldFail) return;
+			shouldFail = false;
+			throw new Error('accepted root cleanup failed');
+		});
+
+		expect(() => root.render(Scene, { present: false })).toThrow('accepted root cleanup failed');
+		expect(scene.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+		expect(original.map((object) => getThreeInstance(object))).toEqual([null, null]);
+		expect(refValues.get('a')).toBeNull();
+		expect(refValues.get('b')).toBeNull();
+		expect(container.commits).toHaveLength(2);
+		expect(disposals).toEqual([]);
+
+		container.flushDisposals();
+		expect(disposals).toEqual(['a', 'b']);
+		root.render(Scene, { present: true });
+		expect(scene.children.map((object) => object.name)).toEqual(['a', 'b']);
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('preserves keyed root identities and refs while reordering and updating their properties', () => {
+		const mesh = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const refLog: string[] = [];
+		const refs = new Map(
+			['a', 'b', 'c', 'd'].map((id) => [
+				id,
+				(value: THREE.Mesh | null) => refLog.push(`${id}:${value === null ? 'clear' : 'set'}`),
+			]),
+		);
+		const Scene = defineUniversalComponent(
+			'three',
+			(props: { items: readonly { id: string; x: number }[] }) =>
+				universalList(props.items, (item) =>
+					universalKey(
+						item.id,
+						universalValue(mesh, [
+							universalProps([
+								['set', 'name', item.id],
+								['set', 'position', [item.x, 0, 0]],
+								['set', 'ref', refs.get(item.id)!],
+							]),
+						]),
+					),
+				),
+		);
+		const { container, root, scene } = createRoot();
+		const initial = [
+			{ id: 'a', x: 1 },
+			{ id: 'b', x: 2 },
+			{ id: 'c', x: 3 },
+			{ id: 'd', x: 4 },
+		];
+		root.render(Scene, { items: initial });
+		const objects = new Map(scene.children.map((object) => [object.name, object]));
+		refLog.length = 0;
+		const reordered = [
+			{ id: 'd', x: 40 },
+			{ id: 'b', x: 20 },
+			{ id: 'a', x: 10 },
+			{ id: 'c', x: 30 },
+		];
+
+		const abandoned = root.prepare(Scene, { items: reordered });
+		expect(scene.children.map((object) => object.name)).toEqual(['a', 'b', 'c', 'd']);
+		expect(scene.children.map((object) => object.position.x)).toEqual([1, 2, 3, 4]);
+		abandoned.abort();
+		expect(refLog).toEqual([]);
+
+		root.render(Scene, { items: reordered });
+		expect(scene.children.map((object) => object.name)).toEqual(['d', 'b', 'a', 'c']);
+		expect(scene.children.map((object) => object.position.x)).toEqual([40, 20, 10, 30]);
+		for (const object of scene.children) expect(object).toBe(objects.get(object.name));
+		expect(refLog).toEqual([]);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('honors scene placement overrides installed after directly mounting root meshes', () => {
+		const Scene = createRootReorderScene();
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { order: ['a', 'b', 'c'], position: 0 });
+		const objects = new Map(scene.children.map((object) => [object.name, object]));
+		const observed: string[] = [];
+		const originalAdd = scene.add;
+		const originalRemove = scene.remove;
+		Object.defineProperties(scene, {
+			add: {
+				configurable: true,
+				value(...children: THREE.Object3D[]) {
+					for (const child of children) observed.push(`add:${child.name}`);
+					return originalAdd.apply(this, children);
+				},
+			},
+			remove: {
+				configurable: true,
+				value(...children: THREE.Object3D[]) {
+					for (const child of children) observed.push(`remove:${child.name}`);
+					return originalRemove.apply(this, children);
+				},
+			},
+		});
+
+		root.render(Scene, { order: ['c', 'a', 'b'], position: 4 });
+
+		expect(scene.children.map((object) => object.name)).toEqual(['c', 'a', 'b']);
+		expect(scene.children.map((object) => object.position.x)).toEqual([4, 4, 4]);
+		for (const object of scene.children) expect(object).toBe(objects.get(object.name));
+		expect(observed).toEqual(['add:c', 'remove:c', 'add:a', 'remove:a', 'add:b', 'remove:b']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('observes scene placement overrides installed after a root reorder is prepared', () => {
+		const Scene = createRootReorderScene();
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { order: ['a', 'b', 'c'], position: 0 });
+		const prepared = root.prepare(Scene, { order: ['b', 'c', 'a'], position: 2 });
+		if (prepared.status !== 'prepared') throw new Error('Expected a prepared root reorder.');
+		const observed: string[] = [];
+		const originalAdd = scene.add;
+		Object.defineProperty(scene, 'add', {
+			configurable: true,
+			value(...children: THREE.Object3D[]) {
+				for (const child of children) observed.push(child.name);
+				return originalAdd.apply(this, children);
+			},
+		});
+		expect(scene.children.map((object) => object.name)).toEqual(['a', 'b', 'c']);
+		expect(observed).toEqual([]);
+
+		prepared.commit();
+
+		expect(scene.children.map((object) => object.name)).toEqual(['b', 'c', 'a']);
+		expect(scene.children.map((object) => object.position.x)).toEqual([2, 2, 2]);
+		expect(observed).toEqual(['b', 'c', 'a']);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('preserves protected and external ownership when clearing root objects', () => {
+		const disposals: string[] = [];
+		class FlatOwnedResource extends THREE.Object3D {
+			constructor(id: string) {
+				super();
+				this.name = id;
+			}
+
+			dispose() {
+				disposals.push(this.name);
+			}
+		}
+		extend({ FlatOwnedResource });
+		const owned = universalPlan('three', {
+			kind: 'host',
+			type: 'flatOwnedResource',
+			propsSlot: 0,
+		});
+		const primitive = universalPlan('three', {
+			kind: 'host',
+			type: 'primitive',
+			propsSlot: 0,
+		});
+		const external = new FlatOwnedResource('external');
+		const refValues = new Map<string, THREE.Object3D | null>();
+		const references = new Map(
+			['owned', 'protected', 'external'].map((id) => [
+				id,
+				(value: THREE.Object3D | null) => refValues.set(id, value),
+			]),
+		);
+		const Scene = defineUniversalComponent('three', (props: { present: boolean }) =>
+			universalList(props.present ? ['owned', 'protected', 'external'] : [], (id) =>
+				universalKey(
+					id,
+					universalValue(id === 'external' ? primitive : owned, [
+						universalProps(
+							id === 'external'
+								? [
+										['set', 'object', external],
+										['set', 'ref', references.get(id)!],
+									]
+								: id === 'protected'
+									? [
+											['set', 'args', [id]],
+											['set', 'dispose', null],
+											['set', 'ref', references.get(id)!],
+										]
+									: [
+											['set', 'args', [id]],
+											['set', 'ref', references.get(id)!],
+										],
+						),
+					]),
+				),
+			),
+		);
+		const { container, root, scene } = createRoot();
+
+		root.render(Scene, { present: true });
+		const objects = [...scene.children];
+		root.render(Scene, { present: false });
+		expect(scene.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+		expect(objects.map((object) => getThreeInstance(object))).toEqual([null, null, null]);
+		expect([...refValues]).toEqual([
+			['owned', null],
+			['protected', null],
+			['external', null],
+		]);
+		expect(disposals).toEqual([]);
+
+		container.flushDisposals();
+		expect(disposals).toEqual(['owned']);
+		root.unmount();
+	});
+
+	it('defers disposal getters and observes disposal methods added after root removal', () => {
+		class FlatDeferredResource extends THREE.Object3D {
+			constructor(id: string) {
+				super();
+				this.name = id;
+			}
+		}
+		extend({ FlatDeferredResource });
+		const resource = universalPlan('three', {
+			kind: 'host',
+			type: 'flatDeferredResource',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { present: boolean }) =>
+			universalList(props.present ? ['throws', 'added-later'] : [], (id) =>
+				universalKey(id, universalValue(resource, [universalProps([['set', 'args', [id]]])])),
+			),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { present: true });
+		const [throwing, addedLater] = scene.children;
+		let getterReads = 0;
+		Object.defineProperty(throwing, 'dispose', {
+			get() {
+				getterReads++;
+				throw new Error('deferred disposal getter failed');
+			},
+		});
+
+		expect(() => root.render(Scene, { present: false })).not.toThrow();
+		expect(getterReads).toBe(0);
+		expect(scene.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+		expect(getThreeInstance(throwing)).toBeNull();
+		expect(getThreeInstance(addedLater)).toBeNull();
+		let disposedLater = false;
+		Object.defineProperty(addedLater, 'dispose', {
+			value() {
+				disposedLater = true;
+			},
+		});
+
+		expect(() => container.flushDisposals()).toThrow('deferred disposal getter failed');
+		expect(getterReads).toBe(1);
+		expect(disposedLater).toBe(true);
+		root.unmount();
+	});
+
 	it('reasserts externally mutated root order and visibility on a retained leaf update', () => {
 		const meshPlan = universalPlan('three', {
 			kind: 'host',
@@ -833,6 +1521,40 @@ describe('Three universal driver', () => {
 		container.flushDisposals();
 	});
 
+	it('updates mesh positions without writing unchanged non-writable names', () => {
+		const mesh = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { name: string; x: number }) =>
+			universalValue(mesh, [
+				universalProps([
+					['set', 'name', props.name],
+					['set', 'position', [props.x, 0, 0]],
+				]),
+			]),
+		);
+		const { container, root, scene } = createRoot();
+		root.render(Scene, { name: 'retained', x: 1 });
+		const object = scene.children[0] as THREE.Mesh;
+		Object.defineProperty(object, 'name', {
+			configurable: true,
+			enumerable: true,
+			value: 'retained',
+			writable: false,
+		});
+
+		expect(() => root.render(Scene, { name: 'retained', x: 2 })).not.toThrow();
+		expect(object.position.x).toBe(2);
+		expect(() => root.render(Scene, { name: 'changed', x: 3 })).toThrow();
+		expect(object.name).toBe('retained');
+		expect(object.position.x).toBe(2);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
 	it('falls back to the canonical vector setter after public method mutation', () => {
 		const meshPlan = universalPlan('three', {
 			kind: 'host',
@@ -851,7 +1573,7 @@ describe('Three universal driver', () => {
 
 		root.render(Scene, { x: 1 });
 		const mesh = scene.children[0] as THREE.Mesh;
-		(mesh.position as THREE.Vector3 & { fromArray: null }).fromArray = null;
+		Object.defineProperty(mesh.position, 'fromArray', { value: null });
 		expect(() => root.render(Scene, { x: 2 })).not.toThrow();
 		expect(mesh.position.x).toBe(2);
 
@@ -866,9 +1588,11 @@ describe('Three universal driver', () => {
 			propsSlot: 0,
 		});
 		const position = [4, 0, 0];
-		position.every = () => {
-			throw new Error('authored every must stay inert');
-		};
+		Object.defineProperty(position, 'every', {
+			value() {
+				throw new Error('authored every must stay inert');
+			},
+		});
 		const Scene = defineUniversalComponent('three', () =>
 			universalValue(meshPlan, [
 				universalProps([

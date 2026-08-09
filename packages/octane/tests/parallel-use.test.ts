@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount, act } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	ChainHost,
 	DependentChain,
@@ -14,6 +15,7 @@ import {
 	ImportedCapturedHookHost,
 	ImportedDependentHookHost,
 	AdjacentPanelsHost,
+	SyncWarmBranchesHost,
 	EarlyReturnPanelsHost,
 	VersionedSiblingsHost,
 	RepeatedPanelsHost,
@@ -503,6 +505,89 @@ describe('parallel use() — adjacent async component trees', () => {
 		expect(r.find('.insights-chart').textContent).toBe('insights-chart-v0');
 		expect([...resources.calls].sort()).toEqual(expected);
 		r.unmount();
+	});
+
+	it('warms an async descendant through multiple forward-declared synchronous wrappers', async () => {
+		const resources = resourceFetcher();
+		const root = mount(SyncWarmBranchesHost, { load: resources.load, version: 0 });
+		const expected = ['sync-warm-direct:0', 'sync-warm-leaf:0'];
+
+		expect([...resources.calls].sort()).toEqual(expected);
+		expect(root.find('.fallback').textContent).toBe('sync-warm-loading');
+
+		await act(() => {
+			resources.settle('sync-warm-direct', 0);
+			resources.settle('sync-warm-leaf', 0);
+		});
+
+		expect(root.find('.sync-warm-direct').textContent).toBe('sync-warm-direct-v0');
+		expect(root.find('.sync-warm-leaf').textContent).toBe('sync-warm-leaf-v0');
+		expect([...resources.calls].sort()).toEqual(expected);
+		root.unmount();
+	});
+
+	it('starts async work hidden behind a reassigned same-module component before its sibling resolves', async () => {
+		const source = `
+			import { use } from 'octane';
+
+			function MutableComponent(props) {
+				return <span>initially synchronous</span>;
+			}
+
+			function AsyncReplacement(props) @{
+				const value = use(props.load('mutable-reassigned', props.version));
+				<span class="mutable-warm-reassigned">{value as string}</span>
+			}
+
+			function AsyncSibling(props) @{
+				const value = use(props.load('mutable-sibling', props.version));
+				<span class="mutable-warm-sibling">{value as string}</span>
+			}
+
+			function Wrapper(props) @{
+				<MutableComponent load={props.load} version={props.version} />
+			}
+
+			MutableComponent = AsyncReplacement;
+
+			function Branches(props) @{
+				<main>
+					<AsyncSibling load={props.load} version={props.version} />
+					<Wrapper load={props.load} version={props.version} />
+				</main>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Branches load={props.load} version={props.version} />
+					} @pending {
+						<span class="mutable-warm-pending">loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'mutable-component-warming.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.App, { load: resources.load, version: 0 });
+		const expected = ['mutable-reassigned:0', 'mutable-sibling:0'];
+
+		expect([...resources.calls].sort()).toEqual(expected);
+		expect(root.find('.mutable-warm-pending').textContent).toBe('loading');
+
+		await act(() => {
+			resources.settle('mutable-reassigned', 0);
+			resources.settle('mutable-sibling', 0);
+		});
+
+		expect(root.find('.mutable-warm-reassigned').textContent).toBe('mutable-reassigned-v0');
+		expect(root.find('.mutable-warm-sibling').textContent).toBe('mutable-sibling-v0');
+		expect([...resources.calls].sort()).toEqual(expected);
+		root.unmount();
 	});
 
 	it('warms again when an update returns to previously consumed dependency values', async () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { applyProps, dispose, extend } from '@octanejs/three';
+import { createThreeTestRenderer } from '@octanejs/three/testing';
+import { defineUniversalComponent, universalComponent, universalProps } from 'octane/universal';
 import {
 	createThreeObject,
 	registerThreeNamespace,
@@ -54,6 +56,62 @@ describe('@octanejs/three catalogue', () => {
 		const Component = extend(ComponentObject);
 		expect(typeof Component).toBe('function');
 		expect(extend(ComponentObject)).toBe(Component);
+	});
+
+	it('preserves children, references, event handlers, and constructor identity on extended components', async () => {
+		class ComponentMesh extends THREE.Mesh {
+			constructor(readonly label: string) {
+				super();
+				this.name = label;
+			}
+		}
+		const Component = extend(ComponentMesh);
+		const refs: Array<ComponentMesh | null> = [];
+		const pointerEvents: string[] = [];
+		const ref = (value: ComponentMesh | null) => refs.push(value);
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalComponent(
+				'three',
+				Component,
+				universalProps([
+					['set', 'args', [`parent:${props.generation}`]],
+					['set', 'ref', ref],
+					['set', 'onPointerDown', () => pointerEvents.push(`parent:${props.generation}`)],
+					[
+						'set',
+						'children',
+						universalComponent(
+							'three',
+							Component,
+							universalProps([['set', 'args', ['retained-child']]]),
+						),
+					],
+				]),
+			),
+		);
+		const root = await createThreeTestRenderer(Scene, { generation: 0 });
+
+		try {
+			const initial = root.scene.children[0] as ComponentMesh;
+			const child = initial.children[0] as ComponentMesh;
+			expect(initial).toBeInstanceOf(ComponentMesh);
+			expect(child).toBeInstanceOf(ComponentMesh);
+			expect(child.name).toBe('retained-child');
+			expect(refs).toEqual([initial]);
+			await root.fireEvent(initial, 'pointerDown');
+
+			root.update(Scene, { generation: 1 });
+			const replacement = root.scene.children[0] as ComponentMesh;
+			expect(replacement).not.toBe(initial);
+			expect(replacement.name).toBe('parent:1');
+			expect(replacement.children).toEqual([child]);
+			expect(refs).toEqual([initial, null, replacement]);
+			await root.fireEvent(replacement, 'pointerDown');
+			expect(pointerEvents).toEqual(['parent:0', 'parent:1']);
+			expect(extend(ComponentMesh)).toBe(Component);
+		} finally {
+			root.unmount();
+		}
 	});
 });
 

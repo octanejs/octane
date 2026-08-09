@@ -33,6 +33,10 @@ examples/**/*.d.tsrx.ts
 # benchmarks/baselines/ratios.json ARE committed — see benchmarks/baselines/README.md.)
 benchmarks/results/
 benchmarks/baselines/ratios.suggested.json
+# lynx-table build outputs and per-host wall-clock reports; the vendored
+# reference bundles under benchmarks/lynx-table/reference/ ARE committed.
+benchmarks/lynx-table/app/dist*/
+benchmarks/lynx-table/results/
 
 # Differential-parity build artifact: the `@tsrx/react`-compiled fixture output the
 # differential test rigs regenerate under each package's tests on every run.

@@ -1,9 +1,12 @@
 {
   "name": "octane",
-  "version": "0.1.29",
+  "version": "0.1.32",
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/compiler/register.js",
+    "./dist/compiler/register.js"
+  ],
   "engines": {
     "node": ">=22.22.2"
   },
