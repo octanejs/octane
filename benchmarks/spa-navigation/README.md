@@ -69,55 +69,46 @@ bodies or fell back to the runtime de-opt renderer (`createElement` / `childSlot
 / `deoptItemBody` / `reconcileKeyed`), and how much of the surviving shell was
 rebuilt.
 
-## Standing finding: the JSX dialect de-opts on navigation
+## Resolved finding: the JSX dialect no longer de-opts on navigation
 
-The two Octane fixtures are the same app over the same core, authored twice. The
-`.tsrx` fixture navigates entirely through compiled block bodies. The `.tsx`
-fixture reaches the runtime de-opt renderer for the whole routed subtree:
+The two Octane fixtures are the same app over the same core, authored twice.
+When this suite landed (2026-08-07), the `.tsx` fixture reached the runtime
+de-opt renderer for the whole routed subtree — 4099 `createElement`, 4094
+`childSlot`, 2046 `deoptItemBody`, 1023 `hostElementBody` per `nav_deep`, 3.3×
+the `.tsrx` wall clock — and `.tsrx` teardown was the slowest of the
+fine-grained runtimes (2.2× solid) because every block detached its own DOM
+range node-by-node.
 
-| `nav_deep` | octane-tsrx | octane-jsx |
-| --- | --- | --- |
-| `renderBlock` | 5119 | 7169 |
-| `createElement` | 0 | 4099 |
-| `childSlot` | 0 | 4094 |
-| `deoptItemBody` | 0 | 2046 |
-| `hostElementBody` | 0 | 1023 |
-
-That is 1.40× the block renders plus ~11k calls the `.tsrx` path never makes, and
-it shows up in wall clock. A full run on 2026-08-07 (`node benchmarks/bench.mjs
-spa-navigation`, medians in ms):
+Both causes are fixed: unmount teardown removes a deleted subtree's DOM once at
+the outermost detached block, and the compiler lowers conditional JSX returns
+(`if (c) return <A/>; return <B/>`) to the same template control flow as
+`@if`/`@else`. The recursive `Node` — the whole routed tree — now renders
+through `componentSlotVoid` arms with **zero** de-opt-renderer calls in either
+dialect. A full run on 2026-08-09 (`node benchmarks/bench.mjs spa-navigation`,
+medians in ms):
 
 | op | octane-tsrx | octane-jsx | react | solid | vue-vapor |
 | --- | --- | --- | --- | --- | --- |
-| `nav_deep` | 2.60 | 8.60 | 1.80 | 2.20 | 3.10 |
-| `nav_teardown` | 1.30 | 4.20 | 0.80 | 0.60 | 0.50 |
-| `nav_mount` | 1.50 | 4.60 | 1.20 | 1.80 | 2.50 |
-| `nav_nested` | 0.20 | 0.40 | 0.20 | 0.10 | 0.20 |
-| `nav_deep_6x` | 16.80 | 58.40 | 12.20 | 15.00 | 20.70 |
+| `nav_deep` | 1.80 | 2.10 | 1.70 | 2.00 | 2.90 |
+| `nav_teardown` | 0.60 | 0.60 | 0.80 | 0.60 | 0.80 |
+| `nav_mount` | 1.40 | 1.60 | 1.10 | 1.50 | 2.20 |
+| `nav_nested` | 0.10 | 0.10 | 0.10 | 0.10 | 0.20 |
+| `nav_deep_6x` | 12.20 | 13.60 | 11.50 | 14.00 | 19.40 |
 
-`.tsx` costs 3.3× `.tsrx` on `nav_deep` and 3.5× under throttling, where it is
-the difference between a navigation nobody notices and one everybody does.
-
-Two other things that run tells us. Octane's `.tsrx` **mount** is the fastest of
-the three fine-grained runtimes (`nav_mount` 1.50 against Solid 1.80 and Vue
-Vapor 2.50), while its **teardown** is the slowest by a clear margin
-(`nav_teardown` 1.30 against 0.60 and 0.50, standard deviations 0.08/0.06/0.17).
-For deep trees the cost of a navigation sits in unmounting the outgoing route,
-not in building the incoming one, and that is where the `.tsrx` gap is.
+Both dialects now beat Solid on `nav_deep` and tie it on teardown. The residual
+`.tsx` gap (renderBlock 6147 vs 5119, createElement 1029 vs 0) is the
+single-return `_frag` wrapper ABI — one extra block and descriptor per
+component — which is the next lowering target.
 
 `nav_nested` is at the timer floor for every framework, so nothing should be read
-into its ratios. The reuse ratios (0.04 to 0.09 against an ~0.03 floor) say no
-framework here rebuilds the surviving shell, and the throttle ratios (6.5 to 7.2x
-for all five) say none of them degrades disproportionately on a slow CPU: a phone
-is slower because the work is bigger, not because the scheduling changes shape.
+into its ratios. The reuse ratios say no framework here rebuilds the surviving
+shell, and the throttle ratios (~6.5-7x for all five) say none of them degrades
+disproportionately on a slow CPU: a phone is slower because the work is bigger,
+not because the scheduling changes shape.
 
-The `work.mjs` gates hold `.tsrx` at **zero** de-opt-renderer calls on every
-navigation, and cap the `.tsx` counts so the gap cannot widen while it is being
-addressed.
-
-Note the repository's own website is authored entirely in `.tsrx`, so this
-finding does not by itself explain slow navigations there; that needs its own
-measurement against the real site.
+The `work.mjs` gates hold BOTH dialects at **zero** de-opt-renderer calls on
+every navigation, and `benchmarks/baselines/ratios.json` guards `nav_teardown`,
+`nav_deep`, and `nav_mount` against solid so neither fix can silently regress.
 
 ## Fixtures
 

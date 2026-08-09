@@ -51,16 +51,28 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
 	);
 
+	// Strip `export` keywords but KEEP the declarations themselves, then assign
+	// the collected names onto __exports at the end of the module. This preserves
+	// function-declaration hoisting and the module-scope bindings, so exported
+	// components may reference each other (`export const Memo = memo(Tree)` after
+	// `export function Tree`), which the old expression-assignment rewrite broke.
+	const exportedNames: string[] = [];
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
-		(_match: string, asyncKeyword: string | undefined, name: string) =>
-			`__exports.${name} = ${asyncKeyword ?? ''}function ${name}`,
+		(_match: string, asyncKeyword: string | undefined, name: string) => {
+			exportedNames.push(name);
+			return `${asyncKeyword ?? ''}function ${name}`;
+		},
 	);
 	code = code.replace(
 		/export\s+(const|let|var)\s+(\w+)\s*=/g,
-		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
+		(_match: string, kind: string, name: string) => {
+			exportedNames.push(name);
+			return `${kind} ${name} =`;
+		},
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
+	for (const name of exportedNames) code += `\n__exports.${name} = ${name};`;
 
 	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
 		throw new Error(
