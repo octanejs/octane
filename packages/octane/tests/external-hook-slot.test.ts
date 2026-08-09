@@ -658,6 +658,7 @@ describe('manifest-declared manual hook slots', () => {
 			'dnd-kit',
 			'electron',
 			'floating-ui',
+			'gsap',
 			'i18next',
 			'inertia',
 			'jotai',

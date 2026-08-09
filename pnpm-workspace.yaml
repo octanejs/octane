@@ -306,6 +306,8 @@ catalogs:
     esrap: ^2.3.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
+    gsap: 3.15.0
+    '@gsap/react': 2.1.2
     happy-dom: ^20.11.0
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
@@ -441,7 +443,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31
+  - octane@0.1.29 || 0.1.31 || 0.1.32
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

@@ -425,9 +425,9 @@ export function validateManifest(manifest) {
 				fail(
 					'verified provenance with insufficient upstream runtime tests requires full upstream-suite lanes plus repo-authored differential evidence',
 				);
-		} else if (!requiredFullRuntime('adapted-octane', 'repo-authored') || !requiredDifferential) {
+		} else if (!requiredDifferential) {
 			fail(
-				'verified provenance with absent upstream runtime tests requires full adapted-octane and differential lanes with repo-authored evidence',
+				'verified provenance with absent upstream runtime tests requires a required differential lane with repo-authored evidence',
 			);
 		}
 

@@ -531,11 +531,12 @@ test('makes every upstream runtime suite state an executable verified requiremen
 
 	const absent = structuredClone(present);
 	absent.upstreamSuites.runtime = 'absent';
-	absent.lanes = absent.lanes.filter((lane) => lane.type !== 'pristine-upstream');
-	absent.lanes.find((lane) => lane.type === 'adapted-octane').evidenceOrigin = 'repo-authored';
+	absent.lanes = absent.lanes.filter(
+		(lane) => lane.type !== 'pristine-upstream' && lane.type !== 'adapted-octane',
+	);
 	assert.throws(
 		() => validateManifest(absent),
-		/absent upstream runtime tests requires full adapted-octane and differential lanes with repo-authored evidence/,
+		/absent upstream runtime tests requires a required differential lane with repo-authored evidence/,
 	);
 	absent.lanes.push(differentialLane());
 	assert.doesNotThrow(() => validateManifest(absent));

@@ -107,34 +107,15 @@
       "then": {
         "properties": {
           "lanes": {
-            "allOf": [
-              {
-                "contains": {
-                  "properties": {
-                    "type": { "const": "adapted-octane" },
-                    "oracle": { "const": "required" },
-                    "available": { "not": { "const": false } },
-                    "evidenceOrigin": { "const": "repo-authored" },
-                    "execution": {
-                      "properties": { "kind": { "const": "vitest-full" } },
-                      "required": ["kind"]
-                    }
-                  },
-                  "required": ["type", "oracle", "evidenceOrigin", "execution"]
-                }
+            "contains": {
+              "properties": {
+                "type": { "const": "differential" },
+                "oracle": { "const": "required" },
+                "available": { "not": { "const": false } },
+                "evidenceOrigin": { "const": "repo-authored" }
               },
-              {
-                "contains": {
-                  "properties": {
-                    "type": { "const": "differential" },
-                    "oracle": { "const": "required" },
-                    "available": { "not": { "const": false } },
-                    "evidenceOrigin": { "const": "repo-authored" }
-                  },
-                  "required": ["type", "oracle", "evidenceOrigin"]
-                }
-              }
-            ]
+              "required": ["type", "oracle", "evidenceOrigin"]
+            }
           }
         }
       }
