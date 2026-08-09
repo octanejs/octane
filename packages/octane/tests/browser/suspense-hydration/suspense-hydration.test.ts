@@ -199,6 +199,68 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		expect(after.globalFailures).toEqual([]);
 	});
 
+	it.each([
+		{
+			selection: 'backward',
+			anchorNode: 'text:last',
+			anchorOffset: 4,
+			focusNode: 'text:first',
+			focusOffset: 2,
+			anchorPosition: 27,
+			focusPosition: 2,
+			direction: 'backward',
+			selectedText: 'pha beta middle words ome',
+		},
+		{
+			selection: 'boundary',
+			anchorNode: 'element:first',
+			anchorOffset: 1,
+			focusNode: 'element:editable',
+			focusOffset: 2,
+			anchorPosition: 5,
+			focusPosition: 23,
+			direction: 'forward',
+			selectedText: ' beta middle words',
+		},
+	])(
+		'preserves nested $selection editable selection across a keyed reorder like React',
+		async ({ selection, ...initial }) => {
+			await openCase(`case=editable-focus-restoration&implementation=react&selection=${selection}`);
+			const reactBefore = await snapshot();
+			expect(reactBefore).toMatchObject({
+				...initial,
+				editableSame: true,
+				editableConnected: true,
+				activeId: 'focus-editable-2',
+				rows: [1, 2, 3, 4],
+				globalFailures: [],
+			});
+
+			await page!.evaluate(() => window.__suspenseHydration.urgent!());
+			const reactAfter = await snapshot();
+			expect(reactAfter).toMatchObject({
+				editableSame: true,
+				editableConnected: true,
+				activeId: 'focus-editable-2',
+				anchorPosition: initial.anchorPosition,
+				focusPosition: initial.focusPosition,
+				direction: initial.direction,
+				selectedText: initial.selectedText,
+				rows: [4, 3, 2, 1],
+				globalFailures: [],
+			});
+			await page!.close();
+			page = undefined;
+
+			await openCase(
+				`case=editable-focus-restoration&implementation=octane&selection=${selection}`,
+			);
+			expect(await snapshot()).toEqual(reactBefore);
+			await page!.evaluate(() => window.__suspenseHydration.urgent!());
+			expect(await snapshot()).toEqual(reactAfter);
+		},
+	);
+
 	it('contains async hydration recovery and preserves an interactive outside sibling', async () => {
 		const page = await openCase('case=hydration');
 		let state = await snapshot();
@@ -356,7 +418,12 @@ declare global {
 	interface Window {
 		__suspenseHydration: {
 			kind:
-				'hydration' | 'suspense' | 'react-baseline' | 'direct-ref-unmount' | 'focus-restoration';
+				| 'hydration'
+				| 'suspense'
+				| 'react-baseline'
+				| 'direct-ref-unmount'
+				| 'focus-restoration'
+				| 'editable-focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;
 			urgent?: () => void;

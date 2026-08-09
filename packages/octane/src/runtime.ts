@@ -2968,6 +2968,55 @@ function hasTextSelection(element: HTMLElement): boolean {
 	return false;
 }
 
+/** Resolve editable selection offsets without materializing its text every commit. */
+function captureContentEditableSelection(
+	focused: HTMLElement,
+	anchorNode: Node,
+	anchorOffset: number,
+	focusNode: Node,
+	focusOffset: number,
+): FocusSelectionSnapshot | null {
+	let node: Node = focused;
+	let parent: Node | null = null;
+	let length = 0;
+	let start = -1;
+	let end = -1;
+	let anchorChildIndex = 0;
+	let focusChildIndex = 0;
+
+	selection: for (;;) {
+		for (;;) {
+			if (node === anchorNode && (anchorOffset === 0 || node.nodeType === 3)) {
+				start = length + anchorOffset;
+			}
+			if (node === focusNode && (focusOffset === 0 || node.nodeType === 3)) {
+				end = length + focusOffset;
+			}
+			if (start !== -1 && end !== -1) break selection;
+			if (node.nodeType === 3) length += node.nodeValue!.length;
+			const child = node.firstChild;
+			if (child === null) break;
+			parent = node;
+			node = child;
+		}
+		for (;;) {
+			if (node === focused) break selection;
+			if (parent === anchorNode && ++anchorChildIndex === anchorOffset) start = length;
+			if (parent === focusNode && ++focusChildIndex === focusOffset) end = length;
+			if (start !== -1 && end !== -1) break selection;
+			const sibling = node.nextSibling;
+			if (sibling !== null) {
+				node = sibling;
+				break;
+			}
+			node = parent!;
+			parent = node.parentNode;
+		}
+	}
+
+	return start === -1 || end === -1 ? null : { focused, start, end, contentEditable: true };
+}
+
 /** Capture selection only when a render pass could actually mutate focused DOM. */
 function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
 	const focused = activeElementForDocument(doc) as HTMLElement | null;
@@ -2990,12 +3039,41 @@ function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
 			focused.contains(selection.anchorNode) &&
 			focused.contains(selection.focusNode)
 		) {
-			const range = focused.ownerDocument.createRange();
-			range.selectNodeContents(focused);
-			range.setEnd(selection.anchorNode, selection.anchorOffset);
-			const start = range.toString().length;
-			range.setEnd(selection.focusNode, selection.focusOffset);
-			return { focused, start, end: range.toString().length, contentEditable: true };
+			const anchorNode = selection.anchorNode;
+			const focusNode = selection.focusNode;
+			if (anchorNode === focusNode && anchorNode.nodeType === 3) {
+				// A direct first text child has no preceding text to count.
+				if (anchorNode === focused.firstChild) {
+					return {
+						focused,
+						start: selection.anchorOffset,
+						end: selection.focusOffset,
+						contentEditable: true,
+					};
+				}
+				// Below 256 UTF-16 code units, one native prefix walk beats JS traversal;
+				// shared-node offset arithmetic also preserves selection direction.
+				if (anchorNode.nodeValue!.length < 256) {
+					const range = focused.ownerDocument.createRange();
+					range.selectNodeContents(focused);
+					range.setEnd(anchorNode, selection.anchorOffset);
+					const start = range.toString().length;
+					return {
+						focused,
+						start,
+						end: start + selection.focusOffset - selection.anchorOffset,
+						contentEditable: true,
+					};
+				}
+			}
+			const snapshot = captureContentEditableSelection(
+				focused,
+				anchorNode,
+				selection.anchorOffset,
+				focusNode,
+				selection.focusOffset,
+			);
+			if (snapshot !== null) return snapshot;
 		}
 	}
 	return { focused, start: -1, end: -1, contentEditable: false };
