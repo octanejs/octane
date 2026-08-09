@@ -2056,6 +2056,58 @@ export default defineConfig({
 					name: 'recharts',
 					include: ['packages/recharts/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					exclude: ['packages/recharts/tests/differential/**/*.test.ts'],
+					// The differential oracle (real recharts + vendored d3) is expensive
+					// to load and charts settle over many raf rounds — slow CI runners
+					// can spend more than 30s transforming the oracle while the build
+					// integration projects saturate the machine.
+					testTimeout: 60_000,
+					// Differential precompile for recharts fixtures: rewrites
+					// `@octanejs/recharts` → `recharts` so the React side runs the real
+					// recharts as the byte-for-byte SVG oracle.
+					globals: false,
+					// Inline the oracle so it resolves the SAME module graph a real
+					// bundled app does: recharts has no exports map, so externalized
+					// node loading takes its CJS `main` → victory-vendor's `require`
+					// condition → the vendored PRE-3.2 d3-shape build (full-precision
+					// paths). Inlined, both sides take the `import` condition →
+					// victory-vendor/es → real d3-shape@3.2 (3-digit path rounding).
+					server: {
+						deps: {
+							inline: ['recharts', 'victory-vendor'],
+						},
+					},
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/recharts$/,
+							replacement: resolve(import.meta.dirname, 'packages/recharts/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/recharts\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/recharts/src') + '/$1.ts',
+						},
+						{
+							// SSR resolution ignores the `module` field, so bare 'recharts'
+							// would enter through its CJS `main` even when inlined — send it
+							// to the es6 build explicitly (no exports map, deep path is legal)
+							// so the oracle runs the same ESM graph a bundled app runs.
+							find: /^recharts$/,
+							replacement: 'recharts/es6/index.js',
+						},
+					],
+				},
+			},
+			{
+				// Keep outside react-parity ownership while the manifest is
+				// recorded-unverified: react-parity:check only validates that
+				// status, so ordinary shards must still execute the oracle.
+				test: {
+					name: 'recharts-differential',
+					include: ['packages/recharts/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
 					// The differential oracle (real recharts + vendored d3) is expensive
 					// to load and charts settle over many raf rounds — slow CI runners
 					// can spend more than 30s transforming the oracle while the build

@@ -420,7 +420,7 @@
         "Chart events coordinate through octane's native delegated events rather than React's synthetic layer."
       ],
       "ssr": "Untested; text measurement (`getStringSize`) returns 0×0 under SSR.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/redux",
