@@ -25,6 +25,7 @@
       "@octanejs/tanstack-router",
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
+      "@octanejs/inertia",
       "@octanejs/nuqs"
     ]
   },
@@ -43,6 +44,7 @@
       "@octanejs/mantine-hooks",
       "@octanejs/floating-ui",
       "@octanejs/animejs",
+      "@octanejs/gsap",
       "@octanejs/motion",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",

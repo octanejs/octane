@@ -160,6 +160,8 @@ catalogs:
     viem: 2.55.10
     wagmi: 3.7.4
     '@graphql-typed-document-node/core': ^3.2.0
+    '@inertiajs/core': 3.6.1
+    '@inertiajs/react': 3.6.1
     '@lucide/icons': 1.24.0
     '@phosphor-icons/core': 2.1.1
     '@babel/core': 7.29.7
@@ -304,6 +306,8 @@ catalogs:
     esrap: ^2.3.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
+    gsap: 3.15.0
+    '@gsap/react': 2.1.2
     happy-dom: ^20.11.0
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
@@ -374,6 +378,7 @@ catalogs:
     d3-voronoi: ^1.1.4
     'decimal.js-light': ^2.5.1
     'es-toolkit': ^1.49.0
+    'laravel-precognition': ^2.0.0
     eventemitter3: ^5.0.4
     fast-equals: ^5.4.1
     immer: ^11.1.15
@@ -438,7 +443,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31
+  - octane@0.1.29 || 0.1.31 || 0.1.32
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

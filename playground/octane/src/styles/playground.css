@@ -231,6 +231,37 @@ pre.boom {
 	margin-top: 12px;
 }
 
+.gsap-stage {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	min-height: 210px;
+	overflow: hidden;
+	background:
+		radial-gradient(
+			circle at 50% 20%,
+			color-mix(in oklch, var(--primary) 18%, transparent),
+			transparent 52%
+		),
+		var(--card);
+}
+
+.gsap-orb {
+	display: grid;
+	width: 58px;
+	aspect-ratio: 1;
+	place-items: center;
+	border: 1px solid color-mix(in oklch, var(--primary) 45%, var(--border));
+	border-radius: 999px;
+	background: var(--primary);
+	color: var(--primary-foreground);
+	box-shadow: 0 12px 30px color-mix(in oklch, var(--primary) 30%, transparent);
+	font-size: 18px;
+	font-weight: 750;
+	will-change: transform;
+}
+
 /* @octanejs/cmdk ships unstyled — it exposes a DOM contract of `cmdk-*`
  * attributes to style against. Ported here from the playground's old inline
  * <style> block when that was retired, with the original hard-coded palette

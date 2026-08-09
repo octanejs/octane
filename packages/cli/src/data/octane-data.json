@@ -161,6 +161,25 @@
       "verified": "2026-07-05"
     },
     {
+      "name": "@octanejs/gsap",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "@gsap/react",
+        "version": "2.1.2",
+        "source": "https://github.com/greensock/react/tree/2.1.2",
+        "tagCommit": "b7f44ca767eb93390f965d6f19679e2b77be7966",
+        "license": "GSAP Standard License"
+      },
+      "surface": "Full useGSAP hook contract: callback, dependency-array and config signatures; scoped contexts; contextSafe; revertOnUpdate; register; and headless.",
+      "divergences": [
+        "The adapter imports Octane hooks and uses compiler-selected manual hook slots instead of React hooks.",
+        "GSAP remains an external peer dependency and is not redistributed by this MIT-licensed adapter."
+      ],
+      "ssr": "Server rendering creates stable context helpers without running GSAP effects. Client hydration activates the standard lifecycle.",
+      "verified": "2026-08-02"
+    },
+    {
       "name": "@octanejs/hook-form",
       "version": "0.1.29",
       "category": "Forms and content",
@@ -187,6 +206,18 @@
       ],
       "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
       "verified": "2026-07-13"
+    },
+    {
+      "name": "@octanejs/inertia",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "@inertiajs/react", "version": "3.6.1" },
+      "surface": "Octane Inertia 3.6.1 adapter foundation: framework-neutral router, HTTP client, progress, and server exports reuse @inertiajs/core unchanged; page, remember, poll, prefetch, form-state, router-submit, direct-HTTP, precognition, and layout-property hooks are ported to Octane.",
+      "divergences": [
+        "React, ReactDOM, StrictMode, forwardRef, and synthetic events are not runtime dependencies; the Octane adapter uses Octane roots, refs-as-props, and native events."
+      ],
+      "ssr": "The framework-neutral Inertia server entry is exposed. Hook initialization is request-local and covered in the server runtime; Octane page rendering and hydration are completed by the adapter SSR unit.",
+      "verified": "2026-07-30"
     },
     {
       "name": "@octanejs/jotai",
@@ -850,6 +881,8 @@
     "@base-ui-components/react": "@octanejs/base-ui",
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@floating-ui/react": "@octanejs/floating-ui",
+    "@gsap/react": "@octanejs/gsap",
+    "@inertiajs/react": "@octanejs/inertia",
     "@lexical/react": "@octanejs/lexical",
     "@livestore/react": "@octanejs/livestore",
     "@mantine/hooks": "@octanejs/mantine-hooks",
