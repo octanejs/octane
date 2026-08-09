@@ -57,6 +57,10 @@ export function FormAttrs(props) @{
 	</form>
 }
 
+export function AutoFocusSpread(props) @{
+	<input id="hydrated-autofocus-spread" {...props.attributes} />
+}
+
 export function NamespacedTags(props) @{
 	<div>
 		<svg class="s1" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">

@@ -29,6 +29,18 @@ import {
 	CustomElChangeInput,
 	AutoFocusInput,
 	AutoFocusBare,
+	AutoFocusButton,
+	AutoFocusSelect,
+	AutoFocusTextarea,
+	AutoFocusUnsupported,
+	AutoFocusCustom,
+	AutoFocusSpread,
+	AutoFocusMixed,
+	AutoFocusDescriptor,
+	LowercaseAutoFocus,
+	AutoFocusMultiple,
+	AutoFocusInserted,
+	AutoFocusLayout,
 } from './_fixtures/dom-attributes.tsrx';
 
 // ============================================================================
@@ -813,9 +825,8 @@ describe('enumerated + overloaded boolean attributes', () => {
 });
 
 describe('autoFocus — commit-phase focus, never an attribute (React parity, 2026-07-08)', () => {
-	// Per ReactDOMComponent's autoFocus handling: React writes NO attribute and
-	// calls .focus() at commitMount. octane queues the focus into the commit
-	// (drained before layout effects, so a layout effect moving focus wins).
+	// Per ReactDOM-test.js:354, client mounts focus supported controls after DOM
+	// insertion without writing an attribute; server markup is covered separately.
 	it('focuses the element at mount commit and writes no attribute', () => {
 		const r = mount(AutoFocusBare);
 		const el = r.find('#afb') as HTMLInputElement;
@@ -833,5 +844,155 @@ describe('autoFocus — commit-phase focus, never an attribute (React parity, 20
 		r.update(AutoFocusInput, { v: true });
 		expect(document.activeElement).not.toBe(el);
 		r.unmount();
+	});
+
+	it('focuses buttons, selects, and textareas without writing an attribute', () => {
+		for (const [component, selector] of [
+			[AutoFocusButton, '#af-button'],
+			[AutoFocusSelect, '#af-select'],
+			[AutoFocusTextarea, '#af-textarea'],
+		] as const) {
+			const r = mount(component);
+			try {
+				const el = r.find(selector);
+				expect(document.activeElement).toBe(el);
+				expect(el.hasAttribute('autofocus')).toBe(false);
+			} finally {
+				r.unmount();
+			}
+		}
+	});
+
+	it('does not focus divs, anchors, or SVG elements', () => {
+		const outside = document.createElement('button');
+		document.body.appendChild(outside);
+		outside.focus();
+		const r = mount(AutoFocusUnsupported);
+		try {
+			expect(document.activeElement).toBe(outside);
+			for (const selector of ['#af-div', '#af-anchor', '#af-svg', '#af-circle']) {
+				expect(r.find(selector).hasAttribute('autofocus')).toBe(false);
+			}
+		} finally {
+			r.unmount();
+			outside.remove();
+		}
+	});
+
+	it('keeps custom-element autoFocus as a raw attribute without focusing it', () => {
+		const outside = document.createElement('button');
+		document.body.appendChild(outside);
+		outside.focus();
+		const r = mount(AutoFocusCustom, { v: true });
+		try {
+			expect(r.find('#af-custom').getAttribute('autofocus')).toBe('');
+			expect(document.activeElement).toBe(outside);
+		} finally {
+			r.unmount();
+			outside.remove();
+		}
+	});
+
+	it('focuses a spread-supplied autoFocus only when the element mounts', () => {
+		const focused = mount(AutoFocusSpread, { attributes: { autoFocus: true } });
+		try {
+			const el = focused.find('#af-spread');
+			expect(document.activeElement).toBe(el);
+			expect(el.hasAttribute('autofocus')).toBe(false);
+		} finally {
+			focused.unmount();
+		}
+
+		const unfocused = mount(AutoFocusSpread, { attributes: { autoFocus: false } });
+		try {
+			const el = unfocused.find('#af-spread');
+			unfocused.update(AutoFocusSpread, { attributes: { autoFocus: true } });
+			expect(document.activeElement).not.toBe(el);
+		} finally {
+			unfocused.unmount();
+		}
+
+		const omitted = mount(AutoFocusSpread, { attributes: {} });
+		try {
+			const el = omitted.find('#af-spread');
+			omitted.update(AutoFocusSpread, { attributes: { autoFocus: true } });
+			expect(document.activeElement).not.toBe(el);
+		} finally {
+			omitted.unmount();
+		}
+	});
+
+	it('resolves direct and spread autoFocus before deciding mount focus', () => {
+		for (const [before, direct, after, shouldFocus] of [
+			[{}, false, { autoFocus: true }, true],
+			[{}, true, { autoFocus: false }, false],
+			[{ autoFocus: true }, false, {}, false],
+		] as const) {
+			const r = mount(AutoFocusMixed, { before, direct, after });
+			try {
+				expect(document.activeElement === r.find('#af-mixed')).toBe(shouldFocus);
+			} finally {
+				r.unmount();
+			}
+		}
+	});
+
+	it('does not focus an existing descriptor when autoFocus is added later', () => {
+		const r = mount(AutoFocusDescriptor, { attributes: {} });
+		try {
+			const el = r.find('#af-descriptor');
+			r.update(AutoFocusDescriptor, { attributes: { autoFocus: true } });
+			expect(r.find('#af-descriptor')).toBe(el);
+			expect(document.activeElement).not.toBe(el);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps lowercase autofocus as an invalid raw attribute, not a focus request', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(LowercaseAutoFocus, { value: true });
+		try {
+			const el = r.find('#af-lowercase');
+			expect(el.hasAttribute('autofocus')).toBe(false);
+			expect(document.activeElement).not.toBe(el);
+			r.update(LowercaseAutoFocus, { value: 'literal' });
+			expect(el.getAttribute('autofocus')).toBe('literal');
+			expect(document.activeElement).not.toBe(el);
+			expectDevError(error, 'Invalid DOM property `autofocus`. Did you mean `autoFocus`?');
+		} finally {
+			r.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('focuses a newly inserted element during an update', () => {
+		const r = mount(AutoFocusInserted, { show: false, focus: true });
+		try {
+			r.update(AutoFocusInserted, { show: true, focus: true });
+			expect(document.activeElement).toBe(r.find('#af-inserted'));
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('focuses multiple mounted controls in their DOM order', () => {
+		const r = mount(AutoFocusMultiple);
+		try {
+			expect(document.activeElement).toBe(r.find('#af-second'));
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('focuses before layout effects, which can intentionally move focus', () => {
+		const observed: string[] = [];
+		const r = mount(AutoFocusLayout, { observe: (id: string) => observed.push(id) });
+		try {
+			expect(observed).toEqual(['af-layout-input']);
+			expect(document.activeElement).toBe(r.find('#af-layout-target'));
+		} finally {
+			r.unmount();
+		}
 	});
 });

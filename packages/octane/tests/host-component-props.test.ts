@@ -60,4 +60,48 @@ describe('hostComponent — no stale props/events on the reused element', () => 
 		expect(captured).toBe(1);
 		r.unmount();
 	});
+
+	it('honors autoFocus on mount but not when added to an existing host', () => {
+		const initial = mount(HostBody as any, {
+			tag: 'input',
+			hp: { id: 'host-initial-autofocus', autoFocus: true },
+		});
+		try {
+			expect(document.activeElement).toBe(initial.find('#host-initial-autofocus'));
+		} finally {
+			initial.unmount();
+		}
+
+		const existing = mount(HostBody as any, {
+			tag: 'input',
+			hp: { id: 'host-later-autofocus' },
+		});
+		try {
+			const el = existing.find('#host-later-autofocus');
+			existing.update(HostBody as any, {
+				tag: 'input',
+				hp: { id: 'host-later-autofocus', autoFocus: true },
+			});
+			expect(existing.find('#host-later-autofocus')).toBe(el);
+			expect(document.activeElement).not.toBe(el);
+		} finally {
+			existing.unmount();
+		}
+	});
+
+	it('still adds a raw autoFocus attribute to an existing custom host', () => {
+		const r = mount(HostBody as any, {
+			tag: 'my-autofocus-element',
+			hp: { id: 'host-custom-autofocus' },
+		});
+		try {
+			r.update(HostBody as any, {
+				tag: 'my-autofocus-element',
+				hp: { id: 'host-custom-autofocus', autoFocus: true },
+			});
+			expect(r.find('#host-custom-autofocus').getAttribute('autofocus')).toBe('');
+		} finally {
+			r.unmount();
+		}
+	});
 });

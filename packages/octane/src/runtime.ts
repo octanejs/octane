@@ -2924,6 +2924,245 @@ function flush(): void {
 	flushWork();
 }
 
+interface FocusSelectionSnapshot {
+	focused: HTMLElement;
+	start: number;
+	end: number;
+	contentEditable: boolean;
+}
+
+/** Resolve the focused element in the root's own document and same-origin frames. */
+function activeElementForDocument(doc: Document): Element | null {
+	try {
+		let focused = doc.activeElement;
+		while (focused !== null && focused.localName === 'iframe') {
+			let nested: Document | null;
+			try {
+				nested = (focused as HTMLIFrameElement).contentDocument;
+			} catch {
+				break;
+			}
+			if (nested === null) break;
+			const inner = nested.activeElement;
+			if (inner === null) break;
+			focused = inner;
+		}
+		return focused;
+	} catch {
+		// Reading activeElement on a torn-down document can throw.
+		return null;
+	}
+}
+
+function hasTextSelection(element: HTMLElement): boolean {
+	if (element.localName === 'textarea') return true;
+	if (element.localName !== 'input') return false;
+	switch ((element as HTMLInputElement).type) {
+		case 'text':
+		case 'search':
+		case 'tel':
+		case 'url':
+		case 'password':
+			return true;
+	}
+	return false;
+}
+
+/** Resolve editable selection offsets without materializing its text every commit. */
+function captureContentEditableSelection(
+	focused: HTMLElement,
+	anchorNode: Node,
+	anchorOffset: number,
+	focusNode: Node,
+	focusOffset: number,
+): FocusSelectionSnapshot | null {
+	let node: Node = focused;
+	let parent: Node | null = null;
+	let length = 0;
+	let start = -1;
+	let end = -1;
+	let anchorChildIndex = 0;
+	let focusChildIndex = 0;
+
+	selection: for (;;) {
+		for (;;) {
+			if (node === anchorNode && (anchorOffset === 0 || node.nodeType === 3)) {
+				start = length + anchorOffset;
+			}
+			if (node === focusNode && (focusOffset === 0 || node.nodeType === 3)) {
+				end = length + focusOffset;
+			}
+			if (start !== -1 && end !== -1) break selection;
+			if (node.nodeType === 3) length += node.nodeValue!.length;
+			const child = node.firstChild;
+			if (child === null) break;
+			parent = node;
+			node = child;
+		}
+		for (;;) {
+			if (node === focused) break selection;
+			if (parent === anchorNode && ++anchorChildIndex === anchorOffset) start = length;
+			if (parent === focusNode && ++focusChildIndex === focusOffset) end = length;
+			if (start !== -1 && end !== -1) break selection;
+			const sibling = node.nextSibling;
+			if (sibling !== null) {
+				node = sibling;
+				break;
+			}
+			node = parent!;
+			parent = node.parentNode;
+		}
+	}
+
+	return start === -1 || end === -1 ? null : { focused, start, end, contentEditable: true };
+}
+
+/** Capture selection only when a render pass could actually mutate focused DOM. */
+function captureFocusSelection(doc: Document): FocusSelectionSnapshot | null {
+	const focused = activeElementForDocument(doc) as HTMLElement | null;
+	if (focused === null || focused === focused.ownerDocument.body) return null;
+	if (hasTextSelection(focused)) {
+		const input = focused as HTMLInputElement | HTMLTextAreaElement;
+		return {
+			focused,
+			start: input.selectionStart ?? 0,
+			end: input.selectionEnd ?? 0,
+			contentEditable: false,
+		};
+	}
+	if (focused.contentEditable === 'true' || focused.getAttribute('contenteditable') === 'true') {
+		const selection = focused.ownerDocument.getSelection();
+		if (
+			selection !== null &&
+			selection.anchorNode !== null &&
+			selection.focusNode !== null &&
+			focused.contains(selection.anchorNode) &&
+			focused.contains(selection.focusNode)
+		) {
+			const anchorNode = selection.anchorNode;
+			const focusNode = selection.focusNode;
+			if (anchorNode === focusNode && anchorNode.nodeType === 3) {
+				// A direct first text child has no preceding text to count.
+				if (anchorNode === focused.firstChild) {
+					return {
+						focused,
+						start: selection.anchorOffset,
+						end: selection.focusOffset,
+						contentEditable: true,
+					};
+				}
+				// Below 256 UTF-16 code units, one native prefix walk beats JS traversal;
+				// shared-node offset arithmetic also preserves selection direction.
+				if (anchorNode.nodeValue!.length < 256) {
+					const range = focused.ownerDocument.createRange();
+					range.selectNodeContents(focused);
+					range.setEnd(anchorNode, selection.anchorOffset);
+					const start = range.toString().length;
+					return {
+						focused,
+						start,
+						end: start + selection.focusOffset - selection.anchorOffset,
+						contentEditable: true,
+					};
+				}
+			}
+			const snapshot = captureContentEditableSelection(
+				focused,
+				anchorNode,
+				selection.anchorOffset,
+				focusNode,
+				selection.focusOffset,
+			);
+			if (snapshot !== null) return snapshot;
+		}
+	}
+	return { focused, start: -1, end: -1, contentEditable: false };
+}
+
+/** Convert a content-editable text offset back into its current text-node position. */
+function contentEditablePosition(element: HTMLElement, offset: number): [Node, number] {
+	const walker = element.ownerDocument.createTreeWalker(element, 4 /* SHOW_TEXT */);
+	let node = walker.nextNode();
+	let last: Node | null = null;
+	while (node !== null) {
+		const length = node.textContent?.length ?? 0;
+		if (offset <= length) return [node, offset];
+		offset -= length;
+		last = node;
+		node = walker.nextNode();
+	}
+	return last === null ? [element, 0] : [last, last.textContent?.length ?? 0];
+}
+
+function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
+	if (snapshot === null) return;
+	const { focused } = snapshot;
+	const doc = focused.ownerDocument;
+	if (activeElementForDocument(doc) === focused || !doc.documentElement.contains(focused)) return;
+	if (snapshot.start !== -1) {
+		if (snapshot.contentEditable) {
+			const selection = doc.getSelection();
+			if (selection !== null) {
+				const [anchorNode, anchorOffset] = contentEditablePosition(focused, snapshot.start);
+				const [focusNode, focusOffset] = contentEditablePosition(focused, snapshot.end);
+				const range = doc.createRange();
+				range.setStart(anchorNode, anchorOffset);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				selection.extend(focusNode, focusOffset);
+			}
+		} else {
+			const input = focused as HTMLInputElement | HTMLTextAreaElement;
+			input.setSelectionRange(snapshot.start, Math.min(snapshot.end, input.value.length));
+		}
+	}
+	// Refocusing a moved control may scroll every containing element. Preserve
+	// those positions only on this cold, focus-was-actually-lost branch.
+	const ancestors: Array<{ element: HTMLElement; left: number; top: number }> = [];
+	let parent = focused.parentElement;
+	while (parent !== null) {
+		ancestors.push({ element: parent, left: parent.scrollLeft, top: parent.scrollTop });
+		parent = parent.parentElement;
+	}
+	focused.focus();
+	for (let i = 0; i < ancestors.length; i++) {
+		const ancestor = ancestors[i];
+		ancestor.element.scrollLeft = ancestor.left;
+		ancestor.element.scrollTop = ancestor.top;
+	}
+}
+
+type FocusSelectionBatch = FocusSelectionSnapshot | FocusSelectionSnapshot[] | null;
+
+/** A global scheduler drain may contain independently focused documents. */
+function captureQueuedFocusSelection(): FocusSelectionBatch {
+	if (QUEUE.length === 0) return null;
+	const firstDocument = QUEUE[0].parentNode.ownerDocument;
+	if (firstDocument === null) return null;
+	let snapshots: FocusSelectionBatch = captureFocusSelection(firstDocument);
+	let documents: Document[] | null = null;
+	for (let i = 1; i < QUEUE.length; i++) {
+		const doc = QUEUE[i].parentNode.ownerDocument;
+		if (doc === null || doc === firstDocument || documents?.includes(doc)) continue;
+		(documents ??= [firstDocument]).push(doc);
+		const snapshot = captureFocusSelection(doc);
+		if (snapshot === null) continue;
+		if (snapshots === null) snapshots = snapshot;
+		else if (Array.isArray(snapshots)) snapshots.push(snapshot);
+		else snapshots = [snapshots, snapshot];
+	}
+	return snapshots;
+}
+
+function restoreQueuedFocusSelection(snapshots: FocusSelectionBatch): void {
+	if (Array.isArray(snapshots)) {
+		for (let i = 0; i < snapshots.length; i++) restoreFocusSelection(snapshots[i]);
+	} else {
+		restoreFocusSelection(snapshots);
+	}
+}
+
 /**
  * The flush body proper — render+mutate drain plus the effect commit. Shared
  * verbatim by the plain flush() path and the view-transition update callback
@@ -2949,7 +3188,9 @@ function flushWork(): void {
 		// drain as the new children's listener-attach effects — re-ordering them child-first
 		// and letting a child observe an event announcing its own mount.
 		if (QUEUE.length > 0) drainPassivesBeforeRender();
+		const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
 		const pendingError = drainQueue();
+		if (focused !== null) restoreQueuedFocusSelection(focused);
 		commitEffects();
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
@@ -3244,7 +3485,9 @@ export function flushSync<T>(fn: () => T): T {
 			// passive effects (useEffect) still fire AFTER paint via the regular scheduler —
 			// exactly what commitEffects already does.
 			if (QUEUE.length > 0) drainPassivesBeforeRender();
+			const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
 			pendingError = drainQueue();
+			if (focused !== null) restoreQueuedFocusSelection(focused);
 			commitEffects();
 			// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
 			// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
@@ -3268,7 +3511,9 @@ export function flushSync<T>(fn: () => T): T {
 					// Each convergence iteration is a new render pass — flush pending passives
 					// first (React's rule; see flush()).
 					drainPassivesBeforeRender();
+					const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
 					const err = drainQueue();
+					if (focused !== null) restoreQueuedFocusSelection(focused);
 					if (err !== null && pendingError === null) pendingError = err;
 					commitEffects();
 					for (let i = 0; i < QUEUE.length; i++) {
@@ -12038,6 +12283,9 @@ export function setSpread(
 		// reassert every commit (the DOM may have drifted; the helper's own
 		// DOM-diff makes the call cheap).
 		if (v === pv && !isControlledHostProp(el, k)) continue;
+		// React only honors autoFocus from the final props of the element's mount.
+		// An absent initial spread must not turn a later update into a mount.
+		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
 		setAttribute(el, k, v);
 	}
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
@@ -13337,16 +13585,27 @@ function hasControlledSyncs(): boolean {
 }
 
 /**
- * Compiler-emitted binding for `autoFocus` (React parity): never an
- * attribute — the element is focused ONCE, in the commit phase of its mount
- * (after the render pass built the tree, before layout effects — so a layout
- * effect that moves focus still wins, like React's commitMount ordering).
- * Later updates are ignored (React treats autoFocus as mount-only).
+ * Compiler-emitted binding for `autoFocus` (React parity): client mounts never
+ * write an attribute and focus supported controls once, before layout effects.
+ * Server-rendered controls keep their existing autofocus attribute but are
+ * never refocused during hydration; later updates are likewise ignored.
  */
 export function setAutoFocus(el: Element, value: unknown): void {
 	if ((el as any).$$afSeen !== undefined) return; // mount-only
 	(el as any).$$afSeen = true;
-	if (value) AUTOFOCUS_QUEUE.push(el);
+	if (!value) return;
+	switch (el.localName) {
+		case 'button':
+		case 'input':
+		case 'select':
+		case 'textarea':
+			break;
+		default:
+			return;
+	}
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.isFresh(el)) return;
+	AUTOFOCUS_QUEUE.push(el);
 }
 
 /** Text-entry controls (IME-capable; their diagnostic specifically requires onInput). */
@@ -16185,6 +16444,8 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 			// Controlled `value`/`checked` bypass the prev-diff skip (reassert
 			// on every commit; the helper's DOM-diff keeps the call cheap).
 			if (prevProps == null || prevProps[name] !== nv || isControlledHostProp(el, name)) {
+				// This path always reuses an existing host; autoFocus is mount-only.
+				if (name === 'autoFocus' && !isHtmlCustomElement(el)) continue;
 				// `applyDeoptProp` is the FRESH-element helper — its style arm passes
 				// prev=undefined, which on a REUSED element leaves declarations dropped
 				// from the style object stale (applyStyleValue can only remove keys it
@@ -16342,7 +16603,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 					delegateEvents([ev.type]);
 				}
 				(el as any)[ev.key] = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
-			} else {
+			} else if (prev === undefined || name !== 'autoFocus' || isHtmlCustomElement(el)) {
 				setAttribute(el, name, v);
 			}
 		}

@@ -1743,6 +1743,11 @@ export function ssrAttr(
 	// setAttribute writes (hydration parity). Custom elements get their props
 	// VERBATIM (no alias tables) — React parity.
 	if (!isCustomTag) {
+		// Server markup carries browser-native autofocus even though client mounts
+		// perform focus at commit without writing this attribute.
+		if (name === 'autoFocus') {
+			return v && typeof v !== 'function' && typeof v !== 'symbol' ? ' autofocus=""' : '';
+		}
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
 	}
@@ -1966,9 +1971,6 @@ function ssrAttrEntry(
 	)
 		return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
-	// `autoFocus` never serializes (client focuses at its mount commit).
-	if (k === 'autoFocus' && (namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1))
-		return '';
 	if (k === 'style') return ssrStyle(v);
 	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag, namespace);
 	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag, namespace);
@@ -2069,11 +2071,6 @@ export function ssrAttrs(
 			const c = rawName.charCodeAt(2);
 			if (c >= 65 && c <= 90) continue;
 		}
-		if (
-			rawName === 'autoFocus' &&
-			(namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1)
-		)
-			continue;
 		const name = normalizeSsrAttributeName(rawName, tag, namespace);
 		if (!VALID_ATTR_NAME.test(name)) continue;
 		// Attribute identity is ASCII-case-insensitive in the HTML namespace.

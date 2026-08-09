@@ -1,4 +1,5 @@
 import {
+	createElement,
 	createRoot,
 	flushSync,
 	hydrateRoot,
@@ -12,6 +13,7 @@ import {
 	DirectRootRefUnmountApp,
 	SuspensePreservationApp,
 } from '../../_fixtures/suspense-preserves-dom.tsrx';
+import { FastHostControlledList } from '../../_fixtures/for.tsrx';
 
 type Controls = {
 	urgent(next: string): void;
@@ -244,6 +246,179 @@ function mountDirectRefUnmountCase(): void {
 	};
 }
 
+function mountFocusRestorationCase(): void {
+	const container = document.querySelector('#suspense-root') as HTMLElement;
+	const initialRows = [
+		{ id: 1, label: 'first field' },
+		{ id: 2, label: 'selected browser value' },
+		{ id: 3, label: 'third field' },
+		{ id: 4, label: 'fourth field' },
+	];
+	const root = createRoot(container);
+	root.render(FastHostControlledList, { items: initialRows });
+	flushSync(() => {});
+	const scroller = container.querySelector('#fast-host-controlled-list') as HTMLElement;
+	scroller.style.height = '36px';
+	scroller.style.overflow = 'auto';
+	for (const control of scroller.querySelectorAll<HTMLInputElement>('.fast-host-controlled-row')) {
+		control.style.display = 'block';
+		control.style.height = '32px';
+	}
+	const input = container.querySelectorAll<HTMLInputElement>('.fast-host-controlled-row')[1]!;
+	input.focus();
+	input.setSelectionRange(2, 9);
+	scroller.scrollTop = 7;
+
+	function snapshot() {
+		return {
+			inputSame: container.querySelectorAll('.fast-host-controlled-row')[2] === input,
+			inputConnected: input.isConnected,
+			activeValue: (document.activeElement as HTMLInputElement | null)?.value ?? '',
+			selectionStart: input.selectionStart,
+			selectionEnd: input.selectionEnd,
+			scrollTop: scroller.scrollTop,
+			values: Array.from(
+				container.querySelectorAll<HTMLInputElement>('.fast-host-controlled-row'),
+				(element) => element.value,
+			),
+			globalFailures: globalFailures.slice(),
+		};
+	}
+
+	window.__suspenseHydration = {
+		kind: 'focus-restoration',
+		urgent() {
+			flushSync(() => root.render(FastHostControlledList, { items: initialRows.toReversed() }));
+		},
+		resolve() {},
+		unmount() {
+			root.unmount();
+		},
+		snapshot,
+	};
+}
+
+function mountEditableFocusRestorationCase(): void {
+	const container = document.querySelector('#suspense-root') as HTMLElement;
+	const react = search.get('implementation') === 'react';
+	const element: (...args: any[]) => any = react ? React.createElement : createElement;
+	const root = react ? createReactRoot(container) : createRoot(container);
+	const initialRows = [1, 2, 3, 4];
+
+	function EditableRows(props: { items: number[] }) {
+		return element(
+			'section',
+			{ id: 'focus-editable-list' },
+			props.items.map((id) =>
+				element(
+					'div',
+					{
+						key: id,
+						id: `focus-editable-${id}`,
+						'data-editable-row': id,
+						'data-segment': 'editable',
+						contentEditable: true,
+						suppressContentEditableWarning: true,
+					},
+					element(
+						'span',
+						{ 'data-segment': 'first' },
+						element('strong', { 'data-part': 'first' }, 'alpha'),
+						element('em', { 'data-part': 'second' }, ' beta'),
+					),
+					element(
+						'span',
+						{ 'data-segment': 'middle' },
+						element('b', { 'data-part': 'third' }, ' middle'),
+						element('i', { 'data-part': 'fourth' }, ' words'),
+					),
+					element(
+						'span',
+						{ 'data-segment': 'last' },
+						element('u', { 'data-part': 'last' }, ' omega'),
+					),
+				),
+			),
+		);
+	}
+
+	function render(items: number[]): void {
+		const update = () => root.render(element(EditableRows, { items }));
+		if (react) flushReactSync(update);
+		else flushSync(update);
+	}
+
+	render(initialRows);
+	const editable = container.querySelector('#focus-editable-2') as HTMLElement;
+	const first = editable.querySelector('[data-part="first"]')!.firstChild!;
+	const last = editable.querySelector('[data-part="last"]')!.firstChild!;
+	editable.focus();
+	const selection = document.getSelection()!;
+	// Focusing an editable host implicitly creates a collapsed Chromium range.
+	selection.removeAllRanges();
+	if (search.get('selection') === 'boundary') {
+		selection.setBaseAndExtent(editable.querySelector('[data-segment="first"]')!, 1, editable, 2);
+	} else {
+		selection.setBaseAndExtent(last, 4, first, 2);
+	}
+
+	function describeSelectionNode(node: Node | null): string {
+		if (node === null) return '';
+		if (node.nodeType === Node.TEXT_NODE) {
+			return `text:${node.parentElement?.getAttribute('data-part') ?? ''}`;
+		}
+		return `element:${(node as Element).getAttribute('data-segment') ?? ''}`;
+	}
+
+	function selectionOffset(node: Node | null, offset: number): number {
+		if (node === null || !editable.contains(node)) return -1;
+		const range = document.createRange();
+		range.selectNodeContents(editable);
+		range.setEnd(node, offset);
+		return range.toString().length;
+	}
+
+	function snapshot() {
+		const current = document.getSelection();
+		const anchorPosition = selectionOffset(current?.anchorNode ?? null, current?.anchorOffset ?? 0);
+		const focusPosition = selectionOffset(current?.focusNode ?? null, current?.focusOffset ?? 0);
+		return {
+			editableSame: container.querySelector('#focus-editable-2') === editable,
+			editableConnected: editable.isConnected,
+			activeId: (document.activeElement as HTMLElement | null)?.id ?? '',
+			anchorNode: describeSelectionNode(current?.anchorNode ?? null),
+			anchorOffset: current?.anchorOffset ?? -1,
+			focusNode: describeSelectionNode(current?.focusNode ?? null),
+			focusOffset: current?.focusOffset ?? -1,
+			anchorPosition,
+			focusPosition,
+			direction:
+				anchorPosition > focusPosition
+					? 'backward'
+					: anchorPosition < focusPosition
+						? 'forward'
+						: 'collapsed',
+			selectedText: current?.toString() ?? '',
+			rows: Array.from(container.querySelectorAll('[data-editable-row]'), (row) =>
+				Number(row.getAttribute('data-editable-row')),
+			),
+			globalFailures: globalFailures.slice(),
+		};
+	}
+
+	window.__suspenseHydration = {
+		kind: 'editable-focus-restoration',
+		urgent() {
+			render(initialRows.toReversed());
+		},
+		resolve() {},
+		unmount() {
+			root.unmount();
+		},
+		snapshot,
+	};
+}
+
 function mountReactBaselineCase(): void {
 	const container = document.querySelector('#suspense-root') as HTMLElement;
 	const routeB = deferred<string>();
@@ -305,12 +480,20 @@ function mountReactBaselineCase(): void {
 if (testCase === 'hydration') mountHydrationCase();
 else if (testCase === 'suspense') mountSuspenseCase();
 else if (testCase === 'direct-ref-unmount') mountDirectRefUnmountCase();
+else if (testCase === 'focus-restoration') mountFocusRestorationCase();
+else if (testCase === 'editable-focus-restoration') mountEditableFocusRestorationCase();
 else if (testCase === 'react-baseline') mountReactBaselineCase();
 
 declare global {
 	interface Window {
 		__suspenseHydration: {
-			kind: 'hydration' | 'suspense' | 'react-baseline' | 'direct-ref-unmount';
+			kind:
+				| 'hydration'
+				| 'suspense'
+				| 'react-baseline'
+				| 'direct-ref-unmount'
+				| 'focus-restoration'
+				| 'editable-focus-restoration';
 			prepareInput?: () => any;
 			prepareRange?: () => any;
 			urgent?: () => void;
