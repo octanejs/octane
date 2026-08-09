@@ -19461,9 +19461,14 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		},
 	};
 	function wrapper(props: P, scope: Scope, extra: any): unknown {
-		const block = scope.block;
-		// Register on first call; cleared lazily during update() if disposed.
-		meta.liveBlocks.add(block);
+		// Register on first call; cleared lazily during update() if disposed. A
+		// plain direct call (`Row({ … })` inside another component's render) has
+		// no scope of its own — stay transparent and register nothing. The call
+		// site's output still refreshes on edit: its owner's update() re-renders
+		// the owning block, which re-runs the direct call against the swapped-in
+		// body. Registering the AMBIENT block instead would let update() repoint
+		// that block's body at this wrapper, miswiring the caller.
+		if (scope !== undefined) meta.liveBlocks.add(scope.block);
 		// Propagate the wrapped body's return — a return-based (folded) component
 		// hands back a renderable descriptor that renderBlock must still mount.
 		return meta.fn(props as any, scope, extra);

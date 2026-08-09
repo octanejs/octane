@@ -51,33 +51,35 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
 	);
 
-	// Strip `export` keywords but KEEP the declarations themselves, then assign
-	// the collected names onto __exports at the end of the module. This preserves
-	// function-declaration hoisting and the module-scope bindings, so exported
-	// components may reference each other (`export const Memo = memo(Tree)` after
-	// `export function Tree`), which the old expression-assignment rewrite broke.
-	const exportedNames: string[] = [];
+	// `export function X` must stay a real function *declaration*: compiled
+	// modules reference exported components by name after the declaration (the
+	// compiler's module tail stamps `X.$$singleRoot = true;`, and sibling
+	// components call each other directly). Strip only the `export ` keyword
+	// here and register the exports at the end of the module — declarations
+	// hoist, so end-of-module registration is safe and also observes any later
+	// reassignment of the binding.
+	const functionExports: string[] = [];
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) => {
-			exportedNames.push(name);
+			functionExports.push(name);
 			return `${asyncKeyword ?? ''}function ${name}`;
 		},
 	);
 	code = code.replace(
 		/export\s+(const|let|var)\s+(\w+)\s*=/g,
-		(_match: string, kind: string, name: string) => {
-			exportedNames.push(name);
-			return `${kind} ${name} =`;
-		},
+		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
-	for (const name of exportedNames) code += `\n__exports.${name} = ${name};`;
 
 	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
 		throw new Error(
 			`Compiled fixture ${id} contains an import/export shape the shared loader cannot evaluate.`,
 		);
+	}
+
+	for (const name of functionExports) {
+		code += `\n__exports.${name} = ${name};`;
 	}
 
 	const evaluate = new Function(

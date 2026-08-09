@@ -126,6 +126,10 @@ describe('built Start server', () => {
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
 		expect(html).toContain('id="deferred-hydration"');
 		expect(html).toContain('Deferred hydration');
+		expect(html).toContain('id="behavior-only-roots"');
+		expect(html).toContain('Behavior-only roots and external ownership');
+		expect(html).toContain('attachBehaviorRoot');
+		expect(html).toContain('octane/behavior');
 	});
 
 	// This route deliberately renders every chart and accessible data table; give

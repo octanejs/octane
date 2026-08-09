@@ -271,6 +271,95 @@ fallback has already flushed, a later rejection or abort terminalizes that
 server-owned range and retains the fallback; it cannot request client recovery
 because its client graph does not exist.
 
+## Behavior-only roots and external ownership
+
+A permanently static boundary intentionally never installs its descendant
+component handlers: its client component graph does not exist. When another
+system owns that markup, attach independent behavior through `octane/behavior`
+instead of hydrating or rendering the externally managed range:
+
+```ts
+import { attachBehaviorRoot } from 'octane/behavior';
+import { articleStream } from './article-stream.js';
+
+const lifetime = new AbortController();
+const root = attachBehaviorRoot(document.querySelector('#app')!, {
+	signal: lifetime.signal,
+});
+const streamOwner = Symbol('article stream');
+
+root.registerExternalRange(document.querySelector('#article')!, {
+	owner: streamOwner,
+	ready: articleStream.allReady,
+});
+
+let activateAnnotation: (event: Event, element: Element) => void;
+let observeAnnotation: (element: Element, signal: AbortSignal) => () => void;
+
+root.registerBehavior({
+	id: 'article-annotations',
+	owner: streamOwner,
+	target: '[data-annotation]',
+	events: ['click'],
+	ready: import('./annotations.js').then((module) => {
+		activateAnnotation = module.activateAnnotation;
+		observeAnnotation = module.observeAnnotation;
+	}),
+	adopt(element, { signal }) {
+		return observeAnnotation(element, signal);
+	},
+	handleEvent(event, element) {
+		activateAnnotation(event, element);
+	},
+});
+
+await root.ready;
+
+// Aborts pending work, disconnects observers/listeners, and runs every
+// adoption cleanup exactly once. Existing DOM is preserved by default.
+root.dispose();
+```
+
+`attachBehaviorRoot` neither renders nor hydrates its container. Existing DOM,
+attributes, and externally streamed updates retain their identity; a single
+root-scoped observer discovers later matching elements and releases behavior
+when elements leave the container. Importing the focused `octane/behavior`
+entry does not load the component runtime, compiler, or server renderer. The
+same API and public types are also exported by `octane`.
+
+Each external range belongs to its declared `owner`. Strictly nested ranges are
+allowed, and the closest registered range determines ownership for behaviors
+with an `owner` constraint. Registering the same element for another owner
+throws unless `{ replace: true }` explicitly hands the range to its new owner;
+handoff aborts the displaced range and invalidates stale asynchronous work.
+An already-canceled replacement never evicts a healthy existing owner.
+Ranges must belong to the root's document and container. Their optional `ready`
+promise delays adoption without preventing the external owner from updating
+markup. Individual ranges and behavior registrations expose their cancellation
+signal, readiness, and an idempotent `dispose()` method.
+
+Named behaviors may list already registered `dependencies` and incompatible
+`conflicts`. Registration fails for unknown dependencies, duplicate IDs, or an
+active conflict. Adoption waits for dependencies, the entry's optional `ready`
+promise, and its closest external range. Root readiness reflects the active
+registrations and ranges at the instant `root.ready` is read.
+
+Delegated `events` begin listening immediately. If an interaction arrives
+before its target is adopted, `handleEvent` later receives the exact original
+same-document `Event`, including its genuine `isTrusted` value. Octane does not
+redispatch the event, synthesize trust, repeat native link or form activation,
+or restore transient user activation that expired during asynchronous loading.
+Code requiring transient activation must run synchronously while the original
+event is being dispatched.
+
+Root identity is scoped to its document and container. A second root for the
+same live container requires `{ replace: true }`, which disposes the old root
+without removing markup; creating a root for a replacement document never adopts
+listeners or ranges from its predecessor. Disposing an independently owned
+nested root immediately restores eligible behavior belonging to its surviving
+ancestor root. Pass `{ preserveDOM: false }` to `root.dispose()` only when the
+root should explicitly clear its container.
+
 ## Correctness and nesting
 
 Deferred hydration is a performance hint. An update outside a dormant boundary

@@ -105,6 +105,31 @@ describe('llms text', () => {
 		}
 	});
 
+	it('documents behavior-only ownership in the summary and full website corpus', () => {
+		const ownershipGuide = LLMS_TXT.split(
+			'## Behavior-only roots and external ownership\n',
+		)[1]?.split('\n## ')[0];
+		expect(ownershipGuide).toBeDefined();
+
+		for (const marker of [
+			'attachBehaviorRoot',
+			'octane/behavior',
+			'registerExternalRange',
+			'registerBehavior',
+			'preserveDOM',
+			'/docs/core-apis#behavior-only-roots',
+		]) {
+			expect(ownershipGuide, marker).toContain(marker);
+		}
+
+		const coreApis = docBySlug('core-apis')!;
+		expect(coreApis.sections).toContainEqual(
+			expect.objectContaining({ id: 'behavior-only-roots' }),
+		);
+		expect(coreApis.markdown).toContain('attachBehaviorRoot');
+		expect(LLMS_FULL_TXT).toContain(coreApis.markdown.trim());
+	});
+
 	it('lists the catalogued bindings package-for-package', () => {
 		const bindingsGuide = LLMS_TXT.split(
 			'Bindings — reach for these when asked about the React equivalent:\n',
