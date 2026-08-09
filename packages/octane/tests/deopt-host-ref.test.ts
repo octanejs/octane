@@ -155,6 +155,28 @@ describe('de-opt keyed list / wholesale-unmount ref detach', () => {
 		m.unmount();
 	});
 
+	it('detaches a ref that was ADDED by a later update, on removal', () => {
+		// The ref arrives via the reuse/diff path (no ref on mount, added on
+		// update) — its removal-time detach must work exactly like a mount-time
+		// ref's.
+		const r = ref();
+		function MaybeRef(props: any) {
+			return createElement('div', props.withRef ? { id: 'mr', ref: props.r } : { id: 'mr' });
+		}
+		const m = mount(Gate as any, { show: true, comp: MaybeRef, props: { withRef: false, r } });
+		expect(r.current).toBeNull();
+
+		m.root.render(Gate as any, { show: true, comp: MaybeRef, props: { withRef: true, r } });
+		flushSync(() => {});
+		expect(r.current).toBe(m.container.querySelector('#mr'));
+
+		m.root.render(Gate as any, { show: false, comp: MaybeRef, props: { withRef: true, r } });
+		flushSync(() => {});
+		expect(m.container.querySelector('#mr')).toBeNull();
+		expect(r.current).toBeNull();
+		m.unmount();
+	});
+
 	it('detaches item refs on root unmount', () => {
 		const a = { id: 1, r: ref() };
 		const m = mount(KeyedList as any, { items: [a] });
