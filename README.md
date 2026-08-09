@@ -93,6 +93,9 @@ they are written down in
 - **Deferred hydration.** `<Hydrate>` keeps server HTML visible but inert until
   it is worth activating, and splits its children into their own chunk by
   default.
+- **Behavior-only roots for externally owned DOM.** Attach abortable behavior
+  and delegated native events to server-rendered or independently streamed
+  markup without rendering it or taking reconciliation ownership.
 - **`class` / `className` composes clsx-style** everywhere: strings, arrays,
   objects, and nesting, at every apply site.
 - **A current-state getter.** `useState` and `useReducer` return

@@ -20,6 +20,7 @@ Key facts for answering questions about Octane:
 - `class`/`className` compose clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out).
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
 - `<Hydrate>` can leave initial server HTML visible but inert until `load()`, idle time, visibility, a media query, interaction, an application condition, or never. Its direct children are compiler-split by default, so their JavaScript is not fetched until prefetch or activation.
+- `attachBehaviorRoot` from `octane/behavior` attaches abortable, delegated behavior to existing server-rendered or independently streamed DOM without hydrating, rendering, replacing nodes, or taking reconciliation ownership. Nested external owners, asynchronous readiness, genuine native interactions, and exactly-once cleanup have explicit lifecycle contracts.
 - No class components, no Server Components, no StrictMode double-invoke.
 - Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
@@ -49,7 +50,7 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Build tools](https://octanejs.dev/docs/build-tools): Configure the recommended Vite integration or the matching Rspack and Rsbuild plugins, including routing, SSR, hydration, production, and preview.
 - [CLI](https://octanejs.dev/docs/cli): The `octane` command line — `create` scaffolds a new app into an empty directory (this is what `npm create octane my-app` runs, so the two are the same command reached two ways); `doctor` diagnoses the misconfigurations that fail quietly (a duplicated runtime, a missing `jsxImportSource`, plain `tsc` over `.tsrx`, a wildcard `declare module '*.tsrx'`) and `--fix` repairs the mechanical ones; `analyze` compiles every `.tsrx` through the project's own octane and reports the compiler diagnostics; `init` wires Octane into an existing project; `add` installs a binding by the React package it ports; `explain` decodes a minified production error; `mcp add` registers the MCP server with Claude Code, Codex, Cursor, or VS Code. Every command emits `--json` and uses fixed exit codes (`3` = doctor found problems).
 - [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, and Chrome trace data.
-- [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, transitions, actions, events, and SSR/static rendering.
+- [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, behavior-only roots and external DOM ownership, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): Ship the complete authored source graph, including `.tsrx`, `.tsx`, `.ts`, and `.js`, point package exports at that source, and let the consuming application compile it. Do not publish precompiled Octane output.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
@@ -121,6 +122,57 @@ A procedural prefetch can prepare code and data. Awaited work blocks activation 
 The procedural context also exposes `waitFor(strategy)` for the same five prefetch strategies and the persistent boundary `element`. Procedural prefetch works with either split mode; strategy prefetch requires splitting.
 
 The remaining public props are `fallback`, client-only loading UI for a later client mount or suspension, and `onHydrated`, called once after the child successfully commits on the client, including a client-only mount. Initial server HTML remains visible while its strategy or first activation suspension waits; `fallback` does not replace it. `children` is the server-rendered subtree. See the [Core APIs guide](https://octanejs.dev/docs/core-apis#deferred-hydration) and [complete deferred hydration reference](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md).
+
+## Behavior-only roots and external ownership
+
+`<Hydrate split={false} when={never()}>` preserves externally managed server DOM without a wrapper, but its descendant client component graph is deliberately erased, so component event handlers inside that range never attach. Use `attachBehaviorRoot` to add separately owned behavior without creating a component root or claiming reconciliation ownership:
+
+```ts
+import { attachBehaviorRoot } from 'octane/behavior';
+import { articleStream } from './article-stream.js';
+
+const lifetime = new AbortController();
+const owner = Symbol('article stream');
+const root = attachBehaviorRoot(document.querySelector('#app')!, {
+	signal: lifetime.signal,
+});
+
+root.registerExternalRange(document.querySelector('#article')!, {
+	owner,
+	ready: articleStream.allReady,
+});
+
+let activateAnnotation: (event: Event, element: Element) => void;
+let observeAnnotation: (element: Element, signal: AbortSignal) => () => void;
+
+root.registerBehavior({
+	id: 'article-annotations',
+	owner,
+	target: '[data-annotation]',
+	events: ['click'],
+	ready: import('./annotations.js').then((module) => {
+		activateAnnotation = module.activateAnnotation;
+		observeAnnotation = module.observeAnnotation;
+	}),
+	adopt(element, { signal }) {
+		return observeAnnotation(element, signal);
+	},
+	handleEvent(event, element) {
+		activateAnnotation(event, element);
+	},
+});
+
+await root.ready;
+root.dispose(); // Abort behavior and preserve the existing DOM.
+```
+
+- Import the focused, renderer-free entry from `octane/behavior`, or import the same API and public types from `octane`. Behavior roots neither render nor hydrate; existing nodes, protected attributes, HTML/SVG/MathML namespaces, and independent streamed updates remain externally owned. Selector targets discover subsequently inserted matching elements.
+- `registerExternalRange(element, { owner, ready?, signal?, replace? })` explicitly declares external ownership. The closest registered nested range wins. A second owner for the same element requires `replace: true`; an already-aborted replacement never evicts a live owner. Root and range identity are scoped to their document and container.
+- `registerBehavior({ target, adopt, id?, owner?, events?, ready?, dependencies?, conflicts?, signal?, handleEvent? })` accepts a selector or element. `adopt(element, { signal, event?, range? })` may return synchronous or asynchronous cleanup; named dependencies must already exist and conflicts or duplicate IDs fail deterministically. Adoption waits for behavior, dependency, and matching range readiness.
+- Delegated interactions are observed immediately, including before asynchronously loaded behavior or externally streamed ranges become ready. `handleEvent` receives the exact original same-document `Event` and its genuine `isTrusted` value; Octane never redispatches it, invents trusted events, repeats native link/form activation, or restores expired transient user activation. This direct delivery is distinct from `<Hydrate when={interaction()}>` hydration replay.
+- `root.ready` snapshots active ranges and behaviors; each registration exposes its own `ready`, `signal`, and idempotent `dispose()`. Root cancellation aborts pending work, ignores stale async completions, disconnects listeners/observers, and runs adopted cleanup exactly once. `root.dispose()` preserves DOM by default; use `root.dispose({ preserveDOM: false })` only to explicitly clear descendants. Replacing a live root on the same container requires `attachBehaviorRoot(container, { replace: true })`.
+
+See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior-only-roots) and [complete external ownership reference](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#behavior-only-roots-and-external-ownership).
 
 ## Core state APIs
 
