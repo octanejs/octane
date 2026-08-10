@@ -3,10 +3,10 @@
 // Builds the cross-framework table app (./app) plus the real dual-thread Lynx
 // path with the Octane compiler, runs create/update10th/select and the two
 // storms through real tap tokens in-process, and reports the per-operation
-// COMMAND COUNT and SERIALIZED COMMIT BYTES from the build-flag-gated
-// `__OCTANE_LYNX_PROFILE__` counters. Those are deterministic for a fixed app
-// and interaction sequence, so they carry the regression gates; wall-clock
-// belongs to the Lynx-for-Web harness (web/run-web.mjs), which is
+// COMMAND COUNT, SERIALIZED COMMIT BYTES, and ROW BODY RENDERS from the
+// build-flag-gated `__OCTANE_LYNX_PROFILE__` counters. Those are deterministic
+// for a fixed app and interaction sequence, so they carry the regression
+// gates; wall-clock belongs to the Lynx-for-Web harness (web/run-web.mjs), which is
 // informational. The `changed-rows-model` target is the semantic floor: the
 // commands a change of that size strictly implies. Ratios of octane-lynx over
 // that model are the "wire cost is proportional to change size, not tree
@@ -120,11 +120,19 @@ try {
 				break;
 			}
 			const nextSignature = JSON.stringify({
-				create: result.create.commands,
-				update10th: result.update10th.commands,
-				select: [result.select.commands, result.select.bytes],
-				updateStorm: [result.updateStorm.commits, result.updateStorm.commands],
-				selectStorm: [result.selectStorm.commits, result.selectStorm.commands],
+				create: [result.create.commands, result.create.itemRenders],
+				update10th: [result.update10th.commands, result.update10th.itemRenders],
+				select: [result.select.commands, result.select.bytes, result.select.itemRenders],
+				updateStorm: [
+					result.updateStorm.commits,
+					result.updateStorm.commands,
+					result.updateStorm.itemRenders,
+				],
+				selectStorm: [
+					result.selectStorm.commits,
+					result.selectStorm.commands,
+					result.selectStorm.itemRenders,
+				],
 			});
 			if (signature === null) signature = nextSignature;
 			else if (signature !== nextSignature) {
@@ -138,8 +146,13 @@ try {
 
 		octaneOps[`create_commands_${suffix}`] = countStat(result.create.commands, iterations);
 		octaneOps[`update10th_commands_${suffix}`] = countStat(result.update10th.commands, iterations);
+		octaneOps[`update10th_item_renders_${suffix}`] = countStat(
+			result.update10th.itemRenders,
+			iterations,
+		);
 		octaneOps[`select_commands_${suffix}`] = countStat(result.select.commands, iterations);
 		octaneOps[`select_bytes_${suffix}`] = countStat(result.select.bytes, iterations);
+		octaneOps[`select_item_renders_${suffix}`] = countStat(result.select.itemRenders, iterations);
 		octaneOps[`update_storm_commits_${suffix}`] = countStat(result.updateStorm.commits, iterations);
 		octaneOps[`update_storm_commands_${suffix}`] = countStat(
 			result.updateStorm.commands,
@@ -157,12 +170,15 @@ try {
 		// one commit per tick in this synchronous harness — ticks arrive in their
 		// own macrotasks, so nothing can legitimately merge them here — times the
 		// per-tick change. select_bytes uses the absolute 2 KiB acceptance budget
-		// for a point-update commit rather than a modeled byte count.
+		// for a point-update commit rather than a modeled byte count. The row
+		// render floors count only components whose observable props changed.
 		const changed = Math.ceil(rows / 10);
 		modelOps[`create_commands_${suffix}`] = countStat(result.create.commands, iterations);
 		modelOps[`update10th_commands_${suffix}`] = countStat(changed, iterations);
+		modelOps[`update10th_item_renders_${suffix}`] = countStat(changed, iterations);
 		modelOps[`select_commands_${suffix}`] = countStat(2, iterations);
 		modelOps[`select_bytes_${suffix}`] = countStat(2048, iterations);
+		modelOps[`select_item_renders_${suffix}`] = countStat(2, iterations);
 		modelOps[`update_storm_commits_${suffix}`] = countStat(workload.STORM_UPDATE_TICKS, iterations);
 		modelOps[`update_storm_commands_${suffix}`] = countStat(
 			workload.STORM_UPDATE_TICKS * changed,
@@ -178,17 +194,20 @@ try {
 			rows,
 			createdElements: result.createdElements,
 			createBytes: result.create.bytes,
+			createItemRenders: result.create.itemRenders,
 			update10thBytes: result.update10th.bytes,
 			updateStormBytes: result.updateStorm.bytes,
+			updateStormItemRenders: result.updateStorm.itemRenders,
 			selectStormBytes: result.selectStorm.bytes,
+			selectStormItemRenders: result.selectStorm.itemRenders,
 		};
 
 		console.log(
-			`rows=${String(rows).padStart(5)}  create=${result.create.commands}  ` +
-				`update10th=${result.update10th.commands}  ` +
-				`select=${result.select.commands} (${result.select.bytes}B)  ` +
-				`updateStorm=${result.updateStorm.commits}c/${result.updateStorm.commands}  ` +
-				`selectStorm=${result.selectStorm.commits}c/${result.selectStorm.commands}`,
+			`rows=${String(rows).padStart(5)}  create=${result.create.commands} (${result.create.itemRenders}r)  ` +
+				`update10th=${result.update10th.commands} (${result.update10th.itemRenders}r)  ` +
+				`select=${result.select.commands} (${result.select.bytes}B, ${result.select.itemRenders}r)  ` +
+				`updateStorm=${result.updateStorm.commits}c/${result.updateStorm.commands} (${result.updateStorm.itemRenders}r)  ` +
+				`selectStorm=${result.selectStorm.commits}c/${result.selectStorm.commands} (${result.selectStorm.itemRenders}r)`,
 		);
 	}
 

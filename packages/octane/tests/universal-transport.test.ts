@@ -12,15 +12,21 @@ import {
 	type UniversalTransportCommitMessage,
 	type UniversalTransportEventMessage,
 	type UniversalTransportIdentity,
+	createContext,
 	createObjectContainer,
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
 	type UniversalRoot,
+	universalComponent,
+	universalContext,
+	universalFor,
 	universalPlan,
 	universalProps,
 	universalValue,
 	use,
+	useContext,
+	useEffect,
 	useLayoutEffect,
 	useState,
 } from '../src/universal.js';
@@ -1338,6 +1344,186 @@ describe('universal asynchronous transport', () => {
 		);
 		expect(protocol.error?.message).toMatch(/uses protocol 999/);
 		expect(log).toEqual([]);
+		await root.unmountAsync();
+	});
+});
+
+describe('transported retained component subtrees', () => {
+	interface SceneRow {
+		readonly id: number;
+		readonly label: string;
+	}
+
+	interface SceneCommand {
+		readonly select?: number;
+		readonly theme?: string;
+		readonly rotate?: boolean;
+		readonly relabel?: number;
+	}
+
+	const itemPlan = universalPlan(RENDERER, { kind: 'host', type: 'item', propsSlot: 0 });
+	const Theme = createContext('plain');
+
+	function createScene() {
+		const { container, loopback, root } = transportRoot();
+		const rendered: number[] = [];
+		const effects: string[] = [];
+		let command!: (payload: SceneCommand) => void;
+		const onCommand = (payload: unknown) => command(payload as SceneCommand);
+		const Item = defineUniversalComponent(
+			RENDERER,
+			(props: { row: SceneRow; selected: boolean; onCommand: (payload: unknown) => void }) => {
+				const theme = useContext(Theme);
+				rendered.push(props.row.id);
+				useEffect(
+					() => {
+						effects.push(`mount:${props.row.id}`);
+						return () => effects.push(`cleanup:${props.row.id}`);
+					},
+					[],
+					'mounted',
+				);
+				return universalValue(itemPlan, [
+					universalProps([
+						['set', 'label', props.row.label],
+						['set', 'theme', theme],
+						['set', 'selected', props.selected],
+						['set', 'onPoke', props.onCommand],
+					]),
+				]);
+			},
+		);
+		const Scene = defineUniversalComponent(RENDERER, () => {
+			const [rows, setRows] = useState<readonly SceneRow[]>(
+				[
+					{ id: 1, label: 'a' },
+					{ id: 2, label: 'b' },
+					{ id: 3, label: 'c' },
+				],
+				'rows',
+			);
+			const [selected, setSelected] = useState(0, 'selected');
+			const [theme, setTheme] = useState('plain', 'theme');
+			command = (payload) => {
+				if (payload.select !== undefined) setSelected(payload.select);
+				if (payload.theme !== undefined) setTheme(payload.theme);
+				if (payload.rotate === true) {
+					setRows((previous) => [previous[2]!, previous[0]!, previous[1]!]);
+				}
+				if (payload.relabel !== undefined) {
+					setRows((previous) =>
+						previous.map((row) =>
+							row.id === payload.relabel ? { id: row.id, label: `${row.label}!` } : row,
+						),
+					);
+				}
+			};
+			return universalContext(Theme, theme, () =>
+				universalFor(
+					rows,
+					(row) => row.id,
+					(row) =>
+						universalComponent(
+							RENDERER,
+							Item,
+							universalProps([
+								['set', 'row', row],
+								['set', 'selected', selected === row.id],
+								['set', 'onCommand', onCommand],
+							]),
+						),
+				),
+			);
+		});
+		const items = () => container.host.children;
+		const poke = async (occurrence: number, payload: SceneCommand) => {
+			const outcome = await loopback.sendEvent([
+				{ listener: loopback.listener('poke', occurrence), payload },
+			]);
+			expect(outcome.error).toBeUndefined();
+			await root.flushTransport();
+		};
+		return { root, Scene, rendered, effects, items, poke };
+	}
+
+	it('retains unchanged keyed children and their listeners across acknowledged updates', async () => {
+		const { root, Scene, rendered, effects, items, poke } = createScene();
+		await root.renderAsync(Scene, undefined);
+		await root.flushTransport();
+		const [first, second, third] = [...items()];
+		expect(items().map((item) => item.props.label)).toEqual(['a', 'b', 'c']);
+
+		rendered.length = 0;
+		await poke(0, { select: 2 });
+		expect(rendered).toContain(2);
+		expect(rendered).not.toContain(1);
+		expect(rendered).not.toContain(3);
+		expect(items()).toEqual([first, second, third]);
+		expect(items().map((item) => item.props.selected)).toEqual([false, true, false]);
+
+		// A listener announced before a retained commit must still dispatch after
+		// that commit advances the acknowledged root version.
+		rendered.length = 0;
+		await poke(2, { select: 3 });
+		expect(rendered).toContain(2);
+		expect(rendered).toContain(3);
+		expect(rendered).not.toContain(1);
+		expect(items().map((item) => item.props.selected)).toEqual([false, false, true]);
+
+		rendered.length = 0;
+		await poke(0, { relabel: 1 });
+		expect(rendered).toContain(1);
+		expect(rendered).not.toContain(2);
+		expect(rendered).not.toContain(3);
+		expect(items()[0]).toBe(first);
+		expect(items().map((item) => item.props.label)).toEqual(['a!', 'b', 'c']);
+		expect(effects).toEqual(['mount:1', 'mount:2', 'mount:3']);
+
+		await root.unmountAsync();
+		expect(effects.slice(3).toSorted()).toEqual(['cleanup:1', 'cleanup:2', 'cleanup:3']);
+	});
+
+	it('invalidates retained children when their consumed context changes', async () => {
+		const { root, Scene, rendered, items, poke } = createScene();
+		await root.renderAsync(Scene, undefined);
+		await root.flushTransport();
+		expect(items().map((item) => item.props.theme)).toEqual(['plain', 'plain', 'plain']);
+
+		rendered.length = 0;
+		await poke(0, { theme: 'dark' });
+		expect(rendered).toEqual(expect.arrayContaining([1, 2, 3]));
+		expect(items().map((item) => item.props.theme)).toEqual(['dark', 'dark', 'dark']);
+
+		rendered.length = 0;
+		await poke(0, { select: 2 });
+		expect(rendered).toContain(2);
+		expect(rendered).not.toContain(1);
+		expect(rendered).not.toContain(3);
+		expect(items().map((item) => item.props.theme)).toEqual(['dark', 'dark', 'dark']);
+		await root.unmountAsync();
+	});
+
+	it('reorders retained keyed children without changing their hosts, effects, or listeners', async () => {
+		const { root, Scene, rendered, effects, items, poke } = createScene();
+		await root.renderAsync(Scene, undefined);
+		await root.flushTransport();
+		const [first, second, third] = [...items()];
+
+		rendered.length = 0;
+		await poke(0, { rotate: true });
+		expect(rendered).not.toContain(1);
+		expect(rendered).not.toContain(2);
+		expect(rendered).not.toContain(3);
+		expect(items()).toEqual([third, first, second]);
+		expect(items().map((item) => item.props.label)).toEqual(['c', 'a', 'b']);
+		expect(effects).toEqual(['mount:1', 'mount:2', 'mount:3']);
+
+		rendered.length = 0;
+		await poke(1, { select: 2 });
+		expect(rendered).toContain(2);
+		expect(rendered).not.toContain(1);
+		expect(rendered).not.toContain(3);
+		expect(items().map((item) => item.props.selected)).toEqual([false, false, true]);
 		await root.unmountAsync();
 	});
 });

@@ -1103,8 +1103,8 @@ interface RenderAttempt {
 	bridgeContextReads: Map<UniversalContext<any>, unknown> | null;
 	// Whether this attempt may reuse committed component subtrees whose inputs
 	// are provably unchanged instead of re-rendering them. Only plain urgent
-	// local-driver attempts qualify; replay, transition, bridge, and transport
-	// renders need every owner re-executed for their own bookkeeping.
+	// attempts qualify; replay, transition, and bridge renders need every owner
+	// re-executed for their own bookkeeping.
 	retainEligible: boolean;
 	retainedCount: number;
 	// The dirty epoch this attempt consumed. An owner stamped with it contains
@@ -8513,13 +8513,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			transitionBatches,
 			transitionRender,
 			bridgeContextReads: null,
-			// Replay, transition, bridge, and transport attempts re-execute every
-			// owner for their own bookkeeping (warm replays, lane rebasing, bridge
-			// context read tracking, remote commit protocols); only a plain urgent
-			// local attempt may adopt committed subtrees without re-rendering them.
+			// Replay, transition, and bridge attempts re-execute every owner for
+			// their own bookkeeping. An ordinary transported full-root commit can
+			// adopt unchanged subtrees: its acknowledgement still covers the whole
+			// tree, and committed hosts and listeners remain published.
 			retainEligible:
 				allowRetain &&
-				this.transport === null &&
 				this.bridge === null &&
 				!this.attemptFullRootScheduled &&
 				replayEntries.length === 0 &&
