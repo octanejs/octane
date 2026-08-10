@@ -47,6 +47,7 @@ function pointerInit(pointerId: number, overrides: PointerEventInit = {}): Point
 }
 
 describe('differential: @octanejs/aria/components Phase-4 vs real react-aria-components', () => {
+	// @parity-case differential:aria-rac-button
 	it('Button: hover + mid-press data attributes + press count, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ButtonSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -74,6 +75,7 @@ describe('differential: @octanejs/aria/components Phase-4 vs real react-aria-com
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-togglebutton-click-toggles-aria-pressed-data-selected
 	it('ToggleButton: click toggles aria-pressed + data-selected, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ToggleButtonSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -88,6 +90,7 @@ describe('differential: @octanejs/aria/components Phase-4 vs real react-aria-com
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-checkbox-click-toggles-data-selected-render-prop-classname
 	it('Checkbox: click toggles data-selected + render-prop className, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'CheckboxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -102,6 +105,7 @@ describe('differential: @octanejs/aria/components Phase-4 vs real react-aria-com
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-textfield-typing-through-native-input-path
 	it('TextField: typing through the native input path, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TextFieldSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -112,6 +116,7 @@ describe('differential: @octanejs/aria/components Phase-4 vs real react-aria-com
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-disclosure-trigger-press-expands-panel-data-expanded
 	it('Disclosure: trigger press expands the panel with data-expanded, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'DisclosureSpec', undefined, CACHE);
 		await d.step('mount', () => {});

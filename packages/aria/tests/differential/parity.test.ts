@@ -34,6 +34,7 @@ function pointerInit(pointerId: number, overrides: PointerEventInit = {}): Point
 }
 
 describe('differential: @octanejs/aria vs real react-aria on React', () => {
+	// @parity-case differential:aria-interactions-press
 	it('usePress: pointer press start → pressed state → press sequence, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'PressLog', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -52,6 +53,7 @@ describe('differential: @octanejs/aria vs real react-aria on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usehover-pointer-enter-leave-toggles-hover-state
 	it('useHover: pointer enter/leave toggles hover state, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'HoverBadge', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -78,6 +80,7 @@ describe('differential: @octanejs/aria vs real react-aria on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usefocuswithin-focus-inside-sets-focus-outside-clears
 	it('useFocusWithin: focus inside sets, focus outside clears, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'FocusWithinBox', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -104,6 +107,7 @@ describe('differential: @octanejs/aria vs real react-aria on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usekeyboard-stop-by-default-suppresses-parent-continuepropagation-lets
 	it('useKeyboard: stop-by-default suppresses the parent; continuePropagation lets it through', async () => {
 		const d = await mountDifferential(FIXTURE, 'KeyEcho', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -118,6 +122,7 @@ describe('differential: @octanejs/aria vs real react-aria on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usekeyboard-continuepropagation-latch-across-dispatches-one-wrapper-matches
 	it('useKeyboard: continuePropagation latch across dispatches of one wrapper matches React', async () => {
 		const d = await mountDifferential(FIXTURE, 'KeyLatch', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -136,6 +141,7 @@ describe('differential: @octanejs/aria vs real react-aria on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-useid-mergeprops-merged-ids-converge-consistent-references
 	it('useId + mergeProps: merged ids converge with consistent references', async () => {
 		const d = await mountDifferential(FIXTURE, 'MergedIdsLabel', undefined, CACHE);
 		await d.step('mount', () => {});

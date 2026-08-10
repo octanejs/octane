@@ -64,6 +64,7 @@ import {
 	verifyLaneEnvironment,
 	verifyManifestFiles,
 } from './harness-lib.mjs';
+import { runRequiredBindingLanes } from './check-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -419,6 +420,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// livestore keeps a dedicated verifier (different dispositions); others use the shared binding helper
 		// Livestore keeps a dedicated disposition set; other bindings share the
 		// generic port-test classifications verifier introduced for nuqs.
+		// Livestore keeps a dedicated classifier (different dispositions); other
+		// ports share binding-classifications-lib via the manifest loop.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
@@ -450,6 +453,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 				cwd: REPO,
 				stdio: 'inherit',
 			});
+			runRequiredBindingLanes({ relativeFile, harnessPath: HARNESS_PATH, repo: REPO });
 		}
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);

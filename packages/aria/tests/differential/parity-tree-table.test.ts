@@ -36,24 +36,28 @@ describe('differential: @octanejs/aria/components Tree + Table vs real react-ari
 	// shared-document focus limitation as Phase 1's focus fixtures; the probe showed
 	// React's side ends with real DOM focus parked on the previously-focused row).
 	// rac-tree.test.ts carries the interaction coverage with real focus.
+	// @parity-case differential:aria-tree-treegrid-structure-branch-expanded
 	it('Tree: treegrid structure with a branch expanded, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TreeSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-tree-fully-collapsed-structure
 	it('Tree: fully collapsed structure, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TreeCollapsedSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-tree-nested-expansion-checkbox-selection-state
 	it('Tree: nested expansion + checkbox selection state, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TreeExpandedSelectedSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-rac-table
 	it('Table: grid structure, sort cycling, row selection, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TableSpec', undefined, CACHE);
 		await d.step('mount', () => {});

@@ -13,12 +13,14 @@ const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-tabs.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/aria Phase-2 tabs vs real react-aria', () => {
+	// @parity-case differential:aria-default-selection-roles-aria-wiring
 	it('default selection + roles + aria wiring, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TabsSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-clicking-tab-moves-selection
 	it('clicking a tab moves selection, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TabsSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -33,12 +35,14 @@ describe('differential: @octanejs/aria Phase-2 tabs vs real react-aria', () => {
 const LISTBOX_FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-listbox.tsrx');
 
 describe('differential: @octanejs/aria Phase-2 listbox vs real react-aria', () => {
+	// @parity-case differential:aria-roles-labelling-mount
 	it('roles + labelling on mount, byte-identical', async () => {
 		const d = await mountDifferential(LISTBOX_FIXTURE, 'ListBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-listbox-selection
 	it('clicking an option selects it, byte-identical', async () => {
 		const d = await mountDifferential(LISTBOX_FIXTURE, 'ListBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
