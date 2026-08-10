@@ -1,6 +1,7 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0-M6 LANDED (2026-07-13; see each phase's note). Follow-up to the
+Status: M0-M7 LANDED (M0-M6 2026-07-13, M7 2026-08-09; see each phase's
+note). Follow-up to the
 website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
@@ -86,27 +87,28 @@ descriptors — the cross-module signaling channel exists.
 
 ### M0 — Measurement first (same doctrine as the size plan)
 
-- **`comments_1k` op in the js-framework harness**: after the `run` op (1,000
-  rows), count comment nodes in-page. Deterministic per framework → works
-  with `--compare` AND cross-framework ratio guards (solid/ripple also use
-  marker comments — honest comparison). Record baselines.
-- **Deterministic DOM-weight benchmarks**: measure comment-node weight in the
-  js-framework harness and ratio system. Keep performance thresholds out of
-  correctness suites so implementation-preserving marker changes do not
-  require browser-test churn.
+The historical js-framework DOM census was later retired; structural coverage
+continues in TodoMVC, chat-stream, and portal-swarm.
+
+- **Historical `comments_1k` op in the js-framework harness**: after the `run`
+  op (1,000 rows), counted comment nodes in-page and recorded baselines.
+- **Historical js-framework DOM-weight benchmarks**: measured comment-node
+  weight in its harness and ratio system. Keep performance thresholds out of
+  correctness suites so implementation-preserving marker changes do not require
+  browser-test churn.
 - **Behavioral hydration coverage**: render representative wrapper, keyed,
   Suspense, and de-opt fixtures through SSR and hydration; assert DOM adoption,
   state, identity, events, and mismatch diagnostics rather than marker spelling.
 
 **M0 LANDED 2026-07-09.** Three layers, all green in both compile modes:
 
-- `comments_1k` op in the js-framework harness (payload now carries every
-  collected op). Recorded: **octane-tsrx 3 · octane-jsx 3 · react 0 ·
-  ripple 0 · solid 0** — the 1,000-row grid is already almost marker-free
-  (forBlock singleRoot at work), so this op is a singleRoot-regression
-  TRIPWIRE (+1 comment fails the absolute compare), not a ratio (references
-  are 0 — no ratio guard possible). Wrapper/de-opt weight is tracked by the
-  broader DOM-weight benchmarks and validated behaviorally during hydration.
+- Historical `comments_1k` op in the js-framework harness. Recorded:
+  **octane-tsrx 3 · octane-jsx 3 · react 0 · ripple 0 · solid 0** — the
+  1,000-row grid was already almost marker-free (forBlock singleRoot at work),
+  so this op was a singleRoot-regression TRIPWIRE (+1 comment failed the
+  absolute compare), not a ratio (references were 0 — no ratio guard was
+  possible). Wrapper/de-opt weight remains tracked by the broader DOM-weight
+  benchmarks and validated behaviorally during hydration.
 - Historical per-route measurements at landing: `/` 2,123 · `/docs` 379 ·
   `/benchmarks` **17,381** (the 12 recharts cards; the M2 number) ·
   `/playground` 185. Current DOM-weight regression coverage lives in the
@@ -337,9 +339,10 @@ equivalent to a range marker.
 The same js-framework fixture authored through the generic return-JSX paths
 lost its cliff: the naive TSRX variant went from 2,003 comments to **2**, and
 the naive JSX variant from 4,003 to **2**, matching the tuned fixture's DOM
-shape. Solid and Svelte are still reported separately by the harness because
-their compiled output deliberately uses extra text/comment nodes in several
-fixtures; element and meaningful-text equality is the semantic comparison.
+shape. Solid and Svelte were reported separately in this historical census
+because their compiled output deliberately uses extra text/comment nodes in
+several fixtures; element and meaningful-text equality was the semantic
+comparison.
 
 The attribution and changes are deliberately narrow:
 
@@ -369,14 +372,15 @@ The attribution and changes are deliberately narrow:
   `<Activity>` ranges, multi-root keyed items, order-bearing value-hole
   anchors, and adjacent-text SSR separators also remain load-bearing.
 
-`benchmarks/lib/dom-nodes.mjs` is the regression surface: js-framework,
-TodoMVC, chat-stream, and portal-swarm now emit deterministic `nodes_*`,
+`benchmarks/lib/dom-nodes.mjs` remains the regression surface for TodoMVC,
+chat-stream, and portal-swarm. TodoMVC and chat-stream emit deterministic `nodes_*`,
 `elements_*`, `text_*`, `comments_*`, `empty_text_*`, and
 `whitespace_text_*` operations plus comment-payload/parent histograms in
-`meta.dom`. Ratio guards cap total nodes while requiring Octane's visible
-element/text counts to equal React's. Portal-swarm records both the fixture
-root and whole-body census so target-side portal ranges cannot disappear from
-the accounting.
+`meta.dom`; the js-framework census and its DOM-weight ratio guards were
+retired. Remaining ratio guards cap total nodes while requiring Octane's
+visible element/text counts to equal React's. Portal-swarm records both the
+fixture root and whole-body census so target-side portal ranges cannot
+disappear from the accounting.
 
 The implementation plan was ordered by invariant risk: instrument first;
 reuse already-owned anchors/ranges; extend the existing single-root proof;
@@ -483,11 +487,51 @@ in the framework chunk (the app chunk shrinks by 2 B); the JSX fixture grows
 gzip. This is the counted-marker parser, ownership proof, and no-op guard cost;
 normal app codegen is effectively unchanged.
 
+### M7 — Transitive single-root proof (static multi-hole component children)
+
+**M7 LANDED 2026-08-09 — compiler-only.** The definition-site single-root
+proof (`info.singleRoot`) now resolves `@if`/`@else` bodies through a fixed
+point: a void `@{}` body whose sole root is an `@if` tree where every
+reachable arm renders exactly one plain host OR one qualifying same-module
+component call (bare identifier tag, no key/spread/children, callee proven
+single-root — `collectSingleRootIfDeps`) is stamped single-root, in the same
+pass that already made autoMemo purity transitive. That closes the static
+multi-hole host case for proven callees:
+`<div class="n"><Node/><Node/></div>` (the spa-navigation bench's recursive
+`Node`, whose `@else` arm is a component) previously minted a `comp`/`/comp`
+pair per child slot because the callee failed the host-only proof; both slots
+now take the existing anchorless all-component-children emission +
+componentSlot singleRoot regime. Zero runtime changes: promotion,
+`replaceSharedBlockBoundary` repointing, the first-flip promotion to one
+durable pair, transitions, and Suspense probing all predate this. SSR
+emission and hydration adoption are untouched (client-mount elision only, the
+M1/M2/M4 doctrine); the module-tail `$$singleRoot` stamps carry the widened
+proof to cross-module `2`-sentinel call sites for free.
+
+- Landing measurement (spa-navigation, 1024-leaf route census):
+  octane-tsrx **4,093 → 1** comment (react 0 / solid 2,046), elements/text
+  exactly equal (2,052/1,025) — the census is now emitted as deterministic
+  `*_deep` ops with five ratio guards. Same-run medians: nav_mount
+  1.80 → **1.00 ms** (0.67x solid, 0.91x react), nav_deep 3.10 → **1.70**
+  (0.80x solid), nav_teardown 1.60 → **0.80** (fewer nodes to detach).
+  Work-gate call counts unchanged by construction.
+- Declines stay conservative: fragment/dynamic/member/keyed/spread/children
+  arms, missing `@else` (empty-capable), local shadows, imported or unproven
+  callees, and unresolved cycles all keep the marker pair.
+- Found while testing (pre-existing, dev-only, NOT this change): a hookless
+  lite child that mounts EMPTY inside an anchorless all-component host loses
+  its position when it later renders content (lands after its siblings) —
+  lite has no range and the inner `@if`'s insertion anchor is null. Tracked
+  as a spawned fix task; prod is unaffected (autoMemo forces the slot path).
+
 **Still open (small or order-constrained — diminishing returns):**
 
 1. Multi-hole hosts: the remaining ~684 empty anchors on `/` are
    order-bearing (`<g>{a}{b}</g>` — siblings need stable positions); eliding
-   them needs per-hole neighbor bookkeeping. Biggest remaining bucket.
+   them needs per-hole neighbor bookkeeping. Biggest remaining bucket for
+   VALUE holes; static component children are M7-covered when the callee
+   proof holds. `@switch`-root bodies and optimistic self-recursive arms are
+   natural M7 extensions.
 2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
 3. Sole-root `@switch` construct inherit + children-render-fn /
    value-position sole roots (M3 leftovers).
@@ -498,7 +542,7 @@ normal app codegen is effectively unchanged.
 
 ### Ordering & measured effect
 
-M0 → M1 → M2 → M3 → M4 → M5 → M6. M1-M5 remove ranges at the
+M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7. M1-M5 and M7 remove ranges at the
 compiler/runtime source for client-created content; M6 complements them by
 compacting redundant ranges that must remain explicit in the SSR wire format.
 The original home-page report's 40-opening wrapper prefix fell to 19 before
@@ -518,7 +562,8 @@ coextensive wrapper stack.
 - Perf: same-session A/B on js-framework/dbmon/effectful-list. Expected
   neutral-to-positive (fewer DOM nodes, shorter walks); the singleRoot item
   precedent showed no cost. Memory is where wins may show (dbmon).
-- Ratchet: `comments_1k` and the deterministic DOM-weight ratio guards tighten per phase.
+- Ratchet: deterministic DOM-weight ratio guards tighten per phase in the
+  remaining structural benchmark suites.
 
 ## 6. Open questions
 

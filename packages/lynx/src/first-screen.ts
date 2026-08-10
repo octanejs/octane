@@ -4,7 +4,12 @@ import type { LynxFirstScreenRenderResult } from './main-renderer.js';
 
 /** Main-thread root contract installed by the generated receiver entry. */
 export interface LynxFirstScreenHost {
-	/** Returns null when the receiver defers rendering to the engine lifecycle. */
+	/**
+	 * Returns null when no synchronous first screen was painted: either the
+	 * receiver deferred rendering to the engine lifecycle, or it declined a
+	 * rendered screen the background cannot adopt. Both mean the background owns
+	 * the page; neither reports a fault.
+	 */
 	render<Props>(
 		component: UniversalComponent<Props>,
 		props: Props,
@@ -41,6 +46,7 @@ function requireHost(): LynxFirstScreenHost {
 export interface LynxFirstScreenRoot {
 	readonly renderer: 'lynx';
 	readonly ready: Promise<void>;
+	/** Null when no synchronous first screen was painted; see {@link LynxFirstScreenHost.render}. */
 	render<Props>(component: LynxComponent<Props>, props?: Props): LynxFirstScreenRenderResult | null;
 	flushTransport(): Promise<void>;
 	unmount(): Promise<void>;

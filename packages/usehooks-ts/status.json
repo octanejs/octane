@@ -42,7 +42,13 @@
     "Public setter types are structurally equivalent to React Dispatch/SetStateAction without importing React types."
   ],
   "ssr": "Supported for the listed cohort. Effects and timers do not run during server rendering; hydration activates lifecycle and timing work without requiring browser reads during render.",
-  "verified": "2026-07-29",
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/juliencrn/usehooks-ts",
+    "license": "MIT",
+    "commit": "61949134144d3690fe9f521260a16c779a6d3797",
+    "verification": "recorded-unverified"
+  },
   "notes": [
     "Audited against the exact usehooks-ts 3.1.1 npm tarball (SHA-1 0bb7f38f36f8219ee4509cc5e944ae610fb97656).",
     "Storage/media are deferred: initializeWithValue:false exists upstream, but this first cohort does not claim deterministic Octane SSR/hydration parity without dedicated host-event evidence.",

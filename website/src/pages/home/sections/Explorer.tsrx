@@ -16,7 +16,7 @@ export function Explorer() @{
 			<p class="explorer-sub">
 				Choose a suite and a few frameworks for the bar chart, or scan the full grid. Each cell
 				shows the geometric mean of that framework’s per-operation scores relative to Octane. Lower
-				is better.
+				is better. Every primary React comparison uses the official React Compiler.
 			</p>
 		</div>
 		<BenchmarkExplorer card={HOME_SUMMARY} />

@@ -10,6 +10,7 @@ import Cli from './docs/cli.mdx';
 import CoreApis from './docs/core-apis.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
+import Lynx from './docs/lynx.mdx';
 import ReactCompat from './docs/react-compat.mdx';
 import PublishingLibraries from './docs/publishing-libraries.mdx';
 import Bindings from './docs/bindings.mdx';
@@ -30,6 +31,7 @@ const components: Record<string, DocEntry['component']> = {
 	'core-apis': CoreApis,
 	'tsrx-vs-tsx': TsrxVsTsx,
 	'differences-from-react': DifferencesFromReact,
+	lynx: Lynx,
 	'react-compat': ReactCompat,
 	profiling: Profiling,
 	'publishing-libraries': PublishingLibraries,

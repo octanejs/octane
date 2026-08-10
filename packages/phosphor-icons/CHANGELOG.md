@@ -1,5 +1,68 @@
 # @octanejs/phosphor-icons
 
+## 0.0.13
+
+### Patch Changes
+
+- Updated dependencies [1fe297e]
+- Updated dependencies [db0d495]
+- Updated dependencies [677182d]
+- Updated dependencies [3fb96df]
+- Updated dependencies [677182d]
+- Updated dependencies [4653a2e]
+- Updated dependencies [7282555]
+- Updated dependencies [3d09348]
+- Updated dependencies [8cb40df]
+- Updated dependencies [677182d]
+- Updated dependencies [fc1c146]
+- Updated dependencies [a84fcaa]
+- Updated dependencies [217a0b5]
+  - octane@0.1.33
+
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [d453832]
+- Updated dependencies [3152f0b]
+- Updated dependencies [1c44117]
+- Updated dependencies [cbd55ca]
+- Updated dependencies [cdb501c]
+  - octane@0.1.32
+
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [80a9c7e]
+- Updated dependencies [62d7f13]
+- Updated dependencies [16df26e]
+  - octane@0.1.31
+
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [10011bb]
+- Updated dependencies [081fa1e]
+- Updated dependencies [60004f0]
+- Updated dependencies [27758f5]
+- Updated dependencies [136b0e3]
+- Updated dependencies [d69ab86]
+- Updated dependencies [1a27e19]
+- Updated dependencies [7f6a134]
+- Updated dependencies [ce68bb8]
+- Updated dependencies [fbe0d39]
+- Updated dependencies [9fa0b47]
+  - octane@0.1.30
+
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [8fb7990]
+  - octane@0.1.29
+
 ## 0.0.8
 
 ### Patch Changes

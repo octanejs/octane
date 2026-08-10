@@ -5,7 +5,13 @@
     "Chart events coordinate through octane's native delegated events rather than React's synthetic layer."
   ],
   "ssr": "Untested; text measurement (`getStringSize`) returns 0×0 under SSR.",
-  "verified": "2026-07-29",
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/recharts/recharts",
+    "license": "MIT",
+    "commit": "b3451050c027a23957ffa50a2665c9119df21e47",
+    "verification": "recorded-unverified"
+  },
   "notes": [
     "Known gaps: `Brush` and `Treemap`; SSR text measurement still reports zero dimensions."
   ],

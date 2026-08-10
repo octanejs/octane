@@ -12,10 +12,12 @@
     "EIP-1193 event validation, duplicate coalescing, and connector-generation invalidation are delegated unchanged to @wagmi/core 3.6.4. This binding does not add a second provider-event layer or claim independent normalization behavior."
   ],
   "ssr": "WagmiProvider supports ssr:true and initialState through @wagmi/core hydrate. parseHydratedState accepts only a versioned, 16 KiB-bounded public-state hint and rejects malformed or privileged material; a hydrated connection is never authority for signing or submission.",
-  "verified": "2026-07-29",
+  "verified": "2026-08-02",
   "provenance": {
     "source": "https://github.com/wevm/wagmi",
-    "license": "MIT"
+    "license": "MIT",
+    "commit": "4c461abcbf1b7a0f7adbef3d80e801c2723aa274",
+    "verification": "recorded-unverified"
   },
   "supportedExports": [
     "createConfig",

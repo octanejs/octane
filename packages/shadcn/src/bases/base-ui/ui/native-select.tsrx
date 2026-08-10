@@ -4,7 +4,7 @@
 // from upstream's `bases/base-ui/ui/native-select.tsx`, which was not available at port time.
 // Diff the class strings against the upstream source before treating this as ported.
 //
-// OCTANE DIVERGENCE: upstream's IconPlaceholder resolves to lucide via @octanejs/lucide.
+// Octane divergence (shadcn-icon-resolution): upstream's IconPlaceholder resolves to lucide via @octanejs/lucide.
 // Events are native: a `<select>`'s `change` keeps its platform commit meaning, so consumer
 // `onChange` handlers are passed through unrenamed.
 import { ChevronDownIcon } from '@octanejs/lucide';

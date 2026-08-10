@@ -44,6 +44,29 @@ describe('benchmark card bars', () => {
 	// js-framework: every framework measured on every operation.
 	const card = FRAMEWORK_CARDS[0];
 
+	it('keeps DOM-node census operations out of js-framework benchmark charts', async () => {
+		const nodeOperations = [
+			'nodes_1k',
+			'elements_1k',
+			'text_1k',
+			'comments_1k',
+			'empty_text_1k',
+			'whitespace_text_1k',
+		];
+		const deoptCard = OCTANE_CARDS.find((candidate) => candidate.id === 'js-framework-deopt')!;
+
+		for (const benchmark of [card, deoptCard]) {
+			const { container, unmount } = await mountCard(benchmark);
+			const operations = Array.from(container.querySelectorAll('.bench-op'), (button) =>
+				button.textContent!.trim(),
+			);
+
+			expect(operations).toContain('run');
+			for (const operation of nodeOperations) expect(operations).not.toContain(operation);
+			unmount();
+		}
+	});
+
 	it('opens on the overall summary: one ranked geomean bar per framework', async () => {
 		const { container, barLabels, barValues, opButton } = await mountCard(card);
 
@@ -58,6 +81,39 @@ describe('benchmark card bars', () => {
 		const values = barValues();
 		expect(values.length).toBeGreaterThan(1);
 		expect(values).toEqual([...values].sort((a, b) => a - b));
+	});
+
+	it('keeps Octane-only diagnostics out of the cross-framework operation picker', async () => {
+		const { container } = await mountCard(card);
+		const operations = Array.from(container.querySelectorAll('.bench-op'), (button) =>
+			button.textContent?.trim(),
+		);
+
+		expect(operations).toContain('run');
+		expect(operations).toContain('clear');
+		for (const diagnostic of ['live_inserts_1k', 'fragment_commits_1k', 'production_calls_1k']) {
+			expect(operations).not.toContain(diagnostic);
+		}
+	});
+
+	it('identifies compiled React in both the chart and its accessible data table', async () => {
+		const { container, barLabels } = await mountCard(card);
+
+		expect(barLabels()).toContain('React + Compiler');
+		expect(
+			Array.from(container.querySelectorAll('thead th'), (header) => header.textContent?.trim()),
+		).toContain('React 19 + Compiler');
+	});
+
+	it('distinguishes compiled React from the memo-wall uncompiled control', async () => {
+		const memoWall = FRAMEWORK_CARDS.find((candidate) => candidate.id === 'memo-wall')!;
+		const { container, barLabels } = await mountCard(memoWall);
+
+		expect(barLabels()).toContain('React + Compiler');
+		expect(barLabels()).toContain('React (uncompiled)');
+		expect(
+			Array.from(container.querySelectorAll('thead th'), (header) => header.textContent?.trim()),
+		).toContain('React 19 (uncompiled control)');
 	});
 
 	it('re-charts the bars when an operation is picked', async () => {

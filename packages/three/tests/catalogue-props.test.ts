@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { applyProps, dispose, extend } from '@octanejs/three';
+import { createThreeTestRenderer } from '@octanejs/three/testing';
+import { defineUniversalComponent, universalComponent, universalProps } from 'octane/universal';
 import {
 	createThreeObject,
+	registerThreeIntrinsic,
 	registerThreeNamespace,
 	validateThreeInstance,
 } from '../src/core/catalogue.js';
@@ -10,6 +13,30 @@ import { attachString, detachAttachment, getEffectiveAttachment } from '../src/c
 import { applyThreeProps } from '../src/core/props.js';
 
 describe('@octanejs/three catalogue', () => {
+	it('registers built-in constructors selectively without replacing explicit extensions', () => {
+		class SelectiveMesh extends THREE.Mesh {}
+		class OverriddenMesh extends THREE.Mesh {}
+
+		registerThreeIntrinsic('SelectiveMesh', SelectiveMesh);
+		registerThreeIntrinsic('SelectiveMesh', THREE.Mesh);
+		expect(createThreeObject('selectiveMesh', {}).object).toBeInstanceOf(SelectiveMesh);
+
+		extend({ SelectiveMesh: OverriddenMesh });
+		registerThreeIntrinsic('SelectiveMesh', SelectiveMesh);
+		expect(createThreeObject('selectiveMesh', {}).object).toBeInstanceOf(OverriddenMesh);
+	});
+
+	it('retains explicit built-in overrides when the full Canvas catalogue is registered later', () => {
+		class OverriddenMesh extends THREE.Mesh {}
+		extend({ Mesh: OverriddenMesh });
+		try {
+			registerThreeNamespace();
+			expect(createThreeObject('mesh', {}).object).toBeInstanceOf(OverriddenMesh);
+		} finally {
+			extend({ Mesh: THREE.Mesh });
+		}
+	});
+
 	it('validates built-ins and preserves primitive identity and ownership', () => {
 		registerThreeNamespace();
 
@@ -54,6 +81,62 @@ describe('@octanejs/three catalogue', () => {
 		const Component = extend(ComponentObject);
 		expect(typeof Component).toBe('function');
 		expect(extend(ComponentObject)).toBe(Component);
+	});
+
+	it('preserves children, references, event handlers, and constructor identity on extended components', async () => {
+		class ComponentMesh extends THREE.Mesh {
+			constructor(readonly label: string) {
+				super();
+				this.name = label;
+			}
+		}
+		const Component = extend(ComponentMesh);
+		const refs: Array<ComponentMesh | null> = [];
+		const pointerEvents: string[] = [];
+		const ref = (value: ComponentMesh | null) => refs.push(value);
+		const Scene = defineUniversalComponent('three', (props: { generation: number }) =>
+			universalComponent(
+				'three',
+				Component,
+				universalProps([
+					['set', 'args', [`parent:${props.generation}`]],
+					['set', 'ref', ref],
+					['set', 'onPointerDown', () => pointerEvents.push(`parent:${props.generation}`)],
+					[
+						'set',
+						'children',
+						universalComponent(
+							'three',
+							Component,
+							universalProps([['set', 'args', ['retained-child']]]),
+						),
+					],
+				]),
+			),
+		);
+		const root = await createThreeTestRenderer(Scene, { generation: 0 });
+
+		try {
+			const initial = root.scene.children[0] as ComponentMesh;
+			const child = initial.children[0] as ComponentMesh;
+			expect(initial).toBeInstanceOf(ComponentMesh);
+			expect(child).toBeInstanceOf(ComponentMesh);
+			expect(child.name).toBe('retained-child');
+			expect(refs).toEqual([initial]);
+			await root.fireEvent(initial, 'pointerDown');
+
+			root.update(Scene, { generation: 1 });
+			const replacement = root.scene.children[0] as ComponentMesh;
+			expect(replacement).not.toBe(initial);
+			expect(replacement.name).toBe('parent:1');
+			expect(replacement.children).toEqual([child]);
+			expect(refs).toEqual([initial, null, replacement]);
+			await root.fireEvent(replacement, 'pointerDown');
+			expect(pointerEvents).toEqual(['parent:0', 'parent:1']);
+			expect(extend(ComponentMesh)).toBe(Component);
+		} finally {
+			root.unmount();
+		}
 	});
 });
 

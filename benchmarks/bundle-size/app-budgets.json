@@ -1,0 +1,70 @@
+{
+  "rows": {
+    "app": {
+      "raw": 7072,
+      "gzip": 2432,
+      "brotli": 2144
+    },
+    "framework": {
+      "raw": 62048,
+      "gzip": 20960,
+      "brotli": 18912
+    },
+    "total": {
+      "raw": 69088,
+      "gzip": 23328,
+      "brotli": 20992
+    }
+  },
+  "todo": {
+    "app": {
+      "raw": 4352,
+      "gzip": 2112,
+      "brotli": 1824
+    },
+    "framework": {
+      "raw": 65952,
+      "gzip": 22144,
+      "brotli": 19872
+    },
+    "total": {
+      "raw": 70240,
+      "gzip": 24192,
+      "brotli": 21664
+    }
+  },
+  "chat": {
+    "app": {
+      "raw": 5888,
+      "gzip": 2752,
+      "brotli": 2432
+    },
+    "framework": {
+      "raw": 65792,
+      "gzip": 22112,
+      "brotli": 19872
+    },
+    "total": {
+      "raw": 71616,
+      "gzip": 24800,
+      "brotli": 22240
+    }
+  },
+  "weather": {
+    "app": {
+      "raw": 22624,
+      "gzip": 7904,
+      "brotli": 6752
+    },
+    "framework": {
+      "raw": 83488,
+      "gzip": 27296,
+      "brotli": 24384
+    },
+    "total": {
+      "raw": 106080,
+      "gzip": 35136,
+      "brotli": 31072
+    }
+  }
+}

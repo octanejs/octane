@@ -26,6 +26,7 @@ jobs:
     # `pull_request_target` is what gives a fork pull request a writable token.
     # Nothing here checks out or executes the pull request's code.
     permissions:
+      contents: write
       issues: read
       pull-requests: write
 
@@ -33,11 +34,10 @@ jobs:
       - name: Convert an agent-authored pull request back to draft
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          # Draft state is not repository content, so the job stays off
-          # `contents`. GITHUB_TOKEN has been reported to answer draft mutations
-          # with "Resource not accessible by integration" (actions/toolkit#1165)
-          # and GraphQL publishes no permission table to check that against, so
-          # an app or PAT secret takes over wherever the repository defines one.
+          # GitHub's GraphQL permission mapping requires `contents: write`
+          # alongside `pull-requests: write` for this mutation, even though no
+          # repository content changes. An app or PAT can still take over where
+          # the repository defines one.
           github-token: ${{ secrets.DRAFT_PR_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;

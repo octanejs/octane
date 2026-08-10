@@ -4,7 +4,7 @@
 // from upstream's `bases/base-ui/ui/spinner.tsx`, which was not available at port time.
 // Diff the class strings against the upstream source before treating this as ported.
 //
-// OCTANE DIVERGENCE: upstream's IconPlaceholder (the CLI-resolved iconLibrary axis) is
+// Octane divergence (shadcn-icon-resolution): upstream's IconPlaceholder (the CLI-resolved iconLibrary axis) is
 // resolved at port time to the default library, lucide, via @octanejs/lucide. Other icon
 // libraries are a registry-emit concern.
 //

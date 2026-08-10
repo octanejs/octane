@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "compiler": "tsrx-tsc",
+  "project": "packages/tanstack-hotkeys/typetests/tsconfig.json",
+  "tests": [
+    {
+      "id": "types:adapted-octane",
+      "name": "adapted Octane type suite"
+    }
+  ]
+}

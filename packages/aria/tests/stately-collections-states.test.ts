@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { compile } from 'octane/compiler';
 import { act, mount } from '../../octane/tests/_helpers';
 import {
 	ListHarness,
@@ -11,6 +14,7 @@ import {
 	SelectEmptyHarness,
 	ComboBoxHarness,
 	NumberFieldHarness,
+	ControlledNumberFieldHarness,
 	SliderHarness,
 } from './_fixtures/stately-collections-states.tsx';
 
@@ -246,6 +250,160 @@ describe('@octanejs/aria/stately — useComboBoxState', () => {
 });
 
 describe('@octanejs/aria/stately — useNumberFieldState', () => {
+	it('compiles the published number-field hook with Strong render-purity checks enabled', () => {
+		const filename = resolve(__dirname, '../src/stately/numberfield/useNumberFieldState.ts');
+
+		expect(() => compile(readFileSync(filename, 'utf8'), filename, { strong: true })).not.toThrow();
+	});
+
+	it('preserves unfinished controlled edits when equivalent formatting options are recreated', async () => {
+		const props = {
+			value: 1234.5,
+			locale: 'en-US',
+			formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 3 },
+			draft: '9,876.500',
+		};
+		const r = mount(ControlledNumberFieldHarness, props);
+		expect(text(r, 'input')).toBe('in:1,234.50');
+
+		await act(() => click(r, 'edit'));
+		expect(text(r, 'input')).toBe('in:9,876.500');
+		expect(text(r, 'number')).toBe('n:9876.5');
+
+		r.update(ControlledNumberFieldHarness, {
+			...props,
+			formatOptions: { ...props.formatOptions },
+		});
+		expect(text(r, 'input')).toBe('in:9,876.500');
+		expect(text(r, 'number')).toBe('n:9876.5');
+		r.unmount();
+	});
+
+	it.each([
+		[{ roundingIncrement: 5 }, '10', '10'],
+		[{ roundingIncrement: 5, minimumFractionDigits: 2 }, '12.25', '12.25'],
+		[{ roundingIncrement: 5, maximumFractionDigits: 2 }, '12.25', '12.25'],
+		[{ roundingIncrement: 25, minimumFractionDigits: 2 }, '12.25', '12.25'],
+		[{ style: 'currency', currency: 'USD', roundingIncrement: 5 }, '$10', '10'],
+		[{ style: 'currency', currency: 'JPY', roundingIncrement: 5 }, '¥10', '10'],
+		[{ style: 'currency', currency: 'BHD', roundingIncrement: 5 }, 'BHD\u00a010', '10'],
+		[{ style: 'currency', currency: 'KWD', roundingIncrement: 5 }, 'KWD\u00a010', '10'],
+		[
+			{ style: 'currency', currency: 'USD', roundingIncrement: 5, minimumFractionDigits: 2 },
+			'$12.25',
+			'12.25',
+		],
+	] as const)(
+		'formats controlled values when rounding increments are added without paired fraction options: %j',
+		(formatOptions, formattedValue, parsedValue) => {
+			const props = { value: 12.27, locale: 'en-US', draft: '9.875' };
+			const r = mount(ControlledNumberFieldHarness, props);
+
+			r.update(ControlledNumberFieldHarness, { ...props, formatOptions });
+
+			expect(text(r, 'input')).toBe('in:' + formattedValue);
+			expect(text(r, 'number')).toBe('n:' + parsedValue);
+			r.unmount();
+		},
+	);
+
+	it('preserves unfinished drafts when equivalent rounding options are recreated before normalization', async () => {
+		const props = {
+			value: 15,
+			locale: 'en-US',
+			formatOptions: {
+				roundingIncrement: 5,
+				minimumFractionDigits: 0,
+				maximumFractionDigits: 0,
+			},
+			draft: '17',
+		};
+		const r = mount(ControlledNumberFieldHarness, props);
+
+		await act(() => click(r, 'edit'));
+		expect(text(r, 'input')).toBe('in:17');
+
+		r.update(ControlledNumberFieldHarness, {
+			...props,
+			formatOptions: { roundingIncrement: 5, maximumFractionDigits: 0 },
+		});
+
+		expect(text(r, 'input')).toBe('in:17');
+		expect(text(r, 'number')).toBe('n:17');
+		r.unmount();
+	});
+
+	it('reconciles a changed controlled number with the displayed and parsed values', async () => {
+		const props = { value: 1234.5, locale: 'en-US', draft: '9,876.5' };
+		const r = mount(ControlledNumberFieldHarness, props);
+
+		await act(() => click(r, 'edit'));
+		expect(text(r, 'input')).toBe('in:9,876.5');
+
+		r.update(ControlledNumberFieldHarness, { ...props, value: 2500.25 });
+		expect(text(r, 'input')).toBe('in:2,500.25');
+		expect(text(r, 'number')).toBe('n:2500.25');
+		r.unmount();
+	});
+
+	it('reformats and reparses controlled values when locale or formatting options change', async () => {
+		const props = { value: 1234.5, locale: 'en-US', draft: '9,876.5' };
+		const r = mount(ControlledNumberFieldHarness, props);
+
+		await act(() => click(r, 'edit'));
+		r.update(ControlledNumberFieldHarness, {
+			...props,
+			locale: 'de-DE',
+			draft: '9.876,5',
+		});
+		expect(text(r, 'input')).toBe('in:1.234,5');
+		expect(text(r, 'number')).toBe('n:1234.5');
+		expect(text(r, 'valid')).toBe('valid:true');
+
+		r.update(ControlledNumberFieldHarness, {
+			...props,
+			locale: 'de-DE',
+			draft: '9.876,5',
+			formatOptions: { minimumFractionDigits: 2 },
+		});
+		expect(text(r, 'input')).toBe('in:1.234,50');
+		expect(text(r, 'number')).toBe('n:1234.5');
+		r.unmount();
+	});
+
+	it('retains the numbering system selected by user-entered digits on a controlled update', async () => {
+		const props = { value: 1234.5, locale: 'ar-EG', draft: '9876.5' };
+		const r = mount(ControlledNumberFieldHarness, props);
+
+		await act(() => click(r, 'edit'));
+		expect(text(r, 'input')).toBe('in:9876.5');
+		expect(text(r, 'number')).toBe('n:9876.5');
+
+		r.update(ControlledNumberFieldHarness, { ...props, value: 2500.25 });
+		expect(text(r, 'input')).toBe('in:2,500.25');
+		expect(text(r, 'number')).toBe('n:2500.25');
+		r.unmount();
+	});
+
+	it('commits locale-formatted edits without replacing an unchanged controlled value', async () => {
+		const changes: number[] = [];
+		const r = mount(ControlledNumberFieldHarness, {
+			value: 1234.5,
+			locale: 'de-DE',
+			draft: '4.321,25',
+			onChange: (value: number) => changes.push(value),
+		});
+
+		await act(() => click(r, 'edit'));
+		expect(text(r, 'number')).toBe('n:4321.25');
+		await act(() => click(r, 'commit'));
+
+		expect(changes).toEqual([4321.25]);
+		expect(text(r, 'input')).toBe('in:1.234,5');
+		expect(text(r, 'number')).toBe('n:1234.5');
+		r.unmount();
+	});
+
 	it('increments, decrements, and clamps to min/max', async () => {
 		const r = mount(NumberFieldHarness);
 		expect(text(r, 'input')).toBe('in:5');

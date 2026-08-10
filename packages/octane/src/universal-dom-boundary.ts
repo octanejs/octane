@@ -1,5 +1,7 @@
 import {
+	flushSync,
 	readContextFromScope,
+	renderClientContextProvider,
 	useInsertionEffect as useDomInsertionEffect,
 	useLayoutEffect as useDomLayoutEffect,
 	useRendererThenable as useDomRendererThenable,
@@ -16,6 +18,7 @@ import {
 	type UniversalPreparedAttempt,
 	type UniversalRoot,
 } from './universal-core.js';
+import { registerClientRendererBridge } from './renderer-bridge.js';
 
 const UNIVERSAL_BOUNDARY = Symbol.for('octane.universal.boundary');
 
@@ -74,6 +77,11 @@ function assertRendererId(value: unknown): asserts value is string {
 	}
 }
 
+/** Coordinate real mixed-renderer owners without charging DOM-only roots. */
+export function registerUniversalHostBridge(): void {
+	registerClientRendererBridge(renderClientContextProvider, flushSync);
+}
+
 export function createUniversalHostBoundary(renderer: string): ((
 	props: HostBoundaryProps,
 	scope: Scope,
@@ -81,6 +89,7 @@ export function createUniversalHostBoundary(renderer: string): ((
 	readonly [UNIVERSAL_BOUNDARY]: UniversalBoundaryMetadata;
 } {
 	assertRendererId(renderer);
+	registerUniversalHostBridge();
 	const boundary = ((props: HostBoundaryProps, scope: Scope) => {
 		if (props.root.renderer !== renderer) {
 			throw new Error(

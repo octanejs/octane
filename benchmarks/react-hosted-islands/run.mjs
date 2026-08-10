@@ -30,6 +30,7 @@ process.env.NODE_ENV = 'production';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { reactCompiler } from '../react-compiler.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, 'dist');
@@ -47,7 +48,10 @@ async function buildEntry() {
 	await build({
 		root: __dirname,
 		logLevel: 'warn',
-		plugins: [octane({ hmr: false })],
+		plugins: [
+			octane({ hmr: false }),
+			reactCompiler({ include: /\/react-hosted-islands\/src\/entry\.ts(?:$|\?)/ }),
+		],
 		// A CLIENT-mode lib build (an SSR build would compile the .tsrx fixtures
 		// against octane/server): octane is bundled in from workspace source;
 		// react/react-dom stay external and resolve from this package's
@@ -58,7 +62,7 @@ async function buildEntry() {
 			emptyOutDir: true,
 			minify: false,
 			rollupOptions: {
-				external: ['react', 'react-dom', 'react-dom/client'],
+				external: ['react', 'react/compiler-runtime', 'react-dom', 'react-dom/client'],
 			},
 		},
 	});

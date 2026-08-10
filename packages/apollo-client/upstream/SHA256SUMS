@@ -1,0 +1,3 @@
+6d4568f2adac9fd90e85a2802a1e8ae25f707af9243cd5a8843402399b92b3c4  LICENSE
+3b8d94654d9dae4d6e4818f9f5e88cfcad326dcbaad183b6442fefad9fd510e5  src/react/context/__tests__/ApolloProvider.test.tsx
+1f551a680b6cc19b91ecc2fc01ad561ac5ffe3db5663f6a93d32e1f57bb749b8  src/react/hooks/__tests__/useApolloClient.test.tsx

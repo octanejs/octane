@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/rainbowkit",
-  "version": "0.0.8",
+  "version": "0.0.13",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -46,6 +46,7 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@rainbow-me/rainbowkit": "2.2.11",
     "@octanejs/tanstack-query": "workspace:*",
     "@testing-library/jest-dom": "catalog:default",
     "@tsrx/react": "catalog:default",

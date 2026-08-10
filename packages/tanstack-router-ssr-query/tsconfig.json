@@ -1,20 +1,28 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "module": "esnext",
-    "lib": ["esnext", "dom", "dom.iterable"],
-    "target": "esnext",
-    "noEmit": true,
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "noEmitOnError": true,
-    "noErrorTruncation": true,
+    "allowJs": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["node"],
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "checkJs": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "strict": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "octane",
-    "allowImportingTsExtensions": true
+    "stripInternal": true,
+    "target": "ES2020"
   },
-  "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["*.config.*", "scripts"]
 }

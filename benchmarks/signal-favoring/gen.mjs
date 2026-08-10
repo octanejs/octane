@@ -5,10 +5,10 @@
 // their framework-specific flush and batching contracts are too nuanced to
 // regenerate from the component template. Stateful counters live at C1, C11, C21,
 // ..., C91. On `__bumpAt<N>`, signal frameworks (solid, ripple) re-evaluate
-// only the `{count}` text node inside CN; hook frameworks (react, octane)
-// re-render CN and cascade through CN+1..C100. The bench measures the median
-// cost of bumping at shallow, middle, and deep stateful positions plus
-// MOUNT and UNMOUNT.
+// only the `{count}` text node inside CN; hook frameworks re-render CN and may
+// cascade through CN+1..C100. React Compiler can skip unchanged descendants by
+// caching eligible child elements. The bench measures the median cost of bumping
+// at shallow, middle, and deep stateful positions plus MOUNT and UNMOUNT.
 //
 // Run: `node benchmarks/signal-favoring/gen.mjs`
 
@@ -42,7 +42,9 @@ function genRippleNew() {
 	// (TSRX hoists function declarations, but ordering keeps the file readable).
 	for (let i = N; i >= 1; i--) {
 		if (i === N) {
-			out += `function C${i}(props) @{ <span class='leaf'>${i}</span> }\n`;
+			out += `function C${i}(props) @{ <span class={props.kind}>${i}</span> }\n`;
+		} else if (i === N - 1) {
+			out += `function C${i}({ kind }) @{ <div class={kind}>${i} <C${i + 1} kind="leaf" /></div> }\n`;
 		} else if (isStateful(i)) {
 			out += `function C${i}(props) @{\n`;
 			out += `  const [v, set] = useState(0);\n`;
@@ -50,7 +52,8 @@ function genRippleNew() {
 			out += `  <div class='c'>${i}:{v as number} <C${i + 1} /></div>\n`;
 			out += `}\n`;
 		} else {
-			out += `function C${i}(props) @{ <div class='c'>${i} <C${i + 1} /></div> }\n`;
+			const childProps = i === N - 2 ? ' kind="c"' : '';
+			out += `function C${i}(props) @{ <div class='c'>${i} <C${i + 1}${childProps} /></div> }\n`;
 		}
 	}
 	out += '\nexport default function App(props) @{ <C1 /> }\n';
@@ -125,12 +128,12 @@ function genRipple() {
 }
 
 // ----------------------------------------------------------------------------
-// react (jsx, React 19)
+// react (jsx, React 19 + React Compiler)
 // ----------------------------------------------------------------------------
 function genReact() {
 	let out = `import { useState } from 'react';\n\n`;
 	out += `// 100 uniquely-named components in a chain. Stateful counters at C${STATEFUL_INDICES.join(', C')}.\n`;
-	out += `// React re-renders the owning component and cascades through its descendants.\n\n`;
+	out += `// React re-renders the owning component; React Compiler can skip unchanged descendants.\n\n`;
 	for (const i of STATEFUL_INDICES) out += `let _set${i} = null;\n`;
 	out += '\n';
 	for (const i of STATEFUL_INDICES) {
@@ -161,7 +164,7 @@ function genPreact() {
 	return genReact()
 		.replace("import { useState } from 'react';", "import { useState } from 'preact/hooks';")
 		.replace(
-			'// React re-renders the owning component and cascades through its descendants.',
+			'// React re-renders the owning component; React Compiler can skip unchanged descendants.',
 			'// Preact re-renders the owning component and cascades through its descendants.',
 		);
 }

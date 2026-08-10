@@ -1,0 +1,441 @@
+/**
+ * Deterministic wire-cost workload for the Octane Lynx table app.
+ *
+ * It drives the production background root, async transport, main-thread
+ * receiver, and host driver over an in-process ContextProxy pair with a cheap
+ * fake Element PAPI — the same chassis as benchmarks/lynx-render — but runs
+ * the full cross-framework table app (benchmarks/lynx-table/app) through real
+ * native tap tokens: create rows, update every 10th, select a row, and the
+ * update/select storms. The workload build defines `__OCTANE_LYNX_PROFILE__`,
+ * so `@octanejs/lynx` accumulates commit/command/byte counters in
+ * `globalThis.__OCTANE_LYNX_PROF`; per-operation deltas of those counters are
+ * deterministic for a fixed app and interaction, which is what run.mjs gates
+ * on. Wall time is not measured here at all.
+ */
+import { createLynxRoot, type LynxRoot } from '../../packages/lynx/src/index.js';
+import { installLynxMainThread } from '../../packages/lynx/src/main-thread.js';
+import type {
+	LynxContextProxy,
+	LynxContextProxyEvent,
+} from '../../packages/lynx/src/core/protocol.js';
+import type { LynxElementEventListener } from '../../packages/lynx/src/core/papi.js';
+import type { LynxWireProfile } from '../../packages/lynx/src/core/profiling.js';
+import { App } from './app/src/App.lynx.tsrx';
+
+interface FakeNode {
+	readonly sign: number;
+	readonly type: string;
+	parent: FakeNode | null;
+	readonly children: FakeNode[];
+	classes: string;
+	id: string | null;
+	text: string;
+	attributes: Map<string, unknown> | null;
+	events: Map<string, LynxElementEventListener> | null;
+}
+
+type Listener = (event: LynxContextProxyEvent) => void;
+
+/**
+ * Two cross-wired synchronous ContextProxy ends. Dispatching on one end runs
+ * the other end's listeners, matching the direction the real dual-thread
+ * ContextProxy uses. Because delivery is synchronous, acknowledgements return
+ * immediately: this harness measures per-commit wire cost, not the
+ * backpressure coalescing an asynchronous main thread produces.
+ */
+function createContextPair(): { background: LynxContextProxy; main: LynxContextProxy } {
+	const backgroundListeners = new Map<string, Listener[]>();
+	const mainListeners = new Map<string, Listener[]>();
+	const end = (own: Map<string, Listener[]>, other: Map<string, Listener[]>): LynxContextProxy => ({
+		addEventListener(type, listener) {
+			const list = own.get(type);
+			if (list === undefined) own.set(type, [listener]);
+			else list.push(listener);
+		},
+		removeEventListener(type, listener) {
+			const list = own.get(type);
+			if (list === undefined) return;
+			const index = list.indexOf(listener);
+			if (index !== -1) list.splice(index, 1);
+			if (list.length === 0) own.delete(type);
+		},
+		dispatchEvent(event) {
+			const list = other.get(event.type);
+			if (list === undefined) return;
+			for (const listener of list.slice()) listener(event);
+		},
+	});
+	return {
+		background: end(backgroundListeners, mainListeners),
+		main: end(mainListeners, backgroundListeners),
+	};
+}
+
+class FakeElementPAPI {
+	private nextSign = 1;
+	readonly nodes = new Map<number, FakeNode>();
+	flushes = 0;
+	createdElements = 0;
+	page: FakeNode | null = null;
+
+	private create(type: string, text = ''): FakeNode {
+		const sign = this.nextSign++;
+		const node: FakeNode = {
+			sign,
+			type,
+			parent: null,
+			children: [],
+			classes: '',
+			id: null,
+			text,
+			attributes: null,
+			events: null,
+		};
+		this.nodes.set(sign, node);
+		this.createdElements++;
+		return node;
+	}
+
+	globals(): Record<string, unknown> {
+		return {
+			__CreatePage: (_componentId: string, _cssId: number) => (this.page = this.create('page')),
+			__CreateElement: (type: string) => this.create(type),
+			__CreateView: () => this.create('view'),
+			__CreateScrollView: () => this.create('scroll-view'),
+			__CreateText: () => this.create('text'),
+			__CreateRawText: (text: string) => this.create('raw-text', text),
+			__CreateImage: () => this.create('image'),
+			__GetElementUniqueID: (node: FakeNode) => node.sign,
+			__GetParent: (node: FakeNode) => node.parent,
+			__ElementIsEqual: (first: FakeNode, second: FakeNode) => first === second,
+			__InsertElementBefore: (parent: FakeNode, child: FakeNode, before?: FakeNode) => {
+				if (child.parent !== null) {
+					const previous = child.parent.children.indexOf(child);
+					if (previous !== -1) child.parent.children.splice(previous, 1);
+				}
+				const index = before === undefined ? -1 : parent.children.indexOf(before);
+				if (index === -1) parent.children.push(child);
+				else parent.children.splice(index, 0, child);
+				child.parent = parent;
+			},
+			__RemoveElement: (parent: FakeNode, child: FakeNode) => {
+				const index = parent.children.indexOf(child);
+				if (index !== -1) parent.children.splice(index, 1);
+				child.parent = null;
+			},
+			__ReplaceElement: (replacement: FakeNode, previous: FakeNode) => {
+				const parent = previous.parent;
+				if (parent === null) return;
+				const index = parent.children.indexOf(previous);
+				if (index !== -1) parent.children.splice(index, 1, replacement);
+				replacement.parent = parent;
+				previous.parent = null;
+			},
+			__SetClasses: (node: FakeNode, value: string) => {
+				node.classes = value;
+			},
+			__SetInlineStyles: (node: FakeNode, value: unknown) => {
+				(node.attributes ??= new Map()).set('style', value);
+			},
+			__SetCSSId: (_node: FakeNode, _id: number, _entryName?: string) => {},
+			__SetAttribute: (node: FakeNode, name: string, value: unknown) => {
+				if (name === 'text') node.text = String(value);
+				else (node.attributes ??= new Map()).set(name, value);
+			},
+			__SetDataset: (node: FakeNode, value: unknown) => {
+				(node.attributes ??= new Map()).set('dataset', value);
+			},
+			__AddEvent: (
+				node: FakeNode,
+				kind: string,
+				name: string,
+				listener: LynxElementEventListener,
+			) => {
+				const events = (node.events ??= new Map());
+				if (listener === undefined) events.delete(`${kind}:${name}`);
+				else events.set(`${kind}:${name}`, listener);
+			},
+			__SetID: (node: FakeNode, id: string | null) => {
+				node.id = id;
+			},
+			__FlushElementTree: () => {
+				this.flushes++;
+			},
+		};
+	}
+}
+
+interface Harness {
+	readonly papi: FakeElementPAPI;
+	readonly root: LynxRoot;
+	readonly main: ReturnType<typeof installLynxMainThread>;
+	readonly diagnostics: Error[];
+	readonly backgroundTarget: Record<string, unknown>;
+	dispose(): Promise<void>;
+}
+
+function createHarness(): Harness {
+	const contexts = createContextPair();
+	const papi = new FakeElementPAPI();
+	const diagnostics: Error[] = [];
+	const emitter = { addListener() {}, removeListener() {}, emit() {} };
+	const mainTarget = {
+		...papi.globals(),
+		lynx: { getJSContext: () => contexts.main },
+	};
+	const main = installLynxMainThread({
+		target: mainTarget,
+		context: contexts.main,
+		onDiagnostic: (error) => diagnostics.push(error),
+	});
+	const backgroundTarget = {
+		lynxCoreInject: { tt: {} as Record<string, unknown> },
+		lynx: {
+			getCoreContext: () => contexts.background,
+			getJSModule: (name: string) => {
+				if (name === 'GlobalEventEmitter') return emitter;
+				throw new Error(`getJSModule(${name}) is not available in the benchmark host.`);
+			},
+			reportError: (error: unknown) => {
+				diagnostics.push(error instanceof Error ? error : new Error(String(error)));
+			},
+		},
+		queueMicrotask: (callback: () => void) => queueMicrotask(callback),
+	};
+	const root = createLynxRoot({
+		target: backgroundTarget,
+		onDiagnostic: (error) => diagnostics.push(error),
+	});
+	return {
+		papi,
+		root,
+		main,
+		diagnostics,
+		backgroundTarget: backgroundTarget as unknown as Record<string, unknown>,
+		async dispose() {
+			await root.unmount();
+			main.close();
+		},
+	};
+}
+
+// -- profile counters --------------------------------------------------------
+
+interface ProfileGlobals {
+	__OCTANE_LYNX_PROF?: LynxWireProfile;
+}
+
+function profileSnapshot(): { commits: number; commands: number; bytes: number } {
+	const profile = (globalThis as ProfileGlobals).__OCTANE_LYNX_PROF;
+	// Both fake threads share this realm, so the main-thread receiver also
+	// counted each commit; halve to report per-wire commits and commands once.
+	return {
+		commits: (profile?.commits ?? 0) / 2,
+		commands: (profile?.commands ?? 0) / 2,
+		bytes: profile?.bytes ?? 0,
+	};
+}
+
+// -- fake-tree queries -------------------------------------------------------
+
+const hasClass = (node: FakeNode, cls: string): boolean => node.classes.split(/\s+/).includes(cls);
+
+function findAll(papi: FakeElementPAPI, predicate: (node: FakeNode) => boolean): FakeNode[] {
+	const out: FakeNode[] = [];
+	const walk = (node: FakeNode): void => {
+		if (predicate(node)) out.push(node);
+		for (const child of node.children) walk(child);
+	};
+	if (papi.page !== null) walk(papi.page);
+	return out;
+}
+
+function tapTokenOf(node: FakeNode): string | null {
+	const listener = node.events?.get('bindEvent:tap');
+	return typeof listener === 'string' ? listener : null;
+}
+
+function buttonTapToken(papi: FakeElementPAPI, label: string): string | null {
+	for (const raw of findAll(papi, (node) => node.type === 'raw-text' && node.text === label)) {
+		let ancestor = raw.parent;
+		while (ancestor !== null) {
+			const token = tapTokenOf(ancestor);
+			if (token !== null) return token;
+			ancestor = ancestor.parent;
+		}
+	}
+	return null;
+}
+
+function rowViews(papi: FakeElementPAPI): FakeNode[] {
+	return findAll(papi, (node) => node.type === 'view' && hasClass(node, 'row'));
+}
+
+function cellOf(row: FakeNode, cls: string): FakeNode | null {
+	for (const child of row.children) if (hasClass(child, cls)) return child;
+	return null;
+}
+
+function labelTextOf(row: FakeNode): string {
+	const cell = cellOf(row, 'col-label');
+	if (cell === null) return '';
+	return cell.children.map((child) => child.text).join('') || cell.text;
+}
+
+// -- driving -----------------------------------------------------------------
+
+const macrotask = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+async function settle(harness: Harness): Promise<void> {
+	await harness.root.flushTransport();
+	for (let turn = 0; turn < 8; turn++) await Promise.resolve();
+}
+
+/**
+ * Pump transport flushes and macrotasks until the fake tree satisfies the
+ * predicate. Macrotasks matter: the app's storm ticks schedule through a
+ * MessageChannel, so every tick needs its own turn of the Node event loop.
+ */
+async function until(
+	harness: Harness,
+	predicate: () => boolean,
+	what: string,
+	turns = 20_000,
+): Promise<void> {
+	for (let turn = 0; turn < turns; turn++) {
+		await settle(harness);
+		if (predicate()) return;
+		await macrotask();
+	}
+	throw new Error(`timed out waiting for ${what}`);
+}
+
+function tap(harness: Harness, token: string): void {
+	const engine = (harness.backgroundTarget as { lynxCoreInject?: { tt?: Record<string, unknown> } })
+		.lynxCoreInject?.tt;
+	const publishEvent = engine?.publishEvent as
+		((handler: unknown, event: unknown) => unknown) | undefined;
+	if (typeof publishEvent !== 'function') {
+		throw new Error('the background thread installed no engine publishEvent receiver.');
+	}
+	publishEvent(token, {
+		type: 'tap',
+		timestamp: 1,
+		target: { id: 'bench', uid: 1, dataset: {} },
+		currentTarget: { id: 'bench', uid: 1, dataset: {} },
+	});
+}
+
+async function tapButton(harness: Harness, label: string): Promise<void> {
+	const token = buttonTapToken(harness.papi, label);
+	if (token === null) throw new Error(`no tap token found for button "${label}"`);
+	tap(harness, token);
+	await settle(harness);
+}
+
+export interface OpCounters {
+	readonly commits: number;
+	readonly commands: number;
+	readonly bytes: number;
+}
+
+export interface TableRunResult {
+	readonly rows: number;
+	readonly create: OpCounters;
+	readonly update10th: OpCounters;
+	readonly select: OpCounters;
+	readonly updateStorm: OpCounters;
+	readonly selectStorm: OpCounters;
+	readonly createdElements: number;
+	readonly diagnostics: readonly string[];
+}
+
+const CREATE_BUTTON: Record<number, string> = {
+	1000: 'Create 1,000 rows',
+	3000: 'Create 3,000 rows',
+	5000: 'Create 5,000 rows',
+	10000: 'Create 10,000 rows',
+	20000: 'Create 20,000 rows',
+	30000: 'Create 30,000 rows',
+};
+
+const STORM_UPDATE_TICKS = 50;
+const STORM_SELECT_TICKS = 30;
+
+/** Run the full op sequence at one scale and report per-op counter deltas. */
+export async function runTable(rows: number): Promise<TableRunResult> {
+	const createButton = CREATE_BUTTON[rows];
+	if (createButton === undefined) throw new Error(`no create button for ${rows} rows`);
+	const harness = createHarness();
+	try {
+		await harness.root.render(App, {});
+		await until(harness, () => buttonTapToken(harness.papi, createButton) !== null, 'mount', 200);
+
+		const measure = async (drive: () => Promise<void>): Promise<OpCounters> => {
+			const before = profileSnapshot();
+			await drive();
+			const after = profileSnapshot();
+			return {
+				commits: after.commits - before.commits,
+				commands: after.commands - before.commands,
+				bytes: after.bytes - before.bytes,
+			};
+		};
+
+		const create = await measure(async () => {
+			await tapButton(harness, createButton);
+			await until(harness, () => rowViews(harness.papi).length === rows, `${rows} rows`);
+		});
+
+		const update10th = await measure(async () => {
+			const first = rowViews(harness.papi)[0]!;
+			const expected = `${labelTextOf(first)} !!!`;
+			await tapButton(harness, 'Update every 10th row');
+			await until(
+				harness,
+				() => labelTextOf(rowViews(harness.papi)[0]!) === expected,
+				'updated first label',
+			);
+		});
+
+		// Two taps: the first turns selection on, the second moves it, so the
+		// measured op is the steady state (one row gains .danger, one loses it).
+		const preSelect = rowViews(harness.papi)[1]!;
+		tap(harness, tapTokenOf(cellOf(preSelect, 'col-label')!)!);
+		await until(harness, () => hasClass(rowViews(harness.papi)[1]!, 'danger'), 'first select');
+		const select = await measure(async () => {
+			const row = rowViews(harness.papi)[2]!;
+			tap(harness, tapTokenOf(cellOf(row, 'col-label')!)!);
+			await until(harness, () => hasClass(rowViews(harness.papi)[2]!, 'danger'), 'select');
+		});
+
+		const updateStorm = await measure(async () => {
+			await tapButton(harness, 'Update storm');
+			await until(
+				harness,
+				() => labelTextOf(rowViews(harness.papi)[0]!) === `bench ${STORM_UPDATE_TICKS}`,
+				'update storm',
+			);
+		});
+
+		const selectStorm = await measure(async () => {
+			await tapButton(harness, 'Select storm');
+			await until(harness, () => hasClass(rowViews(harness.papi)[0]!, 'danger'), 'select storm');
+		});
+
+		return {
+			rows,
+			create,
+			update10th,
+			select,
+			updateStorm,
+			selectStorm,
+			createdElements: harness.papi.createdElements,
+			diagnostics: harness.diagnostics.map((error) => error.message),
+		};
+	} finally {
+		await harness.dispose();
+	}
+}
+
+export { STORM_UPDATE_TICKS, STORM_SELECT_TICKS };

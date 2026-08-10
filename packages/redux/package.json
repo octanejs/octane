@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/redux",
-  "version": "0.1.25",
+  "version": "0.1.30",
   "license": "MIT",
   "type": "module",
   "engines": {

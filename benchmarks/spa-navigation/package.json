@@ -1,0 +1,16 @@
+{
+  "name": "@benchmarks/spa-navigation",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "SPA full-page navigation benchmark across Octane and reference frameworks: routed subtree teardown and mount with a surviving app shell.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:work": "node work.mjs",
+    "bench:long": "node run.mjs 40",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}

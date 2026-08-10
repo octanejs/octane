@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { reactCompiler } from '../../react-compiler.mjs';
 
 // Production React build (NODE_ENV=production resolves React's prod bundle), terser-
 // minified so it's comparable to the octane column's production output.
 export default defineConfig({
-	plugins: [react()],
+	plugins: [react(), reactCompiler()],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 	build: {

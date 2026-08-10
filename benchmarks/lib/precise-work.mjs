@@ -5,13 +5,17 @@
 // the emitted production bundle instead. Callers should launch Chromium with
 // `--jitless` so optimized/inlined functions cannot disappear from coverage.
 
+// A hook is either a bare `window.__name` string or `{ name, arg }` for the
+// suites whose hooks are parameterized (spa-navigation drives one `__navigate`
+// with a route rather than one hook per destination).
 async function invokeHook(page, hook) {
-	await page.evaluate(async (name) => {
+	const call = typeof hook === 'string' ? { name: hook, arg: undefined } : hook;
+	await page.evaluate(async ({ name, arg }) => {
 		const fn = window[name];
 		if (typeof fn !== 'function') throw new Error(`missing ${name}`);
-		const result = fn();
+		const result = fn(arg);
 		if (result && typeof result.then === 'function') await result;
-	}, hook);
+	}, call);
 }
 
 function countNamedFunctions(coverage, metrics) {

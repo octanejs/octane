@@ -26,9 +26,18 @@ import news from '../../../benchmarks/baselines/local/news.json';
 import portalSwarm from '../../../benchmarks/baselines/local/portal-swarm.json';
 import recursiveContext from '../../../benchmarks/baselines/local/recursive-context.json';
 import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.json';
+import spaNavigation from '../../../benchmarks/baselines/local/spa-navigation.json';
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
 import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
+import svgDashboard from '../../../benchmarks/baselines/local/svg-dashboard.json';
 import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
+import asyncComposition from '../../../benchmarks/baselines/local/async-composition.json';
+import ssrHttp from '../../../benchmarks/baselines/local/ssr-http.json';
+import tanstackStart from '../../../benchmarks/baselines/local/tanstack-start.json';
+import threeBundleSize from '../../../benchmarks/baselines/local/three-bundle-size.json';
+import threeRenderer from '../../../benchmarks/baselines/local/three-renderer.json';
+import weatherAppLighthouse from '../../../benchmarks/baselines/local/weather-app-lighthouse.json';
+import weatherApp from '../../../benchmarks/baselines/local/weather-app.json';
 
 // `score` is charted when present; older checked-in baselines fall back to
 // `median`. Other stats vary by suite, so they stay optional.
@@ -86,13 +95,16 @@ export interface BenchCard {
 const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'octane-tsrx', label: 'Octane (.tsrx)', color: '#ff415a' },
 	{ key: 'octane-jsx', label: 'Octane (.tsx)', color: '#c98500' },
-	{ key: 'react', label: 'React 19', color: '#1e93b0' },
-	{ key: 'react-compiler', label: 'React Compiler 1.0', color: '#4bafe7' },
+	{ key: 'react', label: 'React 19 + Compiler', color: '#1e93b0' },
+	{ key: 'react-uncompiled', label: 'React 19 (uncompiled control)', color: '#4bafe7' },
 	{ key: 'preact', label: 'Preact 10', color: '#7478fb' },
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
 	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
+	// The weather-app fixtures publish plain `vue` (same 3.6 pin). Color follows
+	// the entity, and the two Vue keys never appear on the same card.
+	{ key: 'vue', label: 'Vue 3.6', color: '#e06ec4' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
@@ -153,6 +165,19 @@ function frameworkCard(
 	};
 }
 
+const JS_FRAMEWORK_SHARED_OPS = [
+	'run',
+	'replace',
+	'add',
+	'update',
+	'select',
+	'swap',
+	'remove',
+	'runlots',
+	'select_lots',
+	'clear',
+];
+
 // ---------------------------------------------------------------------------
 // Octane vs the field — one card per cross-framework suite.
 // ---------------------------------------------------------------------------
@@ -162,6 +187,10 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		'js-framework',
 		'js-framework',
 		'krausest-style table operations over 1,000 rows — create, replace, partial update, select, swap, remove, clear.',
+		undefined,
+		// Keep only shared timings; insertion/fragment diagnostics in Octane's
+		// baseline are not measured by the reference frameworks.
+		JS_FRAMEWORK_SHARED_OPS,
 	),
 	frameworkCard(
 		todoMvc,
@@ -190,6 +219,42 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		],
 	),
 	frameworkCard(
+		weatherApp,
+		'weather-app',
+		'weather-app',
+		'A real weather dashboard — cold start to interactive, keyed forecast churn, and async city search with error and recovery flows. The DOM-census counters in the baseline are diagnostics and stay out of the chart.',
+		{
+			initial_ready: 'cold ready',
+			forecast_cycle: 'forecast churn',
+			search_city: 'search city',
+			search_error: 'search error',
+			search_recover: 'search recover',
+		},
+		['initial_ready', 'forecast_cycle', 'search_city', 'search_error', 'search_recover'],
+	),
+	frameworkCard(
+		weatherAppLighthouse,
+		'weather-app-lighthouse',
+		'weather-app — Lighthouse',
+		'Desktop Lighthouse lab metrics for the same weather app — simulated and observed first and largest contentful paint, speed index, and total blocking time. Simulated paints use Lighthouse’s desktop-network model; observed paints come from the unthrottled browser trace. Cumulative layout shift is unitless and omitted from the millisecond chart.',
+		{
+			first_contentful_paint: 'simulated FCP',
+			observed_first_contentful_paint: 'observed FCP',
+			largest_contentful_paint: 'simulated LCP',
+			observed_largest_contentful_paint: 'observed LCP',
+			speed_index: 'speed index',
+			total_blocking_time: 'TBT',
+		},
+		[
+			'first_contentful_paint',
+			'observed_first_contentful_paint',
+			'largest_contentful_paint',
+			'observed_largest_contentful_paint',
+			'speed_index',
+			'total_blocking_time',
+		],
+	),
+	frameworkCard(
 		chatStream,
 		'chat-stream',
 		'chat-stream',
@@ -202,6 +267,39 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 			type160: 'type 160 chars',
 		},
 		['streamFine', 'streamCoarse', 'appendHistory', 'switchConv', 'type160'],
+	),
+	frameworkCard(
+		svgDashboard,
+		'svg-dashboard',
+		'svg-dashboard',
+		'A hand-rolled SVG observability dashboard — path and transform churn, keyed reconciliation inside SVG, foreignObject labels, portal tooltips, runtime icons, and style/spread updates.',
+		{
+			charts_tick: 'chart tick',
+			tick_sparse: 'sparse tick',
+			drag_nodes: 'drag nodes',
+			pan_zoom: 'pan and zoom',
+			select_toggle: 'toggle selection',
+			topology_churn: 'topology churn',
+			label_churn: 'label churn',
+			tooltip_swarm: 'tooltip swarm',
+			icon_swap: 'icon swap',
+			series_toggle: 'series toggle',
+			style_spread_pulse: 'style/spread pulse',
+		},
+		[
+			'mount',
+			'charts_tick',
+			'tick_sparse',
+			'drag_nodes',
+			'pan_zoom',
+			'select_toggle',
+			'topology_churn',
+			'label_churn',
+			'tooltip_swarm',
+			'icon_swap',
+			'series_toggle',
+			'style_spread_pulse',
+		],
 	),
 	frameworkCard(
 		jsFrameworkReorder,
@@ -225,13 +323,26 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		memoWall,
 		'memo-wall',
 		'memo-wall',
-		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. React Compiler is shown separately from vanilla React; Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
+		'Memo bail-out walls — parent re-renders against memoized subtrees, and context updates punching through them. The primary React entry uses React Compiler; an additional, explicitly uncompiled React control isolates the compiler’s effect. Solid, Svelte, Ripple and Vue Vapor have no parent re-render to absorb, so their near-zero wall ops are the fine-grained model’s honest number.',
 	),
 	frameworkCard(
 		recursiveContext,
 		'recursive-context',
 		'recursive-context',
 		'A deep recursive tree driven by context updates — mount, root and partial updates, unmount.',
+	),
+	frameworkCard(
+		spaNavigation,
+		'spa-navigation',
+		'spa-navigation',
+		'Full-page client navigation — routed-subtree teardown and mount while the app shell survives, including nested-layout reuse and a 6× CPU-throttled route swap.',
+		{
+			nav_deep: 'deep route swap',
+			nav_teardown: 'deep → nested',
+			nav_mount: 'nested → deep',
+			nav_nested: 'nested route swap',
+			nav_deep_6x: 'deep route swap (6× CPU)',
+		},
 	),
 	frameworkCard(
 		signalFavoring,
@@ -278,14 +389,14 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		bundleSize,
 		'bundle-size',
 		'bundle-size',
-		'Production shipped JavaScript bytes with normalized minification — total gzip and app-code gzip across the rows, TodoMVC and chat fixtures.',
+		'Production shipped JavaScript bytes with normalized minification — total gzip across the rows, TodoMVC, chat and weather fixtures.',
 		{
 			js_gzip: 'rows total gzip',
-			app_gzip: 'rows app gzip',
-			todo_app_gzip: 'Todo app gzip',
-			chat_app_gzip: 'chat app gzip',
+			todo_js_gzip: 'TodoMVC total gzip',
+			chat_js_gzip: 'chat total gzip',
+			weather_js_gzip: 'weather total gzip',
 		},
-		['js_gzip', 'app_gzip', 'todo_app_gzip', 'chat_app_gzip'],
+		['js_gzip', 'todo_js_gzip', 'chat_js_gzip', 'weather_js_gzip'],
 		'bytes',
 	),
 ];
@@ -318,6 +429,137 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 }
 
 // ---------------------------------------------------------------------------
+// Head-to-head targets — suites whose roster is a specific stack rather than
+// the whole field: octane against React on real HTTP servers, composed async
+// trees and TanStack Start, plus the Three.js renderer column. These stay off
+// the home summary, which aggregates only the full-roster cards above.
+// ---------------------------------------------------------------------------
+export const TARGET_CARDS: BenchCard[] = [
+	frameworkCard(
+		asyncComposition,
+		'async-composition',
+		'async-composition',
+		'Composed async use() trees — Octane\u2019s compiled parallel-use batching against React\u2019s render-and-suspend loop. The wave, call and span counts in the baseline are deterministic diagnostics and stay out of the chart.',
+		{ init: 'initial render', update: 'update' },
+		['init', 'update'],
+	),
+	frameworkCard(
+		ssrHttp,
+		'ssr-http',
+		'ssr-http',
+		'Real production HTTP servers rendering the news page — renderer import, cold spawn/listen/first-byte, and streamed shell and completion times over HTTP for staggered and all-fast Suspense.',
+		{
+			import_renderer: 'import renderer',
+			cold_spawn_to_listen: 'cold spawn\u2192listen',
+			cold_listen_to_first_byte: 'cold listen\u2192first byte',
+			cold_spawn_to_first_byte: 'cold spawn\u2192first byte',
+			http_shell_staggered: 'staggered shell',
+			http_total_staggered: 'staggered complete',
+			http_shell_allfast: 'all-fast shell',
+			http_total_allfast: 'all-fast complete',
+		},
+	),
+];
+
+{
+	const b = tanstackStart as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane-minimal', label: 'Octane Start (minimal server)', color: VARIANT_COLORS.tuned },
+		{ key: 'octane-nitro', label: 'Octane Start (nitro)', color: VARIANT_COLORS.dark },
+		{ key: 'react', label: 'React (TanStack Start)', color: '#1e93b0' },
+	];
+	TARGET_CARDS.push({
+		id: 'tanstack-start',
+		title: 'tanstack-start',
+		description:
+			'The same TanStack Start app served by React and by the Octane port — cold start to first byte, warm TTFB and completion for the posts and deferred routes, the deferred stream tail, and sequential home requests.',
+		series,
+		rows: rowsFor(b, series, {
+			cold_spawn_to_listen: 'cold spawn\u2192listen',
+			cold_listen_to_first_byte: 'cold listen\u2192first byte',
+			cold_spawn_to_first_byte: 'cold spawn\u2192first byte',
+			warm_ttfb_posts: 'warm TTFB /posts',
+			warm_total_posts: 'warm total /posts',
+			warm_ttfb_deferred: 'warm TTFB /deferred',
+			warm_total_deferred: 'warm total /deferred',
+			warm_stream_tail_deferred: 'deferred stream tail',
+			warm_seq_request_home: 'sequential home requests',
+		}),
+		iterations: b.iterations,
+	});
+}
+
+// The imperative Three.js column is the no-framework control, so it wears the
+// control blue (react-uncompiled\u2019s slot — the two never share a card).
+const THREE_SERIES = {
+	octane: { label: 'Octane Three', color: VARIANT_COLORS.tuned },
+	r3f: { label: 'React Three Fiber 9', color: '#1e93b0' },
+	plain: { label: 'Plain Three.js', color: '#4bafe7' },
+} as const;
+
+{
+	const b = threeRenderer as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane', ...THREE_SERIES.octane },
+		{ key: 'r3f-9.6.1', ...THREE_SERIES.r3f },
+		{ key: 'plain-three', ...THREE_SERIES.plain },
+	];
+	TARGET_CARDS.push({
+		id: 'three-renderer',
+		title: 'three-renderer',
+		description:
+			'Object lifecycle at 1,000 meshes — mount, update, reorder, unmount, direct and component-driven reconstruction with disposal, a frame with 1,000 subscribers, and raycast events — for the Octane Three renderer, React Three Fiber, and hand-written Three.js.',
+		series,
+		rows: rowsFor(b, series, {
+			mount_1k: 'mount 1k',
+			update_1k: 'update 1k',
+			reorder_1k: 'reorder 1k',
+			unmount_tree_1k: 'unmount 1k',
+			reconstruct_dispose_1k: 'reconstruct + dispose 1k',
+			reconstruct_component_dispose_1k: 'reconstruct component + dispose 1k',
+			frame_1k_subscribers: 'frame, 1k subscribers',
+			raycast_event: 'raycast event',
+		}),
+		iterations: b.iterations,
+	});
+}
+
+// three-bundle-size targets are named `<renderer>-<scene>` — regroup into one
+// row per scene with one gzip-bytes column per renderer.
+{
+	const b = threeBundleSize as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane', ...THREE_SERIES.octane },
+		{ key: 'r3f', ...THREE_SERIES.r3f },
+		{ key: 'plain', ...THREE_SERIES.plain },
+	];
+	const byName = new Map(b.targets.map((t) => [t.name, t]));
+	const rows: BenchRow[] = (
+		[
+			['min', 'minimal scene'],
+			['full', 'full helpers'],
+		] as const
+	).map(([scene, label]) => {
+		const row: BenchRow = { op: label };
+		for (const s of series) {
+			const target = byName.get(`${s.key}-${scene}`);
+			if (target) row[s.key] = statValue(target.ops.js_gzip);
+		}
+		return row;
+	});
+	TARGET_CARDS.push({
+		id: 'three-bundle-size',
+		title: 'three-bundle-size',
+		description:
+			'Shipped gzip JavaScript for a minimal scene and a helpers-heavy scene across the three renderers.',
+		series,
+		rows,
+		iterations: b.iterations,
+		format: 'bytes',
+	});
+}
+
+// ---------------------------------------------------------------------------
 // The authoring cliff — octane-internal de-opt suites.
 // ---------------------------------------------------------------------------
 export const OCTANE_CARDS: BenchCard[] = [];
@@ -340,7 +582,9 @@ export const OCTANE_CARDS: BenchCard[] = [];
 		description:
 			'The same 1,000-row app authored four ways: tuned .tsrx, React-style naive .tsrx and .tsx, and plain-.ts createElement with no compiler involvement (the shape every binding produces).',
 		series,
-		rows: rowsFor(b, series),
+		// The tuned fixture also emits deterministic diagnostics that the naive
+		// fixtures do not. Keep this comparison to operations measured by all four.
+		rows: rowsFor(b, series, undefined, JS_FRAMEWORK_SHARED_OPS),
 		iterations: b.iterations,
 	});
 }

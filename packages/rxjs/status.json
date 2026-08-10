@@ -9,5 +9,11 @@
     "@react-rxjs/dom is omitted because octane batches updates without ReactDOM.unstable_batchedUpdates."
   ],
   "ssr": "useSyncExternalStore supplies the state snapshot during server rendering; browser-only ReactDOM batching helpers are intentionally absent.",
-  "verified": "2026-07-30"
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/re-rxjs/react-rxjs",
+    "license": "MIT",
+    "commit": "330f4c329f635c577e39655bd46c0d80a13f3a41",
+    "verification": "recorded-unverified"
+  }
 }

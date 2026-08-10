@@ -1,6 +1,7 @@
 /** @jsxImportSource octane */
 import { useState } from 'octane';
 import { I18nProvider, SSRProvider, useId, useIsSSR, useLocale } from '@octanejs/aria';
+import { useNumberFieldState } from '@octanejs/aria/stately';
 
 function AriaServerContents() {
 	const labelId = useId('aria-hydration-label');
@@ -29,5 +30,19 @@ export function AriaServerFixture(props: { locale: string }) {
 				<AriaServerContents />
 			</I18nProvider>
 		</SSRProvider>
+	);
+}
+
+export function AriaNumberFieldServerFixture(props: {
+	locale: string;
+	value: number;
+	formatOptions?: Intl.NumberFormatOptions;
+}) {
+	const state = useNumberFieldState(props);
+
+	return (
+		<output id="aria-server-number" data-number={state.numberValue}>
+			{state.inputValue}
+		</output>
 	);
 }

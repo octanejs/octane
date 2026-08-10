@@ -12,6 +12,8 @@
 //     react-dom/server upstream) is opt-IN here via BENCH_REDACT=true — the
 //     react flavor benchmarks stock React; the redact flavor re-enables the
 //     alias map. Upstream default is redact ON (DISABLE_REDACT opt-out).
+//   - Both flavors apply React Compiler to the shared application source;
+//     redact's compiler-runtime alias keeps generated cache calls compatible.
 import { defineConfig } from 'vite';
 import type { PluginOption } from 'vite';
 import { redact } from '@tanstack/redact/vite';
@@ -19,6 +21,7 @@ import contentCollections from '@content-collections/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import tailwindcss from '@tailwindcss/vite';
 import viteReact from '@vitejs/plugin-react';
+import { reactCompiler } from '../../react-compiler.mjs';
 import path from 'node:path';
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -236,6 +239,7 @@ export default defineConfig({
 			},
 		}),
 		viteReact(),
+		reactCompiler(),
 		contentCollections(),
 		tailwindcss(),
 	] as PluginOption[],

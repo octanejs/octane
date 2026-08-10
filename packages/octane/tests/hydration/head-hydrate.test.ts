@@ -299,6 +299,141 @@ describe('hoisted document metadata — hydration', () => {
 		expect(document.head.querySelectorAll('meta[name="description"]').length).toBe(0);
 	});
 
+	it.each([
+		{
+			form: 'TSRX template',
+			id: '/src/inline-resource-events.tsrx',
+			wrap: (element: string) =>
+				`export function Page(props: Record<string, () => void>) @{ ${element} }`,
+		},
+		{
+			form: 'TSX returned JSX',
+			id: '/src/inline-resource-events.tsx',
+			wrap: (element: string) =>
+				`/** @jsxImportSource octane */\nfunction ResourcePage(props: Record<string, () => void>) { return (${element}); }\nexport const Page = ResourcePage;`,
+		},
+	])(
+		'keeps $form resource handlers inline through server rendering and hydration',
+		({ id, wrap }) => {
+			interface ResourceModule extends CompiledFixtureModule {
+				Page: (props: Record<string, () => void>) => unknown;
+			}
+
+			const source = wrap(`
+<section onLoad={props.onAncestorLoad} onError={props.onAncestorError}>
+	<link
+		rel="stylesheet"
+		href="/inline-resource.css"
+		onLoad={props.onLoad}
+		onError={props.onError}
+	/>
+	<span>hydrated resource</span>
+</section>
+`);
+			const client = loadCompiledFixtureSource<ResourceModule>(source, { id, mode: 'client' });
+			const serverModule = loadCompiledFixtureSource<ResourceModule>(source, {
+				id,
+				mode: 'server',
+			});
+			const calls: string[] = [];
+			const props = {
+				onLoad: () => calls.push('target:load'),
+				onError: () => calls.push('target:error'),
+				onAncestorLoad: () => calls.push('ancestor:load'),
+				onAncestorError: () => calls.push('ancestor:error'),
+			};
+			const { html } = ServerRT.renderToString(serverModule.Page, props);
+			expect(html).not.toMatch(/on(?:load|error)/i);
+			container.innerHTML = html;
+			const section = container.querySelector('section')!;
+			const link = section.querySelector('link[href="/inline-resource.css"]')!;
+			const span = section.querySelector('span')!;
+			expect(link).not.toBeNull();
+			expect(document.head.querySelector('link[href="/inline-resource.css"]')).toBeNull();
+
+			const root = hydrateRoot(container, client.Page, props);
+			flushSync(() => {});
+
+			expect(container.querySelector('section')).toBe(section);
+			expect(section.querySelector('link[href="/inline-resource.css"]')).toBe(link);
+			expect(section.querySelector('span')).toBe(span);
+			expect(document.head.querySelector('link[href="/inline-resource.css"]')).toBeNull();
+
+			link.dispatchEvent(new Event('load', { bubbles: false }));
+			link.dispatchEvent(new Event('error', { bubbles: false }));
+			expect(calls).toEqual(['target:load', 'ancestor:load', 'target:error', 'ancestor:error']);
+			root.unmount();
+		},
+	);
+
+	it('adopts a server-rendered resource and keeps load/error handlers current through unmount', () => {
+		interface ResourceModule extends CompiledFixtureModule {
+			Page: (props: { handlers: Record<string, () => void> }) => unknown;
+		}
+
+		const source = `
+export function Page(props: { handlers: Record<string, () => void> }) @{
+	<>
+		<link rel="stylesheet" href="/hydrated-resource.css" {...props.handlers} />
+		<main>hydrated</main>
+	</>
+}
+`;
+		const id = '/src/hydrated-resource-events.tsrx';
+		const client = loadCompiledFixtureSource<ResourceModule>(source, { id, mode: 'client' });
+		const serverModule = loadCompiledFixtureSource<ResourceModule>(source, { id, mode: 'server' });
+		const calls: string[] = [];
+		const handlers = (version: string) => ({
+			onLoad: () => calls.push(`${version}:load:bubble`),
+			onLoadCapture: () => calls.push(`${version}:load:capture`),
+			onError: () => calls.push(`${version}:error:bubble`),
+			onErrorCapture: () => calls.push(`${version}:error:capture`),
+		});
+		const expected = (version: string) => [
+			`${version}:load:capture`,
+			`${version}:load:bubble`,
+			`${version}:error:capture`,
+			`${version}:error:bubble`,
+		];
+		const initial = handlers('initial');
+		const { html } = ServerRT.renderToString(serverModule.Page, { handlers: initial });
+		const bodyStart = html.indexOf('<main');
+		if (bodyStart === -1) throw new Error('Expected hydrated resource body markup');
+		document.head.innerHTML = html.slice(0, bodyStart);
+		container.innerHTML = html.slice(bodyStart);
+		const link = document.head.querySelector('link[href="/hydrated-resource.css"]')!;
+		const body = container.querySelector('main')!;
+		const dispatch = () => {
+			link.dispatchEvent(new Event('load'));
+			link.dispatchEvent(new Event('error'));
+		};
+		const root = hydrateRoot(container, client.Page, { handlers: initial });
+		flushSync(() => {});
+
+		expect(document.head.querySelector('link[href="/hydrated-resource.css"]')).toBe(link);
+		expect(container.querySelector('main')).toBe(body);
+		dispatch();
+		expect(calls).toEqual(expected('initial'));
+
+		flushSync(() => root.render(client.Page, { handlers: handlers('updated') }));
+		dispatch();
+		expect(calls).toEqual([...expected('initial'), ...expected('updated')]);
+
+		flushSync(() => root.render(client.Page, { handlers: {} }));
+		dispatch();
+		expect(calls).toEqual([...expected('initial'), ...expected('updated')]);
+
+		flushSync(() => root.render(client.Page, { handlers: handlers('retained') }));
+		dispatch();
+		const beforeUnmount = [...expected('initial'), ...expected('updated'), ...expected('retained')];
+		expect(calls).toEqual(beforeUnmount);
+
+		root.unmount();
+		expect(link.isConnected).toBe(false);
+		dispatch();
+		expect(calls).toEqual(beforeUnmount);
+	});
+
 	it('skips an interposed foreign element and adopts the intended head element', () => {
 		const { html } = ServerRT.renderToString(server.Page, { params: {} });
 		const bodyStart = html.indexOf('<section');

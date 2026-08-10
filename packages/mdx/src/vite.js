@@ -20,7 +20,7 @@
  * exactly as written and never applies TS-style `.js` → `.ts` mapping.
  */
 import { compileMdx } from './compile.js';
-import { createOctaneCompiler } from 'octane/compiler/bundler';
+import { createOctaneCompiler, HYDRATE_QUERY_PARAM } from 'octane/compiler/bundler';
 
 /**
  * @typedef {Omit<import('./compile.js').CompileMdxOptions, 'mode' | 'hmr' | 'dev'> & {
@@ -97,7 +97,12 @@ export function octaneMdx(options = {}) {
 			for (const dependency of profileIdentity?.dependencies ?? []) {
 				this.addWatchFile?.(dependency);
 			}
-			const compilerId = profileIdentity?.id ?? file;
+			const baseCompilerId = profileIdentity?.id ?? file;
+			const hydrateBoundaryPath = new URLSearchParams(query).get(HYDRATE_QUERY_PARAM);
+			const compilerId =
+				hydrateBoundaryPath === null
+					? baseCompilerId
+					: `${baseCompilerId}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
 			const result = await compileMdx(code, compilerId, {
 				...compileOptions,
 				mode: ssr ? 'server' : 'client',

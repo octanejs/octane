@@ -11,6 +11,7 @@ import {
 	type UniversalTransportIdentity,
 	type UniversalSerializableValue,
 } from 'octane/universal/native';
+import { LYNX_PROFILE, lynxWireProfile, profileOutboundMessage } from './profiling.js';
 import {
 	applyLynxHostAttachments,
 	invalidateLynxClientContainer,
@@ -308,6 +309,17 @@ export function createLynxBackgroundTransport(
 
 	const dispatch = (message: Parameters<typeof validateLynxBackgroundOutboundMessage>[0]) => {
 		if (closedError !== null) throw closedError;
+		if (LYNX_PROFILE) {
+			const profile = lynxWireProfile();
+			const startedSelfCheck = performance.now();
+			const validated = selfCheckLynxBackgroundOutboundMessage(message);
+			const startedDispatch = performance.now();
+			context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
+			profile.dispatchMs += performance.now() - startedDispatch;
+			profile.selfcheckMs += startedDispatch - startedSelfCheck;
+			profileOutboundMessage(profile, message);
+			return;
+		}
 		const validated = selfCheckLynxBackgroundOutboundMessage(message);
 		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
 	};

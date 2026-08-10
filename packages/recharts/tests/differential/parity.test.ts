@@ -13,6 +13,7 @@ const FIXTURE = resolve(__dirname, '../_fixtures/shapes.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/recharts vs real recharts (Phase 0 shapes)', () => {
+	// @parity-case differential:recharts-shapes
 	it('Surface + Layer + Rectangle/Dot/Cross/Polygon render byte-identical SVG', async () => {
 		const d = await mountDifferential(FIXTURE, 'ShapesApp', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -58,12 +59,14 @@ async function unmountCharts(d: { unmount(): void }): Promise<void> {
 }
 
 describe('differential: @octanejs/recharts vs real recharts (Phase 1 charts)', () => {
+	// @parity-case differential:recharts-bar-chart
 	it('static BarChart with axes renders byte-identical SVG', async () => {
 		const d = await mountDifferential(CHARTS_FIXTURE, 'BarChartApp', undefined, CACHE);
 		await d.step('settled', settleCharts);
 		await unmountCharts(d);
 	});
 
+	// @parity-case differential:recharts-line-chart
 	it('static LineChart with axes renders byte-identical SVG', async () => {
 		const d = await mountDifferential(CHARTS_FIXTURE, 'LineChartApp', undefined, CACHE);
 		await d.step('settled', settleCharts);

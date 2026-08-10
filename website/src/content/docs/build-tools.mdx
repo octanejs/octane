@@ -408,10 +408,12 @@ and needs a dev-server restart.
 <h2 id="renderer-targets">Renderer targets</h2>
 
 Compiler and app-core options use declarative module IDs rather than bundler
-callbacks or instantiated renderer objects. That keeps DOM, Three, and future
-Lynx renderer selection an Octane compiler/config concern.
+callbacks or instantiated renderer objects. That keeps DOM, Three, and Lynx
+renderer selection an Octane compiler/config concern.
 
 `@octanejs/rsbuild-plugin` already follows the Rsbuild plugin model consumed by
-Rspeedy, but this release targets Octane's DOM renderer. A Lynx renderer target
-and Rspeedy preset are future work; do not point the current web hydration entry
-at a Lynx application.
+Rspeedy, but it targets Octane's DOM renderer. A Lynx application is a separate
+build: it runs Rspeedy with `@octanejs/rspeedy-plugin`, which compiles one
+authored entry into the main-thread and background graphs Lynx evaluates. See
+[Native with Lynx](/docs/lynx). Do not point the web hydration entry at a Lynx
+application.

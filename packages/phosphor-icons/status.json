@@ -7,7 +7,13 @@
     "The React package's SSR namespace is unnecessary because Octane icons use the same components on client and server."
   ],
   "ssr": "Supported and tested against @phosphor-icons/react/ssr for every weight; hydration adopts and updates server-rendered SVG hosts.",
-  "verified": "2026-07-29",
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/phosphor-icons/react",
+    "license": "MIT",
+    "commit": "57424d5f99b793b585f5c6f5cab76f79772510e5",
+    "verification": "recorded-unverified"
+  },
   "notes": [
     "Generated modules embed only their own official @phosphor-icons/core SVG geometry, preserving per-icon tree shaking.",
     "Generation checks pin core metadata, six canonical assets per icon, and the React oracle version."

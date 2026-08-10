@@ -195,6 +195,47 @@ describe('Three frame loop', () => {
 		removeEarly();
 	});
 
+	it('preserves equal-priority registration order across mixed subscriptions and removal', async () => {
+		const root = await createRootHarness('never');
+		const order: string[] = [];
+		const subscribe = (label: string, priority: number) =>
+			root.state.internal.subscribe({ current: () => order.push(label) }, priority, root.store);
+		const removeFirstZero = subscribe('zero:first', 0);
+		const removeFirstPositive = subscribe('positive:first', 2);
+		const removeSecondZero = subscribe('zero:second', 0);
+		const removeNegative = subscribe('negative', -1);
+		const removeSecondPositive = subscribe('positive:second', 2);
+		const removeThirdZero = subscribe('zero:third', 0);
+
+		root.state.advance(1);
+		expect(order).toEqual([
+			'negative',
+			'zero:first',
+			'zero:second',
+			'zero:third',
+			'positive:first',
+			'positive:second',
+		]);
+		expect(root.render).not.toHaveBeenCalled();
+
+		removeSecondZero();
+		removeFirstPositive();
+		order.length = 0;
+		root.state.advance(2);
+		expect(order).toEqual(['negative', 'zero:first', 'zero:third', 'positive:second']);
+		expect(root.render).not.toHaveBeenCalled();
+
+		removeSecondPositive();
+		order.length = 0;
+		root.state.advance(3);
+		expect(order).toEqual(['negative', 'zero:first', 'zero:third']);
+		expect(root.render).toHaveBeenCalledOnce();
+
+		removeNegative();
+		removeFirstZero();
+		removeThirdZero();
+	});
+
 	it('honors one additional demand frame invalidated from inside a frame callback', async () => {
 		const root = await createRootHarness('demand');
 		let calls = 0;
