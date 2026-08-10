@@ -9,6 +9,7 @@ import { mount, nextPaint } from '../_helpers';
 import { Toggle } from '../_fixtures/exit.tsrx';
 
 describe('AnimatePresence exit animations', () => {
+	// @parity-case conformance:exit-cleanup-before-detach
 	it('animates a clone of the leaving element, removing it when the exit finishes', async () => {
 		let exitDone: () => void = () => {};
 		animateMock.mockImplementation(() => ({

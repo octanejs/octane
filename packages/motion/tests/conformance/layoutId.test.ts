@@ -16,6 +16,7 @@ afterEach(() => {
 });
 
 describe('layoutId (shared-element crossfade)', () => {
+	// @parity-case conformance:bounded-layoutId
 	it('FLIPs a newly-mounted element from a same-id element that just unmounted', async () => {
 		let box: any = { left: 0, top: 0, width: 100, height: 100 }; // position A
 		Element.prototype.getBoundingClientRect = vi.fn(() => box);

@@ -45,6 +45,7 @@ import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mj
 import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
 import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
 import { verifyVisxTypes } from './visx-types-lib.mjs';
+import { verifyMotionTypes } from './motion-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -177,6 +178,9 @@ try {
 	verifyTiptapTestClassifications(REPO);
 } catch (error) {
 	errors.push(`@octanejs/tiptap test classifications are invalid: ${error.message}`);
+	verifyMotionTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/motion type evidence is invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTestClassifications(REPO);
@@ -394,6 +398,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// Livestore has its own disposition set; verified above via verifyLivestore*.
 		// livestore keeps a binding-specific classifier (different dispositions);
 		// other bindings with classifications use the shared verifier.
+		// Livestore keeps a dedicated disposition set and verifier; the shared
+		// port classifications path would reject its adapted-upstream-suite entries.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))

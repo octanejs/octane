@@ -40,17 +40,31 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project motion",
-    "typecheck": "tsgo --noEmit -p tsconfig.json"
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
+    "upstream:verify": "node ./scripts/verify-upstream.mjs"
   },
   "dependencies": {
-    "motion": "catalog:default"
+    "motion": "catalog:default",
+    "motion-dom": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@swc/core": "1.15.41",
+    "@swc/jest": "0.2.39",
+    "@testing-library/dom": "catalog:default",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "16.3.2",
+    "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "jest-fixed-jsdom": "0.0.10",
     "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
     "vitest": "catalog:default"
   }
 }
