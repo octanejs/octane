@@ -146,7 +146,258 @@ const KEYED_PANELS_SOURCE = `
 	}
 `;
 
+const TRANSITION_PANELS_SOURCE = `
+	import { Suspense, startTransition, use, useState } from 'octane';
+
+	const PANELS = ['activity', 'insights'];
+
+	function ProjectBadge(props) @{
+		const badge = use(props.load('badge', props.version));
+		<span class="transition-badge">{badge as string}</span>
+	}
+
+	function ProjectOwner(props) @{
+		const owner = use(props.load('owner', props.version, props.project));
+		<span class="transition-owner">{owner as string}</span>
+	}
+
+	function ProjectHeader(props) @{
+		const project = use(props.load('project', props.version));
+		<section class="transition-project">
+			<span class="transition-project-value">{project as string}</span>
+			<div class="transition-project-meta">
+				<ProjectBadge load={props.load} version={props.version} />
+				<ProjectOwner load={props.load} version={props.version} project={project} />
+			</div>
+		</section>
+	}
+
+	function ActivityPanel(props) @{
+		const value = use(props.load('activity', props.version));
+		<span class="transition-panel" data-panel="activity">{value as string}</span>
+	}
+
+	function InsightsPanel(props) @{
+		const value = use(props.load('insights', props.version));
+		<span class="transition-panel" data-panel="insights">{value as string}</span>
+	}
+
+	function Dashboard(props) @{
+		<main class="transition-dashboard" data-version={props.version as string}>
+			<ProjectHeader load={props.load} version={props.version} />
+			@for (const panel of PANELS; key panel) {
+				@if (panel === 'activity') {
+					<ActivityPanel load={props.load} version={props.version} />
+				} @else {
+					<InsightsPanel load={props.load} version={props.version} />
+				}
+			}
+		</main>
+	}
+
+	export function TransitionPanels(props) @{
+		const [version, setVersion] = useState(props.initialVersion ?? 0);
+		<div>
+			<button class="transition-bump" onClick={() => startTransition(() => setVersion(value => value + 1))}>next</button>
+			<button class="transition-urgent" onClick={() => setVersion(2)}>urgent</button>
+			<span class="transition-shell">{'shell-' + version}</span>
+			<Suspense fallback={<span class="transition-pending">loading</span>}>
+				<Dashboard load={props.load} version={version} />
+			</Suspense>
+		</div>
+	}
+`;
+
 describe('parallel use() — independent asynchronous keyed-list children', () => {
+	it('starts each transition request once while preserving its dependent second wave', async () => {
+		const client = loadCompiledFixtureSource(TRANSITION_PANELS_SOURCE, {
+			id: 'warmed-transition-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.TransitionPanels, { load: resources.load });
+
+		try {
+			expect(resources.calls).toEqual(['project:0', 'badge:0', 'activity:0', 'insights:0']);
+			expect(root.find('.transition-pending').textContent).toBe('loading');
+
+			await act(() => {
+				resources.settle('badge', 0);
+				resources.settle('activity', 0);
+				resources.settle('insights', 0);
+				resources.settle('project', 0);
+			});
+			expect(resources.calls).toEqual([
+				'project:0',
+				'badge:0',
+				'activity:0',
+				'insights:0',
+				'owner:0',
+			]);
+			await act(() => resources.settle('owner', 0));
+
+			const dashboard = root.find('.transition-dashboard');
+			const panels = root.findAll('.transition-panel');
+			expect(panels.map((node) => node.textContent)).toEqual(['activity-v0', 'insights-v0']);
+			expect(dashboard.getAttribute('data-version')).toBe('0');
+			expect(root.find('.transition-shell').textContent).toBe('shell-0');
+			expect(root.find('.transition-owner').textContent).toBe('owner-v0');
+
+			root.click('.transition-bump');
+			expect(resources.calls.slice(5)).toEqual([
+				'project:1',
+				'badge:1',
+				'activity:1',
+				'insights:1',
+			]);
+			expect(root.find('.transition-dashboard')).toBe(dashboard);
+			expect(root.findAll('.transition-panel')).toEqual(panels);
+			expect(dashboard.getAttribute('data-version')).toBe('0');
+			expect(root.find('.transition-shell').textContent).toBe('shell-0');
+			expect(root.findAll('.transition-pending')).toEqual([]);
+
+			await act(() => {
+				resources.settle('badge', 1);
+				resources.settle('activity', 1);
+				resources.settle('insights', 1);
+				resources.settle('project', 1);
+			});
+			expect(resources.calls.slice(5)).toEqual([
+				'project:1',
+				'badge:1',
+				'activity:1',
+				'insights:1',
+				'owner:1',
+			]);
+			expect(root.find('.transition-dashboard')).toBe(dashboard);
+			expect(dashboard.getAttribute('data-version')).toBe('0');
+			expect(root.find('.transition-owner').textContent).toBe('owner-v0');
+
+			await act(() => resources.settle('owner', 1));
+			expect(root.find('.transition-dashboard')).toBe(dashboard);
+			expect(root.findAll('.transition-panel')).toEqual(panels);
+			expect(dashboard.getAttribute('data-version')).toBe('1');
+			expect(root.find('.transition-shell').textContent).toBe('shell-1');
+			expect(root.find('.transition-owner').textContent).toBe('owner-v1');
+			expect(root.findAll('.transition-panel').map((node) => node.textContent)).toEqual([
+				'activity-v1',
+				'insights-v1',
+			]);
+			expect(resources.calls).toEqual([
+				'project:0',
+				'badge:0',
+				'activity:0',
+				'insights:0',
+				'owner:0',
+				'project:1',
+				'badge:1',
+				'activity:1',
+				'insights:1',
+				'owner:1',
+			]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('starts separate requests for an independent root while another transition is pending', async () => {
+		const client = loadCompiledFixtureSource(TRANSITION_PANELS_SOURCE, {
+			id: 'independent-transition-roots.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const calls: string[] = [];
+		const jobs = new Map<string, Deferred<string>>();
+		let activeRoot = 'first';
+		const load = (resource: string, version: number) => {
+			const key = `${activeRoot}:${resource}:${version}`;
+			const job = deferred<string>();
+			calls.push(key);
+			jobs.set(key, job);
+			return job.promise;
+		};
+		const first = mount(client.TransitionPanels, { load, initialVersion: 0 });
+		let second: ReturnType<typeof mount> | undefined;
+
+		try {
+			await act(() => {
+				for (const resource of ['badge', 'activity', 'insights', 'project']) {
+					jobs.get(`first:${resource}:0`)!.resolve(`${resource}-first-v0`);
+				}
+			});
+			await act(() => jobs.get('first:owner:0')!.resolve('owner-first-v0'));
+			first.click('.transition-bump');
+			const start = calls.length;
+
+			activeRoot = 'second';
+			second = mount(client.TransitionPanels, { load, initialVersion: 1 });
+			expect(calls.slice(start)).toEqual([
+				'second:project:1',
+				'second:badge:1',
+				'second:activity:1',
+				'second:insights:1',
+			]);
+			expect(second.find('.transition-pending').textContent).toBe('loading');
+			expect(first.find('.transition-shell').textContent).toBe('shell-0');
+		} finally {
+			second?.unmount();
+			first.unmount();
+		}
+	});
+
+	it('does not reuse requests from a transition superseded by an urgent update', async () => {
+		const client = loadCompiledFixtureSource(TRANSITION_PANELS_SOURCE, {
+			id: 'superseded-transition-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.TransitionPanels, { load: resources.load });
+
+		try {
+			await act(() => {
+				for (const resource of ['badge', 'activity', 'insights', 'project']) {
+					resources.settle(resource, 0);
+				}
+			});
+			await act(() => resources.settle('owner', 0));
+
+			root.click('.transition-bump');
+			expect(resources.calls.slice(5)).toEqual([
+				'project:1',
+				'badge:1',
+				'activity:1',
+				'insights:1',
+			]);
+
+			root.click('.transition-urgent');
+			expect(resources.calls.slice(9)).toEqual([
+				'project:2',
+				'badge:2',
+				'activity:2',
+				'insights:2',
+			]);
+			expect(root.find('.transition-shell').textContent).toBe('shell-2');
+
+			await act(() => {
+				for (const resource of ['badge', 'activity', 'insights', 'project']) {
+					resources.settle(resource, 1);
+				}
+			});
+			expect(resources.calls).not.toContain('owner:1');
+			expect(root.find('.transition-shell').textContent).toBe('shell-2');
+			expect(root.find('.transition-owner').textContent).toBe('owner-v0');
+			expect(root.findAll('.transition-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'insights-v0',
+			]);
+			expect(root.find('.transition-dashboard').getAttribute('data-version')).toBe('0');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('starts every selected keyed child before any request resolves and adopts each request once', async () => {
 		const client = loadCompiledFixtureSource(KEYED_PANELS_SOURCE, {
 			id: 'independent-keyed-panels.tsrx',
