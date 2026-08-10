@@ -79,3 +79,5 @@ packages/react-spring/.pristine-upstream-*/
 # Root `dist` would otherwise ignore packages/*/upstream/dist/.
 !packages/textarea-autosize/upstream/dist/
 !packages/textarea-autosize/upstream/dist/**
+# Pristine vitest cache for monaco-editor upstream suite
+packages/monaco-editor/.vite-pristine/

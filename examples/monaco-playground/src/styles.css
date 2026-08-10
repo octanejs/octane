@@ -1,0 +1,48 @@
+:root {
+	color-scheme: light;
+	font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+	background: #f6f7f9;
+	color: #1b1f24;
+}
+
+body {
+	margin: 0;
+}
+
+.app {
+	max-width: 1100px;
+	margin: 0 auto;
+	padding: 24px;
+}
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 12px 0 16px;
+}
+
+.toolbar button,
+.toolbar select {
+	font: inherit;
+	padding: 6px 10px;
+}
+
+.editor-frame,
+.diff-frame {
+	height: 360px;
+	border: 1px solid #c9ced3;
+	background: #fff;
+}
+
+.diff-frame {
+	margin-top: 24px;
+	height: 280px;
+}
+
+.value-preview {
+	margin-top: 12px;
+	padding: 12px;
+	background: #eef1f5;
+	overflow: auto;
+}

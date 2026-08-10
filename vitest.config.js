@@ -5032,9 +5032,10 @@ export default defineConfig({
 				},
 			},
 			{
+				// Port-authored lifecycle/useMonaco against the real loader + fake Monaco.
 				test: {
 					name: 'monaco-editor',
-					include: ['packages/monaco-editor/tests/**/*.test.ts'],
+					include: ['packages/monaco-editor/tests/runtime/**/*.test.ts'],
 					environment: 'jsdom',
 					globals: false,
 				},
@@ -5047,6 +5048,117 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/monaco-editor/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'monaco-editor-pristine',
+					include: ['packages/monaco-editor/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+				},
+			},
+			{
+				// Adapted upstream snapshot ports + harness negatives + hydration.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/monaco-editor/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'monaco-editor-adapted',
+					include: [
+						'packages/monaco-editor/tests/upstream/**/*.test.ts',
+						'packages/monaco-editor/tests/harness/**/*.test.ts',
+						'packages/monaco-editor/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+				plugins: [octane()],
+				resolve: {
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: [
+						{
+							find: /^@monaco-editor\/loader$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/monaco-editor/tests/_mocks/loader.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/monaco-editor$/,
+							replacement: resolve(import.meta.dirname, 'packages/monaco-editor/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'monaco-editor-differential',
+					include: ['packages/monaco-editor/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/monaco-editor/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: [
+						{
+							find: /^@monaco-editor\/loader$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/monaco-editor/tests/_mocks/loader.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/monaco-editor$/,
+							replacement: resolve(import.meta.dirname, 'packages/monaco-editor/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'monaco-editor-ssr',
+					include: ['packages/monaco-editor/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^@monaco-editor\/loader$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/monaco-editor/tests/_mocks/loader.ts',
+							),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/monaco-editor$/,
+							replacement: resolve(import.meta.dirname, 'packages/monaco-editor/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'monaco-editor-browser',
+					include: ['packages/monaco-editor/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{

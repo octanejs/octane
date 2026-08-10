@@ -434,14 +434,21 @@
       "name": "@octanejs/monaco-editor",
       "version": "0.0.2",
       "category": "Forms and content",
-      "upstream": { "package": "@monaco-editor/react", "version": "4.7.0" },
-      "surface": "Editor, DiffEditor, loader, useMonaco, and the complete upstream 4.7.0 prop and callback type surface, including controlled values, model paths, languages, themes, options, view-state restoration, validation, and model ownership.",
+      "upstream": {
+        "package": "@monaco-editor/react",
+        "version": "4.7.0",
+        "commit": "eb120e66378471315620fe5339b73ba003f199ad"
+      },
+      "surface": "Editor (default), DiffEditor, loader, useMonaco, and the complete upstream 4.7.0 prop and callback type surface, including controlled values, model paths, languages, themes, options, view-state restoration, validation, and model ownership.",
       "divergences": [
-        "The components are compiled Octane components and accept Octane renderables for loading content; they do not depend on React.",
-        "Model disposal is ownership-aware: a component only disposes models it created, and it cleans up superseded owned path models on unmount instead of leaking them."
+        "Components are compiled Octane `.tsrx` modules and accept OctaneNode for loading content; they do not depend on React.",
+        "MonacoContainer uses Octane ref as an ordinary prop instead of upstream private _ref.",
+        "Model disposal is ownership-aware: binding-owned models are tracked in a WeakSet with lease counts in a WeakMap, so externally created or shared models are not disposed by the wrong owner; superseded owned path models are cleaned up on unmount.",
+        "View state is stored in a WeakMap keyed by model identity rather than upstream path-string Map.",
+        "CSS style modules use plain records instead of React CSSProperties."
       ],
-      "ssr": "Editor and DiffEditor render a deterministic loading shell without touching browser globals; live Monaco construction begins in a client effect. Hydration is not yet separately verified.",
-      "verified": "2026-07-31"
+      "ssr": "Editor and DiffEditor render a deterministic loading shell without touching browser globals; live Monaco construction begins in a client effect. Hydration adopts server DOM (section, slot nodes) and reaches a ready editor without mismatch warnings.",
+      "verified": "2026-08-10"
     },
     {
       "name": "@octanejs/motion",
