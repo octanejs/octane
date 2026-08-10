@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "files": ["packages/valtio/typetests/pristine/public-api.test-d.ts"],
+  "assertionGroups": ["useSnapshot readonly inference", "useProxy mutable inference"]
+}

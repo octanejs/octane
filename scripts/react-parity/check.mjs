@@ -378,6 +378,9 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		if (
 			binding !== 'livestore' &&
 			binding !== 'tanstack-table' &&
+		// Livestore has its own disposition set; verified above via verifyLivestore*.
+		if (
+			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		)
 			verifyPortTestClassifications(REPO, binding);

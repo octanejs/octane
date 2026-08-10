@@ -596,12 +596,57 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/valtio/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'valtio',
 					include: ['packages/valtio/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					exclude: ['packages/valtio/tests/differential/**/*.test.ts'],
 					globals: false,
 				},
+
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/valtio$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/react\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/react/utils.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/react.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/vanilla\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/vanilla/utils.ts'),
+						},
+						{
+							find: /^@octanejs\/valtio\/vanilla$/,
+							replacement: resolve(import.meta.dirname, 'packages/valtio/src/vanilla.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/valtio/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'valtio-differential',
+					include: ['packages/valtio/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					globalSetup: ['packages/valtio/tests/differential/_setup.ts'],
+				},
+
 				plugins: [octane()],
 				resolve: {
 					alias: [

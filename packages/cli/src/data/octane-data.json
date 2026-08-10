@@ -973,7 +973,7 @@
         "React DevTools affected-path debug labels are omitted because Octane's `useDebugValue` is currently a no-op."
       ],
       "ssr": "The server snapshot path uses `snapshot(proxyObject)`; no dedicated SSR rendering test is included yet.",
-      "verified": "2026-07-27"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/vaul",

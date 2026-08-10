@@ -1,6 +1,7 @@
 import { useState } from 'octane';
 import { useSnapshot } from '@octanejs/valtio';
 import { useProxy } from '@octanejs/valtio/react/utils';
+import { proxy } from '@octanejs/valtio/vanilla';
 
 type CounterState = {
 	count: number;
@@ -51,5 +52,31 @@ export function SwitchingValue(props: { state: CounterState }) @{
 
 export function MutableProxy(props: { state: CounterState }) @{
 	const state = useProxy(props.state);
+	<button id="proxy-count" onClick={() => state.count++}>{state.count as string}</button>
+}
+
+// The React fixture compiler evaluates this module independently, so these
+// stores isolate each runtime instead of sharing mutable props across them.
+const differentialCounterState = proxy<CounterState>({
+	count: 0,
+	other: 0,
+	profile: { name: 'Ada' },
+});
+const differentialMutableProxyState = proxy<CounterState>({
+	count: 0,
+	other: 0,
+	profile: { name: 'Ada' },
+});
+
+export function DifferentialCounter() @{
+	const snap = useSnapshot(differentialCounterState);
+	<div>
+		<span id="count">{snap.count as string}</span>
+		<button id="increment" onClick={() => differentialCounterState.count++}>increment</button>
+	</div>
+}
+
+export function DifferentialMutableProxy() @{
+	const state = useProxy(differentialMutableProxyState);
 	<button id="proxy-count" onClick={() => state.count++}>{state.count as string}</button>
 }
