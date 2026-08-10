@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
@@ -355,36 +355,61 @@ describe('CI workflow aggregation', () => {
 		assert.equal(projects[1].testExecution, undefined);
 	});
 
-	test('runs required differential evidence only in its owning CI lane', () => {
+	test('assigns every required Vitest parity lane to its owning CI lane', () => {
 		const baseProjects = new Map(
 			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
 		);
 		const shardedProjects = new Map(
 			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
 		);
-		for (const project of [
-			'mobx-differential',
-			'phosphor-icons-differential',
-			'rainbowkit-differential',
-			'recharts-differential',
-			'rxjs-differential',
-			'usehooks-ts-differential',
-			'wagmi-differential',
-		]) {
-			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
-			assert.equal(shardedProjects.has(project), false);
-		}
+		const packagesRoot = path.join(REPO, 'packages');
 
-		const mixedProject = baseProjects.get('react-error-boundary-differential');
-		const parityFile = 'packages/react-error-boundary/tests/differential/parity.test.ts';
-		assert.deepEqual(mixedProject.testExecution, {
-			group: 'react-parity',
-			include: [parityFile],
-		});
-		assert.equal(
-			shardedProjects.get('react-error-boundary-differential').test.exclude.includes(parityFile),
-			true,
-		);
+		for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue;
+			const manifestPath = path.join(packagesRoot, entry.name, 'audit/react-parity.json');
+			if (!existsSync(manifestPath)) continue;
+
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+			for (const lane of manifest.lanes) {
+				if (
+					lane.oracle !== 'required' ||
+					lane.available === false ||
+					['typescript', 'jest-full', 'playwright-full'].includes(lane.execution?.kind)
+				)
+					continue;
+
+				const project = baseProjects.get(lane.project);
+				assert.ok(project, `${lane.id} references missing Vitest project ${lane.project}`);
+				assert.equal(
+					project.testExecution?.group,
+					'react-parity',
+					`${lane.id} must not also run in ordinary sharded CI`,
+				);
+
+				const ownedPatterns = project.testExecution.include;
+				if (!ownedPatterns?.length) {
+					assert.equal(shardedProjects.has(lane.project), false);
+					continue;
+				}
+
+				const evidenceFiles =
+					lane.execution?.kind === 'vitest-full'
+						? JSON.parse(readFileSync(path.join(REPO, lane.execution.inventory), 'utf8')).files
+						: lane.files.filter((file) => file.role === 'test').map((file) => file.path);
+				for (const file of evidenceFiles) {
+					assert.ok(
+						ownedPatterns.some((pattern) => path.matchesGlob(file, pattern)),
+						`${lane.id} evidence file ${file} is not owned by react-parity`,
+					);
+				}
+
+				const shardedProject = shardedProjects.get(lane.project);
+				assert.ok(shardedProject, `${lane.project} must retain its ordinary tests`);
+				for (const pattern of ownedPatterns) {
+					assert.ok(shardedProject.test.exclude.includes(pattern));
+				}
+			}
+		}
 	});
 });
 
