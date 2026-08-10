@@ -1,0 +1,16 @@
+{
+  "upstream": {
+    "package": "@tanstack/db",
+    "version": "0.6.17"
+  },
+  "surface": "Re-exports `@tanstack/db@0.6.17` unchanged and implements its live-query binding surface (`useLiveQuery`, `useLiveInfiniteQuery`, `useLiveSuspenseQuery`, `useLiveQueryEffect`, `usePacedMutations`) on Octane hooks.",
+  "divergences": [
+    "Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches)."
+  ],
+  "ssr": "Not yet exercised: no server-render tests are included for the live-query hooks.",
+  "notes": [
+    "Behavioral conformance runs the shared `@tanstack/db` live-query conformance suite against the Octane adapter, plus coverage for suspense, effect hooks, paced mutations, and eager onStoreChange; type tests cover the `useLiveQuery` overload families.",
+    "The `@tanstack/db` expression evaluator and comparison utilities are vendored under `tests/db-fixtures/db-internal/` (pinned to 0.6.17) so the infinite-query tests can interpret the where/cursor IR db generates internally; these are test-only and not shipped."
+  ],
+  "verified": "2026-08-10"
+}
