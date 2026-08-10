@@ -8382,9 +8382,32 @@ function isSuspenseException(x: any): x is SuspenseException {
 
 const HYDRATION_REJECTION_SEED = Symbol('octane.hydration.rejection-seed');
 const HYDRATION_REJECTION_EXCEPTION = Symbol('octane.hydration.rejection-exception');
+const HYDRATION_SITE_EVENTS = Symbol('octane.hydration.site-events');
+const HYDRATION_SEED_FACTORY = Symbol('octane.hydration.seed-factory');
 
 interface HydrationRejectionSeed {
 	[HYDRATION_REJECTION_SEED]: unknown;
+}
+
+interface HydrationSiteEvents {
+	queues: Map<string, number[]>;
+	offsets: Map<string, number>;
+}
+
+interface HydrationSeedArray extends Array<unknown> {
+	[HYDRATION_SITE_EVENTS]?: HydrationSiteEvents;
+}
+
+interface HydrationSeedFactory {
+	index: number;
+	factory: (() => unknown) | null;
+	value?: unknown;
+	error?: unknown;
+	failed?: boolean;
+}
+
+interface HydrationSeedThenable extends TrackedThenable {
+	[HYDRATION_SEED_FACTORY]: HydrationSeedFactory;
 }
 
 class HydrationRejectionException {
@@ -8467,10 +8490,11 @@ function isHydrationRejection(error: unknown): error is HydrationRejectionExcept
 
 /**
  * Hydration uses the server's settled value/reason as the canonical first-render
- * result, but evaluating the client component has already created its matching
- * thenable. Observe that thenable without letting its eventual result replace
- * the seed. Otherwise a later client-side rejection is reported as unhandled
- * even though the authored use() is visibly handled by its hydrated @catch arm.
+ * result. An externally supplied or otherwise unoptimized client thenable may
+ * already exist, so observe it without letting its eventual result replace the
+ * seed. Otherwise a later client-side rejection is reported as unhandled even
+ * though the authored use() is visibly handled by its hydrated @catch arm.
+ * Compiler-owned seeded factories never create a client thenable to observe.
  */
 function observeHydrationSeedThenable(thenable: TrackedThenable<unknown>): void {
 	thenable.then(
@@ -8485,6 +8509,36 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function materializeHydrationSeedFactory(record: HydrationSeedFactory): unknown {
+	if (record.failed === true) throw record.error;
+	if (record.factory !== null) {
+		const factory = record.factory;
+		record.factory = null;
+		try {
+			record.value = factory();
+		} catch (error) {
+			record.failed = true;
+			record.error = error;
+			throw error;
+		}
+	}
+	return record.value;
+}
+
+function getHydrationSeedFactory(thenable: TrackedThenable): HydrationSeedFactory | undefined {
+	try {
+		return (thenable as HydrationSeedThenable)[HYDRATION_SEED_FACTORY];
+	} catch {
+		return undefined;
+	}
+}
+
+/** Compiler-owned direct use() creations consult their server-proven site outcome first. */
+export function seedOrCreate<T>(site: string, factory: () => T): T {
+	const hydration = activeHydration();
+	return hydration === null ? factory() : hydration.seedOrCreate(site, factory);
 }
 
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
@@ -8505,20 +8559,7 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 		hydration.seeds !== null &&
 		hydration.seedCursor < hydration.seeds.length
 	) {
-		const seed = hydration.seeds[hydration.seedCursor++];
-		observeHydrationSeedThenable(thenable);
-		const rejection = hydration.rejectionFromSeed(seed);
-		if (rejection !== null) {
-			thenable.status = 'rejected';
-			thenable.reason = rejection.reason;
-			state[idx] = thenable;
-			throw rejection;
-		}
-		const value = seed as T;
-		thenable.status = 'fulfilled';
-		thenable.value = value;
-		state[idx] = thenable;
-		return value;
+		return hydration.useSeed(thenable, state, idx, replaceOnResume);
 	}
 
 	const stored = state[idx];
@@ -9687,6 +9728,74 @@ class HydrationCapability {
 		return hydrationRejectionFromSeed(seed);
 	}
 
+	seedOrCreate<T>(site: string, factory: () => T): T {
+		if (this.seeds === null) return factory();
+		const events = (this.seeds as HydrationSeedArray)[HYDRATION_SITE_EVENTS];
+		if (events === undefined) return factory();
+		const queue = events.queues.get(site);
+		if (queue === undefined) return factory();
+		const offset = events.offsets.get(site) ?? 0;
+		events.offsets.set(site, offset + 1);
+		const index = queue[offset];
+		if (index === undefined || index < this.seedCursor) return factory();
+
+		const record: HydrationSeedFactory = { index, factory };
+		const thenable: HydrationSeedThenable = {
+			[HYDRATION_SEED_FACTORY]: record,
+			then(onFulfilled, onRejected) {
+				if (thenable.status === 'fulfilled') {
+					return Promise.resolve(thenable.value).then(onFulfilled, onRejected);
+				}
+				if (thenable.status === 'rejected') {
+					return Promise.reject(thenable.reason).then(onFulfilled, onRejected);
+				}
+				return Promise.resolve(materializeHydrationSeedFactory(record)).then(
+					onFulfilled,
+					onRejected,
+				);
+			},
+		};
+		return thenable as T;
+	}
+
+	useSeed<T>(
+		thenable: TrackedThenable<T>,
+		state: TrackedThenable<any>[],
+		index: number,
+		replaceOnResume: boolean,
+	): T {
+		const factory = getHydrationSeedFactory(thenable);
+		if (factory !== undefined && factory.index !== this.seedCursor) {
+			CURRENT_BLOCK!.__thenableIdx = index;
+			const usable = materializeHydrationSeedFactory(factory);
+			if (
+				replaceOnResume &&
+				usable !== null &&
+				usable !== undefined &&
+				typeof (usable as PromiseLike<T>).then === 'function'
+			) {
+				return useThenable(usable as TrackedThenable<T>, true);
+			}
+			return use(usable as PromiseLike<T>) as T;
+		}
+
+		const seed = this.seeds![this.seedCursor++];
+		if (factory === undefined) observeHydrationSeedThenable(thenable);
+		else factory.factory = null;
+		const rejection = this.rejectionFromSeed(seed);
+		if (rejection !== null) {
+			thenable.status = 'rejected';
+			thenable.reason = rejection.reason;
+			state[index] = thenable;
+			throw rejection;
+		}
+		const value = seed as T;
+		thenable.status = 'fulfilled';
+		thenable.value = value;
+		state[index] = thenable;
+		return value;
+	}
+
 	/** Mark a client-built hydration replacement (and its descendants) as fresh DOM. */
 	markFresh(node: Node): void {
 		this.freshNodes.add(node);
@@ -10141,6 +10250,38 @@ function parseSeedJson(raw: string): unknown[] | null {
 			values[entry[0]] = {
 				[HYDRATION_REJECTION_SEED]: decodeHydrationRejectionPayload(entry[1]),
 			} satisfies HydrationRejectionSeed;
+		}
+		if (envelope.sites !== undefined) {
+			if (!Array.isArray(envelope.sites)) return null;
+			const queues = new Map<string, number[]>();
+			const seededSites = new Set<number>();
+			let previousSeedIndex = -1;
+			for (const entry of envelope.sites) {
+				if (
+					!Array.isArray(entry) ||
+					entry.length !== 2 ||
+					typeof entry[0] !== 'string' ||
+					entry[0] === '' ||
+					!Number.isInteger(entry[1]) ||
+					entry[1] < -1 ||
+					entry[1] >= values.length
+				)
+					return null;
+				const index = entry[1] as number;
+				if (index >= 0) {
+					if (index <= previousSeedIndex || seededSites.has(index)) return null;
+					previousSeedIndex = index;
+					seededSites.add(index);
+				}
+				const queue = queues.get(entry[0]);
+				if (queue === undefined) queues.set(entry[0], [index]);
+				else queue.push(index);
+			}
+			if (seededSites.size === 0) return null;
+			(values as HydrationSeedArray)[HYDRATION_SITE_EVENTS] = {
+				queues,
+				offsets: new Map(),
+			};
 		}
 		return values;
 	} catch {

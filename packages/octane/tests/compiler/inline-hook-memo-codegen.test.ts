@@ -93,7 +93,7 @@ describe('inline hook-memo tier — compile-mode and shape routing', () => {
 			'inline-pu-dev.tsrx',
 			{ hmr: 'vite', dev: true },
 		).code;
-		expect(dev).toMatch(/useMemo\(\(\) => fetchUser/);
+		expect(dev).toMatch(/useMemo\(\s*\(\)\s*=>[\s\S]*?\(\)\s*=>\s*fetchUser\(id\)/);
 		expect(dev).not.toMatch(/puTake/);
 	});
 

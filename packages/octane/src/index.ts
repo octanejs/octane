@@ -221,6 +221,7 @@ export {
 	// Compiler-emitted parallel use(): batched stratum unwrap + fetch-tree
 	// warming (docs/suspense-parallel-use-plan.md).
 	useBatch,
+	seedOrCreate,
 	warmMemo,
 	warmChild,
 	// Closure-free creation take/publish ABI (inline hook-memo tier).
