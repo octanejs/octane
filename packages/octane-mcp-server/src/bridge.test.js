@@ -253,6 +253,15 @@ describe('bridgeReportFromSource', () => {
 		expect(report.plan[0]).toContain('@octanejs/tanstack-query');
 	});
 
+	it('routes the React Monaco adapter to its framework-neutral editor core', () => {
+		const report = bridgeReportFromSource(`export {};`, {
+			packageName: '@monaco-editor/react',
+		});
+		expect(report.existingBinding).toBe('@octanejs/monaco-editor');
+		expect(report.vanillaCore).toBe('monaco-editor');
+		expect(report.plan[0]).toContain('@octanejs/monaco-editor');
+	});
+
 	it('same-name hook usage stays bridgeable', () => {
 		const report = bridgeReportFromSource(`
 			import { useSyncExternalStore } from 'react';

@@ -3143,6 +3143,24 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'monaco-editor',
+					include: ['packages/monaco-editor/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: [
+						{
+							find: /^@octanejs\/monaco-editor$/,
+							replacement: resolve(import.meta.dirname, 'packages/monaco-editor/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',

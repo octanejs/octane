@@ -24,6 +24,7 @@ of bridging by hand:
 | `styled-components` | `@octanejs/styled-components` |
 | `react-router` / `react-router-dom` | `@octanejs/remix-router` |
 | `@lexical/react` | `@octanejs/lexical` |
+| `@monaco-editor/react` | `@octanejs/monaco-editor` |
 | `lucide-react` | `@octanejs/lucide` |
 | `@floating-ui/react` | `@octanejs/floating-ui` |
 | `radix-ui` | `@octanejs/radix` |

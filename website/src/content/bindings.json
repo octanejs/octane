@@ -67,6 +67,7 @@
       "@octanejs/lexical",
       "@octanejs/tiptap",
       "@octanejs/streamdown",
+      "@octanejs/monaco-editor",
       "@octanejs/mdx",
       "@octanejs/i18next"
     ]
