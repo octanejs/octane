@@ -2222,6 +2222,48 @@
   },
   {
     "suite": "spa-navigation",
+    "op": "elements_deep",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the 1024-leaf route renders exactly 2052 elements in both frameworks."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "text_deep",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the 1024-leaf route renders exactly 1025 text nodes in both frameworks."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "comments_deep",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.01,
+    "note": "Marker elision: transitive @if-arm single-root proof leaves 1 comment vs Solid's 2046 on the 1024-leaf route (0.0005x, 2026-08-09). A regression to per-slot comp pairs is 2x Solid and fails loudly."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "nodes_deep",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.005,
+    "note": "Total DOM weight of the 1024-leaf route: Octane 3078 vs React 3077 nodes (1.0003x, 2026-08-09)."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "comments_deep",
+    "target": "octane-jsx",
+    "reference": "solid",
+    "maxRatio": 4.05,
+    "note": "Holds the JSX-dialect de-opt line: 8184 vs Solid 2046 comments (4.0x, 2026-08-09) while the de-opt gap is being addressed."
+  },
+  {
+    "suite": "spa-navigation",
     "op": "nav_teardown",
     "target": "octane-tsrx",
     "reference": "solid",

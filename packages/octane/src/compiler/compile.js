@@ -5078,6 +5078,64 @@ function isSingleHostIfRoot(node) {
 }
 
 /**
+ * A component-call arm that participates in the transitive single-root proof:
+ * a bare same-module identifier tag with no key, no spread, and no children.
+ * Those are the same conditions under which the call site emits the markerless
+ * singleRoot/lite regime (makeCompCall's callSiteOk + key gate), so "the arm
+ * renders exactly one element" reduces to "the callee's output is one element".
+ * Local shadows are rejected — the module-level proof would name the wrong
+ * binding. Returns the callee name, or null when the arm does not qualify.
+ */
+function singleRootComponentArmName(node, locals, ctx) {
+	if ((node.type !== 'Element' && node.type !== 'JSXElement') || !isComponentTag(node)) return null;
+	const name = tagBindingName(node);
+	if (name === null || locals.has(name) || !ctx.componentInfo.has(name)) return null;
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	for (const a of attrs) {
+		if (a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute') return null;
+		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
+		if ((a.name && (a.name.name || a.name)) === 'key') return null;
+	}
+	if ((node.children || []).length > 0) return null;
+	return name;
+}
+
+/**
+ * Transitive definition-site single-root proof for a void `@{}` body whose
+ * sole root is an `@if`/`@else` tree: every reachable arm must render exactly
+ * one plain host OR one qualifying same-module component call (see
+ * singleRootComponentArmName). Returns the set of callee names the proof
+ * depends on (empty when every arm is a host), or null when the shape does
+ * not qualify. The caller resolves the deps with a fixed point over
+ * componentInfo, so `@if (d > 0) { <div>…</div> } @else { <Leaf/> }` is
+ * proven single-root once Leaf is — the multi-hole host shape
+ * `<div><Node/><Node/></div>` then takes the existing anchorless
+ * componentSlot singleRoot regime with zero minted markers. Purely a
+ * client-mount elision: SSR emission and hydration adoption are unchanged
+ * (hydration always adopts the server's frame pair before this regime is
+ * consulted).
+ */
+function collectSingleRootIfDeps(render, locals, ctx) {
+	const roots = normalizeChildren(render ? [render] : []).filter((n) => n.type !== 'HeadHoist');
+	if (roots.length !== 1 || !isIfDirective(roots[0])) return null;
+	const deps = new Set();
+	const armOk = (arm) => {
+		if (isIfDirective(arm)) return ifOk(arm);
+		const out = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+		if (out.length !== 1) return false;
+		const sole = out[0];
+		if (isIfDirective(sole)) return ifOk(sole);
+		if (isPlainHostRoot(sole)) return true;
+		const name = singleRootComponentArmName(sole, locals, ctx);
+		if (name === null) return false;
+		deps.add(name);
+		return true;
+	};
+	const ifOk = (n) => n.alternate != null && armOk(n.consequent) && armOk(n.alternate);
+	return ifOk(roots[0]) ? deps : null;
+}
+
+/**
  * Local (non-transitive) anchorless-append shape of a lite component's body
  * root, for the all-component-children emission (see emitElementHtml and
  * makeCompCall's anchorlessAppendSafe). A componentSlotLite call with no
@@ -7555,6 +7613,12 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// like a single-root `@for` item. (Output-shape based — independent of which
 		// hooks it calls.)
 		info.singleRoot = singleHostComponentRoot(compNode);
+		// Transitive @if-arm form of the same proof — resolved by the fixed point
+		// below once every same-module callee an arm depends on is itself proven.
+		info.singleRootIfDeps =
+			!info.singleRoot && isVoidJsxCodeBlockFunction(compNode)
+				? collectSingleRootIfDeps(compNode.body.render, locals, ctx)
+				: null;
 	}
 	// Purity is transitive for same-module component calls. Iterate to a fixed
 	// point so declaration order and mutually recursive pure components do not
@@ -7605,6 +7669,31 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 				info.autoMemoImportedComponents = [...importedComponents].sort();
 				info.autoMemoMayReadContext = mayReadContext;
 				autoMemoCapturesChanged = true;
+			}
+		}
+	}
+	// Single-root output is transitive across same-module `@if` arms (see
+	// collectSingleRootIfDeps): flip false → true until stable so declaration
+	// order and recursion through a proven base case don't matter. Pessimistic —
+	// an unproven cycle (`A = @{ <B/> arm }`, `B = @{ <A/> arm }` with no host
+	// base) stays false. Runs before lowering, so call sites, the `$$singleRoot`
+	// module-tail stamps, and the @for item proof all consume the widened result
+	// through the existing channels.
+	let singleRootChanged = true;
+	while (singleRootChanged) {
+		singleRootChanged = false;
+		for (const [, info] of ctx.componentInfo) {
+			if (info.singleRoot === true || info.singleRootIfDeps == null) continue;
+			let proven = true;
+			for (const name of info.singleRootIfDeps) {
+				if (ctx.componentInfo.get(name)?.singleRoot !== true) {
+					proven = false;
+					break;
+				}
+			}
+			if (proven) {
+				info.singleRoot = true;
+				singleRootChanged = true;
 			}
 		}
 	}

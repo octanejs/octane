@@ -36,7 +36,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-import { censusDomNodes } from '../lib/dom-nodes.mjs';
+import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -62,6 +62,13 @@ const NAVS = [
 ];
 
 const OPS = [...NAVS.map((n) => n.op), 'nav_deep_6x'];
+
+// Deterministic DOM-shape ops from the untimed census of the 1024-leaf route
+// (see measureDom): visible elements/text are the semantic control (equivalent
+// trees), comment nodes are the marker-elision claim. Ratio-guarded in
+// benchmarks/baselines/ratios.json; keep count assertions here, out of the
+// correctness suites.
+const CENSUS_OPS = ['nodes_deep', 'elements_deep', 'text_deep', 'comments_deep'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -263,6 +270,10 @@ async function runTarget(t) {
 		console.error(`  → nav_deep_6x`);
 		results.nav_deep_6x = await measureNav(browser, t.url, NAVS[0], { throttle: THROTTLE_RATE });
 		results.__dom = dom;
+		results.nodes_deep = deterministicCount(dom.deep.total);
+		results.elements_deep = deterministicCount(dom.deep.elements);
+		results.text_deep = deterministicCount(dom.deep.text);
+		results.comments_deep = deterministicCount(dom.deep.comments);
 		return { gateErrors: [], results };
 	} finally {
 		await browser.close();
@@ -347,6 +358,15 @@ async function runTarget(t) {
 			const ratio = scoreOf(all[c].nav_deep_6x) / scoreOf(all[c].nav_deep);
 			console.log(`  ${c.padEnd(13)} ${ratio.toFixed(2)}x`);
 		}
+
+		// Deterministic DOM census of the 1024-leaf route: equal visible
+		// elements/text is the semantic control; comments are renderer overhead
+		// (Octane's marker-elision claim lives here, not in correctness suites).
+		console.log('\nDOM census, 1024-leaf route (elements / text / comments):');
+		for (const c of cols) {
+			const d = all[c].__dom.deep;
+			console.log(`  ${c.padEnd(13)} ${d.elements} / ${d.text} / ${d.comments}`);
+		}
 	}
 
 	if (process.env.BENCH_JSON) {
@@ -356,7 +376,13 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: all[t.name]
-					? Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])]))
+					? Object.fromEntries([
+							...OPS.map((op) => [op, timingStatForJson(all[t.name][op])]),
+							...CENSUS_OPS.map((op) => {
+								const r = all[t.name][op];
+								return [op, { median: r.median, min: r.min, samples: r.samples.length }];
+							}),
+						])
 					: {},
 				meta: {
 					gates: failedTargets.has(t.name) ? 'fail' : 'pass',
