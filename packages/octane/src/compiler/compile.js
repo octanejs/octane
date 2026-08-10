@@ -14330,6 +14330,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 		const item = declaration?.id;
 		if (
 			candidate === undefined ||
+			!guards.every(isSafeWarmListGuard) ||
 			ctx.currentComponentLocals?.has(iterable.name) ||
 			locals.has(iterable.name) ||
 			loop.await ||
@@ -14355,10 +14356,39 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 		}
 	}
 
+	function isSafeWarmListGuard(guard) {
+		const expression = unwrapTsExpr(guard);
+		if (expression?.type === 'Literal' || expression?.type === 'Identifier') return true;
+		if (expression?.type === 'MemberExpression') {
+			return (
+				!expression.computed &&
+				!expression.optional &&
+				expression.object?.type === 'Identifier' &&
+				expression.property?.type === 'Identifier'
+			);
+		}
+		if (expression?.type === 'UnaryExpression' && expression.operator === '!') {
+			return isSafeWarmListGuard(expression.argument);
+		}
+		if (
+			expression?.type === 'BinaryExpression' &&
+			(expression.operator === '===' || expression.operator === '!==')
+		) {
+			return isSafeWarmListGuard(expression.left) && isSafeWarmListGuard(expression.right);
+		}
+		return false;
+	}
+
 	function visitWarmListArm(arm, item, value) {
-		if (arm?.type !== 'BlockStatement') return false;
-		for (const entry of arm.body || []) {
-			if (entry.type === 'JSXIfExpression') {
+		const entries =
+			arm?.type === 'BlockStatement'
+				? arm.body || []
+				: arm?.type === 'JSXIfExpression' || arm?.type === 'IfStatement'
+					? [arm]
+					: null;
+		if (entries === null) return false;
+		for (const entry of entries) {
+			if (entry.type === 'JSXIfExpression' || entry.type === 'IfStatement') {
 				const test = unwrapTsExpr(entry.test);
 				if (
 					test?.type !== 'BinaryExpression' ||
@@ -14444,6 +14474,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			if (
 				entry.type === 'JSXElement' ||
 				entry.type === 'JSXFragment' ||
+				entry.type === 'JSXForExpression' ||
 				entry.type === 'JSXIfExpression' ||
 				entry.type === 'JSXTryExpression'
 			) {
