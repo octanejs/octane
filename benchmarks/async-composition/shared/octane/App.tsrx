@@ -4,6 +4,8 @@ import { ActivityPanel } from './ActivityPanel.tsrx';
 import { InsightsPanel } from './InsightsPanel.tsrx';
 import { ProjectHeader } from './ProjectHeader.tsrx';
 
+const DASHBOARD_PANELS = ['activity', 'insights'];
+
 // Synchronous transition-atomicity guard: keyed rows that reorder, drop and
 // gain a member every version, plus a controlled input. All of it must move
 // with the fetched panels in one step — the observer counts any earlier
@@ -20,8 +22,13 @@ function Board(props: { version: number }) @{
 function Dashboard(props: { version: number }) @{
 	<main data-dashboard-version={props.version}>
 		<ProjectHeader version={props.version} />
-		<ActivityPanel version={props.version} />
-		<InsightsPanel version={props.version} />
+		@for (const panel of DASHBOARD_PANELS; key panel) {
+			@if (panel === 'activity') {
+				<ActivityPanel version={props.version} />
+			} @else {
+				<InsightsPanel version={props.version} />
+			}
+		}
 		<Board version={props.version} />
 	</main>
 }

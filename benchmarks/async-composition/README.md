@@ -159,3 +159,22 @@ production compiles: binding writes, controlled value projection, and keyed
 removals/insertions/moves all have to move with the fetched panels in one step.
 Disabling the runtime's transition journal makes the update gate fail with
 `mixedStates regressed to 1 (ceiling 0)`; React records zero as the reference.
+
+## Keyed asynchronous panels
+
+The Octane dashboard renders `ActivityPanel` and `InsightsPanel` from a private,
+two-entry keyed panel list. The rendered dashboard, its eight versioned request
+keys, and the dependent owner request are unchanged; the four independent panel
+requests must still start in the first wave.
+
+The compiler expands eligible child warm plans from a private, nonescaping list
+of at most 16 distinct string values. Expansion happens at compile time, so
+speculation does not iterate the list, evaluate its keys, or add hook slots. An
+unknown, mutable, or escaped list retains the ordinary rendering behavior.
+
+The existing browser gate requires all seven independent requests in the first
+wave, two waves per operation, and eight actual network starts. Its current
+factory-call ceilings are eight on initialization and 13 on an update; the
+remaining update-only replay calls reuse cached requests. Keyed board identity,
+controlled input state, fallback retention, and zero mixed transition states
+remain mandatory.

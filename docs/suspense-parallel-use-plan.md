@@ -168,6 +168,19 @@ What shipped, and where it deviates from the phases as written:
     MAX-pass errors (retired 33/37 → 47/48) now hint at the cause. Pinned in
     `tests/ssr-prop-flow-promises.test.ts` (streaming + prerender + bare-root,
     exactly-once creation for the memoized shape).
+- **Bounded keyed-child discovery LANDED 2026-08-10.** The client compiler can
+  statically unroll a keyed `@for` into its parent's existing child warm plan
+  when its iterable is a private, unescaped module-level string-literal array with
+  at most 16 distinct entries, its sole use is that iterable, and its explicit
+  key is the item itself. Only pure, statically selected branches and safe
+  component props participate. The warm plan never evaluates the iterable,
+  item indexes, or keys, and never puts hooks in the loop; each real child
+  still owns its existing keyed component scope. Dynamic, dependent, mutated,
+  aliased, duplicate-key, and over-limit lists remain excluded, as do `@switch`
+  arms. Server and universal compilation are unchanged. The existing
+  composition dashboard's two keyed async panels return from four discovery
+  waves to two, restoring all seven independent first-wave requests while
+  preserving its current eight initial and 13 transition-update creators.
 - **Decision points resolved:** (1) unconditional, with no serial-timing mode;
   (2) loops excluded — mandatory (Phase 0); (3) member-path deps; (4)
   AbortSignal not shipped; (5)
@@ -597,6 +610,7 @@ is that Phase 4's coverage makes this unnecessary.
 | `use(context)` | Untouched: trivial args skip Phase 1; `_$useBatch` skips `$$kind === CONTEXT_TAG` entries at runtime. |
 | `use()` behind `@if` / plain `if` / early-return guard | Batched only within its own block; slot symbols are already conditional-safe. Never lift a creation out of its guarding condition. |
 | `use()` in loops | Excluded from Phases 1–2 (RESOLVED, Phase 0): loop iterations share one slot symbol, so `useMemo` thrashes one entry and a memoized creation would fresh-promise every render → infinite re-suspend. Bare `use()` stays loop-safe (call-order indexed). |
+| Async component children of a keyed `@for` | Client warming statically unrolls only private, nonescaping string-literal arrays with at most 16 distinct explicit item keys; children keep their separate component scopes and no hook is inserted into the loop. All other keyed lists remain opaque. |
 | Dependent creations (`use(f(a))`) | Not hoisted; on replay they join the pending set (Phase 3); dev warning explains the chain (Phase 5). |
 | Interleaved non-declaration statements | Terminate the batch run (v1 conservatism). |
 | Child props depend on suspended data (`<Detail item={data.first}/>`) | Correctly excluded from the warm plan — a true data dependency; that child's fetches start on resume (dependency-depth behavior). |
