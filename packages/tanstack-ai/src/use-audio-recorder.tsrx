@@ -49,18 +49,15 @@ export interface UseAudioRecorderReturn<TOutput> {
  * ```
  */
 export function useAudioRecorder<
-  TOnComplete extends (recording: AudioRecording) => unknown,
+  TOnComplete extends (recording: AudioRecording) => unknown = (
+    recording: AudioRecording,
+  ) => AudioRecording,
 >(
-  options: UseAudioRecorderOptions<TOnComplete>,
-): UseAudioRecorderReturn<InferAudioRecordingOutput<TOnComplete>>
-export function useAudioRecorder(
-  options?: UseAudioRecorderOptions<undefined>,
-): UseAudioRecorderReturn<AudioRecording>
-export function useAudioRecorder(
-  options: UseAudioRecorderOptions<(recording: AudioRecording) => unknown> = {},
-): UseAudioRecorderReturn<unknown> {
+  options: UseAudioRecorderOptions<TOnComplete> = {},
+): UseAudioRecorderReturn<InferAudioRecordingOutput<TOnComplete>> {
+  type Output = InferAudioRecordingOutput<TOnComplete>
   const [isRecording, setIsRecording] = useState(false)
-  const [recording, setRecording] = useState<unknown>(null)
+  const [recording, setRecording] = useState<Output | null>(null)
   // Read the freshest callbacks at fire time without recreating the recorder.
   const optionsRef = useRef(options)
   optionsRef.current = options
@@ -94,7 +91,7 @@ export function useAudioRecorder(
     // Only `undefined` (returning nothing) falls back to the raw recording, so
     // a transform that returns null is preserved — matching the inferred type,
     // which excludes only undefined/void/null from the transform's return.
-    const output = transformed === undefined ? recording : transformed
+    const output = (transformed === undefined ? recording : transformed) as Output
     setRecording(() => output)
     return output
   }, [recorder])

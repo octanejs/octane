@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-ai/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane root export surface; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-audio-recorder.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane media lifecycle; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-chat-fetcher.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks ordinary fetcher transport behavior; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-chat-options-probe.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane option type contract at runtime; it is not a React oracle."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-chat-structured-output.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane structured-output state; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-chat.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks ordinary useChat conformance; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-generation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks ordinary generation conformance; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-mcp-app-bridge.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the portable MCP bridge hook; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/use-realtime-chat.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks ordinary realtime conformance; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/parity/use-chat-fetcher.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane transport-replacement behavior without a pinned React oracle; ordinary package evidence only."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/parity/use-chat.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane identifier/lifecycle contracts without a pinned React oracle; ordinary package evidence only."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/parity/use-generation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane devtools framework labeling without a pinned React oracle; ordinary package evidence only."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/parity/use-realtime-chat.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane realtime option/callback corrections without a pinned React oracle; ordinary package evidence only."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/parity/divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates omitted MCP renderer and unavailable auto-resume surfaces as Octane package contracts; ordinary evidence only."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs one exact same-fixture streamed-chat scenario against @tanstack/ai-react@0.17.0."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering; it is not compared with React SSR and is not parity evidence."
+    }
+  ]
+}

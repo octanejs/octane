@@ -20,6 +20,7 @@ const cache = resolve(__dirname, '.react-cache');
 const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('differential: @octanejs/tanstack-ai vs @tanstack/ai-react', () => {
+	// @parity-case differential:tanstack-ai-streamed-chat
 	it('matches streamed chat output after each step', async () => {
 		const d = await mountDifferential(fixture, 'ChatParity', undefined, cache);
 		await d.step('mount', () => {});

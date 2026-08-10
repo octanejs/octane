@@ -1,0 +1,102 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/ai.git",
+    "version": "@tanstack/ai-react@0.17.0",
+    "commit": "9ca3706513b94764d11ea63c7541b2cf4f3daa20",
+    "sourceRoot": "packages/ai-react/src",
+    "testRoot": "packages/ai-react/tests",
+    "license": "MIT",
+    "integrity": "sha256:27eea2e78722c51e1f30f8ddf4d193b0ebc79a330dc9d0aa876516828e30cbe6",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-ai/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-ai/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "669294cd71fb4fbe6f48ede7d7a2a958c117611b45b1563eb2799226c20ed018"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-ai-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one exact same-fixture streamed-chat scenario against @tanstack/ai-react@0.17.0. Octane adaptation, SSR, and type contracts remain ordinary package tests outside parity evidence until the pinned upstream suite is vendored into pristine / one-for-one adapted lanes.",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "2da077d7c8df08b3018a4d556f33cdc4042636c3d0b2f050991a49edd75c713b",
+          "cases": [
+            {
+              "id": "differential:tanstack-ai-streamed-chat",
+              "testName": "matches streamed chat output after each step",
+              "fullName": "differential: @octanejs/tanstack-ai vs @tanstack/ai-react matches streamed chat output after each step"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "892a41a3da8ec18e6b937f7f50ee4dc80d4283ddb1e0f443ac122a1e694d2717"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/_fixtures/parity.tsrx",
+          "role": "support",
+          "sha256": "1ab155814f6c94177fb3e8b5f428212e252800c100eeafad2153f662122c5553"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "0287f0190374cf0e951999a0278ef7b740a368183ad7c159ee54200a7712d472"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-suite-artifacts.json",
+          "role": "support",
+          "sha256": "136aa5b733bee17fbab832f7fde32ce265e3a0bd5258e06fe8c81dd1a317373a"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "6d2710b701dc4b454103d8cc70e823a4e963fa78caa42bf017a6ec8f3011b63a"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

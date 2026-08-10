@@ -716,7 +716,7 @@
         "One upstream `useChat` test case (\"auto-resume on mount / when the browser comes back online\") is omitted: it targets `ChatClient.prototype.maybeAutoResume`, an API absent from the pinned (and latest published) `@tanstack/ai-client@0.21.0` and never invoked by `useChat`. It is untestable in this binding until that dependency ships the method."
       ],
       "ssr": "Supported and tested: useChat renders its initial message snapshot through octane/server without a DOM.",
-      "verified": "2026-07-16"
+      "verified": "2026-08-09"
     },
     {
       "name": "@octanejs/tanstack-devtools",
