@@ -1,0 +1,469 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pmndrs/react-three-fiber.git",
+    "version": "v9.6.1",
+    "commit": "2a528745e9aa7c9e6cca41e404b59d45cf0d0cc7",
+    "sourceRoot": "packages/fiber/src",
+    "testRoot": "packages/fiber/tests; packages/test-renderer/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:01177da508a5551b38908e3da7ce51601f140fd35497e3b3daf73af58f75e67c",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": [
+        "packages/three/src"
+      ],
+      "include": [
+        "\\.(?:ts|tsrx)$"
+      ],
+      "exclude": []
+    },
+    "tests": {
+      "roots": [
+        "packages/three/tests"
+      ],
+      "include": [
+        "\\.test\\.ts$"
+      ],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "7197f3e0d5509ad99f0f18b45536bfb3fca68c958f9d8c11010732d7c727a324"
+    }
+  },
+  "lanes": [
+    {
+      "id": "three-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "three-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs scene, events, capture, portal, and Suspense behavior against the pinned R3F oracle.",
+      "files": [
+        {
+          "path": "packages/three/tests/differential.test.ts",
+          "role": "test",
+          "sha256": "ec75f1e5da43116ca4ac6f7f09342fd1b6b28284a597570bd4df5fab34424b4d",
+          "cases": [
+            {
+              "id": "differential:three-scene",
+              "testName": "matches mount, prop updates, keyed moves, reconstruction, and unmount",
+              "fullName": "R3F 9.6.1 scene oracle matches mount, prop updates, keyed moves, reconstruction, and unmount"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/events-differential.test.ts",
+          "role": "test",
+          "sha256": "176b0364da73572be6b877ae75b978b9bbcd17f7f0d7813127b15a169169d9e9",
+          "cases": [
+            {
+              "id": "differential:three-events",
+              "testName": "matches hit payloads, propagation, hover transitions, and misses",
+              "fullName": "R3F 9.6.1 event oracle matches hit payloads, propagation, hover transitions, and misses"
+            },
+            {
+              "id": "adapted:three-captured-reconstruction",
+              "testName": "matches captured event state across reconstruction, release, and exit",
+              "fullName": "R3F 9.6.1 event oracle matches captured event state across reconstruction, release, and exit"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/portal-differential.test.ts",
+          "role": "test",
+          "sha256": "95386d20909cfc60707c50ea03f164e5d4ea7d0061be90b383bd651662c91473",
+          "cases": [
+            {
+              "id": "differential:three-portal",
+              "testName": "matches external target placement across mount, update, and unmount",
+              "fullName": "R3F 9.6.1 portal scene oracle matches external target placement across mount, update, and unmount"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/suspense-differential.test.ts",
+          "role": "test",
+          "sha256": "b350efde97a44fc54383e1dac511c3fdda76ddc35636a7478c448429f7c5af8a",
+          "cases": [
+            {
+              "id": "adapted:three-hidden-activity",
+              "testName": "matches fallback, retained hidden content, resolution, and Three identity",
+              "fullName": "R3F 9.6.1 Suspense scene oracle matches fallback, retained hidden content, resolution, and Three identity"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "three-adapted-divergences",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "three",
+      "notes": "Authenticates the renderer-integration divergences that intentionally differ from R3F.",
+      "files": [
+        {
+          "path": "packages/three/tests/public-api.test.ts",
+          "role": "test",
+          "sha256": "fecd99b1b460963667e23799ec1d1e244e74f693656c68324190f0f3995fe6a3",
+          "cases": [
+            {
+              "id": "adapted:three-renderer-ownership",
+              "testName": "coordinates direct rendering through the public scheduling and unmount helpers",
+              "fullName": "@octanejs/three public root API coordinates direct rendering through the public scheduling and unmount helpers"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/root.test.ts",
+          "role": "test",
+          "sha256": "57e64066644bd4e223c36d252b920feb40f27daea60ea781878358aaf588323b",
+          "cases": [
+            {
+              "id": "adapted:three-root-component-props",
+              "testName": "configures and tears down a structurally typed offscreen canvas",
+              "fullName": "Three root configuration configures and tears down a structurally typed offscreen canvas"
+            },
+            {
+              "id": "adapted:three-synchronous-teardown",
+              "testName": "unmounts a registered canvas synchronously and notifies only that removal",
+              "fullName": "Three root configuration unmounts a registered canvas synchronously and notifies only that removal"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/hooks.test.ts",
+          "role": "test",
+          "sha256": "4a8b86de71e2efb52e380be2ef481f6ae16f0d1aebd0ce654961b5871d7cb967",
+          "cases": [
+            {
+              "id": "adapted:three-build-graph",
+              "testName": "collects the public named object graph",
+              "fullName": "Three hooks and graph helpers collects the public named object graph"
+            },
+            {
+              "id": "adapted:three-store-selector",
+              "testName": "selects root state, exposes managed handles, and keeps frame callbacks current",
+              "fullName": "Three hooks and graph helpers selects root state, exposes managed handles, and keeps frame callbacks current"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/catalogue-props.test.ts",
+          "role": "test",
+          "sha256": "cd60e9825f00ad496b57697a98f4c723c98e698316657c71bbe373ddda4af79c",
+          "cases": [
+            {
+              "id": "adapted:three-pierced-reset",
+              "testName": "applies Three math, color, pierced, and ordinary properties without leaking renderer props",
+              "fullName": "@octanejs/three host observations applies Three math, color, pierced, and ordinary properties without leaking renderer props"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/events.test.ts",
+          "role": "test",
+          "sha256": "556d46dc5c319a1ec9f3a0dd1b3d556528c5bca94373ffd6a2749521d4a81976",
+          "cases": [
+            {
+              "id": "adapted:three-hidden-activity-raycast",
+              "testName": "disconnects retained Activity hits while hidden and restores them when visible",
+              "fullName": "Three ray and pointer events disconnects retained Activity hits while hidden and restores them when visible"
+            },
+            {
+              "id": "adapted:three-reconstructed-capture-intersections",
+              "testName": "rewrites captured raw-hit intersections when a descendant reconstructs",
+              "fullName": "Three ray and pointer events rewrites captured raw-hit intersections when a descendant reconstructs"
+            },
+            {
+              "id": "adapted:three-reconstructed-hover-intersections",
+              "testName": "targets reconstructed objects when a stored hover event changes pointer capture",
+              "fullName": "Three ray and pointer events targets reconstructed objects when a stored hover event changes pointer capture"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/portal.test.ts",
+          "role": "test",
+          "sha256": "6a1ef3f3a7bc15bb40cda43a805cbfbe291d70b9ef849dac5e5c02580edb6c66",
+          "cases": [
+            {
+              "id": "adapted:three-root-scoped-portal-targets",
+              "testName": "rejects invalid and cross-root targets without mutating either scene",
+              "fullName": "Three portals rejects invalid and cross-root targets without mutating either scene"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/dom-region.test.ts",
+          "role": "test",
+          "sha256": "b3de08cf3c9dfc4521e05eb37cff138938861cf14539b8a2fc149e4267fde609",
+          "cases": [
+            {
+              "id": "adapted:three-dom-region",
+              "testName": "preserves DOM state and identity while context, content, and the explicit target update",
+              "fullName": "DOMRegion preserves DOM state and identity while context, content, and the explicit target update"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/tests/upstream-crosswalk.test.ts",
+          "role": "test",
+          "sha256": "5c5834e590aa1632239fb4d99edc263afdf829ef3608344cc7e7e8b8c408a769",
+          "cases": [
+            {
+              "id": "adapted:three-upstream-crosswalk",
+              "testName": "classifies all 90 exports and 157 tests with no missing evidence targets",
+              "fullName": "@octanejs/three pinned upstream crosswalk classifies all 90 exports and 157 tests with no missing evidence targets"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "e4b3f8d54e576fde8b7cc681b0318ca6d03772eb7f61d550542f01a22d419cae"
+        },
+        {
+          "path": "packages/three/scripts/check-upstream-crosswalk.mjs",
+          "role": "support",
+          "sha256": "21c7a37a3dc63ec04973884283abcad15a3f440b1bc34d2a152934e39fbc4853"
+        }
+      ]
+    },
+    {
+      "id": "three-browser-canvas",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "three-browser",
+      "notes": "Runs the direct-root lifecycle on an actual browser OffscreenCanvas.",
+      "files": [
+        {
+          "path": "packages/three/tests/browser/xr.test.ts",
+          "role": "test",
+          "sha256": "77bb9ddbbdb8c93346ba3c88d24860ddc2d4785a138d94209e6613eca33b84b2",
+          "cases": [
+            {
+              "id": "browser:three-offscreen-lifecycle",
+              "testName": "runs a direct root lifecycle on an actual OffscreenCanvas",
+              "fullName": "Three WebXR lifecycle runs a direct root lifecycle on an actual OffscreenCanvas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "three-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "three-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored public/loader/renderer/subpath type matrix. Not a pristine upstream type suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/three/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/three/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "a6788d769aa22f8ca0dafe7b876442e18afeb4bb2a29903bd093d6cfd1fe2389",
+          "cases": [
+            {
+              "id": "types:three-public-matrix",
+              "testName": "Three public type matrix",
+              "fullName": "Three public type matrix"
+            }
+          ]
+        },
+        {
+          "path": "packages/three/typetests/loader-api.test.ts",
+          "role": "support",
+          "sha256": "590d8b7b4fa50c58b783abbed8ebb6dd412fb0dea80b4ba3189c6a10b5cb35ed"
+        },
+        {
+          "path": "packages/three/typetests/public-api.test.ts",
+          "role": "support",
+          "sha256": "5f9d9ea54d63c778e8ac84fa693cdb25d5699097f59b243f1f5879543009ddd5"
+        },
+        {
+          "path": "packages/three/typetests/renderer-local.test.ts",
+          "role": "support",
+          "sha256": "effaff52eb7cc8acfbc6e9fa9ea98fff5a02e1e7f3fd98ba209173338b9a6fb0"
+        },
+        {
+          "path": "packages/three/typetests/subpath-api.test.ts",
+          "role": "support",
+          "sha256": "58f2908e4ddf4595b35335de27c907b4ab60bc31357d79fefa7aad1ad4b99ce5"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "octane-renderer-ownership",
+      "caseIds": [
+        "adapted:three-renderer-ownership"
+      ],
+      "upstreamResult": "R3F embeds React Reconciler for component execution and scheduling.",
+      "octaneResult": "Octane owns execution, hooks, context, scheduling, Suspense, refs, and effects.",
+      "rationale": "The binding targets Octane's universal renderer contract.",
+      "classification": "framework-integration",
+      "consumerImpact": "React renderer internals are not exposed.",
+      "migrationGuidance": "Use Octane components and scheduling helpers.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if renderer ownership changes."
+    },
+    {
+      "id": "component-props-root-api",
+      "caseIds": [
+        "adapted:three-root-component-props"
+      ],
+      "upstreamResult": "R3F roots render a React element descriptor.",
+      "octaneResult": "Roots render an Octane component plus props.",
+      "rationale": "Octane's root API is component-oriented.",
+      "classification": "framework-integration",
+      "consumerImpact": "Programmatic render call shape differs.",
+      "migrationGuidance": "Pass the component and props separately.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if root render signatures converge."
+    },
+    {
+      "id": "order-based-callable-selector",
+      "caseIds": [
+        "adapted:three-store-selector"
+      ],
+      "upstreamResult": "React callable store selectors inherit React hook identity.",
+      "octaneResult": "Dynamic callable selectors are order-based; compiler-visible hooks retain conditional identity.",
+      "rationale": "Dynamic calls cannot receive compiler slots.",
+      "classification": "framework-integration",
+      "consumerImpact": "Conditional dynamic selector call ordering must remain stable.",
+      "migrationGuidance": "Prefer compiler-visible useStore and useThree calls.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if dynamic hook slot propagation is introduced."
+    },
+    {
+      "id": "build-graph-named-only",
+      "caseIds": [
+        "adapted:three-build-graph"
+      ],
+      "upstreamResult": "R3F can publish empty or undefined graph keys.",
+      "octaneResult": "buildGraph omits unnamed and array-valued material entries.",
+      "rationale": "Only stable named identities are useful graph keys.",
+      "classification": "intentional-correction",
+      "consumerImpact": "Empty graph keys are absent.",
+      "migrationGuidance": "Assign names to graph objects consumed by key.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if upstream graph semantics change."
+    },
+    {
+      "id": "pierced-prop-reset-target",
+      "caseIds": [
+        "adapted:three-pierced-reset"
+      ],
+      "upstreamResult": "R3F 9.6.1 writes the default to a root leaf key when removing a pierced prop.",
+      "octaneResult": "Octane restores the original nested target.",
+      "rationale": "The upstream behavior targets the wrong object.",
+      "classification": "intentional-correction",
+      "consumerImpact": "Nested values restore correctly.",
+      "migrationGuidance": "Do not depend on the upstream misplaced root property.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review when upstream fixes pierced reset."
+    },
+    {
+      "id": "reconstructed-intersection-rewrite",
+      "caseIds": [
+        "adapted:three-reconstructed-capture-intersections",
+        "adapted:three-reconstructed-hover-intersections"
+      ],
+      "upstreamResult": "R3F updates only outer capture and hover identities during reconstruction.",
+      "octaneResult": "Octane also rewrites nested stored intersections to the replacement.",
+      "rationale": "Captured delivery must not reference retired objects.",
+      "classification": "intentional-correction",
+      "consumerImpact": "Post-reconstruction captured events target the live object.",
+      "migrationGuidance": "Do not retain retired intersection objects.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review when upstream rewrites nested intersections."
+    },
+    {
+      "id": "hidden-activity-raycast",
+      "caseIds": [
+        "adapted:three-hidden-activity-raycast"
+      ],
+      "upstreamResult": "R3F can raycast hidden retained descendants through visible ancestors.",
+      "octaneResult": "Hidden Activity subtrees are excluded from recursive raycasts.",
+      "rationale": "Three r172 raycasting does not honor Object3D.visible recursively.",
+      "classification": "intentional-correction",
+      "consumerImpact": "Hidden retained content cannot receive pointer hits.",
+      "migrationGuidance": "Do not rely on interaction with hidden Activity descendants.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if Three or upstream raycast visibility changes."
+    },
+    {
+      "id": "root-scoped-portal-targets",
+      "caseIds": [
+        "adapted:three-root-scoped-portal-targets"
+      ],
+      "upstreamResult": "R3F portal target lifetime is tied to reconciler ownership.",
+      "octaneResult": "Target handles are root-scoped and cross-root placement is rejected before mutation.",
+      "rationale": "Universal target ownership must be explicit.",
+      "classification": "framework-integration",
+      "consumerImpact": "Cross-root portal placement throws without partial mutation.",
+      "migrationGuidance": "Create portals within the target's owning root.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if universal portal ownership changes."
+    },
+    {
+      "id": "synchronous-root-teardown",
+      "caseIds": [
+        "adapted:three-synchronous-teardown"
+      ],
+      "upstreamResult": "R3F defers registry teardown and callback delivery by 500ms.",
+      "octaneResult": "Octane teardown and callback delivery are synchronous.",
+      "rationale": "Octane commits teardown atomically.",
+      "classification": "framework-integration",
+      "consumerImpact": "Resources and callbacks settle before unmount returns.",
+      "migrationGuidance": "Do not add a delay when awaiting teardown.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if upstream removes delayed teardown."
+    },
+    {
+      "id": "octane-dom-region",
+      "caseIds": [
+        "adapted:three-dom-region"
+      ],
+      "upstreamResult": "R3F has no equivalent explicit-target low-level DOMRegion primitive.",
+      "octaneResult": "Octane exposes DOMRegion without positioning, occlusion, styling, or layout semantics.",
+      "rationale": "It proves the universal Three-to-DOM boundary without claiming Drei Html parity.",
+      "classification": "framework-integration",
+      "consumerImpact": "Consumers own all layout and styling.",
+      "migrationGuidance": "Treat DOMRegion as an explicit target boundary, not Drei Html.",
+      "owner": "@octanejs/three",
+      "reviewCondition": "Review if a higher-level HTML overlay API is added."
+    }
+  ]
+}

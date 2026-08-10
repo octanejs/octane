@@ -189,6 +189,7 @@ const firstItems: readonly SceneItem[] = [
 ];
 
 describe('R3F 9.6.1 scene oracle', () => {
+	// @parity-case differential:three-scene
 	it('matches mount, prop updates, keyed moves, reconstruction, and unmount', async () => {
 		const initial: SceneInput = {
 			groupArgs: ['revision-one'],

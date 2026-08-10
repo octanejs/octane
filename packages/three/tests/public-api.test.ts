@@ -17,6 +17,8 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer {
 }
 
 describe('@octanejs/three public root API', () => {
+	// OCTANE DIVERGENCE[octane-renderer-ownership][adapted:three-renderer-ownership]
+	// @parity-case adapted:three-renderer-ownership
 	it('coordinates direct rendering through the public scheduling and unmount helpers', async () => {
 		const canvas = document.createElement('canvas');
 		const root = createRoot(canvas);

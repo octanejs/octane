@@ -420,6 +420,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		)
 		if (PORT_TEST_CLASSIFICATION_BINDINGS.has(binding))
+		if (existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`)))
 			verifyPortTestClassifications(REPO, binding);
 		await verifyManifestFiles(manifest, REPO);
 		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });

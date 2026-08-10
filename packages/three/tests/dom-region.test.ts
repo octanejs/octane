@@ -76,6 +76,8 @@ describe('DOMRegion', () => {
 		await acted;
 	});
 
+	// OCTANE DIVERGENCE[octane-dom-region][adapted:three-dom-region]
+	// @parity-case adapted:three-dom-region
 	it('preserves DOM state and identity while context, content, and the explicit target update', async () => {
 		const firstTarget = target();
 		const secondTarget = target();

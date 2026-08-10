@@ -513,6 +513,8 @@ describe('Three ray and pointer events', () => {
 		]);
 	});
 
+	// OCTANE DIVERGENCE[hidden-activity-raycast][adapted:three-hidden-activity-raycast]
+	// @parity-case adapted:three-hidden-activity-raycast
 	it('disconnects retained Activity hits while hidden and restores them when visible', async () => {
 		const { canvas, root } = await createEventRoot();
 		const log: string[] = [];
@@ -733,6 +735,8 @@ describe('Three ray and pointer events', () => {
 		expect(canvas.releasePointerCapture).toHaveBeenCalledWith(14);
 	});
 
+	// OCTANE DIVERGENCE[reconstructed-intersection-rewrite][adapted:three-reconstructed-capture-intersections]
+	// @parity-case adapted:three-reconstructed-capture-intersections
 	it('rewrites captured raw-hit intersections when a descendant reconstructs', async () => {
 		const { canvas, root } = await createEventRoot();
 		const first = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
@@ -760,6 +764,8 @@ describe('Three ray and pointer events', () => {
 		expect(capture?.intersection.eventObject).toBe(parent);
 	});
 
+	// OCTANE DIVERGENCE[reconstructed-intersection-rewrite][adapted:three-reconstructed-hover-intersections]
+	// @parity-case adapted:three-reconstructed-hover-intersections
 	it('targets reconstructed objects when a stored hover event changes pointer capture', async () => {
 		const { canvas, root } = await createEventRoot();
 		const first = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());

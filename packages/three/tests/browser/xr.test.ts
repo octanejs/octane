@@ -133,6 +133,7 @@ afterEach(async () => {
 });
 
 describe('Three WebXR lifecycle', () => {
+	// @parity-case browser:three-offscreen-lifecycle
 	it('runs a direct root lifecycle on an actual OffscreenCanvas', async () => {
 		const lifecycle = await callProof<OffscreenLifecycleProof>('offscreenLifecycle');
 

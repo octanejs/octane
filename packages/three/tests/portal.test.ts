@@ -812,6 +812,8 @@ describe('Three portals', () => {
 		expect(rejectedCamera.projectionMatrix.equals(rejectedProjection)).toBe(true);
 	});
 
+	// OCTANE DIVERGENCE[root-scoped-portal-targets][adapted:three-root-scoped-portal-targets]
+	// @parity-case adapted:three-root-scoped-portal-targets
 	it('rejects invalid and cross-root targets without mutating either scene', async () => {
 		const firstRefs = refs();
 		const firstTarget = new THREE.Group();

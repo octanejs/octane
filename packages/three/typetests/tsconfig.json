@@ -3,6 +3,8 @@
     "strict": true,
     "module": "esnext",
     "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
     "moduleResolution": "bundler",
     "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": false,
