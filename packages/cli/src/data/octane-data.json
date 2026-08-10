@@ -447,7 +447,7 @@
         "`useDebugValue` is octane's no-op compatibility hook; observable query behavior is unchanged."
       ],
       "ssr": "Preloaded RTK Query state renders through the traditional @octanejs/redux Provider; effects and browser listeners remain client-only. Dedicated SSR and hydration tests are included.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/remix-router",
