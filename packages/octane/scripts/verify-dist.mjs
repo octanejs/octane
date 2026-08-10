@@ -564,6 +564,14 @@ export function publishedRuntimeEntries(publishedExports) {
 	});
 }
 
+export function publishedRequireEntries(publishedExports) {
+	return Object.entries(publishedExports).flatMap(([subpath, value]) => {
+		if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+		const target = value.require;
+		return typeof target === 'string' ? [[subpath, target]] : [];
+	});
+}
+
 export function missingRequiredPublicValueExports(subpath, actualNames) {
 	const actual = new Set(actualNames);
 	return (REQUIRED_PUBLIC_VALUE_EXPORTS[subpath] ?? []).filter((name) => !actual.has(name));
@@ -673,6 +681,28 @@ export function smokeDist(pkgDir) {
 					'--input-type=module',
 					'-e',
 					`const namespace = await import(${JSON.stringify(url)});
+process.stdout.write(JSON.stringify(Object.keys(namespace)));`,
+				],
+				{
+					encoding: 'utf8',
+					stdio: ['ignore', 'pipe', 'inherit'],
+					cwd: pkgDir,
+					timeout: 10_000,
+				},
+			),
+		);
+		assertRequiredPublicValueExports(subpath, exportedNames);
+	}
+
+	for (const [subpath, entry] of publishedRequireEntries(pkg.publishConfig.exports)) {
+		const path = join(pkgDir, entry);
+		const exportedNames = JSON.parse(
+			execFileSync(
+				process.execPath,
+				[
+					'--input-type=commonjs',
+					'-e',
+					`const namespace = require(${JSON.stringify(path)});
 process.stdout.write(JSON.stringify(Object.keys(namespace)));`,
 				],
 				{

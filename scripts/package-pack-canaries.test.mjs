@@ -2,15 +2,55 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
+	createPackedCommonjsConsumerManifest,
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
+	renderPackedCommonjsConsumerSource,
+	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
+
+describe('packed CommonJS consumer', () => {
+	const archiveSpecs = {
+		'@octanejs/base-ui': 'file:/tmp/base-ui.tgz',
+		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
+		'@octanejs/radix': 'file:/tmp/radix.tgz',
+		octane: 'file:/tmp/octane.tgz',
+	};
+
+	test('installs exactly the complete CommonJS dependency closure', () => {
+		assert.deepEqual(createPackedCommonjsConsumerManifest(archiveSpecs).dependencies, archiveSpecs);
+		assert.throws(
+			() => createPackedCommonjsConsumerManifest({ ...archiveSpecs, octane: undefined }),
+			/no packed archive was provided for octane/,
+		);
+	});
+
+	test('requires all four packages and executes Octane SSR', () => {
+		const source = renderPackedCommonjsConsumerSource();
+		assert.match(source, /require\('octane'\)/);
+		assert.match(source, /require\('octane\/server'\)/);
+		assert.match(source, /require\('@octanejs\/floating-ui'\)/);
+		assert.match(source, /require\('@octanejs\/base-ui'\)/);
+		assert.match(source, /require\('@octanejs\/radix'\)/);
+		assert.match(source, /renderToString/);
+	});
+
+	test('imports the same four-package graph for the ESM parity probe', () => {
+		const source = renderPackedEsmConsumerSource();
+		assert.match(source, /from 'octane'/);
+		assert.match(source, /from 'octane\/server'/);
+		assert.match(source, /from '@octanejs\/floating-ui'/);
+		assert.match(source, /from '@octanejs\/base-ui'/);
+		assert.match(source, /from '@octanejs\/radix'/);
+		assert.match(source, /renderToString/);
+	});
+});
 
 describe('isForbiddenNativeGraphModule', () => {
 	test('rejects built and source DOM or React runtime modules from native graphs', () => {

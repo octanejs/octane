@@ -14,7 +14,7 @@
       ]
     }
   },
-  "description": "Base UI (@base-ui/react) for the octane renderer — headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
+  "description": "Base UI (@base-ui/react) for the octane renderer \u2014 headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -32,14 +32,27 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "dist/cjs"
   ],
   "exports": {
-    ".": "./src/index.ts",
-    "./*": "./src/*.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/cjs/index.cjs",
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./src/*.ts",
+      "import": "./src/*.ts",
+      "require": "./dist/cjs/*.cjs",
+      "default": "./src/*.ts"
+    }
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
+    "prepack": "pnpm build:cjs"
   },
   "dependencies": {
     "@floating-ui/utils": "catalog:default",

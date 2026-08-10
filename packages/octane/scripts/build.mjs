@@ -20,6 +20,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { buildPackageCommonjs } from '../../../scripts/build-package-commonjs.mjs';
 import { smokeDist, verifyDist } from './verify-dist.mjs';
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,6 +53,13 @@ await build({
 	platform: 'neutral',
 	target: 'esnext',
 	bundle: false,
+});
+
+await buildPackageCommonjs({
+	packageDir: pkgDir,
+	entries: ['src/index.ts', 'src/server/index.ts'],
+	outdir: 'dist/cjs',
+	sourceRoot: 'src',
 });
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });

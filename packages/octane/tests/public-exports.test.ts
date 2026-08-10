@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	assertRequiredPublicValueExports,
 	missingPublishedPublicSubpaths,
+	publishedRequireEntries,
 	publishedRuntimeEntries,
 	REQUIRED_PUBLIC_VALUE_EXPORTS,
 } from '../scripts/verify-dist.mjs';
@@ -43,6 +44,19 @@ describe('published package export contract', () => {
 		);
 	});
 
+	it('identifies executable CommonJS condition targets', () => {
+		expect(
+			publishedRequireEntries({
+				'.': {
+					types: './dist/index.d.ts',
+					import: './dist/index.js',
+					require: './dist/cjs/index.cjs',
+				},
+				'./types-only': { types: './dist/types-only.d.ts' },
+			}),
+		).toEqual([['.', './dist/cjs/index.cjs']]);
+	});
+
 	it('publishes every subpath advertised to source consumers', () => {
 		expect(
 			missingPublishedPublicSubpaths(
@@ -57,6 +71,10 @@ describe('published package export contract', () => {
 			exports: Record<string, unknown>;
 			publishConfig: { exports: Record<string, unknown> };
 		};
+		expect(publishedRequireEntries(manifest.publishConfig.exports)).toEqual([
+			['.', './dist/cjs/index.cjs'],
+			['./server', './dist/cjs/server/index.cjs'],
+		]);
 
 		expect(
 			missingPublishedPublicSubpaths(manifest.exports, manifest.publishConfig.exports),

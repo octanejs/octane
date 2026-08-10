@@ -476,6 +476,67 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 		}
 	});
 
+	it('discovers bindings whose require condition targets a missing CommonJS build', () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-source-discovery-cjs-'));
+		try {
+			writeFileSync(
+				join(fixtureRoot, 'package.json'),
+				JSON.stringify({
+					name: 'consumer',
+					private: true,
+					dependencies: { '@octanejs/parent-binding': '0.0.0' },
+				}),
+			);
+			const scope = join(fixtureRoot, 'node_modules/@octanejs');
+			mkdirSync(scope, { recursive: true });
+			const parentRoot = join(scope, 'parent-binding');
+			const childRoot = join(scope, 'child-binding');
+			mkdirSync(parentRoot);
+			mkdirSync(childRoot);
+			writeFileSync(
+				join(parentRoot, 'package.json'),
+				JSON.stringify({
+					name: '@octanejs/parent-binding',
+					exports: {
+						'.': {
+							types: './src/index.ts',
+							import: './src/index.ts',
+							require: './dist/cjs/index.cjs',
+							default: './src/index.ts',
+						},
+					},
+					dependencies: {
+						octane: '0.0.0',
+						'@octanejs/child-binding': '0.0.0',
+					},
+				}),
+			);
+			writeFileSync(
+				join(childRoot, 'package.json'),
+				JSON.stringify({
+					name: '@octanejs/child-binding',
+					exports: {
+						'.': {
+							types: './src/index.ts',
+							import: './src/index.ts',
+							require: './dist/cjs/index.cjs',
+							default: './src/index.ts',
+						},
+					},
+					dependencies: {
+						octane: '0.0.0',
+					},
+				}),
+			);
+
+			const discovered = discoverOctaneSourceDependencies(fixtureRoot);
+			expect(discovered).toContain('@octanejs/parent-binding');
+			expect(discovered).toContain('@octanejs/child-binding');
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
 	it('aliases bare Octane imports to the server runtime for SSR', async () => {
 		const plugin = octane();
 		const resolved = await (plugin.resolveId as any).call(

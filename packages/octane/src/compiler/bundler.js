@@ -159,6 +159,27 @@ function expandViteOptimizeDepsExclusions(configured, dependencyNames) {
 	return exclusions;
 }
 
+/**
+ * Locate an installed package's manifest when `require.resolve` cannot open the
+ * package entry. Workspace/source packages may advertise a `require` condition
+ * that points at a prepack-only CommonJS build; discovery still needs the
+ * package root so Vite can compile their authored source.
+ */
+function resolveInstalledPackageManifest(name, issuerRoot, collected) {
+	let candidateRoot = nodePath.resolve(issuerRoot);
+	for (;;) {
+		const manifestPath = nodePath.join(candidateRoot, 'node_modules', name, 'package.json');
+		if (nodeFs.existsSync(manifestPath)) {
+			collected.dependencies.add(manifestPath);
+			return manifestPath;
+		}
+		collected.missingDependencies.add(manifestPath);
+		const parent = nodePath.dirname(candidateRoot);
+		if (parent === candidateRoot) return null;
+		candidateRoot = parent;
+	}
+}
+
 function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
 }
@@ -694,43 +715,38 @@ class OctaneBundlerCompiler {
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
 			const packageRequire = nodeModule.createRequire(nodePath.join(issuerRoot, 'package.json'));
+			let entry;
 			try {
-				const entry = packageRequire.resolve(name);
-				const lookup = this._nearestOctanePackageRule(nodePath.dirname(entry));
-				addMetadata(collected, lookup);
-				if (!lookup.rule?.usesOctane) return;
-				sourceDependencies.add(name);
-				for (const dependency of lookup.rule.viteOptimizeDepsExclusions) {
-					viteOptimizeDepsExclusionRules.add(dependency);
-				}
-				for (const dependency of lookup.rule.runtimeDependencies) {
-					viteOptimizeDepsCandidates.add(dependency);
-				}
-				let packageRoot = lookup.rule.root;
-				try {
-					packageRoot = nodeFs.realpathSync(packageRoot);
-				} catch {
-					// Keep the resolved/symlink path as the cycle key.
-				}
-				if (visitedPackageRoots.has(packageRoot)) return;
-				visitedPackageRoots.add(packageRoot);
-				for (const dependency of lookup.rule.runtimeDependencies) {
-					visit(dependency, lookup.rule.root);
-				}
+				entry = packageRequire.resolve(name);
 			} catch {
 				// Match Node's upward node_modules search: package managers commonly
 				// satisfy a nested raw-source dependency by hoisting it to the project
-				// root. Any candidate's creation can therefore make this request
-				// resolvable and must invalidate a cached miss.
-				let candidateRoot = nodePath.resolve(issuerRoot);
-				for (;;) {
-					collected.missingDependencies.add(
-						nodePath.join(candidateRoot, 'node_modules', name, 'package.json'),
-					);
-					const parent = nodePath.dirname(candidateRoot);
-					if (parent === candidateRoot) break;
-					candidateRoot = parent;
-				}
+				// root. Prefer the installed manifest when the package entry itself is
+				// unresolvable (for example a require condition targeting a missing
+				// prepack-only CommonJS build).
+				entry = resolveInstalledPackageManifest(name, issuerRoot, collected);
+				if (entry === null) return;
+			}
+			const lookup = this._nearestOctanePackageRule(nodePath.dirname(entry));
+			addMetadata(collected, lookup);
+			if (!lookup.rule?.usesOctane) return;
+			sourceDependencies.add(name);
+			for (const dependency of lookup.rule.viteOptimizeDepsExclusions) {
+				viteOptimizeDepsExclusionRules.add(dependency);
+			}
+			for (const dependency of lookup.rule.runtimeDependencies) {
+				viteOptimizeDepsCandidates.add(dependency);
+			}
+			let packageRoot = lookup.rule.root;
+			try {
+				packageRoot = nodeFs.realpathSync(packageRoot);
+			} catch {
+				// Keep the resolved/symlink path as the cycle key.
+			}
+			if (visitedPackageRoots.has(packageRoot)) return;
+			visitedPackageRoots.add(packageRoot);
+			for (const dependency of lookup.rule.runtimeDependencies) {
+				visit(dependency, lookup.rule.root);
 			}
 		};
 		for (const name of dependencyNames) visit(name, projectManifestRoot);

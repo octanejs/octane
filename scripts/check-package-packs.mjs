@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { build } from 'esbuild';
 import {
 	cpSync,
 	existsSync,
@@ -20,13 +21,17 @@ import {
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
 import {
+	createPackedCommonjsConsumerManifest,
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
 	createPackedExampleManifest,
 	isWithinDirectory,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
+	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PACKAGES,
 	renderPackedExampleWorkspace,
+	renderPackedCommonjsConsumerSource,
+	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
@@ -841,6 +846,128 @@ function validatePackedTsrxConsumer(tempRoot, archives) {
 	);
 }
 
+async function validatePackedCommonjsConsumer(tempRoot, archives) {
+	const consumerDirectory = path.join(tempRoot, 'external-commonjs-consumer');
+	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
+		throw new Error('packed CommonJS consumer must be created outside the workspace');
+	}
+	mkdirSync(consumerDirectory, { recursive: true });
+	const archiveSpecs = Object.fromEntries(
+		PACKED_COMMONJS_CONSUMER_PACKAGES.map((packageName) => [
+			packageName,
+			fileArchiveSpec(archives, packageName),
+		]),
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'package.json'),
+		`${JSON.stringify(createPackedCommonjsConsumerManifest(archiveSpecs), null, 2)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		renderPackedExampleWorkspace(archiveSpecs),
+	);
+	writeFileSync(path.join(consumerDirectory, 'require.cjs'), renderPackedCommonjsConsumerSource());
+	writeFileSync(path.join(consumerDirectory, 'import.mjs'), renderPackedEsmConsumerSource());
+
+	execFileSync(
+		'pnpm',
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=false',
+		],
+		{
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+
+	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
+	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
+	for (const packageName of PACKED_COMMONJS_CONSUMER_PACKAGES) {
+		const entry = realpathSync(consumerRequire.resolve(packageName));
+		if (!entry.endsWith('.cjs')) {
+			throw new Error(`${packageName} require condition did not select CommonJS: ${entry}`);
+		}
+		if (isWithinDirectory(REPO_ROOT, entry)) {
+			throw new Error(`${packageName} resolved back into the workspace: ${entry}`);
+		}
+		if (packageName !== 'octane') {
+			const peerRuntime = realpathSync(createRequire(entry).resolve('octane'));
+			if (peerRuntime !== directRuntime) {
+				throw new Error(
+					`${packageName} resolved a second Octane runtime:\n  app: ${directRuntime}\n  package: ${peerRuntime}`,
+				);
+			}
+		}
+	}
+	const serverEntry = realpathSync(consumerRequire.resolve('octane/server'));
+	if (!serverEntry.endsWith('.cjs')) {
+		throw new Error(`octane/server require condition did not select CommonJS: ${serverEntry}`);
+	}
+	for (const reactRuntime of ['react', 'react-dom']) {
+		try {
+			consumerRequire.resolve(reactRuntime);
+			throw new Error(`packed CommonJS consumer unexpectedly resolved ${reactRuntime}`);
+		} catch (error) {
+			if (error.code !== 'MODULE_NOT_FOUND') throw error;
+		}
+	}
+	const commonjsSurface = JSON.parse(
+		execFileSync(process.execPath, ['require.cjs'], {
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			timeout: 30_000,
+		}),
+	);
+	await build({
+		absWorkingDir: consumerDirectory,
+		entryPoints: ['import.mjs'],
+		outfile: 'import-bundle.mjs',
+		bundle: true,
+		format: 'esm',
+		platform: 'node',
+		target: 'node22',
+		logLevel: 'silent',
+	});
+	const esmSurface = JSON.parse(
+		execFileSync(process.execPath, ['import-bundle.mjs'], {
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			timeout: 30_000,
+		}),
+	);
+	assertRequiredPublicValueExports('.', commonjsSurface.octane);
+	assertRequiredPublicValueExports('.', esmSurface.octane);
+	for (const packageName of ['base', 'floating', 'radix']) {
+		if (!Array.isArray(commonjsSurface[packageName]) || commonjsSurface[packageName].length === 0) {
+			throw new Error(`packed CommonJS ${packageName} surface is empty`);
+		}
+		if (!Array.isArray(esmSurface[packageName]) || esmSurface[packageName].length === 0) {
+			throw new Error(`packed ESM ${packageName} surface is empty`);
+		}
+	}
+	for (const packageName of ['base', 'floating', 'octane', 'radix']) {
+		if (
+			JSON.stringify([...commonjsSurface[packageName]].sort()) !==
+			JSON.stringify([...esmSurface[packageName]].sort())
+		) {
+			throw new Error(`packed ESM and CommonJS ${packageName} surfaces differ`);
+		}
+	}
+	if (JSON.stringify(commonjsSurface.ssr) !== JSON.stringify(esmSurface.ssr)) {
+		throw new Error('packed ESM and CommonJS SSR output differs');
+	}
+	console.log(
+		'installed packed Octane, Floating UI, Base UI, and Radix without React; CommonJS require and bundled ESM surfaces and SSR matched',
+	);
+}
+
 /**
  * Exercise the private Lynx packages on the Milestone 9 minimum lane exactly
  * as an external application consumes them. This builds and decodes the native
@@ -1185,6 +1312,10 @@ try {
 	}
 	if (!failures.length) {
 		const consumerValidations = [
+			{
+				label: 'external packed CommonJS consumer',
+				run: () => validatePackedCommonjsConsumer(tempRoot, packedArchives),
+			},
 			{
 				label: 'external strict packed TSRX source consumer',
 				run: () => validatePackedTsrxConsumer(tempRoot, packedArchives),
