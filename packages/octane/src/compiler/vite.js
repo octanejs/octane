@@ -13,7 +13,6 @@
 // module graphs evaluate this file against an externalized `node:*` shim.
 // Named imports trip the shim at evaluation; namespace member access only
 // throws if a Node-only code path actually runs.
-import * as nodeCrypto from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import * as nodePath from 'node:path';
 import {
@@ -22,6 +21,8 @@ import {
 	createClientReferenceManifest,
 	createOctaneCompiler,
 	discoverOctaneSourceDependencies,
+	findDescriptorChildrenExports,
+	findDescriptorChildrenImports,
 	findVoidComponentImports,
 } from './bundler.js';
 
@@ -29,6 +30,7 @@ export { discoverOctaneSourceDependencies };
 
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const VOID_EXPORTS_META = 'octane:void-component-exports';
+const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 
 function realRoot(path) {
@@ -61,19 +63,34 @@ function voidImportKey(request, imported) {
 	return `${request}\0${imported}`;
 }
 
-function compiledCodeFingerprint(code) {
-	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
-}
-
-async function loadVoidComponentImports(context, imports, importer) {
+async function loadImportMetadata(
+	context,
+	imports,
+	importer,
+	metadataKey,
+	{ failLoud = false, descriptorSourceCache } = {},
+) {
 	if (typeof context.resolve !== 'function' || typeof context.load !== 'function') return new Set();
 	const proven = new Set();
+	const byRequest = new Map();
+	for (const candidate of imports) {
+		const candidates = byRequest.get(candidate.request) ?? [];
+		candidates.push(candidate);
+		byRequest.set(candidate.request, candidates);
+	}
 	await Promise.all(
-		imports.map(async ({ request, imported }) => {
+		[...byRequest].map(async ([request, candidates]) => {
 			let resolved;
 			try {
 				resolved = await context.resolve(request, importer, { skipSelf: true });
-			} catch {
+			} catch (error) {
+				if (failLoud)
+					throw new Error(
+						`Failed to resolve descriptor-children metadata for ${request} from ${importer}`,
+						{
+							cause: error,
+						},
+					);
 				return;
 			}
 			if (
@@ -84,29 +101,74 @@ async function loadVoidComponentImports(context, imports, importer) {
 			) {
 				return;
 			}
-			let moduleInfo;
+			let loadedModuleInfo;
 			try {
-				// Loading through the module graph runs the resolved module's real load
-				// and transform hooks. `resolveDependencies: false` avoids recursively
-				// walking its imports just to read Octane's compile metadata.
-				moduleInfo = await context.load({ id: resolved.id, resolveDependencies: false });
-			} catch {
+				// Avoid recursively walking the dependency graph merely to classify one
+				// imported JSX binding. A pre-transform snapshot is handled below by the
+				// live-graph and exact-filesystem fallbacks.
+				loadedModuleInfo = await context.load({ id: resolved.id, resolveDependencies: false });
+			} catch (error) {
+				if (failLoud)
+					throw new Error(
+						`Failed to load descriptor-children metadata for ${request} from ${importer}`,
+						{
+							cause: error,
+						},
+					);
 				return;
 			}
-			const metadata = moduleInfo?.meta?.[VOID_EXPORTS_META];
-			if (
+			// Rollup/Vite may return the pre-transform ModuleInfo snapshot from
+			// `this.load()` while publishing transform metadata to the live graph
+			// record. Read that record after the awaited load without touching the
+			// unsupported `ModuleInfo.code` accessor.
+			const moduleInfo = context.getModuleInfo?.(resolved.id) ?? loadedModuleInfo;
+			let metadata = moduleInfo?.meta?.[metadataKey];
+			if (metadata == null && metadataKey === DESCRIPTOR_CHILDREN_EXPORTS_META) {
+				// `this.load()` is allowed to expose a pre-transform snapshot. For a
+				// real filesystem module, classify direct markers from the exact source
+				// rather than silently making lowering depend on traversal order.
+				const sourceId = cleanModuleId(resolved.id);
+				let classification = descriptorSourceCache?.get(sourceId);
+				if (!classification) {
+					classification = nodeFs.promises
+						.readFile(sourceId, 'utf8')
+						.then((source) => findDescriptorChildrenExports(source, resolved.id))
+						.catch(() => []);
+					descriptorSourceCache?.set(sourceId, classification);
+				}
+				const exports = await classification;
+				if (exports.length > 0) metadata = { exports };
+			}
+			if (metadata == null) return;
+			const valid =
 				metadata !== null &&
 				typeof metadata === 'object' &&
 				Array.isArray(metadata.exports) &&
-				metadata.exports.includes(imported) &&
-				typeof moduleInfo.code === 'string' &&
-				metadata.fingerprint === compiledCodeFingerprint(moduleInfo.code)
-			) {
+				metadata.exports.every((value) => typeof value === 'string');
+			if (!valid) {
+				if (failLoud)
+					throw new Error(`Invalid descriptor-children metadata for ${request} from ${importer}`);
+				return;
+			}
+			for (const { imported, exported } of candidates) {
+				if (!metadata.exports.includes(imported)) continue;
 				proven.add(voidImportKey(request, imported));
+				if (exported !== undefined) proven.add(`export\0${exported}`);
 			}
 		}),
 	);
 	return proven;
+}
+
+async function loadVoidComponentImports(context, imports, importer) {
+	return loadImportMetadata(context, imports, importer, VOID_EXPORTS_META);
+}
+
+async function loadDescriptorChildrenImports(context, imports, importer, descriptorSourceCache) {
+	return loadImportMetadata(context, imports, importer, DESCRIPTOR_CHILDREN_EXPORTS_META, {
+		failLoud: true,
+		descriptorSourceCache,
+	});
 }
 
 async function loadClientOnlyImports(context, compiler, code, importer) {
@@ -193,6 +255,7 @@ export function octane(options = {}) {
 	const requireDirective = options.requireDirective === true;
 	let logger = null;
 	const warn = (message) => (logger ?? console).warn(message);
+	const descriptorSourceCache = new Map();
 	let compiler = createOctaneCompiler({
 		root: projectRoot,
 		exclude: options.exclude,
@@ -206,6 +269,7 @@ export function octane(options = {}) {
 	const forceSsr = options.ssr;
 
 	const resetCompiler = (root) => {
+		descriptorSourceCache.clear();
 		projectRoot = nodePath.resolve(root);
 		compiler = createOctaneCompiler({
 			root: projectRoot,
@@ -280,6 +344,7 @@ export function octane(options = {}) {
 		},
 		watchChange(id) {
 			compiler.invalidate(id);
+			descriptorSourceCache.delete(cleanModuleId(id));
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
@@ -303,7 +368,10 @@ export function octane(options = {}) {
 				forceSsr !== undefined
 					? forceSsr
 					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
-			const transformWithProof = (proven, clientOnlyImports = []) => {
+			const transformWithProof = (proven, descriptorProven = new Set(), clientOnlyImports = []) => {
+				const propagatedExports = [...descriptorProven]
+					.filter((key) => key.startsWith('export\0'))
+					.map((key) => key.slice('export\0'.length));
 				const result = compiler.transform(code, id, {
 					environment: server ? 'server' : 'client',
 					hmr: !server && hmrEnabled ? 'vite' : false,
@@ -321,10 +389,26 @@ export function octane(options = {}) {
 									proven.has(voidImportKey(request, imported)),
 							}
 						: {}),
+					...(descriptorProven.size
+						? {
+								isDescriptorChildrenImport: (request, imported) =>
+									descriptorProven.has(voidImportKey(request, imported)),
+							}
+						: {}),
 				});
-				if (result === null) return null;
+				if (result === null) {
+					if (propagatedExports.length === 0) return null;
+					return {
+						code,
+						map: null,
+						meta: {
+							[DESCRIPTOR_CHILDREN_EXPORTS_META]: {
+								exports: [...new Set(propagatedExports)],
+							},
+						},
+					};
+				}
 				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
-				if (result.kind === 'none') return null;
 				const meta = {};
 				if (result.clientReference !== undefined) {
 					meta[CLIENT_REFERENCE_META] = result.clientReference;
@@ -332,9 +416,19 @@ export function octane(options = {}) {
 				if (result.kind === 'compile' && Array.isArray(result.voidComponentExports)) {
 					meta[VOID_EXPORTS_META] = {
 						exports: result.voidComponentExports ?? [],
-						fingerprint: compiledCodeFingerprint(result.code),
 					};
 				}
+				if (
+					(result.kind === 'compile' && Array.isArray(result.descriptorChildrenExports)) ||
+					propagatedExports.length > 0
+				) {
+					meta[DESCRIPTOR_CHILDREN_EXPORTS_META] = {
+						exports: [
+							...new Set([...(result.descriptorChildrenExports ?? []), ...propagatedExports]),
+						],
+					};
+				}
+				if (result.kind === 'none' && Object.keys(meta).length === 0) return null;
 				return {
 					code: result.code,
 					map: result.map,
@@ -343,8 +437,12 @@ export function octane(options = {}) {
 			};
 
 			if (server) {
-				return loadClientOnlyImports(this, compiler, code, id).then((imports) =>
-					transformWithProof(null, imports),
+				const descriptorImports = findDescriptorChildrenImports(code, id);
+				return Promise.all([
+					loadClientOnlyImports(this, compiler, code, id),
+					loadDescriptorChildrenImports(this, descriptorImports, id, descriptorSourceCache),
+				]).then(([imports, descriptorProven]) =>
+					transformWithProof(null, descriptorProven, imports),
 				);
 			}
 
@@ -352,8 +450,11 @@ export function octane(options = {}) {
 				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
 					? findVoidComponentImports(code, id)
 					: [];
-			if (voidImports.length === 0) return transformWithProof(null);
-			return loadVoidComponentImports(this, voidImports, id).then(transformWithProof);
+			const descriptorImports = findDescriptorChildrenImports(code, id);
+			return Promise.all([
+				loadVoidComponentImports(this, voidImports, id),
+				loadDescriptorChildrenImports(this, descriptorImports, id, descriptorSourceCache),
+			]).then(([proven, descriptorProven]) => transformWithProof(proven, descriptorProven));
 		},
 	};
 }

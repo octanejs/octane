@@ -111,6 +111,7 @@ export {
 
 	// Compiler-emitted codegen helpers (private ABI — see module doc)
 	markChildrenBlock,
+	descriptorChildren,
 	createElement,
 	createScopedValue,
 	createScopedElement,

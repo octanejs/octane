@@ -1,6 +1,7 @@
 // @vitest-environment node
 
-import { describe, expect, it } from 'vitest';
+import { parseModule } from '@tsrx/core';
+import { describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'vite';
 import { octane } from 'octane/compiler/vite';
 
@@ -42,7 +43,311 @@ async function transform(
 	).call({}, source, id, options) as Promise<{ code: string } | null> | { code: string } | null;
 }
 
+function componentChildren(code: string, component: string): unknown {
+	const ast = parseModule(code, 'compiled.js');
+	const factories = new Set<string>();
+	const componentSlots = new Set<string>();
+	for (const statement of ast.body) {
+		if (statement.type !== 'ImportDeclaration') continue;
+		if (statement.source?.value !== 'octane' && statement.source?.value !== 'octane/server')
+			continue;
+		for (const specifier of statement.specifiers) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				['createElement', 'createScopedElement'].includes(specifier.imported?.name)
+			)
+				factories.add(specifier.local.name);
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				['componentSlot', 'componentSlotVoid', 'ssrComponent'].includes(specifier.imported?.name)
+			)
+				componentSlots.add(specifier.local.name);
+		}
+	}
+	let children: unknown;
+	const seen = new WeakSet<object>();
+	const visit = (node: any) => {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'CallExpression' &&
+			factories.has(node.callee?.name) &&
+			node.arguments[0]?.name === component
+		) {
+			const props = node.arguments[1];
+			children = props?.properties?.find(
+				(property: any) => property.key?.name === 'children' || property.key?.value === 'children',
+			)?.value;
+		}
+		if (
+			node.type === 'CallExpression' &&
+			componentSlots.has(node.callee?.name) &&
+			node.arguments[3]?.name === component
+		) {
+			const props = node.arguments[4];
+			children = props?.properties?.find(
+				(property: any) => property.key?.name === 'children' || property.key?.value === 'children',
+			)?.value;
+		}
+		if (
+			node.type === 'CallExpression' &&
+			componentSlots.has(node.callee?.name) &&
+			node.arguments[1]?.name === component
+		) {
+			const props = node.arguments[2];
+			children = props?.properties?.find(
+				(property: any) => property.key?.name === 'children' || property.key?.value === 'children',
+			)?.value;
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata') continue;
+			if (Array.isArray(value)) value.forEach(visit);
+			else visit(value);
+		}
+	};
+	visit(ast);
+	return children;
+}
+
+function isChildrenBlock(code: string, value: any): boolean {
+	const ast = parseModule(code, 'compiled.js');
+	const factories = new Set<string>();
+	for (const statement of ast.body) {
+		if (statement.type !== 'ImportDeclaration') continue;
+		if (statement.source?.value !== 'octane' && statement.source?.value !== 'octane/server')
+			continue;
+		for (const specifier of statement.specifiers) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.imported?.name === 'markChildrenBlock'
+			) {
+				factories.add(specifier.local.name);
+			}
+		}
+	}
+	return value?.type === 'CallExpression' && factories.has(value.callee?.name);
+}
+
 describe('octane/compiler/vite public options', () => {
+	it('carries descriptor-children export metadata through the Vite module graph', async () => {
+		const childId = `${ROOT}/src/Slot.tsrx`;
+		const barrelId = `${ROOT}/src/index.ts`;
+		const childSource = `
+			import { Children, cloneElement, descriptorChildren } from 'octane';
+			function Impl(props) { return cloneElement(Children.only(props.children), { class: 'cloned' }); }
+			export const Slottable = descriptorChildren(Impl);
+			export default descriptorChildren(Impl);
+			export function Ordinary(props) @{ <section>{props.children}</section> }`;
+		const barrelSource = `export { Slottable as BarrelSlot } from './Slot.tsrx';`;
+		const consumerSource = `
+			import DefaultSlot, { Slottable as Alias, Ordinary } from './Slot.tsrx';
+			import { BarrelSlot } from './index.ts';
+			export function App() @{
+				<main>
+					<Alias><button>marked</button></Alias>
+					<DefaultSlot><button>default</button></DefaultSlot>
+					<BarrelSlot><button>barrel</button></BarrelSlot>
+					<Ordinary><i>ordinary</i></Ordinary>
+				</main>
+			}`;
+
+		for (const ssr of [false, true]) {
+			const plugin = octane({ hmr: false });
+			configure(plugin, 'build', { ssr });
+			const child = (await (plugin.transform as any).call({}, childSource, childId, {
+				ssr,
+			})) as { code: string; meta: Record<string, unknown> };
+			const barrelLoad = vi.fn(async () => ({ code: child.code, meta: child.meta }));
+			const barrel = (await (plugin.transform as any).call(
+				{
+					resolve: async (request: string) => (request === './Slot.tsrx' ? { id: childId } : null),
+					load: barrelLoad,
+				},
+				barrelSource,
+				barrelId,
+				{ ssr },
+			)) as { code: string; meta: Record<string, unknown> };
+			const consumerLoad = vi.fn(async ({ id }: { id: string }) =>
+				id === childId
+					? { code: child.code, meta: child.meta }
+					: { code: barrel.code, meta: barrel.meta },
+			);
+			const consumer = (await (plugin.transform as any).call(
+				{
+					resolve: async (request: string) =>
+						request === './Slot.tsrx'
+							? { id: childId }
+							: request === './index.ts'
+								? { id: barrelId }
+								: null,
+					load: consumerLoad,
+				},
+				consumerSource,
+				`${ROOT}/src/App.tsrx`,
+				{ ssr },
+			)) as { code: string };
+			expect(barrelLoad).toHaveBeenCalledTimes(1);
+			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 2 : 4);
+			for (const component of ['Alias', 'DefaultSlot', 'BarrelSlot']) {
+				const children = componentChildren(consumer.code, component);
+				expect(children, component).toBeDefined();
+				expect(isChildrenBlock(consumer.code, children)).toBe(false);
+			}
+			expect(isChildrenBlock(consumer.code, componentChildren(consumer.code, 'Ordinary'))).toBe(
+				true,
+			);
+		}
+	});
+
+	it('does not load descriptor metadata for unrelated value imports', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const resolve = vi.fn();
+		const load = vi.fn();
+		await (plugin.transform as any).call(
+			{ resolve, load },
+			"import { helper } from './utils'; export function App() @{ <main>ok</main> }",
+			`${ROOT}/src/App.tsrx`,
+		);
+		expect(resolve).not.toHaveBeenCalled();
+		expect(load).not.toHaveBeenCalled();
+	});
+
+	it('discovers imported marked bindings used as TSRX Element tags', async () => {
+		const { findDescriptorChildrenImports } = await import('octane/compiler/bundler');
+		const jsxSource =
+			"import Slot from './Slot.tsrx';\n" + 'export function App() @{ <Slot><b>x</b></Slot> }\n';
+		expect(findDescriptorChildrenImports(jsxSource, `${ROOT}/src/App.tsrx`)).toEqual([
+			{ request: './Slot.tsrx', imported: 'default', local: 'Slot' },
+		]);
+
+		// Legacy/compiler Element nodes expose the tag as Identifier `id`, not
+		// JSXOpeningElement/JSXIdentifier — the same shape void-import scanning covers.
+		const elementAst = {
+			type: 'Program',
+			body: [
+				{
+					type: 'ImportDeclaration',
+					source: { value: './Slot.tsrx' },
+					specifiers: [
+						{
+							type: 'ImportDefaultSpecifier',
+							local: { type: 'Identifier', name: 'Slot' },
+						},
+					],
+				},
+				{
+					type: 'ExportNamedDeclaration',
+					declaration: {
+						type: 'FunctionDeclaration',
+						id: { type: 'Identifier', name: 'App' },
+						params: [],
+						body: {
+							type: 'BlockStatement',
+							body: [
+								{
+									type: 'ReturnStatement',
+									argument: {
+										type: 'Element',
+										id: { type: 'Identifier', name: 'Slot' },
+										children: [],
+									},
+								},
+							],
+						},
+					},
+				},
+			],
+		};
+		expect(findDescriptorChildrenImports(elementAst, `${ROOT}/src/App.tsrx`)).toEqual([
+			{ request: './Slot.tsrx', imported: 'default', local: 'Slot' },
+		]);
+	});
+
+	it('reads descriptor metadata from the live graph after loading a dependency', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build', { ssr: true });
+		const source =
+			"import Slot from './Slot.tsrx'; export function App() @{ <Slot><b>x</b></Slot> }";
+		const metadata = {
+			'octane:descriptor-children-exports': {
+				exports: ['default'],
+			},
+		};
+		const result = (await (plugin.transform as any).call(
+			{
+				resolve: async () => ({ id: `${ROOT}/src/Slot.tsrx` }),
+				load: async () => ({ meta: {} }),
+				getModuleInfo: () => ({ meta: metadata }),
+			},
+			source,
+			`${ROOT}/src/App.tsrx`,
+			{ ssr: true },
+		)) as { code: string };
+		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Slot'))).toBe(false);
+	});
+
+	it('classifies a direct filesystem marker when load returns a pre-transform snapshot', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build', { ssr: true });
+		const source =
+			"import Slot from './Slot.tsrx'; export function App() @{ <Slot><b>x</b></Slot> }";
+		const slotId = `${process.cwd()}/packages/octane/tests/compiler/_fixtures/descriptor-children-direct.tsrx`;
+		const result = (await (plugin.transform as any).call(
+			{
+				resolve: async () => ({ id: slotId }),
+				load: async () => ({ meta: {} }),
+				getModuleInfo: () => null,
+			},
+			source,
+			`${ROOT}/src/App.tsrx`,
+			{ ssr: true },
+		)) as { code: string };
+		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Slot'))).toBe(false);
+	});
+
+	it('fails loudly when descriptor metadata cannot be loaded', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const source =
+			"import { Slot } from './Slot.tsrx'; export function App() @{ <Slot><b>x</b></Slot> }";
+		await expect(
+			(plugin.transform as any).call(
+				{
+					resolve: async () => ({ id: `${ROOT}/src/Slot.tsrx` }),
+					load: async () => {
+						throw new Error('graph unavailable');
+					},
+				},
+				source,
+				`${ROOT}/src/App.tsrx`,
+			),
+		).rejects.toThrow(/Failed to load descriptor-children metadata.*\.\/Slot\.tsrx/);
+	});
+
+	it('fails loudly when descriptor metadata is malformed', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const source =
+			"import { Slot } from './Slot.tsrx'; export function App() @{ <Slot><b>x</b></Slot> }";
+		await expect(
+			(plugin.transform as any).call(
+				{
+					resolve: async () => ({ id: `${ROOT}/src/Slot.tsrx` }),
+					load: async () => ({
+						meta: {
+							'octane:descriptor-children-exports': {
+								exports: ['Slot', null],
+							},
+						},
+					}),
+				},
+				source,
+				`${ROOT}/src/App.tsrx`,
+			),
+		).rejects.toThrow(/Invalid descriptor-children metadata.*\.\/Slot\.tsrx/);
+	});
+
 	it('enforces the public Strong option for both client and server transforms', async () => {
 		for (const ssr of [false, true]) {
 			const plugin = octane({ hmr: false, strong: true });
