@@ -306,6 +306,73 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 	);
 
 	it.each([
+		{ shape: 'null', initial: 8, value: null },
+		{ shape: 'a boolean', initial: 8, value: true },
+		{ shape: 'null after a longhand matching its shorthand', initial: 4, value: null },
+	])(
+		'removes a stale mixed inline style longhand after a suspended mount retries with $shape',
+		async ({ initial, value }) => {
+			const source = `
+			import { use } from 'octane';
+
+			function Content(props) @{
+				const text = use(props.promise);
+				<span id="mixed-inline-style-retry-content">{text as string}</span>
+			}
+
+			function Panel(props) @{
+				<section
+					id="mixed-inline-style-retry-panel"
+					style={{ margin: '4px', marginTop: props.value }}
+				>
+					<Content promise={props.promise} />
+				</section>
+			}
+
+			export function App(props) @{
+				<main>
+					@try {
+						<Panel value={props.value} promise={props.promise} />
+					} @pending {
+						<span id="mixed-inline-style-retry-pending">{'pending'}</span>
+					}
+				</main>
+			}
+		`;
+			const client = loadMixedInlineStyle(source, 'mixed-inline-style-suspended-retry.tsrx');
+			let resolve!: (text: string) => void;
+			const promise = new Promise<string>((complete) => {
+				resolve = complete;
+			});
+			const root = mount(client.App, { promise, value: initial });
+
+			try {
+				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+				const preserved = root.find('#mixed-inline-style-retry-panel') as HTMLElement;
+				expect(preserved.style.marginTop).toBe(`${initial}px`);
+				expect(preserved.style.marginRight).toBe('4px');
+
+				root.update(client.App, { promise, value });
+				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+
+				await act(() => resolve('resolved'));
+				const panel = root.find('#mixed-inline-style-retry-panel') as HTMLElement;
+				expect(panel).toBe(preserved);
+				expect(root.find('#mixed-inline-style-retry-content').textContent).toBe('resolved');
+				expect(panel.style.marginTop).toBe('');
+				expect(panel.style.marginRight).toBe('4px');
+
+				root.update(client.App, { promise, value: 12 });
+				expect(root.find('#mixed-inline-style-retry-panel')).toBe(panel);
+				expect(panel.style.marginTop).toBe('12px');
+				expect(panel.style.marginRight).toBe('4px');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each([
 		{
 			shape: 'duplicate names',
 			style: "{ color: 'red', color: props.color, position: 'absolute' }",

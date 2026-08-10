@@ -19134,14 +19134,11 @@ function planJsx(
 			);
 		}
 		// Const-seeded fields keep their registry strings until the factory call.
-		// A mixed-style scalar starts at NaN so its first deferred write still runs
-		// for null/undefined; `0 / 0` cannot be shadowed by an authored `NaN`.
+		// A mixed-style scalar starts at its private owning scope so its first
+		// deferred write still runs for null/undefined. The same identity lets its
+		// setter distinguish a fresh mount from a preserved suspended retry.
 		const constArgNode = (expr) =>
-			expr === 'null'
-				? b.literal(null)
-				: expr === 'style-unset'
-					? b.binary('/', b.literal(0), b.literal(0))
-					: b.id(expr);
+			expr === 'null' ? b.literal(null) : expr === 'style-unset' ? b.id('__s') : b.id(expr);
 		const bagFieldValue = (f) => (f.constExpr !== null ? constArgNode(f.constExpr) : b.id(f.local));
 		const rootArg = () => (single ? b.id('_root') : b.literal(null));
 		if (bag.fields.length <= BAG_FACTORY_MAX) {
@@ -20910,6 +20907,7 @@ function emitBindingUpdate(bind, bag) {
 									inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
 									V(),
 									inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
+									F('_prev'),
 								),
 							),
 							b.stmt(b.assignment('=', F('_prev'), V())),

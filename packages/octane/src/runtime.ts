@@ -12254,6 +12254,7 @@ export function setStyleProperty(
 	name: string,
 	value: any,
 	staticCss: string,
+	previous: any,
 ): void {
 	const hydration = activeHydration();
 	if (hydration !== null) {
@@ -12261,10 +12262,9 @@ export function setStyleProperty(
 		return;
 	}
 	const remove = value == null || typeof value === 'boolean';
-	// An absent initial longhand must not erase a baked shorthand's value.
-	// The existing scope mount flag becomes true only after its body returns;
-	// later null/boolean updates still remove the authored dynamic declaration.
-	if (remove && CURRENT_SCOPE?.mounted !== true) return;
+	// The compiler seeds each binding with its private scope, distinguishing a
+	// genuinely absent initial longhand from a preserved suspended-mount retry.
+	if (remove && previous === CURRENT_SCOPE) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
