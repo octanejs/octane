@@ -13694,6 +13694,16 @@ const CAPTURE_FLUSH_FALLBACK = /* @__PURE__ */ Symbol('octane.capture.flushFallb
 // independent phases, so each carries its own stamp.
 const DELEGATED_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched');
 const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
+// A receiver-specific target lets one accessor survive nested native dispatch.
+const CURRENT_TARGET_NODE = /* @__PURE__ */ Symbol('octane.currentTarget');
+const CURRENT_TARGET_DESCRIPTOR: PropertyDescriptor = {
+	configurable: true,
+	get(this: Event): EventTarget | null {
+		return (this as any)[CURRENT_TARGET_NODE] as EventTarget | null;
+	},
+};
+// Synchronous nested capture walks borrow disjoint frames from this one stack.
+const CAPTURE_PATH: any[] = [];
 
 // Invoke one event slot — a bare handler `fn(event)` or a nominal `{ fn, args }` bundle
 // (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
@@ -13923,25 +13933,27 @@ function dispatchDelegatedCapture(event: Event): void {
 	// its native onChange handler can observe the activated value.
 	if (!event.bubbles || !_delegated.has(event.type)) maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
-	const path: any[] = [];
+	const pathBase = CAPTURE_PATH.length;
 	for (let node = event.target as any; node !== null && node !== undefined;) {
-		path.push(node);
+		CAPTURE_PATH.push(node);
 		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
 	}
 	_dispatchDepth++;
 	const discrete = DISCRETE_EVENTS.has(event.type);
 	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
 	try {
-		for (let i = path.length - 1; i >= 0; i--) {
-			const slot = path[i][key] as EventSlot;
+		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
+			const slot = CAPTURE_PATH[i][key] as EventSlot;
 			if (slot != null) {
 				// React parity: the handler's element is the currentTarget.
-				setCurrentTarget(event, path[i]);
+				setCurrentTarget(event, CAPTURE_PATH[i]);
 				fireEventSlot(slot, event);
 				if (event.cancelBubble) return;
 			}
 		}
 	} finally {
+		// Nested dispatch appends its own frame and restores the outer traversal.
+		CAPTURE_PATH.length = pathBase;
 		clearCurrentTarget(event);
 		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
@@ -13958,14 +13970,13 @@ function noop(): void {}
 // delegation ROOT), so shadow it with a configurable own property during each handler and
 // remove the shadow after the walk (restoring native semantics).
 function setCurrentTarget(event: Event, node: EventTarget | null): void {
-	Object.defineProperty(event, 'currentTarget', {
-		configurable: true,
-		get: () => node,
-	});
+	(event as any)[CURRENT_TARGET_NODE] = node;
+	Object.defineProperty(event, 'currentTarget', CURRENT_TARGET_DESCRIPTOR);
 }
 function clearCurrentTarget(event: Event): void {
 	// Deleting the own property re-exposes Event.prototype's native getter.
 	delete (event as any).currentTarget;
+	delete (event as any)[CURRENT_TARGET_NODE];
 }
 
 // ---------------------------------------------------------------------------

@@ -5958,6 +5958,19 @@ function isIfDirective(node) {
 	return node?.type === 'IfStatement' || node?.type === 'JSXIfExpression';
 }
 
+function isSwitchDirective(node) {
+	return node?.type === 'SwitchStatement' || node?.type === 'JSXSwitchExpression';
+}
+
+function hasSwitchCaseLocalBinding(statements) {
+	return statements.some(
+		(statement) =>
+			statement.type === 'VariableDeclaration' ||
+			statement.type === 'FunctionDeclaration' ||
+			statement.type === 'ClassDeclaration',
+	);
+}
+
 /**
  * A directive @if/@else whose every reachable arm emits exactly one plain
  * host. The chosen tag may change, but the item always owns one element; the
@@ -5998,8 +6011,9 @@ function singleRootComponentArmName(node, locals, ctx) {
 
 /**
  * Transitive definition-site single-root proof for a void `@{}` body whose
- * sole root is an `@if`/`@else` tree: every reachable arm must render exactly
- * one plain host OR one qualifying same-module component call (see
+ * sole root is an exhaustive `@if`/`@else` or `@switch` tree: every reachable
+ * arm must render exactly one plain host OR one qualifying same-module
+ * component call (see
  * singleRootComponentArmName). Returns the set of callee names the proof
  * depends on (empty when every arm is a host), or null when the shape does
  * not qualify. The caller resolves the deps with a fixed point over
@@ -6013,22 +6027,41 @@ function singleRootComponentArmName(node, locals, ctx) {
  */
 function collectSingleRootIfDeps(render, locals, ctx) {
 	const roots = normalizeChildren(render ? [render] : []).filter((n) => n.type !== 'HeadHoist');
-	if (roots.length !== 1 || !isIfDirective(roots[0])) return null;
+	if (roots.length !== 1 || (!isIfDirective(roots[0]) && !isSwitchDirective(roots[0]))) {
+		return null;
+	}
 	const deps = new Set();
-	const armOk = (arm) => {
-		if (isIfDirective(arm)) return ifOk(arm);
-		const out = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+	const armOk = (arm, insideSwitch = false) => {
+		if (isIfDirective(arm)) return ifOk(arm, insideSwitch);
+		if (isSwitchDirective(arm)) return switchOk(arm);
+		const statements = Array.isArray(arm) ? arm : statementsOf(arm);
+		if (insideSwitch && hasSwitchCaseLocalBinding(statements)) return false;
+		const out = statements.filter((s) => isJsxNode(s) || isIfDirective(s) || isSwitchDirective(s));
 		if (out.length !== 1) return false;
 		const sole = out[0];
-		if (isIfDirective(sole)) return ifOk(sole);
+		if (isIfDirective(sole)) return ifOk(sole, insideSwitch);
+		if (isSwitchDirective(sole)) return switchOk(sole);
 		if (isPlainHostRoot(sole)) return true;
 		const name = singleRootComponentArmName(sole, locals, ctx);
 		if (name === null) return false;
 		deps.add(name);
 		return true;
 	};
-	const ifOk = (n) => n.alternate != null && armOk(n.consequent) && armOk(n.alternate);
-	return ifOk(roots[0]) ? deps : null;
+	const ifOk = (n, insideSwitch = false) =>
+		n.alternate != null && armOk(n.consequent, insideSwitch) && armOk(n.alternate, insideSwitch);
+	const switchOk = (n) => {
+		const cases = n.cases || [];
+		let hasDefault = false;
+		for (const clause of cases) {
+			if (clause.test == null) {
+				if (hasDefault) return false;
+				hasDefault = true;
+			}
+			if (!armOk(clause.consequent || [], true)) return false;
+		}
+		return hasDefault;
+	};
+	return (isIfDirective(roots[0]) ? ifOk(roots[0]) : switchOk(roots[0])) ? deps : null;
 }
 
 /**
@@ -6044,11 +6077,11 @@ function collectSingleRootIfDeps(render, locals, ctx) {
  * anything else — including empty component output, whose slot still mints
  * its own comment pair — gets the branch pair minted around it), so we admit:
  *   - one plain host root (the element is the boundary), and
- *   - an @if with a FULL @else chain whose every arm is exactly one plain
- *     host, one component tag (safe unless it lowers to an unsafe lite slot —
- *     resolved transitively via `edges` by the componentInfo fixpoint), or a
- *     nested chain of the same shape.
- * Everything else (missing @else, @switch/@for/hole/fragment roots,
+ *   - an @if with a FULL @else chain or an @switch with a @default whose every
+ *     arm is exactly one plain host, one component tag (safe unless it lowers
+ *     to an unsafe lite slot — resolved transitively via `edges` by the
+ *     componentInfo fixpoint), or a nested exhaustive directive.
+ * Everything else (missing @else/@default, @for/hole/fragment roots,
  * multi-node arms) returns null: the call site keeps its `<!>` anchor.
  * Note every admitted shape renders at least one node in every state, which
  * is what keeps each mounted arm's boundary derivable.
@@ -6063,11 +6096,14 @@ function anchorlessRootShape(node) {
 	if (render == null) return null;
 	if (isPlainHostRoot(render)) return { edges: [] };
 	const edges = [];
-	const armOk = (arm) => {
-		const out = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+	const armOk = (arm, insideSwitch = false) => {
+		const statements = Array.isArray(arm) ? arm : statementsOf(arm);
+		if (insideSwitch && hasSwitchCaseLocalBinding(statements)) return false;
+		const out = statements.filter((s) => isJsxNode(s) || isIfDirective(s) || isSwitchDirective(s));
 		if (out.length !== 1) return false;
 		const n = out[0];
-		if (isIfDirective(n)) return chainOk(n);
+		if (isIfDirective(n)) return chainOk(n, insideSwitch);
+		if (isSwitchDirective(n)) return switchOk(n);
 		if (isPlainHostRoot(n)) return true;
 		if ((n.type === 'Element' || n.type === 'JSXElement') && isComponentTag(n)) {
 			const name = tagBindingName(n);
@@ -6076,9 +6112,25 @@ function anchorlessRootShape(node) {
 		}
 		return false;
 	};
-	const chainOk = (ifNode) =>
-		ifNode.alternate != null && armOk(ifNode.consequent) && armOk(ifNode.alternate);
-	return isIfDirective(render) && chainOk(render) ? { edges } : null;
+	const chainOk = (ifNode, insideSwitch = false) =>
+		ifNode.alternate != null &&
+		armOk(ifNode.consequent, insideSwitch) &&
+		armOk(ifNode.alternate, insideSwitch);
+	const switchOk = (switchNode) => {
+		let hasDefault = false;
+		for (const clause of switchNode.cases || []) {
+			if (clause.test == null) {
+				if (hasDefault) return false;
+				hasDefault = true;
+			}
+			if (!armOk(clause.consequent || [], true)) return false;
+		}
+		return hasDefault;
+	};
+	return (isIfDirective(render) && chainOk(render)) ||
+		(isSwitchDirective(render) && switchOk(render))
+		? { edges }
+		: null;
 }
 
 /**
