@@ -63,3 +63,6 @@ benchmarks/lynx-table/results/
 # and the @lynx-js/web-core client build).
 website/public/lynx-examples
 website/public/lynx-runtime
+
+# Pristine vitest cache for tanstack-hotkeys upstream suite
+packages/tanstack-hotkeys/.vite-pristine/

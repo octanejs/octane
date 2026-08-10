@@ -641,12 +641,12 @@
       "version": "0.0.22",
       "category": "UI and interaction",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
-      "surface": "Complete: the full upstream hook surface (`useHotkey`, `useHotkeys`, `useHeldKeys`, `useHeldKeyCodes`, `useKeyHold`, `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`, `useHotkeySequenceRecorder`, `useHotkeyRegistrations`) plus `HotkeysProvider`/`useHotkeysContext`/`useDefaultHotkeysOptions`, re-exporting the framework-agnostic `@tanstack/hotkeys@0.8.0` core unchanged; store subscriptions go through `@octanejs/tanstack-store`.",
+      "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
       "divergences": [
         "`target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical."
       ],
       "ssr": "Supported: every hook registers listeners in effects and resolves `document` lazily, so server rendering produces no registrations and no browser access (matching upstream's `typeof document` guards).",
-      "verified": "2026-07-20"
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/tanstack-pacer",

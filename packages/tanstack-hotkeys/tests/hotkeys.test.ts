@@ -11,8 +11,11 @@ import {
 } from '@octanejs/tanstack-hotkeys';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import {
+	ContextProbe,
 	DisabledProviderProbe,
+	HeldStateProbe,
 	MultipleShortcutsProbe,
+	RecorderProbe,
 	SequenceProbe,
 	ShortcutProbe,
 } from './_fixtures/hotkeys.tsrx';
@@ -96,7 +99,7 @@ describe('@octanejs/tanstack-hotkeys', () => {
 		result.unmount();
 	});
 
-	it('completes a real multi-key shortcut sequence', () => {
+	it('completes a real multi-key shortcut sequence with useHotkeySequence', () => {
 		const onShortcut = vi.fn();
 		const result = mount(SequenceProbe, { onShortcut });
 		flushEffects();
@@ -131,5 +134,45 @@ describe('@octanejs/tanstack-hotkeys', () => {
 		pressKey('k', { ctrlKey: true });
 
 		expect(onShortcut).not.toHaveBeenCalled();
+	});
+
+	it('exposes held-key state through useHeldKeys, useHeldKeyCodes, and useKeyHold', function () {
+		const result = mount(HeldStateProbe);
+		flushEffects();
+
+		expect(result.container.querySelector('#held-keys')).not.toBeNull();
+		expect(result.container.querySelector('#held-codes')).not.toBeNull();
+		expect(result.container.querySelector('#shift-held')?.textContent).toBe('false');
+		result.unmount();
+		flushEffects();
+	});
+
+	it('records shortcuts through useHotkeyRecorder and useHotkeySequenceRecorder', function () {
+		const onRecord = vi.fn();
+		const onSequence = vi.fn();
+		const result = mount(RecorderProbe, { onRecord, onSequence });
+		flushEffects();
+
+		const startHotkey = result.container.querySelector('#start-hotkey-recorder');
+		const startSequence = result.container.querySelector('#start-sequence-recorder');
+		expect(startHotkey).not.toBeNull();
+		expect(startSequence).not.toBeNull();
+		(startHotkey as HTMLButtonElement).click();
+		(startSequence as HTMLButtonElement).click();
+		flushEffects();
+
+		expect(result.container.textContent).toContain('recording:true');
+		expect(result.container.textContent).toContain('sequenceRecording:true');
+		result.unmount();
+		flushEffects();
+	});
+
+	it('surfaces HotkeysProvider defaults through useHotkeysContext and useDefaultHotkeysOptions', function () {
+		const result = mount(ContextProbe);
+		flushEffects();
+
+		expect(result.container.querySelector('#has-context')?.textContent).toBe('true');
+		expect(result.container.querySelector('#default-enabled')?.textContent).toBe('true');
+		result.unmount();
 	});
 });

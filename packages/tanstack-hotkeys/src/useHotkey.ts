@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'octane';
 import { detectPlatform, getHotkeyManager, normalizeRegisterableHotkey } from '@tanstack/hotkeys';
 import { useDefaultHotkeysOptions } from './context';
-import { isRef } from './utils';
+import { isRef, withoutSlotOption } from './utils';
 import type { RefObjectLike } from './utils';
 import type {
 	HotkeyCallback,
@@ -55,9 +55,10 @@ export function useHotkey(
 	callback: HotkeyCallback,
 	options: UseHotkeyOptions = {},
 ): void {
+	const resolvedOptions = withoutSlotOption(options) ?? {};
 	const mergedOptions = {
 		...useDefaultHotkeysOptions().hotkey,
-		...options,
+		...resolvedOptions,
 	} as UseHotkeyOptions;
 
 	const manager = getHotkeyManager();

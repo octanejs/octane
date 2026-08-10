@@ -1042,6 +1042,16 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-hotkeys-pristine',
+					include: ['packages/tanstack-hotkeys/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+				},
+			},
+			{
 				test: {
 					name: 'animejs',
 					include: ['packages/animejs/tests/**/*.test.ts'],
@@ -1086,10 +1096,20 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-hotkeys/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'tanstack-hotkeys',
 					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
+					exclude: [
+						'packages/tanstack-hotkeys/tests/upstream-original.test.ts',
+						'packages/tanstack-hotkeys/tests/differential/**/*.test.ts',
+						'packages/tanstack-hotkeys/tests/parity/**/*.test.ts',
+					],
 					environment: 'jsdom',
+					setupFiles: ['packages/tanstack-hotkeys/tests/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],
@@ -1103,7 +1123,46 @@ export default defineConfig({
 							find: /^@octanejs\/tanstack-store$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
 						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-hotkeys-differential',
+					include: ['packages/tanstack-hotkeys/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-hotkeys/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-hotkeys$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-hotkeys/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-hotkeys-parity-audit',
+					include: ['packages/tanstack-hotkeys/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
 				},
 			},
 			{

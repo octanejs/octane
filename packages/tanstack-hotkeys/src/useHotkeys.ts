@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'octane';
 import { detectPlatform, getHotkeyManager, normalizeRegisterableHotkey } from '@tanstack/hotkeys';
 import { useDefaultHotkeysOptions } from './context';
-import { isRef } from './utils';
+import { isRef, withoutSlotOption } from './utils';
 import type { UseHotkeyOptions } from './useHotkey';
 import type {
 	Hotkey,
@@ -60,14 +60,15 @@ export function useHotkeys(
 		target: Document | HTMLElement | Window;
 	};
 
+	const resolvedCommonOptions = withoutSlotOption(commonOptions) ?? {};
 	const defaultOptions = useDefaultHotkeysOptions().hotkey;
 	const manager = getHotkeyManager();
-	const platform = commonOptions.platform ?? defaultOptions?.platform ?? detectPlatform();
+	const platform = resolvedCommonOptions.platform ?? defaultOptions?.platform ?? detectPlatform();
 
 	const registrationsRef = useRef<Map<string, RegistrationRecord>>(new Map());
 	const hotkeysRef = useRef(hotkeys);
 	const hotkeyStringsRef = useRef<Array<Hotkey>>([]);
-	const commonOptionsRef = useRef(commonOptions);
+	const commonOptionsRef = useRef(resolvedCommonOptions);
 	const defaultOptionsRef = useRef(defaultOptions);
 	const managerRef = useRef(manager);
 
@@ -75,7 +76,7 @@ export function useHotkeys(
 
 	hotkeysRef.current = hotkeys;
 	hotkeyStringsRef.current = hotkeyStrings;
-	commonOptionsRef.current = commonOptions;
+	commonOptionsRef.current = resolvedCommonOptions;
 	defaultOptionsRef.current = defaultOptions;
 	managerRef.current = manager;
 
@@ -176,7 +177,7 @@ export function useHotkeys(
 			handle.callback = def.callback;
 			const mergedOptions = {
 				...defaultOptions,
-				...commonOptions,
+				...resolvedCommonOptions,
 				...def.options,
 			} as UseHotkeyOptions;
 			const { target: _target, ...optionsWithoutTarget } = mergedOptions;

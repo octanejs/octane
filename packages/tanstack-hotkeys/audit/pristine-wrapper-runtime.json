@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-hotkeys-pristine",
+  "roots": ["packages/tanstack-hotkeys/tests"],
+  "files": ["packages/tanstack-hotkeys/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:2be5b4a1ac7aea8c",
+      "file": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+      "fullName": "runs all 41 pinned @tanstack/react-hotkeys tests unchanged"
+    }
+  ]
+}

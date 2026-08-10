@@ -1,0 +1,256 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/hotkeys.git",
+    "version": "0.10.0",
+    "commit": "c73a3a167c979d500e1008341ecad096a6c4e635",
+    "sourceRoot": "packages/react-hotkeys/src",
+    "testRoot": "packages/react-hotkeys/tests",
+    "license": "MIT",
+    "integrity": "sha256:1ac05739e0b649ffbc5fb7954fcd7106456de9c337660ca5db3242ae14b9758d",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-hotkeys/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/tanstack-hotkeys/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 41,
+    "uniqueIdentities": 41,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "1d8f1420afbf3e32c2ecc7c12a159167d0cd37303db26dea5f4bcf5872d91fae"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-hotkeys-pristine",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-hotkeys-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Spawns the pinned upstream Vitest suite unchanged, captures the child JSON report, and requires the exact 41 declared identities to pass once.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-hotkeys/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-hotkeys/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "711702a84feea85335c5bebb1bfd456b74efcb279e485cdf51de72121a576d28"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "2f5291f93573b9866d30de1d6a09ace6c6a10a38c04db137283611584317f6ab"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "e02bfba644d9be83df2fa541c74051079f3394ae8bd328bc19882f2db31a9a28"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/tests/upstream-pristine.vitest.config.ts",
+          "role": "support",
+          "sha256": "4ff7a9c63e85bd9abc53cb5ea8861b479b72ead23abac97dd1774ce4bad82d7f"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-hotkeys-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "623a226552b2f19ffd20be00f5e53036fd71f52d8eaa95494b274188f0dcb421"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "15d18ca1d85011855185b8f37d13958a01a4fe04e0cd586585554e5aa1741b7a"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/scripts/check-upstream-ledger.mjs",
+          "role": "support",
+          "sha256": "55834dbdf5d55e9059c643074257b38ce48c453caf32bb1d54609ff7c8f606a8"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-hotkeys-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-hotkeys",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Adapted Octane port of the 41-case upstream runtime suite.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-hotkeys/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-hotkeys/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "e5869993d034496b7d33adb23653b74bbf7a7ba89d53a1ae8d250813da00552d"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/tests/_setup.ts",
+          "role": "support",
+          "sha256": "e7ca508e3d549c61e0604d208ce8b2472183cc1d2553cbd76b8cd373177136e4"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "03bf000c8edc41d144d37b989da6e0c982f72a465d19f2d5ecc763333ebd33ea"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-hotkeys-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-hotkeys-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned upstream test:types command (tsc over package source) unchanged.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-hotkeys/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-hotkeys/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "765eb6a11a1f847ed0398b0b45c232121d0de31f5a5b219ffb5b328a9ebceac8",
+          "cases": [
+            {
+              "id": "types:pristine-upstream",
+              "testName": "pinned upstream type suite",
+              "fullName": "pinned upstream type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-hotkeys/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "2908cf0ddfa89aaf55a111bd842c981054fc4d10e72c59fc958ae8dfb831cc41"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-hotkeys-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-hotkeys-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the Octane adapter surface and explicit plain target-ref type assertions with tsrx-tsc.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-hotkeys/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-hotkeys/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "d0b9ff883bb702d79695860ea04c320c68cab85c2773ea11117c887890be0fc5",
+          "cases": [
+            {
+              "id": "types:adapted-octane",
+              "testName": "adapted Octane type suite",
+              "fullName": "adapted Octane type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-hotkeys/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "c54176a2262da23f745f65d0b556b5172741a1869be2f48203664024081d1ffe"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/typetests/exports.test-d.ts",
+          "role": "support",
+          "sha256": "000ee3bdfee1c56394b4907db02a28cee8ce77d07ffea3838faa23eb39833343"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-hotkeys-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-hotkeys-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one representative same-fixture keyboard lifecycle against @octanejs/tanstack-hotkeys and the pinned React adapter with target-local registrations and independent per-runtime keydown drives.",
+      "files": [
+        {
+          "path": "packages/tanstack-hotkeys/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "53ff1ec34139b367d5c0ad01f70e27ceed40c74846287a9d4536b378d6d51a4f",
+          "cases": [
+            {
+              "id": "differential:tanstack-hotkeys-keyboard-lifecycle",
+              "testName": "matches registration, shortcuts, sequences, enabled updates, and cleanup",
+              "fullName": "differential: @octanejs/tanstack-hotkeys vs @tanstack/react-hotkeys matches registration, shortcuts, sequences, enabled updates, and cleanup"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-hotkeys/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "b733e56b93029b54d9e5ae7cece02abd98a67f14cefa24a459a997def4cfddff"
+        },
+        {
+          "path": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys-diff.tsrx",
+          "role": "support",
+          "sha256": "1dbacd017f141037898426eac4f644cbd1b284f743be091f1ab2517dc4af7e11"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "e731d56e03979da8be5f48b31d9b8aa7ff2881f87db1ac86239db278d286efbe"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "plain-ref-target",
+      "caseIds": ["types:adapted-octane"],
+      "upstreamResult": "Target options use React.RefObject<EventTarget | null>.",
+      "octaneResult": "Target options use a plain { current: EventTarget | null } object.",
+      "rationale": "Octane has no React.RefObject type, while the runtime ref shape is framework-neutral.",
+      "classification": "types",
+      "consumerImpact": "Consumers type target refs as plain current-bearing objects.",
+      "migrationGuidance": "Pass the same current-bearing ref object without importing React ref types.",
+      "owner": "@octanejs/tanstack-hotkeys",
+      "reviewCondition": "Review if Octane introduces a canonical RefObject type."
+    }
+  ]
+}
