@@ -36,7 +36,7 @@ export function visible(
 			const callback = prefetch ?? gate?.resolve;
 			if (!callback) return;
 
-			if (!element) {
+			if (!element || typeof IntersectionObserver !== 'function') {
 				callback();
 				return;
 			}

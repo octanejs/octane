@@ -152,6 +152,39 @@ describe('Rsbuild build.target mapping', () => {
 		);
 	});
 
+	it('targets Samsung Internet explicitly alongside its Chromium engine', async () => {
+		writeApp(root, JSON.stringify(['samsung24', 'chrome117']));
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		const inspected = await instance.inspectConfig();
+
+		expect(inspected.origin.environmentConfigs.web.output.overrideBrowserslist).toEqual([
+			'samsung >= 24',
+			'chrome >= 117',
+		]);
+		expect(inspected.origin.bundlerConfigs.map((config) => config.target)).toEqual(
+			expect.arrayContaining([
+				['web', 'browserslist:samsung >= 24,chrome >= 117'],
+				['node', 'browserslist:samsung >= 24,chrome >= 117'],
+			]),
+		);
+	});
+
+	it('includes the equivalent Samsung Internet release in the modules browser baseline', async () => {
+		writeApp(root, JSON.stringify('modules'));
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		const inspected = await instance.inspectConfig();
+
+		expect(inspected.origin.environmentConfigs.web.output.overrideBrowserslist).toEqual(
+			expect.arrayContaining(['chrome >= 87', 'samsung >= 14']),
+		);
+	});
+
 	it('maps build.target=false without dropping the false-valued configuration', async () => {
 		writeApp(root, 'false');
 		const instance = await createRsbuild({

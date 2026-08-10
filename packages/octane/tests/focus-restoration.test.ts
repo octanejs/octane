@@ -58,6 +58,18 @@ function EditableRows(props: { items: FocusRow[] }) {
 	});
 }
 
+function DescriptorInputRows(props: { items: FocusRow[] }) {
+	return createElement('section', {
+		children: props.items.map((row) =>
+			createElement('input', {
+				key: row.id,
+				id: `descriptor-input-${row.id}`,
+				defaultValue: row.label,
+			}),
+		),
+	});
+}
+
 describe('focus and text selection survive DOM updates', () => {
 	// Per ReactDOM-test.js, "preserves focus": DOM mutations may blur a
 	// surviving control, but focus must be restored before the commit ends.
@@ -77,6 +89,58 @@ describe('focus and text selection survive DOM updates', () => {
 			rendered.unmount();
 		}
 	});
+
+	it.each(rows)(
+		'keeps compiled keyed input $id continuously focused while its row moves',
+		(row) => {
+			const rendered = mount(FastHostControlledList, { items: rows });
+			try {
+				const input = rendered.findAll('input')[row.id - 1] as HTMLInputElement;
+				const interrupted: string[] = [];
+				input.addEventListener('blur', () => interrupted.push('blur'));
+				input.addEventListener('focusout', () => interrupted.push('focusout'));
+				input.focus();
+				input.setSelectionRange(1, 4);
+				input.addEventListener('focus', () => interrupted.push('focus'));
+				input.addEventListener('focusin', () => interrupted.push('focusin'));
+
+				rendered.update(FastHostControlledList, { items: rows.toReversed() });
+
+				expect(rendered.findAll('input')[rows.length - row.id]).toBe(input);
+				expect(document.activeElement).toBe(input);
+				expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4]);
+				expect(interrupted).toEqual([]);
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
+
+	it.each(rows)(
+		'keeps descriptor keyed input $id continuously focused while its row moves',
+		(row) => {
+			const rendered = mount(DescriptorInputRows, { items: rows });
+			try {
+				const input = rendered.find(`#descriptor-input-${row.id}`) as HTMLInputElement;
+				const interrupted: string[] = [];
+				input.addEventListener('blur', () => interrupted.push('blur'));
+				input.addEventListener('focusout', () => interrupted.push('focusout'));
+				input.focus();
+				input.setSelectionRange(1, 4);
+				input.addEventListener('focus', () => interrupted.push('focus'));
+				input.addEventListener('focusin', () => interrupted.push('focusin'));
+
+				rendered.update(DescriptorInputRows, { items: rows.toReversed() });
+
+				expect(rendered.find(`#descriptor-input-${row.id}`)).toBe(input);
+				expect(document.activeElement).toBe(input);
+				expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4]);
+				expect(interrupted).toEqual([]);
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
 
 	it('restores focus when an update is committed by its normal scheduled flush', async () => {
 		const rendered = mount(FastHostControlledList, { items: rows });
@@ -158,7 +222,7 @@ describe('focus and text selection survive DOM updates', () => {
 		}
 	});
 
-	it('restores the previous control before a newly mounted autoFocus control wins', () => {
+	it('keeps the previous control focused until a newly mounted autoFocus control wins', () => {
 		const events: string[] = [];
 		const observe = (focused: Element | null) => events.push(`layout:${focused?.id}`);
 		const rendered = mount(ObservedRows, { items: rows, observe });
@@ -177,7 +241,7 @@ describe('focus and text selection survive DOM updates', () => {
 				addAutoFocus: true,
 			});
 
-			expect(events).toEqual(['selected value', 'focus-new', 'layout:focus-new']);
+			expect(events).toEqual(['focus-new', 'layout:focus-new']);
 			expect(document.activeElement).toBe(rendered.find('#focus-new'));
 		} finally {
 			rendered.unmount();
@@ -229,6 +293,54 @@ describe('focus and text selection survive DOM updates', () => {
 			move.mockRestore();
 			rendered.unmount();
 			outside.remove();
+		}
+	});
+
+	it.each([1, 2])('restores focus and selection inside %i open shadow roots', (depth) => {
+		const host = document.createElement('section');
+		document.body.appendChild(host);
+		let shadow = host.attachShadow({ mode: 'open' });
+		for (let level = 1; level < depth; level++) {
+			const nestedHost = document.createElement('section');
+			shadow.appendChild(nestedHost);
+			shadow = nestedHost.attachShadow({ mode: 'open' });
+		}
+		const container = document.createElement('div');
+		shadow.appendChild(container);
+		const root = createRoot(container);
+		root.render(FastHostControlledList, { items: rows });
+		flushSync(() => {});
+		const input = container.querySelectorAll('input')[1]!;
+		input.focus();
+		input.setSelectionRange(2, 9);
+		expect(shadow.activeElement).toBe(input);
+		const parent = container.querySelector('#fast-host-controlled-list')!;
+		const originalInsert = parent.insertBefore;
+		let lostFocus = false;
+		const move = vi.spyOn(parent, 'insertBefore').mockImplementation(function <T extends Node>(
+			node: T,
+			anchor: Node | null,
+		): T {
+			const result = originalInsert.call(this, node, anchor) as T;
+			if (!lostFocus) {
+				input.blur();
+				input.setSelectionRange(0, 0);
+				lostFocus = shadow.activeElement !== input;
+			}
+			return result;
+		});
+		try {
+			flushSync(() => root.render(FastHostControlledList, { items: rows.toReversed() }));
+
+			expect(lostFocus).toBe(true);
+			expect(container.querySelectorAll('input')[2]).toBe(input);
+			expect(document.activeElement).toBe(host);
+			expect(shadow.activeElement).toBe(input);
+			expect([input.selectionStart, input.selectionEnd]).toEqual([2, 9]);
+		} finally {
+			move.mockRestore();
+			root.unmount();
+			host.remove();
 		}
 	});
 

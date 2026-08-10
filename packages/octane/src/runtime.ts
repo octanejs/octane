@@ -43,6 +43,7 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { hasOwnProp } from './has-own.js';
 import { headOwnershipKey } from './head-ownership.js';
 import {
 	__profileBail,
@@ -83,6 +84,7 @@ import {
 	initializeHydrationEventCapture,
 	markDelegatedDynamicHydrationIntent,
 	registerHydrationIntentBoundary,
+	shouldPreventHydrationInteractionDefault,
 	takeDelegatedDynamicHydrationIntent,
 	takePendingHydrationIntents,
 	unregisterHydrationIntentBoundary,
@@ -2973,20 +2975,26 @@ interface FocusSelectionSnapshot {
 	contentEditable: boolean;
 }
 
-/** Resolve the focused element in the root's own document and same-origin frames. */
+/** Resolve focus through same-origin frames and any nested open shadow roots. */
 function activeElementForDocument(doc: Document): Element | null {
 	try {
 		let focused = doc.activeElement;
-		while (focused !== null && focused.localName === 'iframe') {
-			let nested: Document | null;
-			try {
-				nested = (focused as HTMLIFrameElement).contentDocument;
-			} catch {
-				break;
+		while (focused !== null) {
+			if (focused.localName === 'iframe') {
+				let nested: Document | null;
+				try {
+					nested = (focused as HTMLIFrameElement).contentDocument;
+				} catch {
+					break;
+				}
+				if (nested === null) break;
+				const inner = nested.activeElement;
+				if (inner === null) break;
+				focused = inner;
+				continue;
 			}
-			if (nested === null) break;
-			const inner = nested.activeElement;
-			if (inner === null) break;
+			const inner = focused.shadowRoot?.activeElement;
+			if (inner === null || inner === undefined) break;
 			focused = inner;
 		}
 		return focused;
@@ -3140,7 +3148,7 @@ function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 	if (snapshot === null) return;
 	const { focused } = snapshot;
 	const doc = focused.ownerDocument;
-	if (activeElementForDocument(doc) === focused || !doc.documentElement.contains(focused)) return;
+	if (activeElementForDocument(doc) === focused || !focused.isConnected) return;
 	if (snapshot.start !== -1) {
 		if (snapshot.contentEditable) {
 			const selection = doc.getSelection();
@@ -3177,6 +3185,15 @@ function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 
 type FocusSelectionBatch = FocusSelectionSnapshot | FocusSelectionSnapshot[] | null;
 
+// The scheduler already captures document focus once per render pass. Reuse
+// that snapshot while moving keyed nodes so ordinary unfocused reconciliation
+// never performs an extra activeElement read.
+let renderingFocus: FocusSelectionBatch = null;
+let renderingFocusMoves: Array<{
+	snapshot: FocusSelectionSnapshot;
+	ancestors: Array<{ element: HTMLElement; left: number; top: number }>;
+}> | null = null;
+
 /** A global scheduler drain may contain independently focused documents. */
 function captureQueuedFocusSelection(): FocusSelectionBatch {
 	if (QUEUE.length === 0) return null;
@@ -3205,6 +3222,90 @@ function restoreQueuedFocusSelection(snapshots: FocusSelectionBatch): void {
 	}
 }
 
+function drainQueueWithFocus(snapshots: FocusSelectionBatch): { err: any } | null {
+	if (snapshots === null && renderingFocus === null) return drainQueue();
+	const previous = renderingFocus;
+	const previousMoves = renderingFocusMoves;
+	renderingFocus = snapshots;
+	renderingFocusMoves = null;
+	try {
+		return drainQueue();
+	} finally {
+		try {
+			restoreFocusedMovements();
+		} finally {
+			renderingFocusMoves = previousMoves;
+			renderingFocus = previous;
+		}
+	}
+}
+
+function restoreFocusedMovements(): void {
+	if (renderingFocusMoves === null) return;
+	for (let i = 0; i < renderingFocusMoves.length; i++) {
+		const movement = renderingFocusMoves[i];
+		const snapshot = movement.snapshot;
+		if (snapshot.contentEditable) {
+			const doc = snapshot.focused.ownerDocument;
+			const selection = doc.getSelection();
+			if (selection !== null && activeElementForDocument(doc) === snapshot.focused) {
+				const [anchorNode, anchorOffset] = contentEditablePosition(
+					snapshot.focused,
+					snapshot.start,
+				);
+				const [focusNode, focusOffset] = contentEditablePosition(snapshot.focused, snapshot.end);
+				if (
+					selection.anchorNode !== anchorNode ||
+					selection.anchorOffset !== anchorOffset ||
+					selection.focusNode !== focusNode ||
+					selection.focusOffset !== focusOffset
+				) {
+					const range = doc.createRange();
+					range.setStart(anchorNode, anchorOffset);
+					range.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(range);
+					selection.extend(focusNode, focusOffset);
+				}
+			}
+		}
+		for (let j = 0; j < movement.ancestors.length; j++) {
+			const ancestor = movement.ancestors[j];
+			ancestor.element.scrollLeft = ancestor.left;
+			ancestor.element.scrollTop = ancestor.top;
+		}
+	}
+}
+
+function captureFocusedMovement(parent: Node, snapshots: Exclude<FocusSelectionBatch, null>): void {
+	let snapshot: FocusSelectionSnapshot | null = null;
+	if (Array.isArray(snapshots)) {
+		for (let i = 0; i < snapshots.length; i++) {
+			if (snapshots[i].focused.ownerDocument === parent.ownerDocument) {
+				snapshot = snapshots[i];
+				break;
+			}
+		}
+	} else if (snapshots.focused.ownerDocument === parent.ownerDocument) {
+		snapshot = snapshots;
+	}
+	if (snapshot === null || !parent.contains(snapshot.focused)) return;
+	if (renderingFocusMoves !== null) {
+		for (let i = 0; i < renderingFocusMoves.length; i++) {
+			if (renderingFocusMoves[i].snapshot === snapshot) return;
+		}
+	}
+	const ancestors: Array<{ element: HTMLElement; left: number; top: number }> = [];
+	for (
+		let ancestor = snapshot.focused.parentElement;
+		ancestor !== null;
+		ancestor = ancestor.parentElement
+	) {
+		ancestors.push({ element: ancestor, left: ancestor.scrollLeft, top: ancestor.scrollTop });
+	}
+	(renderingFocusMoves ??= []).push({ snapshot, ancestors });
+}
+
 /**
  * The flush body proper — render+mutate drain plus the effect commit. Shared
  * verbatim by the plain flush() path and the view-transition update callback
@@ -3231,7 +3332,7 @@ function flushWork(): void {
 		// and letting a child observe an event announcing its own mount.
 		if (QUEUE.length > 0) drainPassivesBeforeRender();
 		const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-		const pendingError = drainQueue();
+		const pendingError = drainQueueWithFocus(focused);
 		if (focused !== null) restoreQueuedFocusSelection(focused);
 		commitEffects();
 		if (pendingError !== null) throw pendingError.err;
@@ -3528,7 +3629,7 @@ export function flushSync<T>(fn: () => T): T {
 			// exactly what commitEffects already does.
 			if (QUEUE.length > 0) drainPassivesBeforeRender();
 			const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-			pendingError = drainQueue();
+			pendingError = drainQueueWithFocus(focused);
 			if (focused !== null) restoreQueuedFocusSelection(focused);
 			commitEffects();
 			// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
@@ -3554,7 +3655,7 @@ export function flushSync<T>(fn: () => T): T {
 					// first (React's rule; see flush()).
 					drainPassivesBeforeRender();
 					const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-					const err = drainQueue();
+					const err = drainQueueWithFocus(focused);
 					if (focused !== null) restoreQueuedFocusSelection(focused);
 					if (err !== null && pendingError === null) pendingError = err;
 					commitEffects();
@@ -3877,6 +3978,7 @@ export function drainPassiveEffects(): void {
 	// Cancel any scheduler-side passive drain that hadn't fired yet — we're
 	// about to drain inline.
 	passiveScheduled = false;
+	cancelPostPaint();
 	drainPassivePhase();
 }
 
@@ -4306,29 +4408,61 @@ function drainStoreSyncs(): void {
 
 // `schedulePostPaint` — fires after the next paint (React's scheduler trick).
 let _postPaintCbs: Array<() => void> = [];
-/** Swap out the pending post-paint callbacks and run them (both delivery paths). */
-function drainPostPaint(): void {
-	const cbs = _postPaintCbs;
+let _postPaintTimeout: ReturnType<typeof setTimeout> | null = null;
+let _postPaintGeneration = 0;
+
+function cancelPostPaint(): void {
+	if (_postPaintCbs.length === 0) return;
 	_postPaintCbs = [];
+	_postPaintGeneration++;
+	if (_postPaintTimeout !== null) {
+		clearTimeout(_postPaintTimeout);
+		_postPaintTimeout = null;
+	}
+	// Preserve the already-requested frame: sibling imperative focus callbacks
+	// may join it after an inline passive drain. Generation checks discard ours.
+}
+
+/** Swap out the pending post-paint callbacks and run them (both delivery paths). */
+function drainPostPaint(generation?: number): void {
+	if (generation !== undefined && generation !== _postPaintGeneration) return;
+	const cbs = _postPaintCbs;
+	if (cbs.length === 0) return;
+	cancelPostPaint();
 	for (let i = 0; i < cbs.length; i++) cbs[i]();
 }
-let _postAfterPaint: (() => void) | undefined;
-function initPostAfterPaint(): () => void {
+let _postAfterPaint: ((generation: number) => void) | undefined;
+function initPostAfterPaint(): (generation: number) => void {
 	if (_postAfterPaint === undefined) {
 		if (typeof MessageChannel === 'undefined') {
-			_postAfterPaint = () => setTimeout(drainPostPaint, 0);
+			_postAfterPaint = (generation) => setTimeout(() => drainPostPaint(generation), 0);
 		} else {
 			const channel = new MessageChannel();
-			channel.port1.onmessage = drainPostPaint;
-			_postAfterPaint = () => channel.port2.postMessage(0);
+			channel.port1.onmessage = (event) => drainPostPaint(event?.data);
+			_postAfterPaint = (generation) => channel.port2.postMessage(generation);
 		}
 	}
 	return _postAfterPaint;
 }
 function schedulePostPaint(cb: () => void): void {
 	_postPaintCbs.push(cb);
-	// rAF lands before paint; the shared callback posts a macrotask after paint.
-	requestAnimationFrame(initPostAfterPaint());
+	if (_postPaintCbs.length !== 1) return;
+	const postAfterPaint = initPostAfterPaint();
+	const generation = ++_postPaintGeneration;
+	const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+	const hasAnimationFrame = typeof requestAnimationFrame === 'function';
+	// Background tabs and occluded WebViews may never receive an animation
+	// frame. One bounded timer per batch prevents passive effects starving while
+	// the ordinary visible-page path still waits for rAF and its post-paint task.
+	_postPaintTimeout = setTimeout(
+		() => drainPostPaint(generation),
+		hidden || !hasAnimationFrame ? 0 : 250,
+	);
+	if (!hidden && hasAnimationFrame) {
+		requestAnimationFrame(() => {
+			postAfterPaint(generation);
+		});
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -6808,11 +6942,7 @@ function resetHmrBlock(block: Block): void {
 		const hooks = block.hooks;
 		if (hooks !== null) {
 			for (const value of hooks.values()) {
-				if (
-					value !== null &&
-					typeof value === 'object' &&
-					Object.prototype.hasOwnProperty.call(value, 'deps')
-				) {
+				if (value !== null && typeof value === 'object' && hasOwnProp.call(value, 'deps')) {
 					value.deps = undefined;
 				}
 			}
@@ -6919,8 +7049,6 @@ interface HydrateSlot {
 	intentBoundary: HydrationIntentBoundary;
 	delegatedDynamicIntent: boolean;
 	serverPreserved: boolean;
-	/** Snapshot used instead of authored fallback for an initial SSR boundary. */
-	preservedFallbackNodes: Node[] | null;
 	seedRaw: string | null;
 	idState: RootIdState;
 	/** One-shot result of the client-only function form of `when`. */
@@ -6952,6 +7080,62 @@ interface HydrateSlot {
 // Created only for the rare activation that races a renderer stream. Keep the
 // ordinary Hydrate state shape unchanged and retain no completed boundaries.
 let hydrateStreamWaitCleanups: WeakMap<HydrateSlot, () => void> | null = null;
+
+interface PreservedHydrateActivation {
+	hydration: HydrationCapability;
+	thenable: TrackedThenable<unknown>;
+	generation: number;
+	capture: OffscreenCapture;
+	source: Block | null;
+	cursor: Node | null;
+}
+
+// Allocate bookkeeping only when an already-visible SSR arm really suspends.
+// Keeping its actual DOM attached preserves focus, selection, draft values and
+// native IME sessions; cloning that arm cannot preserve browser-owned state.
+let preservedHydrateActivations: WeakMap<HydrateSlot, PreservedHydrateActivation> | null = null;
+
+function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unknown>): Block | null {
+	const own = (scope.block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
+	if (own !== undefined && own.includes(thenable)) return scope.block;
+	// Compiler-emitted useBatch can suspend before use() registers a thenable on
+	// its block. The deepest unfinished registered child is that same source.
+	let suspended: Block | null = scope.block.mounted ? null : scope.block;
+	forEachSubtreeChild(scope, (child) => {
+		const candidate = findSuspendedHydrateBlock(child, thenable);
+		if (candidate !== null) suspended = candidate;
+	});
+	return suspended;
+}
+
+function preserveSuspendedHydrateActivation(
+	state: HydrateSlot,
+	hydration: HydrationCapability,
+	thenable: TrackedThenable<unknown>,
+): void {
+	const suspendedBlock = findSuspendedHydrateBlock(state.block, thenable);
+	const activation: PreservedHydrateActivation = {
+		hydration,
+		thenable,
+		generation: state.activationGeneration,
+		capture: WIP_CAPTURE!,
+		source: suspendedBlock === state.block ? null : suspendedBlock,
+		cursor: hydration.node,
+	};
+	(preservedHydrateActivations ??= new WeakMap()).set(state, activation);
+	const resume = () => {
+		if (
+			state.block.disposed ||
+			!state.activationRequested ||
+			state.activationGeneration !== activation.generation ||
+			preservedHydrateActivations?.get(state) !== activation
+		)
+			return;
+		state.serverActivationStarted = false;
+		scheduleRender(state.parentBlock);
+	};
+	thenable.then(resume, resume);
+}
 
 function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
 	return typeof when === 'function' ? 'dynamic' : (when?._t ?? 'dynamic');
@@ -7071,40 +7255,40 @@ function renderHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): v
 
 function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 	const contentBody: ComponentBody = (_props, scope, extra) => {
-		if (state.loadedBody === null) {
-			const preload = beginHydratePreload(state);
-			if (preload !== null) {
-				// This internal code-chunk thenable is not application `use()` data and
-				// must never consume a server seed. Track/throw it directly through the
-				// enclosing tryBlock; the stable cached promise makes retries safe.
-				const thenable = preload as TrackedThenable<void>;
-				trackThenable(thenable);
-				if (thenable.status === 'rejected') throw thenable.reason;
-				if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
+		try {
+			if (state.loadedBody === null) {
+				const preload = beginHydratePreload(state);
+				if (preload !== null) {
+					// This internal code-chunk thenable is not application `use()` data and
+					// must never consume a server seed. Track/throw it directly through the
+					// enclosing tryBlock; the stable cached promise makes retries safe.
+					const thenable = preload as TrackedThenable<void>;
+					trackThenable(thenable);
+					if (thenable.status === 'rejected') throw thenable.reason;
+					if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
+				}
 			}
+			renderHydrateChild(state, scope, extra);
+		} catch (error) {
+			const hydration = activeHydration();
+			if (
+				!state.serverPreserved ||
+				state.hydrated ||
+				hydration === null ||
+				!isSuspenseException(error)
+			) {
+				throw error;
+			}
+			// The SSR arm is already the visible content. Let its adopted try block
+			// remain connected and retry adoption in the same hydration capability
+			// once application data settles, without ever mounting a cloned fallback.
+			preserveSuspendedHydrateActivation(state, hydration, error.thenable);
+			return;
 		}
-		renderHydrateChild(state, scope, extra);
 		state.hydrated = true;
 		useEffect(() => notifyHydrateBoundary(state), [state], HYDRATE_NOTIFY_SLOT);
 	};
 	const pendingBody: ComponentBody = (_props, scope) => {
-		if (state.serverPreserved && state.preservedFallbackNodes !== null) {
-			// Initial-document boundaries keep showing their server result if their
-			// first client attempt suspends. The authored fallback is exclusively for
-			// a later/client-only mount. A slot sentinel prevents a pending-body
-			// refresh from appending the snapshot twice; the pending Block's own range
-			// removes these raw cloned nodes when the child is ready.
-			if (scope.slots[0] === undefined) {
-				for (let i = 0; i < state.preservedFallbackNodes.length; i++) {
-					scope.block.parentNode.insertBefore(
-						state.preservedFallbackNodes[i].cloneNode(true),
-						scope.block.endMarker,
-					);
-				}
-				scope.slots[0] = { __kind: 'hydratePreservedFallback' };
-			}
-			return;
-		}
 		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
 	};
 	return (_props, scope) => {
@@ -7251,6 +7435,15 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 function teardownHydrateBoundary(state: HydrateSlot): void {
 	cleanupHydrateInstallers(state);
 	cleanupHydrateStreamWait(state);
+	const preserved = preservedHydrateActivations?.get(state);
+	if (preserved !== undefined) {
+		preservedHydrateActivations!.delete(state);
+		discardOffscreenCapture(preserved.capture);
+		// The connected server arm never committed its captured refs/effects.
+		// Let the existing exact-host aborted-mount suppression cover descendants
+		// that individually finished before a later sibling suspended.
+		state.block.mounted = false;
+	}
 	state.prefetchAbort?.abort();
 	resolveHydrateWaiters(state, 'abort');
 	unregisterHydrationIntentBoundary(state.wrapper, state.intentBoundary);
@@ -7364,7 +7557,7 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		if (path === null) return;
 		state.replays.push({ event, path });
 		if (event.bubbles) {
-			event.preventDefault();
+			if (shouldPreventHydrationInteractionDefault(event)) event.preventDefault();
 			event.stopPropagation();
 			event.stopImmediatePropagation();
 		}
@@ -7661,7 +7854,6 @@ function createHydrateSlot(
 		intentBoundary,
 		delegatedDynamicIntent: takeDelegatedDynamicHydrationIntent(wrapper),
 		serverPreserved,
-		preservedFallbackNodes: null,
 		seedRaw,
 		idState,
 		dynamicStrategy: null,
@@ -7704,46 +7896,66 @@ function createHydrateSlot(
 function activateHydrateBoundary(state: HydrateSlot): void {
 	const block = state.block;
 	const activationSlot = block.slots[0] as TrySlot | undefined;
-	if (!state.serverPreserved || activationSlot?.__kind === 'trySlotSlot') {
-		// The original server arm can be adopted only once. A cancelled suspended
-		// attempt leaves its internal try slot and preserved snapshot mounted; a
-		// later strategy resumes that slot as client work instead of treating its
-		// synthetic pending markers as untouched server HTML.
+	const preserved = preservedHydrateActivations?.get(state);
+	if (
+		!state.serverPreserved ||
+		(activationSlot?.__kind === 'trySlotSlot' && preserved === undefined)
+	) {
 		renderBlock(block);
 		return;
 	}
-	if (state.preservedFallbackNodes === null) {
-		const snapshot: Node[] = [];
-		for (let node = state.start.nextSibling; node !== null && node !== state.end;) {
-			snapshot.push(node.cloneNode(true));
-			node = node.nextSibling;
-		}
-		state.preservedFallbackNodes = snapshot;
+	const hydration =
+		preserved?.hydration ?? new HydrationCapability(block, state.start.nextSibling, null);
+	if (preserved === undefined) {
+		if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
+		hydration.protectRootAnchor(state.end);
 	}
-
-	const hydration = new HydrationCapability(block, state.start.nextSibling, null);
-	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
-	hydration.protectRootAnchor(state.end);
 	const previousHydration = currentHydration;
+	const previousCapture = WIP_CAPTURE;
+	const capture = preserved?.capture ?? createOffscreenCapture();
 	currentHydration = hydration;
+	WIP_CAPTURE = capture;
 	let completed = false;
 	try {
+		if (preserved?.source !== null && preserved?.source !== undefined) {
+			// Existing component slots do not re-enter their own adopted server
+			// ranges on an ordinary parent replay. Complete the actually suspended
+			// leaf at its saved cursor first, then let its ancestors reconcile the
+			// already-adopted siblings without treating their range as fresh DOM.
+			hydration.node = preserved.cursor;
+			try {
+				renderBlock(preserved.source);
+			} catch (error) {
+				if (!isSuspenseException(error)) throw error;
+				preserveSuspendedHydrateActivation(state, hydration, error.thenable);
+				return;
+			}
+		}
 		renderBlock(block);
 		drainHydrationRenderPhaseUpdates(block);
-		hydration.flushClassWrites();
-		hydration.flushTextWarnings();
-		// A first-attempt suspension deliberately leaves the internal try slot's
-		// pending block live until its thenable resumes. Its cursor is parked on
-		// that slot's close marker, so a normal root-remainder sweep would mistake
-		// the still-owned close marker for stale server DOM and detach the anchor
-		// the async retry needs. The pending path has already removed the abandoned
-		// adopted arm; finish/coalesce only after this boundary actually commits.
+		// Suspended initial adoption intentionally leaves its real server arm and
+		// cursor untouched. Sweep only after that same arm eventually commits.
 		if (state.hydrated) {
+			hydration.flushClassWrites();
+			hydration.flushTextWarnings();
 			hydration.finishRoot();
 			completed = true;
 		}
+	} catch (error) {
+		// A rejected parked promise can throw while its unfinished source retries.
+		// Discard the same uncommitted work as an explicit boundary unmount before
+		// the enclosing error boundary tears down its partially mounted children.
+		preservedHydrateActivations?.delete(state);
+		discardOffscreenCapture(capture);
+		state.block.mounted = false;
+		throw error;
 	} finally {
+		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
+	}
+	if (completed) {
+		preservedHydrateActivations?.delete(state);
+		spliceOffscreenCapture(capture);
 	}
 	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
 }
@@ -7770,6 +7982,15 @@ function cloneHydrationReplayEvent(event: Event, target: Element): Event {
 	if (realm.FocusEvent !== undefined && event instanceof realm.FocusEvent) {
 		return new realm.FocusEvent(event.type, event);
 	}
+	if (realm.InputEvent !== undefined && event instanceof realm.InputEvent) {
+		return new realm.InputEvent(event.type, event);
+	}
+	if (realm.CompositionEvent !== undefined && event instanceof realm.CompositionEvent) {
+		return new realm.CompositionEvent(event.type, event);
+	}
+	if (realm.TouchEvent !== undefined && event instanceof realm.TouchEvent) {
+		return cloneHydrationTouchEvent(event, realm.TouchEvent);
+	}
 	// Cold: a programmatic dispatch may cross realms, where the original event
 	// came from a parent Window while its target belongs to an iframe Window (or
 	// the reverse). No local constructor claims it, but Web IDL's toStringTag
@@ -7787,7 +8008,35 @@ function cloneHydrationReplayEvent(event: Event, target: Element): Event {
 	if (realm.FocusEvent !== undefined && brand === '[object FocusEvent]') {
 		return new realm.FocusEvent(event.type, event);
 	}
+	if (realm.InputEvent !== undefined && brand === '[object InputEvent]') {
+		return new realm.InputEvent(event.type, event);
+	}
+	if (realm.CompositionEvent !== undefined && brand === '[object CompositionEvent]') {
+		return new realm.CompositionEvent(event.type, event);
+	}
+	if (realm.TouchEvent !== undefined && brand === '[object TouchEvent]') {
+		return cloneHydrationTouchEvent(event as TouchEvent, realm.TouchEvent);
+	}
 	return new realm.Event(event.type, event);
+}
+
+function cloneHydrationTouchEvent(
+	event: TouchEvent,
+	TouchEventImpl: typeof TouchEvent,
+): TouchEvent {
+	return new TouchEventImpl(event.type, {
+		bubbles: event.bubbles,
+		cancelable: event.cancelable,
+		composed: event.composed,
+		detail: event.detail,
+		ctrlKey: event.ctrlKey,
+		shiftKey: event.shiftKey,
+		altKey: event.altKey,
+		metaKey: event.metaKey,
+		touches: Array.from(event.touches),
+		targetTouches: Array.from(event.targetTouches),
+		changedTouches: Array.from(event.changedTouches),
+	});
 }
 
 function notifyHydrateBoundary(state: HydrateSlot): void {
@@ -7870,11 +8119,9 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 				state.activationReady &&
 				(!state.serverPreserved || !state.serverActivationStarted)
 			) {
-				// A first attempt can suspend after replacing the adopted arm with its
-				// preserved-server pending block. From that point the internal try slot owns
-				// the thenable and resume path; re-entering here on a parent update would
-				// remount that pending block and abandon the in-flight attempt. Client-only
-				// boundaries keep re-entering so new props can supersede suspended data.
+				// A suspended first attempt keeps its adopted server arm connected until
+				// its own gated resume requests another pass. Client-only boundaries keep
+				// re-entering so new props can supersede suspended data.
 				if (state.serverPreserved) state.serverActivationStarted = true;
 				try {
 					activateHydrateBoundary(state);
@@ -8510,11 +8757,7 @@ function decodeHydrationRejectionPayload(payload: any): unknown {
 }
 
 function hydrationRejectionFromSeed(seed: unknown): HydrationRejectionException | null {
-	if (
-		seed === null ||
-		typeof seed !== 'object' ||
-		!Object.prototype.hasOwnProperty.call(seed, HYDRATION_REJECTION_SEED)
-	)
+	if (seed === null || typeof seed !== 'object' || !hasOwnProp.call(seed, HYDRATION_REJECTION_SEED))
 		return null;
 	return new HydrationRejectionException(
 		(seed as HydrationRejectionSeed)[HYDRATION_REJECTION_SEED],
@@ -10890,7 +11133,7 @@ export function setDangerouslySetInnerHTMLSources(
 	if (resolved !== null && resolvedChild != null) throw dangerHtmlChildrenError();
 	validateDangerouslySetInnerHTMLValue(resolved);
 	if (
-		Object.prototype.hasOwnProperty.call(el, DANGER_HTML_RESOLVED_VALUE) &&
+		hasOwnProp.call(el, DANGER_HTML_RESOLVED_VALUE) &&
 		Object.is((el as any)[DANGER_HTML_RESOLVED_VALUE], resolved) &&
 		Object.is((el as any)[DANGER_HTML_RESOLVED_CHILD], resolvedChild)
 	) {
@@ -13188,6 +13431,19 @@ const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
 	...EMULATED_BUBBLING_EVENTS,
 ]);
 const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
+const ACTIVE_TOUCH_BUBBLE: AddEventListenerOptions = { passive: false };
+const ACTIVE_TOUCH_CAPTURE: AddEventListenerOptions = { capture: true, passive: false };
+
+function delegatedListenerOptions(
+	name: string,
+	capture: boolean,
+): boolean | AddEventListenerOptions {
+	return name === 'touchstart' || name === 'touchmove'
+		? capture
+			? ACTIVE_TOUCH_CAPTURE
+			: ACTIVE_TOUCH_BUBBLE
+		: capture;
+}
 
 // The enter/leave family is dispatched PER ELEMENT by the browser — each
 // entered/left element receives its OWN non-bubbling event — so the delegated
@@ -13221,7 +13477,11 @@ export function delegateEvents(eventNames: string[]): void {
 		// back-attach the listener to every active target so handlers stamped on
 		// their DOM via `el.$$click = …` still receive events.
 		for (const target of _delegationTargets.keys()) {
-			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
+			target.addEventListener(
+				name,
+				dispatchDelegated,
+				delegatedListenerOptions(name, delegatedCapture(name)),
+			);
 		}
 	}
 }
@@ -13241,7 +13501,7 @@ export function delegateCaptureEvents(eventNames: string[]): void {
 		// `$$capture:<type>` along the built path).
 		if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
 		for (const target of _delegationTargets.keys()) {
-			target.addEventListener(name, dispatchDelegatedCapture, true);
+			target.addEventListener(name, dispatchDelegatedCapture, delegatedListenerOptions(name, true));
 		}
 	}
 }
@@ -13265,10 +13525,14 @@ function registerDelegationTarget(target: Node): void {
 			(target as any).onclick = noop;
 		}
 		for (const name of _delegated) {
-			target.addEventListener(name, dispatchDelegated, delegatedCapture(name));
+			target.addEventListener(
+				name,
+				dispatchDelegated,
+				delegatedListenerOptions(name, delegatedCapture(name)),
+			);
 		}
 		for (const name of _delegatedCapture) {
-			target.addEventListener(name, dispatchDelegatedCapture, true);
+			target.addEventListener(name, dispatchDelegatedCapture, delegatedListenerOptions(name, true));
 		}
 	}
 }
@@ -13974,9 +14238,10 @@ interface ControlledState {
 	 *  it CHANGES (an unchanged default on an unrelated re-render must not
 	 *  clobber the user's selection; uncontrolled selects stay user-owned). */
 	dvv: unknown;
-	/** True between compositionstart and compositionend (IME) — reassert and
-	 *  restore both hold off so they can't cancel an active composition. */
+	/** True during IME composition and while its final committed input can arrive. */
 	composing: boolean;
+	/** undefined until text composition is armed; null or the pending completion task. */
+	compositionEndTask: ReturnType<typeof setTimeout> | null | undefined;
 	/** Select re-projection already queued for the pending commit. */
 	queued: boolean;
 	/** Whether the compiler's spread-aware form aggregation path has committed. */
@@ -14010,7 +14275,6 @@ const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 // DOM against the values the handlers just committed. Tiny array + linear
 // dedupe: one event targets one element; nesting stays single-digit.
 let pendingRestores: Element[] = [];
-let restoreMicrotaskScheduled = false;
 
 // The checkable input whose click ACTIVATION is currently in flight: the
 // platform has toggled `checked` but the activation's `input`/`change`
@@ -14096,28 +14360,43 @@ function isTextEntry(el: Element): boolean {
 
 // IME guard — DIRECT per-element listeners (not delegation), attached once at
 // arm time: a user handler's stopPropagation can never starve the composing
-// flag, and compositionend re-enters the restore path via a microtask even
-// when the delegated dispatch was stopped. Two shared module-level handlers —
-// no per-element closures.
+// flag. A cancellable task after compositionend leaves the browser's final
+// committed input observable; blur gets a temporary listener only while an
+// actual composition is active, so interrupted sessions cannot stay stuck.
 function onCtrlCompositionStart(e: Event): void {
-	const ctrl = (e.currentTarget as any).$$ctrl as ControlledState | undefined;
-	if (ctrl !== undefined) ctrl.composing = true;
+	const el = e.currentTarget as Element;
+	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
+	if (ctrl === undefined) return;
+	if (ctrl.compositionEndTask !== undefined && ctrl.compositionEndTask !== null) {
+		clearTimeout(ctrl.compositionEndTask);
+		ctrl.compositionEndTask = null;
+	}
+	ctrl.composing = true;
+	el.addEventListener('blur', onCtrlCompositionEnd);
 }
 function onCtrlCompositionEnd(e: Event): void {
 	const el = e.currentTarget as Element;
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
 	if (ctrl === undefined) return;
-	ctrl.composing = false;
-	if (pendingRestores.indexOf(el) === -1) pendingRestores.push(el);
-	// The delegated compositionend dispatch normally drains this in
-	// maybeFlushDiscrete; the microtask is the un-starvable fallback.
-	if (!restoreMicrotaskScheduled) {
-		restoreMicrotaskScheduled = true;
-		queueMicrotask(() => {
-			restoreMicrotaskScheduled = false;
-			if (pendingRestores.length > 0) restoreControlledStates();
-		});
+	el.removeEventListener('blur', onCtrlCompositionEnd);
+	if (ctrl.compositionEndTask !== undefined && ctrl.compositionEndTask !== null) {
+		clearTimeout(ctrl.compositionEndTask);
 	}
+	// Android keyboards can dispatch the committed input after compositionend,
+	// a microtask checkpoint, and the next task. Give that input a full turn;
+	// blur needs no extra turn because it has already interrupted the session.
+	ctrl.composing = true;
+	const settleComposition = () => {
+		ctrl.compositionEndTask = null;
+		ctrl.composing = false;
+		restoreControlledElement(el);
+	};
+	ctrl.compositionEndTask =
+		e.type === 'blur'
+			? setTimeout(settleComposition, 0)
+			: setTimeout(() => {
+					ctrl.compositionEndTask = setTimeout(settleComposition, 0);
+				}, 0);
 }
 
 /** Get-or-create the shared controlled-state record and restoration listeners. */
@@ -14132,6 +14411,7 @@ function armControlledBase(el: Element): ControlledState {
 			sawC: false,
 			dvv: UNCONTROLLED,
 			composing: false,
+			compositionEndTask: undefined,
 			queued: false,
 			formSeen: false,
 			formDefaultValue: UNCONTROLLED,
@@ -14149,12 +14429,13 @@ function armControlledBase(el: Element): ControlledState {
 
 /** Full arming for controls that may accept IME text composition. */
 function armControlled(el: Element): ControlledState {
-	const existing = (el as any).$$ctrl as ControlledState | undefined;
-	if (existing !== undefined) return existing;
-	const ctrl = armControlledBase(el);
+	let ctrl = (el as any).$$ctrl as ControlledState | undefined;
+	if (ctrl === undefined) ctrl = armControlledBase(el);
 	// Direct checked-only compiler sites use armControlledBase instead. Their
 	// statically-known checkbox/radio type proves these text listeners are dead.
-	if (isTextEntry(el)) {
+	// Recheck existing records so a dynamic date-to-text type change can arm IME.
+	if (ctrl.compositionEndTask === undefined && isTextEntry(el)) {
+		ctrl.compositionEndTask = null;
 		el.addEventListener('compositionstart', onCtrlCompositionStart);
 		el.addEventListener('compositionend', onCtrlCompositionEnd);
 	}
@@ -14881,8 +15162,8 @@ function drainControlledSyncs(): void {
 /**
  * Restore one armed element's DOM to its last RENDERED state (value/checked/
  * selection) — React's restoreControlledState. Composition holds the restore
- * off (compositionend re-enqueues); a disconnected element has nothing to
- * restore.
+ * off until its committed input or completion fallback; a disconnected
+ * element has nothing to restore.
  */
 function restoreControlledElement(el: Element): void {
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
@@ -14973,6 +15254,30 @@ function isControlledHostProp(el: Element, name: string): boolean {
 function maybeEnqueueRestore(event: Event): void {
 	const t = event.target as any;
 	if (t === null || t.$$ctrl === undefined || !RESTORE_EVENTS.has(event.type)) return;
+	const ctrl = t.$$ctrl as ControlledState;
+	if (event.type === 'input' && ctrl.compositionEndTask !== undefined) {
+		const inputEvent = event as InputEvent;
+		const inputType = inputEvent.inputType;
+		const composingInput =
+			inputEvent.isComposing === true ||
+			inputType === 'insertCompositionText' ||
+			inputType === 'deleteCompositionText';
+		if (composingInput) {
+			if (ctrl.compositionEndTask !== null) {
+				clearTimeout(ctrl.compositionEndTask);
+				ctrl.compositionEndTask = null;
+			}
+			if (!ctrl.composing) t.addEventListener('blur', onCtrlCompositionEnd);
+			ctrl.composing = true;
+		} else if (ctrl.composing && typeof inputEvent.isComposing === 'boolean') {
+			if (ctrl.compositionEndTask !== null) {
+				clearTimeout(ctrl.compositionEndTask);
+				ctrl.compositionEndTask = null;
+			}
+			t.removeEventListener('blur', onCtrlCompositionEnd);
+			ctrl.composing = false;
+		}
+	}
 	// A checkable's click never arms — its `input`/`change` follow-ups do
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
@@ -14985,7 +15290,6 @@ function maybeEnqueueRestore(event: Event): void {
 			// press-state machinery does this) must not reassert the still-uncommitted
 			// prop over the user's toggle: the checked binding switches to React's
 			// prop-diff semantics for the marked element (see setCheckedState).
-			const ctrl = t.$$ctrl as ControlledState;
 			if (ctrl.c !== -1) activationCheckable = t as Element;
 			// The platform dispatches click after pre-activation, then input/change.
 			// Remember that sequence so input does not restore before native change.
@@ -15827,8 +16131,7 @@ export function cloneElement<P>(
 	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
 		key === null &&
-		(elementKeyWasProvided(element) ||
-			(config != null && Object.prototype.hasOwnProperty.call(config, 'key')))
+		(elementKeyWasProvided(element) || (config != null && hasOwnProp.call(config, 'key')))
 	) {
 		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
 	}
@@ -17800,7 +18103,13 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		const at = hasForeign
 			? liveOwnedChildAt(el, i, hydrationOwnsUnstamped === true)
 			: (existing[i] ?? null);
-		if (at !== want) el.insertBefore(want, at);
+		if (at !== want) {
+			if (renderingFocus === null) el.insertBefore(want, at);
+			else {
+				captureFocusedMovement(el, renderingFocus);
+				moveFocusedNodeBefore(el, want, at, renderingFocus);
+			}
+		}
 	}
 }
 
@@ -18637,7 +18946,7 @@ export function mapSlot(
 			!Array.isArray(receiver) ||
 			Object.getPrototypeOf(receiver) !== Array.prototype ||
 			slotOrMethod !== NATIVE_ARRAY_MAP ||
-			Object.prototype.hasOwnProperty.call(receiver, 'constructor') ||
+			hasOwnProp.call(receiver, 'constructor') ||
 			Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
 			Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
 		) {
@@ -20090,7 +20399,6 @@ export function compilerCacheContext(
 	return current;
 }
 
-const hasOwnProp = Object.prototype.hasOwnProperty;
 const OBJ_PROTO = Object.prototype;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),
@@ -25951,6 +26259,11 @@ function moveBlockBefore(block: Block, anchor: Node): void {
 	const parent = block.startMarker!.parentNode!;
 	const end = block.endMarker!;
 	let n: Node | null = block.startMarker!;
+	if (renderingFocus !== null) {
+		captureFocusedMovement(parent, renderingFocus);
+		moveFocusedBlockBefore(parent, n, end, anchor, renderingFocus);
+		return;
+	}
 	// Walk by checking `n === end` BEFORE moving. The previous design captured
 	// `stop = endMarker.nextSibling` at function entry, then iterated until
 	// `n === stop`. That breaks when the block range has multi-root content
@@ -25966,6 +26279,84 @@ function moveBlockBefore(block: Block, anchor: Node): void {
 		parent.insertBefore(n, anchor);
 		if (isEnd) break;
 		n = next;
+	}
+}
+
+function moveFocusedBlockBefore(
+	parent: Node,
+	node: Node,
+	end: Node,
+	anchor: Node,
+	snapshots: Exclude<FocusSelectionBatch, null>,
+): void {
+	let current: Node | null = node;
+	while (current !== null) {
+		const isEnd = current === end;
+		const next: Node | null = current.nextSibling;
+		moveFocusedNodeBefore(parent, current, anchor, snapshots);
+		if (isEnd) break;
+		current = next;
+	}
+}
+
+function moveFocusedNodeBefore(
+	parent: Node,
+	node: Node,
+	anchor: Node | null,
+	snapshots: Exclude<FocusSelectionBatch, null>,
+): void {
+	let snapshot: FocusSelectionSnapshot | null = null;
+	if (Array.isArray(snapshots)) {
+		for (let i = 0; i < snapshots.length; i++) {
+			if (snapshots[i].focused.ownerDocument === node.ownerDocument) {
+				snapshot = snapshots[i];
+				break;
+			}
+		}
+	} else if (snapshots.focused.ownerDocument === node.ownerDocument) {
+		snapshot = snapshots;
+	}
+	const focused = snapshot?.focused ?? null;
+	if (
+		focused === null ||
+		(node !== focused && (node.nodeType !== 1 || !(node as Element).contains(focused)))
+	) {
+		parent.insertBefore(node, anchor);
+		return;
+	}
+
+	const moveBefore = (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
+		.moveBefore;
+	// Chromium's state-preserving move keeps input composition alive but still
+	// collapses live Range selections inside a moved content-editable subtree.
+	if (!snapshot!.contentEditable && typeof moveBefore === 'function') {
+		moveBefore.call(parent, node, anchor);
+		return;
+	}
+
+	// insertBefore detaches an existing node, which ends a trusted keyboard
+	// composition even when the commit later restores focus. Older Chromium,
+	// Samsung Internet, and editable Range selections instead keep the focused
+	// node attached and rotate only its intervening siblings around it.
+	if (node === anchor || node.nextSibling === anchor) return;
+	if (
+		anchor === null ||
+		(node.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+	) {
+		let cursor = node.nextSibling;
+		while (cursor !== anchor) {
+			const next = cursor!.nextSibling;
+			parent.insertBefore(cursor!, node);
+			cursor = next;
+		}
+	} else {
+		const end = node.nextSibling;
+		let cursor: Node | null = anchor;
+		while (cursor !== node) {
+			const next: Node | null = cursor!.nextSibling;
+			parent.insertBefore(cursor!, end);
+			cursor = next;
+		}
 	}
 }
 

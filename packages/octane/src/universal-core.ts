@@ -11,6 +11,7 @@
  * may change in patch releases until real Three and transported renderers
  * validate the protocol.
  */
+import { hasOwnProp } from './has-own.js';
 import {
 	__profileBeginRender,
 	__profileComponentSource,
@@ -1587,7 +1588,7 @@ function assignUniversalPropSpread(
 	}
 
 	let protoAssigned = false;
-	const needsProtoGuard = hasOwnProto && !Object.prototype.hasOwnProperty.call(props, '__proto__');
+	const needsProtoGuard = hasOwnProto && !hasOwnProp.call(props, '__proto__');
 	if (needsProtoGuard) {
 		Object.defineProperty(props, '__proto__', {
 			configurable: true,
@@ -1646,7 +1647,7 @@ export function universalProps(
 		}
 	}
 	if (children !== NO_CHILDREN) props.children = children;
-	const hasKey = Object.prototype.hasOwnProperty.call(props, 'key');
+	const hasKey = hasOwnProp.call(props, 'key');
 	const key = hasKey ? props.key : null;
 	if (hasKey) delete props.key;
 	return {
@@ -1654,7 +1655,7 @@ export function universalProps(
 		props: Object.freeze(props),
 		key,
 		hasKey,
-		hasChildren: Object.prototype.hasOwnProperty.call(props, 'children'),
+		hasChildren: hasOwnProp.call(props, 'children'),
 	};
 }
 
@@ -3583,18 +3584,13 @@ function materializeNode(
 		propsValue = normalizePropsValue(values[node.propsSlot] as any);
 		Object.assign(props, propsValue.props);
 	}
-	const hasKey =
-		staticProps === null &&
-		(propsValue?.hasKey || Object.prototype.hasOwnProperty.call(props, 'key'));
+	const hasKey = staticProps === null && (propsValue?.hasKey || hasOwnProp.call(props, 'key'));
 	const hostKey = normalizeUniversalKey(
 		propsValue?.hasKey ? propsValue.key : hasKey ? props.key : null,
 	);
-	const ref =
-		staticProps === null && Object.prototype.hasOwnProperty.call(props, 'ref') ? props.ref : null;
+	const ref = staticProps === null && hasOwnProp.call(props, 'ref') ? props.ref : null;
 	const dynamicChildren =
-		staticProps === null && Object.prototype.hasOwnProperty.call(props, 'children')
-			? props.children
-			: undefined;
+		staticProps === null && hasOwnProp.call(props, 'children') ? props.children : undefined;
 	if (staticProps === null) {
 		delete props.ref;
 		delete props.key;
@@ -4054,9 +4050,9 @@ export function sameUniversalHostPropValue(left: unknown, right: unknown, depth 
 	}
 	let leftCount = 0;
 	for (const key in left) {
-		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
+		if (!hasOwnProp.call(left, key)) continue;
 		leftCount++;
-		if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+		if (!hasOwnProp.call(right, key)) return false;
 		if (
 			!sameUniversalHostPropValue(
 				(left as Record<string, unknown>)[key],
@@ -4069,7 +4065,7 @@ export function sameUniversalHostPropValue(left: unknown, right: unknown, depth 
 	}
 	let rightCount = 0;
 	for (const key in right) {
-		if (Object.prototype.hasOwnProperty.call(right, key)) rightCount++;
+		if (hasOwnProp.call(right, key)) rightCount++;
 	}
 	return leftCount === rightCount;
 }
@@ -4082,19 +4078,16 @@ function shallowPropsEqual(
 	if (left === right) return true;
 	let leftCount = 0;
 	for (const key in left) {
-		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
+		if (!hasOwnProp.call(left, key)) continue;
 		leftCount++;
-		if (
-			!Object.prototype.hasOwnProperty.call(right, key) ||
-			!sameUniversalHostPropValue(left[key], right[key])
-		) {
+		if (!hasOwnProp.call(right, key) || !sameUniversalHostPropValue(left[key], right[key])) {
 			return false;
 		}
 	}
 	if (rightCountHint >= 0) return leftCount === rightCountHint;
 	let rightCount = 0;
 	for (const key in right) {
-		if (Object.prototype.hasOwnProperty.call(right, key)) rightCount++;
+		if (hasOwnProp.call(right, key)) rightCount++;
 	}
 	return leftCount === rightCount;
 }
@@ -6165,10 +6158,7 @@ function universalShallowEqual(previous: unknown, next: unknown): boolean {
 	const nextKeys = Object.keys(next);
 	if (previousKeys.length !== nextKeys.length) return false;
 	for (const key of previousKeys) {
-		if (
-			!Object.prototype.hasOwnProperty.call(next, key) ||
-			!Object.is((previous as any)[key], (next as any)[key])
-		) {
+		if (!hasOwnProp.call(next, key) || !Object.is((previous as any)[key], (next as any)[key])) {
 			return false;
 		}
 	}
@@ -9144,8 +9134,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const hostProps = list.props[index]!;
 				if (
 					(lastBinding === null ||
-						!Object.prototype.hasOwnProperty.call(record.props, lastBinding) ||
-						!Object.prototype.hasOwnProperty.call(hostProps, lastBinding) ||
+						!hasOwnProp.call(record.props, lastBinding) ||
+						!hasOwnProp.call(hostProps, lastBinding) ||
 						Object.is(record.props[lastBinding], hostProps[lastBinding])) &&
 					shallowPropsEqual(record.props, hostProps, list.propCount)
 				) {

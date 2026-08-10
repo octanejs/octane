@@ -34,7 +34,7 @@
  * arrays evaluate this helper on every render, so every branch must stay
  * allocation-free.
  */
-const hasOwnProp = Object.prototype.hasOwnProperty;
+import { hasOwnProp } from './has-own.js';
 
 export function __methodDep(receiver: unknown, name: string): unknown {
 	if ((typeof receiver !== 'object' || receiver === null) && typeof receiver !== 'function') {

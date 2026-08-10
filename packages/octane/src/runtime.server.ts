@@ -59,6 +59,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 
@@ -108,7 +109,7 @@ export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) 
 		!Array.isArray(receiver) ||
 		Object.getPrototypeOf(receiver) !== Array.prototype ||
 		method !== NATIVE_ARRAY_MAP ||
-		Object.prototype.hasOwnProperty.call(receiver, 'constructor') ||
+		hasOwnProp.call(receiver, 'constructor') ||
 		Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
 		Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
 	) {
@@ -497,7 +498,7 @@ function hasElementConfigKey(config: any): boolean {
 	// gated on the build mode the way the client twin is: an SSR bundle does not
 	// always fold the dev-mode env check away, and reading it per call would cost
 	// more than the allocation it saves.
-	if (Object.prototype.hasOwnProperty.call(config, 'key')) {
+	if (hasOwnProp.call(config, 'key')) {
 		const own = Object.getOwnPropertyDescriptor(config, 'key');
 		if (own?.get != null && (own.get as any).isReactWarning) return false;
 	}
@@ -508,7 +509,7 @@ function copyElementConfig(config: any): any {
 	const props: any = {};
 	if (config == null) return props;
 	for (const name in config) {
-		if (name !== 'key' && Object.prototype.hasOwnProperty.call(config, name)) {
+		if (name !== 'key' && hasOwnProp.call(config, name)) {
 			props[name] = config[name];
 		}
 	}
@@ -729,7 +730,7 @@ function flattenSsrChildContainer(
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
-			if (item.ref != null || Object.prototype.hasOwnProperty.call(item.props, 'ref')) {
+			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
 				outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
 				continue;
@@ -773,7 +774,7 @@ function prepareSsrDeoptList(value: any, includeKeyedSingle: boolean): PreparedS
 	// descriptor, text, null) is the common one — build the two output arrays only
 	// once a list regime is established. Mirrors prepareDeoptList in runtime.ts.
 	if (isFragmentDescriptor(value)) {
-		if (value.ref != null || Object.prototype.hasOwnProperty.call(value.props, 'ref')) {
+		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
 			return {
 				items: [fragmentRefDescriptor(value)],
 				keys: [scopedSsrDeoptKey([], value, 0, value.key ?? 0)],
@@ -832,11 +833,7 @@ export function cloneElement(
 		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
 		props = {};
 		for (const name in element.props) {
-			if (
-				name !== 'key' &&
-				name !== 'children' &&
-				Object.prototype.hasOwnProperty.call(element.props, name)
-			) {
+			if (name !== 'key' && name !== 'children' && hasOwnProp.call(element.props, name)) {
 				props[name] = element.props[name];
 			}
 		}
@@ -850,7 +847,7 @@ export function cloneElement(
 		for (const name in config) {
 			if (name === 'key') continue;
 			if (name === 'ref' && config.ref === undefined) continue;
-			if (Object.prototype.hasOwnProperty.call(config, name)) {
+			if (hasOwnProp.call(config, name)) {
 				props[name] = config[name];
 				if (name === 'children') replacedChildren = true;
 			}
@@ -3818,7 +3815,7 @@ function reasonSnapshot(
 			const out = new Array(length);
 			for (let i = 0; i < length; i++) {
 				try {
-					if (Object.prototype.hasOwnProperty.call(arrayValue, i)) {
+					if (hasOwnProp.call(arrayValue, i)) {
 						out[i] = reasonSnapshot(arrayValue[i], state, depth + 1);
 					}
 				} catch {
@@ -3936,9 +3933,7 @@ function hydrationRejectionSeed(reason: unknown): HydrationRejectionSeed {
 
 function isHydrationRejectionSeed(value: unknown): value is HydrationRejectionSeed {
 	return (
-		value !== null &&
-		typeof value === 'object' &&
-		Object.prototype.hasOwnProperty.call(value, HYDRATION_REJECTION_SEED)
+		value !== null && typeof value === 'object' && hasOwnProp.call(value, HYDRATION_REJECTION_SEED)
 	);
 }
 
@@ -5194,7 +5189,7 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
 		if (
 			value !== null &&
 			typeof value === 'object' &&
-			Object.prototype.hasOwnProperty.call(value, HYDRATION_SITE_EVENT)
+			hasOwnProp.call(value, HYDRATION_SITE_EVENT)
 		) {
 			wireValues ??= values.slice(0, i);
 			sites ??= [];
