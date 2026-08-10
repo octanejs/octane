@@ -1,20 +1,119 @@
 import { describe, it, expect } from 'vitest';
-import { mount, flushEffects, act, nextPaint } from './_helpers.js';
+import { mount, flushEffects, act, nextPaint, type MountResult } from './_helpers';
 import {
+	WideTrio,
+	WidePanels,
+	TrailingPanel,
+	ChainTrio,
+	TransitiveTrio,
 	Pair,
 	Tree,
 	KeyedPair,
 	TransitionPair,
-	WideTrio,
+	FragmentTrio,
 	SuspendingPair,
 } from './_fixtures/component-children-host.tsrx';
 
-// A host element whose children are all component slots, each of which renders
-// through an @if/@else (host arm or component arm). The contract: children
-// render in source order, an arm flip in one child never disturbs a sibling's
-// DOM identity or state, component-local state survives its own flip, and
-// teardown leaves nothing behind. These hold in every marker regime, so the
-// assertions strip comments the same way mixed-child-order.test.ts does.
+// A host element whose children are ALL components mounts each child slot in
+// source order. The contract pinned here is sibling ORDER: a component child
+// that renders nothing at mount and produces content on a later render must
+// still place that content at its own source position — ahead of every later
+// sibling's content — and keep doing so across repeated toggles.
+//
+// Assertions read element order (`children`) and textContent, never raw
+// innerHTML: the dev and prod compiles legitimately differ in comment markers.
+
+const order = (r: MountResult) =>
+	[...r.find('section.host').children].map((el) => `${el.className}:${el.textContent}`);
+
+describe('all-component-children host sibling order', () => {
+	it('children that start with content mount in source order', () => {
+		const r = mount(WidePanels, { aBig: true, bBig: true });
+		expect(order(r)).toEqual(['big:A', 'big:B', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('a panel that mounts EMPTY renders before its later sibling once it appears', () => {
+		const r = mount(WideTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+
+		r.update(WideTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+
+		// And the order survives toggling away and back.
+		r.update(WideTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+		r.update(WideTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('two empty-mounted panels interleave in source order regardless of toggle order', () => {
+		// B appears first, then A — A must still land ahead of B.
+		const r = mount(WidePanels, { aBig: false, bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+
+		r.update(WidePanels, { aBig: false, bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+
+		r.update(WidePanels, { aBig: true, bBig: true });
+		expect(order(r)).toEqual(['big:A', 'big:B', 'leaf:C']);
+
+		r.update(WidePanels, { aBig: false, bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+
+		r.update(WidePanels, { aBig: true, bBig: true });
+		expect(order(r)).toEqual(['big:A', 'big:B', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('a full @if/@else chain child keeps its place across branch swaps', () => {
+		const r = mount(ChainTrio, { aBig: false });
+		expect(order(r)).toEqual(['small:A', 'leaf:C']);
+
+		r.update(ChainTrio, { aBig: true });
+		expect(order(r)).toEqual(['big:A', 'leaf:C']);
+		r.update(ChainTrio, { aBig: false });
+		expect(order(r)).toEqual(['small:A', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('an empty mount reached through a chain child still inserts in source order', () => {
+		// The may-render-nothing panel sits INSIDE a full-chain arm, so the
+		// hazard is only visible transitively through the chain component.
+		const r = mount(TransitiveTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+
+		r.update(TransitiveTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.update(TransitiveTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+		r.update(TransitiveTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('a trailing panel that mounts empty appears after its earlier sibling', () => {
+		const r = mount(TrailingPanel, { zBig: false });
+		expect(order(r)).toEqual(['leaf:A']);
+
+		r.update(TrailingPanel, { zBig: true });
+		expect(order(r)).toEqual(['leaf:A', 'big:Z']);
+
+		r.update(TrailingPanel, { zBig: false });
+		expect(order(r)).toEqual(['leaf:A']);
+		r.update(TrailingPanel, { zBig: true });
+		expect(order(r)).toEqual(['leaf:A', 'big:Z']);
+		r.unmount();
+	});
+});
+
+// Children whose @if/@else bodies are proven single-root transitively (host or
+// component arms) mount with no minted markers. The contract: source order, an
+// arm flip in one child never disturbs a sibling's DOM identity or state,
+// component-local state survives its own flip, and teardown leaves nothing
+// behind. These hold in every marker regime, so the assertions strip comments
+// the same way mixed-child-order.test.ts does.
 function stripComments(html: string): string {
 	return html.replace(/<!--[\s\S]*?-->/g, '');
 }
@@ -144,10 +243,9 @@ describe('host with only component children (@if-root components)', () => {
 		// WidePanel's arm is a fragment (two DOM roots) and MaybePanel has no
 		// @else (can render nothing), so neither can self-delimit — the contract
 		// must hold however their slots are bounded. This is the shape an
-		// over-widened single-root proof corrupts. Both mount WITH content so
-		// their positions are established; a component that mounts EMPTY in an
-		// all-component host is a separate known dev-mode ordering defect.
-		const m = mount(WideTrio, { aBig: true, bBig: true });
+		// over-widened single-root proof corrupts. (The empty-MOUNT ordering
+		// cases live in the describe above.)
+		const m = mount(FragmentTrio, { aBig: true, bBig: true });
 		flushEffects();
 		expect(stripComments(m.html())).toBe(
 			'<section class="host"><div class="big">A</div><em class="tail">A</em><div class="big">B</div><span class="leaf">C</span></section>',
@@ -155,7 +253,7 @@ describe('host with only component children (@if-root components)', () => {
 		const c = m.find('.leaf');
 		// B collapses to empty; A and C keep their nodes.
 		const aTail = m.find('.tail');
-		m.update(WideTrio, { aBig: true, bBig: false });
+		m.update(FragmentTrio, { aBig: true, bBig: false });
 		flushEffects();
 		expect(stripComments(m.html())).toBe(
 			'<section class="host"><div class="big">A</div><em class="tail">A</em><span class="leaf">C</span></section>',
@@ -163,20 +261,20 @@ describe('host with only component children (@if-root components)', () => {
 		expect(m.find('.tail')).toBe(aTail);
 		expect(m.find('.leaf')).toBe(c);
 		// B returns to its slot BETWEEN A's tail and C.
-		m.update(WideTrio, { aBig: true, bBig: true });
+		m.update(FragmentTrio, { aBig: true, bBig: true });
 		flushEffects();
 		expect(stripComments(m.html())).toBe(
 			'<section class="host"><div class="big">A</div><em class="tail">A</em><div class="big">B</div><span class="leaf">C</span></section>',
 		);
 		expect(m.find('.leaf')).toBe(c);
 		// A collapses to a single leaf; B stays put.
-		m.update(WideTrio, { aBig: false, bBig: true });
+		m.update(FragmentTrio, { aBig: false, bBig: true });
 		flushEffects();
 		expect(stripComments(m.html())).toBe(
 			'<section class="host"><span class="leaf">A</span><div class="big">B</div><span class="leaf">C</span></section>',
 		);
 		// And back to the wide arm.
-		m.update(WideTrio, { aBig: true, bBig: true });
+		m.update(FragmentTrio, { aBig: true, bBig: true });
 		flushEffects();
 		expect(stripComments(m.html())).toBe(
 			'<section class="host"><div class="big">A</div><em class="tail">A</em><div class="big">B</div><span class="leaf">C</span></section>',

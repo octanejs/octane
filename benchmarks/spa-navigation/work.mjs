@@ -74,14 +74,32 @@ const GATES = {
 		},
 	},
 	'octane-jsx': {
-		// The JSX dialect currently reaches the runtime de-opt renderer for the
-		// whole routed subtree (see the README): these ceilings stop that getting
-		// worse while it is being addressed.
+		// Conditional JSX returns now compile to template control flow, so the
+		// routed subtree's recursive Node never reaches the de-opt renderer
+		// (hostElementBody / deoptItemBody are held at ZERO). The remaining
+		// createElement/renderBlock headroom over the .tsrx twin is the
+		// single-return `_frag` wrapper ABI (one extra block + descriptor per
+		// component), which is the next lowering target.
 		nav_nested: {
-			max: { renderBlock: 260, unmountBlock: 260, createElement: 160, deoptItemBody: 80 },
+			max: {
+				renderBlock: 220,
+				unmountBlock: 220,
+				createElement: 60,
+				childSlot: 10,
+				hostElementBody: 0,
+				deoptItemBody: 0,
+				reconcileKeyed: 0,
+			},
 		},
 		nav_deep: {
-			max: { renderBlock: 7400, createElement: 4300, deoptItemBody: 2200 },
+			max: {
+				renderBlock: 6400,
+				createElement: 1200,
+				childSlot: 10,
+				hostElementBody: 0,
+				deoptItemBody: 0,
+				reconcileKeyed: 0,
+			},
 		},
 	},
 };

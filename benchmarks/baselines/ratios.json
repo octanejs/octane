@@ -1404,16 +1404,16 @@
     "op": "js_gzip",
     "target": "octane-min",
     "reference": "r3f-min",
-    "maxRatio": 2.4,
-    "note": "Minimal direct-root production gzip, with built bundles executed and scene-checked in Chromium. The refreshed observable-scene baseline recorded 305165 / 188008 = 1.62x on 2026-07-17."
+    "maxRatio": 1.0,
+    "note": "Minimal direct-root production gzip must not exceed React Three Fiber; each built bundle renders and verifies the same real Mesh in Chromium."
   },
   {
     "suite": "three-bundle-size",
     "op": "js_gzip",
     "target": "octane-full",
     "reference": "r3f-full",
-    "maxRatio": 1.8,
-    "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. The refreshed observable-scene baseline recorded 304757 / 250306 = 1.22x on 2026-07-17."
+    "maxRatio": 1.0,
+    "note": "Full-catalogue production gzip must not exceed React Three Fiber; each built bundle verifies the complete Three namespace and the same real Mesh in Chromium."
   },
   {
     "suite": "react-hosted-islands",
@@ -2261,5 +2261,29 @@
     "reference": "solid",
     "maxRatio": 4.05,
     "note": "Holds the JSX-dialect de-opt line: 8184 vs Solid 2046 comments (4.0x, 2026-08-09) while the de-opt gap is being addressed."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "nav_teardown",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.6,
+    "note": "Same-run 1024-leaf route teardown, gated on the shell surviving by node identity. Per-block DOM detach measured 2.24x solid before the wholesale unmount detach; detaching once at the outermost block measures 1.0x (0.60 vs 0.60 on 2026-08-09). The 1.6 ceiling leaves sub-millisecond noise headroom while failing if per-descendant removeChild returns."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "nav_deep",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.4,
+    "note": "Same-run full route swap (1024-leaf teardown + mount), measured 0.95x solid (1.80 vs 1.90) on 2026-08-09 after the wholesale detach. Guards the navigation as a whole so a teardown regression cannot hide behind a mount improvement."
+  },
+  {
+    "suite": "spa-navigation",
+    "op": "nav_mount",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.2,
+    "note": "Protects the existing mount win: 32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on 2026-08-09. Octane mounts faster than the fine-grained peers despite marker traffic; a breach means the compiled mount path grew per-node cost."
   }
 ]

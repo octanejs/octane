@@ -222,6 +222,36 @@ globalThis.renderedValue = container.children[0].props.value;
 		expect(output).not.toMatch(/\b(?:document|window|MutationObserver|HTMLElement)\b/);
 	});
 
+	it('keeps a DOM-only public root independent of universal renderer modules', async () => {
+		const result = await build({
+			stdin: {
+				contents:
+					"import { createRoot } from 'octane'; globalThis.__octaneCreateRoot = createRoot;",
+				resolveDir: resolve(import.meta.dirname, '..'),
+				sourcefile: 'dom-only-consumer.ts',
+			},
+			bundle: true,
+			define: { __OCTANE_PROFILE_ENABLED__: 'false' },
+			format: 'iife',
+			metafile: true,
+			minify: true,
+			platform: 'browser',
+			target: 'esnext',
+			treeShaking: true,
+			write: false,
+		});
+		const inputs = Object.keys(Object.values(result.metafile!.outputs)[0].inputs);
+
+		expect(inputs).toEqual(
+			expect.arrayContaining([expect.stringMatching(/packages\/octane\/src\/runtime\.ts$/)]),
+		);
+		expect(
+			inputs.some((input) =>
+				/packages\/octane\/src\/universal-(?:core|native|dom-boundary)\.ts$/.test(input),
+			),
+		).toBe(false);
+	});
+
 	it('requires a host scheduler when queueMicrotask is absent and preserves thrown errors', async () => {
 		const result = await build({
 			stdin: {

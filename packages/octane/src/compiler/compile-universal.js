@@ -10,6 +10,232 @@
 import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 
+// Keep this catalogue in the compiler, never in generated application code. It
+// is the union of actual constructor exports from Three r156, r172, and r183,
+// so an authored built-in gets a tree-shakable named import while custom host
+// names and primitives remain on their explicit-registration paths.
+const THREE_BUILTIN_CONSTRUCTORS = new Set([
+	'AmbientLight',
+	'AmbientLightProbe',
+	'AnimationAction',
+	'AnimationClip',
+	'AnimationLoader',
+	'AnimationMixer',
+	'AnimationObjectGroup',
+	'AnimationUtils',
+	'ArcCurve',
+	'ArrayCamera',
+	'ArrowHelper',
+	'Audio',
+	'AudioAnalyser',
+	'AudioContext',
+	'AudioListener',
+	'AudioLoader',
+	'AxesHelper',
+	'BatchedMesh',
+	'BezierInterpolant',
+	'Bone',
+	'BooleanKeyframeTrack',
+	'Box2',
+	'Box3',
+	'Box3Helper',
+	'BoxGeometry',
+	'BoxHelper',
+	'BufferAttribute',
+	'BufferGeometry',
+	'BufferGeometryLoader',
+	'Camera',
+	'CameraHelper',
+	'CanvasTexture',
+	'CapsuleGeometry',
+	'CatmullRomCurve3',
+	'CircleGeometry',
+	'Clock',
+	'Color',
+	'ColorKeyframeTrack',
+	'CompressedArrayTexture',
+	'CompressedCubeTexture',
+	'CompressedTexture',
+	'CompressedTextureLoader',
+	'ConeGeometry',
+	'Controls',
+	'CubeCamera',
+	'CubeDepthTexture',
+	'CubeTexture',
+	'CubeTextureLoader',
+	'CubicBezierCurve',
+	'CubicBezierCurve3',
+	'CubicInterpolant',
+	'Curve',
+	'CurvePath',
+	'CylinderGeometry',
+	'Cylindrical',
+	'Data3DTexture',
+	'DataArrayTexture',
+	'DataTexture',
+	'DataTextureLoader',
+	'DataUtils',
+	'DepthTexture',
+	'DirectionalLight',
+	'DirectionalLightHelper',
+	'DiscreteInterpolant',
+	'DodecahedronGeometry',
+	'EdgesGeometry',
+	'EllipseCurve',
+	'Euler',
+	'EventDispatcher',
+	'ExternalTexture',
+	'ExtrudeGeometry',
+	'FileLoader',
+	'Float16BufferAttribute',
+	'Float32BufferAttribute',
+	'Float64BufferAttribute',
+	'Fog',
+	'FogExp2',
+	'FramebufferTexture',
+	'Frustum',
+	'FrustumArray',
+	'GLBufferAttribute',
+	'GridHelper',
+	'Group',
+	'HemisphereLight',
+	'HemisphereLightHelper',
+	'HemisphereLightProbe',
+	'IcosahedronGeometry',
+	'ImageBitmapLoader',
+	'ImageLoader',
+	'ImageUtils',
+	'InstancedBufferAttribute',
+	'InstancedBufferGeometry',
+	'InstancedInterleavedBuffer',
+	'InstancedMesh',
+	'Int16BufferAttribute',
+	'Int32BufferAttribute',
+	'Int8BufferAttribute',
+	'InterleavedBuffer',
+	'InterleavedBufferAttribute',
+	'Interpolant',
+	'KeyframeTrack',
+	'LOD',
+	'LatheGeometry',
+	'Layers',
+	'Light',
+	'LightProbe',
+	'Line',
+	'Line3',
+	'LineBasicMaterial',
+	'LineCurve',
+	'LineCurve3',
+	'LineDashedMaterial',
+	'LineLoop',
+	'LineSegments',
+	'LinearInterpolant',
+	'Loader',
+	'LoaderUtils',
+	'LoadingManager',
+	'Material',
+	'MaterialLoader',
+	'Matrix2',
+	'Matrix3',
+	'Matrix4',
+	'Mesh',
+	'MeshBasicMaterial',
+	'MeshDepthMaterial',
+	'MeshDistanceMaterial',
+	'MeshLambertMaterial',
+	'MeshMatcapMaterial',
+	'MeshNormalMaterial',
+	'MeshPhongMaterial',
+	'MeshPhysicalMaterial',
+	'MeshStandardMaterial',
+	'MeshToonMaterial',
+	'NumberKeyframeTrack',
+	'Object3D',
+	'ObjectLoader',
+	'OctahedronGeometry',
+	'OrthographicCamera',
+	'PMREMGenerator',
+	'Path',
+	'PerspectiveCamera',
+	'Plane',
+	'PlaneGeometry',
+	'PlaneHelper',
+	'PointLight',
+	'PointLightHelper',
+	'Points',
+	'PointsMaterial',
+	'PolarGridHelper',
+	'PolyhedronGeometry',
+	'PositionalAudio',
+	'PropertyBinding',
+	'PropertyMixer',
+	'QuadraticBezierCurve',
+	'QuadraticBezierCurve3',
+	'Quaternion',
+	'QuaternionKeyframeTrack',
+	'QuaternionLinearInterpolant',
+	'RawShaderMaterial',
+	'Ray',
+	'Raycaster',
+	'RectAreaLight',
+	'RenderTarget',
+	'RenderTarget3D',
+	'RenderTargetArray',
+	'RingGeometry',
+	'Scene',
+	'ShaderMaterial',
+	'ShadowMaterial',
+	'Shape',
+	'ShapeGeometry',
+	'ShapePath',
+	'ShapeUtils',
+	'Skeleton',
+	'SkeletonHelper',
+	'SkinnedMesh',
+	'Source',
+	'Sphere',
+	'SphereGeometry',
+	'Spherical',
+	'SphericalHarmonics3',
+	'SplineCurve',
+	'SpotLight',
+	'SpotLightHelper',
+	'Sprite',
+	'SpriteMaterial',
+	'StereoCamera',
+	'StringKeyframeTrack',
+	'TetrahedronGeometry',
+	'Texture',
+	'TextureLoader',
+	'TextureUtils',
+	'Timer',
+	'TorusGeometry',
+	'TorusKnotGeometry',
+	'Triangle',
+	'TubeGeometry',
+	'Uint16BufferAttribute',
+	'Uint32BufferAttribute',
+	'Uint8BufferAttribute',
+	'Uint8ClampedBufferAttribute',
+	'Uniform',
+	'UniformsGroup',
+	'Vector2',
+	'Vector3',
+	'Vector4',
+	'VectorKeyframeTrack',
+	'VideoFrameTexture',
+	'VideoTexture',
+	'WebGL1Renderer',
+	'WebGL3DRenderTarget',
+	'WebGLArrayRenderTarget',
+	'WebGLCubeRenderTarget',
+	'WebGLMultipleRenderTargets',
+	'WebGLRenderTarget',
+	'WebGLRenderer',
+	'WebXRController',
+	'WireframeGeometry',
+]);
+
 const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'Activity',
 	'createContext',
@@ -1811,6 +2037,62 @@ function collectComponentNames(ast) {
 	return names;
 }
 
+function collectExplicitThreeHostIntrinsics(ast, renderer) {
+	if (renderer.id !== 'three' || renderer.module !== '@octanejs/three/renderer') return null;
+	const aliases = new Set();
+	for (const statement of ast.body ?? []) {
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.importKind === 'type' ||
+			statement.source?.value !== '@octanejs/three'
+		) {
+			continue;
+		}
+		for (const specifier of statement.specifiers ?? []) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				(specifier.imported?.name ?? specifier.imported?.value) === 'extend' &&
+				typeof specifier.local?.name === 'string'
+			) {
+				aliases.add(specifier.local.name);
+			}
+		}
+	}
+	if (aliases.size === 0) return null;
+	const intrinsics = new Map();
+	for (const statement of ast.body ?? []) {
+		if (statement.type !== 'ExpressionStatement') continue;
+		const call = statement.expression;
+		if (
+			call?.type !== 'CallExpression' ||
+			call.optional === true ||
+			call.callee?.type !== 'Identifier' ||
+			!aliases.has(call.callee.name) ||
+			call.arguments?.length !== 1 ||
+			call.arguments[0]?.type !== 'ObjectExpression' ||
+			typeof statement.end !== 'number'
+		) {
+			continue;
+		}
+		for (const property of call.arguments[0].properties ?? []) {
+			if (property.type !== 'Property' || property.kind !== 'init' || property.method === true) {
+				continue;
+			}
+			const key =
+				property.key?.type === 'Identifier' && property.computed !== true
+					? property.key.name
+					: property.key?.type === 'Literal' && typeof property.key.value === 'string'
+						? property.key.value
+						: null;
+			if (key !== null && THREE_BUILTIN_CONSTRUCTORS.has(key) && !intrinsics.has(key)) {
+				intrinsics.set(key, statement.end);
+			}
+		}
+	}
+	return intrinsics.size === 0 ? null : intrinsics;
+}
+
 function collectOwnerFreeThreeHostComponents(ast, state, development) {
 	if (
 		development ||
@@ -2617,6 +2899,37 @@ function addDynamicAst(context, expression) {
 	return withPlanOrigin({ kind: 'slot', slot }, expression);
 }
 
+function registerThreeHostIntrinsic(type, node, state) {
+	if (
+		state.renderer.id !== 'three' ||
+		state.renderer.module !== '@octanejs/three/renderer' ||
+		type === 'primitive'
+	) {
+		return;
+	}
+	let constructor = `${type[0].toUpperCase()}${type.slice(1)}`;
+	if (!THREE_BUILTIN_CONSTRUCTORS.has(constructor) && /^three[A-Z]/.test(type)) {
+		constructor = type.slice('three'.length);
+	}
+	if (!THREE_BUILTIN_CONSTRUCTORS.has(constructor)) return;
+	const explicitlyRegistered = state.explicitThreeHostIntrinsics?.get(constructor);
+	if (
+		explicitlyRegistered !== undefined &&
+		typeof node.start === 'number' &&
+		explicitlyRegistered < node.start
+	) {
+		return;
+	}
+	const intrinsics = (state.threeHostIntrinsics ??= new Map());
+	if (intrinsics.has(constructor)) return;
+	const prefix = state.planPrefix ?? '__octaneThree';
+	intrinsics.set(constructor, {
+		local: allocName(state, `${prefix}${constructor}`),
+		origin: node,
+	});
+	state.helpers.threeRegisterIntrinsic ??= allocName(state, `${prefix}RegisterIntrinsic`);
+}
+
 function compileHostElementAst(node, context, state) {
 	const type = jsxName(node);
 	if (type === 'Activity') return compileActivityElementAst(node, context, state);
@@ -2629,6 +2942,7 @@ function compileHostElementAst(node, context, state) {
 		);
 	}
 	if (!/^[a-z]/.test(type)) return compileComponentElementAst(node, context, state);
+	registerThreeHostIntrinsic(type, node, state);
 	const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
 	if (isMainThreadRenderOnly(state)) {
 		const spread = attributes.find(
@@ -3311,6 +3625,9 @@ function universalHelperImportAst(state, extraPairs = [], origin = null) {
 		...(state.helpers.hostComponentLeafPlan === undefined
 			? []
 			: [['universalHostComponentLeafPlan', state.helpers.hostComponentLeafPlan]]),
+		...(state.helpers.threeRegisterIntrinsic === undefined
+			? []
+			: [['registerThreeIntrinsic', state.helpers.threeRegisterIntrinsic]]),
 		['universalProps', state.helpers.props],
 		['universalIf', state.helpers.if],
 		['universalSwitch', state.helpers.switch],
@@ -3332,6 +3649,36 @@ function universalHelperImportAst(state, extraPairs = [], origin = null) {
 		...extraPairs,
 	];
 	return inheritGeneratedOrigin(b.imports(pairs, state.renderer.module), origin);
+}
+
+function threeHostIntrinsicStatementsAst(state, origin = null) {
+	if (state.threeHostIntrinsics === undefined) return { imports: [], registrations: [] };
+	const entries = [...state.threeHostIntrinsics];
+	const imports = [
+		inheritGeneratedOrigin(
+			b.imports(
+				entries.map(([constructor, { local }]) => [constructor, local]),
+				'three',
+			),
+			origin,
+		),
+	];
+	const registrations = entries.map(([constructor, entry]) =>
+		inheritGeneratedOrigin(
+			b.stmt(
+				generatedCall(
+					state.helpers.threeRegisterIntrinsic,
+					[
+						b.literal(constructor, JSON.stringify(constructor)),
+						generatedIdentifier(entry.local, entry.origin),
+					],
+					entry.origin,
+				),
+			),
+			entry.origin,
+		),
+	);
+	return { imports, registrations };
 }
 
 function universalProfileImportAst(state, origin = null) {
@@ -3649,6 +3996,10 @@ export function lowerUniversalRendererRegionAst(
 		planPrefix: prefix,
 		validationImportReferences: [],
 	};
+	state.explicitThreeHostIntrinsics = collectExplicitThreeHostIntrinsics(
+		options.authoredAst ?? analysisAst,
+		renderer,
+	);
 	state.helpers.component = allocName(state, `${prefix}Define`);
 	state.helpers.plan = allocName(state, `${prefix}Plan`);
 	state.helpers.value = allocName(state, `${prefix}Value`);
@@ -3857,6 +4208,7 @@ export function lowerUniversalRendererRegionAst(
 	specializationBindings.add(componentName);
 	const hmrBlocks = buildUniversalHmrBlocksAst(state, origin);
 	const profileImport = universalProfileImportAst(state, origin);
+	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, origin);
 	const helperImportPairs = [
 		['rendererRegion', regionHelper],
 		...runtimeImports.map(({ imported, local }) => [imported, local]),
@@ -3902,8 +4254,10 @@ export function lowerUniversalRendererRegionAst(
 		}),
 		statements: Object.freeze([
 			universalHelperImportAst(state, helperImportPairs, origin),
+			...threeHostIntrinsics.imports,
 			...(profileImport === null ? [] : [profileImport]),
 			...hmrBlocks.prelude,
+			...threeHostIntrinsics.registrations,
 			...universalPlanDeclarationsAst(state, origin),
 			...(state.threadFunctionRegistrationsAst ?? []),
 			...emittedComponents,
@@ -3959,6 +4313,7 @@ export function compileUniversal(
 		componentNames: collectComponentNames(ast),
 		runtimeImports: new Map(),
 	};
+	state.explicitThreeHostIntrinsics = collectExplicitThreeHostIntrinsics(ast, renderer);
 	state.ownerFreeThreeHostComponents = collectOwnerFreeThreeHostComponents(
 		ast,
 		state,
@@ -4033,12 +4388,15 @@ export function compileUniversal(
 		components: state.components,
 	};
 	const profileImport = universalProfileImportAst(state, moduleOrigin);
+	const threeHostIntrinsics = threeHostIntrinsicStatementsAst(state, moduleOrigin);
 	const program = {
 		...ast,
 		body: [
 			universalHelperImportAst(state, [], moduleOrigin),
+			...threeHostIntrinsics.imports,
 			...(profileImport === null ? [] : [profileImport]),
 			...hmrBlocks.prelude,
+			...threeHostIntrinsics.registrations,
 			...universalPlanDeclarationsAst(state, moduleOrigin),
 			...(state.threadFunctionRegistrationsAst ?? []),
 			...emitted,

@@ -8,4 +8,7 @@
 export * from './universal-core.js';
 
 export { createContext } from './runtime.js';
-export { createUniversalHostBoundary } from './universal-dom-boundary.js';
+export {
+	createUniversalHostBoundary,
+	registerUniversalHostBridge,
+} from './universal-dom-boundary.js';
