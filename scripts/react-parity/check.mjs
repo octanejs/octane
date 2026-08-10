@@ -46,6 +46,7 @@ import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-cla
 import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
 import { verifyVisxTypes } from './visx-types-lib.mjs';
 import { verifyMotionTypes } from './motion-types-lib.mjs';
+import { verifyNuqsTypes } from './nuqs-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -187,6 +188,9 @@ try {
 	verifyMotionTypes(REPO);
 } catch (error) {
 	errors.push(`@octanejs/motion type evidence is invalid: ${error.message}`);
+	verifyNuqsTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/nuqs type evidence is invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTestClassifications(REPO);
@@ -409,6 +413,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// Livestore uses a dedicated classifier (adapted-upstream-suite + pristine
 		// path filters); shared binding classifications cover hook-form / RTL.
 		// livestore keeps a dedicated verifier (different dispositions); others use the shared binding helper
+		// Livestore keeps a dedicated disposition set; other bindings share the
+		// generic port-test classifications verifier introduced for nuqs.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
