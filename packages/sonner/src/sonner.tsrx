@@ -3,8 +3,10 @@
 //
 // Octane adaptations:
 // - React hooks/isValidElement + ReactDOM.flushSync come directly from octane.
-// - forwardRef becomes the normal `ref` prop in ToasterProps.
-// - event handlers receive native DOM events.
+// Divergence note (sonner-normal-ref-prop): forwardRef becomes the normal `ref`
+// prop in ToasterProps. Divergence note (sonner-native-action-events): event
+// handlers receive native DOM events. Both are authenticated by the ordinary
+// packages/sonner/tests/parity/divergence-contracts.test.ts contract (not parity evidence).
 import {
 	flushSync,
 	isValidElement,

@@ -1,6 +1,8 @@
-// Ported from sonner@2.0.7 src/hooks.tsx. The guarded initializer is the one
-// deliberate SSR adaptation: Octane's server runtime executes this component,
-// while upstream assumes a client boundary owns it.
+// Ported from sonner@2.0.7 src/hooks.tsx.
+// Divergence note (sonner-ssr-visibility-guard): Octane's server runtime
+// executes this component, so the document read is guarded while upstream
+// assumes a client boundary owns it. Authenticated by the ordinary
+// packages/sonner/tests/ssr/visibility-guard.test.ts contract (not parity evidence).
 import { useEffect, useState } from 'octane';
 
 export function useIsDocumentHidden(): boolean {

@@ -62,6 +62,7 @@ for (const [binding, testCount] of [
 	['redux', 3],
 	['redux-toolkit', 6],
 	['shadcn', 23],
+	['sonner', 7],
 ]) {
 	test(`verifies the ${binding} classification ledger`, async (t) => {
 		const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));

@@ -324,6 +324,20 @@ test('shadcn exact selection fails closed when a declared case is renamed', asyn
 	);
 });
 
+test('sonner exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/sonner/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const differential = value.lanes.find((lane) => lane.id === 'sonner-runtime-differential');
+	assert.ok(differential);
+	const renamed = structuredClone(value);
+	const lane = renamed.lanes.find((entry) => entry.id === 'sonner-runtime-differential');
+	lane.files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
 test('accepts explicit TypeScript lanes and builds portable compiler argv without a shell', () => {
 	const lane = {
 		...manifest().lanes[0],
