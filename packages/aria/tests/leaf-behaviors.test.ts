@@ -39,39 +39,6 @@ describe('@octanejs/aria — useSearchField', () => {
 		expect(input.value).toBe('');
 		r.unmount();
 	});
-
-	it('does not submit or clear an Android IME composition-confirmation keystroke', async () => {
-		const r = mount(SearchFieldHarness);
-		const input = r.container.querySelector('input')!;
-		await act(() => {
-			input.value = '候補';
-			input.dispatchEvent(new Event('input', { bubbles: true }));
-		});
-
-		for (const key of ['Enter', 'Escape']) {
-			await act(() => {
-				input.dispatchEvent(
-					new KeyboardEvent('keydown', {
-						key,
-						keyCode: 229,
-						isComposing: false,
-						bubbles: true,
-						cancelable: true,
-					}),
-				);
-			});
-		}
-
-		expect(r.container.querySelector('[data-submitted]')!.getAttribute('data-submitted')).toBe('');
-		expect(input.value).toBe('候補');
-		await act(() => {
-			input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-		});
-		expect(r.container.querySelector('[data-submitted]')!.getAttribute('data-submitted')).toBe(
-			'候補',
-		);
-		r.unmount();
-	});
 });
 
 describe('@octanejs/aria — useRadio', () => {

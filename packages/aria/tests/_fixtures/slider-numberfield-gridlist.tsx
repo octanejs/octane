@@ -46,48 +46,6 @@ export function SliderHarness() {
 	);
 }
 
-export function RangeSliderHarness(props: { locale?: string }) {
-	const state = useSliderState({
-		defaultValue: [1200, 3400],
-		minValue: 0,
-		maxValue: 5000,
-		step: 100,
-		numberFormatter: new Intl.NumberFormat(props.locale ?? 'en-US'),
-	});
-	const trackRef = useRef<any>(null);
-	const { groupProps, trackProps, labelProps, outputProps } = useSlider(
-		{ label: 'Price range' },
-		state,
-		trackRef,
-	);
-	const firstInputRef = useRef<any>(null);
-	const firstThumb = useSliderThumb(
-		{ index: 0, trackRef, inputRef: firstInputRef, 'aria-label': 'Minimum price' },
-		state,
-	);
-	const secondInputRef = useRef<any>(null);
-	const secondThumb = useSliderThumb(
-		{ index: 1, trackRef, inputRef: secondInputRef, 'aria-label': 'Maximum price' },
-		state,
-	);
-	return (
-		<div {...groupProps}>
-			<span {...labelProps}>Price range</span>
-			<output {...outputProps} data-testid="range-output">
-				{state.getFormattedValue()}
-			</output>
-			<div {...trackProps} ref={trackRef} data-testid="range-track">
-				<div {...firstThumb.thumbProps}>
-					<input {...firstThumb.inputProps} ref={firstInputRef} data-testid="range-thumb-min" />
-				</div>
-				<div {...secondThumb.thumbProps}>
-					<input {...secondThumb.inputProps} ref={secondInputRef} data-testid="range-thumb-max" />
-				</div>
-			</div>
-		</div>
-	);
-}
-
 // ---------------------------------------------------------------------------
 // NumberField: useNumberFieldState → useNumberField.
 // ---------------------------------------------------------------------------

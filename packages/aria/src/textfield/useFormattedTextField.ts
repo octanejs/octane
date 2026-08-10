@@ -185,16 +185,14 @@ export function useFormattedTextField(...args: any[]): TextFieldAria {
 				compositionStartState.current = { value, selectionStart, selectionEnd };
 			},
 			onCompositionEnd() {
-				const snapshot = compositionStartState.current;
-				if (inputRef.current && snapshot !== null && !state.validate(inputRef.current.value)) {
+				if (inputRef.current && !state.validate(inputRef.current.value)) {
 					// Restore the input value in the DOM immediately so we can synchronously update the selection position.
 					// But also update the value in state as well so it is correct for future updates.
-					let { value, selectionStart, selectionEnd } = snapshot;
+					let { value, selectionStart, selectionEnd } = compositionStartState.current!;
 					inputRef.current.value = value;
 					inputRef.current.setSelectionRange(selectionStart, selectionEnd);
 					state.setInputValue(value);
 				}
-				compositionStartState.current = null;
 			},
 		}),
 		labelProps,

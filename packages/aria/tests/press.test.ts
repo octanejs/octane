@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers';
 import {
 	PressButton,
@@ -122,36 +122,6 @@ describe('@octanejs/aria — usePress', () => {
 			].join(','),
 		);
 		r.unmount();
-	});
-
-	it('preserves Android screen-reader presses in Samsung Internet desktop mode', async () => {
-		const userAgentSpy = vi
-			.spyOn(window.navigator, 'userAgent', 'get')
-			.mockReturnValue(
-				'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Safari/537.36',
-			);
-		const r = mount(PressButton);
-		try {
-			const button = r.container.querySelector('button')!;
-			await act(() => {
-				button.dispatchEvent(
-					pointerEvent('click', {
-						buttons: 1,
-						pointerType: 'mouse',
-						width: 1,
-						height: 1,
-						pressure: 0,
-						detail: 1,
-					}),
-				);
-			});
-
-			expect(button.textContent).toContain('pressstart:virtual');
-			expect(button.textContent).toContain('press:virtual');
-		} finally {
-			r.unmount();
-			userAgentSpy.mockRestore();
-		}
 	});
 
 	it('presses via keyboard Enter on a button', async () => {

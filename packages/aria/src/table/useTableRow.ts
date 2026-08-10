@@ -193,10 +193,6 @@ function getLastChild(collection: Collection<Node<unknown>>, node: Node<unknown>
 			? collection.getItem((node as any).lastChildKey)
 			: null;
 	} else {
-		let lastChild: Node<unknown> | undefined;
-		for (const child of node.childNodes) {
-			if (child.parentKey === node.key) lastChild = child;
-		}
-		return lastChild;
+		return Array.from(node.childNodes).findLast((item) => item.parentKey === node.key);
 	}
 }

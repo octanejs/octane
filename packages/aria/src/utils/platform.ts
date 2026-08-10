@@ -66,9 +66,7 @@ export const isChrome: () => boolean = cached(function () {
 });
 
 export const isAndroid: () => boolean = cached(function () {
-	// Samsung Internet on Android replaces its Android token with X11/Linux in
-	// DeX and desktop-site modes; Samsung's Windows and Tizen browsers do not.
-	return testUserAgent(/Android|X11.*SamsungB/i);
+	return testUserAgent(/Android/i);
 });
 
 export const isFirefox: () => boolean = cached(function () {

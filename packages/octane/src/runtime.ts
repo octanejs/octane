@@ -43,6 +43,7 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { hasOwnProp } from './has-own.js';
 import { headOwnershipKey } from './head-ownership.js';
 import {
 	__profileBail,
@@ -6941,11 +6942,7 @@ function resetHmrBlock(block: Block): void {
 		const hooks = block.hooks;
 		if (hooks !== null) {
 			for (const value of hooks.values()) {
-				if (
-					value !== null &&
-					typeof value === 'object' &&
-					Object.prototype.hasOwnProperty.call(value, 'deps')
-				) {
+				if (value !== null && typeof value === 'object' && hasOwnProp.call(value, 'deps')) {
 					value.deps = undefined;
 				}
 			}
@@ -8760,11 +8757,7 @@ function decodeHydrationRejectionPayload(payload: any): unknown {
 }
 
 function hydrationRejectionFromSeed(seed: unknown): HydrationRejectionException | null {
-	if (
-		seed === null ||
-		typeof seed !== 'object' ||
-		!Object.prototype.hasOwnProperty.call(seed, HYDRATION_REJECTION_SEED)
-	)
+	if (seed === null || typeof seed !== 'object' || !hasOwnProp.call(seed, HYDRATION_REJECTION_SEED))
 		return null;
 	return new HydrationRejectionException(
 		(seed as HydrationRejectionSeed)[HYDRATION_REJECTION_SEED],
@@ -11140,7 +11133,7 @@ export function setDangerouslySetInnerHTMLSources(
 	if (resolved !== null && resolvedChild != null) throw dangerHtmlChildrenError();
 	validateDangerouslySetInnerHTMLValue(resolved);
 	if (
-		Object.prototype.hasOwnProperty.call(el, DANGER_HTML_RESOLVED_VALUE) &&
+		hasOwnProp.call(el, DANGER_HTML_RESOLVED_VALUE) &&
 		Object.is((el as any)[DANGER_HTML_RESOLVED_VALUE], resolved) &&
 		Object.is((el as any)[DANGER_HTML_RESOLVED_CHILD], resolvedChild)
 	) {
@@ -16138,8 +16131,7 @@ export function cloneElement<P>(
 	// Only a nullish result key needs the out-of-band record (see createElement).
 	if (
 		key === null &&
-		(elementKeyWasProvided(element) ||
-			(config != null && Object.prototype.hasOwnProperty.call(config, 'key')))
+		(elementKeyWasProvided(element) || (config != null && hasOwnProp.call(config, 'key')))
 	) {
 		KEYED_ELEMENT_DESCRIPTORS.add(descriptor);
 	}
@@ -18954,7 +18946,7 @@ export function mapSlot(
 			!Array.isArray(receiver) ||
 			Object.getPrototypeOf(receiver) !== Array.prototype ||
 			slotOrMethod !== NATIVE_ARRAY_MAP ||
-			Object.prototype.hasOwnProperty.call(receiver, 'constructor') ||
+			hasOwnProp.call(receiver, 'constructor') ||
 			Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
 			Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
 		) {
@@ -20407,7 +20399,6 @@ export function compilerCacheContext(
 	return current;
 }
 
-const hasOwnProp = Object.prototype.hasOwnProperty;
 const OBJ_PROTO = Object.prototype;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),

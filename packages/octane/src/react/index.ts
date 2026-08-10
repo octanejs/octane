@@ -43,6 +43,7 @@
  */
 
 import * as React from 'react';
+import { hasOwnProp } from '../has-own.js';
 import {
 	bindRendererRegionOwner,
 	createContext as createOctaneContext,
@@ -146,7 +147,7 @@ function shallowEqualProps(a: Record<string, unknown>, b: Record<string, unknown
 	if (aKeys.length !== bKeys.length) return false;
 	for (let i = 0; i < aKeys.length; i++) {
 		const key = aKeys[i];
-		if (!Object.is(a[key], (b as never)[key]) || !Object.prototype.hasOwnProperty.call(b, key)) {
+		if (!Object.is(a[key], (b as never)[key]) || !hasOwnProp.call(b, key)) {
 			return false;
 		}
 	}

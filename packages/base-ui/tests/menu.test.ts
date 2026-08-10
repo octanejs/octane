@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
 import { TYPEAHEAD_RESET_MS } from '@octanejs/base-ui/utils/constants';
@@ -172,40 +172,6 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 		expect(document.activeElement).toBe(m.find('.menu-trigger'));
 
 		m.unmount();
-	});
-
-	it('focuses the first item for Samsung desktop-mode screen-reader activation', async () => {
-		const userAgentSpy = vi
-			.spyOn(window.navigator, 'userAgent', 'get')
-			.mockReturnValue(
-				'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Safari/537.36',
-			);
-		const m = mount(MenuItemsInteractive);
-		try {
-			await settle();
-			flushSync(() => {
-				m.find('.menu-trigger').dispatchEvent(
-					new PointerEvent('click', {
-						bubbles: true,
-						cancelable: true,
-						button: 0,
-						buttons: 1,
-						pointerType: 'mouse',
-						width: 1,
-						height: 1,
-						pressure: 0,
-						detail: 1,
-					}),
-				);
-			});
-			await settleUntil(() => m.container.querySelector('[data-highlighted]') !== null);
-
-			expect(m.container.querySelector('[role="menu"]')).not.toBe(null);
-			expect(m.container.querySelector('[data-highlighted]')?.textContent).toBe('Apple');
-		} finally {
-			m.unmount();
-			userAgentSpy.mockRestore();
-		}
 	});
 
 	// `MenuStore.setOpen` does NOT apply the open change itself — it emits `setOpen` on the floating
