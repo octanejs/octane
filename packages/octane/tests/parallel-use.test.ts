@@ -595,6 +595,88 @@ describe('parallel use() — adjacent async component trees', () => {
 	);
 
 	it.each([
+		['key', 'key="stable"', ''],
+		['ref', 'ref={props.capture}', ' ref={props.ref}'],
+	])(
+		'does not read a synchronous child with a %s before an earlier sibling resolves',
+		async (kind, componentAttribute, hostAttribute) => {
+			const source = `
+				import { use } from 'octane';
+
+				function SynchronousChild(props) @{
+					<span class="decorated-profile"${hostAttribute}>{props.label as string}</span>
+				}
+
+				function Wrapper(props) @{
+					<SynchronousChild ${componentAttribute} label={props.label} />
+				}
+
+				function AsyncSibling(props) @{
+					const value = use(props.load('decorated-sibling', props.version));
+					<span class="decorated-sibling">{value as string}</span>
+				}
+
+				function Branches(props) @{
+					<main>
+						<AsyncSibling load={props.load} version={props.version} />
+						<Wrapper label={props.profile.label} capture={props.capture} />
+					</main>
+				}
+
+				export function App(props) @{
+					<>
+						@try {
+							<Branches
+								load={props.load}
+								version={props.version}
+								profile={props.profile}
+								capture={props.capture}
+							/>
+						} @pending {
+							<span class="decorated-pending">loading</span>
+						}
+					</>
+				}
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `${kind}-synchronous-child.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const resources = resourceFetcher();
+			const reads: string[] = [];
+			const attachments: (Element | null)[] = [];
+			const capture = (node: Element | null) => {
+				attachments.push(node);
+			};
+			const profile = new Proxy(
+				{ label: 'Ada' },
+				{
+					get(target, property, receiver) {
+						if (property === 'label') reads.push(property);
+						return Reflect.get(target, property, receiver);
+					},
+				},
+			);
+			const root = mount(client.App, { load: resources.load, version: 0, profile, capture });
+
+			expect(resources.calls).toEqual(['decorated-sibling:0']);
+			expect(root.find('.decorated-pending').textContent).toBe('loading');
+			expect(reads).toEqual([]);
+			expect(attachments).toEqual([]);
+
+			await act(() => resources.settle('decorated-sibling', 0));
+
+			const child = root.find('.decorated-profile');
+			expect(child.textContent).toBe('Ada');
+			expect(root.find('.decorated-sibling').textContent).toBe('decorated-sibling-v0');
+			expect(attachments).toEqual(kind === 'ref' ? [child] : []);
+			root.unmount();
+			expect(attachments).toEqual(kind === 'ref' ? [child, null] : []);
+		},
+	);
+
+	it.each([
 		['destructured props', '{ load, version }', 'load', 'version'],
 		['aliased destructured props', '{ load: fetch, version: revision }', 'fetch', 'revision'],
 		['direct prop access', 'props', 'props.load', 'props.version'],

@@ -3950,7 +3950,7 @@ function warmCallsiteOwnsRequiredProps(info, props) {
 		} else {
 			return false;
 		}
-		if (name === '__proto__' || name === 'key' || name === 'ref') return false;
+		if (name === '__proto__') return false;
 	}
 
 	for (const name of required) {
@@ -3958,6 +3958,8 @@ function warmCallsiteOwnsRequiredProps(info, props) {
 		for (let index = 0; index < props.length; index++) {
 			const prop = props[index];
 			const own = prop.key ?? (typeof prop.name === 'string' ? prop.name : prop.name.name);
+			// Reconciliation consumes `key`; `ref` remains an ordinary own prop.
+			if (own === 'key') continue;
 			if (own === name) {
 				found = true;
 				break;
