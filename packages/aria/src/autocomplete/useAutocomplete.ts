@@ -342,10 +342,11 @@ export function useAutocomplete(...args: any[]): AutocompleteAria<any> {
 		// copy paste/backspacing/undo/redo for screen reader announcements
 		if (
 			(lastInputType.current === 'insertText' ||
-				// IME composition (e.g. CJK input) reports 'insertCompositionText'/'insertFromComposition'
-				// instead of 'insertText'. Treat these as forward typing so the first item gets virtual focus.
+				// IME composition and predictive replacements use different input types;
+				// treat all of them as forward typing so the first item gets virtual focus.
 				lastInputType.current === 'insertCompositionText' ||
-				lastInputType.current === 'insertFromComposition') &&
+				lastInputType.current === 'insertFromComposition' ||
+				lastInputType.current === 'insertReplacementText') &&
 			!disableAutoFocusFirst
 		) {
 			focusFirstItem();
@@ -376,7 +377,7 @@ export function useAutocomplete(...args: any[]): AutocompleteAria<any> {
 		keyDownTarget.current = getEventTarget(e) as Element;
 		// octane adaptation: `.nativeEvent.isComposing` → `e.isComposing` (the BaseEvent Proxy
 		// forwards the read to the live native event).
-		if (e.isComposing) {
+		if (e.isComposing || e.keyCode === 229) {
 			return;
 		}
 

@@ -3,10 +3,15 @@ export type HydrationWhen =
 
 export type HydrationInteractionEvent =
 	| 'auxclick'
+	| 'beforeinput'
 	| 'click'
+	| 'compositionend'
+	| 'compositionstart'
+	| 'compositionupdate'
 	| 'contextmenu'
 	| 'dblclick'
 	| 'focusin'
+	| 'input'
 	| 'keydown'
 	| 'keyup'
 	| 'mousedown'
@@ -16,7 +21,9 @@ export type HydrationInteractionEvent =
 	| 'pointerdown'
 	| 'pointerenter'
 	| 'pointerover'
-	| 'pointerup';
+	| 'pointerup'
+	| 'touchend'
+	| 'touchstart';
 
 export type HydrationInteractionEvents =
 	HydrationInteractionEvent | ReadonlyArray<HydrationInteractionEvent>;

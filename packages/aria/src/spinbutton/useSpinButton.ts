@@ -100,7 +100,15 @@ export function useSpinButton(...args: any[]): SpinbuttonAria {
 
 	let onKeyDown = (e: KeyboardEvent) => {
 		// octane adaptation: `e.nativeEvent.isComposing` → the native event's own flag.
-		if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || isReadOnly || e.isComposing) {
+		if (
+			e.ctrlKey ||
+			e.metaKey ||
+			e.shiftKey ||
+			e.altKey ||
+			isReadOnly ||
+			e.isComposing ||
+			e.keyCode === 229
+		) {
 			return;
 		}
 

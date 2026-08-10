@@ -362,7 +362,9 @@ export function useSliderState(...args: any[]): SliderState {
 			case 1:
 				return formatter.format(valueParam[0]);
 			case 2:
-				return formatter.formatRange(valueParam[0], valueParam[1]);
+				return typeof formatter.formatRange === 'function'
+					? formatter.formatRange(valueParam[0], valueParam[1])
+					: `${formatter.format(valueParam[0])} – ${formatter.format(valueParam[1])}`;
 			default: {
 				let formatted = valueParam.map((value) => formatter.format(value));
 				let listFormat = listFormatRef.current;

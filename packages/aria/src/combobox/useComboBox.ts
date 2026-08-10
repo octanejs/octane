@@ -203,7 +203,7 @@ export function useComboBox(...args: any[]): ComboBoxAria<any> {
 	let onKeyDown = (e: any) => {
 		// octane adaptation: `.nativeEvent.isComposing` → `e.isComposing` (the BaseEvent Proxy
 		// forwards the read to the live native event).
-		if (e.isComposing) {
+		if (e.isComposing || e.keyCode === 229) {
 			return;
 		}
 		switch (e.key) {
@@ -291,6 +291,9 @@ export function useComboBox(...args: any[]): ComboBoxAria<any> {
 		state.setFocused(true);
 	};
 
+	let onCollectionKeyDown = (e: any) => {
+		if (!e.isComposing && e.keyCode !== 229) collectionProps.onKeyDown?.(e);
+	};
 	let valueId = useValueId(
 		[state.selectionManager.selectedKeys, state.selectionManager.selectionMode],
 		subSlot(slot, 'valueId'),
@@ -306,7 +309,7 @@ export function useComboBox(...args: any[]): ComboBoxAria<any> {
 					: props.isRequired,
 			onChange: state.setInputValue,
 			onKeyDown: !isReadOnly
-				? chain(state.isOpen && collectionProps.onKeyDown, onKeyDown, props.onKeyDown)
+				? chain(state.isOpen && onCollectionKeyDown, onKeyDown, props.onKeyDown)
 				: props.onKeyDown,
 			onBlur,
 			value: state.inputValue,

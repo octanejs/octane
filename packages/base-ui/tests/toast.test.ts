@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
 import {
@@ -101,6 +101,27 @@ describe('@octanejs/base-ui — Toast behavior', () => {
 		await settleUntil(() => toastCount(m) === 0);
 		expect(toastCount(m)).toBe(0);
 
+		m.unmount();
+	});
+
+	it('updates an existing toast without requiring Object.hasOwn', async () => {
+		const m = mount(ToastManaged);
+		await settle();
+		const id = manager.add({ title: 'Original' });
+		await settle();
+
+		const hasOwn = Object.hasOwn;
+		try {
+			Object.hasOwn = undefined as unknown as typeof Object.hasOwn;
+			manager.update(id, { title: 'Updated on an older browser' });
+		} finally {
+			Object.hasOwn = hasOwn;
+		}
+
+		await settle();
+		expect(m.find('.toast-title').textContent).toBe('Updated on an older browser');
+		manager.close(id);
+		await settleUntil(() => toastCount(m) === 0);
 		m.unmount();
 	});
 
@@ -266,6 +287,78 @@ describe('@octanejs/base-ui — Toast behavior', () => {
 		expect(toastCount(m)).toBe(0);
 
 		m.unmount();
+	});
+
+	it('cleans up document swipe listeners when the browser ignores abort signals', async () => {
+		const m = mount(ToastManaged);
+		await settle();
+		manager.add({ title: 'Swipe safely on an older browser' });
+		await settle();
+
+		const listeners = new Map<string, Set<EventListenerOrEventListenerObject>>([
+			['pointerup', new Set()],
+			['pointercancel', new Set()],
+		]);
+		const addEventListener = document.addEventListener;
+		const removeEventListener = document.removeEventListener;
+		const addSpy = vi
+			.spyOn(document, 'addEventListener')
+			.mockImplementation(
+				(
+					type: string,
+					listener: EventListenerOrEventListenerObject | null,
+					options?: boolean | AddEventListenerOptions,
+				) => {
+					const active = listeners.get(type);
+					if (active && listener) {
+						active.add(listener);
+						if (typeof options === 'object' && options !== null) {
+							return addEventListener.call(document, type, listener, {
+								capture: options.capture,
+								once: options.once,
+								passive: options.passive,
+							});
+						}
+					}
+					return addEventListener.call(document, type, listener, options);
+				},
+			);
+		const removeSpy = vi
+			.spyOn(document, 'removeEventListener')
+			.mockImplementation(
+				(
+					type: string,
+					listener: EventListenerOrEventListenerObject | null,
+					options?: boolean | EventListenerOptions,
+				) => {
+					if (listener) listeners.get(type)?.delete(listener);
+					return removeEventListener.call(document, type, listener, options);
+				},
+			);
+
+		let mounted = true;
+		try {
+			const root = m.find('.toast-root');
+			pointer(root, 'pointerdown', 100, 100);
+			expect([...listeners.values()].map((active) => active.size)).toEqual([1, 1]);
+
+			pointer(document, 'pointerup', 100, 100);
+			expect([...listeners.values()].map((active) => active.size)).toEqual([0, 0]);
+
+			pointer(root, 'pointerdown', 100, 100);
+			expect([...listeners.values()].map((active) => active.size)).toEqual([1, 1]);
+
+			m.unmount();
+			mounted = false;
+			expect([...listeners.values()].map((active) => active.size)).toEqual([0, 0]);
+		} finally {
+			if (mounted) m.unmount();
+			for (const [type, active] of listeners) {
+				for (const listener of active) removeEventListener.call(document, type, listener);
+			}
+			removeSpy.mockRestore();
+			addSpy.mockRestore();
+		}
 	});
 
 	it('tracks the swipe direction and movement while dragging, and springs back below the threshold', async () => {

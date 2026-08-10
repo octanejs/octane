@@ -22,7 +22,7 @@ export function markComponentFlags<T extends Function>(
 export function hasComponentFlags(component: unknown, flags: number): boolean {
 	return (
 		typeof component === 'function' &&
-		Object.hasOwn(component, OCTANE_COMPONENT_FLAGS) &&
+		Object.prototype.hasOwnProperty.call(component, OCTANE_COMPONENT_FLAGS) &&
 		((component as FlaggedComponent)[OCTANE_COMPONENT_FLAGS]! & flags) === flags
 	);
 }

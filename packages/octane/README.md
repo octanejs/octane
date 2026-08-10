@@ -30,6 +30,19 @@ taking ownership of the existing markup. See the
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 
+## Browser compatibility
+
+Configure your application's build target for the browser engines you support.
+The Rsbuild integration's `modules` target includes Chromium 87 and Samsung
+Internet 14; Samsung Internet can also be selected directly with targets such as
+`samsung24`. Samsung Internet versions do not match their Chromium engine
+versions, and Android System WebView is updated independently from the browser.
+
+Build targets transpile JavaScript syntax; they do not polyfill application Web
+APIs. Features such as native `inert` may require a polyfill on older supported
+browsers. Validate text entry with the keyboards, languages, and browser or
+WebView versions your application supports.
+
 Octane is alpha software. It is ready to try, but not yet ready for production.
 
 ## License

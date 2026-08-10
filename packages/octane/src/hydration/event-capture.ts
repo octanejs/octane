@@ -20,10 +20,15 @@ function isHydrationElement(target: EventTarget | null): target is Element {
 
 export const HYDRATE_SUPPORTED_INTERACTION_EVENTS = [
 	'auxclick',
+	'beforeinput',
 	'click',
+	'compositionend',
+	'compositionstart',
+	'compositionupdate',
 	'contextmenu',
 	'dblclick',
 	'focusin',
+	'input',
 	'keydown',
 	'keyup',
 	'mousedown',
@@ -34,7 +39,31 @@ export const HYDRATE_SUPPORTED_INTERACTION_EVENTS = [
 	'pointerenter',
 	'pointerover',
 	'pointerup',
+	'touchend',
+	'touchstart',
 ] as const;
+
+/**
+ * @internal Keep trusted focusing, touch activation, editing, and IME work on
+ * the original event. Replaying an untrusted clone cannot restore those native
+ * default actions; discrete activation events still need navigation guarded.
+ */
+export function shouldPreventHydrationInteractionDefault(event: Event): boolean {
+	switch (event.type) {
+		case 'beforeinput':
+		case 'compositionend':
+		case 'compositionstart':
+		case 'compositionupdate':
+		case 'input':
+		case 'mousedown':
+		case 'pointerdown':
+		case 'touchend':
+		case 'touchstart':
+			return false;
+		default:
+			return event.cancelable;
+	}
+}
 
 export interface HydrationReplayIntent {
 	event: Event;
@@ -153,7 +182,7 @@ function handleEarlyHydrationIntent(event: Event): void {
 	const intent = { event, path };
 	HYDRATE_HANDLED_INTENT_EVENTS.add(event);
 	if (event.bubbles) {
-		event.preventDefault();
+		if (shouldPreventHydrationInteractionDefault(event)) event.preventDefault();
 		event.stopPropagation();
 		event.stopImmediatePropagation();
 	}

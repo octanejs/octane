@@ -151,6 +151,24 @@ describe('@octanejs/aria — useComboBox', () => {
 		r.unmount();
 	});
 
+	it('does not navigate or select while an Android keyboard is composing', async () => {
+		const selections: any[] = [];
+		const r = mount(ComboBoxHarness, { onSelectionChange: (key: any) => selections.push(key) });
+		const el = input(r);
+		await act(() => {
+			el.focus();
+			keydown(el, 'ArrowDown');
+		});
+		expect(output(r).getAttribute('data-focused-key')).toBe('apple');
+
+		await act(() => keydown(el, 'ArrowDown', { keyCode: 229, isComposing: false }));
+		expect(output(r).getAttribute('data-focused-key')).toBe('apple');
+		await act(() => keydown(el, 'Enter', { keyCode: 229, isComposing: false }));
+		expect(selections).toEqual([]);
+		expect(output(r).getAttribute('data-open')).toBe('true');
+		r.unmount();
+	});
+
 	it('clicking an option sets the input value to its text, selects the key, and closes the menu', async () => {
 		const selections: any[] = [];
 		const r = mount(ComboBoxHarness, { onSelectionChange: (k: any) => selections.push(k) });

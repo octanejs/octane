@@ -12,13 +12,24 @@ export function media(query: string): HydrationPrefetchStrategy<typeof mediaType
 			if (!callback) return;
 
 			const mediaQuery = window.matchMedia(query);
+			if (mediaQuery.matches) {
+				callback();
+				return;
+			}
+
 			const onChange = () => {
 				if (mediaQuery.matches) callback();
 			};
-			mediaQuery.addEventListener('change', onChange);
-			onChange();
+			if (typeof mediaQuery.addEventListener === 'function') {
+				mediaQuery.addEventListener('change', onChange);
+				return () => mediaQuery.removeEventListener('change', onChange);
+			}
+			if (typeof mediaQuery.addListener === 'function') {
+				mediaQuery.addListener(onChange);
+				return () => mediaQuery.removeListener(onChange);
+			}
 
-			return () => mediaQuery.removeEventListener('change', onChange);
+			callback();
 		},
 	};
 }

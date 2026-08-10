@@ -7,6 +7,7 @@ import {
 	ResizeHarness,
 	TreeGridHarness,
 	TreeGridAllHarness,
+	TreeGridRowsHarness,
 	GridHarness,
 } from './_fixtures/stately-table.tsx';
 
@@ -142,6 +143,24 @@ describe('@octanejs/aria/stately — useTableColumnResizeState', () => {
 });
 
 describe('@octanejs/aria/stately — UNSTABLE_useTreeGridState', () => {
+	it('renders accessible nested rows without requiring Array.prototype.findLast', () => {
+		const findLast = Array.prototype.findLast;
+		let mounted: ReturnType<typeof mount> | undefined;
+		try {
+			Array.prototype.findLast = undefined as unknown as typeof Array.prototype.findLast;
+			mounted = mount(TreeGridRowsHarness);
+		} finally {
+			Array.prototype.findLast = findLast;
+		}
+
+		try {
+			expect(mounted.container.querySelectorAll('[role="row"]')).toHaveLength(2);
+			expect(mounted.container.querySelector('[data-testid="tree-row-r1"]')).not.toBe(null);
+		} finally {
+			mounted.unmount();
+		}
+	});
+
 	it('collapsed child rows stay out of the collection until their parent is expanded', async () => {
 		const r = mount(TreeGridHarness);
 		expect(text(r, 'expanded')).toBe('e:empty');

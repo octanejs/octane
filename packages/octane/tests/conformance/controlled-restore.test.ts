@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '../_helpers';
-import { ControlledInput, AcceptingInput, DigitsInput } from './_fixtures/controlled-forms.tsrx';
+import {
+	ControlledInput,
+	AcceptingInput,
+	DigitsInput,
+	SpreadInput,
+} from './_fixtures/controlled-forms.tsrx';
 
 // ============================================================================
 // The event-side restore machinery — ports of ReactControlledComponent-test.js
@@ -79,8 +84,192 @@ describe('conformance: IME composition guard', () => {
 		type(el, 'lockedあ');
 		expect(el.value).toBe('lockedあ'); // composing: no restore
 		el.dispatchEvent(new Event('compositionend', { bubbles: true }));
-		await Promise.resolve(); // the un-starvable microtask fallback
+		await vi.waitFor(() => expect(el.value).toBe('locked'), { interval: 1 });
+		r.unmount();
+	});
+
+	it('recognizes a composing input when its compositionstart was missed', () => {
+		const r = mount(ControlledInput, { value: 'locked', onInput: () => {} });
+		const el = r.find('#ci') as HTMLInputElement;
+		el.value = 'locked候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		expect(el.value).toBe('locked候');
+		r.unmount();
+	});
+
+	it('recognizes composition input types when the keyboard omits isComposing', () => {
+		const r = mount(ControlledInput, { value: 'locked', onInput: () => {} });
+		const el = r.find('#ci') as HTMLInputElement;
+		el.value = 'locked候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: false,
+			}),
+		);
+		expect(el.value).toBe('locked候');
+		r.unmount();
+	});
+
+	it('keeps the candidate available for a committed input following compositionend', async () => {
+		const observed: string[] = [];
+		const r = mount(ControlledInput, {
+			value: 'locked',
+			onInput: (event: InputEvent) => observed.push((event.target as HTMLInputElement).value),
+		});
+		const el = r.find('#ci') as HTMLInputElement;
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = 'locked候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '候' }));
+		await Promise.resolve();
+		expect(el.value).toBe('locked候');
+
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertText',
+				isComposing: false,
+			}),
+		);
+		expect(observed).toEqual(['locked候', 'locked候']);
 		expect(el.value).toBe('locked');
+		r.unmount();
+	});
+
+	it('preserves the candidate when the committed input arrives in the next task', async () => {
+		const observed: string[] = [];
+		const r = mount(ControlledInput, {
+			value: 'locked',
+			onInput: (event: InputEvent) => observed.push((event.target as HTMLInputElement).value),
+		});
+		const el = r.find('#ci') as HTMLInputElement;
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = 'locked候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '候' }));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(el.value).toBe('locked候');
+
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertText',
+				isComposing: false,
+			}),
+		);
+		expect(observed).toEqual(['locked候', 'locked候']);
+		expect(el.value).toBe('locked');
+		r.unmount();
+	});
+
+	it('does not let an earlier composition completion interrupt a replacement session', async () => {
+		const r = mount(ControlledInput, { value: 'locked', onInput: () => {} });
+		const el = r.find('#ci') as HTMLInputElement;
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = 'locked候';
+		el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '候' }));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = 'locked補';
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(el.value).toBe('locked補');
+		el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '補' }));
+		await vi.waitFor(() => expect(el.value).toBe('locked'), { interval: 1 });
+		r.unmount();
+	});
+
+	it('resumes controlled restoration when composition is interrupted without compositionend', () => {
+		const r = mount(ControlledInput, { value: 'locked', onInput: () => {} });
+		const el = r.find('#ci') as HTMLInputElement;
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = 'locked候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		el.dispatchEvent(new FocusEvent('blur'));
+		el.value = 'lockedX';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: 'X',
+				inputType: 'insertText',
+				isComposing: false,
+			}),
+		);
+		expect(el.value).toBe('locked');
+		r.unmount();
+	});
+
+	it('settles an interrupted composition after the input loses focus', async () => {
+		const r = mount(ControlledInput, { value: 'locked', onInput: () => {} });
+		const el = r.find('#ci') as HTMLInputElement;
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = 'locked候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		el.dispatchEvent(new FocusEvent('blur'));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(el.value).toBe('locked');
+		r.unmount();
+	});
+
+	it('arms composition protection when a spread changes a date input into text', () => {
+		const onInput = () => {};
+		const r = mount(SpreadInput, {
+			sp: { type: 'date', value: '2026-08-10', onInput },
+		});
+		const el = r.find('#si') as HTMLInputElement;
+		r.update(SpreadInput, { sp: { type: 'text', value: '2026-08-10', onInput } });
+		expect(r.find('#si')).toBe(el);
+		el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		el.value = '2026-08-10候';
+		el.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '候',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		expect(el.value).toBe('2026-08-10候');
 		r.unmount();
 	});
 

@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers';
 import {
 	SliderHarness,
+	RangeSliderHarness,
 	NumberFieldHarness,
 	GridListHarness,
 	TagGroupHarness,
@@ -40,6 +41,67 @@ describe('@octanejs/aria — useSlider / useSliderThumb', () => {
 		expect(input.getAttribute('aria-valuetext')).toBe('20');
 		r.unmount();
 	});
+
+	it('preserves native locale-specific number-range formatting when available', async () => {
+		const r = mount(RangeSliderHarness, { locale: 'de-DE' });
+		try {
+			await act(() => {});
+			const output = r.container.querySelector('[data-testid="range-output"]') as HTMLOutputElement;
+			expect(output.textContent).toBe(new Intl.NumberFormat('de-DE').formatRange(1200, 3400));
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each([
+		['de-DE', '1.200 – 3.400', '1.500 – 3.400'],
+		['ar-EG', '١٬٢٠٠ – ٣٬٤٠٠', '١٬٥٠٠ – ٣٬٤٠٠'],
+	])(
+		'keeps a two-thumb %s slider usable without Intl.NumberFormat.formatRange',
+		async (locale, initial, updated) => {
+			const original = Object.getOwnPropertyDescriptor(Intl.NumberFormat.prototype, 'formatRange');
+			Object.defineProperty(Intl.NumberFormat.prototype, 'formatRange', {
+				configurable: true,
+				value: undefined,
+				writable: true,
+			});
+			let r: ReturnType<typeof mount> | undefined;
+			try {
+				r = mount(RangeSliderHarness, { locale });
+				await act(() => {});
+				const output = r.container.querySelector(
+					'[data-testid="range-output"]',
+				) as HTMLOutputElement;
+				const first = r.container.querySelector(
+					'[data-testid="range-thumb-min"]',
+				) as HTMLInputElement;
+				const second = r.container.querySelector(
+					'[data-testid="range-thumb-max"]',
+				) as HTMLInputElement;
+				expect(output.textContent).toBe(initial);
+				expect(first.getAttribute('aria-valuetext')).toBe(
+					new Intl.NumberFormat(locale).format(1200),
+				);
+				expect(second.getAttribute('aria-valuetext')).toBe(
+					new Intl.NumberFormat(locale).format(3400),
+				);
+
+				await act(() => {
+					first.value = '1500';
+					first.dispatchEvent(new Event('input', { bubbles: true }));
+				});
+				expect(first.value).toBe('1500');
+				expect(output.textContent).toBe(updated);
+			} finally {
+				r?.unmount();
+				if (original !== undefined) {
+					Object.defineProperty(Intl.NumberFormat.prototype, 'formatRange', original);
+				} else {
+					Reflect.deleteProperty(Intl.NumberFormat.prototype, 'formatRange');
+				}
+			}
+		},
+	);
 });
 
 describe('@octanejs/aria — useNumberField', () => {
@@ -63,6 +125,40 @@ describe('@octanejs/aria — useNumberField', () => {
 		await act(() => inc.click());
 		expect(input.value).toBe('6');
 		r.unmount();
+	});
+
+	it.each([
+		[
+			'Samsung Internet on Android',
+			'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Mobile Safari/537.36',
+			'decimal',
+		],
+		[
+			'Samsung Internet desktop mode',
+			'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Safari/537.36',
+			'decimal',
+		],
+		[
+			'Samsung Browser on Windows',
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/29.0 Chrome/136.0.0.0 Safari/537.36',
+			'numeric',
+		],
+		[
+			'Samsung Smart TV',
+			'Mozilla/5.0 (SMART-TV; Linux; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 TV Safari/537.36',
+			'numeric',
+		],
+	])('chooses the correct software keyboard for %s', async (_platform, userAgent, inputMode) => {
+		const userAgentSpy = vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(userAgent);
+		const r = mount(NumberFieldHarness, {});
+		try {
+			await act(() => {});
+			const input = r.container.querySelector('[data-testid="nf-input"]') as HTMLInputElement;
+			expect(input.getAttribute('inputmode')).toBe(inputMode);
+		} finally {
+			r.unmount();
+			userAgentSpy.mockRestore();
+		}
 	});
 });
 

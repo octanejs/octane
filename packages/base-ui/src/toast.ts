@@ -472,7 +472,7 @@ export class ToastStore extends ReactStore<ToastState, {}, typeof toastSelectors
 		const nextTimeout = nextToast.timeout ?? timeout;
 		const prevTimeout = prevToast?.timeout ?? timeout;
 
-		const timeoutUpdated = Object.hasOwn(updates, 'timeout');
+		const timeoutUpdated = Object.prototype.hasOwnProperty.call(updates, 'timeout');
 
 		const shouldHaveTimer =
 			nextToast.transitionStatus !== 'ending' && nextToast.type !== 'loading' && nextTimeout > 0;
@@ -1444,7 +1444,7 @@ function ToastRoot(componentProps: any): any {
 	const isFirstPointerMoveRef = useRef(false, subSlot(slot, 'firstMove'));
 	const dragOffsetRef = useRef({ x: 0, y: 0 }, subSlot(slot, 'offsetRef'));
 	const activePointerIdRef = useRef<number | null>(null, subSlot(slot, 'pointerId'));
-	const dragAbortControllerRef = useRef<AbortController | null>(null, subSlot(slot, 'abort'));
+	const dragDocumentRef = useRef<Document | null>(null, subSlot(slot, 'dragDocument'));
 
 	const domIndex = store.useState('toastIndex', subSlot(slot, 'domIndex'), toast.id);
 	const visibleIndex = store.useState('toastVisibleIndex', subSlot(slot, 'visIndex'), toast.id);
@@ -1505,10 +1505,18 @@ function ToastRoot(componentProps: any): any {
 		setDragOffset(nextDragOffset);
 	}
 
+	function removeSwipeDocumentListeners() {
+		const doc = dragDocumentRef.current;
+		if (doc === null) return;
+		doc.removeEventListener('pointerup', handleSwipeEnd as EventListener);
+		doc.removeEventListener('pointercancel', handleSwipeEnd as EventListener);
+		dragDocumentRef.current = null;
+	}
+
 	useLayoutEffect(
 		() => {
 			return () => {
-				dragAbortControllerRef.current?.abort();
+				removeSwipeDocumentListeners();
 			};
 		},
 		[],
@@ -1559,8 +1567,7 @@ function ToastRoot(componentProps: any): any {
 			}
 
 			activePointerIdRef.current = null;
-			dragAbortControllerRef.current?.abort();
-			dragAbortControllerRef.current = null;
+			removeSwipeDocumentListeners();
 			setIsSwiping(false);
 			setIsRealSwipe(false);
 			setLockedDirection(null);
@@ -1670,17 +1677,11 @@ function ToastRoot(componentProps: any): any {
 
 		const element = rootRef.current;
 		if (element) {
-			dragAbortControllerRef.current?.abort();
-			const dragAbortController = new AbortController();
-			dragAbortControllerRef.current = dragAbortController;
-
+			removeSwipeDocumentListeners();
 			const doc = ownerDocument(element);
-			doc.addEventListener('pointerup', handleSwipeEnd as EventListener, {
-				signal: dragAbortController.signal,
-			});
-			doc.addEventListener('pointercancel', handleSwipeEnd as EventListener, {
-				signal: dragAbortController.signal,
-			});
+			dragDocumentRef.current = doc;
+			doc.addEventListener('pointerup', handleSwipeEnd as EventListener);
+			doc.addEventListener('pointercancel', handleSwipeEnd as EventListener);
 
 			(element as any).setPointerCapture?.(event.pointerId);
 		}

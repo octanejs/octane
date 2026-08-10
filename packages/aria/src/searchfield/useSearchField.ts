@@ -76,6 +76,7 @@ export function useSearchField(...args: any[]): SearchFieldAria {
 	);
 	let { isDisabled, isReadOnly, onSubmit, onClear, type = 'search' } = props;
 	let onKeyDown = (e: any) => {
+		if (e.isComposing || e.keyCode === 229) return;
 		const key = e.key;
 
 		if (key === 'Enter' && (isDisabled || isReadOnly)) {

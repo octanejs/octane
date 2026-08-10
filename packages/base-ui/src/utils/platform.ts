@@ -25,7 +25,8 @@ function isVoiceOver(): boolean {
 }
 
 function isAndroid(): boolean {
-	return /Android/.test(ua());
+	// Samsung Internet's DeX/desktop-site UA identifies Android as X11/Linux.
+	return /Android|X11.*SamsungB/i.test(ua());
 }
 
 function isMac(): boolean {

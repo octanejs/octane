@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { useRef, useState } from 'octane';
 // The table/grid stately hooks are not on the public entry yet (export wiring is
 // owned by the coordinating session), so fixtures import from source paths.
 import { Cell } from '../../src/stately/table/Cell';
@@ -12,6 +12,8 @@ import { UNSTABLE_useTreeGridState } from '../../src/stately/table/useTreeGridSt
 import { enableTableNestedRows } from '../../src/stately/flags';
 import { GridCollection } from '../../src/stately/grid/GridCollection';
 import { useGridState } from '../../src/stately/grid/useGridState';
+import { useTable } from '../../src/table/useTable';
+import { useTableRow } from '../../src/table/useTableRow';
 
 // useTreeGridState is gated behind the ported feature flag (upstream contract).
 enableTableNestedRows();
@@ -435,6 +437,31 @@ export function TreeGridAllHarness() {
 			</output>
 			<output data-testid="size">{'size:' + state.collection.size}</output>
 		</div>
+	);
+}
+
+function TreeGridRow(props: { node: any; state: any }) {
+	const ref = useRef<HTMLTableRowElement | null>(null);
+	const { rowProps } = useTableRow({ node: props.node }, props.state, ref);
+	return (
+		<tr {...rowProps} ref={ref} data-testid={'tree-row-' + String(props.node.key)}>
+			<td>{props.node.key as string}</td>
+		</tr>
+	);
+}
+
+export function TreeGridRowsHarness() {
+	const state = UNSTABLE_useTreeGridState({ children: treeChildren() as any });
+	const ref = useRef<HTMLTableElement | null>(null);
+	const { gridProps } = useTable({ 'aria-label': 'Nested rows' }, state, ref);
+	return (
+		<table {...gridProps} ref={ref}>
+			<tbody>
+				{[...state.collection].map((node: any) => (
+					<TreeGridRow key={node.key} node={node} state={state} />
+				))}
+			</tbody>
+		</table>
 	);
 }
 

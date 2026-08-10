@@ -318,7 +318,7 @@ export function useNumberField(...args: any[]): NumberFieldAria {
 		(e: any) => {
 			// octane adaptation: `e.nativeEvent.isComposing` → the native event's own flag
 			// (the wrapped keyboard event proxies it through).
-			if (e.isComposing) {
+			if (e.isComposing || e.keyCode === 229) {
 				return;
 			}
 

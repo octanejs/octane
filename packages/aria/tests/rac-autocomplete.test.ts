@@ -149,6 +149,40 @@ describe('@octanejs/aria/components — Autocomplete', () => {
 		r.unmount();
 	});
 
+	it('focuses the first matching suggestion after a predictive-text replacement', async () => {
+		vi.useFakeTimers();
+		const r = mount(AutocompleteScenario, {});
+		try {
+			await act(() => {});
+			const el = input(r);
+			await keydown(el, 'ArrowDown');
+			expect(options(r)[0].getAttribute('data-focused')).toBe('true');
+
+			await act(() => {
+				el.dispatchEvent(
+					new InputEvent('beforeinput', {
+						bubbles: true,
+						data: 'py',
+						inputType: 'insertReplacementText',
+					}),
+				);
+				const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+				setter.call(el, 'py');
+				el.dispatchEvent(new Event('input', { bubbles: true }));
+			});
+
+			expect(options(r).map((option) => option.textContent)).toEqual(['Python']);
+			expect(options(r)[0].getAttribute('data-focused')).toBe('true');
+			await act(() => {
+				vi.advanceTimersByTime(500);
+			});
+			expect(el.getAttribute('aria-activedescendant')).toBe(options(r)[0].id);
+		} finally {
+			r.unmount();
+			vi.useRealTimers();
+		}
+	});
+
 	it('moves virtual focus into the collection with ArrowDown and reflects it in aria-activedescendant', async () => {
 		const r = mount(AutocompleteScenario, {});
 		await act(() => {});
@@ -182,6 +216,21 @@ describe('@octanejs/aria/components — Autocomplete', () => {
 		const keys = [...onSelectionChange.mock.calls[0][0]];
 		expect(keys).toEqual(['js']);
 		expect(options(r)[0].getAttribute('aria-selected')).toBe('true');
+		r.unmount();
+	});
+
+	it('does not commit a suggestion from an Android composition-confirmation Enter', async () => {
+		const onSelectionChange = vi.fn();
+		const r = mount(AutocompleteScenario, { onSelectionChange });
+		await act(() => {});
+		const el = input(r);
+		await keydown(el, 'ArrowDown');
+		await keydown(el, 'Enter', { keyCode: 229, isComposing: false });
+		expect(onSelectionChange).not.toHaveBeenCalled();
+		expect(options(r)[0].getAttribute('data-focused')).toBe('true');
+
+		await keydown(el, 'Enter');
+		expect(onSelectionChange).toHaveBeenCalledTimes(1);
 		r.unmount();
 	});
 

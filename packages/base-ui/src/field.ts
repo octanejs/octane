@@ -151,7 +151,9 @@ function FieldRootInner(props: any): any {
 	);
 
 	const formError =
-		effectiveName && Object.hasOwn(errors, effectiveName) ? errors[effectiveName] : null;
+		effectiveName && Object.prototype.hasOwnProperty.call(errors, effectiveName)
+			? errors[effectiveName]
+			: null;
 	const hasFormError = !!(Array.isArray(formError) ? formError.length : formError);
 	const invalid = invalidProp === true || hasFormError;
 
@@ -495,7 +497,8 @@ function FieldError(props: any): any {
 	const { setMessageIds } = useLabelableContext();
 	const { errors } = useFormContext();
 
-	const formError = name && Object.hasOwn(errors, name) ? errors[name] : null;
+	const formError =
+		name && Object.prototype.hasOwnProperty.call(errors, name) ? errors[name] : null;
 	const hasFormError = !!(Array.isArray(formError) ? formError.length : formError);
 	const hasSpecificMatch = typeof match === 'string';
 

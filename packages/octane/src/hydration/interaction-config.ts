@@ -4,5 +4,12 @@ export const HYDRATE_DEFAULT_INTERACTION_EVENTS = [
 	'pointerenter',
 	'focusin',
 	'pointerdown',
+	'touchstart',
+	'touchend',
+	'beforeinput',
+	'input',
+	'compositionstart',
+	'compositionupdate',
+	'compositionend',
 	'click',
 ] as const;

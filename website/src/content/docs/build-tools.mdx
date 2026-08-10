@@ -135,8 +135,12 @@ web and Node entries required for SSR and hydration.
 
 The shared `build.target` setting controls both SWC application transforms and
 Rspack's generated runtime. Rsbuild accepts one ES level, `modules`, `false`, or
-esbuild-style browser targets such as `['chrome100', 'firefox100']`; do not mix
-ES levels and browser targets in the same array.
+browser targets such as `['chrome100', 'firefox100', 'samsung24']`; do not mix
+ES levels and browser targets in the same array. Samsung targets use the Samsung
+Internet version rather than its Chromium engine version: `samsung24` means
+Samsung Internet 24, which is based on Chromium 117. The `modules` baseline
+includes Samsung Internet 14 and Chromium 87. Browser targeting transpiles
+syntax but does not supply application-specific Web API polyfills.
 
 <h2 id="strong-mode">Strong mode</h2>
 
