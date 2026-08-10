@@ -460,8 +460,12 @@ export function validateManifest(manifest) {
 					'verified provenance with insufficient upstream runtime tests requires full upstream-suite lanes plus repo-authored differential evidence',
 				);
 		} else if (!requiredDifferential) {
+			// Absent upstream adapter suites have nothing to port into a full
+			// adapted-octane inventory. Repo-authored differential evidence is the
+			// runtime contract; optional focused adapted-octane lanes may still
+			// document divergences when they carry same-scenario React observations.
 			fail(
-				'verified provenance with absent upstream runtime tests requires a required differential lane with repo-authored evidence',
+				'verified provenance with absent upstream runtime tests requires differential lanes with repo-authored evidence',
 			);
 		}
 

@@ -844,7 +844,7 @@
         "Upstream's `useLegacyTable` entry (the v8-compat `get*RowModel` shim, its marker factories, and the `Legacy*` type aliases) is NOT ported. It exists to migrate existing React v8 codebases; octane has none, so octane code targets the v9 `useTable` API directly."
       ],
       "ssr": "No SSR-specific surface; table-core is pure computation.",
-      "verified": "2026-07-26"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/tanstack-virtual",

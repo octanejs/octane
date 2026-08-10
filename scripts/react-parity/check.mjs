@@ -37,6 +37,8 @@ import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
 import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
+import { verifyTanstackTableTypes } from './tanstack-table-types-lib.mjs';
+import { verifyTanstackTableTestClassifications } from './tanstack-table-classifications-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -152,6 +154,11 @@ try {
 	errors.push(`@octanejs/solana-react type evidence is invalid: ${error.message}`);
 }
 try {
+	verifyTanstackTableTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tanstack-table type evidence is invalid: ${error.message}`);
+}
+try {
 	verifyLivestoreTestClassifications(REPO);
 } catch (error) {
 	errors.push(`livestore test classifications are invalid: ${error.message}`);
@@ -244,6 +251,10 @@ try {
 	errors.push(`drei type evidence is invalid: ${error.message}`);
 }
 
+	verifyTanstackTableTestClassifications(REPO);
+} catch (error) {
+	errors.push(`tanstack-table test classifications are invalid: ${error.message}`);
+}
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components
 // (BenchmarkExplorer, BenchBars, …). Scan both trees so a misleading claim can't
@@ -339,6 +350,14 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		) {
 			verifyPortTestClassifications(REPO, binding);
 		}
+		// Livestore and tanstack-table keep dedicated disposition sets verified
+		// above; do not re-check them with the generic binding ledger.
+		if (
+			binding !== 'livestore' &&
+			binding !== 'tanstack-table' &&
+			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
+		)
+			verifyPortTestClassifications(REPO, binding);
 		await verifyManifestFiles(manifest, REPO);
 		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 		for (const lane of manifest.lanes) {

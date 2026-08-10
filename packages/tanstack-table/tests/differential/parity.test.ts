@@ -26,6 +26,7 @@ const CACHE = resolve(__dirname, '.react-cache');
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
 describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table', () => {
+	// @parity-case differential:tanstack-table-basic
 	it('BasicTable: flexRender shapes + data swap, byte-identical', async () => {
 		const d = await mountDifferential(BASIC, 'BasicTable', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -40,6 +41,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-sorting
 	it('SortingTable: asc → desc → cleared → replace, byte-identical', async () => {
 		const d = await mountDifferential(SORTING, 'SortingTable', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -71,6 +73,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-filter-pagination
 	it('FilterPaginate: filter input + pagination buttons, byte-identical', async () => {
 		const d = await mountDifferential(FILTER_PAGINATE, 'FilterPaginate', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -108,6 +111,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-selection
 	it('SelectionTable: predicate select-all + row toggles, byte-identical', async () => {
 		const d = await mountDifferential(SELECTION, 'SelectionTable', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -134,6 +138,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-visibility-expanding
 	it('VisExpand: visibility toggles + nested expanding, byte-identical', async () => {
 		const d = await mountDifferential(VIS_EXPAND, 'VisExpand', undefined, CACHE);
 		await d.step('mount', () => {});

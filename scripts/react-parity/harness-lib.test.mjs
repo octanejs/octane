@@ -790,7 +790,7 @@ test('makes every upstream runtime suite state an executable verified requiremen
 	);
 	assert.throws(
 		() => validateManifest(absent),
-		/absent upstream runtime tests requires a required differential lane with repo-authored evidence/,
+		/absent upstream runtime tests requires differential lanes with repo-authored evidence/,
 	);
 	absent.lanes.push(differentialLane());
 	assert.doesNotThrow(() => validateManifest(absent));
