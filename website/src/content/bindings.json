@@ -70,6 +70,7 @@
   {
     "title": "Forms and content",
     "description": "Forms, file acquisition, rich-text editing, streaming Markdown, MDX, and translations.",
+    "description": "Forms, rich-text editing, ordinary and streaming Markdown, MDX, and translations.",
     "packages": [
       "@octanejs/hook-form",
       "@octanejs/input-otp",
@@ -77,6 +78,7 @@
       "@octanejs/tanstack-form",
       "@octanejs/lexical",
       "@octanejs/tiptap",
+      "@octanejs/markdown",
       "@octanejs/streamdown",
       "@octanejs/monaco-editor",
       "@octanejs/mdx",

@@ -379,6 +379,20 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/markdown",
+      "version": "0.1.20",
+      "category": "Forms and content",
+      "upstream": { "package": "react-markdown", "version": "10.1.0" },
+      "surface": "Complete react-markdown 10.1.0 root runtime and public type surface: Markdown, MarkdownAsync, MarkdownHooks, defaultUrlTransform, and all six exported type families.",
+      "divergences": [
+        "Rendered elements, component mappings, hooks, and public renderable types target Octane instead of React.",
+        "React 19 may emit automatic image preload hints during server rendering; Octane preserves the Markdown image output without that renderer-specific hint.",
+        "React's synchronous renderer throws when MarkdownAsync suspends; Octane's MarkdownAsync returns an awaitable ElementDescriptor."
+      ],
+      "ssr": "Synchronous and awaited asynchronous Markdown are deterministic and browser-global-free; hydration adoption and updates are covered for default output, plugins, filtering, URLs, and component mappings. MarkdownHooks preserves its fallback and resolves on the client.",
+      "verified": "2026-08-02"
+    },
+    {
       "name": "@octanejs/mdx",
       "version": "0.1.31",
       "category": "Forms and content",
@@ -1189,6 +1203,7 @@
     "react-i18next": "@octanejs/i18next",
     "react-map-gl": "@octanejs/react-map-gl",
     "react-map-gl/mapbox": "@octanejs/react-map-gl",
+    "react-markdown": "@octanejs/markdown",
     "react-redux": "@octanejs/redux",
     "react-router": "@octanejs/remix-router",
     "react-router-dom": "@octanejs/remix-router",

@@ -627,6 +627,49 @@ test('runs Jest full suites directly and rejects identity or snapshot drift', as
 	);
 });
 
+test('runs Node full suites directly and rejects leaf identity drift', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-node-root-'));
+	const lane = {
+		...fullRuntimeLane('pristine-upstream'),
+		execution: {
+			kind: 'node-full',
+			root: 'packages/example/upstream',
+			file: 'packages/example/upstream/test.jsx',
+			loader: 'packages/example/upstream/load-jsx.js',
+			inventory: 'audit/pristine-upstream.json',
+		},
+	};
+	const inventory = {
+		schemaVersion: 1,
+		root: lane.execution.root,
+		tests: [{ file: lane.execution.file, fullName: 'suite works', status: 'passed' }],
+		snapshots: 0,
+	};
+	await mkdir(join(root, 'audit'), { recursive: true });
+	await writeFile(join(root, lane.execution.inventory), JSON.stringify(inventory));
+
+	assert.deepEqual(buildLaneArgv(lane, root), [
+		process.execPath,
+		'scripts/react-parity/node-full-runner.mjs',
+		'--root',
+		lane.execution.root,
+		'--file',
+		lane.execution.file,
+		'--loader',
+		lane.execution.loader,
+		'--inventory',
+		lane.execution.inventory,
+	]);
+	assert.equal(
+		verifyLaneRunResult(lane, JSON.stringify({ schemaVersion: 1, tests: inventory.tests }), root),
+		true,
+	);
+	assert.throws(
+		() => verifyLaneRunResult(lane, JSON.stringify({ schemaVersion: 1, tests: [] }), root),
+		/did not execute every inventoried Node identity exactly once/,
+	);
+});
+
 test('sorts test identities by locale-independent code-unit order', () => {
 	const identities = [
 		{ file: 'test.ts', fullName: 'z' },

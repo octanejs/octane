@@ -3,6 +3,7 @@ import { relative, resolve, sep } from 'node:path';
 
 const DISPOSITIONS = new Set([
 	'unmodified-upstream-suite-wrapper',
+	'adapted-upstream-suite',
 	'react-octane-differential',
 	'octane-only-divergence',
 	'octane-only-framework-contract',

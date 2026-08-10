@@ -59,6 +59,7 @@ export const KNOWN_BINDINGS = {
 	'react-transition-group': '@octanejs/transition-group',
 	'react-day-picker': '@octanejs/day-picker',
 	vaul: '@octanejs/vaul',
+	'react-markdown': '@octanejs/markdown',
 	streamdown: '@octanejs/streamdown',
 	// The official plugins are consolidated as subpaths of the same package.
 	// The bundled bridge skill documents each exact import rewrite.

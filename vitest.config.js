@@ -6352,6 +6352,30 @@ export default defineConfig({
 						},
 					],
 				},
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/markdown/tests/conformance/public-types.test.ts',
+						'packages/markdown/tests/conformance/sync.server.test.ts',
+						'packages/markdown/tests/async/markdown-async.server.test.ts',
+						'packages/markdown/tests/hooks/markdown-hooks.test.ts',
+						'packages/markdown/tests/validation.test.ts',
+						'packages/markdown/tests/differential/processor.test.ts',
+						'packages/markdown/tests/differential/url-transform.test.ts',
+					],
+				},
+				test: {
+					name: 'markdown',
+					include: ['packages/markdown/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/markdown/tests/pristine/**/*.test.ts',
+						'packages/markdown/tests/parity/differential.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane()],
 			},
 			{
 				testExecution: { group: 'react-parity' },
@@ -6498,6 +6522,12 @@ export default defineConfig({
 					hookTimeout: 60_000,
 				},
 				testExecution: { group: 'react-parity' },
+					name: 'markdown-differential',
+					include: ['packages/markdown/tests/parity/differential.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane()],
 			},
 			{
 				test: {

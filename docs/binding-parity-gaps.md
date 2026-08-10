@@ -39,6 +39,7 @@ surface and evidence.
 | `@octanejs/livestore` | 0 |
 | `@octanejs/lucide` | 0 |
 | `@octanejs/mantine-hooks` | 0 |
+| `@octanejs/markdown` | 0 |
 | `@octanejs/mdx` | 0 |
 | `@octanejs/mobx` | 0 |
 | `@octanejs/monaco-editor` | 0 |

@@ -33,6 +33,8 @@ import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.
 import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtime.mjs';
 import { verifyTanstackStoreTypes } from './tanstack-store-types-lib.mjs';
 import { verifyTanstackStoreUpstreamEvidence } from './tanstack-store-upstream-lib.mjs';
+import { verifyReactMarkdownTypes } from './react-markdown-types-lib.mjs';
+import { verifyReactMarkdownTestClassifications } from './react-markdown-classifications-lib.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
@@ -168,6 +170,9 @@ try {
 	verifyTanstackStoreUpstreamEvidence(REPO);
 } catch (error) {
 	errors.push(`@octanejs/tanstack-store upstream evidence is invalid: ${error.message}`);
+	verifyReactMarkdownTypes(REPO);
+} catch (error) {
+	errors.push(`react-markdown type evidence is invalid: ${error.message}`);
 }
 try {
 	verifySolanaReactTypes(REPO);
@@ -308,6 +313,9 @@ try {
 	verifyVisxTestClassifications(REPO);
 } catch (error) {
 	errors.push(`visx test classifications are invalid: ${error.message}`);
+	verifyReactMarkdownTestClassifications(REPO);
+} catch (error) {
+	errors.push(`react-markdown test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

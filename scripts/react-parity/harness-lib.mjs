@@ -70,10 +70,12 @@ const EXECUTION_KEYS = new Set([
 	'inventory',
 	'config',
 	'root',
+	'file',
+	'loader',
 ]);
 const SUITE_STATES = new Set(['present', 'absent', 'insufficient']);
 const TYPE_EVIDENCE_ORIGINS = new Set(['upstream-suite', 'repo-authored']);
-const FULL_RUNTIME_EXECUTIONS = new Set(['vitest-full', 'jest-full', 'playwright-full']);
+const FULL_RUNTIME_EXECUTIONS = new Set(['vitest-full', 'jest-full', 'playwright-full', 'node-full']);
 const ADAPTED_ROOT_KEYS = new Set(['source', 'tests']);
 const ADAPTED_SCAN_KEYS = new Set(['roots', 'include', 'exclude']);
 const ADAPTED_RUNTIME_SUMMARY_KEYS = new Set([
@@ -323,7 +325,13 @@ export function validateManifest(manifest) {
 			for (const key of Object.keys(lane.execution))
 				if (!EXECUTION_KEYS.has(key)) fail(`lane ${lane.id} execution has unknown key "${key}"`);
 			if (
-				!['typescript', 'vitest-full', 'jest-full', 'playwright-full'].includes(lane.execution.kind)
+				![
+					'typescript',
+					'vitest-full',
+					'jest-full',
+					'playwright-full',
+					'node-full',
+				].includes(lane.execution.kind)
 			)
 				fail(`lane ${lane.id} execution kind is unsupported`);
 			if (lane.execution.kind === 'typescript') {
@@ -355,7 +363,10 @@ export function validateManifest(manifest) {
 				)
 					fail(`lane ${lane.id} full-suite execution only accepts an inventory`);
 				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
-			} else {
+			} else if (
+				lane.execution.kind === 'jest-full' ||
+				lane.execution.kind === 'playwright-full'
+			) {
 				if (
 					lane.execution.compiler !== undefined ||
 					lane.execution.compilerBins !== undefined ||
@@ -366,6 +377,18 @@ export function validateManifest(manifest) {
 					);
 				exactPath(lane.execution.config, `lane ${lane.id} execution config`);
 				exactPath(lane.execution.root, `lane ${lane.id} execution root`);
+				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
+			} else {
+				if (
+					lane.execution.compiler !== undefined ||
+					lane.execution.compilerBins !== undefined ||
+					lane.execution.project !== undefined ||
+					lane.execution.config !== undefined
+				)
+					fail(`lane ${lane.id} Node execution must not declare a compiler, project, or config`);
+				exactPath(lane.execution.root, `lane ${lane.id} execution root`);
+				exactPath(lane.execution.file, `lane ${lane.id} execution file`);
+				exactPath(lane.execution.loader, `lane ${lane.id} execution loader`);
 				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
 			}
 		}
@@ -387,7 +410,7 @@ export function validateManifest(manifest) {
 			fail(`lane ${lane.id} non-type lane must not declare evidenceOrigin`);
 		}
 		if (
-			['jest-full', 'playwright-full'].includes(lane.execution?.kind) &&
+			['jest-full', 'playwright-full', 'node-full'].includes(lane.execution?.kind) &&
 			lane.type !== 'pristine-upstream'
 		)
 			fail(
@@ -590,7 +613,7 @@ export async function verifyManifestFiles(manifest, root) {
 		} else if (
 			lane.oracle === 'required' &&
 			lane.available !== false &&
-			['jest-full', 'playwright-full'].includes(lane.execution?.kind)
+			['jest-full', 'playwright-full', 'node-full'].includes(lane.execution?.kind)
 		) {
 			const inventory = JSON.parse(
 				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
@@ -892,7 +915,7 @@ export async function verifyManifestTestSelections(manifest, root) {
 	for (const lane of manifest.lanes.filter(
 		(candidate) =>
 			candidate.available !== false &&
-			!['typescript', 'jest-full', 'playwright-full'].includes(candidate.execution?.kind),
+			!['typescript', 'jest-full', 'playwright-full', 'node-full'].includes(candidate.execution?.kind),
 	)) {
 		let collectedTests = testsByProject.get(lane.project);
 		if (!collectedTests) {
@@ -977,6 +1000,20 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 			lane.execution.root,
 		];
 	}
+	if (lane.execution?.kind === 'node-full') {
+		return [
+			process.execPath,
+			'scripts/react-parity/node-full-runner.mjs',
+			'--root',
+			lane.execution.root,
+			'--file',
+			lane.execution.file,
+			'--loader',
+			lane.execution.loader,
+			'--inventory',
+			lane.execution.inventory,
+		];
+	}
 	if (lane.execution?.kind === 'playwright-full') {
 		return [
 			process.execPath,
@@ -1055,6 +1092,18 @@ export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 		if (result.snapshots !== inventory.snapshots)
 			throw new Error(
 				`lane ${lane.id} executed ${result.snapshots ?? 0} of ${inventory.snapshots} inventoried snapshots`,
+			);
+		return true;
+	}
+	if (lane.execution?.kind === 'node-full') {
+		const inventory = JSON.parse(readFileSync(resolve(root, lane.execution.inventory), 'utf8'));
+		if (result?.schemaVersion !== 1 || !Array.isArray(result.tests))
+			throw new Error(`lane ${lane.id} returned an invalid Node full-suite result`);
+		const executed = result.tests.sort(compareTestIdentities);
+		const expected = inventory.tests.sort(compareTestIdentities);
+		if (JSON.stringify(executed) !== JSON.stringify(expected))
+			throw new Error(
+				`lane ${lane.id} did not execute every inventoried Node identity exactly once:\n  ${describeTestIdentityMismatch(expected, executed)}`,
 			);
 		return true;
 	}
