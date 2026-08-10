@@ -1783,6 +1783,9 @@ importers:
 
   benchmarks/lynx-render:
     dependencies:
+      '@lynx-js/react':
+        specifier: 0.123.0
+        version: 0.123.0(@lynx-js/types@4.1.0)(@types/react@18.3.31)
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
@@ -10634,11 +10637,23 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  '@lynx-js/internal-preact@10.29.1-20260519060144-e6da44c':
+    resolution: {integrity: sha512-h2pRrt5oLK9LT1NkjyprtzJij/AdZGvv3CN6B5edL4chixqvITbxoCSdYy667Hl6+uKOBuxmCNZoDddgRfcLnw==}
+
   '@lynx-js/qrcode-rsbuild-plugin@0.6.0':
     resolution: {integrity: sha512-AjRhjQH5xEJKo5VUIIsjdk6zc6qXMf4QsGvKTDuwBjuGr01sDkLLpAt+wbu9GCJvDlGA7ygNTEsxaPJPYHPmIw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@lynx-js/rspeedy': ^0.16.0
+
+  '@lynx-js/react@0.123.0':
+    resolution: {integrity: sha512-w/yX20jmGMdpfuNb2w7eyXN3JktSka43QdJwICvteNBZJPkZUzauvUvQ2EOqT09RHPHzMkcnk0AlpHOh7g+VoQ==}
+    peerDependencies:
+      '@lynx-js/types': '*'
+      '@types/react': ^18
+    peerDependenciesMeta:
+      '@lynx-js/types':
+        optional: true
 
   '@lynx-js/rspeedy@0.16.0':
     resolution: {integrity: sha512-j9a25T3we1rtkCQtpKwjVD5Gn7E6YlILWu6xTyR0cHoG01Rmln1i2BK9SoTjtt9SKnUVB7i+eHOVRimXMpVwuw==}
@@ -15339,6 +15354,9 @@ packages:
   '@types/prismjs@1.26.6':
     resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
 
+  '@types/prop-types@15.7.15':
+    resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
   '@types/qrcode@1.5.6':
     resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
 
@@ -15369,6 +15387,9 @@ packages:
 
   '@types/react-window@1.8.8':
     resolution: {integrity: sha512-8Ls660bHR1AUA2kuRvVG9D/4XpRC6wjAaPT9dil7Ckc76eP9TKWZwwmgfq8Q1LANX3QNDnoU4Zp48A3w+zK69Q==}
+
+  '@types/react@18.3.31':
+    resolution: {integrity: sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==}
 
   '@types/react@19.2.17':
     resolution: {integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==}
@@ -29705,9 +29726,18 @@ snapshots:
 
   '@lynx-js/debug-metadata@0.1.0': {}
 
+  '@lynx-js/internal-preact@10.29.1-20260519060144-e6da44c': {}
+
   '@lynx-js/qrcode-rsbuild-plugin@0.6.0(@lynx-js/rspeedy@0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(bufferutil@4.1.0)(clean-css@5.3.3)(core-js@3.49.0)(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))':
     dependencies:
       '@lynx-js/rspeedy': 0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(bufferutil@4.1.0)(clean-css@5.3.3)(core-js@3.49.0)(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+
+  '@lynx-js/react@0.123.0(@lynx-js/types@4.1.0)(@types/react@18.3.31)':
+    dependencies:
+      '@types/react': 18.3.31
+      preact: '@lynx-js/internal-preact@10.29.1-20260519060144-e6da44c'
+    optionalDependencies:
+      '@lynx-js/types': 4.1.0
 
   '@lynx-js/rspeedy@0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(bufferutil@4.1.0)(clean-css@5.3.3)(core-js@3.49.0)(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
@@ -36061,6 +36091,8 @@ snapshots:
 
   '@types/prismjs@1.26.6': {}
 
+  '@types/prop-types@15.7.15': {}
+
   '@types/qrcode@1.5.6':
     dependencies:
       '@types/node': 25.9.5
@@ -36101,6 +36133,11 @@ snapshots:
   '@types/react-window@1.8.8':
     dependencies:
       '@types/react': 19.2.17
+
+  '@types/react@18.3.31':
+    dependencies:
+      '@types/prop-types': 15.7.15
+      csstype: 3.2.3
 
   '@types/react@19.2.17':
     dependencies:

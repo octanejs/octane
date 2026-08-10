@@ -38,6 +38,9 @@ import { LYNX_NODES_REF_ATTRIBUTE } from '../src/core/nodes-ref.js';
 import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
+	LYNX_CAPABILITY_READY_REQUEST_BASE,
+	LYNX_COMPACT_ACKNOWLEDGEMENT,
+	LYNX_LAZY_PUBLIC_INSTANCES,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
 	LYNX_READY_ANNOUNCEMENT_REQUEST,
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
@@ -1264,6 +1267,105 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		);
 		expect(main.activeIdentity()).toBeNull();
 		expect(main.diagnostics()).toEqual([]);
+	});
+
+	it('rejects unnegotiated intrinsic runs and lazy instances while preserving older peers', () => {
+		const { dom, main } = installEnvironment();
+		const context = backgroundContext();
+		const inbound: LynxBackgroundInboundMessage[] = [];
+		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+			inbound.push(event.data as LynxBackgroundInboundMessage);
+		});
+		const page = dom.window.document.querySelector('page')!;
+		const program = Object.freeze({
+			nodes: Object.freeze([
+				Object.freeze({
+					type: 'view',
+					parent: -1,
+					props: Object.freeze({}),
+					bindings: Object.freeze([Object.freeze({ name: 'id', valueIndex: 0 })]),
+				}),
+			]),
+			events: Object.freeze([]),
+		});
+		const range = Object.freeze({
+			op: 'mount-template-range' as const,
+			parent: null,
+			before: null,
+			program,
+			firstId: 1,
+			values: Object.freeze(['older-peer-host']),
+			firstListenerId: null,
+		});
+		const run = Object.freeze({
+			op: 'mount-template-run' as const,
+			parent: null,
+			before: null,
+			program,
+			firstId: 1,
+			firstListenerId: null,
+			count: 16,
+			values: Object.freeze(Array.from({ length: 16 }, (_, index) => `forged-${index}`)),
+		});
+		const send = (command: typeof range | typeof run, lazy = false): void => {
+			context.dispatchEvent({
+				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+				data: {
+					...identity(509, 1),
+					type: 'commit',
+					ack: LYNX_COMPACT_ACKNOWLEDGEMENT,
+					...(lazy ? { instances: LYNX_LAZY_PUBLIC_INSTANCES } : null),
+					batch: { renderer: 'lynx', version: 1, commands: [command] },
+				},
+			});
+		};
+
+		send(run);
+		expect(inbound.at(-1)).toMatchObject({
+			type: 'reject',
+			error: { message: expect.stringMatching(/unnegotiated intrinsic template run/) },
+		});
+		send(run, true);
+		expect(inbound.at(-1)).toMatchObject({
+			type: 'reject',
+			error: { message: expect.stringMatching(/unnegotiated lazy public instances/) },
+		});
+		expect(page.innerHTML).toBe('');
+		expect(main.activeIdentity()).toBeNull();
+
+		context.dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'main-ready-request',
+				request: LYNX_CAPABILITY_READY_REQUEST_BASE + 19,
+			},
+		});
+		const olderPeerReply = inbound.at(-1);
+		expect(olderPeerReply).toMatchObject({
+			type: 'main-ready',
+			capabilities: { compactAck: 1, templateProgram: 1 },
+		});
+		expect(olderPeerReply).not.toMatchObject({ capabilities: { lazyPublicInstances: 1 } });
+		expect(olderPeerReply).not.toMatchObject({ capabilities: { templateRuns: 1 } });
+
+		send(range, true);
+		expect(inbound.at(-1)).toMatchObject({
+			type: 'reject',
+			error: { message: expect.stringMatching(/unnegotiated lazy public instances/) },
+		});
+		send(run);
+		expect(inbound.at(-1)).toMatchObject({
+			type: 'reject',
+			error: { message: expect.stringMatching(/unnegotiated intrinsic template run/) },
+		});
+		expect(page.innerHTML).toBe('');
+
+		send(range);
+		const host = page.querySelector('#older-peer-host');
+		expect(host?.hasAttribute(LYNX_NODES_REF_ATTRIBUTE)).toBe(true);
+		expect(main.activeIdentity()).toMatchObject({ root: 509, version: 1 });
 	});
 
 	it('rejects a fully staged invalid batch without changing the accepted public tree', () => {

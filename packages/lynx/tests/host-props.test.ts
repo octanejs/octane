@@ -39,6 +39,57 @@ describe('Lynx host prop normalization', () => {
 		expect(planLynxHostPropPatch('view', { class: 'a' }, {}).classes?.value).toBe('');
 	});
 
+	it('preserves every public channel for empty and string-only view/text host creation', () => {
+		for (const type of ['view', 'text']) {
+			for (const next of [{}, { class: '' }, { className: '' }]) {
+				const patch = planLynxHostPropPatch(type, {}, next);
+				expect(patch).toEqual({
+					attributes: [],
+					mainThreadEvents: [],
+					requiresRecreate: false,
+				});
+				expect(Object.isFrozen(patch)).toBe(true);
+				expect(Object.isFrozen(patch.attributes)).toBe(true);
+				expect(Object.isFrozen(patch.mainThreadEvents)).toBe(true);
+			}
+			for (const next of [{ class: 'row active' }, { className: 'row active' }]) {
+				const patch = planLynxHostPropPatch(type, {}, next);
+				expect(patch).toEqual({
+					attributes: [],
+					mainThreadEvents: [],
+					requiresRecreate: false,
+					classes: { value: 'row active' },
+				});
+				expect(Object.isFrozen(patch.classes)).toBe(true);
+			}
+		}
+	});
+
+	it('preserves inherited channels, cross-realm bags, and distinct class names', () => {
+		const inherited = Object.create({ id: 'inherited', style: { width: '12px' } }) as {
+			class: string;
+		};
+		inherited.class = 'inherited-card';
+		const inheritedPatch = planLynxHostPropPatch('view', {}, inherited);
+		expect(inheritedPatch.id?.value).toBe('inherited');
+		expect(inheritedPatch.inlineStyles?.value).toBe('width:12px');
+		expect(inheritedPatch.classes?.value).toBe('inherited-card');
+
+		const foreign = vm.runInNewContext(`({ className: 'foreign-card' })`) as {
+			readonly className: string;
+		};
+		expect(planLynxHostPropPatch('text', {}, foreign).classes?.value).toBe('foreign-card');
+
+		for (let index = 0; index < 160; index++) {
+			expect(planLynxHostPropPatch('view', {}, { class: `unique-${index}` }).classes?.value).toBe(
+				`unique-${index}`,
+			);
+		}
+		expect(planLynxHostPropPatch('view', {}, { class: 'row active' }).classes?.value).toBe(
+			'row active',
+		);
+	});
+
 	it('accepts a style and CSS-scope object authored in another realm', () => {
 		// Host props reach the main thread from the background — a distinct realm in
 		// production (an iframe on Lynx for Web) — so a `style`/CSS-scope object is
@@ -150,6 +201,32 @@ describe('Lynx CSS scope and asset transport', () => {
 		const removed = planLynxHostPropPatch('view', { [LYNX_CSS_SCOPE_PROP]: metadata }, {});
 		expect(removed.cssScope).toBe(undefined);
 		expect(removed.requiresRecreate).toBe(true);
+	});
+
+	it('preserves raw text values and cross-realm CSS scopes across updates and removals', () => {
+		const scope = vm.runInNewContext(`({ cssId: 19, entryName: 'text-card' })`) as {
+			readonly cssId: number;
+			readonly entryName: string;
+		};
+		const first = { value: 'first', [LYNX_CSS_SCOPE_PROP]: scope };
+		const second = { value: 'second', [LYNX_CSS_SCOPE_PROP]: scope };
+		const created = planLynxHostPropPatch('#text', {}, first);
+
+		expect(attributes(created)).toEqual({ value: 'first' });
+		expect(created.cssScope?.value).toEqual({ cssId: 19, entryName: 'text-card' });
+		expect(created.mainThreadEvents).toEqual([]);
+		expect(created.requiresRecreate).toBe(false);
+
+		const updated = planLynxHostPropPatch('#text', first, second);
+		expect(attributes(updated)).toEqual({ value: 'second' });
+		expect(updated.cssScope).toBeUndefined();
+
+		const removedScope = planLynxHostPropPatch('#text', second, { value: 'second' });
+		expect(attributes(removedScope)).toEqual({});
+		expect(removedScope.requiresRecreate).toBe(true);
+
+		const removedValue = planLynxHostPropPatch('#text', { value: 'second' }, {});
+		expect(attributes(removedValue)).toEqual({ value: null });
 	});
 
 	it('preserves Rspeedy-emitted URLs and data URIs without inventing resource handles', () => {
@@ -323,6 +400,20 @@ describe('Lynx host prop routing', () => {
 	});
 
 	it('rejects main/background channel collisions and non-clone-safe worklet values', () => {
+		expect(() =>
+			planLynxHostPropPatch(
+				'#text',
+				{ value: 'previous' },
+				{ value: 'next', 'main-thread:bindtap': { _wkltId: 'tap' } },
+			),
+		).toThrow(/raw-text hosts cannot own direct main-thread prop/);
+		expect(() =>
+			planLynxHostPropPatch(
+				'#text',
+				{ value: 'previous' },
+				{ value: 'next', 'main-thread:ref': { _wvid: 'label' } },
+			),
+		).toThrow(/raw-text hosts cannot own direct main-thread prop/);
 		expect(() =>
 			planLynxHostPropPatch(
 				'raw-text',

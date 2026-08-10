@@ -58,6 +58,98 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('preserves event installation and removal among eventless sibling hosts', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const log: string[] = [];
+		const mixedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'frame',
+			children: [
+				{ kind: 'host', type: 'before', propsSlot: 0 },
+				{
+					kind: 'host',
+					type: 'quiet',
+					children: [{ kind: 'host', type: 'quiet-child' }],
+				},
+				{ kind: 'host', type: 'after', propsSlot: 1 },
+			],
+		});
+		const Scene = defineUniversalComponent('object', ({ enabled }: { enabled: boolean }) =>
+			universalValue(mixedPlan, [
+				universalProps(enabled ? [['set', 'onPress', () => log.push('before')]] : []),
+				universalProps([['set', 'onPress', () => log.push('after')]]),
+			]),
+		);
+
+		root.render(Scene, { enabled: true });
+		const frame = container.children[0];
+		const before = frame.children[0];
+		const quiet = frame.children[1];
+		const quietChild = quiet.children[0];
+		const after = frame.children[2];
+		container.dispatchEvent(before, 'press', undefined);
+		container.dispatchEvent(after, 'press', undefined);
+		expect(log).toEqual(['before', 'after']);
+
+		root.render(Scene, { enabled: false });
+		expect(frame.children).toEqual([before, quiet, after]);
+		expect(quiet.children[0]).toBe(quietChild);
+		expect(() => container.dispatchEvent(before, 'press', undefined)).toThrow(
+			'has no "press" listener',
+		);
+		container.dispatchEvent(after, 'press', undefined);
+		expect(log).toEqual(['before', 'after', 'after']);
+
+		root.render(Scene, { enabled: true });
+		container.dispatchEvent(before, 'press', undefined);
+		container.dispatchEvent(after, 'press', undefined);
+		expect(log).toEqual(['before', 'after', 'after', 'before', 'after']);
+		root.unmount();
+	});
+
+	it('rejects duplicate keys inside a fresh host subtree without publishing partial state', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const parentPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'parent',
+			children: [
+				{ kind: 'slot', slot: 0 },
+				{ kind: 'slot', slot: 1 },
+			],
+		});
+		const childPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'child',
+			bindings: [
+				['key', 0],
+				['label', 1],
+			],
+		});
+		const Scene = defineUniversalComponent(
+			'object',
+			({ first, second }: { first: string; second: string }) =>
+				universalValue(parentPlan, [
+					universalValue(childPlan, [first, 'first']),
+					universalValue(childPlan, [second, 'second']),
+				]),
+		);
+
+		expect(() => root.render(Scene, { first: 'same', second: 'same' })).toThrow(
+			'Duplicate universal child key same',
+		);
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+
+		root.render(Scene, { first: 'first', second: 'second' });
+		expect(container.children[0].children.map((child) => child.props.label)).toEqual([
+			'first',
+			'second',
+		]);
+		root.unmount();
+	});
+
 	it('pins one accepted listener table across nested delivery and flushes discrete work once', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());
@@ -575,6 +667,52 @@ describe('universal event scopes', () => {
 		flushUniversalSync(() => container.dispatchEvent(presser, 'press', {}));
 		expect(frame.children.map((child) => child.type)).toEqual(['presser', 'footer']);
 		expect(frame.children[1]).toBe(footer);
+		root.unmount();
+	});
+
+	it('mounts an initially empty scope before its retained trailing host sibling', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const framePlan = universalPlan('object', {
+			kind: 'host',
+			type: 'frame',
+			children: [
+				{ kind: 'slot', slot: 0 },
+				{ kind: 'host', type: 'footer', bindings: [['value', 1]] },
+			],
+		});
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['value', 0]],
+		});
+		let setVisible!: (visible: boolean) => void;
+		const Rows = defineUniversalComponent('object', () => {
+			const [visible, updateVisible] = useState(false, 'visible');
+			setVisible = updateVisible;
+			return visible
+				? [universalValue(rowPlan, ['first']), universalValue(rowPlan, ['second'])]
+				: null;
+		});
+		const Shell = defineUniversalComponent('object', () =>
+			universalValue(framePlan, [universalComponent('object', Rows), 'foot']),
+		);
+
+		root.render(Shell, undefined);
+		const frame = container.children[0];
+		const footer = frame.children[0];
+		expect(frame.children).toEqual([footer]);
+
+		flushUniversalSync(() => setVisible(true));
+		expect(frame.children.map((child) => child.props.value)).toEqual(['first', 'second', 'foot']);
+		expect(frame.children[2]).toBe(footer);
+
+		flushUniversalSync(() => setVisible(false));
+		expect(frame.children).toEqual([footer]);
+
+		flushUniversalSync(() => setVisible(true));
+		expect(frame.children.map((child) => child.props.value)).toEqual(['first', 'second', 'foot']);
+		expect(frame.children[2]).toBe(footer);
 		root.unmount();
 	});
 

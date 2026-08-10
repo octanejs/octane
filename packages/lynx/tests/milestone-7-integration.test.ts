@@ -419,6 +419,64 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		}
 	});
 
+	it('retires replaced and removed background callbacks without invalidating their live replacement', async () => {
+		const environment = installEnvironment();
+		backgroundRoot = rootApi.createLynxRoot();
+		await backgroundRoot.render(environment.background.Scene, { prefix: 'first' });
+		await backgroundRoot.flushTransport();
+
+		const capturedBackground = (listener: WorkletListener): LynxBackgroundFunctionDescriptor => {
+			const captures = listener.value._c as LynxWorkletRecord & {
+				readonly values: readonly unknown[];
+			};
+			const descriptor = captures.values.find(
+				(value): value is LynxBackgroundFunctionDescriptor =>
+					value !== null && typeof value === 'object' && '_jsFnId' in value,
+			);
+			expect(descriptor).toBeDefined();
+			return descriptor!;
+		};
+		const firstListener = environment.workletListeners.at(-1);
+		expect(firstListener).toBeDefined();
+		const firstDescriptor = capturedBackground(firstListener!);
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		const firstCall = firstScreenApi.runOnBackground<[string], { thread: string; value: string }>(
+			firstDescriptor,
+		);
+		await expect(firstCall('before replacement')).resolves.toEqual({
+			thread: 'background-event',
+			value: 'before replacement',
+		});
+
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		await backgroundRoot.render(environment.background.Scene, { prefix: 'second' });
+		await backgroundRoot.flushTransport();
+		const replacementListener = environment.workletListeners.at(-1);
+		expect(replacementListener).toBeDefined();
+		const replacementDescriptor = capturedBackground(replacementListener!);
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		await expect(firstCall('stale replacement')).rejects.toThrow(/stale or foreign/);
+		const replacementCall = firstScreenApi.runOnBackground<
+			[string],
+			{ thread: string; value: string }
+		>(replacementDescriptor);
+		await expect(replacementCall('after replacement')).resolves.toEqual({
+			thread: 'background-event',
+			value: 'after replacement',
+		});
+
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		const Empty = backgroundRenderer.defineUniversalComponent('lynx', () => null);
+		await backgroundRoot.render(Empty, {});
+		await backgroundRoot.flushTransport();
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		await expect(replacementCall('stale removal')).rejects.toThrow(/stale or foreign/);
+		expect(environment.backgroundEventRuns).toEqual(['before replacement', 'after replacement']);
+	});
+
 	it('persists state-only refs across repeated main calls and releases them with their owner', async () => {
 		const environment = installEnvironment();
 		backgroundRoot = rootApi.createLynxRoot();

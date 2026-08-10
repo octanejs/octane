@@ -30,31 +30,64 @@ const EVENT_PAPI_TYPES: Readonly<Record<LynxNativeEventPrefix, LynxNativeEventPA
 		'global-bind': 'global-bindEvent',
 	});
 
+const MAX_CACHED_EVENT_BINDINGS = 256;
+const MAX_CACHED_EVENT_NAME_LENGTH = 128;
+const NATIVE_EVENT_BINDINGS = new Map<string, LynxNativeEventBinding | null>();
+const MAIN_THREAD_EVENT_BINDINGS = new Map<string, LynxMainThreadEventBinding | null>();
+
+function cacheEventBinding<Binding>(
+	cache: Map<string, Binding | null>,
+	name: string,
+	binding: Binding | null,
+): Binding | null {
+	if (name.length > MAX_CACHED_EVENT_NAME_LENGTH) return binding;
+	if (cache.size === MAX_CACHED_EVENT_BINDINGS) {
+		const oldest = cache.keys().next().value;
+		if (oldest !== undefined) cache.delete(oldest);
+	}
+	cache.set(name, binding);
+	return binding;
+}
+
 /** Parse one background-thread Lynx event prop into its public Element PAPI tuple. */
 export function parseLynxNativeEventProp(name: string): LynxNativeEventBinding | null {
 	if (typeof name !== 'string') return null;
+	const first = name.charCodeAt(0);
+	if (first !== 98 && first !== 99 && first !== 103) return null;
+	const cached = NATIVE_EVENT_BINDINGS.get(name);
+	if (cached !== undefined) return cached;
 	const match = EVENT_PROP.exec(name);
-	if (match === null) return null;
+	if (match === null) return cacheEventBinding(NATIVE_EVENT_BINDINGS, name, null);
 	const prefix = match[1] as LynxNativeEventPrefix;
-	return Object.freeze({
-		prefix,
-		type: EVENT_PAPI_TYPES[prefix],
-		name: match[2]!,
-	});
+	return cacheEventBinding(
+		NATIVE_EVENT_BINDINGS,
+		name,
+		Object.freeze({
+			prefix,
+			type: EVENT_PAPI_TYPES[prefix],
+			name: match[2]!,
+		}),
+	);
 }
 
 /** Parse one direct main-thread worklet event prop into its Element PAPI tuple. */
 export function parseLynxMainThreadEventProp(name: string): LynxMainThreadEventBinding | null {
-	if (typeof name !== 'string') return null;
+	if (typeof name !== 'string' || !name.startsWith('main-thread:')) return null;
+	const cached = MAIN_THREAD_EVENT_BINDINGS.get(name);
+	if (cached !== undefined) return cached;
 	const match = MAIN_THREAD_EVENT_PROP.exec(name);
-	if (match === null) return null;
+	if (match === null) return cacheEventBinding(MAIN_THREAD_EVENT_BINDINGS, name, null);
 	const prefix = match[1] as LynxNativeEventPrefix;
-	return Object.freeze({
-		prop: name,
-		prefix,
-		type: EVENT_PAPI_TYPES[prefix],
-		name: match[2]!,
-	});
+	return cacheEventBinding(
+		MAIN_THREAD_EVENT_BINDINGS,
+		name,
+		Object.freeze({
+			prop: name,
+			prefix,
+			type: EVENT_PAPI_TYPES[prefix],
+			name: match[2]!,
+		}),
+	);
 }
 
 declare const LYNX_NATIVE_EVENT_TOKEN: unique symbol;
@@ -115,9 +148,15 @@ function validateTokenIdentity(value: unknown): asserts value is LynxNativeEvent
 	) {
 		throw tokenError('identity must contain only root, id, generation, listener, and priority.');
 	}
-	for (const key of TOKEN_NUMERIC_KEYS) assertPositiveSafeInteger(record[key], `identity.${key}`);
-	if (!isLynxEventPriority(record.priority)) {
-		throw tokenError('identity.priority must be discrete, continuous, or default.');
+	for (const key of TOKEN_IDENTITY_KEYS) {
+		const descriptor = Object.getOwnPropertyDescriptor(record, key);
+		if (descriptor === undefined || !('value' in descriptor)) {
+			throw tokenError(`identity.${key} must be an own data property.`);
+		}
+		if (key !== 'priority') assertPositiveSafeInteger(descriptor.value, `identity.${key}`);
+		else if (!isLynxEventPriority(descriptor.value)) {
+			throw tokenError('identity.priority must be discrete, continuous, or default.');
+		}
 	}
 }
 
@@ -130,7 +169,28 @@ export function encodeLynxNativeEventToken(
 	identity: LynxNativeEventTokenIdentity,
 ): LynxNativeEventToken {
 	validateTokenIdentity(identity);
-	return `${TOKEN_PREFIX}${identity.root}:${identity.id}:${identity.generation}:${identity.listener}:${identity.priority}` as LynxNativeEventToken;
+	return encodePrevalidatedLynxNativeEventToken(
+		identity.root,
+		identity.id,
+		identity.generation,
+		identity.listener,
+		identity.priority,
+	);
+}
+
+/**
+ * Internal host fast path: every primitive was already checked while preparing
+ * a frozen template program and its contiguous host/listener identity ranges.
+ * Untrusted callers must continue to use the validating public encoder above.
+ */
+export function encodePrevalidatedLynxNativeEventToken(
+	root: number,
+	id: number,
+	generation: number,
+	listener: number,
+	priority: UniversalEventPriority,
+): LynxNativeEventToken {
+	return `${TOKEN_PREFIX}${root}:${id}:${generation}:${listener}:${priority}` as LynxNativeEventToken;
 }
 
 /** Decode and validate a native listener token without accepting non-canonical aliases. */

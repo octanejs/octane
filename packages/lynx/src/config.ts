@@ -222,7 +222,7 @@ export const lynxBackgroundRenderer = {
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['class-name-alias', 'visibility', 'thread-functions'],
+	capabilities: ['class-name-alias', 'visibility', 'thread-functions', 'template-program-mount'],
 	validation: LYNX_BACKGROUND_VALIDATION,
 } as const;
 

@@ -32,6 +32,20 @@ export const LYNX_MAIN_TO_BACKGROUND_EVENT = 'octane-lynx:main-to-background';
 /** Unsolicited readiness announcement used when main installs after background. */
 export const LYNX_READY_ANNOUNCEMENT_REQUEST = 0;
 
+/**
+ * Legacy peers accept and echo every positive safe request ID. Reserving its
+ * high range probes optional capabilities without adding a field an older
+ * exact-shape readiness validator would reject.
+ */
+export const LYNX_CAPABILITY_READY_REQUEST_BASE = 2 ** 40;
+/** A higher probe keeps strict older background validators free of newer capability fields. */
+export const LYNX_LAZY_PUBLIC_INSTANCE_READY_REQUEST_BASE = 2 ** 41;
+/** Distinct from the lazy-instance probe so older strict lazy peers never see a new key. */
+export const LYNX_TEMPLATE_RUN_READY_REQUEST_BASE = 2 ** 42;
+export const LYNX_COMPACT_ACKNOWLEDGEMENT = 'compact-v1';
+export const LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS = 16;
+export const LYNX_LAZY_PUBLIC_INSTANCES = 'lazy-v1';
+
 export interface LynxContextProxyEvent<T = unknown> {
 	readonly type: string;
 	readonly data: T;
@@ -56,6 +70,27 @@ export interface LynxMainReadyReply {
 	readonly type: 'main-ready';
 	readonly request: number;
 	readonly firstTree?: LynxFirstTreeSnapshot;
+	/** Published only in response to a capability-tagged readiness request. */
+	readonly capabilities?: LynxMainThreadCapabilities;
+}
+
+export interface LynxMainThreadCapabilities {
+	readonly compactAck: 1;
+	/** Advertised only after the main host can consume template-mount batches. */
+	readonly templateMount?: 1;
+	/** Shared intrinsic programs with implicit contiguous host/listener ranges. */
+	readonly templateProgram?: 1;
+	/** Private native selectors are installed only before a public instance is exposed. */
+	readonly lazyPublicInstances?: 1;
+	/** One intrinsic command can mount a contiguous run of sibling program instances. */
+	readonly templateRuns?: 1;
+}
+
+export interface LynxTransportCommitMessage extends UniversalTransportCommitMessage {
+	/** Present only after this background and main explicitly negotiated it. */
+	readonly ack?: typeof LYNX_COMPACT_ACKNOWLEDGEMENT;
+	/** Present only on an explicitly negotiated, compact initial intrinsic mount. */
+	readonly instances?: typeof LYNX_LAZY_PUBLIC_INSTANCES;
 }
 
 /** Root-independent native page lifetime teardown broadcast to the background runtime. */
@@ -115,9 +150,130 @@ export interface LynxPublicHandleRemoval {
 export type LynxPublicHandleDelta =
 	LynxPublicHandleUpsert | LynxPublicHandleListAncestry | LynxPublicHandleRemoval;
 
-export interface LynxTransportAcknowledgement extends UniversalTransportAcknowledgement {
+export interface LynxLegacyTransportAcknowledgement extends UniversalTransportAcknowledgement {
 	readonly handles: readonly LynxPublicHandleDelta[];
 	readonly adoption?: 'adopted' | 'repaired';
+	readonly encoding?: never;
+	readonly count?: never;
+}
+
+export interface LynxCompactTransportAcknowledgement extends UniversalTransportAcknowledgement {
+	readonly encoding: typeof LYNX_COMPACT_ACKNOWLEDGEMENT;
+	readonly count: number;
+	readonly handles?: never;
+	readonly adoption?: never;
+}
+
+export type LynxTransportAcknowledgement =
+	LynxLegacyTransportAcknowledgement | LynxCompactTransportAcknowledgement;
+
+const COMPACT_STATIC_PROPS = new WeakMap<object, boolean>();
+const COMPACT_TEMPLATE_PROGRAMS = new WeakMap<object, boolean>();
+
+function hasCompactCompatibleProps(props: Readonly<Record<string, unknown>>): boolean {
+	const cached = COMPACT_STATIC_PROPS.get(props);
+	if (cached !== undefined) return cached;
+	let compatible = true;
+	for (const name in props) {
+		if (name === 'ref' || name.startsWith('main-thread:')) {
+			compatible = false;
+			break;
+		}
+	}
+	if (Object.isFrozen(props)) COMPACT_STATIC_PROPS.set(props, compatible);
+	return compatible;
+}
+
+/**
+ * Count an already-validated batch's fully placed, ordinary fresh hosts.
+ * Host preparation separately proves every target, insertion, generation,
+ * parent, and cycle; equal create/placement counts then imply attachment for
+ * a list-free, portal-free initial root.
+ */
+export function countLynxCompactAcknowledgementHosts(batch: UniversalHostBatch): number | null {
+	let created = 0;
+	let inserted = 0;
+	for (let index = 0; index < batch.commands.length; index++) {
+		const command = batch.commands[index]!;
+		if (command.op === 'create') {
+			if (
+				command.type === 'list' ||
+				command.type === 'list-item' ||
+				!hasCompactCompatibleProps(command.props)
+			) {
+				return null;
+			}
+			created++;
+			continue;
+		}
+		if (command.op === 'mount-template') {
+			if (command.parent !== null && typeof command.parent !== 'number') return null;
+			for (let nodeIndex = 0; nodeIndex < command.nodes.length; nodeIndex++) {
+				const type = command.shape[nodeIndex]!.type;
+				if (
+					type === 'list' ||
+					type === 'list-item' ||
+					!hasCompactCompatibleProps(command.nodes[nodeIndex]!.props)
+				) {
+					return null;
+				}
+			}
+			created += command.nodes.length;
+			inserted += command.nodes.length;
+			continue;
+		}
+		if (command.op === 'mount-template-range' || command.op === 'mount-template-run') {
+			if (command.parent !== null && typeof command.parent !== 'number') return null;
+			let compatible = COMPACT_TEMPLATE_PROGRAMS.get(command.program);
+			if (compatible === undefined) {
+				compatible = true;
+				let immutable = Object.isFrozen(command.program) && Object.isFrozen(command.program.nodes);
+				for (let nodeIndex = 0; nodeIndex < command.program.nodes.length; nodeIndex++) {
+					const node = command.program.nodes[nodeIndex]!;
+					if (
+						node.type === 'list' ||
+						node.type === 'list-item' ||
+						!hasCompactCompatibleProps(node.props)
+					) {
+						compatible = false;
+						break;
+					}
+					if (immutable && (!Object.isFrozen(node) || !Object.isFrozen(node.props))) {
+						immutable = false;
+					}
+					if (immutable && node.bindings !== undefined && !Object.isFrozen(node.bindings)) {
+						immutable = false;
+					}
+					for (const binding of node.bindings ?? []) {
+						if (immutable && !Object.isFrozen(binding)) immutable = false;
+						if (binding.name === 'ref' || binding.name.startsWith('main-thread:')) {
+							compatible = false;
+							break;
+						}
+					}
+					if (!compatible) break;
+				}
+				if (immutable) COMPACT_TEMPLATE_PROGRAMS.set(command.program, compatible);
+			}
+			if (!compatible) return null;
+			const instances = command.op === 'mount-template-run' ? command.count : 1;
+			if (!Number.isSafeInteger(instances) || instances <= 0) return null;
+			const hostCount = command.program.nodes.length * instances;
+			if (!Number.isSafeInteger(hostCount) || !Number.isSafeInteger(created + hostCount)) {
+				return null;
+			}
+			created += hostCount;
+			inserted += hostCount;
+			continue;
+		}
+		if (command.op === 'insert') {
+			if (command.parent !== null && typeof command.parent !== 'number') return null;
+			inserted++;
+			continue;
+		}
+		if (command.op !== 'event') return null;
+	}
+	return created >= LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS && created === inserted ? created : null;
 }
 
 /** Background listener ownership is live; buffered first-screen events may replay. */
@@ -240,7 +396,7 @@ export type LynxBackgroundOutboundMessage =
 	| LynxCancelMainCallMessage
 	| LynxCallBackgroundResultMessage
 	| LynxCallBackgroundErrorMessage
-	| UniversalTransportCommitMessage
+	| LynxTransportCommitMessage
 	| UniversalTransportAbortMessage
 	| LynxDisposeMessage
 	| LynxTerminalDisposeMessage;
@@ -294,15 +450,18 @@ function record(
 	if (!hasCrossRealmPlainPrototype(value)) {
 		return fail(label, 'must be a plain object.', index, field);
 	}
-	if (hasOwnSymbolFields(value)) {
-		return fail(label, 'contains symbol fields.', index, field);
-	}
 	// Enumerability and accessor freedom are what make a later read of this
 	// message safe: an accessor could hand the validator one value and the host
-	// driver another. The descriptor walk is the only way to prove that, so it
-	// stays on the receive path.
-	for (const key of Object.getOwnPropertyNames(value)) {
-		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+	// driver another. One own-key walk covers both symbols and descriptors,
+	// avoiding separate symbol/name arrays for every dynamic template node.
+	for (const key of Reflect.ownKeys(value)) {
+		if (typeof key === 'symbol') {
+			return fail(label, 'contains symbol fields.', index, field);
+		}
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined) {
+			fail(composePath(label, index, field), 'changed during validation.', undefined, key);
+		}
 		if (!descriptor.enumerable) {
 			fail(composePath(label, index, field), 'must be enumerable.', undefined, key);
 		}
@@ -479,20 +638,72 @@ function assertEventListener(value: unknown, label: string): void {
 	}
 }
 
-function assertProps(value: unknown, label: string, index?: number, field?: string): void {
+function assertProps(
+	value: unknown,
+	label: string,
+	index?: number,
+	field?: string,
+	state?: LynxBatchValidationState,
+): void {
+	// Hoisted scalar plan props retain object identity across thousands of
+	// template instances. A frozen, fully validated leaf bag cannot acquire an
+	// accessor, symbol, prototype change, or different value, so validating it
+	// once per inbound batch preserves the same strict trust boundary.
+	if (
+		state?.validatedStaticProps !== undefined &&
+		value !== null &&
+		typeof value === 'object' &&
+		state.validatedStaticProps.has(value)
+	) {
+		return;
+	}
 	// `record` already rejected symbol fields, accessors, and non-enumerable own
 	// keys, so reading each value once here is safe. Leaves skip the walk without
 	// composing a path, which is the common shape of a host prop bag.
 	const props = record(value, label, index, field);
+	let scalar = true;
 	for (const name of Object.keys(props)) {
 		const prop = props[name];
 		if (isWireLeaf(prop)) continue;
+		scalar = false;
 		assertWireValue(prop, `${composePath(label, index, field)}.${name}`);
+	}
+	if (scalar && state !== undefined && Object.isFrozen(props)) {
+		(state.validatedStaticProps ??= new WeakSet<object>()).add(props);
 	}
 }
 
 const COMMANDS_LABEL = 'commit.batch.commands';
 const CREATE_KEYS = Object.freeze(['op', 'id', 'type', 'props']);
+const TEMPLATE_KEYS = Object.freeze(['op', 'parent', 'before', 'shape', 'nodes']);
+const TEMPLATE_RANGE_KEYS = Object.freeze([
+	'op',
+	'parent',
+	'before',
+	'program',
+	'firstId',
+	'values',
+	'firstListenerId',
+]);
+const TEMPLATE_RUN_KEYS = Object.freeze([
+	'op',
+	'parent',
+	'before',
+	'program',
+	'firstId',
+	'firstListenerId',
+	'count',
+	'values',
+]);
+const TEMPLATE_PROGRAM_KEYS = Object.freeze(['nodes', 'events']);
+const TEMPLATE_PROGRAM_NODE_KEYS = Object.freeze(['type', 'parent', 'props']);
+const TEMPLATE_PROGRAM_BOUND_NODE_KEYS = Object.freeze(['type', 'parent', 'props', 'bindings']);
+const TEMPLATE_PROGRAM_BINDING_KEYS = Object.freeze(['name', 'valueIndex']);
+const TEMPLATE_PROGRAM_EVENT_KEYS = Object.freeze(['node', 'type', 'priority']);
+const TEMPLATE_SHAPE_KEYS = Object.freeze(['type', 'parent']);
+const TEMPLATE_NODE_KEYS = Object.freeze(['id', 'props']);
+const TEMPLATE_NODE_EVENT_KEYS = Object.freeze(['id', 'props', 'events']);
+const TEMPLATE_EVENT_KEYS = Object.freeze(['type', 'listener']);
 const UPDATE_KEYS = Object.freeze(['op', 'id', 'props']);
 const PLACEMENT_KEYS = Object.freeze(['op', 'parent', 'id', 'before']);
 const EVENT_KEYS = Object.freeze(['op', 'id', 'type', 'listener']);
@@ -500,28 +711,569 @@ const VISIBILITY_KEYS = Object.freeze(['op', 'id', 'state']);
 const REMOVE_KEYS = Object.freeze(['op', 'parent', 'id']);
 const DESTROY_KEYS = Object.freeze(['op', 'id']);
 
-function assertCommand(value: unknown, index: number): asserts value is UniversalHostCommand {
+interface LynxBatchValidationState {
+	validatedTemplateShapes?: WeakSet<object>;
+	validatedStaticProps?: WeakSet<object>;
+	lastTemplateProgram?: object;
+	lastValidatedTemplateProgram?: LynxValidatedTemplateProgram;
+	validatedTemplatePrograms?: WeakMap<object, LynxValidatedTemplateProgram>;
+	templateNodeIds?: Set<number>;
+	templateRangeStarts?: number[];
+	templateRangeEnds?: number[];
+	listenerRangeStarts?: number[];
+	listenerRangeEnds?: number[];
+}
+
+interface LynxValidatedTemplateProgram {
+	readonly hosts: number;
+	readonly values: number;
+	readonly events: number;
+}
+
+/** Reuse canonical decimal keys across repeated, bounded scalar-array validations. */
+const MAX_CACHED_TEMPLATE_SCALAR_INDEX = 65_536;
+const TEMPLATE_SCALAR_INDEX_KEYS: string[] = [];
+
+function templateScalarIndexKey(index: number): string {
+	if (index >= MAX_CACHED_TEMPLATE_SCALAR_INDEX) return String(index);
+	while (TEMPLATE_SCALAR_INDEX_KEYS.length <= index) {
+		TEMPLATE_SCALAR_INDEX_KEYS.push(String(TEMPLATE_SCALAR_INDEX_KEYS.length));
+	}
+	return TEMPLATE_SCALAR_INDEX_KEYS[index]!;
+}
+
+/** Reject array accessors/prototype tricks before exposing any dynamic value. */
+function assertTemplateArray(value: unknown, label: string): readonly unknown[] {
+	if (!Array.isArray(value)) fail(label, 'must be an array.');
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype === null || !hasCrossRealmPlainPrototype(prototype)) {
+		fail(label, 'must have a plain cross-realm array prototype.');
+	}
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== value.length + 1) {
+		fail(label, 'must be dense and contain no additional or symbol fields.');
+	}
+	for (let index = 0; index < value.length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+		if (
+			descriptor === undefined ||
+			!descriptor.enumerable ||
+			!Object.prototype.hasOwnProperty.call(descriptor, 'value')
+		) {
+			fail(label, 'must contain only enumerable data values.', index);
+		}
+	}
+	return value;
+}
+
+/** Validate each dynamic array slot exactly once without ever evaluating its getter. */
+function assertTemplateScalarValues(value: unknown, expected: number, index: number): void {
+	if (!Array.isArray(value)) {
+		fail(COMMANDS_LABEL, 'must be an array.', index, 'values');
+	}
+	if (value.length !== expected) {
+		fail(COMMANDS_LABEL, 'must match the intrinsic program dynamic-value arity.', index, 'values');
+	}
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype === null || !hasCrossRealmPlainPrototype(prototype)) {
+		fail(COMMANDS_LABEL, 'must have a plain cross-realm array prototype.', index, 'values');
+	}
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== expected + 1 || keys[expected] !== 'length') {
+		fail(
+			COMMANDS_LABEL,
+			'must be dense and contain no additional or symbol fields.',
+			index,
+			'values',
+		);
+	}
+	for (let slot = 0; slot < expected; slot++) {
+		const key = keys[slot]!;
+		if (key !== templateScalarIndexKey(slot)) {
+			fail(
+				composePath(COMMANDS_LABEL, index, 'values'),
+				'must contain ordered canonical dense scalar keys.',
+				slot,
+			);
+		}
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (
+			descriptor === undefined ||
+			!descriptor.enumerable ||
+			!Object.prototype.hasOwnProperty.call(descriptor, 'value')
+		) {
+			fail(
+				composePath(COMMANDS_LABEL, index, 'values'),
+				'must contain only enumerable data values.',
+				slot,
+			);
+		}
+		if (!isWireLeaf(descriptor.value)) {
+			fail(composePath(COMMANDS_LABEL, index, 'values'), 'must contain only scalar values.', slot);
+		}
+		// Frozen own data slots force proxy reads to return the exact descriptor
+		// value. Mutable cross-realm arrays retain the older observable-read
+		// check so a proxy cannot validate one scalar and deliver another.
+		if (
+			(descriptor.configurable || descriptor.writable) &&
+			!Object.is(value[slot], descriptor.value)
+		) {
+			fail(composePath(COMMANDS_LABEL, index, 'values'), 'changed during validation.', slot);
+		}
+	}
+}
+
+function assertTemplateCommand(
+	command: Record<string, unknown>,
+	index: number,
+	state: LynxBatchValidationState,
+): void {
+	const label = `${COMMANDS_LABEL}[${index}]`;
+	exactKeys(command, TEMPLATE_KEYS, COMMANDS_LABEL, index);
+	hostParent(command.parent, COMMANDS_LABEL, index, 'parent');
+	nullableHostId(command.before, COMMANDS_LABEL, index, 'before');
+	if (!Array.isArray(command.shape) || command.shape.length === 0) {
+		fail(label, 'must be a non-empty array.', undefined, 'shape');
+	}
+	if (!Array.isArray(command.nodes) || command.nodes.length !== command.shape.length) {
+		fail(label, 'must match the template shape length.', undefined, 'nodes');
+	}
+	const validatedShapes = (state.validatedTemplateShapes ??= new WeakSet<object>());
+	if (!validatedShapes.has(command.shape)) {
+		let immutableShape = Object.isFrozen(command.shape);
+		for (let nodeIndex = 0; nodeIndex < command.shape.length; nodeIndex++) {
+			const nodeLabel = `${label}.shape[${nodeIndex}]`;
+			const shape = record(command.shape[nodeIndex], nodeLabel);
+			if (immutableShape && !Object.isFrozen(shape)) immutableShape = false;
+			exactKeys(shape, TEMPLATE_SHAPE_KEYS, nodeLabel);
+			nonEmptyString(shape.type, `${nodeLabel}.type`);
+			if (
+				!Number.isSafeInteger(shape.parent) ||
+				(nodeIndex === 0
+					? shape.parent !== -1
+					: (shape.parent as number) < 0 || (shape.parent as number) >= nodeIndex)
+			) {
+				fail(`${nodeLabel}.parent`, 'must name an earlier node, with -1 only for the root.');
+			}
+		}
+		if (immutableShape) validatedShapes.add(command.shape);
+	}
+	const seen = (state.templateNodeIds ??= new Set<number>());
+	const nodeBase = `${label}.nodes`;
+	for (let nodeIndex = 0; nodeIndex < command.nodes.length; nodeIndex++) {
+		const node = record(command.nodes[nodeIndex], nodeBase, nodeIndex);
+		const hasEvents = Object.prototype.hasOwnProperty.call(node, 'events');
+		exactKeys(node, hasEvents ? TEMPLATE_NODE_EVENT_KEYS : TEMPLATE_NODE_KEYS, nodeBase, nodeIndex);
+		positiveInteger(node.id, nodeBase, nodeIndex, 'id');
+		if (seen.has(node.id as number)) {
+			fail(nodeBase, 'must be unique across template mounts in one batch.', nodeIndex, 'id');
+		}
+		if (state.templateRangeStarts !== undefined) {
+			for (let range = 0; range < state.templateRangeStarts.length; range++) {
+				if (
+					(node.id as number) >= state.templateRangeStarts[range]! &&
+					(node.id as number) <= state.templateRangeEnds![range]!
+				) {
+					fail(nodeBase, 'overlaps an intrinsic host range.', nodeIndex, 'id');
+				}
+			}
+		}
+		seen.add(node.id as number);
+		assertProps(node.props, nodeBase, nodeIndex, 'props', state);
+		if (!hasEvents) continue;
+		const eventBase = `${nodeBase}[${nodeIndex}].events`;
+		if (!Array.isArray(node.events)) fail(eventBase, 'must be an array.');
+		for (let eventIndex = 0; eventIndex < (node.events as unknown[]).length; eventIndex++) {
+			const event = record((node.events as unknown[])[eventIndex], eventBase, eventIndex);
+			exactKeys(event, TEMPLATE_EVENT_KEYS, eventBase, eventIndex);
+			nonEmptyString(event.type, eventBase, eventIndex, 'type');
+			assertEventListener(event.listener, `${eventBase}[${eventIndex}].listener`);
+		}
+	}
+}
+
+function assertTemplateProgram(
+	value: unknown,
+	commandIndex: number,
+	state: LynxBatchValidationState,
+): LynxValidatedTemplateProgram {
+	if (value === state.lastTemplateProgram && state.lastValidatedTemplateProgram !== undefined) {
+		return state.lastValidatedTemplateProgram;
+	}
+	if (
+		state.validatedTemplatePrograms !== undefined &&
+		value !== null &&
+		typeof value === 'object'
+	) {
+		const previous = state.validatedTemplatePrograms.get(value);
+		if (previous !== undefined) {
+			state.lastTemplateProgram = value;
+			state.lastValidatedTemplateProgram = previous;
+			return previous;
+		}
+	}
+	const label = `${COMMANDS_LABEL}[${commandIndex}].program`;
+	const program = record(value, label);
+	exactKeys(program, TEMPLATE_PROGRAM_KEYS, label);
+	const nodes = assertTemplateArray(program.nodes, `${label}.nodes`);
+	const events = assertTemplateArray(program.events, `${label}.events`);
+	if (nodes.length === 0) fail(`${label}.nodes`, 'must be a non-empty array.');
+	let immutable = Object.isFrozen(program) && Object.isFrozen(nodes) && Object.isFrozen(events);
+	let maxValue = -1;
+	const usedValues = new Set<number>();
+	for (let index = 0; index < nodes.length; index++) {
+		const nodeLabel = `${label}.nodes[${index}]`;
+		const node = record(nodes[index], nodeLabel);
+		if (immutable && !Object.isFrozen(node)) immutable = false;
+		const hasBindings = Object.prototype.hasOwnProperty.call(node, 'bindings');
+		exactKeys(
+			node,
+			hasBindings ? TEMPLATE_PROGRAM_BOUND_NODE_KEYS : TEMPLATE_PROGRAM_NODE_KEYS,
+			nodeLabel,
+		);
+		nonEmptyString(node.type, `${nodeLabel}.type`);
+		if (node.type === 'list' || node.type === 'list-item') {
+			fail(`${nodeLabel}.type`, 'must not be a native-list host.');
+		}
+		if (
+			!Number.isSafeInteger(node.parent) ||
+			(index === 0
+				? node.parent !== -1
+				: (node.parent as number) < 0 || (node.parent as number) >= index)
+		) {
+			fail(`${nodeLabel}.parent`, 'must name an earlier node, with -1 only for the root.');
+		}
+		assertProps(node.props, `${nodeLabel}.props`, undefined, undefined, state);
+		const props = node.props as Record<string, unknown>;
+		if (immutable && !Object.isFrozen(props)) immutable = false;
+		for (const name of Object.keys(props)) {
+			if (!isWireLeaf(props[name])) {
+				fail(`${nodeLabel}.props.${name}`, 'must be a scalar static host value.');
+			}
+			if (name === 'ref' || name.startsWith('main-thread:')) {
+				fail(`${nodeLabel}.props.${name}`, 'is not allowed in an intrinsic host program.');
+			}
+		}
+		if (!hasBindings) continue;
+		const bindings = assertTemplateArray(node.bindings, `${nodeLabel}.bindings`);
+		if (immutable && !Object.isFrozen(bindings)) immutable = false;
+		const names = new Set<string>();
+		for (let bindingIndex = 0; bindingIndex < bindings.length; bindingIndex++) {
+			const bindingLabel = `${nodeLabel}.bindings[${bindingIndex}]`;
+			const binding = record(bindings[bindingIndex], bindingLabel);
+			if (immutable && !Object.isFrozen(binding)) immutable = false;
+			exactKeys(binding, TEMPLATE_PROGRAM_BINDING_KEYS, bindingLabel);
+			nonEmptyString(binding.name, `${bindingLabel}.name`);
+			if (
+				binding.name === 'ref' ||
+				binding.name === 'key' ||
+				binding.name === 'children' ||
+				(binding.name as string).startsWith('main-thread:') ||
+				names.has(binding.name as string)
+			) {
+				fail(`${bindingLabel}.name`, 'must be a unique ordinary host-prop name.');
+			}
+			names.add(binding.name as string);
+			nonNegativeInteger(binding.valueIndex, `${bindingLabel}.valueIndex`);
+			const valueIndex = binding.valueIndex as number;
+			usedValues.add(valueIndex);
+			if (valueIndex > maxValue) maxValue = valueIndex;
+		}
+	}
+	if (usedValues.size !== maxValue + 1) {
+		fail(`${label}.nodes`, 'must reference a dense dynamic-value range.');
+	}
+	const eventNames = new Set<string>();
+	for (let index = 0; index < events.length; index++) {
+		const eventLabel = `${label}.events[${index}]`;
+		const event = record(events[index], eventLabel);
+		if (immutable && !Object.isFrozen(event)) immutable = false;
+		exactKeys(event, TEMPLATE_PROGRAM_EVENT_KEYS, eventLabel);
+		nonNegativeInteger(event.node, `${eventLabel}.node`);
+		if ((event.node as number) >= nodes.length) {
+			fail(`${eventLabel}.node`, 'must name a host inside the intrinsic program.');
+		}
+		nonEmptyString(event.type, `${eventLabel}.type`);
+		if (
+			event.priority !== 'discrete' &&
+			event.priority !== 'continuous' &&
+			event.priority !== 'default'
+		) {
+			fail(`${eventLabel}.priority`, 'must be discrete, continuous, or default.');
+		}
+		const key = `${event.node}:${event.type}`;
+		if (eventNames.has(key)) {
+			fail(eventLabel, 'repeats a native event on the same intrinsic host.');
+		}
+		eventNames.add(key);
+	}
+	const validated = { hosts: nodes.length, values: maxValue + 1, events: events.length };
+	if (immutable) {
+		if (state.lastTemplateProgram !== undefined) {
+			const cache = (state.validatedTemplatePrograms ??= new WeakMap<
+				object,
+				LynxValidatedTemplateProgram
+			>());
+			cache.set(state.lastTemplateProgram, state.lastValidatedTemplateProgram!);
+			cache.set(program, validated);
+		}
+		state.lastTemplateProgram = program;
+		state.lastValidatedTemplateProgram = validated;
+	}
+	return validated;
+}
+
+function assertTemplateRangeCommand(
+	command: Record<string, unknown>,
+	index: number,
+	state: LynxBatchValidationState,
+): void {
+	hostParent(command.parent, COMMANDS_LABEL, index, 'parent');
+	if (command.parent !== null && typeof command.parent !== 'number') {
+		fail(COMMANDS_LABEL, 'must not target a portal.', index, 'parent');
+	}
+	nullableHostId(command.before, COMMANDS_LABEL, index, 'before');
+	positiveInteger(command.firstId, COMMANDS_LABEL, index, 'firstId');
+	const program = assertTemplateProgram(command.program, index, state);
+	const firstId = command.firstId as number;
+	if (firstId > Number.MAX_SAFE_INTEGER - (program.hosts - 1)) {
+		fail(COMMANDS_LABEL, 'overflows the safe host-ID range.', index, 'firstId');
+	}
+	const lastId = firstId + (program.hosts - 1);
+	const starts = (state.templateRangeStarts ??= []);
+	const ends = (state.templateRangeEnds ??= []);
+	if (starts.length !== 0 && firstId <= ends[ends.length - 1]!) {
+		for (let range = 0; range < starts.length; range++) {
+			if (firstId <= ends[range]! && lastId >= starts[range]!) {
+				fail(COMMANDS_LABEL, 'overlaps another intrinsic host range.', index, 'firstId');
+			}
+		}
+	}
+	if (state.templateNodeIds !== undefined) {
+		for (const id of state.templateNodeIds) {
+			if (id >= firstId && id <= lastId) {
+				fail(COMMANDS_LABEL, 'overlaps a previously created template host.', index, 'firstId');
+			}
+		}
+	}
+	starts.push(firstId);
+	ends.push(lastId);
+	assertTemplateScalarValues(command.values, program.values, index);
+	if (program.events === 0) {
+		if (command.firstListenerId !== null) {
+			fail(
+				COMMANDS_LABEL,
+				'must be null when the program has no events.',
+				index,
+				'firstListenerId',
+			);
+		}
+	} else {
+		positiveInteger(command.firstListenerId, COMMANDS_LABEL, index, 'firstListenerId');
+		const firstListener = command.firstListenerId as number;
+		if (firstListener > Number.MAX_SAFE_INTEGER - (program.events - 1)) {
+			fail(COMMANDS_LABEL, 'overflows the safe event-listener range.', index, 'firstListenerId');
+		}
+		const lastListener = firstListener + (program.events - 1);
+		const listenerStarts = (state.listenerRangeStarts ??= []);
+		const listenerEnds = (state.listenerRangeEnds ??= []);
+		if (listenerStarts.length !== 0 && firstListener <= listenerEnds[listenerEnds.length - 1]!) {
+			for (let range = 0; range < listenerStarts.length; range++) {
+				if (firstListener <= listenerEnds[range]! && lastListener >= listenerStarts[range]!) {
+					fail(
+						COMMANDS_LABEL,
+						'overlaps another intrinsic event-listener range.',
+						index,
+						'firstListenerId',
+					);
+				}
+			}
+		}
+		listenerStarts.push(firstListener);
+		listenerEnds.push(lastListener);
+	}
+}
+
+function assertTemplateRunCommand(
+	command: Record<string, unknown>,
+	index: number,
+	state: LynxBatchValidationState,
+): void {
+	hostParent(command.parent, COMMANDS_LABEL, index, 'parent');
+	if (command.parent !== null && typeof command.parent !== 'number') {
+		fail(COMMANDS_LABEL, 'must not target a portal.', index, 'parent');
+	}
+	nullableHostId(command.before, COMMANDS_LABEL, index, 'before');
+	positiveInteger(command.count, COMMANDS_LABEL, index, 'count');
+	positiveInteger(command.firstId, COMMANDS_LABEL, index, 'firstId');
+	const count = command.count as number;
+	const program = assertTemplateProgram(command.program, index, state);
+	const hostCount = count * program.hosts;
+	if (!Number.isSafeInteger(hostCount)) {
+		fail(COMMANDS_LABEL, 'overflows the intrinsic host count.', index, 'count');
+	}
+	const firstId = command.firstId as number;
+	if (firstId > Number.MAX_SAFE_INTEGER - (hostCount - 1)) {
+		fail(COMMANDS_LABEL, 'overflows the safe host-ID range.', index, 'firstId');
+	}
+	const lastId = firstId + (hostCount - 1);
+	const starts = (state.templateRangeStarts ??= []);
+	const ends = (state.templateRangeEnds ??= []);
+	if (starts.length !== 0 && firstId <= ends[ends.length - 1]!) {
+		for (let range = 0; range < starts.length; range++) {
+			if (firstId <= ends[range]! && lastId >= starts[range]!) {
+				fail(COMMANDS_LABEL, 'overlaps another intrinsic host range.', index, 'firstId');
+			}
+		}
+	}
+	if (state.templateNodeIds !== undefined) {
+		for (const id of state.templateNodeIds) {
+			if (id >= firstId && id <= lastId) {
+				fail(COMMANDS_LABEL, 'overlaps a previously created template host.', index, 'firstId');
+			}
+		}
+	}
+	starts.push(firstId);
+	ends.push(lastId);
+	const valueCount = count * program.values;
+	if (!Number.isSafeInteger(valueCount)) {
+		fail(COMMANDS_LABEL, 'overflows the intrinsic dynamic-value count.', index, 'count');
+	}
+	assertTemplateScalarValues(command.values, valueCount, index);
+	if (program.events === 0) {
+		if (command.firstListenerId !== null) {
+			fail(
+				COMMANDS_LABEL,
+				'must be null when the program has no events.',
+				index,
+				'firstListenerId',
+			);
+		}
+		return;
+	}
+	positiveInteger(command.firstListenerId, COMMANDS_LABEL, index, 'firstListenerId');
+	const eventCount = count * program.events;
+	if (!Number.isSafeInteger(eventCount)) {
+		fail(COMMANDS_LABEL, 'overflows the intrinsic event-listener count.', index, 'count');
+	}
+	const firstListener = command.firstListenerId as number;
+	if (firstListener > Number.MAX_SAFE_INTEGER - (eventCount - 1)) {
+		fail(COMMANDS_LABEL, 'overflows the safe event-listener range.', index, 'firstListenerId');
+	}
+	const lastListener = firstListener + (eventCount - 1);
+	const listenerStarts = (state.listenerRangeStarts ??= []);
+	const listenerEnds = (state.listenerRangeEnds ??= []);
+	if (listenerStarts.length !== 0 && firstListener <= listenerEnds[listenerEnds.length - 1]!) {
+		for (let range = 0; range < listenerStarts.length; range++) {
+			if (firstListener <= listenerEnds[range]! && lastListener >= listenerStarts[range]!) {
+				fail(
+					COMMANDS_LABEL,
+					'overlaps another intrinsic event-listener range.',
+					index,
+					'firstListenerId',
+				);
+			}
+		}
+	}
+	listenerStarts.push(firstListener);
+	listenerEnds.push(lastListener);
+}
+
+/** Fuse the hot range-command object and exact-schema trust checks in one own-key walk. */
+function commandRecord(value: unknown, index: number): Record<string, unknown> {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+		return fail(COMMANDS_LABEL, 'must be an object.', index);
+	}
+	if (!hasCrossRealmPlainPrototype(value)) {
+		return fail(COMMANDS_LABEL, 'must be a plain object.', index);
+	}
+	const keys = Reflect.ownKeys(value);
+	let operation: unknown;
+	let orderedRange = keys.length === TEMPLATE_RANGE_KEYS.length;
+	let orderedRun = keys.length === TEMPLATE_RUN_KEYS.length;
+	for (let position = 0; position < keys.length; position++) {
+		const key = keys[position]!;
+		if (typeof key === 'symbol') {
+			return fail(COMMANDS_LABEL, 'contains symbol fields.', index);
+		}
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined) {
+			fail(composePath(COMMANDS_LABEL, index), 'changed during validation.', undefined, key);
+		}
+		if (!descriptor.enumerable) {
+			fail(composePath(COMMANDS_LABEL, index), 'must be enumerable.', undefined, key);
+		}
+		if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+			fail(composePath(COMMANDS_LABEL, index), 'must not be an accessor.', undefined, key);
+		}
+		if (key === 'op') operation = descriptor.value;
+		if (orderedRange && key !== TEMPLATE_RANGE_KEYS[position]) orderedRange = false;
+		if (orderedRun && key !== TEMPLATE_RUN_KEYS[position]) orderedRun = false;
+	}
+	const schema =
+		operation === 'mount-template-range'
+			? orderedRange
+				? null
+				: TEMPLATE_RANGE_KEYS
+			: operation === 'mount-template-run'
+				? orderedRun
+					? null
+					: TEMPLATE_RUN_KEYS
+				: null;
+	if (schema !== null) {
+		for (const required of schema) {
+			if (!keys.includes(required)) {
+				fail(COMMANDS_LABEL, `is missing field ${JSON.stringify(required)}.`, index);
+			}
+		}
+		for (const key of keys) {
+			if (typeof key === 'string' && !schema.includes(key)) {
+				fail(COMMANDS_LABEL, `contains unknown field ${JSON.stringify(key)}.`, index);
+			}
+		}
+	}
+	return value as Record<string, unknown>;
+}
+
+function assertCommand(
+	value: unknown,
+	index: number,
+	state: LynxBatchValidationState,
+): asserts value is UniversalHostCommand {
 	// One call per accepted host node. Every path below is composed lazily.
 	const label = COMMANDS_LABEL;
-	const command = record(value, label, index);
+	const command = commandRecord(value, index);
 	if (typeof command.op !== 'string') fail(label, 'must be a string.', index, 'op');
 	switch (command.op) {
+		case 'mount-template-run':
+			assertTemplateRunCommand(command, index, state);
+			return;
+		case 'ensure-public-instance':
+			exactKeys(command, DESTROY_KEYS, label, index);
+			positiveInteger(command.id, label, index, 'id');
+			return;
+		case 'mount-template-range':
+			assertTemplateRangeCommand(command, index, state);
+			return;
+		case 'mount-template':
+			assertTemplateCommand(command, index, state);
+			return;
 		case 'create':
 			exactKeys(command, CREATE_KEYS, label, index);
 			positiveInteger(command.id, label, index, 'id');
 			nonEmptyString(command.type, label, index, 'type');
-			assertProps(command.props, label, index, 'props');
+			assertProps(command.props, label, index, 'props', state);
 			return;
 		case 'update':
 			exactKeys(command, UPDATE_KEYS, label, index);
 			positiveInteger(command.id, label, index, 'id');
-			assertProps(command.props, label, index, 'props');
+			assertProps(command.props, label, index, 'props', state);
 			return;
 		case 'recreate':
 			exactKeys(command, CREATE_KEYS, label, index);
 			positiveInteger(command.id, label, index, 'id');
 			nonEmptyString(command.type, label, index, 'type');
-			assertProps(command.props, label, index, 'props');
+			assertProps(command.props, label, index, 'props', state);
 			return;
 		case 'insert':
 		case 'move':
@@ -570,8 +1322,9 @@ function assertBatch(
 		fail('commit.batch.renderer', 'does not match envelope.');
 	if (batch.version !== identity.version) fail('commit.batch.version', 'does not match envelope.');
 	if (!Array.isArray(batch.commands)) fail('commit.batch.commands', 'must be an array.');
+	const validationState: LynxBatchValidationState = {};
 	for (let index = 0; index < batch.commands.length; index++) {
-		assertCommand(batch.commands[index], index);
+		assertCommand(batch.commands[index], index, validationState);
 	}
 }
 
@@ -641,63 +1394,84 @@ function assertSnapshotIdentity(
 	delta: Record<string, unknown>,
 	identity: UniversalTransportIdentity,
 	label: string,
+	index: number,
 ): void {
-	const value = record(snapshot, `${label}.snapshot`);
-	const expected: Readonly<Record<string, unknown>> = {
-		$$kind: 'octane.lynx.element',
-		renderer: LYNX_TRANSPORT_RENDERER,
-		root: identity.root,
-		id: delta.id,
-		type: delta.type,
-		generation: delta.generation,
-	};
-	for (const [name, expectedValue] of Object.entries(expected)) {
-		if (value[name] !== expectedValue) {
-			fail(`${label}.snapshot.${name}`, 'does not match the handle envelope.');
+	const value = record(snapshot, label, index, 'snapshot');
+	for (const name of Object.keys(value)) {
+		const child = value[name];
+		if (!isWireLeaf(child)) {
+			assertWireValue(child, `${composePath(label, index, 'snapshot')}.${name}`);
 		}
 	}
+	if (value.$$kind !== 'octane.lynx.element') {
+		fail(label, 'does not match the handle envelope.', index, 'snapshot.$$kind');
+	}
+	if (value.renderer !== LYNX_TRANSPORT_RENDERER) {
+		fail(label, 'does not match the handle envelope.', index, 'snapshot.renderer');
+	}
+	if (value.root !== identity.root) {
+		fail(label, 'does not match the handle envelope.', index, 'snapshot.root');
+	}
+	if (value.id !== delta.id) {
+		fail(label, 'does not match the handle envelope.', index, 'snapshot.id');
+	}
+	if (value.type !== delta.type) {
+		fail(label, 'does not match the handle envelope.', index, 'snapshot.type');
+	}
+	if (value.generation !== delta.generation) {
+		fail(label, 'does not match the handle envelope.', index, 'snapshot.generation');
+	}
 }
+
+const UPSERT_HANDLE_KEYS = Object.freeze([
+	'op',
+	'id',
+	'type',
+	'generation',
+	'attached',
+	'listDescendant',
+	'snapshot',
+]);
+const LIST_ANCESTRY_HANDLE_KEYS = Object.freeze(['op', 'id', 'generation', 'listDescendant']);
+const REMOVE_HANDLE_KEYS = Object.freeze(['op', 'id', 'generation']);
 
 function assertHandleDelta(
 	value: unknown,
 	index: number,
 	identity: UniversalTransportIdentity,
 ): asserts value is LynxPublicHandleDelta {
-	const label = `ack.handles[${index}]`;
-	const delta = record(value, label);
+	const label = 'ack.handles';
+	const delta = record(value, label, index);
 	if (delta.op === 'upsert') {
-		exactKeys(
-			delta,
-			['op', 'id', 'type', 'generation', 'attached', 'listDescendant', 'snapshot'],
-			label,
-		);
-		positiveInteger(delta.id, `${label}.id`);
-		nonEmptyString(delta.type, `${label}.type`);
-		positiveInteger(delta.generation, `${label}.generation`);
-		if (typeof delta.attached !== 'boolean') fail(`${label}.attached`, 'must be a boolean.');
-		if (typeof delta.listDescendant !== 'boolean') {
-			fail(`${label}.listDescendant`, 'must be a boolean.');
+		exactKeys(delta, UPSERT_HANDLE_KEYS, label, index);
+		positiveInteger(delta.id, label, index, 'id');
+		nonEmptyString(delta.type, label, index, 'type');
+		positiveInteger(delta.generation, label, index, 'generation');
+		if (typeof delta.attached !== 'boolean') {
+			fail(label, 'must be a boolean.', index, 'attached');
 		}
-		assertWireValue(delta.snapshot, `${label}.snapshot`);
-		assertSnapshotIdentity(delta.snapshot, delta, identity, label);
+		if (typeof delta.listDescendant !== 'boolean') {
+			fail(label, 'must be a boolean.', index, 'listDescendant');
+		}
+		assertSnapshotIdentity(delta.snapshot, delta, identity, label, index);
 		return;
 	}
 	if (delta.op === 'list-ancestry') {
-		exactKeys(delta, ['op', 'id', 'generation', 'listDescendant'], label);
-		positiveInteger(delta.id, `${label}.id`);
-		positiveInteger(delta.generation, `${label}.generation`);
+		exactKeys(delta, LIST_ANCESTRY_HANDLE_KEYS, label, index);
+		positiveInteger(delta.id, label, index, 'id');
+		positiveInteger(delta.generation, label, index, 'generation');
 		if (typeof delta.listDescendant !== 'boolean') {
-			fail(`${label}.listDescendant`, 'must be a boolean.');
+			fail(label, 'must be a boolean.', index, 'listDescendant');
 		}
 		return;
 	}
 	if (delta.op === 'remove') {
-		exactKeys(delta, ['op', 'id', 'generation'], label);
-		positiveInteger(delta.id, `${label}.id`);
-		positiveInteger(delta.generation, `${label}.generation`);
+		exactKeys(delta, REMOVE_HANDLE_KEYS, label, index);
+		positiveInteger(delta.id, label, index, 'id');
+		positiveInteger(delta.generation, label, index, 'generation');
 		return;
 	}
-	fail(`${label}.op`, `uses unsupported operation ${JSON.stringify(delta.op)}.`);
+	fail(label, `uses unsupported operation ${JSON.stringify(delta.op)}.`, index, 'op');
 }
 
 function assertFirstTreeSnapshot(value: unknown, label: string): void {
@@ -756,11 +1530,17 @@ function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | Lyn
 	const label = reply ? 'main-ready reply' : 'main-ready request';
 	const message = record(value, label);
 	const hasFirstTree = reply && Object.prototype.hasOwnProperty.call(message, 'firstTree');
+	const hasCapabilities = reply && Object.prototype.hasOwnProperty.call(message, 'capabilities');
 	exactKeys(
 		message,
-		hasFirstTree
-			? ['protocol', 'renderer', 'type', 'request', 'firstTree']
-			: ['protocol', 'renderer', 'type', 'request'],
+		[
+			'protocol',
+			'renderer',
+			'type',
+			'request',
+			...(hasFirstTree ? ['firstTree'] : []),
+			...(hasCapabilities ? ['capabilities'] : []),
+		],
 		label,
 	);
 	if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
@@ -778,6 +1558,69 @@ function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | Lyn
 	if (reply) nonNegativeInteger(message.request, `${label}.request`);
 	else positiveInteger(message.request, `${label}.request`);
 	if (hasFirstTree) assertFirstTreeSnapshot(message.firstTree, `${label}.firstTree`);
+	if (hasCapabilities) {
+		if ((message.request as number) < LYNX_CAPABILITY_READY_REQUEST_BASE) {
+			fail(`${label}.capabilities`, 'requires a capability-tagged readiness request.');
+		}
+		const capabilities = record(message.capabilities, `${label}.capabilities`);
+		const hasTemplateMount = Object.prototype.hasOwnProperty.call(capabilities, 'templateMount');
+		const hasTemplateProgram = Object.prototype.hasOwnProperty.call(
+			capabilities,
+			'templateProgram',
+		);
+		const hasLazyPublicInstances = Object.prototype.hasOwnProperty.call(
+			capabilities,
+			'lazyPublicInstances',
+		);
+		const hasTemplateRuns = Object.prototype.hasOwnProperty.call(capabilities, 'templateRuns');
+		exactKeys(
+			capabilities,
+			[
+				'compactAck',
+				...(hasTemplateMount ? ['templateMount'] : []),
+				...(hasTemplateProgram ? ['templateProgram'] : []),
+				...(hasLazyPublicInstances ? ['lazyPublicInstances'] : []),
+				...(hasTemplateRuns ? ['templateRuns'] : []),
+			],
+			`${label}.capabilities`,
+		);
+		if (capabilities.compactAck !== 1) {
+			fail(`${label}.capabilities.compactAck`, 'must be 1.');
+		}
+		if (hasTemplateMount && capabilities.templateMount !== 1) {
+			fail(`${label}.capabilities.templateMount`, 'must be 1.');
+		}
+		if (hasTemplateProgram && capabilities.templateProgram !== 1) {
+			fail(`${label}.capabilities.templateProgram`, 'must be 1.');
+		}
+		if (hasTemplateProgram && !hasTemplateMount) {
+			fail(`${label}.capabilities.templateProgram`, 'requires the templateMount capability.');
+		}
+		if (hasLazyPublicInstances && capabilities.lazyPublicInstances !== 1) {
+			fail(`${label}.capabilities.lazyPublicInstances`, 'must be 1.');
+		}
+		if (hasLazyPublicInstances && !hasTemplateProgram) {
+			fail(`${label}.capabilities.lazyPublicInstances`, 'requires the templateProgram capability.');
+		}
+		if (
+			hasLazyPublicInstances &&
+			(message.request as number) < LYNX_LAZY_PUBLIC_INSTANCE_READY_REQUEST_BASE
+		) {
+			fail(
+				`${label}.capabilities.lazyPublicInstances`,
+				'requires a lazy-public-instance readiness request.',
+			);
+		}
+		if (hasTemplateRuns && capabilities.templateRuns !== 1) {
+			fail(`${label}.capabilities.templateRuns`, 'must be 1.');
+		}
+		if (hasTemplateRuns && !hasTemplateProgram) {
+			fail(`${label}.capabilities.templateRuns`, 'requires the templateProgram capability.');
+		}
+		if (hasTemplateRuns && (message.request as number) < LYNX_TEMPLATE_RUN_READY_REQUEST_BASE) {
+			fail(`${label}.capabilities.templateRuns`, 'requires a template-run readiness request.');
+		}
+	}
 	return message as unknown as LynxMainReadyRequest | LynxMainReadyReply;
 }
 
@@ -849,9 +1692,33 @@ export function validateLynxBackgroundOutboundMessage(
 		return message as unknown as LynxCallBackgroundErrorMessage;
 	}
 	if (message.type === 'commit') {
-		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'batch'], 'commit');
+		const hasCompactAck = Object.prototype.hasOwnProperty.call(message, 'ack');
+		const hasLazyPublicInstances = Object.prototype.hasOwnProperty.call(message, 'instances');
+		exactKeys(
+			message,
+			[
+				'protocol',
+				'renderer',
+				'root',
+				'version',
+				'type',
+				'batch',
+				...(hasCompactAck ? ['ack'] : []),
+				...(hasLazyPublicInstances ? ['instances'] : []),
+			],
+			'commit',
+		);
+		if (hasCompactAck && message.ack !== LYNX_COMPACT_ACKNOWLEDGEMENT) {
+			fail('commit.ack', `must be ${JSON.stringify(LYNX_COMPACT_ACKNOWLEDGEMENT)}.`);
+		}
+		if (hasLazyPublicInstances && message.instances !== LYNX_LAZY_PUBLIC_INSTANCES) {
+			fail('commit.instances', `must be ${JSON.stringify(LYNX_LAZY_PUBLIC_INSTANCES)}.`);
+		}
+		if (hasLazyPublicInstances && !hasCompactAck) {
+			fail('commit.instances', 'requires a compact acknowledgement.');
+		}
 		assertBatch(message.batch, message);
-		return message as unknown as UniversalTransportCommitMessage;
+		return message as unknown as LynxTransportCommitMessage;
 	}
 	if (message.type === 'abort') {
 		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type'], 'abort');
@@ -942,6 +1809,21 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 		return message as unknown as LynxCallMainErrorMessage;
 	}
 	if (message.type === 'ack') {
+		if (Object.prototype.hasOwnProperty.call(message, 'encoding')) {
+			exactKeys(
+				message,
+				['protocol', 'renderer', 'root', 'version', 'type', 'encoding', 'count'],
+				'ack',
+			);
+			if (message.encoding !== LYNX_COMPACT_ACKNOWLEDGEMENT) {
+				fail('ack.encoding', `must be ${JSON.stringify(LYNX_COMPACT_ACKNOWLEDGEMENT)}.`);
+			}
+			positiveInteger(message.count, 'ack.count');
+			if ((message.count as number) < LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS) {
+				fail('ack.count', `must be at least ${LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS}.`);
+			}
+			return message as unknown as LynxCompactTransportAcknowledgement;
+		}
 		const hasAdoption = Object.prototype.hasOwnProperty.call(message, 'adoption');
 		exactKeys(
 			message,
@@ -957,7 +1839,7 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 		for (let index = 0; index < message.handles.length; index++) {
 			assertHandleDelta(message.handles[index], index, message);
 		}
-		return message as unknown as LynxTransportAcknowledgement;
+		return message as unknown as LynxLegacyTransportAcknowledgement;
 	}
 	if (message.type === 'complete') {
 		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type'], 'complete');

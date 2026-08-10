@@ -8,6 +8,7 @@
     "bench": "node run.mjs"
   },
   "dependencies": {
+    "@lynx-js/react": "0.123.0",
     "vite": "catalog:default"
   }
 }
