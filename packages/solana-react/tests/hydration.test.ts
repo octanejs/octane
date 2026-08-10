@@ -37,6 +37,8 @@ async function settle(): Promise<void> {
 }
 
 describe('@octanejs/solana-react hydration', () => {
+	// The shared hydration helper boots a real Vite SSR server inside this case,
+	// which can exceed Vitest's five-second default on a loaded CI shard.
 	it('adopts stable provider output, then observes one client replacement', async () => {
 		const serverClient = createClient('stable-client');
 		const serverResult = await renderHydrationFixture(
@@ -88,5 +90,5 @@ describe('@octanejs/solana-react hydration', () => {
 			errors.mockRestore();
 			container.remove();
 		}
-	});
+	}, 30_000);
 });
