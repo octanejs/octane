@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { toast } from '@octanejs/sonner';
 import { drainPassiveEffects } from 'octane';
 import { mount } from '../../octane/tests/_helpers';
-import { ToasterFixture } from './_fixtures/sonner-app.tsrx';
+import { DefaultToasterFixture, ToasterFixture } from './_fixtures/sonner-app.tsrx';
 
 async function settle(): Promise<void> {
 	drainPassiveEffects();
@@ -20,7 +20,31 @@ afterEach(async () => {
 });
 
 describe('@octanejs/shadcn — Toaster (sonner wrapper)', () => {
+	// @parity-case adapted:shadcn-sonner-theme
 	it('renders a toast with the cn-toast class, custom success icon, and theme/style wiring', async () => {
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn(() => ({
+				matches: true,
+				addEventListener: vi.fn(),
+				removeEventListener: vi.fn(),
+				addListener: vi.fn(),
+				removeListener: vi.fn(),
+			})),
+		);
+		const defaultMount = mount(DefaultToasterFixture);
+		await settle();
+		toast.info('Default theme', { id: 'shadcn-default-theme', duration: Infinity });
+		await settle();
+		const defaultToaster = document.querySelector('[data-sonner-toaster]') as HTMLElement;
+		expect(defaultToaster).not.toBeNull();
+		// A system-default toaster follows the simulated dark OS preference.
+		expect(defaultToaster.getAttribute('data-sonner-theme')).toBe('dark');
+		toast.dismiss('shadcn-default-theme');
+		defaultMount.unmount();
+		await settle();
+		vi.unstubAllGlobals();
+
 		const { container, unmount } = mount(ToasterFixture);
 		await settle();
 

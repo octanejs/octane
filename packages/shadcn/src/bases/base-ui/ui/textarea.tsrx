@@ -5,7 +5,7 @@
 // UNVERIFIED PROVENANCE: class string taken from this package's React Aria base rather than
 // transcribed from upstream's Base UI source.
 //
-// OCTANE DIVERGENCE: per-keystroke handling is the native `onInput` event, not a synthetic
+// Octane divergence (shadcn-native-input-events): per-keystroke handling is the native `onInput` event, not a synthetic
 // `onChange`; native `change` keeps its commit-on-blur meaning.
 import { cn } from '../../../lib/utils';
 import type { HostProps } from '../../../lib/types';

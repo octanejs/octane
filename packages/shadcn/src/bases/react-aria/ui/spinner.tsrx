@@ -2,7 +2,7 @@
 // no RAC primitive — so this matches the Radix base apart from its own class
 // string.
 //
-// OCTANE DIVERGENCE: upstream's IconPlaceholder (the CLI-resolved iconLibrary
+// Octane divergence (shadcn-icon-resolution): upstream's IconPlaceholder (the CLI-resolved iconLibrary
 // axis) is resolved at port time to the default library, lucide, via
 // @octanejs/lucide. Other icon libraries are a registry-emit concern.
 //

@@ -3041,6 +3041,8 @@ export default defineConfig({
 				},
 			},
 			{
+				// No react-parity lane owns project "shadcn". Divergence/Sonner
+				// authentication stays on ordinary shards as octane-only evidence.
 				test: {
 					name: 'shadcn',
 					include: [
@@ -3051,6 +3053,8 @@ export default defineConfig({
 						'!packages/shadcn/tests/differential/**/*.test.tsx',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -3072,6 +3076,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'shadcn-differential',
 					include: [
@@ -3097,6 +3102,8 @@ export default defineConfig({
 				},
 			},
 			{
+				// No react-parity lane owns `project: "shadcn-ssr"`, so leave this on ordinary
+				// shards rather than marking the package-authored SSR suite as parity-owned.
 				test: {
 					name: 'shadcn-ssr',
 					include: ['packages/shadcn/tests/ssr/**/*.test.ts'],

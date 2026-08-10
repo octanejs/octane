@@ -1,0 +1,185 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/shadcn-ui/ui.git",
+    "version": "4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1",
+    "commit": "4baadbc6517070ae8f8feb2c97037adc2b305544",
+    "sourceRoot": "apps/v4/registry",
+    "testRoot": "apps/v4/registry (calendar.test.ts, config.test.ts); packages/shadcn/src; packages/shadcn/test/fixtures",
+    "license": "MIT",
+    "integrity": "sha256:015a8c4972120e794fa648ef6604fdd0ff94d4748c9308b0cfe147c177b5df4a",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": [
+        "packages/shadcn/src"
+      ],
+      "include": [
+        "\\.(?:ts|tsrx)$"
+      ],
+      "exclude": []
+    },
+    "tests": {
+      "roots": [
+        "packages/shadcn/tests"
+      ],
+      "include": [
+        "\\.test\\.tsx?$"
+      ],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "681c5a29d990eeaa9cb6439f43ff0d48857d3c304b9fd97f88ff0235183bbf6a"
+    }
+  },
+  "lanes": [
+    {
+      "id": "shadcn-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "shadcn-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs five exact same-fixture cases citing pinned shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 sources under apps/v4/registry/bases/radix/ui/{badge,button,tabs,dialog,dropdown-menu}.tsx. dialog.tsx and dropdown-menu.tsx are import-path-only vendors of those files; badge.tsx, button.tsx, and tabs.tsx are port-selected class-hook adaptations of the same cited sources (plus local icon-placeholder resolution). Local React references are lineage evidence with documented transforms, not the pinned oracle itself.",
+      "files": [
+        {
+          "path": "packages/shadcn/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "3bf668a1e97dfdcaa4e5ed2f8ca436b83135e13a3787c31f851153a8ec52bd90",
+          "cases": [
+            {
+              "id": "differential:shadcn-badge-runtime",
+              "testName": "Badge: variants + className merge + asChild anchor, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Badge: variants + className merge + asChild anchor, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-button-runtime",
+              "testName": "Button: variants/sizes/disabled + asChild anchor + onClick wiring, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Button: variants/sizes/disabled + asChild anchor + onClick wiring, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-tabs-upstream",
+              "testName": "Tabs: switch panels via trigger mousedown, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Tabs: switch panels via trigger mousedown, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-dialog-upstream",
+              "testName": "Dialog (non-modal): trigger ARIA + open-state text across open/close, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Dialog (non-modal): trigger ARIA + open-state text across open/close, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-dropdown-upstream",
+              "testName": "DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item \u2014 byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item \u2014 byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/badge.tsrx",
+          "role": "support",
+          "sha256": "7b893856183181b0568dd84d61dec58fe6a9210a36045ec98ab4d712ee1aea8b"
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/button.tsrx",
+          "role": "support",
+          "sha256": "00225797a73964d47e7650021f01566cee203364cc600aec459ed9f2247ab2cb"
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/dialog.tsrx",
+          "role": "support",
+          "sha256": "55080045f249d3e4f64760ca68f8615a4f36527521008749c25ee12da0492228"
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/dropdown-menu.tsrx",
+          "role": "support",
+          "sha256": "ebc8c0ce2b2765d1c898d50962f46121b89a89369d845c36e588dee32b71bc45"
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/tabs.tsrx",
+          "role": "support",
+          "sha256": "bfba124a9f072477b668c83bc0137fe06f863160eb027bee2ab7c9df8b22e53b"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "7f63a51457a53b6b58a7add1b67cd244f024f42d937b2dc87f260d8ff0debb96"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/index.ts",
+          "role": "support",
+          "sha256": "9db6c0a69c172177064bf43c471491d029394f0899ded3fadd0c2d956d9a2a1f"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/utils.ts",
+          "role": "support",
+          "sha256": "6a434db1e9911baf2d9c414bacd1ee059ca8cd0664e2e2359efdd461bd33aba5"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/badge.tsx",
+          "role": "support",
+          "sha256": "43b5e84715f67b86a897eac252071622dc36685fe8c2e0de71678b9c7eabe5f5"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/button.tsx",
+          "role": "support",
+          "sha256": "8b4a0016403849ae26d9ef72534baa894a8a5de130c1a7a2379e4eb7748eb509"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/dialog.tsx",
+          "role": "support",
+          "sha256": "67e8ba9a4af801c3d3faaf5dbe8153ff42a7df639b2d157b87ffd8adfc1edaab"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/dropdown-menu.tsx",
+          "role": "support",
+          "sha256": "65a1c9eb9fb631bb5eaa41a8af4955259e92c45418f86bd08b1aefee142836b6"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/icon-placeholder.tsx",
+          "role": "support",
+          "sha256": "3cb26a06cae450235c8a68340d0d0f43ac64337b385deceb9cea06f1ee6a8204"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/tabs.tsx",
+          "role": "support",
+          "sha256": "d9ca569041eba87eaf5c26ccee81e5fc50e565d9e0615f2478536602d7a7123a"
+        },
+        {
+          "path": "packages/shadcn/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "7f42c85513823d9ed516e46c2ea3d8e96ed449533f1c9cb2299eb451e76d9960"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "f4a137d1754c99c74eedebedd68d3c7aa8b934fdf6e7ab729807ff2c2aa9d8bc"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
