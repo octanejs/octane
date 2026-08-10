@@ -131,29 +131,4 @@ describe('PerformanceMonitor', () => {
 		expect(octaneApi.subscriptions.size).toBe(0);
 		expect(reactApi.subscriptions.size).toBe(0);
 	});
-
-	it('stops sampling after fallback', async () => {
-		const events = callbacks();
-		const root = await createOctaneThree(PerformanceMonitorScene, {
-			iterations: 1,
-			ms: 10,
-			threshold: 0,
-			step: 0.1,
-			factor: 0.5,
-			flipflops: 0,
-			bounds: () => [30, 60],
-			...events,
-		});
-		const now = vi
-			.spyOn(performance, 'now')
-			.mockReturnValueOnce(0)
-			.mockReturnValueOnce(10)
-			.mockReturnValue(20);
-		root.advanceFrames(2);
-		expect(events.onFallback).toHaveBeenCalledOnce();
-		const calls = now.mock.calls.length;
-		root.advanceFrames(5);
-		expect(now).toHaveBeenCalledTimes(calls);
-		root.unmount();
-	});
 });

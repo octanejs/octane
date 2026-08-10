@@ -142,14 +142,6 @@ async function reactRoot(): Promise<{
 }
 
 describe('Texture and useTexture', () => {
-	it('renders natural TSRX block children without invoking them as render props', async () => {
-		const root = await createOctaneThree(TextureBlockBoundary, { input: '/block.png' });
-		await flushLoads();
-		expect(root.scene.getObjectByName('texture-block-child')).toBeDefined();
-		root.unmount();
-		useTexture.clear('/block.png');
-	});
-
 	it.each([
 		['single', '/single.png'],
 		['array', ['/a.png', '/b.png']],

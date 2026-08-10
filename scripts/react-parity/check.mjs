@@ -80,6 +80,19 @@ try {
 	errors.push(`react-hook-form type evidence is invalid: ${error.message}`);
 }
 try {
+	verifyPortTestClassifications(REPO);
+} catch (error) {
+	errors.push(`react-hook-form test classifications are invalid: ${error.message}`);
+}
+try {
+	execFileSync(process.execPath, ['packages/drei/scripts/check-react-parity.mjs'], {
+		cwd: REPO,
+		stdio: 'inherit',
+	});
+} catch (error) {
+	errors.push(`Drei parity evidence is invalid: ${error.message}`);
+}
+try {
 	verifyLivestoreTypes(REPO);
 } catch (error) {
 	errors.push(`livestore type evidence is invalid: ${error.message}`);

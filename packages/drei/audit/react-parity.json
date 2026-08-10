@@ -11,37 +11,24 @@
     "verification": "verified"
   },
   "upstreamSuites": {
-    "runtime": "absent",
+    "runtime": "insufficient",
     "types": "absent"
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/drei/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/drei/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/drei/tests"
-      ],
-      "include": [
-        "\\.test\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
-      "exclude": [
-        "tests/config\\.test\\.ts$",
-        "tests/crosswalk-guard\\.test\\.ts$",
-        "tests/react-parity-guard\\.test\\.ts$",
-        "tests/differential/"
-      ]
+      "roots": ["packages/drei/tests/browser"],
+      "include": ["\\.browser\\.test\\.ts$"],
+      "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 284,
-    "uniqueIdentities": 284,
+    "inventoryEntries": 1,
+    "uniqueIdentities": 1,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -52,68 +39,121 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "b621e5cb0ebc74fffdad32e28aafd743a78ae35f3d0d3c8a3024b3257c0ca887"
+      "lockfileSha256": "3627c861bc34be5e913015b158b5fa0d687a1d6993b0e83e5d36f4dd3f13d835"
     }
   },
   "lanes": [
     {
-      "id": "drei-repo-authored-full-suite",
-      "type": "adapted-octane",
+      "id": "drei-pristine-upstream",
+      "type": "pristine-upstream",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "drei",
-      "evidenceOrigin": "repo-authored",
-      "notes": "Runs the 100 paired React/Octane characterization files. Octane-only guards stay in drei-guards; the View canary lives in drei-differential.",
+      "project": "drei-pristine-playwright",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the vendored Playwright screenshot test byte-for-byte against published React Drei.",
       "execution": {
-        "kind": "vitest-full",
-        "inventory": "packages/drei/audit/adapted-runtime.json"
+        "kind": "playwright-full",
+        "config": "packages/drei/scripts/pristine-playwright.json",
+        "root": "packages/drei/upstream",
+        "inventory": "packages/drei/audit/pristine-runtime.json"
       },
       "files": [
         {
-          "path": "packages/drei/audit/adapted-runtime.json",
+          "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "432dfed848a872c3886ea9982554154222314e57416f851f6dfb2bf973bdcc67"
+          "sha256": "236350603d5770d9a4bdc3b766d9caca5f1d164cea5941b9f2d79387628f2807"
         },
         {
-          "path": "packages/drei/audit/runtime-evidence.json",
+          "path": "packages/drei/scripts/pristine-playwright.json",
           "role": "support",
-          "sha256": "594c98f5b0b607151740742798c4afb06865634ce098cabd2f1a13c7bbf1881d"
+          "sha256": "85e6daa57a67314e19094a9a75f915cca984ee1ac790f4bdc7a4da3ddb263edd"
         },
         {
-          "path": "packages/drei/audit/test-classifications.json",
+          "path": "packages/drei/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "1207635fb6ab8addb97394de470984015d293df577a75fc5c115cc2bb56128be"
+          "sha256": "9edfb434bc8bf93652ae67ccd6354417b9eba642b2444acd1f370c4fc600a0e3"
         },
         {
-          "path": "packages/drei/audit/upstream-test-artifacts.json",
+          "path": "packages/drei/upstream/test/e2e/snapshot.test.ts",
           "role": "support",
-          "sha256": "9e88401f6d60bce151ab106b8e41ad4cbe30501218a6899e6f79e263b9409236"
-        },
-        {
-          "path": "packages/drei/scripts/check-react-parity.mjs",
-          "role": "support",
-          "sha256": "ce7f6711fdd933530825c99734d3ed94eddc7af8e7cc98ab4f3e54505f00b43f"
-        },
-        {
-          "path": "scripts/react-parity/drei-parity-lib.mjs",
-          "role": "support",
-          "sha256": "f94f15d8e74c4af73b3e187ce020a821cdde57fc422de531bbbc4ae63e31a989"
+          "sha256": "dea9f23926e17c55f1ee1623a5b3ba1d466db725c644d0d9671fd4a8644da69b"
         }
       ]
     },
     {
-      "id": "drei-differential-canary",
+      "id": "drei-adapted-upstream-e2e",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "drei-adapted-browser",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Ports the upstream gallery scene to Octane and retains its screenshot oracle as adapted evidence.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/drei/audit/upstream-browser.json"
+      },
+      "files": [
+        {
+          "path": "packages/drei/tests/browser/upstream-e2e.browser.test.ts",
+          "role": "test",
+          "sha256": "99be2ee889bf725fd7d59be3f2eb1c2859a00c9ca0d994d56a150aebc609f4ad",
+          "cases": [
+            {
+              "id": "adapted:e2e-snapshot",
+              "testName": "should match previous one",
+              "fullName": "adapted Drei e2e screenshot (Playwright) should match previous one"
+            }
+          ]
+        },
+        {
+          "path": "packages/drei/audit/upstream-browser.json",
+          "role": "support",
+          "sha256": "e899a546a1c4b1de352796d50e3bb86ee3cd6a3f2fe51faede36363fa2fac2a4"
+        }
+      ]
+    },
+    {
+      "id": "drei-repo-authored-differential",
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
       "project": "drei-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Isolated View canary proving paired React/Octane Three-renderer selection outside the full adapted suite.",
+      "notes": "Runs the paired React/Octane characterization suite (including the View canary) under the non-overlapping drei-differential project. Octane-only guards stay in drei-guards.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/drei/audit/differential-runtime.json"
+      },
       "files": [
+        {
+          "path": "packages/drei/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "b906a3b42d514f22e5065777946443e6971d0c9a8aa0d3623a888ebea224e2ae"
+        },
+        {
+          "path": "packages/drei/audit/runtime-evidence.json",
+          "role": "support",
+          "sha256": "bb77d8f12fa1efe0d9d304c1deebcdde67432456992bb01bb6455d92aea5b224"
+        },
+        {
+          "path": "packages/drei/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "b8769998f398412afb00f94338685359f429d4cf0a2caee5567e3db9cada2fbd"
+        },
+        {
+          "path": "packages/drei/audit/upstream-test-artifacts.json",
+          "role": "support",
+          "sha256": "fdc175ffe1f69cd2d3afe99e707c8dc5535b022eb09f6887d11260261c0895fd"
+        },
+        {
+          "path": "packages/drei/scripts/check-react-parity.mjs",
+          "role": "support",
+          "sha256": "3e16a425d352e48bc311262bfd5aa5d9e13a25b599ff2e6133c1b26ff90cda24"
+        },
         {
           "path": "packages/drei/tests/differential/view.test.ts",
           "role": "test",
-          "sha256": "bef4f777d857efc53ca5f9b4cb1340ca3a280d3797ae0ac85d5f9f0168f7c3d6",
+          "sha256": "deeb76074dc54419c24bb23e55e2d04da0c1b2d741dccdbcd1b0e4a419476112",
           "cases": [
             {
               "id": "differential:view-rendering",
@@ -124,16 +164,6 @@
               "id": "differential:view-visibility",
               "testName": "matches invisible and offscreen clear/render boundaries and event connection cleanup",
               "fullName": "View matches invisible and offscreen clear/render boundaries and event connection cleanup"
-            },
-            {
-              "id": "differential:view-port-surface",
-              "testName": "preserves the View.Port static surface",
-              "fullName": "View preserves the View.Port static surface"
-            },
-            {
-              "id": "differential:view-renderer-boundary",
-              "testName": "documents the outside-DOM renderer boundary while keeping View.Port callable",
-              "fullName": "View documents the outside-DOM renderer boundary while keeping View.Port callable"
             }
           ]
         }
@@ -146,7 +176,7 @@
       "environment": "workspace-node",
       "project": "drei-pristine-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Repo-authored public-surface type assertions against pinned @react-three/drei with tsc. Group hashes and import-root structural comparison are enforced by scripts/react-parity/drei-types-lib.mjs.",
+      "notes": "Repo-authored public-surface type assertions against pinned @react-three/drei with tsc.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -156,7 +186,7 @@
         {
           "path": "packages/drei/typetests/pristine/public-api.test-d.ts",
           "role": "test",
-          "sha256": "fdf17cddfdc52e8cb630da6d412b1f2b0b6b293813e992f2bc2311a934fcc1b4",
+          "sha256": "76511be992ca6678425f22717debe31f46312cf1497db9f0d041cce1e35e3bfc",
           "cases": [
             {
               "id": "types:pristine",
@@ -166,24 +196,9 @@
           ]
         },
         {
-          "path": "packages/drei/typetests/pristine/tsconfig.json",
+          "path": "packages/drei/typetests/assertions.md",
           "role": "support",
-          "sha256": "346135592efdf66be1fa1978bb6a1c79256fbbbe10d6e0e6ae28200524fed97c"
-        },
-        {
-          "path": "packages/drei/audit/type-parity.json",
-          "role": "support",
-          "sha256": "40240195e3f3f5cdd20fbe46b47959f1cf1452c1eda4b6a59d343883d6d47eb8"
-        },
-        {
-          "path": "packages/drei/audit/pristine-types.json",
-          "role": "support",
-          "sha256": "8ec52952fd4525194b20458f80601d7ae65e53054546fbb37514e2339cc11e6f"
-        },
-        {
-          "path": "scripts/react-parity/drei-types-lib.mjs",
-          "role": "support",
-          "sha256": "80d59c9b897d4acfe0cbfcbdedb9670fa8ed291ea6c6f65c427d8567227d1f04"
+          "sha256": "4c7c154076e8b8548c1c14c5fbbf93279c40eb84f5e8909ab437cb9eb56a6d0f"
         }
       ]
     },
@@ -194,7 +209,7 @@
       "environment": "workspace-node",
       "project": "drei-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "The same assertion groups against @octanejs/drei with tsrx-tsc. Fail-closed against deleted assertions and non-import-root edits via drei-types-lib.",
+      "notes": "The same assertion groups against @octanejs/drei with tsrx-tsc.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -204,7 +219,7 @@
         {
           "path": "packages/drei/typetests/adapted/public-api.test-d.ts",
           "role": "test",
-          "sha256": "8819e2eee6d8bbd7d078f75de1964ca834da515dff49c9375de62da348b92ba5",
+          "sha256": "d3c2baa4c25635b7fc1ed2abf4aaefe9acf420fa8288d08280a6bba67247d5f8",
           "cases": [
             {
               "id": "types:adapted",
@@ -214,14 +229,9 @@
           ]
         },
         {
-          "path": "packages/drei/typetests/adapted/tsconfig.json",
+          "path": "packages/drei/typetests/assertions.md",
           "role": "support",
-          "sha256": "e367114dd3ea6ac51e879cbdb14a440e3043d00cca2d45824ffadc047c4de5c1"
-        },
-        {
-          "path": "packages/drei/audit/adapted-types.json",
-          "role": "support",
-          "sha256": "bdbc11657979de046ab94d34b43d92a4c86ff6683d2a2c39ac173a646e858f9d"
+          "sha256": "4c7c154076e8b8548c1c14c5fbbf93279c40eb84f5e8909ab437cb9eb56a6d0f"
         }
       ]
     }
@@ -229,17 +239,24 @@
   "divergences": [
     {
       "id": "view-renderer-boundary",
-      "caseIds": [
-        "differential:view-renderer-boundary"
+      "caseIds": ["ordinary:view-renderer-boundary"],
+      "ordinaryEvidence": [
+        {
+          "id": "ordinary:view-renderer-boundary",
+          "path": "packages/drei/tests/view-renderer-boundary.test.ts",
+          "sha256": "cb7ba202238e852df230ad227a78880bbafa1a4f6b8bd6bd2ea6a0d9f50ec731",
+          "testName": "documents the outside-DOM renderer boundary while keeping View.Port callable",
+          "fullName": "View renderer boundary documents the outside-DOM renderer boundary while keeping View.Port callable"
+        }
       ],
-      "upstreamResult": "React Drei can move View children between DOM and Three roots through tunnel-rat.",
-      "octaneResult": "Inline Canvas View works, while a DOM-root View reports Octane's renderer-boundary diagnostic and View.Port remains callable as a no-op.",
-      "rationale": "Octane components are statically owned by one renderer.",
-      "classification": "intentional-divergence",
-      "consumerImpact": "A View cannot transport authored Three children from an independent DOM root.",
-      "migrationGuidance": "Author View inside the Three Canvas and avoid the DOM-root View.Port transport form.",
+      "upstreamResult": "React Drei View can render from a DOM root and move authored Three children through View.Port via tunnel-rat.",
+      "octaneResult": "Calling View from an Octane DOM root fails with the universal renderer-boundary diagnostic, and View.Port is a callable no-op.",
+      "rationale": "Octane components are statically renderer-owned, so one component cannot switch between DOM and Three renderers or transport authored Three children between independent roots.",
+      "classification": "renderer-boundary",
+      "consumerImpact": "DOM-rooted View usage and View.Port tunneling are unavailable; inline Canvas views remain supported.",
+      "migrationGuidance": "Keep View under an Octane Three Canvas. Do not call View.Port from a DOM tree to host Three children.",
       "owner": "@octanejs/drei",
-      "reviewCondition": "Revisit if Octane gains cross-renderer component transport."
+      "reviewCondition": "Review if Octane gains cross-renderer component ownership or a supported tunnel between DOM and Three roots."
     }
   ]
 }

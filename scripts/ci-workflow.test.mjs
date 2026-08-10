@@ -199,6 +199,7 @@ describe('CI workflow aggregation', () => {
 		assert.match(parity, /name: React parity checks/);
 		assert.match(parity, /node-version: 24/);
 		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
+		assert.match(parity, /pnpm --filter website exec playwright install --with-deps chromium/);
 		assert.match(parity, /pnpm react-parity:check/);
 		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
 		assert.match(lint, /pnpm react-parity:test/);

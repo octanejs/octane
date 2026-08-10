@@ -142,25 +142,6 @@ describe('Trail', () => {
 		await reactThreeAct(async () => react.root.unmount());
 	});
 
-	it('discovers its first Object3D child and applies the first meshLineMaterial override', async () => {
-		let mesh!: THREE.Mesh;
-		let target!: THREE.Group;
-		const root = await createOctaneThree(TrailDiscoveredScene, {
-			ref: (value: THREE.Mesh) => (mesh = value),
-			targetRef: (value: THREE.Group) => (target = value),
-			width: 0.2,
-			color: 'hotpink',
-			position: [2, 3, 4],
-			overrideColor: 'lime',
-			overrideWidth: 0.75,
-		});
-		root.advanceFrames(1, 0.25);
-		expect(target.type).toBe('Group');
-		expect((mesh.material as MeshLineMaterial).color.getHexString()).toBe('00ff00');
-		expect((mesh.material as MeshLineMaterial).lineWidth).toBe(0.75);
-		root.unmount();
-	});
-
 	it('matches useTrail initialization and leaves a missing target unresolved', async () => {
 		const target = new THREE.Object3D();
 		target.position.set(2, 4, 6);

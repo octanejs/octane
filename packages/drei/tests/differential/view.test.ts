@@ -9,18 +9,20 @@ import {
 } from '@react-three/fiber';
 import { View as ReactView } from '@react-three/drei/web/View.js';
 import { createRoot as createOctaneRoot } from '@octanejs/three';
-import { createRoot as createOctaneDomRoot } from 'octane';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { View } from '../../src/web/View.three.tsrx';
-import { ViewDomBoundary } from '../_fixtures/view-dom-boundary.tsrx';
-import { ViewPortScene, ViewScene } from '../_fixtures/view.three.tsrx';
+import { ViewScene } from '../_fixtures/view.three.tsrx';
 
 beforeAll(() => {
 	(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 	extend(THREE as any);
 });
 type Record = [string, ...unknown[]];
+type EventState = {
+	events: { connected: unknown };
+	setEvents: (value: { connected?: unknown }) => void;
+	get?: () => { events: { connected: unknown } };
+};
 function renderer(canvas: HTMLCanvasElement, records: Record[]) {
 	let autoClear = true;
 	return {
@@ -77,6 +79,25 @@ function rect(values: Partial<DOMRect> = {}): DOMRect {
 	} as DOMRect;
 }
 
+function spySetEvents(state: EventState) {
+	const history: Array<{ connected?: unknown }> = [];
+	const prior = state.get ? state.get().events.connected : state.events.connected;
+	const original = state.setEvents.bind(state);
+	state.setEvents = function setEvents(value: { connected?: unknown }) {
+		history.push(value);
+		return original(value);
+	};
+	return { prior, history };
+}
+
+function ReactConnectedProbe({ onState }: { onState: (state: EventState) => void }) {
+	const state = useThree((current) => current);
+	React.useEffect(() => {
+		onState(state as EventState);
+	}, [state, onState]);
+	return null;
+}
+
 async function mountPair(props: any, trackRect = rect()) {
 	const reactRecords: Record[] = [];
 	const octaneRecords: Record[] = [];
@@ -87,9 +108,17 @@ async function mountPair(props: any, trackRect = rect()) {
 	let reactState!: RootState;
 	let reactGroup!: THREE.Group;
 	let octaneGroup!: THREE.Group;
+	let reactEventSpy: ReturnType<typeof spySetEvents> | undefined;
+	let octaneEventSpy: ReturnType<typeof spySetEvents> | undefined;
 	function Capture() {
 		reactState = useThree();
 		return null;
+	}
+	function onReactPortalState(state: EventState) {
+		if (!reactEventSpy) reactEventSpy = spySetEvents(state);
+	}
+	function onOctanePortalState(state: EventState) {
+		if (!octaneEventSpy) octaneEventSpy = spySetEvents(state);
 	}
 	const reactHost = document.createElement('div');
 	const reactCanvas = document.createElement('canvas');
@@ -110,6 +139,7 @@ async function mountPair(props: any, trackRect = rect()) {
 					ReactView,
 					{ ...props, track: { current: reactTrack }, ref: (v: THREE.Group) => (reactGroup = v) },
 					React.createElement('mesh', { name: 'view-child' }),
+					React.createElement(ReactConnectedProbe, { onState: onReactPortalState }),
 				),
 				React.createElement(Capture),
 			),
@@ -129,6 +159,7 @@ async function mountPair(props: any, trackRect = rect()) {
 		...props,
 		track: { current: octaneTrack },
 		viewRef: (v: THREE.Group) => (octaneGroup = v),
+		onConnectedState: onOctanePortalState,
 	});
 	await act(async () => {
 		for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -143,6 +174,8 @@ async function mountPair(props: any, trackRect = rect()) {
 		octaneTrack,
 		reactGroup,
 		octaneGroup,
+		reactEventSpy,
+		octaneEventSpy,
 	};
 }
 function normalize(records: Record[]) {
@@ -175,33 +208,54 @@ describe('View', () => {
 	// @parity-case differential:view-visibility
 	it('matches invisible and offscreen clear/render boundaries and event connection cleanup', async () => {
 		const invisible = await mountPair({ visible: false }, rect());
+		expect(invisible.reactEventSpy?.history).toContainEqual({ connected: invisible.reactTrack });
+		expect(invisible.octaneEventSpy?.history).toContainEqual({ connected: invisible.octaneTrack });
 		await act(async () => reactAdvance(1 / 60, true, invisible.reactState));
 		invisible.octaneRoot.store.getState().advance(1 / 60);
 		expect(normalize(invisible.octaneRecords)).toEqual(normalize(invisible.reactRecords));
 		expect(invisible.octaneRecords.some(([name]) => name === 'render')).toBe(false);
 		invisible.octaneRoot.unmount();
 		await act(async () => invisible.reactRoot.unmount());
+		expect(invisible.reactEventSpy?.history).toContainEqual({
+			connected: invisible.reactEventSpy?.prior,
+		});
+		expect(invisible.octaneEventSpy?.history).toContainEqual({
+			connected: invisible.octaneEventSpy?.prior,
+		});
+
 		const offscreen = await mountPair({ visible: true }, rect({ top: 200, bottom: 250 }));
+		expect(offscreen.reactEventSpy?.history).toContainEqual({ connected: offscreen.reactTrack });
+		expect(offscreen.octaneEventSpy?.history).toContainEqual({ connected: offscreen.octaneTrack });
 		await act(async () => reactAdvance(1 / 60, true, offscreen.reactState));
 		offscreen.octaneRoot.store.getState().advance(1 / 60);
+		await act(async () => {
+			for (let i = 0; i < 8; i++) await Promise.resolve();
+		});
+		const reactRendersAfterSettle = offscreen.reactRecords.filter(
+			([name]) => name === 'render',
+		).length;
+		const octaneRendersAfterSettle = offscreen.octaneRecords.filter(
+			([name]) => name === 'render',
+		).length;
+		await act(async () => reactAdvance(2 / 60, true, offscreen.reactState));
+		offscreen.octaneRoot.store.getState().advance(2 / 60);
+		await act(async () => {
+			for (let i = 0; i < 8; i++) await Promise.resolve();
+		});
 		expect(normalize(offscreen.octaneRecords)).toEqual(normalize(offscreen.reactRecords));
+		expect(offscreen.reactRecords.filter(([name]) => name === 'render')).toHaveLength(
+			reactRendersAfterSettle,
+		);
+		expect(offscreen.octaneRecords.filter(([name]) => name === 'render')).toHaveLength(
+			octaneRendersAfterSettle,
+		);
 		offscreen.octaneRoot.unmount();
 		await act(async () => offscreen.reactRoot.unmount());
-	});
-
-	// @parity-case differential:view-port-surface
-	it('preserves the View.Port static surface', () => {
-		expect(View.Port).toBeTypeOf('function');
-		expect(ReactView.Port).toBeTypeOf('function');
-	});
-
-	// @parity-case differential:view-renderer-boundary
-	// OCTANE DIVERGENCE[view-renderer-boundary][differential:view-renderer-boundary]
-	it('documents the outside-DOM renderer boundary while keeping View.Port callable', () => {
-		const root = createOctaneDomRoot(document.createElement('div'));
-		expect(() => root.render(ViewDomBoundary, {})).toThrow(
-			'Universal hooks may only run while a universal component is rendering.',
-		);
-		expect(() => View.Port).not.toThrow();
+		expect(offscreen.reactEventSpy?.history).toContainEqual({
+			connected: offscreen.reactEventSpy?.prior,
+		});
+		expect(offscreen.octaneEventSpy?.history).toContainEqual({
+			connected: offscreen.octaneEventSpy?.prior,
+		});
 	});
 });

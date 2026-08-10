@@ -28,13 +28,15 @@ The complete tagged test tree contains exactly four artifacts, all under
 They form one whole-gallery Playwright screenshot case. Their byte hashes and
 dispositions are recorded in `audit/upstream-test-artifacts.json`.
 
-That gallery runner is **out of scope** for the Vitest/Jest React-parity harness:
-`e2e.sh` packs a release tarball and boots temporary Vite/Next apps before
-Playwright compares a whole-canvas screenshot. Octane's parity execution kinds
-are `vitest-full` and `jest-full`, so the pin treats the upstream runtime suite
-as `absent` for harness purposes while still vendoring the four artifacts with
-an explicit `out-of-scope` reason. Export-level behavior is covered by
-repo-authored paired React/Octane Vitest tests instead.
+The full tarball/Vite/Next workflow in `e2e.sh` remains out of scope. The
+vendored `snapshot.test.ts` case now runs unchanged in Chromium through the
+`playwright-full` lane, which creates the small Vite React app it expects from
+the byte-exact vendored `App.tsx`. The separate `drei-adapted-browser` Vitest
+project ports that scene to Octane and uses the same screenshot oracle; it is
+adapted evidence, never a claim that the upstream test ran there. The upstream
+runtime suite remains `insufficient`: its one case is genuine pristine evidence,
+but an incomplete suite cannot replace the required upstream-suite lanes and
+repo-authored differential evidence.
 
 The tag contains no upstream type-test suite. The upstream `tsconfig.json`
 compiles package source, while the `@ts-expect-error` comments in that source are
@@ -46,26 +48,29 @@ package typecheck.
 
 ## Executable parity evidence
 
-`audit/react-parity.json` registers the adapted `drei` Vitest project (paired
-files only), an isolated `drei-differential` View canary, and repo-authored
-pristine/adapted type lanes with the global `react-parity:check` harness.
-`audit/test-classifications.json` gives every port-authored test file exactly
-one disposition. Paired files import the pinned React Drei oracle in the test
-body; `config.test.ts`, `crosswalk-guard.test.ts`, and `react-parity-guard.test.ts`
-are Octane-only and execute in the ordinary `drei-guards` project outside
-`testExecution`.
+`audit/react-parity.json` registers the pristine upstream Playwright lane, the
+separate adapted upstream browser lane, the `drei-differential` Vitest project
+(all paired React/Octane characterization files, including the View canary), and
+repo-authored pristine/adapted type lanes with the global `react-parity:check`
+harness. The View renderer-boundary divergence cites an ordinary
+`ordinary:view-renderer-boundary` audit identity (not a React-parity lane) so
+authentication stays in the ordinary `drei-guards` project.
+`audit/test-classifications.json` gives every port-authored runtime and type
+test file exactly one disposition. Paired files import the pinned React Drei
+oracle in the test body; `config.test.ts`, `crosswalk-guard.test.ts`,
+`react-parity-guard.test.ts`, and `view-renderer-boundary.test.ts` are
+Octane-only and execute in the ordinary `drei-guards` project outside
+`testExecution`. Ordinary `typetests/*.test-d.ts` files are classified
+Octane-only and stay outside parity evidence; only the public-API pair under
+`typetests/{pristine,adapted}/` is parity type evidence.
 
 `audit/runtime-evidence.json` hashes every test file and every collected assertion
-inventory. `audit/upstream-test-artifacts.json` records the out-of-scope Playwright
-gallery and an empty transformation ledger. The package checker
-(`scripts/check-react-parity.mjs`) is invoked from the generic
-`scripts/react-parity/check.mjs` path via `drei-parity-lib.mjs`, so omitting that
-wiring fails the shared audit. Type lanes are fail-closed: `drei-types-lib.mjs`
-compares assertion-group inventories and an allowed import-root transformation
-between the pristine and adapted public-api probes, with negative controls for a
-deleted assertion or removed `@ts-expect-error`. The audit guard also covers a
-skipped test file, removed upstream `@ts-expect-error` inventory entry, and
-fabricated upstream type suite.
+inventory. `audit/upstream-test-artifacts.json` records the executed screenshot
+case and its supporting artifacts. `typetests/assertions.md` defines the
+permitted import/comment transformations and shared assertion groups. The audit
+guard includes negative controls for a dropped differential inventory file, deleted
+assertion, removed upstream `@ts-expect-error` inventory entry, and fabricated
+upstream type suite.
 
 ## Completeness contract
 

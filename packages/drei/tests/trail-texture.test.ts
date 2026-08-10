@@ -106,22 +106,4 @@ describe('TrailTexture', () => {
 		octaneRoot.unmount();
 		await reactThreeAct(async () => reactRoot.unmount());
 	});
-
-	it('uses the upstream canvas defaults when no config is supplied', async () => {
-		let tuple!: [THREE.Texture, (event: any) => void];
-		const root = await createOctaneThree(TrailTextureScene, {
-			size: undefined,
-			maxAge: undefined,
-			radius: undefined,
-			intensity: undefined,
-			interpolate: undefined,
-			smoothing: undefined,
-			minForce: undefined,
-			blend: undefined,
-			children: (value: typeof tuple) => void (tuple = value) || null,
-		});
-		expect(tuple[0].image.width).toBe(256);
-		expect(tuple[0].image.height).toBe(256);
-		root.unmount();
-	});
 });

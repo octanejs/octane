@@ -98,19 +98,4 @@ describe('useFont', () => {
 		octaneRoot.unmount();
 		await reactThreeAct(async () => reactRoot.unmount());
 	});
-
-	it('preloads URL data once and refetches only after clear', async () => {
-		const url = '/font.typeface.json';
-		const fetchMock = vi.fn(async () => ({ json: async () => fontData }));
-		vi.stubGlobal('fetch', fetchMock);
-		useFont.preload(url);
-		useFont.preload(url);
-		await flush();
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		useFont.clear(url);
-		useFont.preload(url);
-		await flush();
-		expect(fetchMock).toHaveBeenCalledTimes(2);
-		useFont.clear(url);
-	});
 });

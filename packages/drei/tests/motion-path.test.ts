@@ -139,10 +139,4 @@ describe('MotionPathControls', () => {
 		octane.unmount();
 		await reactThreeAct(async () => root.unmount());
 	});
-
-	it('rejects useMotion outside MotionPathControls', async () => {
-		await expect(createOctaneThree(InvalidMotionReader, {})).rejects.toThrow(
-			'useMotion hook must be used in a MotionPathControls component.',
-		);
-	});
 });

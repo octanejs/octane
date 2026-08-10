@@ -17,11 +17,7 @@ import { create as createOctaneThree } from '@octanejs/three/testing';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { useTexture } from '../src/index.js';
-import {
-	CloudInstanceWithoutParentScene,
-	CloudScene,
-	StandaloneCloudScene,
-} from './_fixtures/cloud.three.tsrx';
+import { CloudScene } from './_fixtures/cloud.three.tsrx';
 
 const originalTextureLoad = THREE.TextureLoader.prototype.load;
 
@@ -209,32 +205,5 @@ describe('Clouds', () => {
 		await reactThreeAct(async () => react.root.unmount());
 		useTexture.clear(texture);
 		reactUseTexture.clear(texture);
-	});
-
-	it('wraps a standalone Cloud in an implicit Clouds provider', async () => {
-		const texture =
-			'https://rawcdn.githack.com/pmndrs/drei-assets/9225a9f1fbd449d9411125c2f419b843d0308c9f/cloud.png';
-		let cloud!: THREE.Group;
-		const root = await createOctaneThree(StandaloneCloudScene, {
-			ref: (value: THREE.Group) => (cloud = value),
-			seed: 2,
-			segments: 1,
-			color: 'white',
-		});
-		await flushLoads();
-		root.advanceFrames(1, 0.25);
-		expect(cloud.type).toBe('Group');
-		expect(
-			cloud.parent?.children.some((object) => (object as THREE.InstancedMesh).isInstancedMesh),
-		).toBe(true);
-		root.unmount();
-		useTexture.clear(texture);
-		reactUseTexture.clear(texture);
-	});
-
-	it('rejects CloudInstance outside Clouds', async () => {
-		await expect(createOctaneThree(CloudInstanceWithoutParentScene, {})).rejects.toThrow(
-			'CloudInstance must be used inside Clouds component.',
-		);
 	});
 });

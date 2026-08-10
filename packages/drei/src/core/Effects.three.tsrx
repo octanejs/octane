@@ -14,6 +14,7 @@ import {
 	RenderPass,
 	ShaderPass,
 } from 'three-stdlib';
+import { isOctaneChildrenBlock } from './octane-element.js';
 
 const EffectComposerElement = extend(EffectComposer);
 const RenderPassElement = extend(RenderPass);
@@ -38,17 +39,21 @@ function assignRef<T>(ref: ThreeRef<T> | undefined, value: T | null): void {
 	else if (ref && 'current' in ref) ref.current = value;
 }
 
-function appendPasses(passes: any[], children: any): void {
+function appendPasses(passes: any[], children: unknown): void {
 	if (Array.isArray(children)) {
 		for (const child of children) appendPasses(passes, child);
 		return;
 	}
-	if (children == null || typeof children === 'boolean') return;
+	// Universal plan/element descriptors are objects. Compiled children blocks and
+	// other functions are not cloneable — those render through auto-attach instead.
+	if (children == null || typeof children === 'boolean' || typeof children === 'function') return;
+	if (typeof children !== 'object') return;
+	const element = children as { props?: Record<string, unknown> };
 	const key = passes.length;
 	passes.push({
-		...children,
+		...element,
 		key: String(key),
-		props: { ...children.props, key, attach: `passes-${key}` },
+		props: { ...element.props, key, attach: `passes-${key}` },
 	});
 }
 
@@ -104,7 +109,8 @@ export function Effects({
 	if (!disableGamma) {
 		passes.push(<ShaderPassElement key="gammapass" attach={`passes-${passes.length}`} args={[GammaCorrectionShader]} />);
 	}
-	appendPasses(passes, children);
+	const blockChildren = isOctaneChildrenBlock(children) ? children : null;
+	if (!blockChildren) appendPasses(passes, children);
 	<EffectComposerElement
 		ref={mergedRef}
 		args={[gl as any, target]}
@@ -112,5 +118,6 @@ export function Effects({
 		{...props as any}
 	>
 		{passes}
+		{blockChildren}
 	</EffectComposerElement>
 }

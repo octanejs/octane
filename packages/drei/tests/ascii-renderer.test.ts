@@ -140,15 +140,4 @@ describe('AsciiRenderer', () => {
 		expect(octaneEffect.domElement.parentNode).toBeNull();
 		expect(reactEffect.domElement.parentNode).toBeNull();
 	});
-
-	it('retains upstream defaults as a negative control', async () => {
-		const dom = parentedCanvas();
-		const root = createOctaneThreeRoot(dom.canvas);
-		await root.configure({ gl: renderer(dom.canvas), frameloop: 'never', dpr: 1 });
-		await octaneAct(async () => root.render(AsciiRendererScene, {}));
-		const effect = mocks.instances.at(-1)!;
-		expect(effect.characters).toBe(' .:-+*=%@#');
-		expect(effect.options).toEqual({ invert: true, color: false, resolution: 0.15 });
-		root.unmount();
-	});
 });

@@ -219,11 +219,16 @@ describe('VideoTexture', () => {
 describe('screen and webcam video textures', () => {
 	it('matches media acquisition options/defaults and stops every track on cleanup', async () => {
 		const screenTrack = { stop: vi.fn() };
-		const webcamTrack = { stop: vi.fn() };
+		const reactWebcamTrack = { stop: vi.fn() };
+		const octaneWebcamTrack = { stop: vi.fn() };
 		const screenStream = { getTracks: () => [screenTrack] } as unknown as MediaStream;
-		const webcamStream = { getTracks: () => [webcamTrack] } as unknown as MediaStream;
+		const reactWebcamStream = { getTracks: () => [reactWebcamTrack] } as unknown as MediaStream;
+		const octaneWebcamStream = { getTracks: () => [octaneWebcamTrack] } as unknown as MediaStream;
 		const getDisplayMedia = vi.fn(async () => screenStream);
-		const getUserMedia = vi.fn(async () => webcamStream);
+		const getUserMedia = vi
+			.fn()
+			.mockResolvedValueOnce(reactWebcamStream)
+			.mockResolvedValueOnce(octaneWebcamStream);
 		Object.defineProperty(navigator, 'mediaDevices', {
 			configurable: true,
 			value: { getDisplayMedia, getUserMedia },
@@ -262,16 +267,46 @@ describe('screen and webcam video textures', () => {
 		await flush();
 
 		const constraints = { audio: false, video: { facingMode: 'environment' } };
+		const reactWebcamCanvas = document.createElement('canvas');
+		const reactWebcamRoot = createReactThreeRoot(reactWebcamCanvas);
+		await reactWebcamRoot.configure({
+			gl: renderer(reactWebcamCanvas),
+			frameloop: 'never',
+			dpr: 1,
+		});
+		await reactThreeAct(async () =>
+			reactWebcamRoot.render(
+				React.createElement(
+					React.Suspense,
+					{ fallback: null },
+					React.createElement(ReactWebcamVideoTexture, {
+						constraints,
+						start: false,
+						children: function () {
+							return null;
+						},
+					}),
+				),
+			),
+		);
+		await flush();
+		expect(getUserMedia).toHaveBeenLastCalledWith(constraints);
+		await reactThreeAct(async () => reactWebcamRoot.unmount());
+		await flush();
+		expect(reactWebcamTrack.stop).toHaveBeenCalledOnce();
+
 		const octaneWebcam = await createOctaneThree(WebcamVideoTextureScene, {
 			constraints,
 			ref: () => {},
-			children: () => null,
+			children: function () {
+				return null;
+			},
 		});
 		await flush();
-		expect(getUserMedia).toHaveBeenCalledWith(constraints);
+		expect(getUserMedia).toHaveBeenLastCalledWith(constraints);
 		octaneWebcam.unmount();
 		await flush();
 		expect(screenTrack.stop.mock.calls.length).toBeGreaterThanOrEqual(2);
-		expect(webcamTrack.stop).toHaveBeenCalledOnce();
+		expect(octaneWebcamTrack.stop).toHaveBeenCalledOnce();
 	});
 });

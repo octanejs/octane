@@ -1,0 +1,442 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repository": "https://github.com/eugeniosegala/doom-react-three-fiber",
+    "commit": "b48daeb3f91b8d8175a1d59d6a9c0c6c3b47caa0",
+    "observedAt": "2026-08-02",
+    "license": "NOASSERTION",
+    "vendored": false,
+    "sourcePolicy": "External behavior oracle only; source and assets are neither committed nor packaged."
+  },
+  "attestations": {
+    "oracleResearcher": "isolated-oracle-agent-2026-08-02",
+    "migrationImplementer": "clean-room-octane-implementation-context",
+    "reviewer": "octane-pr-review"
+  },
+  "behaviors": [
+    {
+      "id": "route-landing",
+      "required": true,
+      "observation": "The root and unknown routes present a landing state with a start action.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "builds hashed production assets and server-renders the landing state without browser globals"
+        }
+      ]
+    },
+    {
+      "id": "route-level",
+      "required": true,
+      "observation": "The start action enters the single playable level.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "loading",
+      "required": true,
+      "observation": "A loading overlay precedes the playable level.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "stats",
+      "required": true,
+      "observation": "A frame statistics panel is present during play.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "crosshair-weapon",
+      "required": true,
+      "observation": "Play shows a centered crosshair and bottom weapon overlay.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "start-gesture",
+      "required": true,
+      "observation": "A user gesture requests pointer lock and unlocks background audio.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "aim",
+      "required": true,
+      "observation": "Mouse movement changes view direction while pointer lock is active.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "pointer-lock aim"
+        }
+      ]
+    },
+    {
+      "id": "movement",
+      "required": true,
+      "observation": "WASD moves relative to view and diagonal movement is normalized.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        },
+        {
+          "kind": "unit",
+          "target": "moves exactly 0.09 and normalizes diagonals"
+        }
+      ]
+    },
+    {
+      "id": "movement-cadence",
+      "required": true,
+      "observation": "Movement advances by 0.09 world units per fixed simulation update at player height 1.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "moves exactly 0.09 and normalizes diagonals"
+        }
+      ]
+    },
+    {
+      "id": "collision",
+      "required": true,
+      "observation": "Walls, the blocking prop, and enemy bodies prevent movement within the observed radius.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "uses the contract collision radii at their boundaries"
+        }
+      ]
+    },
+    {
+      "id": "shoot",
+      "required": true,
+      "observation": "Space press or hold fires no faster than every 650ms and retains one player projectile.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        },
+        {
+          "kind": "unit",
+          "target": "retains one player projectile and enforces fire and weapon schedules"
+        }
+      ]
+    },
+    {
+      "id": "weapon-animation",
+      "required": true,
+      "observation": "The firing weapon animation lasts 350ms.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "retains one player projectile and enforces fire and weapon schedules"
+        }
+      ]
+    },
+    {
+      "id": "player-projectile",
+      "required": true,
+      "observation": "A projectile spawns one unit along view, advances 0.8 units per update, and disappears near walls or enemies.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        },
+        {
+          "kind": "unit",
+          "target": "retains one player projectile and enforces fire and weapon schedules"
+        }
+      ]
+    },
+    {
+      "id": "enemy-population",
+      "required": true,
+      "observation": "The level starts with five one-hit enemies.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        },
+        {
+          "kind": "unit",
+          "target": "starts with the exact semantic population and no invented player systems"
+        }
+      ]
+    },
+    {
+      "id": "enemy-wander",
+      "required": true,
+      "observation": "Idle enemies billboard and wander, reconsidering direction after three seconds.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "uses exact idle, chase, and raw enemy projectile schedules"
+        }
+      ]
+    },
+    {
+      "id": "enemy-aggro",
+      "required": true,
+      "observation": "Enemies aggro within 15 units when grid line-of-sight is clear and stop advancing within 2 units.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "uses exact idle, chase, and raw enemy projectile schedules"
+        }
+      ]
+    },
+    {
+      "id": "enemy-shoot",
+      "required": true,
+      "observation": "Aggro enemies fire no faster than every 1000ms and enemy projectiles collide with walls or the player.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "uses exact idle, chase, and raw enemy projectile schedules"
+        }
+      ]
+    },
+    {
+      "id": "no-player-health",
+      "required": true,
+      "observation": "Enemy hits have no player-health, damage, death, or game-over consequence.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "consumes enemy hits without adding player damage consequences"
+        }
+      ]
+    },
+    {
+      "id": "enemy-death",
+      "required": true,
+      "observation": "One player hit kills an enemy, plays death feedback, animates for 1000ms, then leaves a collidable corpse.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "turns one hit into a 1000ms death and collidable corpse"
+        }
+      ]
+    },
+    {
+      "id": "collectible-population",
+      "required": true,
+      "observation": "The level starts with eleven collectibles.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        },
+        {
+          "kind": "unit",
+          "target": "starts with the exact semantic population and no invented player systems"
+        }
+      ]
+    },
+    {
+      "id": "collectible",
+      "required": true,
+      "observation": "A collectible within one unit plays feedback and disappears.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "preserves the collectible restoration quirk"
+        }
+      ]
+    },
+    {
+      "id": "collectible-restore-quirk",
+      "required": true,
+      "observation": "Collecting another item can restore a previously collected item; this oracle quirk remains explicit.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "preserves the collectible restoration quirk"
+        }
+      ]
+    },
+    {
+      "id": "animated-pixel-surfaces",
+      "required": true,
+      "observation": "Enemy, collectible, decorative, weapon, and death visuals animate with pixel-art filtering.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "audio",
+      "required": true,
+      "observation": "Background, firing, collection, and death each have audible state; every projectile uses firing feedback at volume 0.5.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        },
+        {
+          "kind": "manual",
+          "target": "audibility and pointer-feel checklist"
+        }
+      ]
+    },
+    {
+      "id": "pointer-unlock",
+      "required": true,
+      "observation": "Escape unlocks aim without pausing simulation or keyboard movement.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "pointer unlock behavior"
+        }
+      ]
+    },
+    {
+      "id": "browser-back",
+      "required": true,
+      "observation": "Browser back exits to landing; re-entry resets level actors and player state.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "browser back to landing"
+        }
+      ]
+    },
+    {
+      "id": "no-win-hud",
+      "required": true,
+      "observation": "The oracle has no win condition, score, health, ammo, touch controls, pause, reset, or in-game exit control.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "target": "starts with the exact semantic population and no invented player systems"
+        }
+      ]
+    },
+    {
+      "id": "permission-retry",
+      "required": true,
+      "observation": "Rejected pointer-lock or audio attempts remain recoverable through another user gesture.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    },
+    {
+      "id": "webgl-failure",
+      "required": true,
+      "observation": "WebGL unavailability exposes an actionable application failure rather than a false playable state.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "WebGL failure recovery"
+        }
+      ]
+    },
+    {
+      "id": "cleanup",
+      "required": true,
+      "observation": "Route exit and unmount do not leave duplicate listeners, frames, audio, or stale input on re-entry.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "target": "plays through permissions, input, combat, rendering, retry, and repeated cleanup"
+        }
+      ]
+    }
+  ],
+  "constructs": [
+    {
+      "id": "react-composition-hooks",
+      "family": "React",
+      "classification": "mechanically-transformed",
+      "evidence": "TSRX components and Octane hooks preserve the observable application lifecycle."
+    },
+    {
+      "id": "r3f-scene-runtime",
+      "family": "React Three Fiber",
+      "classification": "unchanged",
+      "evidence": "Public @octanejs/three Canvas, frame, camera, event, scene, material, and geometry APIs own the renderer behavior."
+    },
+    {
+      "id": "drei-web-helpers",
+      "family": "Drei",
+      "classification": "unchanged",
+      "evidence": "Public @octanejs/drei Stats, Instance, and Instances exports are consumed by the WebGL scene. The loading shell is app-owned because Loader depends on client-only renderer progress during SSR."
+    },
+    {
+      "id": "zustand-action-store",
+      "family": "Zustand",
+      "classification": "mechanically-transformed",
+      "evidence": "Application state uses public Octane hooks; no compatibility shim is embedded in the game."
+    },
+    {
+      "id": "octane-compiler-slots",
+      "family": "Octane",
+      "classification": "owned-divergence",
+      "evidence": "Compiler-owned hook slots and renderer-specific .three.tsrx modules are structural only and preserve the behavior contract."
+    }
+  ],
+  "assets": [
+    {
+      "id": "procedural-audio",
+      "path": "playground/octane/src/demos/doom/assets.ts",
+      "sha256": "34f7be50229470546985a112181d6d9dd8f345e8f461ae1838a4c2cb8c4282ae",
+      "kind": "source-authored",
+      "license": "MIT",
+      "creator": "Octane contributors",
+      "role": "Synthesized audio cues generated from original oscillator parameters at runtime."
+    },
+    {
+      "id": "procedural-visual-shell",
+      "path": "playground/octane/src/demos/doom/Doom.tsrx",
+      "sha256": "2d125d6e1f40f01be7af9e1b83ac6f89b4570dc0819f9c5725700512c6c57ff7",
+      "kind": "source-authored",
+      "license": "MIT",
+      "creator": "Octane contributors",
+      "role": "DOM/HUD weapon chrome, decorative overlays, and CSS-authored visual presentation."
+    },
+    {
+      "id": "procedural-visual-three",
+      "path": "playground/octane/src/demos/doom/Doom.three.tsrx",
+      "sha256": "1e81953068259e30d22397e1c20cdea1c301879f2d4cff0905b87f0bc453196b",
+      "kind": "source-authored",
+      "license": "MIT",
+      "creator": "Octane contributors",
+      "role": "Three-scene textures, materials, and sprite-like mesh presentation authored as source."
+    },
+    {
+      "id": "procedural-visual-model",
+      "path": "playground/octane/src/demos/doom/model.ts",
+      "sha256": "7310315473deff5e7418820a2942e15d08abe4c2f5a67a56f482e8b0087bf500",
+      "kind": "source-authored",
+      "license": "MIT",
+      "creator": "Octane contributors",
+      "role": "Game-model numeric constants that drive procedural layout and visual state."
+    }
+  ]
+}

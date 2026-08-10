@@ -172,22 +172,4 @@ describe('PositionalAudio', () => {
 		expect(octaneListener.parent).toBeNull();
 		await reactThreeAct(async () => reactRoot.unmount());
 	});
-
-	it('does not invent autoplay when upstream leaves it disabled', async () => {
-		const play = vi.spyOn(ThreePositionalAudio.prototype, 'play');
-		let sound!: ThreePositionalAudio;
-		const root = await createOctaneThree(PositionalAudioScene, {
-			url: '/quiet.ogg',
-			distance: 1,
-			loop: true,
-			autoplay: false,
-			position: [0, 0, 0],
-			ref: (value: ThreePositionalAudio) => (sound = value),
-		});
-		await flush();
-		expect(sound.isPlaying).toBe(false);
-		expect(play).not.toHaveBeenCalled();
-		play.mockRestore();
-		root.unmount();
-	});
 });

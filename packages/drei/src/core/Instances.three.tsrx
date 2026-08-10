@@ -255,7 +255,9 @@ export function Merged({ meshes, children, ref, ...props }: MergedProps & {
 			(accumulator, key, index) => ({ ...accumulator, [key]: args[index] }),
 			{},
 		) as InstanceComponent & Record<string, InstanceComponent>);
-	const rendered = renderRecursive(render, components);
+	const rendered = typeof children === 'function' && !isOctaneChildrenBlock(children)
+		? renderRecursive(render, components)
+		: children as UniversalRenderable;
 	<group ref={ref}>{rendered}</group>
 }
 

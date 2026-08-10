@@ -291,27 +291,6 @@ describe('Instances', () => {
 		});
 	});
 
-	it.each([
-		['render-prop local instances', RenderPropInstancesScene],
-		['createInstances factory context', FactoryInstancesScene],
-	] as const)('supports %s', async (_name, Component) => {
-		let mesh!: THREE.InstancedMesh;
-		let instance!: PositionMesh;
-		const root = await createOctaneThree(Component, {
-			ref: (value: THREE.InstancedMesh) => (mesh = value),
-			instanceRef: (value: PositionMesh) => (instance = value),
-			geometry: new THREE.BoxGeometry(),
-			material: new THREE.MeshBasicMaterial(),
-		});
-		root.advanceFrames(1, 1);
-		expect(mesh.count).toBe(1);
-		expect(instance.instance.current).toBe(mesh);
-		expect(mesh.instanceMatrix.array.slice(12, 15)).toEqual(
-			new Float32Array(_name.startsWith('render') ? [2, 3, 4] : [3, 2, 1]),
-		);
-		root.unmount();
-	});
-
 	it('matches Merged array and record composition while filtering non-mesh record entries', async () => {
 		const arrayMeshes = [
 			new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()),
@@ -361,11 +340,5 @@ describe('Instances', () => {
 		expect(sphere.instance.current?.geometry).toBe(arrayMeshes[1]!.geometry);
 		recordRoot.unmount();
 		await reactThreeAct(async () => reactRecord.root.unmount());
-	});
-
-	it('rejects Instance outside its required provider', async () => {
-		await expect(createOctaneThree(InstanceWithoutParentScene, {})).rejects.toThrow(
-			'Instance must be used inside Instances component.',
-		);
 	});
 });

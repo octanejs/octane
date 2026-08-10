@@ -43,7 +43,7 @@ async function flush(): Promise<void> {
 	});
 }
 
-async function mountPair(props: FacemeshProps) {
+async function mountPair(props: FacemeshProps, afterReactMount?: () => void) {
 	let reactApi: ReactFacemeshApi | null = null;
 	let octaneApi: FacemeshApi | null = null;
 	const reactCanvas = document.createElement('canvas');
@@ -63,6 +63,7 @@ async function mountPair(props: FacemeshProps) {
 			),
 		),
 	);
+	afterReactMount?.();
 	const octaneCanvas = document.createElement('canvas');
 	const octaneRoot = createOctaneRoot(octaneCanvas);
 	await octaneRoot.configure({ gl: renderer(octaneCanvas), frameloop: 'never', dpr: 1 });
@@ -157,14 +158,24 @@ describe('Facemesh', () => {
 		await unmountPair(pair);
 	});
 
-	it('matches the missing-blendshape warning boundary', async () => {
+	it('matches the missing-blendshape warning boundary', async function () {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		const pair = await mountPair({ points: FacemeshDatas.SAMPLE_FACE.keypoints, eyes: true });
 		const warning = 'Facemesh `eyes` option only works if `faceBlendshapes` is provided: skipping.';
-		// React's development root may replay effects; both roots must emit the exact boundary warning.
-		expect(
-			warn.mock.calls.filter(([message]) => message === warning).length,
-		).toBeGreaterThanOrEqual(2);
+		let reactWarnings = 0;
+		const pair = await mountPair(
+			{ points: FacemeshDatas.SAMPLE_FACE.keypoints, eyes: true },
+			function () {
+				reactWarnings = warn.mock.calls.filter(function ([message]) {
+					return message === warning;
+				}).length;
+				warn.mockClear();
+			},
+		);
+		const octaneWarnings = warn.mock.calls.filter(function ([message]) {
+			return message === warning;
+		}).length;
+		expect(reactWarnings).toBeGreaterThanOrEqual(1);
+		expect(octaneWarnings).toBeGreaterThanOrEqual(1);
 		await unmountPair(pair);
 		warn.mockRestore();
 	});

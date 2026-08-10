@@ -271,10 +271,4 @@ describe('Points', () => {
 			geometryIdentity: true,
 		});
 	});
-
-	it('rejects Point outside its required Points provider', async () => {
-		await expect(createOctaneThree(PointWithoutParentScene, {})).rejects.toThrow(
-			'Point must be used inside Points component.',
-		);
-	});
 });

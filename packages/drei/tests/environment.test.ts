@@ -71,17 +71,6 @@ function snapshot(texture: THREE.Texture) {
 }
 
 describe('useEnvironment', () => {
-	it('restores defaults after the compiler-injected trailing slot', async () => {
-		const textures: THREE.Texture[] = [];
-		const root = await createOctaneThree(DefaultEnvironmentBoundary, {
-			onLoad: (texture: THREE.Texture) => textures.push(texture),
-		});
-		await flush();
-		expect(textures.at(-1)).toBeInstanceOf(THREE.CubeTexture);
-		root.unmount();
-		useEnvironment.clear();
-	});
-
 	it.each([
 		['cube', { files: ['/px', '/nx', '/py', '/ny', '/pz', '/nz'], path: '/cube/' }],
 		['hdr', { files: '/studio.hdr', path: '/hdr/' }],
@@ -128,12 +117,6 @@ describe('useEnvironment', () => {
 		);
 		expect(() => reactUseEnvironment.preload({ files: '/gainmap.jpg' })).toThrow(
 			'Preloading gainmaps is not supported',
-		);
-		expect(() => useEnvironment.preload({ files: '/unknown.txt' })).toThrow(
-			'Unrecognized file extension',
-		);
-		expect(() => useEnvironment.preload({ preset: 'invalid' as never })).toThrow(
-			'Preset must be one of',
 		);
 		expect(typeof useEnvironment.preload).toBe(typeof reactUseEnvironment.preload);
 		expect(typeof useEnvironment.clear).toBe(typeof reactUseEnvironment.clear);

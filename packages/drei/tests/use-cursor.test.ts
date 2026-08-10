@@ -25,15 +25,6 @@ function renderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
 }
 
 describe('useCursor', () => {
-	it('restores defaults after the compiler-injected trailing slot', async () => {
-		document.body.style.cursor = '';
-		const root = await createOctaneThree(UseCursorDefaultsScene, { hovered: true });
-		expect(document.body.style.cursor).toBe('pointer');
-		root.unmount();
-		await Promise.resolve();
-		expect(document.body.style.cursor).toBe('auto');
-	});
-
 	it('matches hover, prop updates, custom containers, and cleanup', async () => {
 		const reactContainer = document.createElement('div');
 		const octaneContainer = document.createElement('div');

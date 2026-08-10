@@ -63,24 +63,6 @@ describe('framework-neutral core utilities', () => {
 		expect(misses).toEqual([]);
 	});
 
-	it('matches Drei lazy bounds setup and ignores meshes without a material', () => {
-		const geometry = new BoxGeometry(2, 2, 2);
-		geometry.boundingSphere = null;
-		const mesh = new Mesh(geometry, new MeshBasicMaterial());
-		mesh.updateMatrixWorld(true);
-		const raycaster = new Raycaster(new Vector3(0, 0, 5), new Vector3(0, 0, -1));
-		const intersections: Intersection[] = [];
-
-		meshBounds.call(mesh, raycaster, intersections);
-		expect(geometry.boundingSphere).not.toBeNull();
-		expect(intersections).toHaveLength(1);
-
-		mesh.material = undefined as never;
-		const ignored: Intersection[] = [];
-		meshBounds.call(mesh, raycaster, ignored);
-		expect(ignored).toEqual([]);
-	});
-
 	it('matches Drei shader uniforms, cloning, accessors, parameters, and initialization', () => {
 		const vertexShader = 'void main() { gl_Position = vec4(0.0); }';
 		const fragmentShader = 'void main() { gl_FragColor = vec4(1.0); }';

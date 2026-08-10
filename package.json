@@ -80,6 +80,7 @@
     "react-parity:harness:validate": "node scripts/react-parity/harness.mjs validate",
     "react-parity:harness:list": "node scripts/react-parity/harness.mjs list",
     "react-parity:harness:run": "node scripts/react-parity/harness.mjs run",
+    "doom:audit:check": "node scripts/doom-audit.mjs && node --test scripts/doom-audit.test.mjs",
     "redact-audit:generate": "node scripts/redact-audit/generate.mjs",
     "redact-audit:check": "node scripts/redact-audit/generate.mjs --check && node --test scripts/redact-audit/*.test.mjs",
     "error-codes:generate": "node scripts/error-codes/generate.mjs",

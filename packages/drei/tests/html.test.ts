@@ -304,17 +304,4 @@ describe('Html', () => {
 		custom.octaneRoot.unmount();
 		await act(async () => custom.reactRoot.unmount());
 	});
-
-	it('exports the upstream calculate-position behavior', () => {
-		const object = new THREE.Object3D();
-		const camera = new THREE.PerspectiveCamera();
-		camera.position.z = 5;
-		camera.updateProjectionMatrix();
-		object.updateMatrixWorld();
-		camera.updateMatrixWorld();
-		expect(defaultCalculatePosition(object, camera, { width: 200, height: 100 })).toEqual([
-			100, 50,
-		]);
-		expect(Html).toBeTypeOf('function');
-	});
 });

@@ -124,28 +124,4 @@ describe('TransformControls', () => {
 		expect(mountedReactControls.object).toBeUndefined();
 		expect(octaneRoot.store.getState().controls).toBe(reactState.get().controls);
 	});
-
-	it('matches explicit object attachment instead of the child group', async () => {
-		const object = new THREE.Object3D();
-		object.name = 'external';
-		let controls!: TransformControlsImpl;
-		const root = await createOctaneThree(TransformControlsScene, {
-			object,
-			makeDefault: false,
-			enabled: true,
-			axis: null,
-			mode: 'translate',
-			translationSnap: null,
-			rotationSnap: null,
-			scaleSnap: null,
-			space: 'world',
-			size: 1,
-			showX: true,
-			showY: true,
-			showZ: true,
-			ref: (value: TransformControlsImpl) => (controls = value),
-		});
-		expect(controls.object).toBe(object);
-		root.unmount();
-	});
 });

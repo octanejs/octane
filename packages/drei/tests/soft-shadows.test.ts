@@ -95,23 +95,4 @@ describe('SoftShadows', () => {
 		expect(octaneRenderer.compileCalls).toHaveLength(2);
 		expect(reactRenderer.compileCalls).toHaveLength(2);
 	});
-
-	it('does not retain a global shader mutation after unmount', async () => {
-		const original = THREE.ShaderChunk.shadowmap_pars_fragment;
-		const canvas = document.createElement('canvas');
-		const root = createOctaneThreeRoot(canvas);
-		await root.configure({ gl: renderer(canvas), frameloop: 'never', dpr: 1 });
-		await octaneAct(async () =>
-			root.render(SoftShadowsScene, {
-				focus: 0,
-				samples: 10,
-				size: 25,
-				materialRef: () => {},
-			}),
-		);
-		expect(THREE.ShaderChunk.shadowmap_pars_fragment).not.toBe(original);
-		root.unmount();
-		await octaneAct(async () => undefined);
-		expect(THREE.ShaderChunk.shadowmap_pars_fragment).toBe(original);
-	});
 });

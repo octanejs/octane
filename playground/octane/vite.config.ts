@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { octane } from 'octane/compiler/vite';
-import { threeRenderers } from '@octanejs/three/config';
 import tailwindcss from '@tailwindcss/vite';
+import { dreiRenderers } from '@octanejs/drei/config';
 import { freshWorkspaceExports } from './vite-plugins/fresh-workspace-exports';
 
 // `@octanejs/shadcn` is consumed through per-family subpaths, and vite caches a package's exports
@@ -13,7 +13,7 @@ const SHADCN_DIR = fileURLToPath(new URL('../../packages/shadcn', import.meta.ur
 export default defineConfig({
 	plugins: [
 		freshWorkspaceExports([{ name: '@octanejs/shadcn', dir: SHADCN_DIR }]),
-		octane({ renderers: threeRenderers }),
+		octane({ renderers: dreiRenderers }),
 		tailwindcss(),
 	],
 
@@ -58,6 +58,8 @@ export default defineConfig({
 			'octane',
 			'@octanejs/animejs',
 			'@octanejs/base-ui',
+			'@octanejs/drei',
+			'@octanejs/three',
 			'@octanejs/cmdk',
 			'@octanejs/shadcn',
 			'@octanejs/radix',

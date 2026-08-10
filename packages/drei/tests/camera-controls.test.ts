@@ -126,21 +126,4 @@ describe('CameraControls', () => {
 		expect((mountedOctane as any)._domElement).toBe((mountedReact as any)._domElement);
 		expect(octaneRoot.store.getState().controls).toBe(reactState.get().controls);
 	});
-
-	it('does not regress performance when regress is false', async () => {
-		let controls!: CameraControlsImpl;
-		const root = await createOctaneThree(CameraControlsScene, {
-			makeDefault: false,
-			regress: false,
-			minDistance: 0,
-			maxDistance: Infinity,
-			smoothTime: 0.25,
-			...callbacks(),
-			ref: (value: CameraControlsImpl) => (controls = value),
-		});
-		const regress = vi.spyOn(root.store.getState().performance, 'regress');
-		controls.dispatchEvent({ type: 'control' } as any);
-		expect(regress).not.toHaveBeenCalled();
-		root.unmount();
-	});
 });

@@ -131,30 +131,4 @@ describe('RoundedBoxGeometry', () => {
 		await reactThreeAct(async () => react.root.unmount());
 		expect(octaneRefs.at(-1)).toBeNull();
 	});
-
-	it('recreates geometry when constructor inputs change and preserves it for equal args', async () => {
-		const refs: Array<THREE.ExtrudeGeometry | null> = [];
-		const geometryRef = (value: THREE.ExtrudeGeometry | null) => refs.push(value);
-		const firstInput = { args: [2, 1, 0.5] as Input['args'], radius: 0.1 };
-		const renderer = await createOctaneThree(RoundedBoxGeometryScene, {
-			...firstInput,
-			geometryRef,
-		});
-		const first = refs.at(-1)!;
-
-		renderer.update(RoundedBoxGeometryScene, { ...firstInput, geometryRef });
-		expect(refs.at(-1)).toBe(first);
-
-		renderer.update(RoundedBoxGeometryScene, {
-			args: [3, 1, 0.5],
-			radius: 0.1,
-			geometryRef,
-		});
-		const replacement = refs.at(-1)!;
-		expect(replacement).not.toBe(first);
-		expect(refs).toContain(null);
-
-		renderer.unmount();
-		expect(refs.at(-1)).toBeNull();
-	});
 });

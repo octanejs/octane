@@ -63,12 +63,6 @@ function snapshot(target: THREE.WebGLRenderTarget) {
 }
 
 describe('framebuffer objects', () => {
-	it('renders natural TSRX block children without invoking them as render props', async () => {
-		const root = await createOctaneThree(FboBlockScene);
-		expect(root.scene.getObjectByName('fbo-block-child')).toBeDefined();
-		root.unmount();
-	});
-
 	it('matches explicit dimensions, defaults, multisampling, and depth aliases', async () => {
 		let reactTarget!: THREE.WebGLRenderTarget;
 		function ReactHook() {

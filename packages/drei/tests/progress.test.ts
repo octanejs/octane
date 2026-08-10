@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import * as React from 'react';
 import {
 	act as reactThreeAct,
@@ -9,8 +10,9 @@ import { DefaultLoadingManager, NoToneMapping, SRGBColorSpace, type WebGLRendere
 import * as THREE from 'three';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { useProgress as octaneUseProgress } from '../src/index.js';
-import { ProgressBlockScene, ProgressScene } from './_fixtures/progress.three.tsrx';
+import { ProgressScene } from './_fixtures/progress.three.tsrx';
 
+const require = createRequire(import.meta.url);
 const previousActEnvironment = (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
 	.IS_REACT_ACT_ENVIRONMENT;
 const octaneHandlers = {
@@ -46,15 +48,34 @@ function renderer(canvas: HTMLCanvasElement): WebGLRenderer {
 	} as unknown as WebGLRenderer;
 }
 
-describe('Progress and useProgress', () => {
-	it('renders natural TSRX block children without invoking them as render props', async () => {
-		const root = await createOctaneThree(ProgressBlockScene);
-		expect(root.scene.getObjectByName('progress-block-child')).toBeDefined();
-		root.unmount();
-	});
+function driveLoadingSequence(handlers: {
+	onStart?: typeof DefaultLoadingManager.onStart;
+	onProgress?: typeof DefaultLoadingManager.onProgress;
+	onError?: typeof DefaultLoadingManager.onError;
+	onLoad?: typeof DefaultLoadingManager.onLoad;
+}) {
+	handlers.onStart?.('/one', 0, 2);
+	handlers.onProgress?.('/one', 1, 2);
+	handlers.onError?.('/broken');
+	handlers.onProgress?.('/two', 2, 2);
+	handlers.onLoad?.();
+}
 
+describe('Progress and useProgress', () => {
 	it('matches the pinned React Drei loading-manager state and render-prop output', async () => {
 		const ReactDrei = await import('@react-three/drei');
+		const reactThreePath = require.resolve('three', {
+			paths: [require.resolve('@react-three/drei')],
+		});
+		const { DefaultLoadingManager: ReactDefaultLoadingManager } = await import(reactThreePath);
+		const reactHandlers = {
+			onStart: ReactDefaultLoadingManager.onStart,
+			onProgress: ReactDefaultLoadingManager.onProgress,
+			onError: ReactDefaultLoadingManager.onError,
+			onLoad: ReactDefaultLoadingManager.onLoad,
+		};
+		expect(reactHandlers.onError).not.toBe(octaneHandlers.onError);
+
 		ReactDrei.useProgress.setState({
 			errors: [],
 			active: false,
@@ -97,13 +118,22 @@ describe('Progress and useProgress', () => {
 			},
 		});
 
-		octaneHandlers.onStart?.('/one', 0, 2);
-		octaneHandlers.onProgress?.('/one', 1, 2);
-		octaneHandlers.onError?.('/broken');
-		octaneHandlers.onProgress?.('/two', 2, 2);
-		octaneHandlers.onLoad?.();
-		const finalState = octaneUseProgress.getState();
-		expect(finalState).toEqual({
+		driveLoadingSequence(reactHandlers);
+		await reactThreeAct(async () => {});
+		await Promise.resolve();
+		const reactFinal = {
+			...ReactDrei.useProgress.getState(),
+			errors: [...ReactDrei.useProgress.getState().errors],
+		};
+
+		driveLoadingSequence(octaneHandlers);
+		await Promise.resolve();
+		const octaneFinal = {
+			...octaneUseProgress.getState(),
+			errors: [...octaneUseProgress.getState().errors],
+		};
+
+		expect(octaneFinal).toEqual({
 			errors: ['/broken'],
 			active: false,
 			progress: 100,
@@ -111,11 +141,7 @@ describe('Progress and useProgress', () => {
 			loaded: 2,
 			total: 2,
 		});
-		ReactDrei.useProgress.setState(finalState);
-		await reactThreeAct(async () => {});
-		await Promise.resolve();
-
-		expect(octaneUseProgress.getState()).toEqual(ReactDrei.useProgress.getState());
+		expect(octaneFinal).toEqual(reactFinal);
 		expect(octaneRenders.at(-1)).toEqual(reactRenders.at(-1));
 
 		octaneRoot.unmount();

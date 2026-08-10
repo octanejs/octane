@@ -2967,6 +2967,102 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'doom',
+					include: ['playground/octane/src/demos/doom/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'doom-browser',
+					include: ['playground/octane/tests/doom/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				// All paired React/Octane characterization (root suite + View canary). Octane-only
+				// contracts stay in drei-guards so differential ownership stays non-overlapping.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'drei-differential',
+					include: ['packages/drei/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/drei/tests/config.test.ts',
+						'packages/drei/tests/crosswalk-guard.test.ts',
+						'packages/drei/tests/react-parity-guard.test.ts',
+						'packages/drei/tests/view-renderer-boundary.test.ts',
+						'packages/drei/tests/octane-contracts/**/*.test.ts',
+						'packages/drei/tests/browser/**/*.browser.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					server: { deps: { inline: ['@react-three/drei', '@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: DREI_RENDERERS })],
+				resolve: {
+					alias: [
+						...THREE_ALIASES,
+						{
+							find: /^@octanejs\/drei$/,
+							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
+						},
+					],
+					dedupe: ['react', 'react-dom', 'three'],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'drei-adapted-browser',
+					include: ['packages/drei/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+				plugins: [octane({ renderers: DREI_RENDERERS })],
+				resolve: {
+					alias: [
+						...THREE_ALIASES,
+						{
+							find: /^@octanejs\/drei$/,
+							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
+						},
+					],
+					dedupe: ['react', 'react-dom', 'three'],
+				},
+			},
+			{
+				test: {
+					name: 'drei-guards',
+					include: [
+						'packages/drei/tests/config.test.ts',
+						'packages/drei/tests/crosswalk-guard.test.ts',
+						'packages/drei/tests/react-parity-guard.test.ts',
+						'packages/drei/tests/view-renderer-boundary.test.ts',
+						'packages/drei/tests/octane-contracts/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					server: { deps: { inline: ['@react-three/drei', '@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: DREI_RENDERERS })],
+				resolve: {
+					alias: [
+						...THREE_ALIASES,
+						{
+							find: /^@octanejs\/drei$/,
+							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
+						},
+					],
+					dedupe: ['react', 'react-dom', 'three'],
+				},
+			},
+			{
+				test: {
 					name: 'visx',
 					include: [
 						'packages/visx/tests/conformance/**/*.test.ts',

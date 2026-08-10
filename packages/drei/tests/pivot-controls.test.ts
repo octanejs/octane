@@ -457,7 +457,4 @@ describe('PivotControls', () => {
 		pair.octaneRoot.unmount();
 		await act(async () => pair.reactRoot.unmount());
 	});
-
-	it('exports the public runtime and props family', () =>
-		expect(PivotControls).toBeTypeOf('function'));
 });

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "upstreamRuntimeSuite": "absent",
+  "upstreamRuntimeSuite": "insufficient",
   "upstreamTypeSuite": "absent",
   "typeSuiteAudit": {
     "searchedRoots": [
@@ -13,7 +13,18 @@
     ],
     "result": "No upstream type-test suite or @ts-expect-error assertion exists at the pinned tag."
   },
-  "allowedTransformations": [],
+  "allowedTransformations": [
+    {
+      "kind": "import-root",
+      "from": "@react-three/drei",
+      "to": "@octanejs/drei",
+      "reason": "Selects the binding under test."
+    },
+    {
+      "kind": "leading-comment",
+      "reason": "Describes each compiler lane."
+    }
+  ],
   "upstreamSourceExpectErrors": [
     {
       "path": "packages/drei/upstream/src/core/ComputedAttribute.tsx",
@@ -84,8 +95,8 @@
   "artifacts": [
     {
       "path": "packages/drei/upstream/test/e2e/App.tsx",
-      "disposition": "out-of-scope",
-      "reason": "Whole-gallery Playwright fixture retained as pin evidence; excluded from Vitest/Jest parity execution because the upstream runner packs a release tarball and boots Vite/Next apps outside the repository harness.",
+      "disposition": "support",
+      "reason": "Copied unchanged into the temporary Vite React application that executes the vendored Playwright test.",
       "sha256": "4499b3c92227b0dce656e3bfdbcaa2e2048994e0f7e507575e59da1678f4d2af"
     },
     {
@@ -96,14 +107,14 @@
     },
     {
       "path": "packages/drei/upstream/test/e2e/snapshot.test.ts",
-      "disposition": "out-of-scope",
-      "reason": "Sole upstream runtime case is a whole-gallery screenshot. Recorded out of scope for export-level Vitest parity; repo-authored differential tests cover export behavior.",
+      "disposition": "executed-pristine",
+      "reason": "Executed unchanged by the playwright-full lane against the vendored App.tsx and pinned React Drei runtime.",
       "sha256": "dea9f23926e17c55f1ee1623a5b3ba1d466db725c644d0d9671fd4a8644da69b"
     },
     {
       "path": "packages/drei/upstream/test/e2e/snapshot.test.ts-snapshots/should-match-previous-one-1-linux.png",
-      "disposition": "out-of-scope",
-      "reason": "Screenshot oracle for the out-of-scope Playwright gallery case.",
+      "disposition": "support",
+      "reason": "Vendored Linux screenshot oracle retained with the executed upstream case.",
       "sha256": "16217caa801c0d1bc62ce0ca07ceae43432f592d4b4b89bdaf94fadba25c9d21"
     }
   ]

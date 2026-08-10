@@ -760,6 +760,15 @@ test('makes every upstream runtime suite state an executable verified requiremen
 	insufficient.lanes.push(differentialLane());
 	assert.doesNotThrow(() => validateManifest(insufficient));
 
+	const missingInsufficientPristine = structuredClone(insufficient);
+	missingInsufficientPristine.lanes = missingInsufficientPristine.lanes.filter(
+		(lane) => lane.type !== 'pristine-upstream',
+	);
+	assert.throws(
+		() => validateManifest(missingInsufficientPristine),
+		/insufficient upstream runtime tests requires full upstream-suite lanes plus repo-authored differential evidence/,
+	);
+
 	const absent = structuredClone(present);
 	absent.upstreamSuites.runtime = 'absent';
 	absent.lanes = absent.lanes.filter(
@@ -773,7 +782,7 @@ test('makes every upstream runtime suite state an executable verified requiremen
 	assert.doesNotThrow(() => validateManifest(absent));
 });
 
-test('requires paired executable type lanes for every upstream type suite state', () => {
+test('requires paired executable type lanes only when upstream type evidence exists', () => {
 	const value = verifiedManifest();
 	for (const mutation of [
 		(candidate) =>
@@ -794,7 +803,7 @@ test('requires paired executable type lanes for every upstream type suite state'
 		);
 	}
 
-	for (const suiteState of ['absent', 'insufficient']) {
+	for (const suiteState of ['insufficient']) {
 		const repoAuthored = structuredClone(value);
 		repoAuthored.upstreamSuites.types = suiteState;
 		for (const lane of repoAuthored.lanes.filter((candidate) => candidate.type.endsWith('-types')))
@@ -834,6 +843,17 @@ test('requires paired executable type lanes for every upstream type suite state'
 			new RegExp(`with ${suiteState} upstream type tests.*repo-authored evidence`),
 		);
 	}
+
+	const absent = structuredClone(value);
+	absent.upstreamSuites.types = 'absent';
+	absent.lanes = absent.lanes.filter((lane) => !lane.type.endsWith('-types'));
+	assert.doesNotThrow(() => validateManifest(absent));
+	const synthetic = structuredClone(absent);
+	synthetic.lanes.push(typeLane('pristine-types'));
+	assert.throws(
+		() => validateManifest(synthetic),
+		/absent upstream type tests requires available required pristine-types and adapted-types lanes with repo-authored evidence when type lanes are declared/,
+	);
 });
 
 test('requires explicit type evidence origins and the framework-appropriate compilers', () => {
@@ -923,6 +943,62 @@ test('rejects stale divergences and accepts one divergence matching multiple kno
 		delete incomplete.divergences[0][field];
 		assert.throws(() => validateManifest(incomplete), new RegExp(field));
 	}
+});
+
+test('accepts ordinary audit identities for divergences outside parity lanes', () => {
+	const ordinary = divergence({
+		caseIds: ['ordinary:view-boundary'],
+		ordinaryEvidence: [
+			{
+				id: 'ordinary:view-boundary',
+				path: 'packages/example/tests/view-boundary.test.ts',
+				sha256: sha256('boundary'),
+				testName: 'documents the boundary',
+				fullName: 'View boundary documents the boundary',
+			},
+		],
+	});
+	assert.deepEqual(
+		validateManifest(manifest({ divergences: [ordinary] })),
+		manifest({ divergences: [ordinary] }),
+	);
+
+	assert.throws(
+		() =>
+			validateManifest(
+				manifest({
+					divergences: [
+						divergence({
+							caseIds: ['ordinary:view-boundary'],
+						}),
+					],
+				}),
+			),
+		/unknown case id "ordinary:view-boundary"/,
+	);
+
+	assert.throws(
+		() =>
+			validateManifest(
+				manifest({
+					divergences: [
+						divergence({
+							caseIds: ['ordinary:view-boundary'],
+							ordinaryEvidence: [
+								{
+									id: 'adapted:example',
+									path: 'packages/example/tests/view-boundary.test.ts',
+									sha256: sha256('boundary'),
+									testName: 'documents the boundary',
+									fullName: 'View boundary documents the boundary',
+								},
+							],
+						}),
+					],
+				}),
+			),
+		/must start with "ordinary:"/,
+	);
 });
 
 test('rejects missing and tampered evidence files', async () => {

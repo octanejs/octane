@@ -11,11 +11,14 @@ const auditRoot = resolve(packageRoot, 'audit');
 const portable = (value) => value.replaceAll('\\', '/');
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 
-const OCTANE_ONLY = new Set([
+const OCTANE_ONLY_GUARDS = new Set([
 	'packages/drei/tests/config.test.ts',
 	'packages/drei/tests/crosswalk-guard.test.ts',
 	'packages/drei/tests/react-parity-guard.test.ts',
+	'packages/drei/tests/view-renderer-boundary.test.ts',
 ]);
+const isOctaneOnly = (path) =>
+	OCTANE_ONLY_GUARDS.has(path) || path.includes('/tests/octane-contracts/');
 
 function listProject(project) {
 	return JSON.parse(
@@ -51,61 +54,125 @@ function withIds(tests) {
 	});
 }
 
-const adaptedTests = withIds(listProject('drei'));
 const differentialTests = withIds(listProject('drei-differential'));
+const browserTests = withIds(listProject('drei-adapted-browser'));
 const guardTests = listProject('drei-guards');
+const typeTests = readdirSync(resolve(root, 'packages/drei/typetests'), {
+	recursive: true,
+	withFileTypes: true,
+})
+	.filter((entry) => entry.isFile() && entry.name.endsWith('.test-d.ts'))
+	.map((entry) => portable(relative(root, resolve(entry.parentPath, entry.name))))
+	.sort();
 
 const inventory = {
 	schemaVersion: 1,
-	project: 'drei',
+	project: 'drei-differential',
 	roots: ['packages/drei/tests'],
-	files: [...new Set(adaptedTests.map((test) => test.file))],
-	tests: adaptedTests,
+	files: [...new Set(differentialTests.map((test) => test.file))],
+	tests: differentialTests,
+};
+const browserInventory = {
+	schemaVersion: 1,
+	project: 'drei-adapted-browser',
+	roots: ['packages/drei/tests/browser'],
+	files: [...new Set(browserTests.map((test) => test.file))],
+	tests: browserTests,
 };
 
 const allParityAndGuardFiles = [
 	...inventory.files,
-	...differentialTests.map((test) => test.file),
+	...browserTests.map((test) => test.file),
 	...guardTests.map((test) => test.file),
 ].sort();
-const uniqueFiles = [...new Set(allParityAndGuardFiles)];
+const uniqueRuntimeFiles = [...new Set(allParityAndGuardFiles)];
+const uniqueFiles = [...uniqueRuntimeFiles, ...typeTests].sort();
 
-const classifications = {
-	schemaVersion: 1,
-	tests: uniqueFiles.map((path) => {
-		if (OCTANE_ONLY.has(path)) {
-			if (path.endsWith('/config.test.ts')) {
-				return {
-					path,
-					disposition: 'octane-only-framework-contract',
-					reason: 'Validates the Octane renderer-boundary preset, which has no React counterpart.',
-				};
-			}
+function classifyPath(path) {
+	if (path === 'packages/drei/typetests/pristine/public-api.test-d.ts') {
+		return {
+			path,
+			disposition: 'repo-authored-type-parity',
+			oracle: 'Repo-authored public-surface type assertions against pinned @react-three/drei.',
+		};
+	}
+	if (path === 'packages/drei/typetests/adapted/public-api.test-d.ts') {
+		return {
+			path,
+			disposition: 'repo-authored-type-parity',
+			oracle: 'Matching public-surface type assertions against @octanejs/drei.',
+		};
+	}
+	if (path.includes('/typetests/')) {
+		return {
+			path,
+			disposition: 'octane-only-framework-contract',
+			reason:
+				'Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes.',
+		};
+	}
+	if (path.includes('/tests/browser/')) {
+		return {
+			path,
+			disposition: 'adapted-octane-upstream-suite',
+			oracle:
+				'Ports the vendored Playwright gallery scene to Octane; pristine upstream execution is tracked separately.',
+		};
+	}
+	if (isOctaneOnly(path)) {
+		if (path.endsWith('/config.test.ts')) {
 			return {
 				path,
 				disposition: 'octane-only-framework-contract',
-				reason: 'Validates repository audit machinery; it is not React behavioral evidence.',
+				reason: 'Validates the Octane renderer-boundary preset, which has no React counterpart.',
 			};
 		}
-		const source = readFileSync(resolve(root, path), 'utf8');
-		if (!source.includes('@react-three/drei')) {
-			throw new Error(`${path} needs an explicit non-differential classification`);
+		if (path.endsWith('/view-renderer-boundary.test.ts')) {
+			return {
+				path,
+				disposition: 'octane-only-divergence',
+				reason:
+					'Pins the intentional DOM-root View renderer-boundary divergence as ordinary drei-guards evidence; it is not paired React behavioral evidence.',
+				divergenceId: 'view-renderer-boundary',
+			};
+		}
+		if (path.includes('/tests/octane-contracts/')) {
+			return {
+				path,
+				disposition: 'octane-only-framework-contract',
+				reason:
+					'Octane-only compiler, provider, or lifecycle contract without a paired React scenario.',
+			};
 		}
 		return {
 			path,
-			disposition: 'react-octane-differential',
-			oracle:
-				'Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body.',
+			disposition: 'octane-only-framework-contract',
+			reason: 'Validates repository audit machinery; it is not React behavioral evidence.',
 		};
-	}),
+	}
+	const source = readFileSync(resolve(root, path), 'utf8');
+	if (!source.includes('@react-three/drei')) {
+		throw new Error(`${path} needs an explicit non-differential classification`);
+	}
+	return {
+		path,
+		disposition: 'react-octane-differential',
+		oracle:
+			'Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body.',
+	};
+}
+
+const classifications = {
+	schemaVersion: 1,
+	tests: uniqueFiles.map(classifyPath),
 };
 
 const runtimeEvidence = {
 	schemaVersion: 1,
 	oracle: '@react-three/drei@10.7.7 with React 19 and @react-three/fiber@9.6.1',
-	files: uniqueFiles.map((path) => {
+	files: uniqueRuntimeFiles.map((path) => {
 		const contents = readFileSync(resolve(root, path));
-		const assertions = [...adaptedTests, ...differentialTests].filter((test) => test.file === path);
+		const assertions = differentialTests.filter((test) => test.file === path);
 		const guardAssertions = guardTests.filter((test) => test.file === path);
 		const allAssertions = assertions.length > 0 ? assertions : guardAssertions;
 		return {
@@ -119,7 +186,7 @@ const runtimeEvidence = {
 
 const upstreamArtifacts = {
 	schemaVersion: 1,
-	upstreamRuntimeSuite: 'absent',
+	upstreamRuntimeSuite: 'insufficient',
 	upstreamTypeSuite: 'absent',
 	typeSuiteAudit: {
 		searchedRoots: [
@@ -132,7 +199,18 @@ const upstreamArtifacts = {
 		],
 		result: 'No upstream type-test suite or @ts-expect-error assertion exists at the pinned tag.',
 	},
-	allowedTransformations: [],
+	allowedTransformations: [
+		{
+			kind: 'import-root',
+			from: '@react-three/drei',
+			to: '@octanejs/drei',
+			reason: 'Selects the binding under test.',
+		},
+		{
+			kind: 'leading-comment',
+			reason: 'Describes each compiler lane.',
+		},
+	],
 	upstreamSourceExpectErrors: readdirRecursive(resolve(root, 'packages/drei/upstream/src'))
 		.filter((path) => /\.[cm]?[jt]sx?$/.test(path))
 		.flatMap((path) => {
@@ -148,9 +226,9 @@ const upstreamArtifacts = {
 	artifacts: [
 		{
 			path: 'packages/drei/upstream/test/e2e/App.tsx',
-			disposition: 'out-of-scope',
+			disposition: 'support',
 			reason:
-				'Whole-gallery Playwright fixture retained as pin evidence; excluded from Vitest/Jest parity execution because the upstream runner packs a release tarball and boots Vite/Next apps outside the repository harness.',
+				'Copied unchanged into the temporary Vite React application that executes the vendored Playwright test.',
 		},
 		{
 			path: 'packages/drei/upstream/test/e2e/e2e.sh',
@@ -160,14 +238,14 @@ const upstreamArtifacts = {
 		},
 		{
 			path: 'packages/drei/upstream/test/e2e/snapshot.test.ts',
-			disposition: 'out-of-scope',
+			disposition: 'executed-pristine',
 			reason:
-				'Sole upstream runtime case is a whole-gallery screenshot. Recorded out of scope for export-level Vitest parity; repo-authored differential tests cover export behavior.',
+				'Executed unchanged by the playwright-full lane against the vendored App.tsx and pinned React Drei runtime.',
 		},
 		{
 			path: 'packages/drei/upstream/test/e2e/snapshot.test.ts-snapshots/should-match-previous-one-1-linux.png',
-			disposition: 'out-of-scope',
-			reason: 'Screenshot oracle for the out-of-scope Playwright gallery case.',
+			disposition: 'support',
+			reason: 'Vendored Linux screenshot oracle retained with the executed upstream case.',
 		},
 	].map((entry) => ({ ...entry, sha256: digest(readFileSync(resolve(root, entry.path))) })),
 };
@@ -179,7 +257,8 @@ function readdirRecursive(directory) {
 }
 
 const generatedFiles = [
-	['adapted-runtime.json', inventory],
+	['differential-runtime.json', inventory],
+	['upstream-browser.json', browserInventory],
 	['test-classifications.json', classifications],
 	['runtime-evidence.json', runtimeEvidence],
 	['upstream-test-artifacts.json', upstreamArtifacts],
@@ -202,8 +281,8 @@ execFileSync(
 
 const manifestPath = resolve(auditRoot, 'react-parity.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-const runtimeIdentities = new Set(adaptedTests.map((test) => `${test.file}\0${test.fullName}`));
-manifest.upstreamSuites = { runtime: 'absent', types: 'absent' };
+const runtimeIdentities = new Set(browserTests.map((test) => `${test.file}\0${test.fullName}`));
+manifest.upstreamSuites = { runtime: 'insufficient', types: 'absent' };
 manifest.adaptedRoots = {
 	source: {
 		roots: ['packages/drei/src'],
@@ -211,74 +290,151 @@ manifest.adaptedRoots = {
 		exclude: [],
 	},
 	tests: {
-		roots: ['packages/drei/tests'],
-		include: ['\\.test\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$'],
-		exclude: [
-			'tests/config\\.test\\.ts$',
-			'tests/crosswalk-guard\\.test\\.ts$',
-			'tests/react-parity-guard\\.test\\.ts$',
-			'tests/differential/',
-		],
+		roots: ['packages/drei/tests/browser'],
+		include: ['\\.browser\\.test\\.ts$'],
+		exclude: [],
 	},
 };
 manifest.adaptedRuntimeSummary = {
-	inventoryEntries: adaptedTests.length,
+	inventoryEntries: browserTests.length,
 	uniqueIdentities: runtimeIdentities.size,
-	duplicateEntriesWithinLanes: adaptedTests.length - runtimeIdentities.size,
+	duplicateEntriesWithinLanes: browserTests.length - runtimeIdentities.size,
 	identitiesSharedAcrossLanes: 0,
 };
 manifest.environments['workspace-node'].lockfileSha256 = digest(
 	readFileSync(resolve(root, manifest.environments['workspace-node'].lockfile)),
 );
 
-const differentialCases = [
-	{
-		id: 'differential:view-rendering',
-		match: 'matches tracked rect, viewport/scissor/render restoration, frames and refs',
-	},
-	{
-		id: 'differential:view-visibility',
-		match: 'matches invisible and offscreen clear/render boundaries and event connection cleanup',
-	},
-	{
-		id: 'differential:view-port-surface',
-		match: 'preserves the View.Port static surface',
-	},
-	{
-		id: 'differential:view-renderer-boundary',
-		match: 'documents the outside-DOM renderer boundary while keeping View.Port callable',
-	},
-].map(function toCase(entry) {
-	const test = differentialTests.find(function findTest(candidate) {
-		return candidate.fullName.includes(entry.match);
-	});
-	if (!test) throw new Error(`differential canary case missing: ${entry.match}`);
-	return {
-		id: entry.id,
-		testName: entry.match,
-		fullName: test.fullName,
-	};
-});
+function requireDifferentialCase(needle) {
+	const match = differentialTests.find((test) => test.fullName.includes(needle));
+	if (!match) {
+		throw new Error(`differential case missing from drei-differential project: ${needle}`);
+	}
+	return match;
+}
+function requireGuardCase(needle) {
+	const match = guardTests.find((test) => test.fullName.includes(needle));
+	if (!match) {
+		throw new Error(`guard case missing from drei-guards project: ${needle}`);
+	}
+	return match;
+}
+const viewRenderingCase = requireDifferentialCase(
+	'matches tracked rect, viewport/scissor/render restoration, frames and refs',
+);
+const viewVisibilityCase = requireDifferentialCase(
+	'matches invisible and offscreen clear/render boundaries and event connection cleanup',
+);
+const viewBoundaryCase = requireGuardCase(
+	'documents the outside-DOM renderer boundary while keeping View.Port callable',
+);
+const adaptedScreenshotCase = browserTests.find((test) =>
+	test.fullName.endsWith('should match previous one'),
+);
+if (!adaptedScreenshotCase) {
+	throw new Error('adapted screenshot case missing from drei-adapted-browser project');
+}
 
 manifest.lanes = [
 	{
-		id: 'drei-repo-authored-full-suite',
-		type: 'adapted-octane',
+		id: 'drei-pristine-upstream',
+		type: 'pristine-upstream',
 		oracle: 'required',
 		environment: 'workspace-node',
-		project: 'drei',
-		evidenceOrigin: 'repo-authored',
+		project: 'drei-pristine-playwright',
+		evidenceOrigin: 'upstream-suite',
 		notes:
-			'Runs the 100 paired React/Octane characterization files. Octane-only guards stay in drei-guards; the View canary lives in drei-differential.',
+			'Runs the vendored Playwright screenshot test byte-for-byte against published React Drei.',
 		execution: {
-			kind: 'vitest-full',
-			inventory: 'packages/drei/audit/adapted-runtime.json',
+			kind: 'playwright-full',
+			config: 'packages/drei/scripts/pristine-playwright.json',
+			root: 'packages/drei/upstream',
+			inventory: 'packages/drei/audit/pristine-runtime.json',
 		},
 		files: [
 			{
-				path: 'packages/drei/audit/adapted-runtime.json',
+				path: 'scripts/react-parity/playwright-full-runner.mjs',
 				role: 'support',
-				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/adapted-runtime.json'))),
+				sha256: digest(
+					readFileSync(resolve(root, 'scripts/react-parity/playwright-full-runner.mjs')),
+				),
+			},
+			{
+				path: 'packages/drei/scripts/pristine-playwright.json',
+				role: 'support',
+				sha256: digest(
+					readFileSync(resolve(root, 'packages/drei/scripts/pristine-playwright.json')),
+				),
+			},
+			{
+				path: 'packages/drei/audit/pristine-runtime.json',
+				role: 'support',
+				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/pristine-runtime.json'))),
+			},
+			{
+				path: 'packages/drei/upstream/test/e2e/snapshot.test.ts',
+				role: 'support',
+				sha256: digest(
+					readFileSync(resolve(root, 'packages/drei/upstream/test/e2e/snapshot.test.ts')),
+				),
+			},
+		],
+	},
+	{
+		id: 'drei-adapted-upstream-e2e',
+		type: 'adapted-octane',
+		oracle: 'required',
+		environment: 'workspace-node',
+		project: 'drei-adapted-browser',
+		evidenceOrigin: 'upstream-suite',
+		notes:
+			'Ports the upstream gallery scene to Octane and retains its screenshot oracle as adapted evidence.',
+		execution: {
+			kind: 'vitest-full',
+			inventory: 'packages/drei/audit/upstream-browser.json',
+		},
+		files: [
+			{
+				path: 'packages/drei/tests/browser/upstream-e2e.browser.test.ts',
+				role: 'test',
+				sha256: digest(
+					readFileSync(resolve(root, 'packages/drei/tests/browser/upstream-e2e.browser.test.ts')),
+				),
+				cases: [
+					{
+						id: 'adapted:e2e-snapshot',
+						testName: 'should match previous one',
+						fullName: adaptedScreenshotCase.fullName,
+					},
+				],
+			},
+			{
+				path: 'packages/drei/audit/upstream-browser.json',
+				role: 'support',
+				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/upstream-browser.json'))),
+			},
+		],
+	},
+	{
+		id: 'drei-repo-authored-differential',
+		type: 'differential',
+		oracle: 'required',
+		environment: 'workspace-node',
+		project: 'drei-differential',
+		evidenceOrigin: 'repo-authored',
+		notes:
+			'Runs the paired React/Octane characterization suite (including the View canary) under the non-overlapping drei-differential project. Octane-only guards stay in drei-guards.',
+		execution: {
+			kind: 'vitest-full',
+			inventory: 'packages/drei/audit/differential-runtime.json',
+		},
+		files: [
+			{
+				path: 'packages/drei/audit/differential-runtime.json',
+				role: 'support',
+				sha256: digest(
+					readFileSync(resolve(root, 'packages/drei/audit/differential-runtime.json')),
+				),
 			},
 			{
 				path: 'packages/drei/audit/runtime-evidence.json',
@@ -305,29 +461,24 @@ manifest.lanes = [
 				sha256: digest(readFileSync(resolve(root, 'packages/drei/scripts/check-react-parity.mjs'))),
 			},
 			{
-				path: 'scripts/react-parity/drei-parity-lib.mjs',
-				role: 'support',
-				sha256: digest(readFileSync(resolve(root, 'scripts/react-parity/drei-parity-lib.mjs'))),
-			},
-		],
-	},
-	{
-		id: 'drei-differential-canary',
-		type: 'differential',
-		oracle: 'required',
-		environment: 'workspace-node',
-		project: 'drei-differential',
-		evidenceOrigin: 'repo-authored',
-		notes:
-			'Isolated View canary proving paired React/Octane Three-renderer selection outside the full adapted suite.',
-		files: [
-			{
 				path: 'packages/drei/tests/differential/view.test.ts',
 				role: 'test',
 				sha256: digest(
 					readFileSync(resolve(root, 'packages/drei/tests/differential/view.test.ts')),
 				),
-				cases: differentialCases,
+				cases: [
+					{
+						id: 'differential:view-rendering',
+						testName: 'matches tracked rect, viewport/scissor/render restoration, frames and refs',
+						fullName: viewRenderingCase.fullName,
+					},
+					{
+						id: 'differential:view-visibility',
+						testName:
+							'matches invisible and offscreen clear/render boundaries and event connection cleanup',
+						fullName: viewVisibilityCase.fullName,
+					},
+				],
 			},
 		],
 	},
@@ -339,7 +490,7 @@ manifest.lanes = [
 		project: 'drei-pristine-types',
 		evidenceOrigin: 'repo-authored',
 		notes:
-			'Repo-authored public-surface type assertions against pinned @react-three/drei with tsc. Group hashes and import-root structural comparison are enforced by scripts/react-parity/drei-types-lib.mjs.',
+			'Repo-authored public-surface type assertions against pinned @react-three/drei with tsc.',
 		execution: {
 			kind: 'typescript',
 			compiler: 'tsc',
@@ -361,26 +512,9 @@ manifest.lanes = [
 				],
 			},
 			{
-				path: 'packages/drei/typetests/pristine/tsconfig.json',
+				path: 'packages/drei/typetests/assertions.md',
 				role: 'support',
-				sha256: digest(
-					readFileSync(resolve(root, 'packages/drei/typetests/pristine/tsconfig.json')),
-				),
-			},
-			{
-				path: 'packages/drei/audit/type-parity.json',
-				role: 'support',
-				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/type-parity.json'))),
-			},
-			{
-				path: 'packages/drei/audit/pristine-types.json',
-				role: 'support',
-				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/pristine-types.json'))),
-			},
-			{
-				path: 'scripts/react-parity/drei-types-lib.mjs',
-				role: 'support',
-				sha256: digest(readFileSync(resolve(root, 'scripts/react-parity/drei-types-lib.mjs'))),
+				sha256: digest(readFileSync(resolve(root, 'packages/drei/typetests/assertions.md'))),
 			},
 		],
 	},
@@ -391,8 +525,7 @@ manifest.lanes = [
 		environment: 'workspace-node',
 		project: 'drei-adapted-types',
 		evidenceOrigin: 'repo-authored',
-		notes:
-			'The same assertion groups against @octanejs/drei with tsrx-tsc. Fail-closed against deleted assertions and non-import-root edits via drei-types-lib.',
+		notes: 'The same assertion groups against @octanejs/drei with tsrx-tsc.',
 		execution: {
 			kind: 'typescript',
 			compiler: 'tsrx-tsc',
@@ -414,18 +547,42 @@ manifest.lanes = [
 				],
 			},
 			{
-				path: 'packages/drei/typetests/adapted/tsconfig.json',
+				path: 'packages/drei/typetests/assertions.md',
 				role: 'support',
-				sha256: digest(
-					readFileSync(resolve(root, 'packages/drei/typetests/adapted/tsconfig.json')),
-				),
-			},
-			{
-				path: 'packages/drei/audit/adapted-types.json',
-				role: 'support',
-				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/adapted-types.json'))),
+				sha256: digest(readFileSync(resolve(root, 'packages/drei/typetests/assertions.md'))),
 			},
 		],
+	},
+];
+
+const viewBoundaryPath = 'packages/drei/tests/view-renderer-boundary.test.ts';
+manifest.divergences = [
+	{
+		id: 'view-renderer-boundary',
+		caseIds: ['ordinary:view-renderer-boundary'],
+		ordinaryEvidence: [
+			{
+				id: 'ordinary:view-renderer-boundary',
+				path: viewBoundaryPath,
+				sha256: digest(readFileSync(resolve(root, viewBoundaryPath))),
+				testName: 'documents the outside-DOM renderer boundary while keeping View.Port callable',
+				fullName: viewBoundaryCase.fullName,
+			},
+		],
+		upstreamResult:
+			'React Drei View can render from a DOM root and move authored Three children through View.Port via tunnel-rat.',
+		octaneResult:
+			'Calling View from an Octane DOM root fails with the universal renderer-boundary diagnostic, and View.Port is a callable no-op.',
+		rationale:
+			'Octane components are statically renderer-owned, so one component cannot switch between DOM and Three renderers or transport authored Three children between independent roots.',
+		classification: 'renderer-boundary',
+		consumerImpact:
+			'DOM-rooted View usage and View.Port tunneling are unavailable; inline Canvas views remain supported.',
+		migrationGuidance:
+			'Keep View under an Octane Three Canvas. Do not call View.Port from a DOM tree to host Three children.',
+		owner: '@octanejs/drei',
+		reviewCondition:
+			'Review if Octane gains cross-renderer component ownership or a supported tunnel between DOM and Three roots.',
 	},
 ];
 

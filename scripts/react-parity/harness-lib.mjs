@@ -90,7 +90,8 @@ const DIVERGENCE_FIELDS = [
 	'owner',
 	'reviewCondition',
 ];
-const DIVERGENCE_KEYS = new Set(['id', 'caseIds', ...DIVERGENCE_FIELDS]);
+const ORDINARY_EVIDENCE_KEYS = new Set(['id', 'path', 'sha256', 'testName', 'fullName']);
+const DIVERGENCE_KEYS = new Set(['id', 'caseIds', 'ordinaryEvidence', ...DIVERGENCE_FIELDS]);
 
 function fail(message) {
 	throw new Error(`Invalid React parity manifest: ${message}`);
@@ -492,11 +493,43 @@ export function validateManifest(manifest) {
 		if (!Array.isArray(divergence.caseIds) || divergence.caseIds.length === 0) {
 			fail(`divergence ${divergence.id} must match at least one case id`);
 		}
+		const ordinaryIds = new Set();
+		if (divergence.ordinaryEvidence !== undefined) {
+			if (!Array.isArray(divergence.ordinaryEvidence) || divergence.ordinaryEvidence.length === 0) {
+				fail(`divergence ${divergence.id} ordinaryEvidence must be a non-empty array`);
+			}
+			for (const evidence of divergence.ordinaryEvidence) {
+				for (const key of Object.keys(evidence))
+					if (!ORDINARY_EVIDENCE_KEYS.has(key))
+						fail(`divergence ${divergence.id} ordinaryEvidence has unknown key "${key}"`);
+				requiredString(evidence.id, `divergence ${divergence.id} ordinaryEvidence.id`);
+				if (!evidence.id.startsWith('ordinary:'))
+					fail(`divergence ${divergence.id} ordinaryEvidence.id must start with "ordinary:"`);
+				if (ordinaryIds.has(evidence.id))
+					fail(`divergence ${divergence.id} duplicate ordinaryEvidence id "${evidence.id}"`);
+				ordinaryIds.add(evidence.id);
+				exactPath(evidence.path, `divergence ${divergence.id} ordinaryEvidence.path`);
+				if (!/^[a-f0-9]{64}$/.test(evidence.sha256))
+					fail(`divergence ${divergence.id} ordinaryEvidence.sha256 is invalid`);
+				requiredString(evidence.testName, `divergence ${divergence.id} ordinaryEvidence.testName`);
+				requiredString(evidence.fullName, `divergence ${divergence.id} ordinaryEvidence.fullName`);
+			}
+		}
 		for (const caseId of divergence.caseIds) {
-			if (!caseIds.has(caseId) && !caseId.startsWith('runtime:'))
+			if (!caseIds.has(caseId) && !caseId.startsWith('runtime:') && !ordinaryIds.has(caseId))
 				fail(`divergence ${divergence.id} references unknown case id "${caseId}"`);
+			if (caseId.startsWith('ordinary:') && !ordinaryIds.has(caseId))
+				fail(
+					`divergence ${divergence.id} ordinary case id "${caseId}" must be declared in ordinaryEvidence`,
+				);
 			if (divergentCases.has(caseId)) fail(`case id "${caseId}" has multiple divergences`);
 			divergentCases.add(caseId);
+		}
+		for (const ordinaryId of ordinaryIds) {
+			if (!divergence.caseIds.includes(ordinaryId))
+				fail(
+					`divergence ${divergence.id} ordinaryEvidence id "${ordinaryId}" must also appear in caseIds`,
+				);
 		}
 		for (const field of DIVERGENCE_FIELDS) {
 			requiredString(divergence[field], `divergence ${divergence.id} ${field}`);
@@ -606,6 +639,58 @@ export async function verifyManifestFiles(manifest, root) {
 				);
 		}
 	}
+	const requiredLaneTestPaths = new Set(
+		manifest.lanes
+			.filter((lane) => lane.oracle === 'required' && lane.available !== false)
+			.flatMap((lane) =>
+				lane.files.filter((file) => file.role === 'test').map((file) => file.path),
+			),
+	);
+	const ordinaryCaseIds = new Set();
+	for (const divergence of manifest.divergences) {
+		for (const evidence of divergence.ordinaryEvidence ?? []) {
+			if (requiredLaneTestPaths.has(evidence.path))
+				throw new Error(
+					`divergence ${divergence.id} ordinaryEvidence path "${evidence.path}" must not be required parity-lane test evidence`,
+				);
+			const absolute = resolve(absoluteRoot, evidence.path);
+			if (relative(absoluteRoot, absolute).startsWith('..'))
+				throw new Error(`file escapes repository: ${evidence.path}`);
+			let contents;
+			try {
+				contents = await readFile(absolute);
+			} catch (error) {
+				if (error.code === 'ENOENT') throw new Error(`missing evidence file: ${evidence.path}`);
+				throw error;
+			}
+			const actual = createHash('sha256').update(contents).digest('hex');
+			if (actual !== evidence.sha256) {
+				throw new Error(`integrity mismatch for evidence file: ${evidence.path}`);
+			}
+			const source = contents.toString('utf8');
+			const marker = `@parity-case ${evidence.id}`;
+			const escapedId = evidence.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const matches = [
+				...source.matchAll(new RegExp(`^\\s*//\\s*@parity-case\\s+${escapedId}\\s*$`, 'gm')),
+			];
+			if (matches.length !== 1)
+				throw new Error(`${evidence.path}: ${marker} must appear exactly once`);
+			const markerEnd = matches[0].index + matches[0][0].length;
+			const tail = source.slice(markerEnd).trimStart();
+			const declaration = /^(?:it|test)(?:\.(skip|todo))?\s*\(\s*/.exec(tail);
+			const exactTitle = declaration
+				? sourceStringLiterals(evidence.testName).some((literal) =>
+						tail.slice(declaration[0].length).startsWith(literal),
+					)
+				: false;
+			if (!declaration || declaration[1] || !exactTitle) {
+				throw new Error(
+					`${evidence.path}: ${marker} must immediately precede one active test named ${JSON.stringify(evidence.testName)}`,
+				);
+			}
+			ordinaryCaseIds.add(evidence.id);
+		}
+	}
 	const markerCounts = new Map();
 	const markerFiles = new Set([
 		...(await discoverAdaptedFiles(absoluteRoot, manifest.adaptedRoots.source)),
@@ -621,7 +706,9 @@ export async function verifyManifestFiles(manifest, root) {
 			const entry = manifest.divergences.find((candidate) => candidate.id === match[1]);
 			if (
 				!entry.caseIds.includes(match[2]) ||
-				(!runtimeCaseIds.has(match[2]) && !caseIdsForManifest(manifest).has(match[2]))
+				(!runtimeCaseIds.has(match[2]) &&
+					!caseIdsForManifest(manifest).has(match[2]) &&
+					!ordinaryCaseIds.has(match[2]))
 			)
 				throw new Error(
 					`${path}: divergence marker "${match[1]}" is not bound to required executed case "${match[2]}"`,

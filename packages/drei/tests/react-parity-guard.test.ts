@@ -23,15 +23,29 @@ async function runMutation(file: string, mutate: (value: any) => void) {
 	});
 }
 
+async function runTypeMutation(file: string, mutate: (value: string) => string) {
+	const directory = await mkdtemp(path.join(tmpdir(), 'octane-drei-type-parity-'));
+	await cp(path.join(packageRoot, 'typetests'), directory, { recursive: true });
+	const target = path.join(directory, file);
+	await writeFile(target, mutate(await readFile(target, 'utf8')));
+	return spawnSync(process.execPath, [checker], {
+		cwd: repositoryRoot,
+		encoding: 'utf8',
+		env: { ...process.env, OCTANE_DREI_PARITY_TYPE_ROOT: directory },
+	});
+}
+
 describe('Drei React-parity guard', () => {
-	it('rejects a skipped runtime file', async () => {
-		const result = await runMutation('adapted-runtime.json', (value) => value.files.pop());
+	it('rejects a differential inventory that drops a paired runtime file', async () => {
+		const result = await runMutation('differential-runtime.json', (value) => value.files.pop());
 		expect(result.status).not.toBe(0);
-		expect(result.stderr).toContain('runtime test file was skipped');
+		expect(result.stderr).toContain(
+			'differential inventory must cover every paired file and exclude guards/browser',
+		);
 	});
 
 	it('rejects a deleted assertion identity', async () => {
-		const result = await runMutation('adapted-runtime.json', (value) => value.tests.pop());
+		const result = await runMutation('differential-runtime.json', (value) => value.tests.pop());
 		expect(result.status).not.toBe(0);
 		expect(result.stderr).toContain('lost or gained an assertion');
 	});
@@ -51,5 +65,33 @@ describe('Drei React-parity guard', () => {
 		);
 		expect(result.status).not.toBe(0);
 		expect(result.stderr).toContain('must not claim an upstream type suite');
+	});
+
+	it('rejects a skipped pristine type assertion file', async function () {
+		const result = await runMutation('react-parity.json', function (value) {
+			value.lanes
+				.find(function (lane: { id: string }) {
+					return lane.id === 'drei-pristine-types';
+				})
+				.files.splice(0, 1);
+		});
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain('must execute its public API type assertion file');
+	});
+
+	it('rejects a deleted assertion group in the type pair', async function () {
+		const result = await runTypeMutation('pristine/public-api.test-d.ts', function (value) {
+			return value.replace('// Assertion group 2: invalid View frame count is rejected.\n', '');
+		});
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain('assertion-group inventories differ');
+	});
+
+	it('rejects a removed type rejection assertion', async function () {
+		const result = await runTypeMutation('adapted/public-api.test-d.ts', function (value) {
+			return value.replace('// @ts-expect-error frame count is numeric on View\n', '');
+		});
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain('must retain matching @ts-expect-error directives');
 	});
 });

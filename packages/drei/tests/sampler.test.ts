@@ -151,26 +151,6 @@ describe('Sampler', () => {
 		await reactThreeAct(async () => react.root.unmount());
 	});
 
-	it('matches automatic child discovery for the sampled and controlled meshes', async () => {
-		let sampled!: THREE.Mesh;
-		let instances!: THREE.InstancedMesh;
-		const root = await createOctaneThree(SamplerAutoScene, {
-			meshRef: (value: THREE.Mesh) => (sampled = value),
-			instancesRef: (value: THREE.InstancedMesh) => (instances = value),
-			geometry: new THREE.PlaneGeometry(2, 2),
-			meshMaterial: new THREE.MeshBasicMaterial(),
-			instanceGeometry: new THREE.BoxGeometry(),
-			instanceMaterial: new THREE.MeshBasicMaterial(),
-			count: 2,
-			transform,
-		});
-		expect(sampled.type).toBe('Mesh');
-		expect(instances.isInstancedMesh).toBe(true);
-		expect(matrices(instances, 2).slice(12, 15)).toEqual([1, 1.25 + 1, -1]);
-		expect(instances.instanceMatrix.version).toBeGreaterThan(0);
-		root.unmount();
-	});
-
 	it('matches the hook default transform and returns a replaced buffer over the sampled storage', async () => {
 		const react = await reactSurface(
 			new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()),

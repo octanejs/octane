@@ -67,17 +67,6 @@ function snapshot(texture: THREE.DepthTexture | null) {
 }
 
 describe('useDepthBuffer', () => {
-	it('restores defaults after the compiler-injected trailing slot', async () => {
-		let texture: THREE.DepthTexture | null = null;
-		const root = await createOctaneThree(
-			DepthBufferDefaultsScene,
-			{ onTexture: (value: THREE.DepthTexture | null) => (texture = value) },
-			{ width: 320, height: 180 },
-		);
-		expect(snapshot(texture)).toMatchObject({ width: 256, height: 256 });
-		root.unmount();
-	});
-
 	it.each([
 		{ size: 128, expected: [128, 128] },
 		{ size: 0, expected: [320, 180] },

@@ -10,6 +10,7 @@ import { Conditional } from './demos/Conditional.tsrx';
 import { Counter } from './demos/Counter.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
 import { DreiDemo } from './demos/Drei.tsrx';
+import { DoomDemo } from './demos/doom/Doom.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { GSAPDemo } from './demos/GSAP.tsrx';
 import { IntersectionObserverDemo } from './demos/IntersectionObserver.tsrx';
@@ -35,6 +36,10 @@ import conditionalSource from './demos/Conditional.tsrx?raw';
 import counterSource from './demos/Counter.tsrx?raw';
 import dynamicSource from './demos/Dynamic.tsrx?raw';
 import dreiSource from './demos/Drei.tsrx?raw';
+import doomShellSource from './demos/doom/Doom.tsrx?raw';
+import doomSceneSource from './demos/doom/Doom.three.tsrx?raw';
+import doomModelSource from './demos/doom/model.ts?raw';
+import doomAssetsSource from './demos/doom/assets.ts?raw';
 import inputsSource from './demos/Inputs.tsrx?raw';
 import gsapSource from './demos/GSAP.tsrx?raw';
 import intersectionObserverSource from './demos/IntersectionObserver.tsrx?raw';
@@ -78,6 +83,23 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Alien Signals',
 				Component: AlienSignalsDemo,
 				source: alienSignalsSource,
+		id: 'games',
+		label: 'Games',
+		demos: [
+			{
+				id: 'doom',
+				title: 'Doom',
+				Component: DoomDemo,
+				source: [
+					'// Doom.tsrx',
+					doomShellSource,
+					'// Doom.three.tsrx',
+					doomSceneSource,
+					'// model.ts',
+					doomModelSource,
+					'// assets.ts',
+					doomAssetsSource,
+				].join('\n\n'),
 			},
 		],
 	},
@@ -138,6 +160,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Anime.js',
 				Component: AnimeJsDemo,
 				source: animeJsSource,
+			},
+			{
+				id: 'drei',
+				title: 'Drei',
+				Component: DreiDemo,
+				source: dreiSource,
 			},
 			{
 				id: 'gsap',
