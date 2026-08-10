@@ -17,14 +17,18 @@ node run.mjs [iterations]          # LYNX_TABLE_SCALES=1000,10000 by default
 Builds the app plus the real dual-thread path (background root, async
 transport, main-thread receiver, host driver) with the Octane compiler, drives
 the ops through real native tap tokens over an in-process ContextProxy pair,
-and reports per-operation **command counts** and **serialized commit bytes**
+and reports per-operation **command counts**, **serialized commit bytes**, and
+**Row component render counts**
 from the `__OCTANE_LYNX_PROFILE__` counters (`@octanejs/lynx`'s permanent,
 build-flag-gated wire profiler — `globalThis.__OCTANE_LYNX_PROF` on each
 thread). Counts are deterministic for a fixed app and interaction sequence, so
 they carry ratio guards in `../baselines/ratios.json` against the
-`changed-rows-model` target — the commands a change of that size strictly
-implies. This is the "wire payload is proportional to change size, not tree
-size" regression gate. The suite runs from the root runner:
+`changed-rows-model` target — the commands and component renders a change of
+that size strictly implies. Selection allows two Row body executions;
+update-every-10th allows `ceil(rows / 10)`. The Row counter is compiled out of
+normal browser and production builds. These gates keep wire payload and render
+breadth proportional to change size, not tree size. The suite runs from the
+root runner:
 
 ```bash
 node benchmarks/bench.mjs --only lynx-table --ratios

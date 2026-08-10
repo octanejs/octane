@@ -17,6 +17,15 @@ declare const __BENCH_AUTOROWS__: number;
 const INITIAL_ROWS: RowData[] =
 	__BENCH_AUTOROWS__ > 0 ? buildDataSeeded(__BENCH_AUTOROWS__) : [];
 
+// Count Row bodies only in the deterministic profile build. Normal browser
+// and production builds fold this branch away with their existing define.
+declare const __OCTANE_LYNX_PROFILE__: boolean;
+function countRowRender(): void {
+	if (!__OCTANE_LYNX_PROFILE__) return;
+	const profile = globalThis as { __BENCH_ROW_RENDERS__?: number };
+	profile.__BENCH_ROW_RENDERS__ = (profile.__BENCH_ROW_RENDERS__ ?? 0) + 1;
+}
+
 // -- storms: N sequential state→render→DOM ticks from one click --------------
 // Each tick runs in its own macrotask (MessageChannel avoids the nested
 // setTimeout 4ms clamp) so every mutation goes through a full render cycle
@@ -54,6 +63,7 @@ interface RowProps {
 }
 
 function Row(props: RowProps) @{
+	countRowRender();
 	<view class={['row', props.isSelected && 'danger']}>
 		<text class="col-id">{String(props.row.id)}</text>
 		<text class="col-label" bindtap={() => props.onSelect(props.row.id)}>{props.row.label}</text>

@@ -223,16 +223,24 @@ function createHarness(): Harness {
 
 interface ProfileGlobals {
 	__OCTANE_LYNX_PROF?: LynxWireProfile;
+	__BENCH_ROW_RENDERS__?: number;
 }
 
-function profileSnapshot(): { commits: number; commands: number; bytes: number } {
+function profileSnapshot(): {
+	commits: number;
+	commands: number;
+	bytes: number;
+	itemRenders: number;
+} {
 	const profile = (globalThis as ProfileGlobals).__OCTANE_LYNX_PROF;
 	// Both fake threads share this realm, so the main-thread receiver also
 	// counted each commit; halve to report per-wire commits and commands once.
+	// Row bodies only run on the background side and must not be halved.
 	return {
 		commits: (profile?.commits ?? 0) / 2,
 		commands: (profile?.commands ?? 0) / 2,
 		bytes: profile?.bytes ?? 0,
+		itemRenders: (globalThis as ProfileGlobals).__BENCH_ROW_RENDERS__ ?? 0,
 	};
 }
 
@@ -337,6 +345,7 @@ export interface OpCounters {
 	readonly commits: number;
 	readonly commands: number;
 	readonly bytes: number;
+	readonly itemRenders: number;
 }
 
 export interface TableRunResult {
@@ -379,6 +388,7 @@ export async function runTable(rows: number): Promise<TableRunResult> {
 				commits: after.commits - before.commits,
 				commands: after.commands - before.commands,
 				bytes: after.bytes - before.bytes,
+				itemRenders: after.itemRenders - before.itemRenders,
 			};
 		};
 

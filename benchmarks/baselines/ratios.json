@@ -1457,11 +1457,27 @@
   },
   {
     "suite": "lynx-table",
+    "op": "select_item_renders_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "A steady-state selection changes exactly two rows' selected props, so only those two row components may re-render. This deterministic render-breadth ceiling catches transported roots replaying all 1,000 rows for a two-row update."
+  },
+  {
+    "suite": "lynx-table",
     "op": "update10th_commands_1k",
     "target": "octane-lynx",
     "reference": "changed-rows-model",
     "maxRatio": 1.5,
     "note": "Update-every-10th rewrites ceil(rows/10) labels; the commit must carry one text update per changed row. Measured exactly 100 = 1.0x the floor on 2026-08-08 (was 3100: every row's class array plus two event re-binds per row crossed on every commit)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update10th_item_renders_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "Updating every tenth row changes exactly 100 row objects, so only those 100 row components may re-render. Unchanged transported row subtrees must retain their existing output and native listeners."
   },
   {
     "suite": "lynx-table",
@@ -1505,11 +1521,27 @@
   },
   {
     "suite": "lynx-table",
+    "op": "select_item_renders_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "A steady-state selection still changes exactly two rows at 10,000 rows. Render breadth must remain proportional to the selection change instead of replaying the whole transported table."
+  },
+  {
+    "suite": "lynx-table",
     "op": "update10th_commands_10k",
     "target": "octane-lynx",
     "reference": "changed-rows-model",
     "maxRatio": 1.5,
     "note": "Same gate at 10k rows: measured exactly 1000 = 1.0x the floor on 2026-08-08 (was 31000 before the fix)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "update10th_item_renders_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "Updating every tenth row at 10,000 rows changes exactly 1,000 row objects. The remaining 9,000 row components must retain their existing output without re-rendering."
   },
   {
     "suite": "lynx-table",
