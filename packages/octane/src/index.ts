@@ -158,6 +158,7 @@ export {
 	setClassAttr,
 	normalizeClass,
 	setStyle,
+	setStyleProperty,
 	setSpread,
 	snapshotSpread,
 	setHostPropSources,

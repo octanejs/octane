@@ -41,9 +41,10 @@ ceded to a future event-dispatch-storm suite.
   `actions` imported): the event-bundle transform only fires for
   identifier-callee arrows, so every row re-render reassigns its `$$click`
   slots.
-- **inline style objects** (value-dependent, so they can't be folded into the
-  static template): fresh object identity per render forces `setStyle`'s
-  key-walk diff.
+- **inline style objects**: the TSRX fixture combines a static declaration with
+  one changing value. Its static prefix is baked into the template and only the
+  changing property is written; the JSX twin retains the ordinary whole-object
+  diff as an unchanged control.
 - **`octane-ts` / plain createElement**: everything above plus the whole tree is
   a fresh descriptor graph per render, reconciled by the runtime de-opt path
   (`childSlot` → `reconcileDeoptNode`/`reconcileDeoptChildren` keyed matching +
@@ -72,6 +73,20 @@ TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5176/","ready":"#run"},
 
 The first target is the ratio baseline, so putting the tuned fixture first
 makes every printed ratio a naive/tuned cliff number directly.
+
+The production style-work gate measures existing row creation, selection, and
+unrelated updates with Chromium precise call coverage. It verifies complete CSS
+values, selected rows, row identity, and the unchanged JSX control:
+
+```bash
+# Build the existing naive fixtures with readable production helper names.
+pnpm --filter octane-tsrx-naive-jsbench exec vite build --minify false
+pnpm --filter octane-jsx-naive-jsbench exec vite build --minify false
+pnpm --filter octane-tsrx-naive-jsbench preview &
+pnpm --filter octane-jsx-naive-jsbench preview &
+pnpm --dir benchmarks/js-framework bench:style-work
+WORK_DIALECT=jsx pnpm --dir benchmarks/js-framework bench:style-work
+```
 
 The naive fixtures also carry the keyed-reorder buttons (mirroring the tuned
 set), so `run-reorder.mjs` can drive them the same way — but the canonical
