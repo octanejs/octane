@@ -70,6 +70,7 @@ for (const [binding, testCount] of [
 	['remix-router', 26],
 	['shadcn', 23],
 	['sonner', 7],
+	['streamdown', 13],
 ]) {
 	test(`verifies the ${binding} classification ledger`, async (t) => {
 		const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));

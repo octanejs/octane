@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/streamdown/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs eight exact same-fixture scenarios against the pinned published Streamdown and plugin packages on React."
+    },
+    {
+      "path": "packages/streamdown/tests/divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane native-event and controls-surface contracts without a pinned React oracle; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/streamdown/tests/highlight-race.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane async highlighting race behavior; it is not a React oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hydration adoption; it is not compared with React hydration."
+    },
+    {
+      "path": "packages/streamdown/tests/icons.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane icon implementation; it is not a React oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/media-state.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane Mermaid and image state races; it is not a React oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/parity-plugins.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates consolidated plugin subpath exports as an Octane package layout contract; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/streamdown/tests/plugins.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane plugin runtime contracts beyond the consolidated-subpath divergence case; it is not a React oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/public-surface.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane root runtime export surface; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/render-state.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane rendering state contracts; it is not a React oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering; it is not compared with React SSR."
+    },
+    {
+      "path": "packages/streamdown/tests/table-actions.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane fullscreen table controls; it is not a React oracle."
+    },
+    {
+      "path": "packages/streamdown/tests/type-exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane type export parity structurally; it is not an executable React type lane."
+    }
+  ]
+}

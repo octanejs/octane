@@ -1,5 +1,8 @@
 'use client';
 
+// Package contract (ordinary test evidence, not parity-counted):
+// the four official plugin packages are published as @octanejs/streamdown subpaths.
+
 import {
 	type BundledLanguage,
 	type BundledTheme,

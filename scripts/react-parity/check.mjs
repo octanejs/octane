@@ -45,6 +45,12 @@ import {
 import { verifyDreiTypes } from './drei-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import { verifyDreiReactParity } from './drei-parity-lib.mjs';
+import {
+	loadManifest,
+	selectHarnessAction,
+	verifyLaneEnvironment,
+	verifyManifestFiles,
+} from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -303,6 +309,10 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			binding !== 'livestore' &&
 		if (
 			binding !== 'hook-form' &&
+		// Livestore uses adapted-upstream-suite dispositions and is verified above via
+		// verifyLivestoreTestClassifications; hook-form/streamdown share this verifier.
+		if (
+			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		) {
 			verifyPortTestClassifications(REPO, binding);
@@ -316,6 +326,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			// Required lanes must execute even when provenance is still
 			// recorded-unverified; verification completeness must not suppress them.
 			const action = requiredExecutableLanes(manifest).length > 0 ? 'run-required' : 'validate';
+			const action = selectHarnessAction(manifest);
 			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',

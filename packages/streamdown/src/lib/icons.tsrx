@@ -1,4 +1,6 @@
 /** biome-ignore-all lint/a11y/noSvgWithoutTitle: "Streamdown icons" */
+// OCTANE DIVERGENCE[streamdown-controls-surface-corrections][differential:streamdown-controls]:
+// Octane consumes size into width/height; upstream 2.5 leaves size inert and renders 16x16.
 import type { SVGProps } from './types';
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };

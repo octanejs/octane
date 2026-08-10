@@ -6,47 +6,83 @@ const fixture = resolve(import.meta.dirname, '../_fixtures/markdown-parity.tsrx'
 const featureFixture = resolve(import.meta.dirname, '../_fixtures/feature-parity.tsrx');
 const cache = resolve(import.meta.dirname, '.react-cache');
 
-function normaliseUpstreamIconSizes(html: string): string {
-	return html.replace(/<svg\b[^>]*>/g, (svg) => {
-		if (!svg.includes('viewBox="0 0 16 16"')) {
-			return svg;
+function cloneElement(element: HTMLElement): HTMLElement {
+	return element.cloneNode(true) as HTMLElement;
+}
+
+function animationTimings(root: ParentNode): Array<[string, string]> {
+	return [...root.querySelectorAll<HTMLElement>('[data-sd-animate]')].map((node) => [
+		node.style.getPropertyValue('--sd-duration'),
+		node.style.getPropertyValue('--sd-delay'),
+	]);
+}
+
+function expectAnimationTimingDivergence(
+	octaneRoot: HTMLElement,
+	reactRoot: HTMLElement,
+	expectedOctane: Array<[string, string]>,
+	expectedReact: Array<[string, string]>,
+): void {
+	expect(animationTimings(octaneRoot)).toEqual(expectedOctane);
+	expect(animationTimings(reactRoot)).toEqual(expectedReact);
+	const octaneClone = cloneElement(octaneRoot);
+	const reactClone = cloneElement(reactRoot);
+	const octaneAnimated = octaneClone.querySelectorAll<HTMLElement>('[data-sd-animate]');
+	const reactAnimated = reactClone.querySelectorAll<HTMLElement>('[data-sd-animate]');
+	expect(octaneAnimated).toHaveLength(reactAnimated.length);
+	for (const nodes of [octaneAnimated, reactAnimated]) {
+		for (const node of nodes) {
+			node.style.removeProperty('--sd-duration');
+			node.style.removeProperty('--sd-delay');
 		}
-
-		const size = svg.match(/ size="([^"]+)"/)?.[1];
-		if (!size) {
-			return svg;
-		}
-
-		return svg
-			.replace(' height="16"', ` height="${size}"`)
-			.replace(` size="${size}"`, '')
-			.replace(' width="16"', ` width="${size}"`);
-	});
+	}
+	expect(normaliseHtml(octaneClone.innerHTML)).toBe(normaliseHtml(reactClone.innerHTML));
 }
 
-function normaliseUpstreamKnownDefects(html: string): string {
-	const normalised = normaliseHtml(html)
-		.replaceAll('bg-[var(--sdm-bg,inherit]', 'bg-[var(--sdm-bg,inherit)]')
-		.replaceAll(
-			'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit)]',
-			'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit))]',
-		);
+function expectCodeBlockDivergences(
+	octaneRoot: HTMLElement,
+	reactRoot: HTMLElement,
+	expectIconSizing = true,
+): void {
+	const octaneClone = cloneElement(octaneRoot);
+	const reactClone = cloneElement(reactRoot);
+	const octanePre = octaneClone.querySelector<HTMLElement>(
+		'[data-streamdown="code-block-body"] pre',
+	)!;
+	const reactPre = reactClone.querySelector<HTMLElement>(
+		'[data-streamdown="code-block-body"] pre',
+	)!;
+	const malformedLight = 'bg-[var(--sdm-bg,inherit]';
+	const correctedLight = 'bg-[var(--sdm-bg,inherit)]';
+	const malformedDark = 'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit)]';
+	const correctedDark = 'dark:bg-[var(--shiki-dark-bg,var(--sdm-bg,inherit))]';
+	expect(reactPre.classList.contains(malformedLight)).toBe(true);
+	expect(reactPre.classList.contains(malformedDark)).toBe(true);
+	expect(octanePre.classList.contains(correctedLight)).toBe(true);
+	expect(octanePre.classList.contains(correctedDark)).toBe(true);
+	reactPre.classList.replace(malformedLight, correctedLight);
+	reactPre.classList.replace(malformedDark, correctedDark);
 
-	return normaliseUpstreamIconSizes(normalised);
-}
-
-function expectUpstreamCodeBlockParity(octaneHtml: string, reactHtml: string): void {
-	expect(normaliseHtml(octaneHtml)).toBe(normaliseUpstreamKnownDefects(reactHtml));
-}
-
-// Streamdown 2.5 shares animation progress across sibling blocks. Compare every
-// other DOM detail with upstream, then assert the corrected timing separately.
-function normaliseAnimationTiming(html: string): string {
-	return normaliseHtml(html).replace(/ ?--sd-(?:duration|delay): \d+ms;/g, '');
-}
-
-function expectUpstreamAnimationParity(octaneHtml: string, reactHtml: string): void {
-	expect(normaliseAnimationTiming(octaneHtml)).toBe(normaliseAnimationTiming(reactHtml));
+	const reactIcons = [...reactClone.querySelectorAll<SVGElement>('svg[viewBox="0 0 16 16"]')];
+	const octaneIcons = [...octaneClone.querySelectorAll<SVGElement>('svg[viewBox="0 0 16 16"]')];
+	expect(octaneIcons).toHaveLength(reactIcons.length);
+	expect(reactIcons.filter((icon) => icon.hasAttribute('size'))).toHaveLength(
+		expectIconSizing ? 4 : 0,
+	);
+	for (const [index, reactIcon] of reactIcons.entries()) {
+		if (!reactIcon.hasAttribute('size')) continue;
+		const octaneIcon = octaneIcons[index]!;
+		const size = reactIcon.getAttribute('size')!;
+		expect(reactIcon.getAttribute('height')).toBe('16');
+		expect(reactIcon.getAttribute('width')).toBe('16');
+		expect(octaneIcon.hasAttribute('size')).toBe(false);
+		expect(octaneIcon.getAttribute('height')).toBe(size);
+		expect(octaneIcon.getAttribute('width')).toBe(size);
+		reactIcon.removeAttribute('size');
+		reactIcon.setAttribute('height', size);
+		reactIcon.setAttribute('width', size);
+	}
+	expect(normaliseHtml(octaneClone.innerHTML)).toBe(normaliseHtml(reactClone.innerHTML));
 }
 
 const STATIC_MARKDOWN = [
@@ -66,6 +102,7 @@ const STATIC_MARKDOWN = [
 ].join('\n');
 
 describe('@octanejs/streamdown differential parity', () => {
+	// @parity-case differential:streamdown-static-markdown
 	it('matches Streamdown 2.5 for static Markdown, GFM, math, CJK, and custom tags', async () => {
 		const differential = await mountDifferential(
 			fixture,
@@ -85,6 +122,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-streaming-append
 	it('preserves completed blocks while appending streamed Markdown', async () => {
 		const differential = await mountDifferential(
 			fixture,
@@ -95,9 +133,19 @@ describe('@octanejs/streamdown differential parity', () => {
 
 		const firstOctaneHeading = differential.octane.find('h1');
 		await differential.observe('initial stream', () => {});
-		expectUpstreamAnimationParity(
-			differential.octane.container.innerHTML,
-			differential.react.container.innerHTML,
+		expectAnimationTimingDivergence(
+			differential.octane.container,
+			differential.react.container,
+			[
+				['100ms', ''],
+				['100ms', ''],
+				['100ms', '40ms'],
+			],
+			[
+				['100ms', ''],
+				['0ms', ''],
+				['0ms', ''],
+			],
 		);
 		for (const animatedText of differential.octane.findAll('[data-sd-animate]')) {
 			expect((animatedText as HTMLElement).style.getPropertyValue('--sd-duration')).toBe('100ms');
@@ -112,9 +160,25 @@ describe('@octanejs/streamdown differential parity', () => {
 			await octane.click('#append-markdown');
 			await react.click('#append-markdown');
 		});
-		expectUpstreamAnimationParity(
-			differential.octane.container.innerHTML,
-			differential.react.container.innerHTML,
+		expectAnimationTimingDivergence(
+			differential.octane.container,
+			differential.react.container,
+			[
+				['100ms', ''],
+				['100ms', ''],
+				['100ms', '40ms'],
+				['100ms', ''],
+				['100ms', ''],
+				['100ms', '40ms'],
+			],
+			[
+				['100ms', ''],
+				['0ms', ''],
+				['0ms', ''],
+				['100ms', ''],
+				['0ms', ''],
+				['100ms', ''],
+			],
 		);
 		for (const animatedText of differential.octane.findAll('h2 [data-sd-animate]')) {
 			expect((animatedText as HTMLElement).style.getPropertyValue('--sd-duration')).toBe('100ms');
@@ -125,6 +189,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-hast-components
 	it('preserves HAST nodes, custom components, inline code, and custom renderers', async () => {
 		const differential = await mountDifferential(
 			featureFixture,
@@ -163,6 +228,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-filtering
 	it('matches element filtering, unwrapping, and URL transformation', async () => {
 		const differential = await mountDifferential(
 			featureFixture,
@@ -184,6 +250,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-controls
 	it('renders the documented code and table control surface', async () => {
 		const differential = await mountDifferential(
 			featureFixture,
@@ -220,12 +287,13 @@ describe('@octanejs/streamdown differential parity', () => {
 			// Streamdown 2.5.0 ships unbalanced arbitrary-value classes and leaves
 			// icon size props inert. Keep the rest of this scenario byte-identical
 			// while normalising only those upstream defects on the React side.
-			expectUpstreamCodeBlockParity(octane.container.innerHTML, react.container.innerHTML);
+			expectCodeBlockDivergences(octane.container, react.container);
 		});
 
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-mode-transitions
 	it('survives append, shrink, and static/streaming mode round trips', async () => {
 		const differential = await mountDifferential(
 			featureFixture,
@@ -235,10 +303,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		);
 
 		await differential.observe('initial incomplete stream', () => {});
-		expectUpstreamCodeBlockParity(
-			differential.octane.container.innerHTML,
-			differential.react.container.innerHTML,
-		);
+		expectCodeBlockDivergences(differential.octane.container, differential.react.container, false);
 		await differential.step('stream to static', async (octane, react) => {
 			await octane.click('#to-static');
 			await react.click('#to-static');
@@ -265,6 +330,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-link-safety
 	it('matches the custom link-safety modal lifecycle', async () => {
 		const differential = await mountDifferential(
 			featureFixture,
@@ -293,6 +359,7 @@ describe('@octanejs/streamdown differential parity', () => {
 		differential.unmount();
 	});
 
+	// @parity-case differential:streamdown-animation-callbacks
 	it('matches animation start and end callbacks', async () => {
 		const differential = await mountDifferential(
 			featureFixture,
