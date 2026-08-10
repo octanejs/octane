@@ -271,6 +271,7 @@ describe('CI workflow aggregation', () => {
 			'packages/dnd-kit/tests/hydration/**/*.test.ts',
 		]);
 		assert.equal(baseProjects.get('dnd-kit').test.globalSetup, undefined);
+		assert.equal(baseProjects.get('dnd-kit-differential').testExecution.group, 'react-parity');
 		assert.deepEqual(baseProjects.get('dnd-kit-differential').test.include, [
 			'packages/dnd-kit/tests/differential/**/*.test.ts',
 		]);
@@ -278,7 +279,7 @@ describe('CI workflow aggregation', () => {
 			'packages/dnd-kit/tests/differential/_setup.ts',
 		]);
 		assert.equal(baseProjects.get('dnd-kit-differential').test.testTimeout, 30_000);
-		assert.equal(shardedProjects.has('dnd-kit-differential'), true);
+		assert.equal(shardedProjects.has('dnd-kit-differential'), false);
 
 		const aggregate = jobSource('test');
 		assert.match(

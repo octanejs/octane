@@ -4136,6 +4136,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'dnd-kit-parity-audit',
+					include: ['packages/dnd-kit/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'dnd-kit-differential',
 					include: ['packages/dnd-kit/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
@@ -4148,6 +4156,7 @@ export default defineConfig({
 					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [

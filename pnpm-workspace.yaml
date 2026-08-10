@@ -162,6 +162,10 @@ catalogs:
   cmdk-react-oracle:
     '@types/react': 19.2.17
     '@types/react-dom': 19.2.3
+  # Exact React/ReactDOM pin for @octanejs/dnd-kit differential evidence.
+  # Keep this catalog exact (no caret) so lock refreshes cannot silently
+  # move the React oracle under the same UPSTREAM.md claim.
+  dnd-kit-react-oracle:
     react: 19.2.7
     react-dom: 19.2.7
   lynx:

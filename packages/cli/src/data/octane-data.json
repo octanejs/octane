@@ -163,7 +163,7 @@
         "useSortable retains the upstream keyboard plugin by default but omits OptimisticSortingPlugin because moving one host element before application state commits can split an Octane keyed DOM range; explicit plugin arrays remain authoritative."
       ],
       "ssr": "Static SSR and hydration are covered; DOM plugins initialize only after client refs register.",
-      "verified": "2026-07-15"
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/drei",

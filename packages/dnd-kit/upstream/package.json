@@ -1,0 +1,92 @@
+{
+  "name": "@dnd-kit/react",
+  "version": "0.5.0",
+  "main": "./index.cjs",
+  "module": "./index.js",
+  "type": "module",
+  "types": "./index.d.ts",
+  "sideEffects": false,
+  "license": "MIT",
+  "files": [
+    "LICENSE",
+    "README.md",
+    "index.js",
+    "index.js.map",
+    "index.d.ts",
+    "index.cjs",
+    "index.cjs.map",
+    "hooks.js",
+    "hooks.js.map",
+    "hooks.d.ts",
+    "hooks.cjs",
+    "hooks.cjs.map",
+    "sortable.js",
+    "sortable.js.map",
+    "sortable.d.ts",
+    "sortable.cjs",
+    "sortable.cjs.map",
+    "utilities.js",
+    "utilities.js.map",
+    "utilities.d.ts",
+    "utilities.cjs",
+    "utilities.cjs.map"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    },
+    "./hooks": {
+      "types": "./hooks.d.ts",
+      "import": "./hooks.js",
+      "require": "./hooks.cjs"
+    },
+    "./sortable": {
+      "types": "./sortable.d.ts",
+      "import": "./sortable.js",
+      "require": "./sortable.cjs"
+    },
+    "./utilities": {
+      "types": "./utilities.d.ts",
+      "import": "./utilities.js",
+      "require": "./utilities.cjs"
+    }
+  },
+  "scripts": {
+    "build": "bun build:utilities && bun build:hooks && bun build:core && bun build:sortable",
+    "build:core": "tsup src/core/index.ts",
+    "build:hooks": "tsup --entry.hooks src/hooks/index.ts",
+    "build:sortable": "tsup --entry.sortable src/sortable/index.ts",
+    "build:utilities": "tsup --entry.utilities src/utilities/index.ts",
+    "dev": "bun build:utilities --watch & bun build:hooks --watch & bun build:core --watch & bun build:sortable --watch",
+    "lint": "TIMING=1 eslint src/**/*.ts* --fix",
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist"
+  },
+  "dependencies": {
+    "@dnd-kit/abstract": "^0.5.0",
+    "@dnd-kit/dom": "^0.5.0",
+    "@dnd-kit/state": "^0.5.0",
+    "tslib": "^2.6.2"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "eslint": "^8.38.0",
+    "@dnd-kit/eslint-config": "*",
+    "react": "^19.0.0",
+    "tsup": "8.3.0",
+    "typescript": "^5.5.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clauderic/dnd-kit"
+  }
+}
