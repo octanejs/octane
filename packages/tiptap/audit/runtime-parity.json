@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "pairs": [
+    {
+      "pristine": "packages/tiptap/upstream/src/EditorContent.spec.ts",
+      "adapted": "packages/tiptap/tests/upstream/EditorContent.test.ts"
+    },
+    {
+      "pristine": "packages/tiptap/upstream/src/menus/BubbleMenu.spec.ts",
+      "adapted": "packages/tiptap/tests/upstream/BubbleMenu.test.ts"
+    },
+    {
+      "pristine": "packages/tiptap/upstream/src/menus/FloatingMenu.spec.ts",
+      "adapted": "packages/tiptap/tests/upstream/FloatingMenu.test.ts"
+    },
+    {
+      "pristine": "packages/tiptap/upstream/src/use-client.spec.ts",
+      "adapted": "packages/tiptap/tests/upstream/use-client.test.ts"
+    }
+  ],
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "React Testing Library and relative @tiptap/react imports become @octanejs/testing-library and @octanejs/tiptap"
+    },
+    {
+      "kind": "create-element",
+      "rule": "React.createElement / React.Fragment / createRef become octane createElement / Fragment / plain ref objects"
+    },
+    {
+      "kind": "callback-style",
+      "rule": "Arrow callbacks may become function declarations; unregisterCalls.some(([key]) => …) may become function (call) { return call[0] === … }"
+    },
+    {
+      "kind": "use-client-each",
+      "rule": "it.each(entries) may expand into one it per entry with firstStatement(path) replacing firstLine"
+    },
+    {
+      "kind": "native-menu-events",
+      "rule": "Documented tiptap-native-menu-events assertion replacements for BubbleMenu synthetic-event probes"
+    }
+  ],
+  "assertionReplacements": [
+    {
+      "divergenceId": "tiptap-native-menu-events",
+      "pristine": "packages/tiptap/upstream/src/menus/BubbleMenu.spec.ts",
+      "title": "applies html props to the actual menu element",
+      "replacements": [
+        {
+          "from": "expect(lastEvent.nativeEvent).toBeInstanceOf(MouseEvent)",
+          "to": "expect(lastEvent?.event).toBeInstanceOf(MouseEvent)"
+        },
+        {
+          "from": "expect(lastEvent.currentTarget).toBe(element)",
+          "to": "expect(lastEvent?.currentTarget).toBe(element)"
+        },
+        {
+          "from": "expect(lastEvent.target).toBeInstanceOf(Element)",
+          "to": "expect(lastEvent?.target).toBeInstanceOf(Element)"
+        },
+        {
+          "from": "expect(typeof lastEvent.persist).toBe('function')",
+          "to": "expect('nativeEvent' in (lastEvent?.event as object)).toBe(false)"
+        }
+      ]
+    }
+  ]
+}

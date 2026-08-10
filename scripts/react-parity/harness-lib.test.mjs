@@ -614,7 +614,13 @@ test('sorts test identities by locale-independent code-unit order', () => {
 	);
 });
 
-test('rejects adapted type evidence that bypasses the TSRX compiler', () => {
+test('accepts standard TypeScript for plain adapted type suites', () => {
+	const lane = typeLane('adapted-types');
+	lane.execution.compiler = 'tsc';
+	assert.doesNotThrow(() => validateManifest(manifest({ lanes: [lane] })));
+});
+
+test('rejects adapted type evidence that bypasses a supported TypeScript compiler', () => {
 	const lane = {
 		...manifest().lanes[0],
 		id: 'adapted-types',
@@ -628,7 +634,7 @@ test('rejects adapted type evidence that bypasses the TSRX compiler', () => {
 	};
 	assert.throws(
 		() => validateManifest(manifest({ lanes: [lane] })),
-		/adapted-types execution must use tsrx-tsc/,
+		/adapted-types execution must use tsc or tsrx-tsc/,
 	);
 });
 
@@ -870,7 +876,7 @@ test('requires paired executable type lanes only when upstream type evidence exi
 	);
 });
 
-test('requires explicit type evidence origins and the framework-appropriate compilers', () => {
+test('requires explicit type evidence origins and supported compilers', () => {
 	for (const type of ['pristine-types', 'adapted-types']) {
 		const value = manifest();
 		value.lanes[0] = {
@@ -890,10 +896,12 @@ test('requires explicit type evidence origins and the framework-appropriate comp
 		assert.throws(() => validateManifest(missingOrigin), /type evidenceOrigin/);
 
 		const wrongCompiler = structuredClone(value);
-		wrongCompiler.lanes[0].execution.compiler = type === 'pristine-types' ? 'tsrx-tsc' : 'tsc';
+		wrongCompiler.lanes[0].execution.compiler = type === 'pristine-types' ? 'tsrx-tsc' : 'tsgo';
 		assert.throws(
 			() => validateManifest(wrongCompiler),
-			new RegExp(`${type} execution must use ${type === 'pristine-types' ? 'tsc' : 'tsrx-tsc'}`),
+			new RegExp(
+				`${type} execution must use ${type === 'pristine-types' ? 'tsc' : 'tsc or tsrx-tsc'}`,
+			),
 		);
 	}
 

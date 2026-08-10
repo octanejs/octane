@@ -1,0 +1,78 @@
+{
+  "name": "@tiptap/react",
+  "version": "3.28.0",
+  "description": "React components for tiptap",
+  "keywords": [
+    "tiptap",
+    "tiptap react components"
+  ],
+  "homepage": "https://tiptap.dev",
+  "bugs": {
+    "url": "https://github.com/ueberdosis/tiptap/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ueberdosis/tiptap",
+    "directory": "packages/react"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/ueberdosis"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/index.d.ts",
+        "require": "./dist/index.d.cts"
+      },
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./menus": {
+      "types": {
+        "import": "./dist/menus/index.d.ts",
+        "require": "./dist/menus/index.d.cts"
+      },
+      "import": "./dist/menus/index.js",
+      "require": "./dist/menus/index.cjs"
+    }
+  },
+  "dependencies": {
+    "@types/use-sync-external-store": "^0.0.6",
+    "fast-equals": "^5.3.3",
+    "use-sync-external-store": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@tiptap/core": "^3.28.0",
+    "@tiptap/pm": "^3.28.0"
+  },
+  "peerDependencies": {
+    "@types/react": "^17.0.0 || ^18.0.0 || ^19.0.0",
+    "@types/react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0",
+    "@tiptap/core": "3.28.0",
+    "@tiptap/pm": "3.28.0"
+  },
+  "optionalDependencies": {
+    "@tiptap/extension-bubble-menu": "^3.28.0",
+    "@tiptap/extension-floating-menu": "^3.28.0"
+  },
+  "scripts": {
+    "build": "tsup"
+  }
+}

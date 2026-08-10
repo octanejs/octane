@@ -100,6 +100,7 @@ export class ReactMarkView extends MarkView<
 
 	/** ProseMirror calls this when the mark view leaves the document. */
 	destroy(): void {
+		// OCTANE DIVERGENCE[tiptap-mark-view-portal-cleanup][differential:tiptap-mark-view-portal-cleanup]
 		this.renderer.destroy();
 	}
 }

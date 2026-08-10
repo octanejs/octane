@@ -39,6 +39,10 @@ import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
 import { verifyTanstackTableTypes } from './tanstack-table-types-lib.mjs';
 import { verifyTanstackTableTestClassifications } from './tanstack-table-classifications-lib.mjs';
+import { verifyTiptapTypes } from './tiptap-types-lib.mjs';
+import { verifyTiptapRuntimeCrosswalk } from './tiptap-runtime-lib.mjs';
+import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mjs';
+import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -72,6 +76,7 @@ const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTyp
 	.filter((manifest) => existsSync(path.join(REPO, manifest)))
 	.sort();
 const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
+const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set(['livestore', 'tanstack-hotkeys', 'tiptap']);
 const errors = [];
 try {
 	verifyHookFormUpstream(REPO);
@@ -157,6 +162,19 @@ try {
 	verifyTanstackTableTypes(REPO);
 } catch (error) {
 	errors.push(`@octanejs/tanstack-table type evidence is invalid: ${error.message}`);
+	verifyTiptapTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tiptap type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyTiptapRuntimeCrosswalk(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tiptap runtime crosswalk is invalid: ${error.message}`);
+}
+try {
+	verifyTiptapTestClassifications(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tiptap test classifications are invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTestClassifications(REPO);
@@ -254,6 +272,9 @@ try {
 	verifyTanstackTableTestClassifications(REPO);
 } catch (error) {
 	errors.push(`tanstack-table test classifications are invalid: ${error.message}`);
+	verifyTanstackHotkeysTestClassifications(REPO);
+} catch (error) {
+	errors.push(`tanstack-hotkeys test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components
@@ -346,6 +367,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// Livestore keeps a dedicated disposition vocabulary and verifier.
 		if (
 			binding !== 'livestore' &&
+		if (
+			!SPECIALIZED_CLASSIFICATION_BINDINGS.has(binding) &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		) {
 			verifyPortTestClassifications(REPO, binding);

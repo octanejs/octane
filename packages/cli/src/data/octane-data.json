@@ -925,7 +925,7 @@
         "ReactMarkView tears down its portal when ProseMirror destroys the mark view, closing a renderer leak present in @tiptap/react 3.28.0."
       ],
       "ssr": "Covered across the complete surface: hooks use null server snapshots and suppress editor construction without a DOM, static NodeView/MarkView helpers render without a DOM renderer, detached menu targets are client-only, and hydration adopts deferred server shells before mounting live custom views and menus.",
-      "verified": "2026-07-17"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/transition-group",

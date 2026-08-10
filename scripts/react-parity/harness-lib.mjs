@@ -395,8 +395,8 @@ export function validateManifest(manifest) {
 			);
 		if (lane.type === 'pristine-types' && lane.execution.compiler !== 'tsc')
 			fail(`lane ${lane.id} pristine-types execution must use tsc`);
-		if (lane.type === 'adapted-types' && lane.execution.compiler !== 'tsrx-tsc')
-			fail(`lane ${lane.id} adapted-types execution must use tsrx-tsc`);
+		if (lane.type === 'adapted-types' && !['tsc', 'tsrx-tsc'].includes(lane.execution.compiler))
+			fail(`lane ${lane.id} adapted-types execution must use tsc or tsrx-tsc`);
 		if (!Array.isArray(lane.files) || lane.files.length === 0)
 			fail(`lane ${lane.id} files must be non-empty`);
 		for (const file of lane.files) {

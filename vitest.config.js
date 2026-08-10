@@ -3991,9 +3991,83 @@ export default defineConfig({
 					include: [
 						'packages/tiptap/tests/unit/**/*.test.ts',
 						'packages/tiptap/tests/unit/**/*.test.tsx',
-						'packages/tiptap/tests/differential/**/*.test.ts',
 						'packages/tiptap/tests/hydration/**/*.test.ts',
 					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tiptap-pristine',
+					include: ['packages/tiptap/upstream/src/**/*.spec.ts'],
+					environment: 'jsdom',
+					globals: false,
+					setupFiles: ['packages/tiptap/tests/_harness/verify-upstream.ts'],
+				},
+				oxc: {
+					jsx: {
+						runtime: 'automatic',
+						importSource: 'react',
+					},
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^@tiptap\/react\/menus$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tiptap/upstream/src/menus/index.ts',
+							),
+						},
+						{
+							find: /^@tiptap\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/upstream/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tiptap-upstream',
+					include: ['packages/tiptap/tests/upstream/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tiptap-differential',
+					include: ['packages/tiptap/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/tiptap/tests/differential/_setup.ts'],
 					globals: false,

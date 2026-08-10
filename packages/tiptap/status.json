@@ -20,5 +20,5 @@
     "Behavioral tests use real TipTap editors for lifecycle, custom views, and menu plugins; shared-fixture differential tests compare editor and custom-view behavior with @tiptap/react.",
     "A real Chromium harness covers caret-preserving input, selection, NodeView dragging, and BubbleMenu/FloatingMenu visibility and positioning."
   ],
-  "verified": "2026-07-17"
+  "verified": "2026-08-02"
 }
