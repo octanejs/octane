@@ -717,6 +717,7 @@ export default defineConfig({
 					exclude: [
 						'packages/dexie/tests/ssr/**/*.test.ts',
 						'packages/dexie/tests/browser/**/*.test.ts',
+						'packages/dexie/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
 					setupFiles: ['packages/dexie/tests/_setup.ts'],
@@ -734,6 +735,32 @@ export default defineConfig({
 			},
 			{
 				testExecution: { group: 'heavy-browser' },
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/dexie/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'dexie-differential',
+					include: ['packages/dexie/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/dexie/tests/differential/_setup.ts'],
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					setupFiles: ['packages/dexie/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/dexie$/,
+							replacement: resolve(import.meta.dirname, 'packages/dexie/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'dexie-browser',
 					include: ['packages/dexie/tests/browser/**/*.test.ts'],

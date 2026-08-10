@@ -160,6 +160,7 @@ async function currentHasItem(id: number) {
 
 describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => {
 	// Per dexie-react-hooks test/index.ts: List component is reacting to changes
+	// @parity-case browser:dexie-list-reactivity
 	it('List component is reacting to changes', async () => {
 		await waitTilEqual(listText, '', 'The list should be empty');
 
@@ -181,6 +182,7 @@ describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => 
 	});
 
 	// Per dexie-react-hooks test/index.ts: ItemLoaderComponent is reacting to changes
+	// @parity-case browser:dexie-item-reactivity
 	it('ItemLoaderComponent is reacting to changes', async () => {
 		await waitTilEqual(
 			currentNotFoundText,
@@ -211,6 +213,7 @@ describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => 
 	});
 
 	// Per dexie-react-hooks test/index.ts: Clicking next button will update the currently viewed item
+	// @parity-case browser:dexie-item-navigation
 	it('Clicking next button will update the currently viewed item', async () => {
 		await dexieCall('bulkPut', [
 			{ id: 1, name: 'Hello' },
@@ -239,6 +242,7 @@ describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => 
 	});
 
 	// Per dexie-react-hooks test/index.ts: Selecting invalid key trigger the err-boundrary
+	// @parity-case browser:dexie-error-boundary
 	it('Selecting invalid key triggers the error boundary', async () => {
 		await dexieCall('bulkPut', [
 			{ id: 1, name: 'Hello' },

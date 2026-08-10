@@ -402,6 +402,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// port classifications path would reject its adapted-upstream-suite entries.
 		// Livestore uses a dedicated classifier (adapted-upstream-suite + pristine
 		// path filters); shared binding classifications cover hook-form / RTL.
+		// livestore keeps a dedicated verifier (different dispositions); others use the shared binding helper
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
@@ -423,6 +424,11 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			// recorded-unverified; verification completeness must not suppress them.
 			const action = selectHarnessAction(manifest);
 			const action = 'run-required';
+			// Provenance verification gates completeness, not execution. Required
+			// lanes on recorded-unverified manifests (e.g. Dexie browser/differential)
+			// still run so parity-owned projects are not skipped after leaving
+			// ordinary shards.
+			const action = requiredExecutableLanes(manifest).length > 0 ? 'run-required' : 'validate';
 			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',
