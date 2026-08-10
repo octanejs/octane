@@ -14850,6 +14850,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const prevLocals = ctx.currentComponentLocals;
 	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
 	const prevAutoMemoLocalHazards = ctx.currentAutoMemoLocalHazards;
+	const prevAutoCalculatedRenderableRefs = ctx.currentAutoCalculatedRenderableRefs;
 	const prevMapTemps = ctx.currentMapTemps;
 	const mapTemps = [];
 	ctx._valueDirectiveLowering = lowerBodyValueDirective;
@@ -14864,6 +14865,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 			.filter((statement) => statement.type === 'ReturnStatement' && isJsxNode(statement.argument))
 			.map((statement) => statement.argument);
 		const renderReadNames = collectRenderReadNames(renderedRoots, ctx);
+		let autoCalculatedDeclarations = null;
 		let renderScopeEstablished = false;
 		newStatements = authoredStatements.map((sourceStatement) => {
 			// Return-JSX functions keep their ordinary callable ABI. Introducing a
@@ -14873,6 +14875,12 @@ function compileReturnJsxFunction(node, ctx, options) {
 			const calculated = renderScopeEstablished
 				? rewriteAutoCalculation(sourceStatement, ctx.currentComponentLocals, renderReadNames, ctx)
 				: sourceStatement;
+			if (ctx.autoMemo && calculated !== sourceStatement) {
+				(autoCalculatedDeclarations ??= new Map()).set(
+					sourceStatement.declarations[0].id.name,
+					sourceStatement,
+				);
+			}
 			if (!renderScopeEstablished && sourceStatement.type === 'VariableDeclaration') {
 				renderScopeEstablished = (sourceStatement.declarations || []).some(
 					(declaration) => stableHookCallName(unwrapTsExpr(declaration.init)) !== null,
@@ -14895,6 +14903,25 @@ function compileReturnJsxFunction(node, ctx, options) {
 			// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 			// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 			if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
+				if (autoCalculatedDeclarations !== null) {
+					// Unlike a JSXCodeBlock, a returned-JSX body's statement list also
+					// contains its output. Do not mistake that owned return for a setup
+					// escape: the separate render-root walk checks its exact hole nodes.
+					const setupStatements = authoredStatements.filter(
+						(statement) => statement.type !== 'ReturnStatement' || !isJsxNode(statement.argument),
+					);
+					const refs = collectAutoCalculatedRenderableRefs(
+						setupStatements,
+						renderedRoots,
+						autoCalculatedDeclarations,
+					);
+					if (refs !== null) {
+						ctx.currentAutoCalculatedRenderableRefs = {
+							nodes: refs,
+							parent: prevAutoCalculatedRenderableRefs,
+						};
+					}
+				}
 				return { ...h, argument: lowerReturnJsx(h.argument, ctx, compInlinedSubs, cssHash) };
 			}
 			return rewriteJsxValues(h, ctx);
@@ -14904,6 +14931,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
 		ctx.currentAutoMemoLocalHazards = prevAutoMemoLocalHazards;
+		ctx.currentAutoCalculatedRenderableRefs = prevAutoCalculatedRenderableRefs;
 		ctx.currentMapTemps = prevMapTemps;
 	}
 	if (
@@ -16410,6 +16438,96 @@ function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = f
 	return false;
 }
 
+// A returned host preserves nested component children as inspectable
+// descriptors. An actual Octane Context can reuse its static host descriptor
+// while a compiler-proven plain descriptor array stays unchanged; the existing
+// implicit element bailout then skips its list without changing the children
+// representation or hydration ranges. Admit only one ordinary `.Provider`, its
+// `value`, and one static host whose sole child is the exact non-escaping
+// calculation Identifier.
+function autoMemoReturnedProviderChild(node, nameNode, ctx) {
+	if (
+		!ctx.autoMemo ||
+		ctx._universalRuntimeUnit != null ||
+		ctx._foldCtx?.immediateRenderedOutput !== true ||
+		!Array.isArray(ctx._foldCtx.compInlinedSubs) ||
+		ctx.currentAutoCalculatedRenderableRefs === null ||
+		(nameNode?.type !== 'MemberExpression' && nameNode?.type !== 'JSXMemberExpression') ||
+		(nameNode.object?.type !== 'Identifier' && nameNode.object?.type !== 'JSXIdentifier') ||
+		nameNode.property?.name !== 'Provider'
+	) {
+		return null;
+	}
+
+	const attributes = node.attributes || node.openingElement?.attributes || [];
+	if (attributes.length !== 1) return null;
+	const valueAttribute = attributes[0];
+	if (
+		(valueAttribute.type !== 'Attribute' && valueAttribute.type !== 'JSXAttribute') ||
+		jsxAttrRawName(valueAttribute) !== 'value'
+	) {
+		return null;
+	}
+	const value =
+		valueAttribute.value?.type === 'JSXExpressionContainer'
+			? unwrapTsExpr(valueAttribute.value.expression)
+			: valueAttribute.value;
+	if (
+		value == null ||
+		(value.type !== 'Identifier' && value.type !== 'Literal' && value.type !== 'StringLiteral')
+	) {
+		return null;
+	}
+
+	const onlyMeaningfulChild = (children) => {
+		let result = null;
+		for (const child of children || []) {
+			if (child?.type === 'JSXText' || child?.type === 'Text') {
+				const text = child.value ?? child.raw;
+				if (typeof text === 'string' && /^\s*$/.test(text) && /[\n\r]/.test(text)) {
+					continue;
+				}
+			}
+			if (result !== null) return null;
+			result = child;
+		}
+		return result;
+	};
+	const host = onlyMeaningfulChild(node.children);
+	if ((host?.type !== 'Element' && host?.type !== 'JSXElement') || isComponentTag(host)) {
+		return null;
+	}
+	for (const attribute of host.attributes || host.openingElement?.attributes || []) {
+		if (attribute.type !== 'Attribute' && attribute.type !== 'JSXAttribute') return null;
+		const name = jsxAttrRawName(attribute);
+		if (
+			name === 'key' ||
+			name === 'ref' ||
+			name === 'children' ||
+			name === 'dangerouslySetInnerHTML'
+		) {
+			return null;
+		}
+		if (
+			attribute.value != null &&
+			attribute.value.type !== 'Literal' &&
+			attribute.value.type !== 'StringLiteral'
+		) {
+			return null;
+		}
+	}
+	const child = onlyMeaningfulChild(host.children);
+	if (child?.type !== 'JSXExpressionContainer' || child.expression?.type !== 'Identifier') {
+		return null;
+	}
+	for (let proof = ctx.currentAutoCalculatedRenderableRefs; proof !== null; proof = proof.parent) {
+		if (proof.nodes.has(child.expression)) {
+			return { host, contextName: nameNode.object.name, rows: child.expression };
+		}
+	}
+	return null;
+}
+
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
 // component Element node. Recurses into prop values so nested JSX values lower too.
 function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
@@ -16494,6 +16612,9 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		childrenNeedRenderScope &&
 		(nameNode?.type === 'MemberExpression' || nameNode?.type === 'JSXMemberExpression') &&
 		nameNode.property?.name === 'Provider';
+	const autoMemoProviderChild = eagerProviderChildren
+		? autoMemoReturnedProviderChild(node, nameNode, ctx)
+		: null;
 	const loweredChildren = [];
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
@@ -16525,6 +16646,71 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	let descriptor;
 	if (childrenNeedRenderScope && loweredChildren.length > 0) {
 		let childrenValue = loweredChildren[0];
+		let memoizedChildrenBody = null;
+		if (autoMemoProviderChild !== null && loweredChildren.length === 1) {
+			const { host, contextName, rows } = autoMemoProviderChild;
+			ctx.runtimeNeeded.add('compilerCacheArray');
+			// `.Provider` is a public property and can belong to any component.
+			// Ask the runtime whether this exact value is provided by the CURRENT
+			// scope. Its identity-map lookup never re-reads `.Provider`, invokes
+			// a fake component's `$$kind` getter, or observes a user Proxy trap.
+			const genuineContext = inheritOriginLoc(
+				b.call(
+					requireRuntimeForContext(ctx, 'compilerOwnsContextProvider'),
+					inheritOriginLoc(b.id(contextName), nameNode.object),
+				),
+				nameNode,
+			);
+			// The scoped descriptor's readChildren callback runs while this
+			// verified Provider owns CURRENT_SCOPE. Its compiler-minted Symbol
+			// therefore belongs to that stable Provider instance, never to an
+			// arbitrary component or to a descriptor inspected outside render.
+			// This site is client-only, so defer its Symbol until shared authored
+			// sites have claimed their ids in both the server and client compiles.
+			const slot = allocTailHookSymbol(ctx, `${contextName}.provider.child.memo`, {
+				componentName: contextName,
+				name: 'provider child memo',
+				kind: 'useMemo',
+				node: host,
+			});
+			const freshName = allocCompilerName(ctx, '__memoFresh');
+			const childName = allocCompilerName(ctx, '__memoChild');
+			const memoizedDescriptor = inheritOriginLoc(
+				b.call(
+					requireRuntimeForContext(ctx, 'useMemo'),
+					b.arrow(
+						[],
+						b.sequence([b.assignment('=', b.id(freshName), b.literal(true)), childrenValue]),
+					),
+					b.array([rows]),
+					b.id(slot),
+				),
+				host,
+			);
+			// A fresh descriptor must reconcile regardless of array contents.
+			// Inspect dense/accessor/scoped eligibility only when the memo HIT
+			// could actually skip reconciliation, just like compilerCacheArray's
+			// ordinary previous-value path. This keeps mount and changed inputs
+			// free of an extra linear scan.
+			const cacheable = b.logical(
+				'&&',
+				genuineContext,
+				b.sequence([
+					b.assignment('=', b.id(childName), memoizedDescriptor),
+					b.logical('||', b.id(freshName), b.call('_$compilerCacheArray', rows, rows)),
+				]),
+			);
+			memoizedChildrenBody = inheritOriginLoc(
+				b.block([
+					b.declaration('let', [
+						b.declarator(b.id(freshName), b.literal(false)),
+						b.declarator(b.id(childName), null),
+					]),
+					b.return(b.conditional(cacheable, b.id(childName), childrenValue)),
+				]),
+				host,
+			);
+		}
 		if (loweredChildren.length > 1) {
 			ctx.runtimeNeeded.add('positionalChildren');
 			childrenValue = inheritOriginLoc(
@@ -16533,7 +16719,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			);
 		}
 		ctx.runtimeNeeded.add('createScopedElement');
-		const readChildren = inheritOriginLoc(b.arrow([], childrenValue), node);
+		const readChildren = inheritOriginLoc(b.arrow([], memoizedChildrenBody ?? childrenValue), node);
 		descriptor = inheritOriginLoc(
 			b.call('_$createScopedElement', compNode, propsNode, readChildren),
 			node,

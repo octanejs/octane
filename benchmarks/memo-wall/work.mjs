@@ -111,9 +111,8 @@ const OPS = [
 	},
 	// Wall B's imported helper is cached against its `items` argument by
 	// production auto-calculation. Equal/context-only parent updates reuse that
-	// descriptor array. TSRX also caches its proven-immutable renderable region,
-	// so unchanged rows never enter keyed reconciliation; context updates still
-	// refresh their mounted leaf consumers directly.
+	// descriptor array. Both dialects must also skip the proven-immutable
+	// renderable region, while context updates refresh existing leaf consumers.
 	{
 		name: 'context_B',
 		hook: '__ctxB',
@@ -158,17 +157,25 @@ const JSX_EXPECTATIONS = {
 	context_A: { RowsA: 1, createElement: ROWS + 3 },
 	one_change_B: { createElement: ROWS + 6 },
 	context_B: {
-		updateSurvivor: ROWS,
+		updateSurvivor: 0,
 		buildValueRows: 0,
 		createElement: ROWS + 1,
-		shallowEqualProps: ROWS,
+		shallowEqualProps: 0,
 	},
 	equal_B_control: {
-		updateSurvivor: ROWS,
+		updateSurvivor: 0,
 		buildValueRows: 0,
 		createElement: 1,
-		shallowEqualProps: ROWS,
+		shallowEqualProps: 0,
 	},
+};
+
+// Wrapper descriptors are implementation work, not a required public effect.
+// These ceilings allow equivalent returned-JSX output to allocate fewer while
+// keeping row/context execution and keyed-list visits exact.
+const JSX_MAXIMUMS = {
+	context_B: { createElement: ROWS + 1 },
+	equal_B_control: { createElement: 1 },
 };
 
 function callCounts(coverage) {
@@ -240,7 +247,10 @@ try {
 			restampCachedContextScope: 0,
 		};
 		for (const metric of METRICS) {
-			if (counts[metric] !== expected[metric]) {
+			const maximum = DIALECT === 'jsx' ? JSX_MAXIMUMS[op.name]?.[metric] : undefined;
+			if (maximum !== undefined && counts[metric] > maximum) {
+				failures.push(`${op.name}.${metric}: ${counts[metric]} > maximum ${maximum}`);
+			} else if (maximum === undefined && counts[metric] !== expected[metric]) {
 				failures.push(`${op.name}.${metric}: ${counts[metric]} !== expected ${expected[metric]}`);
 			}
 		}

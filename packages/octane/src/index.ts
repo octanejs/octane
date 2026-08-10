@@ -202,6 +202,7 @@ export {
 	componentSlotLite,
 	compilerCacheArray,
 	compilerCacheContext,
+	compilerOwnsContextProvider,
 	markSingleRoot,
 	// Compact compiler ABI; keep the descriptive export for older compiled output.
 	markSingleRoot as __s,
