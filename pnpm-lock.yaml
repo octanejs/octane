@@ -5015,6 +5015,9 @@ importers:
       '@mantine/hooks':
         specifier: 9.5.0
         version: 9.5.0(react@19.2.7)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.56(react@19.2.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.17

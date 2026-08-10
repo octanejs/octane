@@ -4652,6 +4652,25 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-differential',
+					include: ['packages/mantine-hooks/tests/differential/**/*.test.ts'],
+					globalSetup: ['packages/mantine-hooks/tests/differential/_setup.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mantine-hooks$/,
+							replacement: resolve(import.meta.dirname, 'packages/mantine-hooks/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'react-error-boundary-ssr',
 					include: ['packages/react-error-boundary/tests/ssr/**/*.test.ts'],
