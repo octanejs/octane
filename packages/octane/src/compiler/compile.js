@@ -4891,6 +4891,79 @@ function collectPrivateUnescapedComponents(body, ctx) {
 	return candidates;
 }
 
+// An authored @for normally hides its children from speculative warming: its
+// iterable, keys, and item properties may all invoke user code. A private
+// dense string-literal array whose only reference is that directive's iterable is
+// different: its complete, immutable contents are already known from source,
+// so selected children can be unrolled without reading the array or its keys.
+function collectPrivateWarmLists(body) {
+	let candidates = null;
+	for (const statement of body) {
+		if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') continue;
+		for (const declaration of statement.declarations || []) {
+			const name = declaration.id?.type === 'Identifier' ? declaration.id.name : null;
+			const array = unwrapTsExpr(declaration.init);
+			if (
+				name === null ||
+				array?.type !== 'ArrayExpression' ||
+				array.elements.length === 0 ||
+				array.elements.length > 16
+			) {
+				continue;
+			}
+			const values = [];
+			const unique = new Set();
+			let safe = true;
+			for (const element of array.elements) {
+				const value = element?.type === 'Literal' ? element.value : undefined;
+				if (element?.type !== 'Literal' || typeof value !== 'string' || unique.has(value)) {
+					safe = false;
+					break;
+				}
+				unique.add(value);
+				values.push(value);
+			}
+			if (safe) (candidates ??= new Map()).set(name, { values, references: 0 });
+		}
+	}
+	if (candidates === null) return null;
+
+	const allowed = new Set();
+	const visited = new WeakSet();
+	let directEvaluation = false;
+	(function visit(node) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (visited.has(node)) return;
+		visited.add(node);
+		const callee = node.type === 'CallExpression' ? unwrapTsExpr(node.callee) : null;
+		if (callee?.type === 'Identifier' && callee.name === 'eval') {
+			directEvaluation = true;
+		}
+		if (node.type === 'JSXForExpression' && node.right?.type === 'Identifier') {
+			const candidate = candidates.get(node.right.name);
+			if (candidate !== undefined) {
+				candidate.references++;
+				allowed.add(node.right);
+			}
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			visit(node[key]);
+		}
+	})(body);
+	if (directEvaluation) return null;
+
+	const escaped = collectFreeIdentifiers(body, [], allowed);
+	for (const [name, candidate] of candidates) {
+		if (candidate.references !== 1 || escaped.has(name)) candidates.delete(name);
+	}
+	return candidates.size === 0 ? null : candidates;
+}
+
 function onlyMeaningfulJsxChild(children) {
 	let result = null;
 	for (const child of children || []) {
@@ -7980,6 +8053,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// single module print must carry a loc (OCTANE_COMPILE_ASSERT_LOC).
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
+	ctx.privateWarmLists = source.includes('@for') ? collectPrivateWarmLists(ast.body) : null;
 	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
 	{
 		const imports = collectOctaneImportBindings(ast.body);
@@ -14236,11 +14310,152 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				if (node.block) out.block = walkArm(node.block, guards);
 				return out;
 			}
+			case 'JSXForExpression':
+				if (ctx.mode !== 'server' && ctx._universalRuntimeUnit == null) {
+					collectWarmListChildren(node);
+				}
+				return node;
 			default:
-				// @for / @switch arms: v1 — no memoization, no warming (loop slot
-				// sharing; switch guards deferred). Everything else is inert.
+				// @switch arms remain opaque. General @for bodies are opaque too;
+				// only statically unrolled, private string lists can warm above.
 				return node;
 		}
+	}
+
+	function collectWarmListChildren(loop) {
+		const iterable = loop.right;
+		const candidate =
+			iterable?.type === 'Identifier' ? ctx.privateWarmLists?.get(iterable.name) : undefined;
+		const declaration = loop.left?.declarations?.[0];
+		const item = declaration?.id;
+		if (
+			candidate === undefined ||
+			!guards.every(isSafeWarmListGuard) ||
+			ctx.currentComponentLocals?.has(iterable.name) ||
+			locals.has(iterable.name) ||
+			loop.await ||
+			loop.empty != null ||
+			loop.index != null ||
+			loop.left?.type !== 'VariableDeclaration' ||
+			loop.left.kind !== 'const' ||
+			loop.left.declarations.length !== 1 ||
+			item?.type !== 'Identifier' ||
+			loop.key?.type !== 'Identifier' ||
+			loop.key.name !== item.name ||
+			loop.body?.type !== 'BlockStatement'
+		) {
+			return;
+		}
+
+		const checkpoint = warmChildren.length;
+		for (const value of candidate.values) {
+			if (!visitWarmListArm(loop.body, item.name, value)) {
+				warmChildren.length = checkpoint;
+				return;
+			}
+		}
+	}
+
+	function isSafeWarmListGuard(guard) {
+		const expression = unwrapTsExpr(guard);
+		if (expression?.type === 'Literal' || expression?.type === 'Identifier') return true;
+		if (expression?.type === 'MemberExpression') {
+			return (
+				!expression.computed &&
+				!expression.optional &&
+				expression.object?.type === 'Identifier' &&
+				expression.property?.type === 'Identifier'
+			);
+		}
+		if (expression?.type === 'UnaryExpression' && expression.operator === '!') {
+			return isSafeWarmListGuard(expression.argument);
+		}
+		if (
+			expression?.type === 'BinaryExpression' &&
+			(expression.operator === '===' || expression.operator === '!==')
+		) {
+			return isSafeWarmListGuard(expression.left) && isSafeWarmListGuard(expression.right);
+		}
+		return false;
+	}
+
+	function visitWarmListArm(arm, item, value) {
+		const entries =
+			arm?.type === 'BlockStatement'
+				? arm.body || []
+				: arm?.type === 'JSXIfExpression' || arm?.type === 'IfStatement'
+					? [arm]
+					: null;
+		if (entries === null) return false;
+		for (const entry of entries) {
+			if (entry.type === 'JSXIfExpression' || entry.type === 'IfStatement') {
+				const test = unwrapTsExpr(entry.test);
+				if (
+					test?.type !== 'BinaryExpression' ||
+					(test.operator !== '===' && test.operator !== '!==')
+				) {
+					return false;
+				}
+				const leftItem = test.left?.type === 'Identifier' && test.left.name === item;
+				const rightItem = test.right?.type === 'Identifier' && test.right.name === item;
+				const literal = leftItem ? test.right : rightItem ? test.left : null;
+				if (leftItem === rightItem || literal?.type !== 'Literal') return false;
+				const selected =
+					(value === literal.value) === (test.operator === '===')
+						? entry.consequent
+						: entry.alternate;
+				if (selected != null && !visitWarmListArm(selected, item, value)) return false;
+				continue;
+			}
+			if (entry.type !== 'JSXElement') return false;
+			const component = entry.openingElement?.name;
+			if (component?.type !== 'JSXIdentifier' || !/^[A-Z]/.test(component.name)) return false;
+
+			const attributes = entry.openingElement.attributes || [];
+			const replacement = [];
+			for (const attribute of attributes) {
+				if (attribute.type !== 'JSXAttribute' || attribute.name?.type !== 'JSXIdentifier') {
+					return false;
+				}
+				if (attribute.name.name === '__proto__') return false;
+				if (attribute.value?.type !== 'JSXExpressionContainer') {
+					replacement.push(attribute);
+					continue;
+				}
+				const expression = unwrapTsExpr(attribute.value.expression);
+				if (
+					expression?.type !== 'Literal' &&
+					expression?.type !== 'Identifier' &&
+					(expression?.type !== 'MemberExpression' ||
+						expression.computed ||
+						expression.optional ||
+						expression.object?.type !== 'Identifier' ||
+						expression.property?.type !== 'Identifier')
+				) {
+					return false;
+				}
+				if (expression?.type === 'Identifier' && expression.name === item) {
+					const literal = inheritOriginLoc(
+						b.literal(value, JSON.stringify(value), expression),
+						expression,
+					);
+					replacement.push({
+						...attribute,
+						value: { ...attribute.value, expression: literal },
+					});
+					continue;
+				}
+				if (collectFreeIdentifiers(expression, []).has(item)) return false;
+				replacement.push(attribute);
+			}
+			const previous = warmChildren.length;
+			collectWarmChild(
+				{ ...entry, openingElement: { ...entry.openingElement, attributes: replacement } },
+				component.name,
+			);
+			if (warmChildren.length === previous) return false;
+		}
+		return true;
 	}
 
 	function walkArm(arm, armGuards) {
@@ -14259,6 +14474,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			if (
 				entry.type === 'JSXElement' ||
 				entry.type === 'JSXFragment' ||
+				entry.type === 'JSXForExpression' ||
 				entry.type === 'JSXIfExpression' ||
 				entry.type === 'JSXTryExpression'
 			) {

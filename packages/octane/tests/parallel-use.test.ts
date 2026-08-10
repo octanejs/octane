@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mount, act } from './_helpers';
+import { prerender } from 'octane/static';
+import { flushSync, hydrateRoot } from '../src/index';
+import { mount, act, flushEffects } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	ChainHost,
@@ -99,6 +101,764 @@ function freshResourceFetcher() {
 	};
 	return { calls, load, settleRound };
 }
+
+const KEYED_PANELS_SOURCE = `
+	import { use } from 'octane';
+
+	const PANELS = ['activity', 'insights'];
+
+	function ProjectHeader(props) @{
+		const value = use(props.load('project', props.version));
+		<span class="keyed-project">{value as string}</span>
+	}
+
+	function ActivityPanel(props) @{
+		const value = use(props.load('activity', props.version));
+		<span class="keyed-panel" data-panel="activity">{value as string}</span>
+	}
+
+	function InsightsPanel(props) @{
+		const value = use(props.load('insights', props.version));
+		<span class="keyed-panel" data-panel="insights">{value as string}</span>
+	}
+
+	function Dashboard(props) @{
+		<section class="keyed-dashboard">
+			<ProjectHeader load={props.load} version={props.version} />
+			@for (const panel of PANELS; key panel) {
+				@if (panel === 'activity') {
+					<ActivityPanel load={props.load} version={props.version} />
+				} @else {
+					<InsightsPanel load={props.load} version={props.version} />
+				}
+			}
+		</section>
+	}
+
+	export function KeyedListHost(props) @{
+		<>
+			@try {
+				<Dashboard load={props.load} version={props.version} />
+			} @pending {
+				<span class="keyed-pending">loading</span>
+			}
+		</>
+	}
+`;
+
+describe('parallel use() — independent asynchronous keyed-list children', () => {
+	it('starts every selected keyed child before any request resolves and adopts each request once', async () => {
+		const client = loadCompiledFixtureSource(KEYED_PANELS_SOURCE, {
+			id: 'independent-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.KeyedListHost, { load: resources.load, version: 0 });
+
+		try {
+			expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0']);
+			expect(root.find('.keyed-pending').textContent).toBe('loading');
+
+			await act(() => {
+				resources.settle('activity', 0);
+				resources.settle('insights', 0);
+				resources.settle('project', 0);
+			});
+
+			expect(root.find('.keyed-project').textContent).toBe('project-v0');
+			expect(root.findAll('.keyed-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'insights-v0',
+			]);
+			expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		{ arm: '@try', open: '@try {', close: '} @pending { <span>rows loading</span> }' },
+		{ arm: '@if', open: '@if (props.enabled) {', close: '}' },
+	])(
+		'starts keyed children directly inside an $arm arm in the first wave',
+		async ({ arm, open, close }) => {
+			const source = `
+			import { use } from 'octane';
+
+			const PANELS = ['activity', 'insights'];
+
+			function ProjectHeader(props) @{
+				const value = use(props.load('project', props.version));
+				<span>{value as string}</span>
+			}
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				<span class="directive-keyed-panel">{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					<ProjectHeader load={props.load} version={props.version} />
+					${open}
+						@for (const panel of PANELS; key panel) {
+							<Panel id={panel} load={props.load} version={props.version} />
+						}
+					${close}
+				</section>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Dashboard load={props.load} version={props.version} enabled={props.enabled} />
+					} @pending {
+						<span class="directive-keyed-pending">loading</span>
+					}
+				</>
+			}
+		`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `direct-${arm.slice(1)}-keyed-panels.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+			});
+			const resources = resourceFetcher();
+			const root = mount(client.App, { load: resources.load, version: 0, enabled: true });
+
+			try {
+				expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0']);
+				expect(root.find('.directive-keyed-pending').textContent).toBe('loading');
+
+				await act(() => {
+					resources.settle('activity', 0);
+					resources.settle('insights', 0);
+					resources.settle('project', 0);
+				});
+
+				expect(root.findAll('.directive-keyed-panel').map((node) => node.textContent)).toEqual([
+					'activity-v0',
+					'insights-v0',
+				]);
+				expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0']);
+
+				if (arm === '@if') {
+					root.update(client.App, { load: resources.load, version: 1, enabled: false });
+					expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0', 'project:1']);
+				}
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('does not evaluate an effectful conditional guard before its keyed-list arm renders', async () => {
+		const source = `
+			import { use } from 'octane';
+			const PANELS = ['activity', 'insights'];
+
+			function ProjectHeader(props) @{
+				const value = use(props.load('project'));
+				<span>{value as string}</span>
+			}
+
+			function Panel(props) @{
+				const value = use(props.load(props.id));
+				<span class="keyed-panel">{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					<ProjectHeader load={props.load} />
+					@if (props.observe()) {
+						@for (const panel of PANELS; key panel) {
+							<Panel id={panel} load={props.load} />
+						}
+					}
+				</section>
+			}
+
+			export function KeyedListHost(props) @{
+				<>
+					@try {
+						<Dashboard load={props.load} observe={props.observe} />
+					} @pending {
+						<span>loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'effectful-conditional-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const project = deferred<string>();
+		const observations: string[] = [];
+		const requests: string[] = [];
+		const root = mount(client.KeyedListHost, {
+			version: 0,
+			observe() {
+				observations.push('observe');
+				return true;
+			},
+			load(panel: string) {
+				requests.push(panel);
+				if (panel === 'project') return project.promise;
+				const value = `${panel}-v0`;
+				return Object.assign(Promise.resolve(value), { status: 'fulfilled' as const, value });
+			},
+		});
+
+		try {
+			expect(requests).toEqual(['project']);
+			expect(observations).toEqual([]);
+			await act(() => project.resolve('project-v0'));
+			expect(observations).toEqual(['observe']);
+			expect(requests).toEqual(['project', 'activity', 'insights']);
+			expect(root.findAll('.keyed-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'insights-v0',
+			]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('starts every independent keyed child selected through an else-if chain', async () => {
+		const source = `
+			import { use } from 'octane';
+
+			const PANELS = ['activity', 'insights', 'reports'];
+
+			function ProjectHeader(props) @{
+				const value = use(props.load('project', props.version));
+				<span>{value as string}</span>
+			}
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				<span class="else-if-keyed-panel">{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					<ProjectHeader load={props.load} version={props.version} />
+					@for (const panel of PANELS; key panel) {
+						@if (panel === 'activity') {
+							<Panel id="activity" load={props.load} version={props.version} />
+						} @else if (panel === 'insights') {
+							<Panel id="insights" load={props.load} version={props.version} />
+						} @else {
+							<Panel id="reports" load={props.load} version={props.version} />
+						}
+					}
+				</section>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Dashboard load={props.load} version={props.version} />
+					} @pending {
+						<span class="else-if-keyed-pending">loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'else-if-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.App, { load: resources.load, version: 0 });
+
+		try {
+			expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0', 'reports:0']);
+			expect(root.find('.else-if-keyed-pending').textContent).toBe('loading');
+
+			await act(() => {
+				resources.settle('activity', 0);
+				resources.settle('insights', 0);
+				resources.settle('reports', 0);
+				resources.settle('project', 0);
+			});
+
+			expect(root.findAll('.else-if-keyed-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'insights-v0',
+				'reports-v0',
+			]);
+			expect(resources.calls).toEqual(['project:0', 'activity:0', 'insights:0', 'reports:0']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('starts each distinct request before a list-first suspension without multiplying existing replays', async () => {
+		const source = KEYED_PANELS_SOURCE.replace(
+			'<ProjectHeader load={props.load} version={props.version} />',
+			'',
+		);
+		const client = loadCompiledFixtureSource(source, {
+			id: 'list-first-independent-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const started = new Set<string>();
+		const root = mount(client.KeyedListHost, {
+			version: 0,
+			load(panel: string, version: number) {
+				started.add(`${panel}:${version}`);
+				return resources.load(panel, version);
+			},
+		});
+
+		try {
+			expect([...started]).toEqual(['activity:0', 'insights:0']);
+
+			await act(() => {
+				resources.settle('activity', 0);
+				resources.settle('insights', 0);
+			});
+
+			expect(root.findAll('.keyed-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'insights-v0',
+			]);
+			expect([...started]).toEqual(['activity:0', 'insights:0']);
+			expect(resources.calls.length).toBeLessThanOrEqual(5);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not start keyed requests whose arguments depend on an unresolved parent', async () => {
+		const source = `
+			import { use } from 'octane';
+
+			const PANELS = ['activity', 'insights'];
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				<span class="dependent-keyed-panel">{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				const owner = use(props.load('owner', props.version));
+				<section>
+					@for (const panel of PANELS; key panel) {
+						<Panel id={owner + '-' + panel} load={props.load} version={props.version} />
+					}
+				</section>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Dashboard load={props.load} version={props.version} />
+					} @pending {
+						<span class="dependent-keyed-pending">loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'dependent-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.App, { load: resources.load, version: 0 });
+
+		try {
+			expect(resources.calls).toEqual(['owner:0']);
+			expect(root.find('.dependent-keyed-pending').textContent).toBe('loading');
+
+			await act(() => resources.settle('owner', 0));
+
+			expect(resources.calls).toContain('owner-v0-activity:0');
+			expect(resources.calls).not.toContain('undefined-activity:0');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not inspect an unknown iterable while an earlier sibling is suspended', async () => {
+		const source = `
+			import { use } from 'octane';
+
+			function Gate(props) @{
+				const value = use(props.load('gate', props.version));
+				<span>{value as string}</span>
+			}
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				<span class="unknown-keyed-panel">{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					<Gate load={props.load} version={props.version} />
+					@for (const panel of props.panels; key panel) {
+						<Panel id={panel} load={props.load} version={props.version} />
+					}
+				</section>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Dashboard panels={props.panels} load={props.load} version={props.version} />
+					} @pending {
+						<span class="unknown-keyed-pending">loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'unknown-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const reads: string[] = [];
+		const panels = new Proxy(['activity', 'insights'], {
+			get(target, property, receiver) {
+				reads.push(String(property));
+				return Reflect.get(target, property, receiver);
+			},
+			getOwnPropertyDescriptor(target, property) {
+				reads.push(`descriptor:${String(property)}`);
+				return Reflect.getOwnPropertyDescriptor(target, property);
+			},
+		});
+		const root = mount(client.App, { panels, load: resources.load, version: 0 });
+
+		try {
+			expect(resources.calls).toEqual(['gate:0']);
+			expect(reads).toEqual([]);
+
+			await act(() => resources.settle('gate', 0));
+
+			expect(reads).toContain('0');
+			expect(resources.calls).toContain('activity:0');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not evaluate effectful keyed-child props before the list actually mounts', async () => {
+		const source = KEYED_PANELS_SOURCE.replace(
+			'<ActivityPanel load={props.load} version={props.version} />',
+			"<ActivityPanel load={props.load} version={props.version} token={props.observe('activity')} />",
+		)
+			.replace(
+				'<InsightsPanel load={props.load} version={props.version} />',
+				"<InsightsPanel load={props.load} version={props.version} token={props.observe('insights')} />",
+			)
+			.replace(
+				'<Dashboard load={props.load} version={props.version} />',
+				'<Dashboard load={props.load} version={props.version} observe={props.observe} />',
+			);
+		const client = loadCompiledFixtureSource(source, {
+			id: 'effectful-keyed-panel-props.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const project = deferred<string>();
+		const observations: string[] = [];
+		const root = mount(client.KeyedListHost, {
+			version: 0,
+			observe(panel: string) {
+				observations.push(panel);
+				return panel;
+			},
+			load(panel: string) {
+				if (panel === 'project') return project.promise;
+				const value = `${panel}-v0`;
+				return Object.assign(Promise.resolve(value), { status: 'fulfilled' as const, value });
+			},
+		});
+
+		try {
+			expect(observations).toEqual([]);
+			await act(() => project.resolve('project-v0'));
+			expect(observations).toEqual(['activity', 'insights']);
+			expect(root.findAll('.keyed-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'insights-v0',
+			]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		{
+			name: 'directly mutated',
+			declarations:
+				"const PANELS = ['activity', 'insights']; export function changePanels() { PANELS[1] = 'replacement'; }",
+		},
+		{
+			name: 'escaped through an alias',
+			declarations:
+				"const PANELS = ['activity', 'insights']; const alias = PANELS; export function changePanels() { alias[1] = 'replacement'; }",
+		},
+		{
+			name: 'mutated through direct evaluation',
+			declarations:
+				"const PANELS = ['activity', 'insights']; export function changePanels() { eval(\"PANELS[1] = 'replacement'\"); }",
+		},
+	])('observes the current contents of a list $name', async ({ name, declarations }) => {
+		const source = `
+			import { use } from 'octane';
+			${declarations}
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				<span class="mutable-keyed-panel">{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					@for (const panel of PANELS; key panel) {
+						<Panel id={panel} load={props.load} version={props.version} />
+					}
+				</section>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Dashboard load={props.load} version={props.version} />
+					} @pending {
+						<span>loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: `mutable-keyed-panels-${name.replace(/\W+/g, '-')}.tsrx`,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		client.changePanels();
+		const root = mount(client.App, { load: resources.load, version: 0 });
+
+		try {
+			expect(resources.calls).toEqual(['activity:0']);
+			await act(() => resources.settle('activity', 0));
+			expect(resources.calls).toContain('replacement:0');
+			expect(resources.calls).not.toContain('insights:0');
+			await act(() => resources.settle('replacement', 0));
+			expect(root.findAll('.mutable-keyed-panel').map((node) => node.textContent)).toEqual([
+				'activity-v0',
+				'replacement-v0',
+			]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not run a later row or its key before an earlier keyed row resolves', () => {
+		const source = `
+			import { use } from 'octane';
+
+			const PANELS = ['activity', 'insights'];
+			let recordKey;
+			export function setKeyRecorder(recorder) { recordKey = recorder; }
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				<span>{value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					@for (const panel of PANELS; key recordKey(panel)) {
+						<Panel id={panel} load={props.load} version={props.version} />
+					}
+				</section>
+			}
+
+			export function App(props) @{
+				<>
+					@try {
+						<Dashboard load={props.load} version={props.version} />
+					} @pending {
+						<span>loading</span>
+					}
+				</>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'observable-keyed-panel-keys.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const events: string[] = [];
+		const resources = resourceFetcher();
+		client.setKeyRecorder((panel: string) => {
+			events.push(`key:${panel}`);
+			return panel;
+		});
+		const root = mount(client.App, {
+			version: 0,
+			load(panel: string, version: number) {
+				events.push(`load:${panel}`);
+				return resources.load(panel, version);
+			},
+		});
+
+		try {
+			expect(events).toEqual(['key:activity', 'load:activity']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('preserves context, effects, and host refs without exposing them during speculation', async () => {
+		const source = `
+			import { createContext, use, useContext, useEffect } from 'octane';
+
+			const Theme = createContext('default');
+			const PANELS = ['activity', 'insights'];
+
+			function Panel(props) @{
+				const value = use(props.load(props.id, props.version));
+				const theme = useContext(Theme);
+				useEffect(() => {
+					props.onEffect('mount:' + props.id);
+					return () => props.onEffect('cleanup:' + props.id);
+				}, []);
+				<span class="context-keyed-panel" ref={props.capture}>{theme + ':' + value as string}</span>
+			}
+
+			function Dashboard(props) @{
+				<section>
+					@for (const panel of PANELS; key panel) {
+						<Panel
+							id={panel}
+							load={props.load}
+							version={props.version}
+							capture={props.capture}
+							onEffect={props.onEffect}
+						/>
+					}
+				</section>
+			}
+
+			export function App(props) @{
+				<Theme.Provider value={props.theme}>
+					@try {
+						<Dashboard
+							load={props.load}
+							version={props.version}
+							capture={props.capture}
+							onEffect={props.onEffect}
+						/>
+					} @pending {
+						<span class="context-keyed-pending">loading</span>
+					}
+				</Theme.Provider>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'context-keyed-panels.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const resources = resourceFetcher();
+		const effects: string[] = [];
+		const attachments: (Element | null)[] = [];
+		const root = mount(client.App, {
+			load: resources.load,
+			version: 0,
+			theme: 'ocean',
+			capture: (node: Element | null) => attachments.push(node),
+			onEffect: (effect: string) => effects.push(effect),
+		});
+
+		try {
+			expect(resources.calls).toEqual(['activity:0', 'insights:0']);
+			expect(attachments).toEqual([]);
+			expect(effects).toEqual([]);
+
+			await act(() => {
+				resources.settle('activity', 0);
+				resources.settle('insights', 0);
+			});
+			flushEffects();
+
+			const panels = root.findAll('.context-keyed-panel');
+			expect(panels.map((node) => node.textContent)).toEqual([
+				'ocean:activity-v0',
+				'ocean:insights-v0',
+			]);
+			expect(attachments).toEqual(panels);
+			expect(effects).toEqual(['mount:activity', 'mount:insights']);
+		} finally {
+			root.unmount();
+			flushEffects();
+		}
+
+		expect(attachments).toEqual([expect.any(Element), expect.any(Element), null, null]);
+		expect(effects).toEqual([
+			'mount:activity',
+			'mount:insights',
+			'cleanup:activity',
+			'cleanup:insights',
+		]);
+	});
+
+	it('adopts server-rendered keyed children without starting client requests', async () => {
+		const id = 'hydrated-independent-keyed-panels.tsrx';
+		const server = loadCompiledFixtureSource(KEYED_PANELS_SOURCE, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(KEYED_PANELS_SOURCE, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const rendered = await prerender(server.KeyedListHost, {
+			version: 0,
+			load: (panel: string, version: number) => Promise.resolve(`${panel}-v${version}`),
+		});
+		const container = document.createElement('div');
+		container.innerHTML = rendered.html;
+		document.body.appendChild(container);
+		const serverNodes = Array.from(container.querySelectorAll('.keyed-panel'));
+		const calls: string[] = [];
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.KeyedListHost, {
+				version: 0,
+				load: (panel: string) => {
+					calls.push(panel);
+					return Promise.resolve(`client-${panel}`);
+				},
+			});
+			flushSync(() => {});
+
+			expect(Array.from(container.querySelectorAll('.keyed-panel'))).toEqual(serverNodes);
+			expect(serverNodes.map((node) => node.textContent)).toEqual(['activity-v0', 'insights-v0']);
+			expect(calls).toEqual([]);
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+});
 
 describe('parallel use() — fetch-tree warming (nested chain)', () => {
 	it('starts EVERY level of a nested chain in the first attempt', async () => {
