@@ -85,8 +85,8 @@ Every concrete case in either pinned inventory has exactly one ledger dispositio
 
 | Baseline | Cases | Untriaged | Planned | In progress | Covered | Documented | Blocked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| stable | 5,345 | 0 | 2,071 | 0 | 849 | 2,425 | 0 |
-| canary | 5,413 | 0 | 2,124 | 0 | 890 | 2,399 | 0 |
+| stable | 5,345 | 0 | 2,026 | 0 | 894 | 2,425 | 0 |
+| canary | 5,413 | 0 | 2,063 | 0 | 951 | 2,399 | 0 |
 
 Classifications are `portable`, `adaptable`, `divergence`, and `non_goal`. A covered case requires live local test evidence; divergence and non-goal dispositions require a rationale.
 
@@ -123,7 +123,8 @@ Suite policies are machine-readable in `react-upstreams.json`; the first matchin
 | Legacy and class case-level surfaces | 77 / 79 | 79 / 81 | low | documented | out of scope | Cases whose individual outcome requires class components, legacy roots/context, StrictMode double invocation, forwardRef/createRef/findDOMNode, or string refs are explicit non-goals even when they live in an otherwise modern React suite; supported function-component outcomes in the same files remain planned or covered independently. |
 | External-store compatibility packages | 12 / 12 | 12 / 12 | medium | planned | runtime | The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API. |
 | React core residual audit | 79 / 79 | 78 / 78 | medium | planned | public API + runtime | Remaining function-component, element, JSX-runtime, context, transition, and diagnostic outcomes require exact Octane public-API evidence or a narrower case-level divergence disposition. |
-| React DOM residual audit | 1,417 / 1,431 | 1,470 / 1,484 | high | planned | runtime + SSR + hydration | Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition. |
+| Fragment refs | 45 / 45 | 61 / 61 | high | covered | runtime + compiler + SSR + hydration | All 61 stable/canary FragmentInstance scenarios have exact executable public evidence for typed refs, lifecycle, native listeners, observers, focus, geometry, document position, scrolling, portals, Activity visibility, and text nodes; buffered/streaming SSR and matching hydration additionally prove server refs stay inactive until client attachment. |
+| React DOM residual audit | 1,372 / 1,386 | 1,409 / 1,423 | high | planned | runtime + SSR + hydration | Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition. |
 | React reconciler residual audit | 755 / 755 | 781 / 781 | high | planned | runtime | Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions. |
 | Residual repository surface | 0 / 0 | 0 / 0 | low | planned | parity audit | This final audited catch-all keeps newly discovered or uncommon React suites visible and actionable until they receive executable public evidence or a narrower documented non-goal/divergence disposition. |
 

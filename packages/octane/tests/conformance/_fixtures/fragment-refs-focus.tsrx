@@ -1,7 +1,11 @@
-import { Fragment } from 'octane';
+import { Fragment, type FragmentInstance } from 'octane';
+
+interface FragmentProps {
+	fragRef: { current: FragmentInstance | null };
+}
 
 // Two focusable inputs side-by-side — covers basic focus() and focusLast().
-export function TwoInputs(props) @{
+export function TwoInputs(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<input id="a" />
@@ -11,7 +15,7 @@ export function TwoInputs(props) @{
 }
 
 // disabled button must be skipped by focus() / focusLast().
-export function DisabledThenButton(props) @{
+export function DisabledThenButton(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<button id="bad" disabled>x</button>
@@ -21,7 +25,7 @@ export function DisabledThenButton(props) @{
 }
 
 // Non-focusable elements at the head — focus() must walk past them.
-export function NonFocusableBeforeButton(props) @{
+export function NonFocusableBeforeButton(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<div>not focusable</div>
@@ -31,8 +35,20 @@ export function NonFocusableBeforeButton(props) @{
 	</div>
 }
 
+export function FocusableFieldset(props: FragmentProps) @{
+	<div id="parent">
+		<Fragment ref={props.fragRef}>
+			<fieldset>
+				<legend>Shipping</legend>
+				<input id="street" />
+				<input id="city" />
+			</fieldset>
+		</Fragment>
+	</div>
+}
+
 // Nothing focusable — focus() and focusLast() must no-op.
-export function NoFocusable(props) @{
+export function NoFocusable(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<div>a</div>
@@ -42,7 +58,7 @@ export function NoFocusable(props) @{
 }
 
 // Explicit tabIndex=0 on a div makes it focusable.
-export function ExplicitTabIndex(props) @{
+export function ExplicitTabIndex(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<div id="tabbable" tabIndex={0}>tabbable</div>
@@ -50,9 +66,9 @@ export function ExplicitTabIndex(props) @{
 	</div>
 }
 
-// tabIndex=-1 makes an otherwise-focusable element non-focusable for
-// focus() / focusLast() — they should pick the next eligible element.
-export function SkipsNegativeTabIndex(props) @{
+// tabIndex=-1 remains programmatically focusable even though keyboard tabbing
+// skips it; FragmentInstance.focus() still chooses it in document order.
+export function SkipsNegativeTabIndex(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<input id="skip" tabIndex={-1} />
@@ -62,7 +78,7 @@ export function SkipsNegativeTabIndex(props) @{
 }
 
 // blur() target — a single focused input inside the fragment.
-export function BlurInside(props) @{
+export function BlurInside(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
 			<input id="inside" />
@@ -73,7 +89,7 @@ export function BlurInside(props) @{
 // blur() must be a no-op when focus is OUTSIDE the fragment. Provides
 // both an outside input and an inside fragment (no focusable elements
 // in the fragment, so any focused element is necessarily outside).
-export function BlurOutside(props) @{
+export function BlurOutside(props: FragmentProps) @{
 	<div id="parent">
 		<input id="outside" />
 		<Fragment ref={props.fragRef}>

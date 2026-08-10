@@ -32,7 +32,10 @@ import {
 } from './_fixtures/control-fold.tsrx';
 import {
 	DirectReturnedFragmentRefMailbox,
+	EmptyFragmentRef,
+	NestedFragmentRefs,
 	ReturnedFragmentRefMailbox,
+	TextFragmentRef,
 } from './_fixtures/control-fold-fragment-ref.tsrx';
 import { Count as RetCount } from './_fixtures/return-count.tsrx';
 import { AtBraceCount } from './_fixtures/atbrace-count.tsrx';
@@ -399,21 +402,162 @@ describe('template directives in a returned fragment', () => {
 		expect(groupRef.current).toBeNull();
 	});
 
-	it('rejects nested and direct returned Fragment refs during server compilation', () => {
-		expect(() =>
-			compile(
-				`export function Nested(p) { return <><Fragment ref={p.ref}><span>nested</span></Fragment></>; }`,
-				'returned-nested-fragment-ref.tsrx',
-				{ mode: 'server' },
-			),
-		).toThrow(/does not support fragment refs/);
-		expect(() =>
-			compile(
-				`export function Direct(p) { return <Fragment ref={p.ref}><span>direct</span></Fragment>; }`,
-				'returned-direct-fragment-ref.tsrx',
-				{ mode: 'server' },
-			),
-		).toThrow(/does not support fragment refs/);
+	it('server-renders nested and directly returned Fragment refs without attaching them', () => {
+		const server = loadServerFixture(
+			'packages/octane/tests/_fixtures/control-fold-fragment-ref.tsrx',
+		);
+		const groupRef: { current: FragmentInstance | null } = { current: null };
+		const nested = ServerRT.renderToString(server.ReturnedFragmentRefMailbox, {
+			groupRef,
+			title: 'Server drafts',
+		});
+		const parsed = document.createElement('div');
+		parsed.innerHTML = nested.html;
+		expect(parsed.querySelector('#fragment-ref-title')?.textContent).toBe('Server drafts');
+		expect(parsed.querySelector('#fragment-draft')?.textContent).toBe('Grouped edits: 0');
+		expect(groupRef.current).toBeNull();
+
+		const calls: string[] = [];
+		const direct = ServerRT.renderToString(server.DirectReturnedFragmentRefMailbox, {
+			groupRef,
+			title: 'Direct server drafts',
+			observe: (phase: string, value: unknown) => {
+				calls.push(phase);
+				return value;
+			},
+		});
+		expect(direct.html).toContain('Direct server drafts');
+		expect(calls.slice(0, 2)).toEqual(['ref', 'child']);
+		expect(groupRef.current).toBeNull();
+		expect(
+			ServerRT.renderToStaticMarkup(server.ReturnedFragmentRefMailbox, {
+				groupRef,
+				title: 'Static drafts',
+			}).html,
+		).toBe(
+			'<h2 id="fragment-ref-title">Static drafts</h2>' +
+				'<button id="fragment-draft">Grouped edits: 0</button>' +
+				'<span id="fragment-ref-tail">Grouped draft ready</span>',
+		);
+	});
+
+	it('hydrates a returned Fragment ref without replacing existing stateful children', () => {
+		const server = loadServerFixture(
+			'packages/octane/tests/_fixtures/control-fold-fragment-ref.tsrx',
+		);
+		const groupRef: { current: FragmentInstance | null } = { current: null };
+		const props = { groupRef, title: 'Hydrated drafts' };
+		const { html } = ServerRT.renderToString(server.ReturnedFragmentRefMailbox, props);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const title = container.querySelector('#fragment-ref-title');
+		const draft = container.querySelector('#fragment-draft') as HTMLButtonElement;
+		const tail = container.querySelector('#fragment-ref-tail');
+
+		const root = hydrateRoot(container, ReturnedFragmentRefMailbox, props);
+		flushSync(() => {});
+
+		expect(container.querySelector('#fragment-ref-title')).toBe(title);
+		expect(container.querySelector('#fragment-draft')).toBe(draft);
+		expect(container.querySelector('#fragment-ref-tail')).toBe(tail);
+		expect(groupRef.current).toBeInstanceOf(FragmentInstance);
+		flushSync(() => draft.click());
+		expect(draft.textContent).toBe('Grouped edits: 1');
+		root.unmount();
+		expect(groupRef.current).toBeNull();
+		container.remove();
+	});
+
+	it('hydrates directly returned multi-root Fragment refs in place', () => {
+		const server = loadServerFixture(
+			'packages/octane/tests/_fixtures/control-fold-fragment-ref.tsrx',
+		);
+		const groupRef: { current: FragmentInstance | null } = { current: null };
+		const props = {
+			groupRef,
+			title: 'Direct hydrated drafts',
+			observe: (_phase: string, value: unknown) => value,
+		};
+		const { html } = ServerRT.renderToString(server.DirectReturnedFragmentRefMailbox, props);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const title = container.querySelector('#direct-fragment-title');
+		const draft = container.querySelector('#direct-fragment-draft') as HTMLButtonElement;
+		const tail = container.querySelector('#direct-fragment-tail');
+
+		const root = hydrateRoot(container, DirectReturnedFragmentRefMailbox, props);
+		flushSync(() => {});
+
+		expect(container.querySelector('#direct-fragment-title')).toBe(title);
+		expect(container.querySelector('#direct-fragment-draft')).toBe(draft);
+		expect(container.querySelector('#direct-fragment-tail')).toBe(tail);
+		expect(groupRef.current).toBeInstanceOf(FragmentInstance);
+		flushSync(() => draft.click());
+		expect(draft.textContent).toBe('Direct grouped edits: 1');
+		root.unmount();
+		expect(groupRef.current).toBeNull();
+		container.remove();
+	});
+
+	it.each([
+		['empty', 'EmptyFragmentRef', EmptyFragmentRef, ''],
+		['text-only', 'TextFragmentRef', TextFragmentRef, 'hydrated text'],
+	] as const)(
+		'hydrates %s Fragment refs without replacing sibling or text nodes',
+		(_kind, name, Client, label) => {
+			const server = loadServerFixture(
+				'packages/octane/tests/_fixtures/control-fold-fragment-ref.tsrx',
+			);
+			const groupRef: { current: FragmentInstance | null } = { current: null };
+			const props = { groupRef, label };
+			const { html } = ServerRT.renderToString(server[name], props);
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = html;
+			const section = container.querySelector('section')!;
+			const serverNodes = [...section.childNodes];
+
+			const root = hydrateRoot(container, Client, props);
+			flushSync(() => {});
+
+			expect(container.querySelector('section')).toBe(section);
+			expect([...section.childNodes]).toEqual(serverNodes);
+			expect(groupRef.current).toBeInstanceOf(FragmentInstance);
+			expect(section.textContent).toBe(label || 'beforeafter');
+			root.unmount();
+			expect(groupRef.current).toBeNull();
+			container.remove();
+		},
+	);
+
+	it('hydrates independently nested Fragment refs without replacing their shared children', () => {
+		const server = loadServerFixture(
+			'packages/octane/tests/_fixtures/control-fold-fragment-ref.tsrx',
+		);
+		const groupRef: { current: FragmentInstance | null } = { current: null };
+		const innerRef: { current: FragmentInstance | null } = { current: null };
+		const props = { groupRef, innerRef };
+		const { html } = ServerRT.renderToString(server.NestedFragmentRefs, props);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const outer = container.querySelector('#nested-outer');
+		const inner = container.querySelector('#nested-inner');
+
+		const root = hydrateRoot(container, NestedFragmentRefs, props);
+		flushSync(() => {});
+
+		expect(container.querySelector('#nested-outer')).toBe(outer);
+		expect(container.querySelector('#nested-inner')).toBe(inner);
+		expect(groupRef.current).toBeInstanceOf(FragmentInstance);
+		expect(innerRef.current).toBeInstanceOf(FragmentInstance);
+		expect(groupRef.current).not.toBe(innerRef.current);
+		root.unmount();
+		expect(groupRef.current).toBeNull();
+		expect(innerRef.current).toBeNull();
+		container.remove();
 	});
 
 	it('retains an ordinary keyed Fragment descriptor boundary', () => {

@@ -4,8 +4,8 @@
  * with octane's exceptions. Compile-only (tsgo --noEmit); never executed and
  * never imported by runtime code.
  */
-import { Fragment } from 'octane';
-import type { JSX as OctaneJSX } from 'octane/jsx-runtime';
+import { Fragment, type FragmentInstance } from 'octane';
+import { Fragment as AutomaticRuntimeFragment, type JSX as OctaneJSX } from 'octane/jsx-runtime';
 import type * as React from 'react';
 
 declare function use<T>(value: T): void;
@@ -21,6 +21,8 @@ use<true>(octaneCoversEveryReactTag);
 export function TypeSurface() {
 	const cb = (el: HTMLDivElement | null) => {};
 	const obj: { current: HTMLDivElement | null } = { current: null };
+	const fragmentObject: { current: FragmentInstance | null } = { current: null };
+	const fragmentCallback = (instance: FragmentInstance | null) => {};
 
 	return (
 		<main>
@@ -85,12 +87,34 @@ export function TypeSurface() {
 			<div>{null}</div>
 
 			{/* ── Fragment: children, key, and fragment refs ── */}
-			<Fragment ref={(instance) => {}}>
+			<Fragment
+				ref={(instance) => {
+					use<FragmentInstance | null>(instance);
+					instance?.focus();
+					instance?.focusLast({ preventScroll: true });
+					instance?.getRootNode({ composed: true });
+					instance?.scrollIntoView(false);
+				}}
+			>
 				<span />
 			</Fragment>
+			<Fragment ref={fragmentObject} />
+			<Fragment ref={[fragmentObject, fragmentCallback]} />
+			<AutomaticRuntimeFragment
+				ref={(instance) => {
+					use<FragmentInstance | null>(instance);
+					instance?.focus();
+				}}
+			/>
+			{/* @ts-expect-error — fragment refs receive an instance, not an element */}
+			<Fragment ref={(instance: HTMLDivElement | null) => {}} />
 		</main>
 	);
 }
+
+declare const fragmentInstance: FragmentInstance;
+// @ts-expect-error — fragment scrolling accepts only its boolean alignment argument.
+fragmentInstance.scrollIntoView({ block: 'center' });
 
 // ── Elements are not promises — the poisoned protocol holds octane-side too ──
 // `Octane.JSX.Element`'s `Promise<React.ReactNode>` parent exists only for the
