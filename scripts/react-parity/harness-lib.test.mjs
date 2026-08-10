@@ -354,6 +354,17 @@ test('routes harness execution from required lanes, not provenance verification'
 	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
 });
 
+test('remix-router exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/remix-router/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
 test('accepts explicit TypeScript lanes and builds portable compiler argv without a shell', () => {
 	const lane = {
 		...manifest().lanes[0],

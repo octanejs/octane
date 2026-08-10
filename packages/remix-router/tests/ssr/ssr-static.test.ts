@@ -20,7 +20,7 @@ import {
 import * as octaneFixture from '../_fixtures/static-ssr-diff.tsrx';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/static-ssr-diff.tsrx');
-const CACHE = resolve(__dirname, '../differential/.react-cache');
+const CACHE = resolve(__dirname, '../differential/.react-cache-ssr');
 
 // Must match _setup.ts / _rig.ts so the cache file name lines up.
 function hashString(s: string): string {
@@ -71,12 +71,14 @@ async function renderReact(url: string, hydrate?: boolean): Promise<string> {
 }
 
 describe('static SSR: octane/server vs react-dom/server over real react-router', () => {
+	// @parity-case differential:remix-router-ssr-index
 	it('index route markup matches', async () => {
 		const i = await renderOctane('http://localhost/', false);
 		const r = await renderReact('http://localhost/', false);
 		expect(normalize(i)).toBe(normalize(r));
 	});
 
+	// @parity-case differential:remix-router-ssr-loader
 	it('loader-data route markup matches', async () => {
 		const i = await renderOctane('http://localhost/data', false);
 		const r = await renderReact('http://localhost/data', false);
@@ -84,6 +86,7 @@ describe('static SSR: octane/server vs react-dom/server over real react-router',
 		expect(normalize(i)).toContain('value=ssr-data');
 	});
 
+	// @parity-case differential:remix-router-ssr-error
 	it('thrown-Response errorElement markup matches', async () => {
 		const i = await renderOctane('http://localhost/boom', false);
 		const r = await renderReact('http://localhost/boom', false);
@@ -91,6 +94,7 @@ describe('static SSR: octane/server vs react-dom/server over real react-router',
 		expect(normalize(i)).toContain('status=400:kaboom');
 	});
 
+	// @parity-case differential:remix-router-ssr-declarative
 	it('declarative <StaticRouter> + descriptor-children <Routes> markup matches', async () => {
 		const { html } = octaneRenderToString(octaneFixture.DeclarativeStaticApp as any, {
 			url: '/about',
@@ -103,6 +107,7 @@ describe('static SSR: octane/server vs react-dom/server over real react-router',
 		expect(normalize(html)).toContain('About');
 	});
 
+	// @parity-case differential:remix-router-ssr-hydration-data
 	it('the __staticRouterHydrationData script payload matches exactly', async () => {
 		const extract = (html: string) => {
 			const m = html.match(/window\.__staticRouterHydrationData = JSON\.parse\((.*?)\);/s);

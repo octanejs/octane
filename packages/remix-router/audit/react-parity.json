@@ -1,0 +1,255 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/remix-run/react-router.git",
+    "version": "8.2.0",
+    "commit": "05180441b118d26da4df94bacc2211923d87e4c1",
+    "sourceRoot": "packages/react-router/lib",
+    "testRoot": "packages/react-router/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:4ac4dc0f608dfaced2943da365c95634c9f5a550d33be6c10f1d13d70f59692b",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": [
+        "packages/remix-router/src"
+      ],
+      "include": [
+        "\\.(?:ts|tsrx)$"
+      ],
+      "exclude": [
+        "\\.d\\.ts$"
+      ]
+    },
+    "tests": {
+      "roots": [
+        "packages/remix-router/tests"
+      ],
+      "include": [
+        "\\.test\\.ts$"
+      ],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e8e139c7d33a948ad914236e662293864634f765f21042a11af0dd9306c3b13c"
+    }
+  },
+  "lanes": [
+    {
+      "id": "remix-router-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "remix-router-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs nine exact scenarios from eight shared fixtures against react-router 8.2.0 on React and @octanejs/remix-router on Octane, with bounded semantic waits before every equality assertion.",
+      "files": [
+        {
+          "path": "packages/remix-router/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "63b3a8e7a9ebbcc6ad92f360700e958d167b2c809ba7cff902a82c698616aefb",
+          "cases": [
+            {
+              "id": "differential:remix-router-nested",
+              "testName": "NestedApp: layouts + params navigation via Link clicks, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router NestedApp: layouts + params navigation via Link clicks, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-loader",
+              "testName": "LoaderApp: loader data + redirect + errorElement + reset, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router LoaderApp: loader data + redirect + errorElement + reset, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-await",
+              "testName": "AwaitApp: fallback \u2192 resolved render-prop, byte-identical at both steps",
+              "fullName": "differential: @octanejs/remix-router vs real react-router AwaitApp: fallback \u2192 resolved render-prop, byte-identical at both steps"
+            },
+            {
+              "id": "differential:remix-router-declarative",
+              "testName": "DeclarativeDiffApp: block-children <Routes> navigation, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router DeclarativeDiffApp: block-children <Routes> navigation, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-navigate",
+              "testName": "NavigateDiffApp: <Navigate> mount redirect, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router NavigateDiffApp: <Navigate> mount redirect, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-navlink",
+              "testName": "NavLinkDiffApp: NavLink active states + useSearchParams, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router NavLinkDiffApp: NavLink active states + useSearchParams, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-forms",
+              "testName": "FormsDiffApp: Form GET/POST + JSON submit + fetcher outcomes, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router FormsDiffApp: Form GET/POST + JSON submit + fetcher outcomes, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-guards",
+              "testName": "GuardsDiffApp: useBlocker lifecycle + unstable_useRouterState, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router GuardsDiffApp: useBlocker lifecycle + unstable_useRouterState, byte-identical"
+            },
+            {
+              "id": "differential:remix-router-pending",
+              "testName": "PendingApp: deterministic loading state \u2192 landed page, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router PendingApp: deterministic loading state \u2192 landed page, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/nested-layouts-diff.tsrx",
+          "role": "support",
+          "sha256": "6aecad9696c2f3d1669aebb623bc90a3da354fad668c4b62e0b4b57d9b53c416"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/loader-redirect-error-diff.tsrx",
+          "role": "support",
+          "sha256": "21889d760409525d31ad96a672dcb776887a55cd37483377420e3cbc06c8ee1b"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/await-deferred-diff.tsrx",
+          "role": "support",
+          "sha256": "ecfd20f19724029e5bb989a13e7b8d1af0c7ac4bc151c19b3b5362642bcb2a8e"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/pending-navigation-diff.tsrx",
+          "role": "support",
+          "sha256": "e511e66f43e2c0163cc66e8503046cdb54626d7a60ad494e82078450e7b126f8"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/declarative-diff.tsrx",
+          "role": "support",
+          "sha256": "23f2f3944bed250c01ae3d8718c407b53284dce8d97c181568945f026a0b6325"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/navlink-diff.tsrx",
+          "role": "support",
+          "sha256": "336c4a1a2de604cac405e4f0ddf8788de0fd4be1991e199f74c87a4d6e13c0e8"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/forms-diff.tsrx",
+          "role": "support",
+          "sha256": "5158801f854fbc4dcbd82b7f0ba8c9b75ec9d5a8c7760530b8e3a3dae1c7a67f"
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/guards-diff.tsrx",
+          "role": "support",
+          "sha256": "b832ca90372f6da5c2dd364eb19115afb7701d0a3f4721a5da5bda5251a75dd2"
+        },
+        {
+          "path": "packages/remix-router/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "7ce3cb7161473003c27ff100a3c871044ffc8b62148488cefc1f28d234823346"
+        },
+        {
+          "path": "packages/remix-router/tests/differential/_compile-fixtures.ts",
+          "role": "support",
+          "sha256": "640f12d36abd94c286fe0c52c03a2a197b6181cf5f1d6198c4c139c85aee6532"
+        },
+        {
+          "path": "packages/remix-router/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "d039c59ccfdffabe3d405231c43333562830f6b2965d929f4cb2f8bd7a70f39d"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "a38d018c6ed4910da468eec41c9c596fa2698d0b229e5ec7db3fadda749ade17"
+        }
+      ]
+    },
+    {
+      "id": "remix-router-ssr-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "remix-router-ssr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs five exact static-render and hydration-payload scenarios from one fixture through react-router/react-dom/server and @octanejs/remix-router/octane/server.",
+      "files": [
+        {
+          "path": "packages/remix-router/tests/ssr/ssr-static.test.ts",
+          "role": "test",
+          "sha256": "1d29f5c22a374ebab41f1d3289bbcf52b0624dbf2ed0e7d3417291d4d06cee27",
+          "cases": [
+            {
+              "id": "differential:remix-router-ssr-index",
+              "testName": "index route markup matches",
+              "fullName": "static SSR: octane/server vs react-dom/server over real react-router index route markup matches"
+            },
+            {
+              "id": "differential:remix-router-ssr-loader",
+              "testName": "loader-data route markup matches",
+              "fullName": "static SSR: octane/server vs react-dom/server over real react-router loader-data route markup matches"
+            },
+            {
+              "id": "differential:remix-router-ssr-error",
+              "testName": "thrown-Response errorElement markup matches",
+              "fullName": "static SSR: octane/server vs react-dom/server over real react-router thrown-Response errorElement markup matches"
+            },
+            {
+              "id": "differential:remix-router-ssr-declarative",
+              "testName": "declarative <StaticRouter> + descriptor-children <Routes> markup matches",
+              "fullName": "static SSR: octane/server vs react-dom/server over real react-router declarative <StaticRouter> + descriptor-children <Routes> markup matches"
+            },
+            {
+              "id": "differential:remix-router-ssr-hydration-data",
+              "testName": "the __staticRouterHydrationData script payload matches exactly",
+              "fullName": "static SSR: octane/server vs react-dom/server over real react-router the __staticRouterHydrationData script payload matches exactly"
+            }
+          ]
+        },
+        {
+          "path": "packages/remix-router/tests/_fixtures/static-ssr-diff.tsrx",
+          "role": "support",
+          "sha256": "e4f2b514357748eaa46aff1c60860a6e2034ee90d40d38dd1a51cc220843c6ee"
+        },
+        {
+          "path": "packages/remix-router/tests/differential/_setup-ssr.ts",
+          "role": "support",
+          "sha256": "f82d95758cff72d33ddb1930cb84c21cca0197ee43465080c80e1645d569facc"
+        },
+        {
+          "path": "packages/remix-router/tests/differential/_compile-fixtures.ts",
+          "role": "support",
+          "sha256": "640f12d36abd94c286fe0c52c03a2a197b6181cf5f1d6198c4c139c85aee6532"
+        },
+        {
+          "path": "packages/remix-router/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "d039c59ccfdffabe3d405231c43333562830f6b2965d929f4cb2f8bd7a70f39d"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "a38d018c6ed4910da468eec41c9c596fa2698d0b229e5ec7db3fadda749ade17"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

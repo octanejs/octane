@@ -36,6 +36,12 @@ import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
 import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
+import {
+	loadManifest,
+	requiredExecutableLanes,
+	verifyLaneEnvironment,
+	verifyManifestFiles,
+} from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -278,13 +284,25 @@ for (const relativeFile of CLAIM_FILES) {
 for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
+		const binding = relativeFile.split('/')[1];
+		// Livestore uses adapted-upstream-suite dispositions and its own verifier
+		// (verifyLivestoreTestClassifications above). The hook-form helper rejects
+		// those ledgers, so never route livestore through verifyPortTestClassifications.
+		if (
+			binding !== 'livestore' &&
+			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
+		) {
+			verifyPortTestClassifications(REPO, binding);
+		}
 		await verifyManifestFiles(manifest, REPO);
 		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
 		if (!validateOnly) {
-			const action = manifest.provenance.verification === 'verified' ? 'run-required' : 'validate';
+			// Required lanes must execute even when provenance is still
+			// recorded-unverified; verification completeness must not suppress them.
+			const action = requiredExecutableLanes(manifest).length > 0 ? 'run-required' : 'validate';
 			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',

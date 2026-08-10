@@ -67,6 +67,7 @@ for (const [binding, testCount] of [
 	['lucide', 6],
 	['redux', 3],
 	['redux-toolkit', 6],
+	['remix-router', 26],
 	['shadcn', 23],
 	['sonner', 7],
 ]) {
