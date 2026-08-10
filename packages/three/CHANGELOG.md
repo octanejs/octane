@@ -1,5 +1,27 @@
 # @octanejs/three
 
+## 0.1.26
+
+### Patch Changes
+
+- fc1c146: Tree-shake unused Three.js constructors from compiled scenes and keep direct
+  Three renderer roots independent of the DOM runtime while preserving full
+  Canvas catalogues, context providers, and mixed-renderer scheduling.
+- Updated dependencies [1fe297e]
+- Updated dependencies [db0d495]
+- Updated dependencies [677182d]
+- Updated dependencies [3fb96df]
+- Updated dependencies [677182d]
+- Updated dependencies [4653a2e]
+- Updated dependencies [7282555]
+- Updated dependencies [3d09348]
+- Updated dependencies [8cb40df]
+- Updated dependencies [677182d]
+- Updated dependencies [fc1c146]
+- Updated dependencies [a84fcaa]
+- Updated dependencies [217a0b5]
+  - octane@0.1.33
+
 ## 0.1.25
 
 ### Patch Changes

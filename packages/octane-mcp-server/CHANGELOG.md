@@ -1,5 +1,13 @@
 # @octanejs/mcp-server
 
+## 0.2.15
+
+### Patch Changes
+
+- 677182d: Expose the deterministic minimal-import bundle reachability benchmark through
+  the MCP server.
+- 9374c55: Expose the SPA navigation benchmark through the Octane benchmark MCP tool.
+
 ## 0.2.14
 
 ### Patch Changes

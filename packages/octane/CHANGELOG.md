@@ -1,5 +1,46 @@
 # octane
 
+## 0.1.33
+
+### Patch Changes
+
+- 1fe297e: Match React's autofocus behavior during server rendering, client mounting, and hydration, and restore focus and text selection after DOM updates.
+- db0d495: Add behavior-only roots for server-rendered and externally streamed DOM, with explicit range ownership, readiness, trusted native event adoption, cancellation, and DOM-preserving disposal.
+- 677182d: Avoid reconciling unchanged compiler-cached renderable children while preserving
+  context and hidden-tree effect lifecycles, cache safe derived values in
+  hook-using JSX components, and omit fetch-warming scaffolding from component
+  trees proven to contain no asynchronous work.
+- 3fb96df: Fix a sibling-ordering bug in hosts whose children are all components: a hookless child that rendered nothing at mount (for example a sole `@if` with no `@else`) inserted content produced by a later render after its later siblings instead of at its own source position. The compiler now keeps per-child anchors for such hosts, while hosts whose children provably hold their position keep the marker-elided form.
+- 677182d: Reduce server-runtime initialization retention and production compiler output while preserving
+  hydration, streaming, component-owned events and styles, View Transitions, and callback identity.
+- 4653a2e: Fix a dev-only crash ("Cannot read properties of undefined (reading 'block')") when a component is invoked as a plain function — for example `Row({ label })` inside another component's render or a `.map` callback. The HMR wrapper now stays transparent to scope-less direct calls, matching production behavior, and an edit still refreshes the call site's output through the caller's hot update.
+- 7282555: Preserve React-compatible inline placement and event propagation for resource
+  links with explicit load or error handlers. Keep dynamically hoisted metadata
+  listeners synchronized across capture and bubble updates, hydration, and unmount.
+- 3d09348: The compiler now lowers React-style conditional JSX returns
+  (`if (c) return <A/>; return <B/>;`, including ternary returns) to the same
+  template control flow as `@if`/`@else` when the branch shapes are provably
+  remount-equivalent under React semantics, so branch-selected output stops
+  running through the de-opt descriptor renderer on both client and server.
+  Hooks, direct-call helpers, fragment arms, same-type arms, self-recursive
+  arms, and every other return shape keep the established value ABI.
+- 8cb40df: The compiler's single-root proof is now transitive: a component whose `@{}` body is an `@if`/`@else` tree where every arm renders exactly one plain host element or one qualifying same-module component call is proven single-root through a fixed point, so its call sites (including multiple component children of one host) mount with the existing anchorless self-marked regime instead of minting a `<!--comp-->`/`<!--/comp-->` pair each. Client-mount elision only — SSR output and hydration adoption are unchanged. On the spa-navigation benchmark's 1024-leaf route this removes all 4,092 per-slot marker comments and their insertions.
+- 677182d: Preserve compiler-hook registration and TanStack Start client hydration when
+  their bootstrap entrypoints are imported for side effects in production bundles,
+  while keeping unrelated package modules tree-shakeable.
+- fc1c146: Tree-shake unused Three.js constructors from compiled scenes and keep direct
+  Three renderer roots independent of the DOM runtime while preserving full
+  Canvas catalogues, context providers, and mixed-renderer scheduling.
+- a84fcaa: Avoid unnecessary asynchronous warming for synchronous components that read plain
+  props, preventing speculative getter evaluation and reducing generated render work.
+- 217a0b5: Unmount teardown now removes a deleted subtree's DOM once at the outermost
+  detached block instead of per-descendant range (portals still self-detach from
+  their foreign targets), and the de-opt ref-detach walk is skipped for subtrees
+  that never stamped a descriptor ref. A full-page teardown drops from thousands
+  of `removeChild` calls to one per top-level node, and deletion cleanups now
+  observe the entire deleted subtree still attached — matching React's
+  commitDeletionEffects order.
+
 ## 0.1.32
 
 ### Patch Changes

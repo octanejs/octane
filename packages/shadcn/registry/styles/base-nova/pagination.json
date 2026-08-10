@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.27"
+    "@octanejs/lucide@0.1.28"
   ],
   "registryDependencies": [
     "@octane/button",
