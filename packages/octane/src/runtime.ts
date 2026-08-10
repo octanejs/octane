@@ -11282,10 +11282,7 @@ export class FragmentInstance {
 	 */
 	scrollIntoView(alignToTop?: boolean): void {
 		if (typeof alignToTop === 'object') {
-			throw new Error(
-				'FragmentInstance.scrollIntoView() does not support scrollIntoViewOptions. ' +
-					'Use the alignToTop boolean instead.',
-			);
+			throw new Error(formatClientError(49));
 		}
 		if (this._destroyed) return;
 		const alignStart = alignToTop !== false;
@@ -17190,7 +17187,7 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 				}
 				cursor = cursor.nextSibling;
 			}
-			if (cursor === null) throw new Error('Unclosed server-rendered Fragment descriptor.');
+			if (cursor === null) throw new Error(formatClientError(50));
 			end = cursor as Comment;
 			hydration!.node = start.nextSibling;
 		} else {
