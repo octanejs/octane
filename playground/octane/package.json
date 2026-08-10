@@ -19,6 +19,7 @@
     "@livestore/common": "catalog:default",
     "@livestore/livestore": "catalog:default",
     "@livestore/utils": "catalog:default",
+    "@octanejs/alien-signals": "workspace:*",
     "@opentelemetry/api": "catalog:default",
     "@octanejs/animejs": "workspace:*",
     "@octanejs/aria": "workspace:*",

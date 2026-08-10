@@ -64,6 +64,7 @@ export const KNOWN_BINDINGS = {
 	'@streamdown/cjk': '@octanejs/streamdown',
 	shadcn: '@octanejs/shadcn',
 	recharts: '@octanejs/recharts',
+	'react-alien-signals': '@octanejs/alien-signals',
 	// react-map-gl@8 is a re-export shell; the binding covers the package its
 	// ./mapbox subpath resolves to, so both specifiers map here.
 	'react-map-gl': '@octanejs/react-map-gl',
@@ -165,6 +166,7 @@ export const KNOWN_VANILLA_CORES = {
 	'@reduxjs/toolkit': 'redux',
 	'react-i18next': 'i18next',
 	'react-hook-form': null,
+	'react-alien-signals': 'alien-signals',
 	zustand: 'zustand/vanilla',
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',

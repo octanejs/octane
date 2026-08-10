@@ -3,6 +3,7 @@
     "title": "Shared state",
     "description": "Small stores, atoms, observable state, Redux, RTK Query, and TanStack Store.",
     "packages": [
+      "@octanejs/alien-signals",
       "@octanejs/zustand",
       "@octanejs/valtio",
       "@octanejs/jotai",

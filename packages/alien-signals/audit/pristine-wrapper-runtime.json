@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "project": "alien-signals-pristine",
+  "roots": [
+    "packages/alien-signals/tests"
+  ],
+  "files": [
+    "packages/alien-signals/tests/upstream-original.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:51dba12b69f76316",
+      "file": "packages/alien-signals/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned react-alien-signals 0.3.0 suite unchanged"
+    }
+  ]
+}

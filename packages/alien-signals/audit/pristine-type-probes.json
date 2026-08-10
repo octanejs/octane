@@ -1,0 +1,13 @@
+[
+  {
+    "path": "public-api.test-d.ts",
+    "sha256": "7205108d1bad438525a8114bdf37793faab70558dd7bdbd9f4679a273d8f8465",
+    "assertionGroups": [
+      "1da26ea02dfa15e9dbb3998252ab2b86d86a9c2f58f2a658d1fda7b02c04464b",
+      "af40bcee76495da284c963a57b8d6b5a6a13b6e7ea00697473f45b73eb6fb89f",
+      "bc75858401764ca3a13559abcb937e8ce701f6ae765af045424eee42aaf638e9",
+      "c7f0866427e0b1db66d6446ac6f97e2292011950943da87838c7e13d4cacd313"
+    ],
+    "origin": "repo-authored-probe"
+  }
+]

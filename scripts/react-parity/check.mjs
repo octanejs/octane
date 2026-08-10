@@ -19,6 +19,10 @@ import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
 import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
 import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
+import { verifyAlienSignalsTypes } from './alien-signals-types-lib.mjs';
+import { verifyAlienSignalsTestClassifications } from './alien-signals-classifications-lib.mjs';
+import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.mjs';
+import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtime.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
@@ -60,6 +64,32 @@ try {
 	verifyLivestoreTypes(REPO);
 } catch (error) {
 	errors.push(`livestore type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyAlienSignalsTypes(REPO);
+} catch (error) {
+	errors.push(`alien-signals type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyAlienSignalsRuntimeStructure(REPO);
+} catch (error) {
+	errors.push(`alien-signals runtime structure evidence is invalid: ${error.message}`);
+}
+try {
+	assertPristineOracleEnvironment({
+		environmentPath: path.join(
+			REPO,
+			'packages/alien-signals/audit/pristine-oracle-environment.json',
+		),
+		fromPath: path.join(REPO, 'packages/alien-signals'),
+	});
+} catch (error) {
+	errors.push(`alien-signals pristine oracle environment is invalid: ${error.message}`);
+}
+try {
+	verifyAlienSignalsTestClassifications(REPO);
+} catch (error) {
+	errors.push(`alien-signals test classifications are invalid: ${error.message}`);
 }
 try {
 	verifySolanaReactTypes(REPO);

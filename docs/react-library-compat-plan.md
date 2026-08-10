@@ -112,6 +112,12 @@ fidelity.)*
 
 ## 5. Phases
 
+The maintained binding catalog now also includes
+`@octanejs/alien-signals`, a thin port of `react-alien-signals@0.3.0` over the
+framework-neutral `alien-signals@1.0.4` core. Its focused suite covers external
+store subscriptions, computed values, effect and scope ownership, SSR, and
+hydration rather than the differential DOM harness.
+
 - **P0 — Bootstrap (1–2d):** audit existing assets (rig, `_setup.ts` rename mechanics,
   conformance + identity helpers, the two existing store fixtures), add the
   `useDebugValue` shim, decide the binding-alias mechanism, set the citation

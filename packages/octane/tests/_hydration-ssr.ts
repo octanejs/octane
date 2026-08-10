@@ -5,6 +5,7 @@ import { octane } from '../src/compiler/vite.js';
 import type { RenderResult } from '../src/runtime.server';
 
 type HydrationBinding =
+	| 'alien-signals'
 	| 'apollo-client'
 	| 'aria'
 	| 'base-ui'
@@ -18,6 +19,10 @@ const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 function bindingAliases(binding: HydrationBinding) {
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
+	if (binding === 'alien-signals') {
+		return [{ find: /^@octanejs\/alien-signals$/, replacement: resolve(source, 'index.ts') }];
+	}
+
 	if (binding === 'apollo-client') {
 		return [
 			{

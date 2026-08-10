@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "project": "alien-signals-pristine-inner",
+  "roots": [
+    "packages/alien-signals/upstream"
+  ],
+  "files": [
+    "packages/alien-signals/upstream/src/index.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:705813b2f8390747",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should cleanup all subscriptions on unmount"
+    },
+    {
+      "id": "runtime:ac16481a83d015df",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should create a signal scope"
+    },
+    {
+      "id": "runtime:ce3155baf9efa0bd",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should create a writable signal"
+    },
+    {
+      "id": "runtime:3d8aeb57d1b2a62f",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should create and run an effect"
+    },
+    {
+      "id": "runtime:b12dafa5d1d46873",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should create and update a computed signal"
+    },
+    {
+      "id": "runtime:e360bf279d054d28",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle computed dependencies correctly"
+    },
+    {
+      "id": "runtime:7de6c1db956a9c25",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle concurrent updates correctly"
+    },
+    {
+      "id": "runtime:f172f7837d79b13e",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle multiple mount/unmount cycles"
+    },
+    {
+      "id": "runtime:ed880e6fcc6ff28c",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle multiple signal updates"
+    },
+    {
+      "id": "runtime:28fe88011258f0a8",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle nested signal updates correctly"
+    },
+    {
+      "id": "runtime:956f6b4aa53e61be",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle signal updates correctly"
+    },
+    {
+      "id": "runtime:50dcb0d4de72c53b",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle signal updates within effects"
+    },
+    {
+      "id": "runtime:5e5f0f02eb162a31",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should handle undefined/null signal values"
+    },
+    {
+      "id": "runtime:05fea814781f9bcb",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library should properly cleanup effects when scope is stopped"
+    },
+    {
+      "id": "runtime:3363c6dc03b235bd",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useComputed should not enter a render loop after a dependency update"
+    },
+    {
+      "id": "runtime:25e2f526ded13fe8",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useComputed should rebuild the computed when deps change"
+    },
+    {
+      "id": "runtime:d8807296c8d7dd4f",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useComputed should return a computed value"
+    },
+    {
+      "id": "runtime:523b058c2372364e",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useComputed should reuse the computed across re-renders when deps are unchanged"
+    },
+    {
+      "id": "runtime:1ff507e6817348ca",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useComputed should update when dependencies change"
+    },
+    {
+      "id": "runtime:f227cbcaf9f9f5cb",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSetSignal should return setter only"
+    },
+    {
+      "id": "runtime:e7fdd726946cc1d2",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSignal should handle functional updates correctly"
+    },
+    {
+      "id": "runtime:227da66af2bd7d2a",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSignal should return [value, setter]"
+    },
+    {
+      "id": "runtime:801138dc3cfa7197",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSignalEffect should handle cleanup correctly"
+    },
+    {
+      "id": "runtime:71708d18846352ed",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSignalEffect should register an effect in React"
+    },
+    {
+      "id": "runtime:4ff3b8771d446caa",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSignalScope should create and manage an effect scope in React"
+    },
+    {
+      "id": "runtime:49469b2e1763c607",
+      "file": "packages/alien-signals/upstream/src/index.test.ts",
+      "fullName": "Alien React Library useSignalValue should return read-only value from a signal"
+    }
+  ]
+}

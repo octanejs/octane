@@ -396,6 +396,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 				engines: { node: '>=22.22.2' },
 				dependencies: {
 					'@apollo/client': '4.2.6',
+					'@octanejs/alien-signals': `file:${requireArchive(archives, '@octanejs/alien-signals')}`,
 					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
 					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
@@ -418,11 +419,14 @@ async function validatePackedConsumer(tempRoot, archives) {
 		path.join(sourceDirectory, 'App.tsrx'),
 		`import { ApolloClient, InMemoryCache } from '@octanejs/apollo-client';
 import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
+import { createComputed, createSignal, useSignalValue } from '@octanejs/alien-signals';
 import { useForm } from '@octanejs/hook-form';
 import { Canvas } from '@octanejs/three';
 import { ThreeScene } from './ThreeScene.three.tsrx';
 
 const client = new ApolloClient({ cache: new InMemoryCache() });
+const count = createSignal(2);
+const doubled = createComputed(() => count() * 2);
 
 function ApolloProbe() @{
 	const activeClient = useApolloClient();
@@ -431,7 +435,9 @@ function ApolloProbe() @{
 
 export function App() @{
 	const form = useForm({ defaultValues: { name: 'Ada' } });
+	const signalValue = useSignalValue(doubled);
 	<div data-probe="bindings-ran">
+		<span data-alien-signals={signalValue as string}>Alien Signals</span>
 		<form>
 			<input {...form.register('name')} />
 		</form>
@@ -626,6 +632,13 @@ process.stdout.write(JSON.stringify(result));`,
 			`binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${peerRuntime}`,
 		);
 	}
+	const alienSignalsEntry = consumerRequire.resolve('@octanejs/alien-signals');
+	const alienSignalsPeerRuntime = realpathSync(createRequire(alienSignalsEntry).resolve('octane'));
+	if (alienSignalsPeerRuntime !== directRuntime) {
+		throw new Error(
+			`Alien Signals binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${alienSignalsPeerRuntime}`,
+		);
+	}
 	const threeEntry = consumerRequire.resolve('@octanejs/three');
 	const threeRequire = createRequire(threeEntry);
 	const threePeerRuntime = realpathSync(threeRequire.resolve('octane'));
@@ -733,6 +746,7 @@ process.stdout.write(output, () => process.exit(0));
 	const { html, surface } = JSON.parse(probeLine.slice('OCTANE_PACK_PROBE:'.length));
 	if (
 		!html.includes('data-probe="bindings-ran"') ||
+		!html.includes('data-alien-signals="4"') ||
 		!html.includes('name="name"') ||
 		!html.includes('data-apollo="connected"') ||
 		!html.includes('<canvas')
@@ -744,7 +758,7 @@ process.stdout.write(output, () => process.exit(0));
 	}
 
 	console.log(
-		'installed packed octane + Hook Form + Apollo Client + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
+		'installed packed octane + Alien Signals + Hook Form + Apollo Client + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
 	);
 }
 

@@ -25,6 +25,7 @@ import { SolanaDemo } from './demos/Solana.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
 import { WagmiDemo } from './demos/Wagmi.tsrx';
 import { UseHooksTsDemo } from './demos/UseHooksTs.tsrx';
+import { AlienSignalsDemo } from './demos/AlienSignals.tsrx';
 
 import commandMenuSource from './demos/CommandMenu.tsrx?raw';
 import animeJsSource from './demos/AnimeJs.tsrx?raw';
@@ -47,6 +48,7 @@ import solanaSource from './demos/Solana.tsrx?raw';
 import suspenseSource from './demos/Suspense.tsrx?raw';
 import wagmiSource from './demos/Wagmi.tsrx?raw';
 import useHooksTsSource from './demos/UseHooksTs.tsrx?raw';
+import alienSignalsSource from './demos/AlienSignals.tsrx?raw';
 
 export interface Demo {
 	/** Stable id — also the URL route, so renaming one breaks shared links. */
@@ -63,6 +65,18 @@ export interface DemoGroup {
 }
 
 export const GROUPS: readonly DemoGroup[] = [
+	{
+		id: 'state',
+		label: 'State',
+		demos: [
+			{
+				id: 'alien-signals',
+				title: 'Alien Signals',
+				Component: AlienSignalsDemo,
+				source: alienSignalsSource,
+			},
+		],
+	},
 	{
 		id: 'language',
 		label: 'Language',

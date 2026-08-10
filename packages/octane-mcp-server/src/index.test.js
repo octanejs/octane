@@ -28,6 +28,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(areaForPath('packages/octane/src/runtime.ts')).toBe('core-runtime');
 		expect(areaForPath('packages/octane/src/runtime.server.ts')).toBe('ssr');
 		expect(areaForPath('packages/zustand/src/index.ts')).toBe('ecosystem-binding');
+		expect(areaForPath('packages/alien-signals/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/radix/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/octane-mcp-server/src/index.js')).toBe('mcp-server');
 		expect(areaForPath('packages/adapter-vercel/src/index.ts')).toBe('deploy-adapter');

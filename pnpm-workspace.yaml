@@ -85,6 +85,8 @@ allowBuilds:
   # LiveStore's test-only telemetry closure uses protobufjs; its postinstall
   # prints a donation notice and does not generate runtime artifacts.
   protobufjs: false
+  # Alien Signals pristine lane shells out to the pinned upstream bun:test suite.
+  bun: true
   # Wallet/WebSocket parity dependencies expose optional native accelerators;
   # Node and the packages themselves provide JavaScript fallbacks.
   bufferutil: false
@@ -170,6 +172,7 @@ catalogs:
     '@livestore/livestore': 0.4.0
     '@livestore/utils': 0.4.0
     '@opentelemetry/api': 1.9.0
+    alien-signals: 1.0.4
     '@apollo/client': 4.2.6
     animejs: 4.5.0
     dexie: 4.4.4

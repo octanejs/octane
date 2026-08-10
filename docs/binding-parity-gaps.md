@@ -15,6 +15,7 @@ surface and evidence.
 
 | Package | Active pins |
 | --- | ---: |
+| `@octanejs/alien-signals` | 0 |
 | `@octanejs/animejs` | 0 |
 | `@octanejs/apollo-client` | 0 |
 | `@octanejs/aria` | 0 |

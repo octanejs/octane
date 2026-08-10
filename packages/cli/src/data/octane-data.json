@@ -1,6 +1,24 @@
 {
   "bindings": [
     {
+      "name": "@octanejs/alien-signals",
+      "version": "0.0.1",
+      "category": "Shared state",
+      "upstream": {
+        "package": "react-alien-signals",
+        "version": "0.3.0",
+        "source": "https://github.com/Rajaniraiyn/react-alien-signals/tree/6d883959ddf25a3f486451ff8abff60eb989671c",
+        "license": "MIT"
+      },
+      "surface": "Complete react-alien-signals hook and helper surface over the unchanged alien-signals@1.0.4 core, with Octane-native subscriptions and lifecycle ownership.",
+      "divergences": [
+        "`useSignalValue` accepts any readable signal, including computed signals, correcting the upstream declaration to match its documented behavior.",
+        "`useSignalScope` starts its scope after client commit and returns a cancellation-safe controller, avoiding render-phase effects."
+      ],
+      "ssr": "Supported and hydration-tested. Reads use the same server snapshot; effects and scopes begin only after client commit and stop on unmount.",
+      "verified": "2026-07-30"
+    },
+    {
       "name": "@octanejs/animejs",
       "version": "0.0.4",
       "category": "UI and interaction",
@@ -1019,6 +1037,7 @@
     "motion": "@octanejs/motion",
     "nuqs": "@octanejs/nuqs",
     "radix-ui": "@octanejs/radix",
+    "react-alien-signals": "@octanejs/alien-signals",
     "react-aria": "@octanejs/aria",
     "react-aria-components": "@octanejs/aria",
     "react-error-boundary": "@octanejs/react-error-boundary",
