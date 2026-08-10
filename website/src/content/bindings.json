@@ -54,6 +54,7 @@
       "@octanejs/sonner",
       "@octanejs/react-error-boundary",
       "@octanejs/transition-group",
+      "@octanejs/day-picker",
       "@octanejs/cmdk",
       "@octanejs/shadcn",
       "@octanejs/lucide",

@@ -21,6 +21,7 @@ surface and evidence.
 | `@octanejs/aria` | 0 |
 | `@octanejs/base-ui` | 0 |
 | `@octanejs/cmdk` | 0 |
+| `@octanejs/day-picker` | 0 |
 | `@octanejs/devtools` | 0 |
 | `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |

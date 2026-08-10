@@ -23,6 +23,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.32` | 2 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.7` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.17` | 1 |
+| `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.1.0` | 12 |
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.22` | 1 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.27` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.29` | 4 |

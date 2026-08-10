@@ -57,6 +57,7 @@ export const KNOWN_BINDINGS = {
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
 	'react-transition-group': '@octanejs/transition-group',
+	'react-day-picker': '@octanejs/day-picker',
 	streamdown: '@octanejs/streamdown',
 	// The official plugins are consolidated as subpaths of the same package.
 	// The bundled bridge skill documents each exact import rewrite.

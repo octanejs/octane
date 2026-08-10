@@ -4611,6 +4611,15 @@ export default defineConfig({
 					include: [
 						'packages/transition-group/tests/**/*.test.ts',
 						'!packages/transition-group/tests/ssr/**/*.test.ts',
+				// Ordinary ownership: repo-authored Octane-only smoke stays out of
+				// adaptedRuntimeSummary / react-parity evidence.
+				test: {
+					name: 'react-day-picker',
+					include: [
+						'packages/day-picker/tests/**/*.test.ts',
+						'!packages/day-picker/tests/ssr/**/*.test.ts',
+						'!packages/day-picker/tests/browser/**/*.test.ts',
+						'!packages/day-picker/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -4621,6 +4630,8 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/transition-group$/,
 							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
+							find: /^@octanejs\/day-picker$/,
+							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
 						},
 					],
 				},
@@ -4635,6 +4646,9 @@ export default defineConfig({
 				test: {
 					name: 'transition-group-ssr',
 					include: ['packages/transition-group/tests/ssr/**/*.test.ts'],
+				test: {
+					name: 'react-day-picker-ssr',
+					include: ['packages/day-picker/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
@@ -4648,6 +4662,38 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/transition-group$/,
 							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
+							find: /^@octanejs\/day-picker$/,
+							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'react-day-picker-browser',
+					include: ['packages/day-picker/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				// Bounded React oracle evidence only — unpaired smoke/SSR/browser
+				// projects stay on ordinary ownership above.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-day-picker-differential',
+					include: ['packages/day-picker/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/day-picker$/,
+							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
 						},
 					],
 				},
