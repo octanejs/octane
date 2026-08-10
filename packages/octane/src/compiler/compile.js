@@ -6810,6 +6810,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
 	ast = lowerNullishComponentExits(ast);
+	// Same contract for React-style conditional JSX returns: branch-selected
+	// output compiles as template control flow instead of de-opt descriptors.
+	ast = lowerJsxReturnBranchComponents(ast);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
@@ -8014,6 +8017,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
 	ast = lowerNullishComponentExits(ast);
+	ast = lowerJsxReturnBranchComponents(ast);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
@@ -23379,6 +23383,458 @@ function lowerNullishComponentExits(ast) {
 				replacement = isExport ? { ...statement, declaration: loweredNode } : loweredNode;
 			}
 		}
+		if (out === null && replacement !== statement) out = statements.slice(0, i);
+		if (out !== null) out.push(replacement);
+	}
+	return out === null ? ast : { ...ast, body: out };
+}
+
+// ---------------------------------------------------------------------------
+// React-style conditional JSX returns → template control flow.
+//
+// `if (c) return <A/>; return <B/>;` selects between templates exactly like
+// `@if (c) { <A/> } @else { <B/> }`, but the generic value ABI runs the whole
+// subtree through the de-opt descriptor renderer. When every component-level
+// return is syntactic JSX (or nullish, or a ternary of those) reachable only
+// through if/else nesting, rebuild the body as setup statements plus one
+// directive-shaped render root and compile it like the `@{}` form. Admission is
+// deliberately conservative:
+//   - a named, non-async FunctionDeclaration with a capitalized name (hooks and
+//     lowercase render helpers keep the callable value ABI);
+//   - a return under any loop/switch/try — or under an if whose returning
+//     consequent can also fall through — keeps the generic path, because
+//     restructuring those would duplicate trailing statements across arms and
+//     re-slot their hooks;
+//   - every pair of arm roots must be a provably DIFFERENT static type (React
+//     updates same-type roots in place; arms remount), no arm may be a
+//     fragment (React key-matches fragment children across branches), no arm
+//     root may be the component itself (bare self-recursive chains overflow
+//     deep SSR trees the value path handles), and no hook call may sit in
+//     arm-bound content (its state would move from the component scope to the
+//     arm scope);
+//   - the module may reference the function only as a JSX tag, an export, or a
+//     bare `memo(...)`/`lazy(...)` argument. Any other value reference (a
+//     direct call, a prop value, a member access) keeps the callable form.
+// The lowering runs in every compiler mode (client, server, HMR) so SSR and
+// hydration share one DOM-range shape — same contract as
+// lowerNullishComponentExits above. The bundler mirrors the decision through
+// hasLowerableJsxReturnBranches for cross-module void-output classification.
+
+const JSX_RETURN_OUTPUT_TYPES = new Set(['JSXElement', 'JSXFragment', 'Element', 'Fragment']);
+
+function unwrapReturnParens(node) {
+	while (node != null && node.type === 'ParenthesizedExpression') node = node.expression;
+	return node;
+}
+
+/**
+ * Static root of a returned JSX arm: `{ kind: 'host', name: tag }` or
+ * `{ kind: 'component', name }`. Null for anything unprovable (member/dynamic
+ * tags) — and fragments are handled by the caller (always rejected: React
+ * key-matches fragment CHILDREN against whatever the other arm renders, so a
+ * fragment arm can reconcile state across branches that arm remounting would
+ * drop).
+ */
+function jsxArmRoot(node) {
+	const name =
+		node.type === 'Element'
+			? node.id
+			: node.type === 'JSXElement'
+				? node.openingElement?.name
+				: null;
+	if (name == null) return null;
+	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
+		return {
+			kind: /^[a-z]/.test(name.name) ? 'host' : 'component',
+			name: name.name,
+		};
+	}
+	return null;
+}
+
+/**
+ * Render-scope hook call anywhere under `node` (nested function bodies are
+ * separate scopes and excluded). Content that moves into an if/else ARM must
+ * not call hooks: on the value path a hook behind an early return keeps its
+ * slot-keyed state on the COMPONENT scope across branch flips, while an arm's
+ * scope is torn down with the arm.
+ */
+function containsHookCall(node) {
+	const seen = new WeakSet();
+	// The shared convention (HOOK_NAME_CONVENTION_RE) — covers `use`, `useX`,
+	// and the `unstable_`/`UNSTABLE_` prefixed forms.
+	const isHookName = isHookCalleeName;
+	const walk = (value) => {
+		if (value == null || typeof value !== 'object') return false;
+		if (Array.isArray(value)) {
+			for (const child of value) if (walk(child)) return true;
+			return false;
+		}
+		if (seen.has(value)) return false;
+		seen.add(value);
+		if (
+			value.type === 'FunctionDeclaration' ||
+			value.type === 'FunctionExpression' ||
+			value.type === 'ArrowFunctionExpression'
+		)
+			return false;
+		if (value.type === 'CallExpression') {
+			const callee = value.callee;
+			if (callee?.type === 'Identifier' && isHookName(callee.name)) return true;
+			if (
+				callee?.type === 'MemberExpression' &&
+				callee.computed !== true &&
+				callee.property?.type === 'Identifier' &&
+				isHookName(callee.property.name)
+			)
+				return true;
+		}
+		for (const key in value) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			if (walk(value[key])) return true;
+		}
+		return false;
+	};
+	return walk(node);
+}
+
+function isNullishReturnArg(argument) {
+	if (argument == null) return true;
+	const a = unwrapReturnParens(argument);
+	return (
+		(a.type === 'Literal' && a.value === null) ||
+		(a.type === 'Identifier' && a.name === 'undefined')
+	);
+}
+
+/** Component-level ReturnStatement anywhere under `node`, nested fns excluded. */
+function containsComponentReturn(node) {
+	const seen = new WeakSet();
+	const walk = (value) => {
+		if (value == null || typeof value !== 'object') return false;
+		if (Array.isArray(value)) {
+			for (const child of value) if (walk(child)) return true;
+			return false;
+		}
+		if (seen.has(value)) return false;
+		seen.add(value);
+		if (
+			value.type === 'FunctionDeclaration' ||
+			value.type === 'FunctionExpression' ||
+			value.type === 'ArrowFunctionExpression'
+		)
+			return false;
+		if (value.type === 'ReturnStatement') return true;
+		for (const key in value) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			if (walk(value[key])) return true;
+		}
+		return false;
+	};
+	return walk(node);
+}
+
+// Lower one return argument to an output node: JSX passes through, nullish
+// yields no output, a ternary becomes an if/else of its lowered arms. Anything
+// else — including a fragment (its children key-match across branches in
+// React), a dynamic/member tag, or JSX containing a hook call — poisons the
+// candidate.
+function lowerReturnArgToOutput(argument, origin, state) {
+	if (isNullishReturnArg(argument)) return null;
+	const a = unwrapReturnParens(argument);
+	if (a.type === 'JSXFragment' || a.type === 'Fragment') {
+		state.failed = true;
+		return null;
+	}
+	if (JSX_RETURN_OUTPUT_TYPES.has(a.type)) {
+		const root = jsxArmRoot(a);
+		if (root === null || containsHookCall(a)) {
+			state.failed = true;
+			return null;
+		}
+		state.roots.push(root);
+		state.jsxReturns++;
+		return a;
+	}
+	if (a.type === 'ConditionalExpression') {
+		state.branchReturn = true;
+		const cons = lowerReturnArgToOutput(a.consequent, origin, state);
+		if (state.failed) return null;
+		const alt = lowerReturnArgToOutput(a.alternate, origin, state);
+		if (state.failed) return null;
+		return inheritOriginLoc(
+			b.if(a.test, b.block(cons !== null ? [cons] : []), alt !== null ? b.block([alt]) : null),
+			origin,
+		);
+	}
+	state.failed = true;
+	return null;
+}
+
+/**
+ * Restructure a statement list so JSX returns become bare output nodes inside
+ * if/else arms. Returns `{ list, terminal }` — `terminal` is true when every
+ * control path through the list returns or throws (the property that lets a
+ * parent attach its remaining statements as the else arm) — or null when the
+ * list cannot be restructured without duplicating statements across arms.
+ */
+function armifyComponentReturnList(stmts, state, inBranch) {
+	const out = [];
+	for (let i = 0; i < stmts.length; i++) {
+		const stmt = stmts[i];
+		if (stmt.type === 'ReturnStatement') {
+			state.totalReturns++;
+			if (inBranch || i !== stmts.length - 1) state.branchReturn = true;
+			const output = lowerReturnArgToOutput(stmt.argument, stmt, state);
+			if (state.failed) return null;
+			if (output !== null) out.push(output);
+			return { list: out, terminal: true };
+		}
+		if (stmt.type === 'ThrowStatement') {
+			out.push(stmt);
+			return { list: out, terminal: true };
+		}
+		if (stmt.type === 'IfStatement' && containsComponentReturn(stmt)) {
+			const cons = armifyComponentReturnList(statementsOf(stmt.consequent), state, true);
+			if (cons === null) return null;
+			// A returning consequent that can also fall through would need the
+			// trailing statements duplicated into it — reject instead.
+			if (!cons.terminal) {
+				state.failed = true;
+				return null;
+			}
+			const restStmts = stmt.alternate
+				? [...statementsOf(stmt.alternate), ...stmts.slice(i + 1)]
+				: stmts.slice(i + 1);
+			const rest = armifyComponentReturnList(restStmts, state, true);
+			if (rest === null) return null;
+			out.push(
+				inheritOriginLoc(
+					b.if(stmt.test, b.block(cons.list), rest.list.length > 0 ? b.block(rest.list) : null),
+					stmt,
+				),
+			);
+			return { list: out, terminal: rest.terminal };
+		}
+		if (containsComponentReturn(stmt)) {
+			// A return under a loop / switch / try / labeled block is not a static
+			// arm selection.
+			state.failed = true;
+			return null;
+		}
+		// A statement that moves INTO an arm must not call hooks — its hook state
+		// would move from the component scope (kept across branch flips) to the
+		// arm scope (torn down with the arm).
+		if (inBranch && containsHookCall(stmt)) {
+			state.failed = true;
+			return null;
+		}
+		out.push(stmt);
+	}
+	return { list: out, terminal: false };
+}
+
+// Names bound at MODULE level: imports, function declarations, and top-level
+// variable declarators (export-wrapped included). Component arm roots must
+// resolve here — a body-local binding (`const {wrapper: MDXLayout} = …`) is a
+// runtime-chosen component whose callers depend on the value ABI's shape.
+function collectModuleLevelBindings(moduleBody) {
+	const names = new Set();
+	const addPattern = (pattern) => {
+		if (pattern == null) return;
+		if (pattern.type === 'Identifier') {
+			names.add(pattern.name);
+			return;
+		}
+		if (pattern.type === 'ObjectPattern') {
+			for (const property of pattern.properties || []) {
+				addPattern(property.type === 'RestElement' ? property.argument : property.value);
+			}
+			return;
+		}
+		if (pattern.type === 'ArrayPattern') {
+			for (const element of pattern.elements || []) addPattern(element);
+			return;
+		}
+		if (pattern.type === 'AssignmentPattern') addPattern(pattern.left);
+		if (pattern.type === 'RestElement') addPattern(pattern.argument);
+	};
+	for (const statement of moduleBody) {
+		const node =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (node == null) continue;
+		if (node.type === 'ImportDeclaration') {
+			for (const spec of node.specifiers || []) if (spec.local?.name) names.add(spec.local.name);
+			continue;
+		}
+		if (
+			(node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') &&
+			node.id?.name
+		) {
+			names.add(node.id.name);
+			continue;
+		}
+		if (node.type === 'VariableDeclaration') {
+			for (const declarator of node.declarations || []) addPattern(declarator.id);
+		}
+	}
+	return names;
+}
+
+function collectOctaneComponentWrapperLocals(moduleBody) {
+	const names = new Set();
+	for (const stmt of moduleBody) {
+		if (stmt.type !== 'ImportDeclaration' || stmt.source?.value !== 'octane') continue;
+		for (const spec of stmt.specifiers || []) {
+			if (spec.type !== 'ImportSpecifier') continue;
+			const imported = spec.imported?.name ?? spec.imported?.value;
+			if ((imported === 'memo' || imported === 'lazy') && spec.local?.name) {
+				names.add(spec.local.name);
+			}
+		}
+	}
+	return names;
+}
+
+// Whether the module references `name` only in component positions: JSX tags
+// (JSXIdentifier / TSRX Element `id`), export clauses, or a bare argument to
+// octane's `memo`/`lazy`. Any other Identifier reference — a direct call, a
+// prop value, a member-expression object — means callers rely on the value ABI.
+function moduleOnlyRendersComponent(moduleBody, name) {
+	const wrapperLocals = collectOctaneComponentWrapperLocals(moduleBody);
+	let ok = true;
+	const seen = new WeakSet();
+	const walk = (value) => {
+		if (!ok || value == null || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) walk(child);
+			return;
+		}
+		if (seen.has(value)) return;
+		seen.add(value);
+		const t = value.type;
+		if (t === 'Identifier') {
+			if (value.name === name) ok = false;
+			return;
+		}
+		if (t === 'ExportSpecifier') return; // export { Name } / { Name as default }
+		if (t === 'ExportDefaultDeclaration') {
+			const decl = value.declaration;
+			if (decl != null && decl.type === 'Identifier') return; // export default Name
+			walk(decl);
+			return;
+		}
+		if (
+			t === 'FunctionDeclaration' ||
+			t === 'FunctionExpression' ||
+			t === 'Element' // TSRX element: `id` is the tag — a render use.
+		) {
+			for (const key in value) {
+				if (key === 'id' || AST_WALK_SKIP_KEYS.has(key)) continue;
+				walk(value[key]);
+			}
+			return;
+		}
+		if (t === 'MemberExpression' && value.computed !== true) {
+			walk(value.object); // skip the static .property name
+			return;
+		}
+		if (t === 'Property' && value.computed !== true) {
+			walk(value.value); // skip the static key
+			return;
+		}
+		if (t === 'CallExpression') {
+			walk(value.callee);
+			const calleeName = value.callee?.type === 'Identifier' ? value.callee.name : null;
+			const allowBareArgs = calleeName !== null && wrapperLocals.has(calleeName);
+			for (const argument of value.arguments || []) {
+				if (allowBareArgs && argument.type === 'Identifier') continue; // memo(Name)
+				walk(argument);
+			}
+			return;
+		}
+		for (const key in value) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(value[key]);
+		}
+	};
+	walk(moduleBody);
+	return ok;
+}
+
+// Rebuild one candidate function as a JSXCodeBlock (setup + render), or return
+// null when it must keep the generic value ABI.
+function lowerJsxReturnBranchesOf(node, moduleBody) {
+	if (
+		node == null ||
+		(node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') ||
+		node.id == null ||
+		node.async === true ||
+		node.generator === true ||
+		node.body?.type !== 'BlockStatement'
+	) {
+		return null;
+	}
+	if (!/^[A-Z]/.test(node.id.name)) return null;
+	const state = { failed: false, totalReturns: 0, branchReturn: false, jsxReturns: 0, roots: [] };
+	const result = armifyComponentReturnList(node.body.body || [], state, false);
+	if (result === null || state.failed) return null;
+	// A single trailing `return <jsx>` stays on the established value paths —
+	// only branch-selected output benefits from directive lowering.
+	if (state.jsxReturns === 0 || !state.branchReturn) return null;
+	// At least one arm must render a HOST root: that is where the template win
+	// lives. Component-only arm sets (`Animate ? <A/> : <B/>` config selectors,
+	// `if (!x) return null; return <Child/>` guards) gain nothing over the
+	// value path and would pay an ssr control range per level.
+	if (!state.roots.some((root) => root.kind === 'host')) return null;
+	// React reconciles SAME-type roots at one position in place (state and DOM
+	// survive the flip), while directive arms remount. Lower only when every
+	// pair of arm roots is a provably different type, and never when an arm is
+	// the component itself — a bare self-recursive arm compiles to a component
+	// chain whose per-level control-flow frames overflow deep SSR trees that
+	// the value path renders fine.
+	let moduleBindings = null;
+	for (let i = 0; i < state.roots.length; i++) {
+		const root = state.roots[i];
+		if (root.kind === 'component') {
+			if (root.name === node.id.name) return null;
+			// Body-local component bindings are runtime-chosen values; only
+			// module-level components have the stable identity the arm needs.
+			moduleBindings ??= collectModuleLevelBindings(moduleBody);
+			if (!moduleBindings.has(root.name)) return null;
+		}
+		for (let j = i + 1; j < state.roots.length; j++) {
+			if (root.kind === state.roots[j].kind && root.name === state.roots[j].name) return null;
+		}
+	}
+	const list = result.list;
+	const render = list.length > 0 ? list[list.length - 1] : null;
+	if (render == null || !isJsxNode(render)) return null;
+	if (!moduleOnlyRendersComponent(moduleBody, node.id.name)) return null;
+	return {
+		...node,
+		body: { ...node.body, type: 'JSXCodeBlock', body: list.slice(0, -1), render },
+	};
+}
+
+/** Bundler mirror of the compile-time lowering decision (no transform). */
+export function hasLowerableJsxReturnBranches(node, moduleBody) {
+	return lowerJsxReturnBranchesOf(node, moduleBody) !== null;
+}
+
+function lowerJsxReturnBranchComponents(ast) {
+	const statements = ast.body || [];
+	let out = null;
+	for (let i = 0; i < statements.length; i++) {
+		const statement = statements[i];
+		let replacement = statement;
+		const isExport =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
+		const node = isExport ? statement.declaration : statement;
+		const lowered = lowerJsxReturnBranchesOf(node, statements);
+		if (lowered !== null) replacement = isExport ? { ...statement, declaration: lowered } : lowered;
 		if (out === null && replacement !== statement) out = statements.slice(0, i);
 		if (out !== null) out.push(replacement);
 	}

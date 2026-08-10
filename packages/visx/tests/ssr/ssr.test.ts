@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
 import { renderToString } from 'octane/server';
 import { ServerFamilies, WordcloudFamilies } from '../_fixtures/charts.tsrx';
 import { HydrationFixture } from '../_fixtures/hydration.tsrx';
@@ -64,6 +65,12 @@ describe('@octanejs/visx SSR', () => {
 		const first = renderToString(HydrationFixture).html;
 		const second = renderToString(HydrationFixture).html;
 		expect(second).toBe(first);
+		// Regenerating ../hydration/server-html.ts after a deliberate compiler
+		// emission change:
+		//   VISX_CAPTURE_SERVER_HTML=/tmp/visx-server.html vitest run --project visx-ssr
+		if (process.env.VISX_CAPTURE_SERVER_HTML) {
+			writeFileSync(process.env.VISX_CAPTURE_SERVER_HTML, first);
+		}
 		expect(first).toBe(SERVER_HTML);
 		expect(first).toContain('id="visx-hydration-svg"');
 		expect(first).toContain('aria-label="hydration xy chart"');

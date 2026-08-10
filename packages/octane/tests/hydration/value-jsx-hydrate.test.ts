@@ -117,10 +117,17 @@ describe('value-position JSX — hydration', () => {
 	it('fills and clears a borrowed empty return range after hydration', () => {
 		const { html } = ServerRT.renderToString(server.ReturnMaybeParent, { show: false });
 		container.innerHTML = html;
+		const section = container.querySelector('#maybe-return');
 		const sibling = container.querySelector('#after-maybe');
 		const root = hydrateRoot(container, ReturnMaybeParent, { show: false });
 		flushSync(() => {});
-		expect(container.innerHTML).toBe(html);
+		// Adoption, not a rebuild: every ELEMENT survives by identity. Marker
+		// comments are hydration's own bookkeeping and may be rewritten while
+		// claiming, so compare content with comments stripped rather than bytes.
+		const stripMarkers = (markup: string) => markup.replace(/<!--[^>]*-->/g, '');
+		expect(stripMarkers(container.innerHTML)).toBe(stripMarkers(html));
+		expect(container.querySelector('#maybe-return')).toBe(section);
+		expect(container.querySelector('#after-maybe')).toBe(sibling);
 
 		root.render(ReturnMaybeParent, { show: true });
 		flushSync(() => {});
