@@ -118,7 +118,6 @@ function EditorComponent(props: EditorProps) @{
 			monaco.editor.setTheme(theme);
 			if (line !== undefined) editorInstance.revealLine(line);
 
-			latestRef.current.onMount(editorInstance, monaco);
 			contentSubscriptionRef.current = editorInstance.onDidChangeModelContent((event) => {
 				if (!preventChangeRef.current) {
 					latestRef.current.onChange?.(editorInstance.getValue(), event);
@@ -133,6 +132,8 @@ function EditorComponent(props: EditorProps) @{
 			setIsEditorReady(true);
 
 			return () => {
+				if (editorRef.current !== editorInstance) return;
+
 				contentSubscriptionRef.current?.dispose();
 				markerSubscriptionRef.current?.dispose();
 				contentSubscriptionRef.current = null;
@@ -161,6 +162,25 @@ function EditorComponent(props: EditorProps) @{
 			throw error;
 		}
 	}, [monaco]);
+
+	useEffect(() => {
+		const editorInstance = editorRef.current;
+		if (!isEditorReady || !editorInstance || !monaco) return;
+
+		// Reason: readiness must commit first so consumers can focus or measure a visible editor.
+		try {
+			latestRef.current.onMount(editorInstance, monaco);
+		} catch (error) {
+			contentSubscriptionRef.current?.dispose();
+			markerSubscriptionRef.current?.dispose();
+			contentSubscriptionRef.current = null;
+			markerSubscriptionRef.current = null;
+			editorInstance.dispose();
+			editorRef.current = null;
+			releaseModels(leasedModelsRef.current, new Set());
+			throw error;
+		}
+	}, [isEditorReady]);
 
 	useEffect(() => {
 		const editorInstance = editorRef.current;

@@ -21,6 +21,9 @@ async function settle(): Promise<void> {
 	flushEffects();
 	flushSync(() => {});
 	flushEffects();
+	// Reason: editor creation marks readiness from a passive effect; drain that render too.
+	flushSync(() => {});
+	flushEffects();
 }
 
 beforeAll(() => {
@@ -167,6 +170,31 @@ describe('@octanejs/monaco-editor Editor', () => {
 		expect(editorInstance!.getModel()?.uri.toString()).toBe('file:///default-model.ts');
 		expect(editorInstance!.getValue()).toBe('default value');
 		expect(editorInstance!.getModel()?.getLanguageId()).toBe('markdown');
+		result.unmount();
+		await settle();
+	});
+
+	it('invokes onMount after revealing the container and subscribing to content changes', async () => {
+		const onChange = vi.fn();
+		let displayDuringMount: string | undefined;
+		let loadingDuringMount: boolean | undefined;
+		const result = mount(Editor as any, {
+			defaultValue: 'before mount',
+			className: 'mount-ready-editor',
+			onChange,
+			onMount: (instance: MonacoEditor) => {
+				const container = document.querySelector<HTMLElement>('.mount-ready-editor');
+				displayDuringMount = container?.style.display;
+				loadingDuringMount = container?.parentElement?.textContent?.includes('Loading...');
+				instance.setValue('changed during mount');
+			},
+		});
+		await settle();
+
+		expect(displayDuringMount).toBe('');
+		expect(loadingDuringMount).toBe(false);
+		expect(onChange).toHaveBeenCalledOnce();
+		expect(onChange).toHaveBeenCalledWith('changed during mount', expect.any(Object));
 		result.unmount();
 		await settle();
 	});
@@ -777,6 +805,27 @@ describe('@octanejs/monaco-editor DiffEditor', () => {
 
 		expect(setValue).toHaveBeenCalledWith('after');
 		expect(executeEdits).not.toHaveBeenCalled();
+		result.unmount();
+		await settle();
+	});
+
+	it('invokes onMount after revealing the container', async () => {
+		let displayDuringMount: string | undefined;
+		let loadingDuringMount: boolean | undefined;
+		const result = mount(DiffEditor as any, {
+			original: 'before',
+			modified: 'after',
+			className: 'mount-ready-diff-editor',
+			onMount: () => {
+				const container = document.querySelector<HTMLElement>('.mount-ready-diff-editor');
+				displayDuringMount = container?.style.display;
+				loadingDuringMount = container?.parentElement?.textContent?.includes('Loading...');
+			},
+		});
+		await settle();
+
+		expect(displayDuringMount).toBe('');
+		expect(loadingDuringMount).toBe(false);
 		result.unmount();
 		await settle();
 	});

@@ -101,10 +101,11 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 			currentOriginalPathRef.current = originalModelPath;
 			currentModifiedPathRef.current = modifiedModelPath;
 			monaco.editor.setTheme(theme);
-			latestRef.current.onMount(editorInstance, monaco);
 			setIsEditorReady(true);
 
 			return () => {
+				if (editorRef.current !== editorInstance) return;
+
 				const models = editorInstance.getModel();
 				editorInstance.dispose();
 				editorRef.current = null;
@@ -125,6 +126,21 @@ function DiffEditorComponent(props: DiffEditorProps) @{
 			throw error;
 		}
 	}, [monaco]);
+
+	useEffect(() => {
+		const editorInstance = editorRef.current;
+		if (!isEditorReady || !editorInstance || !monaco) return;
+
+		// Reason: readiness must commit first so consumers can focus or measure a visible editor.
+		try {
+			latestRef.current.onMount(editorInstance, monaco);
+		} catch (error) {
+			editorInstance.dispose();
+			editorRef.current = null;
+			releaseModels(leasedModelsRef.current, new Set());
+			throw error;
+		}
+	}, [isEditorReady]);
 
 	useEffect(() => {
 		const editorInstance = editorRef.current;
