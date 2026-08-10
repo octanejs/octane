@@ -1,0 +1,64 @@
+{
+  "name": "@octanejs/vaul",
+  "version": "0.1.0",
+  "description": "Octane binding for Vaul drawers",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "author": "Emil Kowalski <e@emilkowal.ski>",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "./src/style.css"
+  ],
+  "exports": {
+    ".": "./src/index.tsrx",
+    "./style.css": "./src/style.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "scripts": {
+    "test": "pnpm upstream:check && vitest run --root ../.. --project vaul --project vaul-differential --project vaul-ssr --project vaul-browser --project vaul-browser-conformance",
+    "parity:inventory": "node ../../scripts/react-parity/vaul-runtime-inventory.mjs",
+    "upstream:check": "node audit/check-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@octanejs/radix": "workspace:*",
+    "@types/react": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react-dom": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vaul": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/octanejs/octane.git",
+    "directory": "packages/vaul"
+  }
+}

@@ -41,6 +41,7 @@
     "packages": [
       "@octanejs/radix",
       "@octanejs/zag",
+      "@octanejs/vaul",
       "@octanejs/base-ui",
       "@octanejs/aria",
       "@octanejs/mantine-hooks",

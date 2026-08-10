@@ -196,6 +196,7 @@ catalogs:
     '@floating-ui/react': 0.27.19
     react-day-picker: 10.0.1
     '@floating-ui/utils': ^0.2.12
+    vaul: 1.1.2
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6

@@ -4620,6 +4620,34 @@ export default defineConfig({
 						'!packages/day-picker/tests/ssr/**/*.test.ts',
 						'!packages/day-picker/tests/browser/**/*.test.ts',
 						'!packages/day-picker/tests/differential/**/*.test.ts',
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'vaul-pristine',
+					include: ['packages/vaul/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+					testTimeout: 600_000,
+					hookTimeout: 600_000,
+				},
+			},
+			{
+				// Mixed project: react-parity owns only adapted drawer evidence.
+				// Differential evidence lives in vaul-differential. exports.test.ts stays
+				// in ordinary shards as an Octane package contract.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/vaul/tests/drawer.test.ts'],
+				},
+				test: {
+					name: 'vaul',
+					include: [
+						'packages/vaul/tests/**/*.test.ts',
+						'!packages/vaul/tests/ssr/**/*.test.ts',
+						'!packages/vaul/tests/browser/**/*.test.ts',
+						'!packages/vaul/tests/browser-conformance/**/*.test.ts',
+						'!packages/vaul/tests/differential/**/*.test.ts',
+						'!packages/vaul/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -4632,6 +4660,8 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
 							find: /^@octanejs\/day-picker$/,
 							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
+							find: /^@octanejs\/vaul$/,
+							replacement: resolve(import.meta.dirname, 'packages/vaul/src/index.tsrx'),
 						},
 					],
 				},
@@ -4649,6 +4679,28 @@ export default defineConfig({
 				test: {
 					name: 'react-day-picker-ssr',
 					include: ['packages/day-picker/tests/ssr/**/*.test.ts'],
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'vaul-differential',
+					include: ['packages/vaul/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/vaul$/,
+							replacement: resolve(import.meta.dirname, 'packages/vaul/src/index.tsrx'),
+						},
+					],
+					dedupe: ['react', 'react-dom'],
+				},
+			},
+			{
+				test: {
+					name: 'vaul-ssr',
+					include: ['packages/vaul/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
@@ -4664,6 +4716,8 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
 							find: /^@octanejs\/day-picker$/,
 							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
+							find: /^@octanejs\/vaul$/,
+							replacement: resolve(import.meta.dirname, 'packages/vaul/src/index.tsrx'),
 						},
 					],
 				},
@@ -4672,6 +4726,10 @@ export default defineConfig({
 				test: {
 					name: 'react-day-picker-browser',
 					include: ['packages/day-picker/tests/browser/**/*.test.ts'],
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'vaul-browser',
+					include: ['packages/vaul/tests/browser/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 					testTimeout: 60_000,
@@ -4696,6 +4754,15 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
 						},
 					],
+				// Octane-only real-browser contracts (unpaired snap-point drag).
+				// Kept out of react-parity ownership and the vaul-browser inventory.
+				test: {
+					name: 'vaul-browser-conformance',
+					include: ['packages/vaul/tests/browser-conformance/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{

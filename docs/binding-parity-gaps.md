@@ -77,6 +77,7 @@ surface and evidence.
 | `@octanejs/transition-group` | 0 |
 | `@octanejs/usehooks-ts` | 0 |
 | `@octanejs/valtio` | 0 |
+| `@octanejs/vaul` | 0 |
 | `@octanejs/visx` | 0 |
 | `@octanejs/wagmi` | 0 |
 | `@octanejs/zag` | 0 |

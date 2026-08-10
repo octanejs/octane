@@ -32,6 +32,9 @@ import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.
 import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtime.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
+import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
+import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
+import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -185,6 +188,19 @@ try {
 	verifyReactTransitionGroupTestClassifications(REPO);
 } catch (error) {
 	errors.push(`react-transition-group test classifications are invalid: ${error.message}`);
+	verifyVaulUpstream(REPO);
+} catch (error) {
+	errors.push(`vaul upstream evidence is invalid: ${error.message}`);
+}
+try {
+	verifyVaulTestClassifications(REPO);
+} catch (error) {
+	errors.push(`vaul test classifications are invalid: ${error.message}`);
+}
+try {
+	verifyVaulAdaptedRuntimeStructure(REPO);
+} catch (error) {
+	errors.push(`vaul adapted runtime structural evidence is invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

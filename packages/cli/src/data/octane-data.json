@@ -947,6 +947,22 @@
       "verified": "2026-07-27"
     },
     {
+      "name": "@octanejs/vaul",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "vaul",
+        "version": "1.1.2",
+        "commit": "73d06cdd3fd990bf4b83214cfe240c246908af0d"
+      },
+      "surface": "Drawer, Root, NestedRoot, Portal, Overlay, Content, Handle, public props, and style.css.",
+      "divergences": [
+        "React DOM prop types are preserved publicly and normalized at Octane render boundaries."
+      ],
+      "ssr": "Closed drawer roots and triggers render without browser globals; portaled content remains absent while closed.",
+      "verified": "2026-08-02"
+    },
+    {
       "name": "@octanejs/visx",
       "version": "0.1.28",
       "category": "Data-heavy screens",
@@ -1129,6 +1145,7 @@
     "styled-components": "@octanejs/styled-components",
     "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",
+    "vaul": "@octanejs/vaul",
     "wagmi": "@octanejs/wagmi",
     "zustand": "@octanejs/zustand"
   },

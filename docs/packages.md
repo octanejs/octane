@@ -85,6 +85,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/transition-group` | [`packages/transition-group`](../packages/transition-group) | framework binding | `0.1.0` | 7 |
 | `@octanejs/usehooks-ts` | [`packages/usehooks-ts`](../packages/usehooks-ts) | framework binding | `0.0.15` | 1 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.17` | 5 |
+| `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.1.0` | 3 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.28` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.34` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.14` | 3 |

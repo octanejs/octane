@@ -336,6 +336,28 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
 	});
 
+	test('routes unpaired browser-conformance suites through a package-agnostic Chromium lane', () => {
+		const browserGlob = 'packages/*/tests/browser-conformance/**/*.test.ts';
+		assert.ok(jobSource('test_shard').includes(`--exclude "${browserGlob}"`));
+		assert.ok(!jobSource('test_shard').includes('packages/vaul/tests/browser-conformance'));
+
+		const heavyIntegration = jobSource('heavy_integration');
+		const browserStart = heavyIntegration.indexOf('- lane: browser');
+		const nextLane = heavyIntegration.indexOf('- lane: astro', browserStart);
+		assert.notEqual(browserStart, -1);
+		assert.notEqual(nextLane, -1);
+		const browserLane = heavyIntegration.slice(browserStart, nextLane);
+		assert.match(browserLane, /chromium: true/);
+		assert.ok(browserLane.includes('packages/*/tests/browser-conformance'));
+		assert.ok(!browserLane.includes('packages/vaul/tests/browser-conformance'));
+
+		const projects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		assert.equal(projects.get('vaul-browser').testExecution?.group, 'react-parity');
+		assert.equal(projects.get('vaul-browser-conformance').testExecution, undefined);
+	});
+
 	test('routes the Lynx Web host smoke through the existing Chromium build lane', () => {
 		const browserGlob = 'packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts';
 		const browserSpec = 'packages/rspeedy-plugin-octane/tests/browser/web-host.test.ts';
@@ -359,6 +381,15 @@ describe('CI workflow aggregation', () => {
 		]);
 		assert.equal(projects.get('rspeedy-plugin').test.exclude, undefined);
 		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
+	});
+
+	test('installs WebKit only for the cross-browser integration lane', () => {
+		const heavyIntegration = jobSource('heavy_integration');
+
+		assert.match(
+			heavyIntegration,
+			/- name: Install Playwright WebKit for cross-browser ownership coverage\n\s+if: \$\{\{ matrix\.lane == 'browser' \}\}\n\s+run: pnpm --filter octane exec playwright install --with-deps webkit/,
+		);
 	});
 
 	test('derives sharded projects generically from execution-group ownership', () => {
