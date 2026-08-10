@@ -10,6 +10,8 @@ packages/shadcn/registry/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
+# DefinitelyTyped suites are preserved byte-exact as pinned provenance.
+packages/*/upstream-types/
 # One-for-one adapted type-suite mirrors must stay structurally identical to
 # the vendored upstream typetests after permitted import rewrites only.
 packages/solana-react/typetests/__typetests__/

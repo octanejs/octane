@@ -4599,6 +4599,60 @@ export default defineConfig({
 				},
 			},
 			{
+				// The one-for-one adapted suite owns tests/upstream/**; exports and
+				// transition integration guards are Octane-authored and stay in the
+				// ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/transition-group/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'transition-group',
+					include: [
+						'packages/transition-group/tests/**/*.test.ts',
+						'!packages/transition-group/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/transition-group$/,
+							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// Only the upstream SSR import case is parity-owned; the authored
+				// initial-state / wrapper rendering cases stay in ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/transition-group/tests/ssr/upstream-import.test.ts'],
+				},
+				test: {
+					name: 'transition-group-ssr',
+					include: ['packages/transition-group/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/transition-group$/,
+							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'gsap',
 					include: [

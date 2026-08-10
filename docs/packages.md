@@ -81,6 +81,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.31` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.27` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.28` | 2 |
+| `@octanejs/transition-group` | [`packages/transition-group`](../packages/transition-group) | framework binding | `0.1.0` | 7 |
 | `@octanejs/usehooks-ts` | [`packages/usehooks-ts`](../packages/usehooks-ts) | framework binding | `0.0.15` | 1 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.17` | 5 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.28` | 49 |

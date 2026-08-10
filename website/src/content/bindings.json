@@ -53,6 +53,7 @@
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
       "@octanejs/react-error-boundary",
+      "@octanejs/transition-group",
       "@octanejs/cmdk",
       "@octanejs/shadcn",
       "@octanejs/lucide",

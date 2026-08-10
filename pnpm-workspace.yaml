@@ -431,6 +431,7 @@ catalogs:
     react-dom: ^19.2.7
     react-i18next: 17.0.9
     react-error-boundary: 6.1.2
+    react-transition-group: 4.4.5
     ripple: ^0.3.118
     rxjs: ^7.8.2
     rulesync: ^8.32.0

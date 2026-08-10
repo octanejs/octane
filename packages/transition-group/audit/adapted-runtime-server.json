@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "transition-group-ssr",
+  "roots": [
+    "packages/transition-group/tests/upstream",
+    "packages/transition-group/tests/ssr"
+  ],
+  "files": [
+    "packages/transition-group/tests/ssr/upstream-import.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:3f92552a37e531f0",
+      "file": "packages/transition-group/tests/ssr/upstream-import.test.ts",
+      "fullName": "react-transition-group v4.4.5 server rendering should import react-transition-group in node env"
+    }
+  ]
+}
