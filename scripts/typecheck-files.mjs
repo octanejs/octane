@@ -11,7 +11,12 @@ import {
 import path from 'node:path';
 import { resolveFileSelection } from './file-selection.mjs';
 
-const IGNORED_DIRECTORIES = new Set(['.git', 'coverage', 'dist', 'node_modules']);
+// `upstream` holds byte-exact vendored source a port is written against. It is
+// provenance, not repository source: its own tsconfig belongs to the upstream
+// build and may not even resolve from the vendored path. Ports validate it with
+// their pristine type lanes and the upstream compiler instead. `.prettierignore`
+// excludes the same trees for the same reason.
+const IGNORED_DIRECTORIES = new Set(['.git', 'coverage', 'dist', 'node_modules', 'upstream']);
 const SOURCE_FILE_PATTERN = /(?:\.d)?\.(?:[cm]?ts|tsx|[cm]?js|jsx)$|\.tsrx$/;
 
 function isTypecheckConfig(file) {

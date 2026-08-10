@@ -104,6 +104,30 @@ export function QueryApp(props: { client: any }) @{
 	</ApolloProvider>
 }
 
+function QuerySourcePanel(props: { query: any; onResult: (result: any) => void }) @{
+	const result = useQuery(props.query, { fetchPolicy: 'network-only' });
+	props.onResult(result);
+	const current = JSON.stringify(result.data ?? null);
+	const previous = JSON.stringify(result.previousData ?? null);
+	<section id="query-source-result">
+		<output id="query-source-status">
+			{result.loading ? 'loading' : 'ready'}
+		</output>
+		<output id="query-source-current">{current as string}</output>
+		<output id="query-source-previous">{previous as string}</output>
+	</section>
+}
+
+export function QuerySourceApp(props: {
+	client: any;
+	query: any;
+	onResult: (result: any) => void;
+}) @{
+	<ApolloProvider client={props.client}>
+		<QuerySourcePanel query={props.query} onResult={props.onResult} />
+	</ApolloProvider>
+}
+
 function SuspenseQueryPanel() @{
 	const result = useSuspenseQuery(GET_VALUE, { fetchPolicy: 'network-only' });
 	const value = (result.data as { value?: string } | undefined)?.value;

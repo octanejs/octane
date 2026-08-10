@@ -5,12 +5,18 @@ import {
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	flushUniversalSync,
+	hmrUniversalComponent,
+	markUniversalHostComponent,
 	universalComponent,
+	universalFor,
+	universalHostComponentLeafPlan,
 	universalPlan,
 	universalProps,
 	universalTry,
 	universalValue,
 	useLayoutEffect,
+	useState,
 } from '../src/universal.js';
 
 const hostPlan = universalPlan('object', {
@@ -21,6 +27,313 @@ const hostPlan = universalPlan('object', {
 });
 
 describe('universal prepared host SDK', () => {
+	it('rejects host adapters whose renderer, forwarding plan, or hot-reload contract differs', () => {
+		const plan = universalPlan('object', { kind: 'host', type: 'wrapped', propsSlot: 0 });
+		const component = defineUniversalComponent<Record<string, unknown>>('object', (props) =>
+			universalValue(plan, [universalProps([['spread', props]])]),
+		);
+		const incorrectRenderer = universalPlan('other', {
+			kind: 'host',
+			type: 'wrapped',
+			propsSlot: 0,
+		});
+		const staticChildren = universalPlan('object', {
+			kind: 'host',
+			type: 'wrapped',
+			propsSlot: 0,
+			children: [{ kind: 'host', type: 'child' }],
+		});
+
+		expect(() => markUniversalHostComponent(component, 'other', incorrectRenderer)).toThrow(
+			/renderer/,
+		);
+		expect(() => markUniversalHostComponent(component, 'object', incorrectRenderer)).toThrow(
+			/matching forwarded-props host/,
+		);
+		expect(() => markUniversalHostComponent(component, 'object', staticChildren)).toThrow(
+			/matching forwarded-props host/,
+		);
+		expect(() =>
+			markUniversalHostComponent(hmrUniversalComponent('object', component), 'object', plan),
+		).toThrow(/hot-reloadable/);
+		expect(markUniversalHostComponent(component, 'object', plan)).toBe(component);
+		expect(markUniversalHostComponent(component, 'object', plan)).toBe(component);
+		expect(universalHostComponentLeafPlan('object', component, '["value"]')).toBe(
+			universalHostComponentLeafPlan('object', component, '["value"]'),
+		);
+		expect(universalHostComponentLeafPlan('other', component, '["value"]')).toBeUndefined();
+		expect(() => universalHostComponentLeafPlan('object', component, '["__proto__"]')).toThrow(
+			/safe, unique ordinary prop names/,
+		);
+		expect(() => universalHostComponentLeafPlan('object', component, '["value","value"]')).toThrow(
+			/safe, unique ordinary prop names/,
+		);
+	});
+
+	it('preserves keyed host-wrapper identity, children, refs, callbacks, and events', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const wrapperPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'wrapped',
+			propsSlot: 0,
+		});
+		const detailPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'detail',
+			bindings: [['label', 0]],
+		});
+		const callable = defineUniversalComponent<Record<string, unknown>>('object', (props) =>
+			universalValue(wrapperPlan, [universalProps([['spread', props]])]),
+		);
+		const Wrapped = markUniversalHostComponent(callable, 'object', wrapperPlan);
+		const events: string[] = [];
+		const updates: string[] = [];
+		const attachments: string[] = [];
+		const refValues = new Map<string, ObjectHostInstance | null>();
+		const refs = new Map(
+			['a', 'b'].map((id) => [id, (value: ObjectHostInstance | null) => refValues.set(id, value)]),
+		);
+		const attachers = new Map(
+			['a', 'b'].map((id) => [
+				id,
+				() => {
+					attachments.push(`attach:${id}`);
+					return () => attachments.push(`cleanup:${id}`);
+				},
+			]),
+		);
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { order: readonly string[]; version: number }) =>
+				props.order.map((id) =>
+					universalComponent(
+						'object',
+						Wrapped,
+						universalProps([
+							['set', 'key', id],
+							['set', 'label', `${id}:${props.version}`],
+							['set', 'children', universalValue(detailPlan, [`detail:${id}:${props.version}`])],
+							['set', 'ref', refs.get(id)!],
+							['set', 'attach', attachers.get(id)!],
+							['set', 'onSelect', () => events.push(`${id}:${props.version}`)],
+							[
+								'set',
+								'onUpdate',
+								(instance: ObjectHostInstance) => updates.push(String(instance.props.label)),
+							],
+						]),
+					),
+				),
+		);
+
+		expect(Wrapped).toBe(callable);
+		root.render(Scene, { order: ['a', 'b'], version: 0 });
+		const first = new Map(container.children.map((instance) => [instance.props.label, instance]));
+		const details = new Map(container.children.map((instance) => [instance, instance.children[0]]));
+		expect(container.children.map((instance) => instance.props.label)).toEqual(['a:0', 'b:0']);
+		expect(attachments).toEqual(['attach:a', 'attach:b']);
+		expect(refValues.get('a')).toBe(first.get('a:0'));
+		container.dispatchEvent(first.get('b:0')!, 'select', undefined);
+		expect(events).toEqual(['b:0']);
+
+		root.render(Scene, { order: ['b', 'a'], version: 1 });
+		expect(container.children).toEqual([first.get('b:0'), first.get('a:0')]);
+		expect(container.children.map((instance) => instance.props.label)).toEqual(['b:1', 'a:1']);
+		for (const instance of container.children) {
+			expect(instance.children[0]).toBe(details.get(instance));
+			expect(instance.children[0].props.label).toBe(`detail:${instance.props.label}`);
+		}
+		container.dispatchEvent(container.children[0], 'select', undefined);
+		expect(events).toEqual(['b:0', 'b:1']);
+		expect(updates).toEqual(['a:0', 'b:0', 'b:1', 'a:1']);
+
+		root.render(Scene, { order: ['b'], version: 2 });
+		expect(container.children).toEqual([first.get('b:0')]);
+		expect(refValues.get('a')).toBeNull();
+		expect(attachments).toEqual(['attach:a', 'attach:b', 'cleanup:b', 'attach:b', 'cleanup:a']);
+		root.unmount();
+		expect(refValues.get('b')).toBeNull();
+		expect(attachments).toEqual([
+			'attach:a',
+			'attach:b',
+			'cleanup:b',
+			'attach:b',
+			'cleanup:a',
+			'cleanup:b',
+		]);
+	});
+
+	it('preserves keyed host wrappers in compiler-proven compact leaf lists', () => {
+		const container = createObjectContainer();
+		const objectDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...objectDriver,
+			capabilities: { ...objectDriver.capabilities, compilerLeafProps: true },
+		});
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'wrapped',
+			propsSlot: 0,
+		});
+		const Wrapped = markUniversalHostComponent(
+			defineUniversalComponent<Record<string, unknown>>('object', (props) =>
+				universalValue(plan, [universalProps([['spread', props]])]),
+			),
+			'object',
+			plan,
+		);
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { items: readonly { id: string; value: number }[] }) =>
+				universalFor(
+					props.items,
+					(item) => item.id,
+					(item) => [item.value],
+					null,
+					true,
+					true,
+					Wrapped,
+					universalHostComponentLeafPlan('object', Wrapped, '["value"]'),
+					'["value"]',
+				),
+		);
+
+		root.render(Scene, {
+			items: [
+				{ id: 'a', value: 1 },
+				{ id: 'b', value: 2 },
+			],
+		});
+		const [first, second] = container.children;
+		root.render(Scene, {
+			items: [
+				{ id: 'b', value: 20 },
+				{ id: 'a', value: 10 },
+			],
+		});
+		expect(container.children).toEqual([second, first]);
+		expect(container.children.map((instance) => instance.props.value)).toEqual([20, 10]);
+		root.unmount();
+	});
+
+	it('rejects repeated mixed, unordered, NaN, signed-zero, and symbol keys in compact lists', () => {
+		const container = createObjectContainer();
+		const objectDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...objectDriver,
+			capabilities: { ...objectDriver.capabilities, compilerLeafProps: true },
+		});
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'keyed',
+			bindings: [['value', 0]],
+		});
+		type Key = string | number | symbol | bigint;
+		const Scene = defineUniversalComponent('object', (props: { keys: readonly Key[] }) =>
+			universalFor(
+				props.keys,
+				(key) => key,
+				(key) => [String(key)],
+				null,
+				true,
+				true,
+				undefined,
+				plan,
+			),
+		);
+		const shared = Symbol('shared');
+		root.render(Scene, { keys: [1, 2, 3] });
+		const committed = [...container.children];
+
+		for (const keys of [
+			[1, 2, 1],
+			[1, '1', 1],
+			[2, 1, 2],
+			[NaN, NaN],
+			[-0, 0],
+			[shared, shared],
+			[1n, 1n],
+		] as readonly Key[][]) {
+			expect(() => root.render(Scene, { keys })).toThrow(/Duplicate universal list key/);
+			expect(container.children).toEqual(committed);
+		}
+		root.unmount();
+	});
+
+	it('keeps ordinary stateful components live when a specialized host guard is unavailable', () => {
+		const container = createObjectContainer();
+		const objectDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...objectDriver,
+			capabilities: { ...objectDriver.capabilities, compilerLeafProps: true },
+		});
+		const plan = universalPlan('object', { kind: 'host', type: 'ordinary', propsSlot: 0 });
+		const forgedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'ordinary',
+			bindings: [['value', 0]],
+		});
+		const Ordinary = defineUniversalComponent<{ value: number }>('object', (props) => {
+			const [increment, setIncrement] = useState(0, 'increment');
+			return universalValue(plan, [
+				universalProps([
+					['set', 'value', props.value + increment],
+					['set', 'onSelect', () => setIncrement((value) => value + 1)],
+				]),
+			]);
+		});
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { items: readonly { id: string; value: number }[] }) =>
+				universalFor(
+					props.items,
+					(item) => item.id,
+					(item) => [item.value],
+					null,
+					true,
+					true,
+					Ordinary,
+					universalHostComponentLeafPlan('object', Ordinary, '["value"]') ?? forgedPlan,
+					'["value"]',
+				),
+		);
+
+		root.render(Scene, {
+			items: [
+				{ id: 'a', value: 1 },
+				{ id: 'b', value: 2 },
+			],
+		});
+		const [first, second] = container.children;
+		flushUniversalSync(() => container.dispatchEvent(second, 'select', undefined));
+		expect(second.props.value).toBe(3);
+		root.render(Scene, {
+			items: [
+				{ id: 'b', value: 20 },
+				{ id: 'a', value: 10 },
+			],
+		});
+		expect(container.children).toEqual([second, first]);
+		expect(container.children.map((instance) => instance.props.value)).toEqual([21, 10]);
+		const WrongArity = defineUniversalComponent('object', () =>
+			universalFor(
+				[0],
+				(value) => value,
+				() => [],
+				null,
+				true,
+				true,
+				Ordinary,
+				forgedPlan,
+				'["value"]',
+			),
+		);
+		expect(() => root.render(WrongArity, undefined)).toThrow(/signature and its values must match/);
+		expect(container.children).toEqual([second, first]);
+		root.unmount();
+	});
+
 	it('recreates a public instance under one logical ID and orders local callbacks, lifecycle, and refs', () => {
 		const container = createObjectContainer();
 		const baseDriver = createObjectDriver();

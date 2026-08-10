@@ -7,12 +7,14 @@
 import * as THREE from 'three';
 import {
 	defineUniversalComponent,
+	markUniversalHostComponent,
 	type UniversalComponent,
 	universalPlan,
 	universalProps,
 	universalValue,
 } from 'octane/universal';
 import type { EventHandlers } from './events.js';
+import { registerTrustedThreeConstructor } from './constructors.js';
 
 export const THREE_RENDERER_ID = 'three';
 
@@ -181,11 +183,23 @@ function toPascalCase(type: string): string {
 	return type.length === 0 ? type : `${type[0].toUpperCase()}${type.slice(1)}`;
 }
 
-/** Register the built-in Three namespace once, at driver creation time. */
+/** Register one compiler-selected built-in without replacing an authored extension. */
+export function registerThreeIntrinsic(name: string, Constructor: ConstructorRepresentation): void {
+	registerTrustedThreeConstructor(Constructor);
+	if (!Object.hasOwn(catalogue, name)) catalogue[name] = Constructor;
+}
+
+/** Register the complete Three namespace only for Canvas's compatibility surface. */
 export function registerThreeNamespace(): void {
 	if (namespaceRegistered) return;
 	namespaceRegistered = true;
-	Object.assign(catalogue, THREE);
+	for (const name of Object.keys(THREE)) {
+		const Constructor = (THREE as unknown as Catalogue)[name];
+		registerTrustedThreeConstructor(Constructor);
+		if (!Object.hasOwn(catalogue, name)) {
+			catalogue[name] = Constructor;
+		}
+	}
 }
 
 /** Resolve conflicting `threeLine`-style host names without shadowing explicit extensions. */
@@ -241,9 +255,6 @@ export function extend<T extends Catalogue>(objects: T): void;
 export function extend<T extends Catalogue | ConstructorRepresentation>(
 	objects: T,
 ): UniversalComponent<any> | void {
-	// Seed built-ins before user entries so an explicit extension can override a
-	// catalogue name deterministically, independent of driver creation order.
-	registerThreeNamespace();
 	if (typeof objects !== 'function') {
 		Object.assign(catalogue, objects);
 		return;
@@ -261,6 +272,7 @@ export function extend<T extends Catalogue | ConstructorRepresentation>(
 		(props) => universalValue(plan, [universalProps([['spread', props]])]),
 		{ module: '@octanejs/three' },
 	);
+	markUniversalHostComponent(component, THREE_RENDERER_ID, plan);
 	constructorComponents.set(objects, component);
 	return component as UniversalComponent<any>;
 }

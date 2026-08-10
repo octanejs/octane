@@ -9,6 +9,12 @@ import {
 	LiveReceiverCalculation,
 	resetIdentities,
 } from './_fixtures/auto-calculation.tsrx';
+import {
+	callTsxCallableProjection,
+	TsxDerivedIdentity,
+	TsxLiveReceiverCalculation,
+	TsxUnstablePrefixedHook,
+} from './_fixtures/tsx-auto-memo.tsx';
 
 // A derived `const` whose initializer reaches a render-time call is cached on
 // its component-local inputs. The observable contract is identity stability —
@@ -158,5 +164,62 @@ describe('auto-calculation — a member call on a live receiver is never cached'
 		r.click('#lr-tick');
 		expect(r.find('#lr-reading').textContent).not.toBe(second);
 		r.unmount();
+	});
+});
+
+describe('auto-calculation — React-style return components', () => {
+	it('preserves derived identity across unrelated updates and invalidates changed inputs', () => {
+		const root = mount(TsxDerivedIdentity);
+		const first = root.find('#tsx-derived-identity').textContent;
+		expect(root.find('#tsx-derived-values').textContent).toBe('r1:1');
+
+		root.click('#tsx-derived-tick');
+		expect(root.find('#tsx-derived-identity').textContent).toBe(first);
+
+		root.click('#tsx-derived-add');
+		const second = root.find('#tsx-derived-identity').textContent;
+		expect(second).not.toBe(first);
+		expect(root.find('#tsx-derived-values').textContent).toBe('r1:1,r2:2');
+
+		root.click('#tsx-derived-tick');
+		expect(root.find('#tsx-derived-identity').textContent).toBe(second);
+		root.unmount();
+	});
+
+	it('keeps a live method-backed calculation reactive', () => {
+		const root = mount(TsxLiveReceiverCalculation);
+		const first = root.find('#tsx-receiver-value').textContent;
+
+		root.click('#tsx-receiver-tick');
+		const second = root.find('#tsx-receiver-value').textContent;
+		expect(second).not.toBe(first);
+
+		root.click('#tsx-receiver-tick');
+		expect(root.find('#tsx-receiver-value').textContent).not.toBe(second);
+		root.unmount();
+	});
+
+	it('keeps an imported uppercase UNSTABLE_ custom hook live after a built-in hook', () => {
+		const root = mount(TsxUnstablePrefixedHook);
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('0');
+
+		root.click('#tsx-unstable-hook-increment');
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('1');
+
+		root.click('#tsx-unstable-hook-tick');
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('1');
+
+		root.click('#tsx-unstable-hook-increment');
+		expect(root.find('#tsx-unstable-hook-value').textContent).toBe('2');
+		root.unmount();
+	});
+
+	it('keeps hookless return components callable outside a render scope', () => {
+		const rows = [{ id: 1, n: 1 }];
+		expect(() => callTsxCallableProjection({ rows })).not.toThrow();
+
+		const root = mount(callTsxCallableProjection, { rows });
+		expect(root.find('#tsx-callable-values').textContent).toBe('r1:1');
+		root.unmount();
 	});
 });

@@ -1,5 +1,11 @@
 # @octanejs/cli
 
+## 0.0.7
+
+### Patch Changes
+
+- d275405: Generate disposable SPA application roots in the form recognized by Octane's production compiler, reducing scaffolded application bundle size without changing reusable root behavior.
+
 ## 0.0.6
 
 ### Patch Changes

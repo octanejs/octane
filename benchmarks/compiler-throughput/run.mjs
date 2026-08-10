@@ -2,6 +2,8 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { transformSync } from '@babel/core';
+import reactCompilerPlugin from 'babel-plugin-react-compiler';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -60,7 +62,27 @@ async function compilerFor(target) {
 		return (source, filename) =>
 			compileOctane(source, filename, { mode: 'client', hmr: false, dev: false }).code;
 	}
-	if (target === 'react' || target === 'preact') {
+	if (target === 'react') {
+		return async (source, filename) => {
+			const compiled = transformSync(source, {
+				babelrc: false,
+				configFile: false,
+				filename,
+				parserOpts: { plugins: ['jsx'] },
+				plugins: [reactCompilerPlugin],
+			});
+			if (!compiled?.code) throw new Error('React Compiler emitted no JavaScript');
+			return (
+				await transformWithEsbuild(compiled.code, filename, {
+					loader: 'jsx',
+					jsx: 'automatic',
+					jsxImportSource: target,
+					minify: false,
+				})
+			).code;
+		};
+	}
+	if (target === 'preact') {
 		return async (source, filename) =>
 			(
 				await transformWithEsbuild(source, filename, {
@@ -83,7 +105,8 @@ async function compilerFor(target) {
 			}).code;
 	}
 	if (target === 'svelte') {
-		const { compile } = await loadFromTarget(target, 'svelte/compiler');
+		const compiler = await loadFromTarget(target, 'svelte/compiler');
+		const { compile } = compiler.default ?? compiler;
 		return (source, filename) =>
 			compile(source, { filename, generate: 'client', dev: false }).js.code;
 	}

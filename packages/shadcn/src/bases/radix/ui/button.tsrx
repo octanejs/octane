@@ -43,7 +43,7 @@ export const buttonVariants = cva(
 export interface ButtonProps extends HostProps<'button'> {
 	variant?: VariantProps<typeof buttonVariants>['variant'];
 	size?: VariantProps<typeof buttonVariants>['size'];
-	// OCTANE DIVERGENCE: asChild composes element descriptors (createElement),
+	// Octane divergence (shadcn-aschild-descriptors): asChild composes element descriptors (createElement),
 	// not opaque compiled .tsrx children — the documented radix Slot contract.
 	asChild?: boolean;
 }

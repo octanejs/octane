@@ -1,8 +1,9 @@
 {
   "name": "@octanejs/usehooks-ts",
-  "version": "0.0.9",
+  "version": "0.0.14",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "octane": {
     "hookSlots": {
       "manual": [
@@ -34,7 +35,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --config vitest.config.js --project usehooks-ts --project usehooks-ts-ssr",
+    "test": "vitest run --root ../.. --config vitest.config.js --project usehooks-ts --project usehooks-ts-differential --project usehooks-ts-ssr",
     "typecheck": "tsrx-tsc --noEmit"
   },
   "dependencies": {
@@ -44,9 +45,11 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@tsrx/react": "catalog:default",
     "@types/lodash.debounce": "4.0.9",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",

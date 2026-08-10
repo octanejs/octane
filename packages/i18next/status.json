@@ -8,5 +8,11 @@
     "The React/Babel-specific `icu.macro` subpath is not shipped; the runtime IcuTrans APIs are fully supported."
   ],
   "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
-  "verified": "2026-07-13"
+  "provenance": {
+    "source": "https://github.com/i18next/react-i18next/tree/8b4a9ea139b73309471737e5ba9c423f82d5c0cc",
+    "license": "MIT",
+    "commit": "8b4a9ea139b73309471737e5ba9c423f82d5c0cc",
+    "verification": "recorded-unverified"
+  },
+  "verified": "2026-08-02"
 }

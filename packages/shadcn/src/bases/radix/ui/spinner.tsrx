@@ -1,7 +1,7 @@
 // Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
 // apps/v4/registry/bases/radix/ui/spinner.tsx.
 //
-// OCTANE DIVERGENCE: upstream's IconPlaceholder (the CLI-resolved iconLibrary
+// Octane divergence (shadcn-icon-resolution): upstream's IconPlaceholder (the CLI-resolved iconLibrary
 // axis) is resolved at port time to the default library, lucide, via
 // @octanejs/lucide. Other icon libraries are a registry-emit concern.
 import { Loader2Icon } from '@octanejs/lucide';

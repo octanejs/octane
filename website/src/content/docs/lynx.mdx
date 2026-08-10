@@ -1,0 +1,204 @@
+---
+title: Native apps with Lynx
+---
+
+import { Go } from '../../components/go/Go.tsrx';
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Early access</p>
+	<h1>Native apps with Lynx</h1>
+	<p className="doc-lede">
+		{
+			'Build with familiar Octane components, then render them with native views on iOS and Android. The examples below use that same code and run here in the browser with Lynx for Web.'
+		}
+	</p>
+</div>
+
+<h2 id="what-lynx-is">How Lynx and Octane work together</h2>
+
+[Lynx](https://lynxjs.org) is an open-source UI renderer from ByteDance and is used in
+TikTok. It runs application code across multiple threads and renders with native views
+on iOS, Android and HarmonyOS. Lynx for Web can run the same bundle in a browser.
+
+Octane provides the programming model. `@octanejs/lynx` connects Octane to Lynx, so you
+can keep using components, hooks, context, Suspense and transitions. The compiler
+targets Lynx’s element API instead of the DOM, with no virtual DOM in between.
+
+<h2 id="gallery">Image gallery with a main-thread scrollbar</h2>
+
+This example brings Lynx’s
+[Product Gallery tutorial](https://lynxjs.org/4.0/learn/gallery.html) to Octane. It
+combines a two-column image gallery with a like button on every card and a custom
+scrollbar. Each like button keeps its own state, and Lynx reuses off-screen list items
+instead of rendering every card at once.
+
+The gallery scrolls automatically and reverses direction when it reaches the top or
+bottom. The custom scrollbar follows that movement on the main thread, keeping it in
+sync frame by frame. Open the Device tab to run the same example on a phone.
+
+<Hydrate when={visible({ rootMargin: '400px' })}>
+	<Go example="gallery" label="Two-column waterfall gallery running on Lynx for Web" />
+</Hydrate>
+
+The component looks much like an Octane component for the web. `@for` renders the cards,
+`@if` changes the heart icon when a card is liked, and a regular function keeps the
+scrollbar moving on the main thread:
+
+```tsrx
+export function Gallery({ pictureData }: { pictureData: Picture[] }) @{
+	const scrollbarMTSRef = useMainThreadRef<object>();
+	const galleryMTSRef = useMainThreadRef<object>();
+	const galleryRef = useRef<LynxPublicHandle | null>(null);
+
+	const onScrollMTS = (event: { detail: GalleryScrollDetail }) => {
+		'main thread';
+		const scrollbar = scrollbarMTSRef.current;
+		const gallery = galleryMTSRef.current;
+		if (!scrollbar || !gallery) return;
+
+		const listHeight = SystemInfo.pixelHeight / SystemInfo.pixelRatio - 48;
+		const scrollbarTop = listHeight * (event.detail.scrollTop / event.detail.scrollHeight);
+		__AddInlineStyle(scrollbar, 'top', scrollbarTop + 'px');
+		__FlushElementTree();
+
+		const atBottom = event.detail.scrollTop + listHeight >= event.detail.scrollHeight;
+		if (event.detail.deltaY > 0 && atBottom) {
+			__InvokeUIMethod(
+				gallery,
+				'autoScroll',
+				{ rate: '-60', start: true, autoStop: true },
+				() => {},
+			);
+		} else if (event.detail.deltaY < 0 && event.detail.scrollTop <= 0) {
+			__InvokeUIMethod(
+				gallery,
+				'autoScroll',
+				{ rate: '60', start: true, autoStop: true },
+				() => {},
+			);
+		}
+	};
+
+	useEffect(() => {
+		void galleryRef.current?.invoke('autoScroll', {
+			rate: '60',
+			start: true,
+			autoStop: true,
+		});
+	}, []);
+
+	<list
+		ref={galleryRef}
+		main-thread:ref={galleryMTSRef}
+		list-type="waterfall"
+		span-count={2}
+		main-thread:bindscroll={onScrollMTS}
+	>
+		@for (const picture of pictureData; key picture.id) {
+			<list-item item-key={picture.id}>
+				<LikeImageCard picture={picture} />
+			</list-item>
+		}
+	</list>
+}
+```
+
+<h2 id="swiper">Product carousel animated on the main thread</h2>
+
+This example brings Lynx’s
+[Product Detail tutorial](https://lynxjs.org/4.0/learn/product-detail.html) to Octane.
+Drag tracking and the release and snap animations run on the main thread, so they do not
+have to wait for the background thread. The background thread keeps track of the current
+image and updates the indicator below the carousel.
+
+The browser preview moves through all eight images automatically, then changes direction
+at each end. The panel opens `preview.json`, where that sequence is defined.
+
+<Hydrate when={visible({ rootMargin: '400px' })}>
+	<Go
+		example="swiper"
+		file="preview.json"
+		label="Product detail carousel running on Lynx for Web"
+	/>
+</Hydrate>
+
+<aside className="doc-callout note">
+	<p className="doc-callout-title">Why the preview swipes by itself</p>
+	<p>
+		{
+			'The carousel listens for touch events, so a desktop mouse cannot drag it. The browser preview sends the same gestures a touchscreen would and shows the contact point on screen. The carousel still handles the drag, release and snap animation itself. On a touchscreen, or in Lynx Explorer through the Device tab, touching the preview stops the automatic sequence and gives you control.'
+		}
+	</p>
+</aside>
+
+<h2 id="two-threads">Two threads, one component tree</h2>
+
+Lynx uses two JavaScript environments. The main thread controls the native element tree
+and the work that must happen within a frame. The background thread handles state,
+effects, refs and most application logic. Octane compiles one component for both
+environments; you mark only the parts that need to run on the main thread:
+
+```tsrx
+const onTouchMove = (event: MainThread.TouchEvent) => {
+	'main thread';
+	// Runs on the frame that produced the touch.
+};
+```
+
+The rest of the component can use `useState`, `useEffect`, context, Suspense and
+`<Activity>` just as it does on the web. These APIs run on the background thread without
+changing how you write the component. Octane’s usual
+[differences from React](/docs/differences-from-react) still apply; Lynx does not add
+another component syntax.
+
+<h2 id="run-it">Run it yourself</h2>
+
+`@octanejs/lynx` and `@octanejs/rspeedy-plugin` are not published yet. For now, run the
+examples from a clone of the repository:
+
+```bash
+git clone https://github.com/octanejs/octane.git
+cd octane && pnpm install
+pnpm --filter @octanejs/rspeedy-plugin exec rspeedy dev --root examples/gallery --environment lynx
+```
+
+Install [Lynx Explorer](https://lynx.dev/guide/start/quick-start) on a phone or simulator,
+then scan the QR code printed by the development server. Lynx Explorer loads the bundle
+and runs it with the native engine, so you can test the example on a device.
+
+An Octane application for Lynx uses a standard Rspeedy configuration with the Octane
+plugin:
+
+```js
+// lynx.config.mjs
+import { defineConfig } from '@lynx-js/rspeedy';
+import { pluginOctane } from '@octanejs/rspeedy-plugin';
+
+export default defineConfig({
+	environments: { lynx: {}, web: {} },
+	source: { entry: { main: './src/index.ts' } },
+	plugins: [pluginOctane()],
+});
+```
+
+`environments.lynx` creates the native bundle for Lynx Explorer. `environments.web`
+creates the Lynx-for-Web bundle used by the previews on this page. Keeping both lets you
+test the same screen on a device and share it in a browser.
+
+<h2 id="status">Current status</h2>
+
+<aside className="doc-callout important">
+	<p className="doc-callout-title">Octane support for Lynx is in early access</p>
+	<p>
+		{
+			'The renderer, compiler directives and Rspeedy integration are working and covered by tests, and the previews above run real Lynx-for-Web bundles. Native support still needs broader testing across iOS and Android. Work also remains on how native lists are created, portals, Native Modules and reloads. Do not use this for a production app yet.'
+		}
+	</p>
+</aside>
+
+For current support details and known gaps, see
+[`packages/lynx/status.json`](https://github.com/octanejs/octane/blob/main/packages/lynx/status.json).
+Each example README also records what has been tested on a device. If you would like to
+help, start with the [open pull requests](https://github.com/octanejs/octane/pulls).

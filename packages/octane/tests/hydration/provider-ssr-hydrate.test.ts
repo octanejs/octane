@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync } from '../../src/index.js';
+import {
+	createElement,
+	flushSync,
+	hydrateRoot,
+	useContext as useClientContext,
+} from '../../src/index.js';
+import { createContext as createNativeContext } from '../../src/universal-native.js';
 import * as ServerRT from 'octane/server';
 import { App } from '../_fixtures/ssr-provider.tsx';
 import { ProviderApp } from '../_fixtures/jsx-context-children.tsx';
@@ -53,6 +59,47 @@ describe('hydration — .tsx <Context.Provider> descriptor children', () => {
 		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
 		expect(after.countedPairs).toBeGreaterThanOrEqual(1);
 		root.unmount();
+	});
+
+	it('renders a renderer-local provider on the server and hydrates the same context identity', () => {
+		const Theme = createNativeContext('default');
+		const ServerReader = () =>
+			ServerRT.createElement(
+				'span',
+				{ className: 'renderer-local-provider' },
+				ServerRT.useContext(Theme as any),
+			);
+		const ServerProvider = () =>
+			ServerRT.createElement(
+				Theme.Provider as any,
+				{ value: 'server-provided' },
+				ServerRT.createElement(ServerReader as any, null),
+			);
+		const { html } = ServerRT.renderToString(ServerProvider);
+		expect(html).toContain('server-provided');
+		container.innerHTML = html;
+		const adopted = container.querySelector('.renderer-local-provider');
+
+		const ClientReader = () =>
+			createElement(
+				'span',
+				{ className: 'renderer-local-provider' },
+				useClientContext(Theme as any),
+			);
+		const ClientProvider = () =>
+			createElement(
+				Theme.Provider as any,
+				{ value: 'server-provided' },
+				createElement(ClientReader, null),
+			);
+		const root = hydrateRoot(container, ClientProvider as any);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('.renderer-local-provider')).toBe(adopted);
+			expect(adopted?.textContent).toBe('server-provided');
+		} finally {
+			root.unmount();
+		}
 	});
 
 	// A de-opt HOST element whose children are COMPONENTS (`<div><Comp/><Comp/></div>`

@@ -1,19 +1,18 @@
 /**
  * Differential parity: the SAME `.tsrx` fixture runs through @octanejs/shadcn
- * (octane) AND a vendored React reference (the setup rewrites
+ * (octane) AND a React reference rewritten from
  * `@octanejs/shadcn` → the precompiled upstream barrel and `octane` →
- * `react`). octane's `mountDifferential` mounts both, drives identical events,
+ * `react`. octane's `mountDifferential` mounts both, drives identical events,
  * and asserts byte-identical innerHTML after each step (useId/radix-id tokens
  * canonicalised — see the rig).
  *
- * WHAT EACH FIXTURE PROVES — the references differ in provenance:
- *   - dialog, dropdown-menu, tabs: vendored byte-identical from the pinned
- *     upstream sources, so these prove UPSTREAM FIDELITY (octane renders what
- *     upstream shadcn renders on React).
- *   - button, badge: the reference was hand-authored to carry the same
- *     maintainer-supplied class strings the port ships, since no upstream file
- *     has that flavor. These prove RUNTIME EQUIVALENCE (octane and React agree
- *     given identical source), NOT upstream fidelity.
+ * ORACLE LINEAGE — each React reference cites a pinned upstream source at
+ * shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 under
+ * apps/v4/registry/bases/radix/ui/. dialog/dropdown-menu keep import-path-only
+ * transforms; badge/button/tabs document port-selected class-hook adaptations
+ * plus local icon-placeholder resolution. The local React files are not
+ * themselves the pinned oracle; they are lineage evidence for same-fixture
+ * runtime equivalence under those cited transforms.
  *
  * Portal'd content (dialog content/overlay, dropdown menu content) lands on
  * document.body on BOTH runtimes, so — exactly like radix's parity suite — the
@@ -25,6 +24,8 @@
  */
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { resolve } from 'node:path';
+import { act as reactAct } from 'react';
+import { drainPassiveEffects as octaneDrainEffects } from 'octane';
 import { mountDifferential, type DiffMount } from '../../../octane/tests/differential/_rig.js';
 
 const fixture = (name: string): string =>
@@ -33,10 +34,29 @@ const fixture = (name: string): string =>
 // _setup.ts) so the React side resolves react/radix-ui/lucide-react from here.
 const CACHE = resolve(__dirname, '.react-cache');
 
-// Let queued timers/rAF fire on BOTH sides between interactions (radix arms
-// mount-time timers — e.g. the delayed pointerdown-outside listener attach —
-// that need a real macrotask turn under jsdom).
-const settleRaf = (): Promise<void> => new Promise((res) => setTimeout(res, 40));
+async function waitForBoth(
+	octane: DiffMount,
+	react: DiffMount,
+	description: string,
+	predicate: (mount: DiffMount) => boolean,
+): Promise<void> {
+	for (let attempt = 0; attempt < 100; attempt++) {
+		octaneDrainEffects();
+		await reactAct(async () => {
+			await new Promise((resolvePromise) => setTimeout(resolvePromise, 5));
+		});
+		if (predicate(octane) && predicate(react)) return;
+	}
+	throw new Error(
+		`${description} did not settle: ${JSON.stringify({
+			octane: octane.container.innerHTML,
+			react: react.container.innerHTML,
+		})}`,
+	);
+}
+
+const textIs = (selector: string, text: string) => (mount: DiffMount) =>
+	mount.container.querySelector(selector)?.textContent === text;
 
 // Real Radix's useSize constructs ResizeObserver unguarded (jsdom has none).
 // A no-op stub keeps sizes at the initial report, identical on both sides.
@@ -94,27 +114,32 @@ const clickEl = (el: HTMLElement): void => {
 	el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 };
 
-describe('differential: @octanejs/shadcn vs upstream shadcn on React', () => {
+describe('differential: @octanejs/shadcn vs curated shadcn references on React', () => {
+	// @parity-case differential:shadcn-badge-runtime
 	it('Badge: variants + className merge + asChild anchor, byte-identical', async () => {
 		const d = await mountDifferential(fixture('badge'), 'BadgeGallery', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
-	});
+	}, 90_000);
 
+	// @parity-case differential:shadcn-button-runtime
 	it('Button: variants/sizes/disabled + asChild anchor + onClick wiring, byte-identical', async () => {
 		const d = await mountDifferential(fixture('button'), 'ButtonApp', undefined, CACHE);
 		await d.step('mount', () => {});
-		await d.step('click increments', async (i, r) => {
+		await d.step('click increments to one', async (i, r) => {
 			await i.click('#btn');
 			await r.click('#btn');
+			await waitForBoth(i, r, 'button first click', textIs('#btn', 'count:1'));
 		});
-		await d.step('click again', async (i, r) => {
+		await d.step('click increments to two', async (i, r) => {
 			await i.click('#btn');
 			await r.click('#btn');
+			await waitForBoth(i, r, 'button second click', textIs('#btn', 'count:2'));
 		});
 		d.unmount();
-	});
+	}, 90_000);
 
+	// @parity-case differential:shadcn-tabs-upstream
 	it('Tabs: switch panels via trigger mousedown, byte-identical', async () => {
 		const d = await mountDifferential(fixture('tabs'), 'TabsApp', undefined, CACHE);
 		await d.step('mount (one active)', () => {});
@@ -126,19 +151,33 @@ describe('differential: @octanejs/shadcn vs upstream shadcn on React', () => {
 			);
 		};
 		await d.step('activate two', async (i, r) => {
-			await settleRaf();
 			mousedown(i.container, 't2');
 			mousedown(r.container, 't2');
-			await settleRaf();
+			await waitForBoth(
+				i,
+				r,
+				'tab two activation',
+				(mount) =>
+					mount.find('#t2').getAttribute('aria-selected') === 'true' &&
+					mount.container.textContent?.includes('second-panel') === true,
+			);
 		});
 		await d.step('back to one', async (i, r) => {
 			mousedown(i.container, 't1');
 			mousedown(r.container, 't1');
-			await settleRaf();
+			await waitForBoth(
+				i,
+				r,
+				'tab one activation',
+				(mount) =>
+					mount.find('#t1').getAttribute('aria-selected') === 'true' &&
+					mount.container.textContent?.includes('first-panel') === true,
+			);
 		});
 		d.unmount();
-	});
+	}, 90_000);
 
+	// @parity-case differential:shadcn-dialog-upstream
 	it('Dialog (non-modal): trigger ARIA + open-state text across open/close, byte-identical', async () => {
 		// Content (overlay + panel + close button) portals to document.body on
 		// both runtimes, so the container compare covers the trigger's
@@ -148,26 +187,31 @@ describe('differential: @octanejs/shadcn vs upstream shadcn on React', () => {
 		const d = await mountDifferential(fixture('dialog'), 'DialogApp', undefined, CACHE);
 		await d.step('mount (closed)', () => {});
 		await d.step('open', async (i, r) => {
-			await settleRaf();
 			await i.click('#dt');
 			await r.click('#dt');
+			await waitForBoth(i, r, 'dialog open', textIs('#dlg-state', 'dialog:open'));
 		});
 		await d.step('close (trigger toggle)', async (i, r) => {
-			await settleRaf();
 			await i.click('#dt');
 			await r.click('#dt');
+			await waitForBoth(i, r, 'dialog close', textIs('#dlg-state', 'dialog:closed'));
 		});
 		d.unmount();
-	});
+	}, 90_000);
 
+	// @parity-case differential:shadcn-dropdown-upstream
 	it('DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item — byte-identical', async () => {
 		const d = await mountDifferential(fixture('dropdown-menu'), 'DropdownApp', undefined, CACHE);
 		await d.step('mount (closed)', () => {});
 		await d.step('open', async (i, r) => {
-			await settleRaf();
 			pointerdown(i.container, 'mt');
 			pointerdown(r.container, 'mt');
-			await settleRaf();
+			await waitForBoth(
+				i,
+				r,
+				'dropdown open',
+				(mount) => mount.find('#mt').getAttribute('aria-expanded') === 'true',
+			);
 		});
 		// Toggling the checkbox item routes through onCheckedChange AND closes the
 		// menu (radix select default) — both observable in the container bytes via
@@ -175,18 +219,33 @@ describe('differential: @octanejs/shadcn vs upstream shadcn on React', () => {
 		await d.step('toggle checkbox item (selects + closes)', async (i, r) => {
 			clickEl(portalItem(i, 'mt', 'mi-check'));
 			clickEl(portalItem(r, 'mt', 'mi-check'));
-			await settleRaf();
+			await waitForBoth(
+				i,
+				r,
+				'dropdown checkbox outcome',
+				textIs('#dd-state', 'checked:true last:none'),
+			);
 		});
 		await d.step('reopen (checkbox now checked)', async (i, r) => {
 			pointerdown(i.container, 'mt');
 			pointerdown(r.container, 'mt');
-			await settleRaf();
+			await waitForBoth(
+				i,
+				r,
+				'dropdown reopen',
+				(mount) => mount.find('#mt').getAttribute('aria-expanded') === 'true',
+			);
 		});
 		await d.step('select Copy (records + closes)', async (i, r) => {
 			clickEl(portalItem(i, 'mt', 'mi-copy'));
 			clickEl(portalItem(r, 'mt', 'mi-copy'));
-			await settleRaf();
+			await waitForBoth(
+				i,
+				r,
+				'dropdown select outcome',
+				textIs('#dd-state', 'checked:true last:copy'),
+			);
 		});
 		d.unmount();
-	});
+	}, 90_000);
 });

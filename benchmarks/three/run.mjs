@@ -16,6 +16,7 @@ const OPS = [
 	'reorder_1k',
 	'unmount_tree_1k',
 	'reconstruct_dispose_1k',
+	'reconstruct_component_dispose_1k',
 	'frame_1k_subscribers',
 	'raycast_event',
 ];
@@ -39,7 +40,7 @@ function verify(op, value) {
 		gate(value.retained === MESH_COUNT, `${op} retained=${value.retained}`);
 	} else if (op === 'unmount_tree_1k') {
 		gate(value.childCount === 0, `${op} children=${value.childCount}`);
-	} else if (op === 'reconstruct_dispose_1k') {
+	} else if (op === 'reconstruct_dispose_1k' || op === 'reconstruct_component_dispose_1k') {
 		gate(value.childCount === MESH_COUNT, `${op} children=${value.childCount}`);
 		gate(value.versionSum === MESH_COUNT, `${op} version sum=${value.versionSum}`);
 		gate(value.retained === 0, `${op} retained=${value.retained}`);
@@ -47,6 +48,7 @@ function verify(op, value) {
 	} else if (op === 'frame_1k_subscribers') {
 		gate(value.childCount === FRAME_COUNT, `${op} children=${value.childCount}`);
 		gate(value.frameCalls === FRAME_COUNT * FRAME_REPS, `${op} calls=${value.frameCalls}`);
+		gate(value.frameRenderCalls === FRAME_REPS, `${op} renders=${value.frameRenderCalls}`);
 		gate(
 			value.frameChecksum === ((FRAME_COUNT * (FRAME_COUNT + 1)) / 2) * FRAME_REPS,
 			`${op} checksum=${value.frameChecksum}`,
@@ -71,6 +73,10 @@ async function runTarget(browser, target) {
 	page.on('pageerror', (error) => errors.push(`pageerror: ${String(error)}`));
 	await page.goto(target.url, { waitUntil: 'load' });
 	await page.waitForFunction(() => globalThis.__threeBench?.ready === true);
+	gate(
+		await page.evaluate(() => globalThis.crossOriginIsolated),
+		`${target.name} requires cross-origin isolation for high-resolution timing`,
+	);
 	const results = {};
 	const checksums = {};
 	for (const op of OPS) {
@@ -84,7 +90,9 @@ async function runTarget(browser, target) {
 				const api = globalThis.__threeBench;
 				const started = performance.now();
 				await api.run(operation);
-				return { duration: performance.now() - started, snapshot: api.snapshot() };
+				const duration = performance.now() - started;
+				await api.settle?.(operation);
+				return { duration, snapshot: api.snapshot() };
 			}, op);
 			if (op === 'frame_1k_subscribers') sample.duration /= FRAME_REPS;
 			if (op === 'raycast_event') sample.duration /= EVENT_REPS;
@@ -133,7 +141,7 @@ if (process.env.BENCH_JSON) {
 }
 
 if (!failed) {
-	const width = 24;
+	const width = Math.max('operation'.length, ...OPS.map((operation) => operation.length));
 	console.log(
 		`\n${'operation'.padEnd(width)} ${TARGETS.map((target) => target.name.padStart(16)).join(' ')}`,
 	);

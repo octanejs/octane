@@ -13,6 +13,8 @@ import { expect, it } from 'vitest';
 import { pluginOctane } from '../../src/index.js';
 
 const DEMO_ROOT = resolve(import.meta.dirname, '../../examples/demo');
+const GALLERY_ROOT = resolve(import.meta.dirname, '../../examples/gallery');
+const MAIN_THREAD_FLUSH_ROOT = resolve(import.meta.dirname, '../_fixtures/main-thread-flush');
 const WEB_CORE_ROOT = resolve(
 	dirname(fileURLToPath(import.meta.resolve('@lynx-js/web-core/package.json'))),
 	'dist/client_prod',
@@ -59,6 +61,7 @@ async function startHost(bundlePath: string): Promise<{
 	url: string;
 	close: () => Promise<void>;
 }> {
+	const bundleRoot = dirname(bundlePath);
 	const server = createServer(async (request, response) => {
 		try {
 			const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
@@ -71,10 +74,15 @@ async function startHost(bundlePath: string): Promise<{
 			const file =
 				pathname === '/main.web.bundle'
 					? bundlePath
-					: pathname.startsWith('/static/')
-						? resolve(WEB_CORE_ROOT, pathname.slice(1))
-						: undefined;
-			if (file === undefined || (file !== bundlePath && !isWithin(WEB_CORE_ROOT, file))) {
+					: pathname.startsWith('/static/image/')
+						? resolve(bundleRoot, pathname.slice(1))
+						: pathname.startsWith('/static/')
+							? resolve(WEB_CORE_ROOT, pathname.slice(1))
+							: undefined;
+			if (
+				file === undefined ||
+				(file !== bundlePath && !isWithin(WEB_CORE_ROOT, file) && !isWithin(bundleRoot, file))
+			) {
 				response.writeHead(404).end('Not found');
 				return;
 			}
@@ -111,64 +119,77 @@ async function startHost(bundlePath: string): Promise<{
 	};
 }
 
-it('mounts the demo through Lynx for Web and handles a native tap', async () => {
-	const temporaryRoot = await mkdtemp(resolve(tmpdir(), 'octane-lynx-web-host-'));
+async function buildWebBundle(cwd: string, outputRoot: string): Promise<void> {
+	const rspeedy = await createRspeedy({
+		cwd,
+		loadEnv: false,
+		environment: ['web'],
+		rspeedyConfig: {
+			mode: 'production',
+			environments: { web: {} },
+			dev: { hmr: false, liveReload: false },
+			output: {
+				cleanDistPath: true,
+				distPath: { root: outputRoot },
+				filenameHash: false,
+				sourceMap: false,
+			},
+			source: { entry: { main: './src/index.ts' } },
+			splitChunks: false,
+			plugins: [pluginOctane({ dev: false, hmr: false })],
+		},
+	});
+	let build: Awaited<ReturnType<typeof rspeedy.build>> | undefined;
+	try {
+		build = await rspeedy.build();
+	} finally {
+		await build?.close();
+	}
+}
+
+async function launchChromium(): Promise<Awaited<ReturnType<typeof chromium.launch>>> {
+	try {
+		return await chromium.launch({ headless: true });
+	} catch (error) {
+		throw new Error(
+			'Chromium is required for the Lynx Web host smoke test ' +
+				'(run `pnpm --filter @octanejs/rspeedy-plugin exec playwright install chromium`): ' +
+				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+		);
+	}
+}
+
+/**
+ * Build a fixture, serve it to a real Chromium against `@lynx-js/web-core`, and
+ * run `visit` against the mounted page. Mounting a Lynx bundle must never fault
+ * the host, so both error channels are asserted empty on the way out for every
+ * caller rather than being restated per test.
+ */
+async function withWebHostPage(
+	fixtureRoot: string,
+	prefix: string,
+	visit: (
+		page: Awaited<ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>>,
+	) => Promise<void>,
+): Promise<void> {
+	const temporaryRoot = await mkdtemp(resolve(tmpdir(), prefix));
 	const outputRoot = resolve(temporaryRoot, 'dist');
 	let host: Awaited<ReturnType<typeof startHost>> | undefined;
 	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 
 	try {
-		const rspeedy = await createRspeedy({
-			cwd: DEMO_ROOT,
-			loadEnv: false,
-			environment: ['web'],
-			rspeedyConfig: {
-				mode: 'production',
-				environments: { web: {} },
-				dev: { hmr: false, liveReload: false },
-				output: {
-					cleanDistPath: true,
-					distPath: { root: outputRoot },
-					filenameHash: false,
-					sourceMap: false,
-				},
-				source: { entry: { main: './src/index.ts' } },
-				splitChunks: false,
-				plugins: [pluginOctane({ dev: false, hmr: false })],
-			},
-		});
-		let build: Awaited<ReturnType<typeof rspeedy.build>> | undefined;
-		try {
-			build = await rspeedy.build();
-		} finally {
-			await build?.close();
-		}
+		await buildWebBundle(fixtureRoot, outputRoot);
 
 		host = await startHost(resolve(outputRoot, 'main.web.bundle'));
-		try {
-			browser = await chromium.launch({ headless: true });
-		} catch (error) {
-			throw new Error(
-				'Chromium is required for the Lynx Web host smoke test ' +
-					'(run `pnpm --filter @octanejs/rspeedy-plugin exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		browser = await launchChromium();
 		const page = await browser.newPage();
 		page.setDefaultTimeout(30_000);
 		const pageErrors: string[] = [];
 		page.on('pageerror', (error) => pageErrors.push(error.message));
 
 		await page.goto(host.url, { waitUntil: 'domcontentloaded' });
-		const initialCount = page.getByText('Count 0', { exact: true });
-		await initialCount.waitFor({ state: 'visible' });
-		expect(await initialCount.count()).toBe(1);
-		expect(await page.locator('lynx-view *').count()).toBeGreaterThan(0);
+		await visit(page);
 
-		await page.getByText('Tap to increment', { exact: true }).click();
-		const updatedCount = page.getByText('Count 1', { exact: true });
-		await updatedCount.waitFor({ state: 'visible' });
-		expect(await updatedCount.count()).toBe(1);
 		expect(pageErrors).toEqual([]);
 		expect(
 			await page.evaluate<string[]>(
@@ -180,4 +201,68 @@ it('mounts the demo through Lynx for Web and handles a native tap', async () => 
 		await host?.close();
 		await rm(temporaryRoot, { recursive: true, force: true });
 	}
+}
+
+it('mounts the demo through Lynx for Web and handles a native tap', async () => {
+	await withWebHostPage(DEMO_ROOT, 'octane-lynx-web-host-', async (page) => {
+		const initialCount = page.getByText('Count 0', { exact: true });
+		await initialCount.waitFor({ state: 'visible' });
+		expect(await initialCount.count()).toBe(1);
+		expect(await page.locator('lynx-view *').count()).toBeGreaterThan(0);
+
+		await page.getByText('Tap to increment', { exact: true }).click();
+		const updatedCount = page.getByText('Count 1', { exact: true });
+		await updatedCount.waitFor({ state: 'visible' });
+		expect(await updatedCount.count()).toBe(1);
+	});
+}, 90_000);
+
+it('reverses gallery auto-scroll at the bottom and top edges', async () => {
+	await withWebHostPage(GALLERY_ROOT, 'octane-lynx-web-gallery-', async (page) => {
+		const list = page.locator('lynx-view').locator('x-list.list');
+		await list.waitFor({ state: 'attached' });
+		const scrollTop = () => list.evaluate((element) => element.scrollTop);
+		const initialPosition = await scrollTop();
+		await expect.poll(scrollTop, { timeout: 5_000 }).toBeGreaterThan(initialPosition + 10);
+
+		// The production rate is deliberately slow. Move close to each edge so the
+		// native scroller still crosses and reverses there without a minutes-long test.
+		const nearBottom = await list.evaluate((element) => {
+			element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight - 40);
+			return element.scrollTop;
+		});
+		await expect.poll(scrollTop).toBeGreaterThan(nearBottom + 10);
+		const lowerEdge = await scrollTop();
+		await expect.poll(scrollTop, { timeout: 5_000 }).toBeLessThan(lowerEdge - 10);
+
+		const nearTop = await list.evaluate((element) => {
+			element.scrollTop = 40;
+			return element.scrollTop;
+		});
+		await expect.poll(scrollTop).toBeLessThan(nearTop - 10);
+		const upperEdge = await scrollTop();
+		await expect.poll(scrollTop, { timeout: 5_000 }).toBeGreaterThan(upperEdge + 10);
+	});
+}, 90_000);
+
+// Lynx for Web calls a `'main thread'` handler from inside its own wasm element
+// context, which then refuses the `__FlushElementTree()` that the documented
+// main-thread scripting pattern ends with. Every refusal used to escape the
+// handler as an uncaught page error — one per event, so a handler bound to a
+// per-frame event flooded the console for as long as the page lived.
+it('publishes a main-thread handler flush without faulting the Web host', async () => {
+	await withWebHostPage(MAIN_THREAD_FLUSH_ROOT, 'octane-lynx-web-flush-', async (page) => {
+		const probe = page.getByText('Tap to flush', { exact: true });
+		await probe.waitFor({ state: 'visible' });
+
+		const barHeight = () =>
+			page.locator('#flush-bar').evaluate((element) => (element as HTMLElement).style.height);
+		expect(await barHeight()).toBe('8px');
+
+		await probe.click();
+		await probe.click();
+		// The style writes prove the handler ran, so an empty error list is not the
+		// vacuous pass of an event that never reached the main thread.
+		await expect.poll(barHeight).toBe('24px');
+	});
 }, 90_000);

@@ -1,0 +1,23 @@
+{
+  "upstream": {
+    "package": "@gsap/react",
+    "version": "2.1.2",
+    "source": "https://github.com/greensock/react/tree/2.1.2",
+    "tagCommit": "b7f44ca767eb93390f965d6f19679e2b77be7966",
+    "license": "GSAP Standard License"
+  },
+  "peer": {
+    "package": "gsap",
+    "version": "3.15.0",
+    "license": "GSAP Standard No Charge License"
+  },
+  "surface": "Full useGSAP hook contract: callback, dependency-array and config signatures; scoped contexts; contextSafe; revertOnUpdate; register; and headless.",
+  "divergences": [
+    "The adapter imports Octane hooks and uses compiler-selected manual hook slots instead of React hooks.",
+    "GSAP remains an external peer dependency and is not redistributed by this MIT-licensed adapter."
+  ],
+  "ssr": "Server rendering creates stable context helpers without running GSAP effects. Client hydration activates the standard lifecycle.",
+  "verified": "2026-08-02",
+  "supportedExports": ["useGSAP"],
+  "unsupported": []
+}

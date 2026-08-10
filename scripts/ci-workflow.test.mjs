@@ -13,6 +13,10 @@ const shardedVitestConfigSource = readFileSync(
 const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
 const packageJson = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
+const reactParityCheckLib = readFileSync(
+	path.join(REPO, 'scripts/react-parity/check-lib.mjs'),
+	'utf8',
+);
 const reactParityHarness = readFileSync(
 	path.join(REPO, 'scripts/react-parity/harness.mjs'),
 	'utf8',
@@ -22,11 +26,20 @@ const { configureShardedProjects, default: shardedVitestConfig } = await import(
 	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
 );
 const publishWorkflow = readFileSync(path.join(REPO, '.github/workflows/publish.yml'), 'utf8');
+const releaseWorkflow = readFileSync(path.join(REPO, '.github/workflows/release.yml'), 'utf8');
 const draftWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/draft-agent-prs.yml'),
 	'utf8',
 );
 const labelWorkflow = readFileSync(path.join(REPO, '.github/workflows/label-pr.yml'), 'utf8');
+const reviewReadinessWorkflow = readFileSync(
+	path.join(REPO, '.github/workflows/review-readiness-label.yml'),
+	'utf8',
+);
+const reviewFeedbackWorkflow = readFileSync(
+	path.join(REPO, '.github/workflows/review-feedback-signal.yml'),
+	'utf8',
+);
 const vercelPreviewWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/vercel-preview.yml'),
 	'utf8',
@@ -171,6 +184,19 @@ describe('CI workflow aggregation', () => {
 		assert.match(jobSource('provenance'), /\[ "\$FULL_CI" = false \]/);
 	});
 
+	test('accepts the generated Octane version source as release metadata', () => {
+		const generatedVersionAllowance = /file\.filename === "packages\/octane\/src\/version\.ts"/;
+
+		assert.match(
+			stepScript(workflow, 'Identify a generated Changesets release change'),
+			generatedVersionAllowance,
+		);
+		assert.match(
+			stepScript(releaseWorkflow, 'Record lightweight release pull request checks'),
+			generatedVersionAllowance,
+		);
+	});
+
 	test('keeps cheap parity validation universal and full execution on Node 24', () => {
 		const parity = jobSource('react_parity_checks');
 		const lint = jobSource('lint_checks');
@@ -260,18 +286,14 @@ describe('CI workflow aggregation', () => {
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
 
-		// The manifest runner owns all required lanes in one process. Execution
-		// reports prove exact identities, so only explicit validation collects.
+		// The manifest runner owns all required lanes in one process for both
+		// verification states. recorded-unverified limits the claim, not execution.
+		assert.doesNotMatch(reactParityCheck, /provenance\.verification/);
+		assert.match(reactParityCheck, /if \(!validateOnly\) \{\s+runRequiredBindingLanes\(\{/);
 		assert.match(
-			reactParityCheck,
-			/manifest\.provenance\.verification === 'verified' \? 'run-required' : 'validate'/,
+			reactParityCheckLib,
+			/\[harnessPath, 'run-required', '--manifest', relativeFile\]/,
 		);
-		assert.match(
-			reactParityCheck,
-			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
-		);
-		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
-		assert.doesNotMatch(reactParityCheck, /'--lane'/);
 		const executionMarker = "} else {\n\tif (action === 'run-required'";
 		const executionStart = reactParityHarness.indexOf(executionMarker);
 		assert.notEqual(executionStart, -1);
@@ -455,9 +477,9 @@ describe('Agent pull request draft policy', () => {
 		assert.match(draftWorkflow, /^ {6}issues: read$/m);
 		assert.match(draftWorkflow, /contains\(github\.event\.pull_request\.labels\.\*\.name/);
 		assert.doesNotMatch(draftWorkflow, /actions\/checkout/);
-		// Converting to draft changes no repository content, and the fallback
-		// secret is the answer to a token that cannot run the mutation.
-		assert.doesNotMatch(draftWorkflow, /contents: write/);
+		// GitHub's GraphQL permission mapping requires both grants even though
+		// converting a pull request to draft does not change repository content.
+		assert.match(draftWorkflow, /^ {6}contents: write$/m);
 		assert.match(
 			draftWorkflow,
 			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
@@ -486,6 +508,7 @@ describe('Pull request labels', () => {
 
 	function runLabeller({
 		title = 'chore: a thing',
+		headRef = 'topic/a-thing',
 		body = `## Provenance\n\n${EMPTY}\n`,
 		labels = [],
 		state = 'open',
@@ -504,6 +527,7 @@ describe('Pull request labels', () => {
 			state,
 			title,
 			body,
+			head: { ref: headRef },
 			labels: labels.map((name) => ({ name })),
 		};
 		const github = {
@@ -573,9 +597,23 @@ describe('Pull request labels', () => {
 		}
 	});
 
+	test('falls back to a type-prefixed title or head branch', async () => {
+		for (const [title, headRef, type] of [
+			['fix/gallery-list-fills-wrapper', 'topic/gallery-list', 'fix'],
+			['Add Solana bindings', 'feat/solana-react-binding', 'feat'],
+		]) {
+			const { added, removed, failures } = await runLabeller({ title, headRef });
+
+			assert.deepEqual(added, [type], `${title} (${headRef})`);
+			assert.deepEqual(removed, []);
+			assert.deepEqual(failures, []);
+		}
+	});
+
 	test('moves the type label when a pull request is retitled', async () => {
 		const { added, removed } = await runLabeller({
 			title: 'fix(compiler): render the non-JSX arm',
+			headRef: 'feat/old-compiler-work',
 			labels: ['feat', 'blocked'],
 		});
 
@@ -791,6 +829,7 @@ describe('Pull request labels', () => {
 		);
 		assert.match(labelWorkflow, /^ {6}issues: read$/m);
 		assert.match(labelWorkflow, /^ {6}pull-requests: write$/m);
+		assert.match(labelWorkflow, /^ {6}contents: write$/m);
 		assert.match(
 			labelWorkflow,
 			/- name: Convert an agent-authored pull request back to draft[\s\S]*?if: always\(\)/,
@@ -800,7 +839,193 @@ describe('Pull request labels', () => {
 			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
 		);
 		assert.doesNotMatch(labelWorkflow, /actions\/checkout/);
-		assert.doesNotMatch(labelWorkflow, /contents: write/);
+	});
+});
+
+describe('Review readiness label', () => {
+	const READY = 'READY FOR REVIEW';
+
+	function reviewThread({ resolved = false } = {}) {
+		return {
+			isResolved: resolved,
+			comments: {
+				nodes: [
+					{
+						url: 'https://github.com/octanejs/octane/pull/487#discussion_r1',
+					},
+				],
+			},
+		};
+	}
+
+	async function runReadiness({
+		eventName = 'issue_comment',
+		body = READY,
+		labels = [],
+		threads = [],
+		matchingPulls = [{ number: 487, labels: { nodes: [{ name: READY }] } }],
+		removeErrorStatus,
+	} = {}) {
+		const added = [];
+		const removed = [];
+		const notices = [];
+		const failures = [];
+		const pull = {
+			state: 'open',
+			labels: labels.map((name) => ({ name })),
+		};
+		const github = {
+			graphql: async (query) => {
+				if (query.includes('pullRequests(first: 100')) {
+					return {
+						repository: {
+							pullRequests: {
+								nodes: matchingPulls,
+								pageInfo: { hasNextPage: false, endCursor: null },
+							},
+						},
+					};
+				}
+				if (query.includes('reviewThreads(first: 100')) {
+					return {
+						repository: {
+							pullRequest: {
+								reviewThreads: {
+									nodes: threads,
+									pageInfo: { hasNextPage: false, endCursor: null },
+								},
+							},
+						},
+					};
+				}
+				throw new Error('unexpected GraphQL query');
+			},
+			rest: {
+				pulls: {
+					get: async () => ({ data: pull }),
+				},
+				issues: {
+					addLabels: async ({ labels: names }) => {
+						added.push(...names);
+						pull.labels.push(...names.map((name) => ({ name })));
+					},
+					removeLabel: async ({ name }) => {
+						if (removeErrorStatus) {
+							const error = new Error(`remove failed with ${removeErrorStatus}`);
+							error.status = removeErrorStatus;
+							throw error;
+						}
+						removed.push(name);
+						pull.labels = pull.labels.filter((label) => label.name !== name);
+					},
+				},
+			},
+		};
+		const context = {
+			eventName,
+			repo: { owner: 'octanejs', repo: 'octane' },
+			payload:
+				eventName === 'workflow_run'
+					? { workflow_run: { conclusion: 'success' } }
+					: { issue: { number: 487 }, comment: { body } },
+		};
+		const core = {
+			notice: (message) => notices.push(message),
+			setFailed: (message) => failures.push(message),
+		};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			stepScript(reviewReadinessWorkflow, 'Reconcile review readiness'),
+		);
+
+		await execute(github, context, core);
+		return { added, removed, notices, failures };
+	}
+
+	test('bridges unprivileged review comments to writable default-branch reconciliation', () => {
+		assert.match(
+			reviewFeedbackWorkflow,
+			/on:\n {2}pull_request_review_comment:\n {4}types: \[created\]/,
+		);
+		assert.match(reviewFeedbackWorkflow, /^permissions: \{\}$/m);
+		assert.doesNotMatch(reviewFeedbackWorkflow, /actions\/checkout/);
+
+		assert.match(
+			reviewReadinessWorkflow,
+			/on:\n {2}issue_comment:\n {4}types: \[created, edited\]/,
+		);
+		assert.match(
+			reviewReadinessWorkflow,
+			/workflow_run:\n {4}workflows: \[Review feedback signal\]\n {4}types: \[completed\]/,
+		);
+		assert.match(
+			reviewReadinessWorkflow,
+			/github\.event_name == 'issue_comment' && github\.event\.issue\.pull_request/,
+		);
+		assert.match(reviewReadinessWorkflow, /github\.event_name == 'workflow_run'/);
+		assert.doesNotMatch(reviewReadinessWorkflow, /github\.event\.workflow_run\.conclusion/);
+		assert.match(reviewReadinessWorkflow, /^ {6}issues: read$/m);
+		assert.match(reviewReadinessWorkflow, /^ {6}pull-requests: write$/m);
+		assert.doesNotMatch(reviewReadinessWorkflow, /actions\/checkout/);
+	});
+
+	test('applies readiness when every review thread is resolved', async () => {
+		const result = await runReadiness({
+			threads: [reviewThread({ resolved: true })],
+		});
+
+		assert.deepEqual(result.added, [READY]);
+		assert.deepEqual(result.removed, []);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('refuses readiness while any reviewer thread is unresolved', async () => {
+		const result = await runReadiness({ threads: [reviewThread()] });
+
+		assert.deepEqual(result.added, []);
+		assert.deepEqual(result.removed, []);
+		assert.match(result.notices.join('\n'), /Did not apply READY FOR REVIEW/);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('removes readiness after new unresolved review feedback', async () => {
+		const result = await runReadiness({
+			eventName: 'workflow_run',
+			labels: [READY],
+			threads: [reviewThread()],
+		});
+
+		assert.deepEqual(result.added, []);
+		assert.deepEqual(result.removed, [READY]);
+		assert.match(result.notices.join('\n'), /Removed READY FOR REVIEW/);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('treats a concurrently removed readiness label as already absent', async () => {
+		const result = await runReadiness({
+			eventName: 'workflow_run',
+			labels: [READY],
+			threads: [reviewThread()],
+			removeErrorStatus: 404,
+		});
+
+		assert.deepEqual(result.added, []);
+		assert.deepEqual(result.removed, []);
+		assert.match(result.notices.join('\n'), /already absent/);
+		assert.deepEqual(result.failures, []);
+	});
+
+	test('still fails when readiness removal returns another API error', async () => {
+		const result = await runReadiness({
+			eventName: 'workflow_run',
+			labels: [READY],
+			threads: [reviewThread()],
+			removeErrorStatus: 500,
+		});
+
+		assert.match(result.failures.join('\n'), /remove failed with 500/);
 	});
 });
 
@@ -826,6 +1051,7 @@ describe('Vercel preview workflow', () => {
 		pullResponse = pull,
 		comments = [],
 		existingRef = null,
+		deleteRefError = null,
 		deploymentSnapshots = [],
 	} = {}) {
 		const gitCalls = [];
@@ -870,6 +1096,7 @@ describe('Vercel preview workflow', () => {
 					},
 					deleteRef: async (input) => {
 						gitCalls.push({ operation: 'delete', ...input });
+						if (deleteRefError) throw deleteRefError;
 						if (currentRef === null) {
 							throw Object.assign(new Error('missing ref'), { status: 404 });
 						}
@@ -1156,6 +1383,12 @@ describe('Vercel preview workflow', () => {
 		assert.equal(currentRef, null);
 		assert.deepEqual(gitCalls, [
 			{
+				operation: 'get',
+				owner: 'octanejs',
+				repo: 'octane',
+				ref: 'heads/deploy-preview-pr-612',
+			},
+			{
 				operation: 'delete',
 				owner: 'octanejs',
 				repo: 'octane',
@@ -1171,7 +1404,26 @@ describe('Vercel preview workflow', () => {
 		const { gitCalls, failures, notices } = await runPreview({ action: 'closed' });
 
 		assert.equal(gitCalls.length, 1);
-		assert.equal(gitCalls[0].operation, 'delete');
+		assert.equal(gitCalls[0].operation, 'get');
+		assert.match(notices.join('\n'), /already absent/);
+		assert.deepEqual(failures, []);
+	});
+
+	test('treats a preview branch removed during cleanup as already absent', async () => {
+		const deleteRefError = Object.assign(new Error('Reference does not exist'), {
+			status: 422,
+			response: { data: { message: 'Reference does not exist' } },
+		});
+		const { gitCalls, failures, notices } = await runPreview({
+			action: 'closed',
+			existingRef: sha,
+			deleteRefError,
+		});
+
+		assert.deepEqual(
+			gitCalls.map((call) => call.operation),
+			['get', 'delete'],
+		);
 		assert.match(notices.join('\n'), /already absent/);
 		assert.deepEqual(failures, []);
 	});

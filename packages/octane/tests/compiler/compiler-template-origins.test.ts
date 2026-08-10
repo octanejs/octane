@@ -167,6 +167,45 @@ describe('compiler template-origin recording (inspect: true)', () => {
 		}
 	});
 
+	it('interns identical production templates without orphaning repeated authored origins', () => {
+		const source =
+			'export function First() @{ <div class="same">same</div> }\n' +
+			'export function Second() @{ <div class="same">same</div> }';
+		const options = { hmr: false as const, dev: false };
+		const plain = compile(source, 'duplicate-origins.tsrx', options);
+		const inspected = compile(source, 'duplicate-origins.tsrx', { ...options, inspect: true });
+		const templates = inspected.inspect.templates as InspectTemplate[];
+
+		expect(inspected.code).toBe(plain.code);
+		expect(templates).toHaveLength(1);
+		expect(templates[0].html).toBe('<div class="same">same</div>');
+
+		const secondOpening = source.indexOf('<div', source.indexOf('\n')) + 1;
+		const firstOpening = source.indexOf('<div') + 1;
+		expect(inspected.inspect.aliases).toContainEqual({
+			srcStart: secondOpening,
+			srcEnd: secondOpening + 'div'.length,
+			ofStart: firstOpening,
+		});
+	});
+
+	it('keeps identical markup separate when its parser namespace differs', () => {
+		const source =
+			'export function Opaque() @{ <a /> }\n' +
+			'export function Svg(props) @{ <svg>@if (props.visible) { <a /> }</svg> }';
+		const result = compile(source, 'template-namespaces.tsrx', {
+			hmr: false,
+			dev: false,
+			inspect: true,
+		});
+
+		expect(
+			(result.inspect.templates as InspectTemplate[]).filter(
+				(template) => template.html === '<a></a>',
+			),
+		).toHaveLength(2);
+	});
+
 	it('exposes the structured template whose single serialization is the runtime HTML', () => {
 		for (const template of compileInspect()) {
 			expect(template.ast.type).toBe('Template');
@@ -464,7 +503,10 @@ describe.each([
 		expect(result.inspect).toBeDefined();
 		// Recording never changes what ships.
 		expect(compile(source, 'origins.tsrx', options).code).toBe(result.code);
-		return { code: result.code, templates: result.inspect.templates as InspectTemplate[] };
+		return {
+			code: result.code,
+			templates: result.inspect.templates as (InspectTemplate & { raw: string })[],
+		};
 	}
 
 	it('is absent from a normal compile', () => {

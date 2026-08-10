@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/bvaughn/react-error-boundary.git",
+    "version": "6.1.2",
+    "commit": "90b9a7e8766faa7890eff14ffedc77ea80740179",
+    "sourceRoot": "lib",
+    "testRoot": "lib",
+    "license": "MIT",
+    "integrity": "sha256:74ba770d513712aaab909ffe27209804739a33896c2635f974eddf141661901f",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/react-error-boundary/src"],
+      "include": ["$a"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/react-error-boundary/tests/differential"],
+      "include": ["$a"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-error-boundary-reset-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-error-boundary-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same imperative-reset fixture runs through Octane and real react-error-boundary.",
+      "files": [
+        {
+          "path": "packages/react-error-boundary/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "04f1de35fb82e6ce6cb99ad203d6192d31c36dfd65c87a7f74b7d613f1847162",
+          "cases": [
+            {
+              "id": "differential:react-error-boundary-reset",
+              "testName": "imperative reset: fallback → content renders byte-identical",
+              "fullName": "differential: @octanejs/react-error-boundary vs real react-error-boundary imperative reset: fallback → content renders byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-error-boundary/tests/_fixtures/app.tsrx",
+          "role": "support",
+          "sha256": "cffc63070ed41b3a2bc30288001572caba72591826827521a62abd82bfce5bfa"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "d41e4b4a965c0c8a28a1b9bcaf1276ab2411870f1e2ecd074d8cc2fe0a2b84fd"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

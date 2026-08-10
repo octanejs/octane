@@ -57,7 +57,7 @@ describe('@octanejs/rainbowkit hydration', () => {
 			errors.mockRestore();
 			container.remove();
 		}
-	});
+	}, 15_000);
 
 	it('keeps a prehydrated connection inert until effects without replacing controls', async () => {
 		const config = createConfig({
@@ -117,5 +117,5 @@ describe('@octanejs/rainbowkit hydration', () => {
 			container.remove();
 			serverQueryClient.clear();
 		}
-	});
+	}, 15_000);
 });

@@ -1,8 +1,9 @@
 {
   "name": "@octanejs/motion",
-  "version": "0.1.27",
+  "version": "0.1.32",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=22.22.2"
   },
@@ -48,6 +49,7 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "vitest": "catalog:default"
   }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as Server from 'octane/server';
 import { createElement } from '../../src/index.js';
@@ -87,6 +87,158 @@ describe('ReactDOMComponent — SSR open-tag markup', () => {
 		expect(html).toContain('b&amp;ckground');
 		const el = parse(html).querySelector('div')!;
 		expect(el.getAttribute('style')).toBe('b&ckground:<3;');
+	});
+});
+
+describe('ReactServerRenderingHydration — server autoFocus attributes', () => {
+	const standard = evalServer(
+		`export function Static() @{
+			<section>
+				<input id="input" autoFocus />
+				<button id="button" autoFocus />
+				<select id="select" autoFocus />
+				<textarea id="textarea" autoFocus />
+				<div id="div" autoFocus />
+				<svg id="svg" autoFocus><circle id="circle" autoFocus /></svg>
+				<math id="math" autoFocus><mi id="mi" autoFocus /></math>
+			</section>
+		}
+		export function StaticValues() @{
+			<section>
+				<input id="static-true" autoFocus={true} />
+				<input id="static-string" autoFocus={'yes'} />
+				<input id="static-number" autoFocus={1} />
+				<input id="static-false" autoFocus={false} />
+				<input id="static-empty" autoFocus={''} />
+				<input id="static-zero" autoFocus={0} />
+			</section>
+		}
+		export function Dynamic(p) @{ <input id="dynamic" autoFocus={p.value} /> }
+		export function Lowercase(p) @{ <input id="lowercase" autofocus={p.value} /> }
+		export function Spread(p) @{ <input id="spread" {...p.attributes} /> }
+		export function Mixed(p) @{
+			<input id="mixed" {...p.before} autoFocus={p.direct} {...p.after} />
+		}
+		export function NamespacedSpread(p) @{
+			<svg {...p.attributes}><circle {...p.attributes} /></svg>
+		}
+		export function Descriptor(p) { return p.node; }`,
+		'dc-autofocus-standard.tsrx',
+	);
+	const custom = evalServer(
+		`export function Direct(p) @{ <my-autofocus-element autoFocus={p.value} /> }
+		export function Spread(p) @{ <my-autofocus-element {...p.attributes} /> }`,
+		'dc-autofocus-custom.tsrx',
+	);
+
+	// Per ReactServerRenderingHydration-test.js:161, SSR emits autofocus while a
+	// client mount performs focus without writing that attribute.
+	it('serializes static autoFocus on standard HTML, SVG, and MathML elements', () => {
+		const { html } = Server.renderToString(standard.Static);
+		expect(Array.from(parse(html).querySelectorAll('[autofocus]'), (el) => el.id)).toEqual([
+			'input',
+			'button',
+			'select',
+			'textarea',
+			'div',
+			'svg',
+			'circle',
+			'math',
+			'mi',
+		]);
+		expect(html.match(/ autofocus=""/g)).toHaveLength(9);
+		expect(html).not.toContain(' autoFocus');
+	});
+
+	it('applies boolean presence semantics to compile-time literal values', () => {
+		const { html } = Server.renderToString(standard.StaticValues);
+		expect(Array.from(parse(html).querySelectorAll('[autofocus]'), (el) => el.id)).toEqual([
+			'static-true',
+			'static-string',
+			'static-number',
+		]);
+		expect(html.match(/ autofocus=""/g)).toHaveLength(3);
+	});
+
+	it('applies boolean presence semantics to direct and spread autoFocus', () => {
+		for (const value of [true, 'yes', 1]) {
+			for (const [component, props] of [
+				[standard.Dynamic, { value }],
+				[standard.Spread, { attributes: { autoFocus: value } }],
+			] as const) {
+				const { html } = Server.renderToString(component, props);
+				expect(parse(html).querySelector('input')?.getAttribute('autofocus')).toBe('');
+				expect(html).toContain(' autofocus=""');
+			}
+		}
+		for (const value of [false, '', 0, null, undefined]) {
+			for (const [component, props] of [
+				[standard.Dynamic, { value }],
+				[standard.Spread, { attributes: { autoFocus: value } }],
+			] as const) {
+				const { html } = Server.renderToString(component, props);
+				expect(parse(html).querySelector('input')?.hasAttribute('autofocus')).toBe(false);
+			}
+		}
+	});
+
+	it('resolves direct and spread autoFocus by the last authored writer', () => {
+		for (const [before, direct, after, expected] of [
+			[{ autoFocus: true }, false, {}, false],
+			[{ autoFocus: false }, false, { autoFocus: true }, true],
+			[{ autoFocus: true }, true, { autoFocus: false }, false],
+		] as const) {
+			const { html } = Server.renderToString(standard.Mixed, { before, direct, after });
+			expect(parse(html).querySelector('#mixed')?.hasAttribute('autofocus')).toBe(expected);
+		}
+	});
+
+	it('does not turn lowercase autofocus into a boolean React prop', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const booleanHtml = Server.renderToString(standard.Lowercase, { value: true }).html;
+			expect(parse(booleanHtml).querySelector('input')?.hasAttribute('autofocus')).toBe(false);
+			const stringHtml = Server.renderToString(standard.Lowercase, { value: 'literal' }).html;
+			expect(parse(stringHtml).querySelector('input')?.getAttribute('autofocus')).toBe('literal');
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	it('serializes spread and descriptor autoFocus in standard namespaces', () => {
+		const spreadHtml = Server.renderToString(standard.NamespacedSpread, {
+			attributes: { autoFocus: true },
+		}).html;
+		expect(spreadHtml.match(/ autofocus=""/g)).toHaveLength(2);
+
+		const descriptorHtml = Server.renderToString(standard.Descriptor, {
+			node: createElement('svg', { autoFocus: true }, createElement('circle', { autoFocus: true })),
+		}).html;
+		expect(descriptorHtml.match(/ autofocus=""/g)).toHaveLength(2);
+	});
+
+	it('preserves raw casing and scalar values for custom elements', () => {
+		for (const value of [true, 'yes', '', 0]) {
+			for (const [component, props] of [
+				[custom.Direct, { value }],
+				[custom.Spread, { attributes: { autoFocus: value } }],
+			] as const) {
+				const { html } = Server.renderToString(component, props);
+				expect(html).toContain(' autoFocus');
+				expect(parse(html).querySelector('my-autofocus-element')?.getAttribute('autofocus')).toBe(
+					value === true ? '' : String(value),
+				);
+			}
+		}
+		for (const component of [custom.Direct, custom.Spread]) {
+			const props =
+				component === custom.Direct ? { value: false } : { attributes: { autoFocus: false } };
+			expect(
+				parse(Server.renderToString(component, props).html)
+					.querySelector('my-autofocus-element')
+					?.hasAttribute('autofocus'),
+			).toBe(false);
+		}
 	});
 });
 

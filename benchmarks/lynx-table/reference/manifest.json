@@ -1,0 +1,25 @@
+{
+  "source": "https://github.com/Huxpro/vue-lynx",
+  "branch": "claude/lynx-implementation-review-n2r0ie",
+  "commit": "02376ecd1cd62d3797ff1de1209d82dc2f9d91d9",
+  "builtAt": "2026-08-07",
+  "build": "pnpm install && pnpm --filter \"vue-lynx...\" build && cd packages/benchmark && node harness/build-unified.mjs --only=vdom-ifr-et,vapor-ifr,react",
+  "cells": {
+    "vdom-ifr-et": {
+      "description": "Vue Lynx vdom top config (vdom +b +ifr; legacy id vdom-ifr-et)",
+      "app": "packages/benchmark/apps/ui-vdom",
+      "framework": "vue 3.6.0-beta.17 (vue-lynx fork)"
+    },
+    "vapor-ifr": {
+      "description": "Vue Lynx vapor top config (vapor +b +ifr; legacy id vapor-ifr)",
+      "app": "packages/benchmark/apps/ui-vapor",
+      "framework": "vue 3.6.0-beta.17 (vue-lynx fork, vapor mode)"
+    },
+    "react": {
+      "description": "ReactLynx default config",
+      "app": "packages/benchmark/apps/ui-react",
+      "framework": "@lynx-js/react 0.122.1"
+    }
+  },
+  "note": "Black-box fixtures: only the .web.bundle files are vendored. They are served unmodified into <lynx-view> by web/run-web.mjs; the app workloads mirror app/src operation-for-operation. The harness host runs @lynx-js/web-core 0.22.2 for every cell (the fork built against 0.22.1 — the host runtime is shared, so the comparison stays same-host)."
+}

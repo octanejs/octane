@@ -337,6 +337,62 @@ async function deoptGate(mod) {
 	return { fast, plain };
 }
 
+// Sample the escaping work after all timed and memory-growth renders. Native
+// literal replacement avoids three RegExp replacement passes per escaped hole;
+// preserve the eager list snapshot and compare the entire observable response.
+async function escapeWorkGate(mod) {
+	const expected = (await mod.renderEscapeHeavy()).body;
+	const originalReplace = RegExp.prototype[Symbol.replace];
+	const originalArrayFrom = Array.from;
+	let regexEscapePasses = 0;
+	let arraySnapshotCopies = 0;
+	let arraySnapshotEntries = 0;
+	let actual;
+
+	try {
+		RegExp.prototype[Symbol.replace] = function (value, replacement) {
+			if (
+				this.flags === 'g' &&
+				((this.source === '&' && replacement === '&amp;') ||
+					(this.source === '<' && replacement === '&lt;') ||
+					(this.source === '>' && replacement === '&gt;'))
+			) {
+				regexEscapePasses++;
+			}
+			return Reflect.apply(originalReplace, this, [value, replacement]);
+		};
+		Array.from = function (...args) {
+			const result = Reflect.apply(originalArrayFrom, this, args);
+			if (Array.isArray(args[0])) {
+				arraySnapshotCopies++;
+				arraySnapshotEntries += result.length;
+			}
+			return result;
+		};
+		actual = (await mod.renderEscapeHeavy()).body;
+	} finally {
+		RegExp.prototype[Symbol.replace] = originalReplace;
+		Array.from = originalArrayFrom;
+	}
+
+	if (actual !== expected) {
+		throw new Error('escape work instrumentation changed the rendered response');
+	}
+	if (regexEscapePasses !== 0) {
+		throw new Error(
+			`escape-heavy performed ${regexEscapePasses} regular-expression escaping passes`,
+		);
+	}
+	if (arraySnapshotCopies !== 1 || arraySnapshotEntries !== 10000) {
+		throw new Error(
+			`escape-heavy expected one eager 10000-entry snapshot, got ` +
+				`${arraySnapshotCopies} copies containing ${arraySnapshotEntries} entries`,
+		);
+	}
+
+	return { regexEscapePasses, arraySnapshotCopies, arraySnapshotEntries };
+}
+
 configs.push({
 	name: 'deopt-page/octane-fast',
 	group: 'deopt-page',
@@ -366,6 +422,7 @@ configs.push({
 		if (holes !== 10000) throw new Error(`expected 10000 holes, got ${holes}`);
 		return bodyMeta(body);
 	},
+	work: escapeWorkGate,
 });
 
 // ── run ───────────────────────────────────────────────────────────────────────
@@ -388,12 +445,13 @@ for (const cfg of selected) {
 		const fn = cfg.fn(mod);
 		const stats = await timeLoop(fn);
 		const mem = await memGrowth(fn, cfg.batch ? Math.ceil(MEM_RENDERS / cfg.batch) : MEM_RENDERS);
+		const work = cfg.work === undefined ? undefined : await cfg.work(mod);
 		if (cfg.batch) {
 			mem.memRenders *= cfg.batch;
 			// stats time whole batches; surface the effective per-render throughput.
 			meta.rendersPerSec = stats.opsPerSec * cfg.batch;
 		}
-		results.push({ name: cfg.name, group: cfg.group, stats, meta: { ...meta, ...mem } });
+		results.push({ name: cfg.name, group: cfg.group, stats, meta: { ...meta, ...mem, ...work } });
 	} catch (err) {
 		failures.push(`${cfg.name}: ${err.message}`);
 		console.error(`  ✗ ${err.message}`);

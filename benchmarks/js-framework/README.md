@@ -99,12 +99,31 @@ machine-readable copy of the results when `BENCH_JSON=<path>` is set
 with a top-level `"failed"` field).
 
 Output is a table of median + min millis per operation: `run`, `replace`,
-`add`, `update`, `select`, `swap`, `remove`, `runlots`, `clear`. The harness
-uses `page.evaluate(el.click)` to fire clicks synchronously inside the page —
-avoids per-click CDP IPC overhead (~10ms each on Chromium) so the numbers
-reflect the renderer's wall time, not Playwright transport. Before warmup, each
-target receives the same seeded `Math.random` stream so generated label lengths
-and allocation patterns cannot drift between dialects.
+`add`, `update`, `select`, `swap`, `remove`, `runlots`, `select_lots`, `clear`.
+The harness uses `page.evaluate(el.click)` to fire clicks synchronously inside
+the page — avoids per-click CDP IPC overhead (~10ms each on Chromium) so the
+numbers reflect the renderer's wall time, not Playwright transport. Before
+warmup, each target receives the same seeded `Math.random` stream so generated
+label lengths and allocation patterns cannot drift between dialects.
+
+Selection samples alternate between the fifth and sixth rows so every click
+changes the selected key instead of measuring an equal-value state bailout.
+`select_lots` reuses the 10,000 rows from `runlots` and alternates between rows
+5,000 and 5,001, moving list-wide selection work above the browser's timer
+resolution. Its same-run TSRX/JSX ratio protects compiler-proven keyed selection
+without depending on machine-specific absolute timings. After each timed
+selection, an untimed correctness gate verifies that exactly the clicked row
+carries the selected class.
+
+After all timed samples, both Octane dialects also mount 1,000 and 10,000 rows,
+append 1,000 or 100 rows, and prepend or insert 100 rows into the middle under
+deterministic browser DOM instrumentation. Each row must retain its ordinary
+direct insertion into the connected table body: detached fragments reduced DOM
+API calls but measurably slowed Chromium's real mount time. The gate checks row
+count, insertion position and order, survivor DOM identity, connectivity,
+delegated events, and selection, then uses precise production call coverage in
+a separate `--jitless` browser to guard reduced per-row framework work without
+depending on minified helper names or contaminating wall-clock measurements.
 
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 
@@ -183,6 +202,15 @@ Two methodology points, both visible in the harness source:
   the gate correctly flags them. `append100` is the only insert op ripple renders
   correctly, because there are no survivors *after* the inserted run. octane-tsrx,
   octane-jsx, and react pass all 14 ops.
+
+- **Bounded reorder-scratch gate.** After all timing samples, Octane's two
+  dialects repeat reverse, rotation, shuffle, and small-displacement operations
+  over 1,000 and 10,000 keyed rows. A transparent typed-array constructor trap
+  rejects allocations after the initial warmup while independently checking
+  survivor identity and final order. A contiguous append must remain
+  allocation-free, an oversized 18,000-row reorder must not evict reusable
+  storage, and an explicit browser garbage collection bounds retained observed
+  scratch backing storage to 128 KiB.
 
 Run it against the same eight targets as `run.mjs`:
 

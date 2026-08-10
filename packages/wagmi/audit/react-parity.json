@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/wevm/wagmi.git",
+    "version": "3.7.4",
+    "commit": "4c461abcbf1b7a0f7adbef3d80e801c2723aa274",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react/src",
+    "license": "MIT",
+    "integrity": "sha256:4be681123deea5cc4b4a4c5bf448aadf32aebeff2a51c9e5009e6602f3b4f00a",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/wagmi/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/wagmi/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "wagmi-connection-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "wagmi-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same connection fixture runs through Octane and the pinned real Wagmi React binding.",
+      "files": [
+        {
+          "path": "packages/wagmi/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "4ac2119a5bb0cd3fd10a2b0fa7c0fe0a6fd4cfc48f07d2bc1a5eb8332210416c",
+          "cases": [
+            {
+              "id": "differential:wagmi-connection",
+              "testName": "connection: disconnected \u2192 connected renders byte-identical",
+              "fullName": "differential: @octanejs/wagmi vs real wagmi connection: disconnected \u2192 connected renders byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/wagmi/tests/_fixtures/parity.tsrx",
+          "role": "support",
+          "sha256": "6cee81d1cd00c05c74d8e7a1596e5afaf895d3858c5d0210cf625272ef209e2e"
+        },
+        {
+          "path": "packages/wagmi/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "f4edcfee7b6ae6ace49fe420a757c2afc929f0058f794caf22fbf6f52031b5ab"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

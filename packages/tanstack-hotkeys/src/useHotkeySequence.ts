@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'octane';
 import { formatHotkeySequence, getSequenceManager } from '@tanstack/hotkeys';
 import { useDefaultHotkeysOptions } from './context';
-import { isRef } from './utils';
+import { isRef, withoutSlotOption } from './utils';
 import type { RefObjectLike } from './utils';
 import type {
 	HotkeyCallback,
@@ -58,9 +58,10 @@ export function useHotkeySequence(
 	callback: HotkeyCallback,
 	options: UseHotkeySequenceOptions = {},
 ): void {
+	const resolvedOptions = withoutSlotOption(options) ?? {};
 	const mergedOptions = {
 		...useDefaultHotkeysOptions().hotkeySequence,
-		...options,
+		...resolvedOptions,
 	} as UseHotkeySequenceOptions;
 
 	const manager = getSequenceManager();

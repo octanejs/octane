@@ -22,36 +22,45 @@ const modifiedTsrxGrammar = {
 	embeddedLangs: ['jsx', 'tsx', 'css'],
 };
 
+// Dual themes for light/dark mode: shiki emits both token colors as CSS
+// variables (`--shiki-light`/`--shiki-dark`) and the site's CSS picks one per
+// `data-theme` (see BASE_STYLES in __root.tsrx). The dark set stays GitHub's
+// accessible high-contrast token set.
+export const websiteShikiThemes = {
+	light: 'github-light',
+	dark: 'github-dark-high-contrast',
+};
+
+// Explicit `langs` replaces shiki's all-bundled default set: list the fence
+// languages the site actually uses, plus the TSRX grammar twice — once under
+// its own name ("TSRX") and once lowercased so ```tsrx fences resolve (the
+// reference registers the second copy the same way).
+//
+// Exported because the docs are not the only Shiki consumer: the Lynx example
+// packaging step (scripts/prepare-lynx-examples.mjs) highlights example sources
+// ahead of time, and those panels sit next to docs code blocks — one theme and
+// grammar set, or the two drift.
+export const websiteShikiLangs = [
+	'javascript',
+	'typescript',
+	'jsx',
+	'tsx',
+	'css',
+	'bash',
+	'html',
+	'json',
+	modifiedTsrxGrammar,
+	{ ...modifiedTsrxGrammar, name: 'tsrx' },
+];
+
 export const websiteMdxOptions = {
 	rehypePlugins: [
 		[
 			rehypeShiki,
 			{
-				// Dual themes for light/dark mode: shiki emits both token colors as
-				// CSS variables (`--shiki-light`/`--shiki-dark`) and the site's CSS
-				// picks one per `data-theme` (see BASE_STYLES in __root.tsrx). The dark
-				// set stays GitHub's accessible high-contrast token set.
-				themes: {
-					light: 'github-light',
-					dark: 'github-dark-high-contrast',
-				},
+				themes: websiteShikiThemes,
 				defaultColor: false,
-				// Explicit `langs` replaces shiki's all-bundled default set: list the
-				// fence languages the site actually uses, plus the TSRX grammar twice —
-				// once under its own name ("TSRX") and once lowercased so ```tsrx
-				// fences resolve (the reference registers the second copy the same way).
-				langs: [
-					'javascript',
-					'typescript',
-					'jsx',
-					'tsx',
-					'css',
-					'bash',
-					'html',
-					'json',
-					modifiedTsrxGrammar,
-					{ ...modifiedTsrxGrammar, name: 'tsrx' },
-				],
+				langs: websiteShikiLangs,
 				// Unknown fence languages render as plain text instead of throwing.
 				fallbackLanguage: 'text',
 				// Shiki writes the language nowhere on the emitted <pre>, so stamp the

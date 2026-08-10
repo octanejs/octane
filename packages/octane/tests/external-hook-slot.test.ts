@@ -650,6 +650,7 @@ describe('manifest-declared manual hook slots', () => {
 			})
 			.sort();
 		expect(declared).toEqual([
+			'animejs',
 			'aria',
 			'base-ui',
 			'devtools',
@@ -657,9 +658,12 @@ describe('manifest-declared manual hook slots', () => {
 			'dnd-kit',
 			'electron',
 			'floating-ui',
+			'gsap',
 			'i18next',
+			'inertia',
 			'jotai',
 			'lexical',
+			'livestore',
 			'lucide',
 			'mdx',
 			'mobx',
@@ -670,6 +674,7 @@ describe('manifest-declared manual hook slots', () => {
 			'react-error-boundary',
 			'remix-router',
 			'rxjs',
+			'solana-react',
 			'styled-components',
 			'stylex',
 			'tanstack-query',

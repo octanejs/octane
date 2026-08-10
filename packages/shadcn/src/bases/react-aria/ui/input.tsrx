@@ -3,7 +3,7 @@
 // prop still receives its render values). Class strings are the package's
 // shipped utilities-inlined flavor, matching the Radix base.
 //
-// OCTANE DIVERGENCE: per-keystroke handling is the native `onInput` event;
+// Octane divergence (shadcn-native-input-events): per-keystroke handling is the native `onInput` event;
 // native `change` keeps its commit-on-blur meaning.
 import { composeRenderProps, Input as InputPrimitive } from '@octanejs/aria/components';
 import type { InputProps as InputPrimitiveProps } from '@octanejs/aria/components';

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noEmitOnError": true,
+    "noErrorTruncation": true,
+    "allowSyntheticDefaultImports": true,
+    // The upstream-util lanes import upstream's vendored .js specs directly.
+    "allowJs": true,
+    "checkJs": false,
+    // The differential test imports the shared rig, which loads React DOM.
+    "types": ["node", "react", "react-dom"],
+    "strict": true
+  },
+  "include": ["./src/", "./tests/"],
+  // The differential test imports Octane's shared rig, which resolves
+  // react-dom/client against packages/octane's own node_modules. Other ports
+  // keep tests out of the package program entirely; this one keeps all of them
+  // except that single cross-package import.
+  "exclude": ["node_modules", "dist", "upstream", "tests/differential"]
+}

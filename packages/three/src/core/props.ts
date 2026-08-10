@@ -12,6 +12,7 @@
  * properties only; renderer-reserved callbacks never become object fields.
  */
 import * as THREE from 'three';
+import { isTrustedThreeConstructor } from './constructors.js';
 
 export type ThreePropBag = Readonly<Record<string, unknown>>;
 
@@ -53,11 +54,6 @@ export const THREE_RESERVED_PROPS = Object.freeze([
 const EVENT_PROP = /^on(Pointer|Click|DoubleClick|ContextMenu|Wheel)/;
 const COLOR_MAPS = new Set(['map', 'emissiveMap', 'sheenColorMap', 'specularColorMap', 'envMap']);
 const MEMOIZED_PROTOTYPES = new Map<Function, any>();
-const THREE_CONSTRUCTORS = new Set<Function>(
-	Object.values(THREE as unknown as Record<string, unknown>).filter(
-		(value) => typeof value === 'function',
-	) as Function[],
-);
 const UNKNOWN_SHAPE = Symbol('unknown Three property shape');
 
 function isObject(value: unknown): value is Record<string, any> {
@@ -373,7 +369,7 @@ function resolveShadowProperty(state: ShadowState, key: string): ResolvedShadowP
 
 function isKnownThreeValue(value: unknown): boolean {
 	const Constructor = (value as { constructor?: unknown } | null)?.constructor;
-	return typeof Constructor === 'function' && THREE_CONSTRUCTORS.has(Constructor);
+	return isTrustedThreeConstructor(Constructor);
 }
 
 function isCanonicalThreeMethod(value: unknown, key: string, method: unknown): boolean {

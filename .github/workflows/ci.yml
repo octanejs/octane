@@ -140,6 +140,7 @@ jobs:
                   file.filename.endsWith("/package.json") ||
                   file.filename === "docs/bindings-status.md" ||
                   file.filename === "docs/packages.md" ||
+                  file.filename === "packages/octane/src/version.ts" ||
                   file.filename.startsWith("packages/shadcn/registry/") ||
                   file.filename === "packages/cli/src/data/octane-data.json" ||
                   file.filename ===
@@ -635,6 +636,10 @@ jobs:
       - name: Install Playwright Chromium
         if: ${{ matrix.chromium && matrix.lane != 'astro' }}
         run: pnpm --filter website exec playwright install --with-deps chromium
+
+      - name: Install Playwright WebKit for cross-browser ownership coverage
+        if: ${{ matrix.lane == 'browser' }}
+        run: pnpm --filter octane exec playwright install --with-deps webkit
 
       - name: Install Playwright Chromium (astro)
         if: ${{ matrix.lane == 'astro' }}

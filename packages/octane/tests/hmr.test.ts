@@ -73,6 +73,9 @@ async function compileHmrComponent(
 				},
 			)
 			.replace(/\bexport let /g, 'let ')
+			// Verbatim return-JSX functions emit `function X … export { X };`
+			// instead of `export let X = …`; drop the list form the same way.
+			.replace(/^export\s*\{[^}]*\};?\s*$/gm, '')
 			.replaceAll('import.meta.webpackHot', 'hot') + `\nreturn ${exportName};`;
 	const hot = {
 		data: undefined,
@@ -239,6 +242,42 @@ describe('hmr — runtime wrapper', () => {
 		}).not.toThrow();
 
 		expect(r.find('#child').textContent).toBe('CHILD ONE');
+		r.unmount();
+	});
+
+	// A component invoked as a plain function (`Row({ … })`) reaches the HMR
+	// wrapper without a scope. The wrapper must stay call-transparent — the
+	// wrapped module renders — and an edit still refreshes the call site's
+	// output through the CALLER's update, exactly as the emitted accept block
+	// drives it (callee first, then the caller whose new body closes over the
+	// new callee).
+	it('renders and refreshes a direct plain-function component call', async () => {
+		const v1 = `/** @jsxImportSource octane */
+			export function Row(props: { label: string }) {
+				if (props.label === '') return <li className="row empty">(empty)</li>;
+				return <li className="row">v1:{props.label}</li>;
+			}
+			export function App(props: { labels: string[] }) {
+				return <ul className="rows">{props.labels.map((label) => Row({ label }))}</ul>;
+			}
+		`;
+		const initialRow = await compileHmrComponent(v1, 'Row', '/src/App.tsx');
+		const initial = await compileHmrComponent(v1, 'App', '/src/App.tsx');
+		const v2 = v1.replace('v1:', 'v2:').replace('(empty)', '(none)');
+		const updatedRow = await compileHmrComponent(v2, 'Row', '/src/App.tsx');
+		const updated = await compileHmrComponent(v2, 'App', '/src/App.tsx');
+
+		const r = mount(initial, { labels: ['a', ''] });
+		expect(r.findAll('.row').map((el) => el.textContent)).toEqual(['v1:a', '(empty)']);
+
+		flushSync(() => {
+			// The direct-call-only component has no live blocks of its own; its
+			// update must still succeed so the module is not force-reloaded.
+			expect((initialRow as any)[HMR].update(updatedRow)).toBe(true);
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+
+		expect(r.findAll('.row').map((el) => el.textContent)).toEqual(['v2:a', '(none)']);
 		r.unmount();
 	});
 

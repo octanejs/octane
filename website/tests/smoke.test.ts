@@ -4,6 +4,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import bundleSizeBaseline from '../../benchmarks/baselines/local/bundle-size.json';
+import threeRendererBaseline from '../../benchmarks/baselines/local/three-renderer.json';
+import weatherAppLighthouseBaseline from '../../benchmarks/baselines/local/weather-app-lighthouse.json';
 import { getRouter } from '../src/router.ts';
 import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
@@ -17,6 +20,7 @@ import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
 	OCTANE_CARDS,
+	TARGET_CARDS,
 	type BenchCard,
 } from '../src/content/benchmarks.ts';
 import { createHomeSummary } from '../src/content/home-benchmark.ts';
@@ -82,6 +86,76 @@ async function renderRoute(url: string) {
 }
 
 describe('website routes', () => {
+	it('reports total shipped gzip for every bundle-size fixture', () => {
+		const bundleSize = FRAMEWORK_CARDS.find((card) => card.id === 'bundle-size')!;
+		const expectedRows = [
+			['rows total gzip', 'js_gzip'],
+			['TodoMVC total gzip', 'todo_js_gzip'],
+			['chat total gzip', 'chat_js_gzip'],
+			['weather total gzip', 'weather_js_gzip'],
+		] as const;
+		const targets = new Map(bundleSizeBaseline.targets.map((target) => [target.name, target]));
+
+		expect(bundleSize.rows.map((row) => row.op)).toEqual(expectedRows.map(([label]) => label));
+		for (const [index, [, op]] of expectedRows.entries()) {
+			const row = bundleSize.rows[index];
+			for (const series of bundleSize.series) {
+				const target = targets.get(series.key);
+				const stat = (
+					target?.ops as Record<string, { score?: number; median: number }> | undefined
+				)?.[op];
+				expect(row[series.key], `${row.op}/${series.key}`).toBe(stat?.score ?? stat?.median);
+			}
+		}
+	});
+
+	it('distinguishes simulated and observed Lighthouse paint measurements', () => {
+		const lighthouse = FRAMEWORK_CARDS.find((card) => card.id === 'weather-app-lighthouse')!;
+		const expectedRows = [
+			['simulated FCP', 'first_contentful_paint'],
+			['observed FCP', 'observed_first_contentful_paint'],
+			['simulated LCP', 'largest_contentful_paint'],
+			['observed LCP', 'observed_largest_contentful_paint'],
+			['speed index', 'speed_index'],
+			['TBT', 'total_blocking_time'],
+		] as const;
+		const targets = new Map(
+			weatherAppLighthouseBaseline.targets.map((target) => [target.name, target]),
+		);
+
+		expect(lighthouse.rows.map((row) => row.op)).toEqual(expectedRows.map(([label]) => label));
+		expect(lighthouse.description).toContain('desktop-network model');
+		expect(lighthouse.description).toContain('unthrottled browser trace');
+		for (const [index, [, op]] of expectedRows.entries()) {
+			const row = lighthouse.rows[index];
+			for (const series of lighthouse.series) {
+				const target = targets.get(series.key);
+				const stat = (
+					target?.ops as Record<string, { score?: number; median: number }> | undefined
+				)?.[op];
+				expect(stat, `${row.op}/${series.key}`).toBeDefined();
+				expect(row[series.key], `${row.op}/${series.key}`).toBe(stat?.score ?? stat?.median);
+			}
+		}
+	});
+
+	it('labels checked-in Three component reconstruction and disposal measurements', () => {
+		const threeRenderer = TARGET_CARDS.find((card) => card.id === 'three-renderer')!;
+		const row = threeRenderer.rows.find(
+			(candidate) => candidate.op === 'reconstruct component + dispose 1k',
+		);
+		const targets = new Map(threeRendererBaseline.targets.map((target) => [target.name, target]));
+
+		expect(row).toBeDefined();
+		for (const series of threeRenderer.series) {
+			const target = targets.get(series.key);
+			const stat = (target?.ops as Record<string, { score?: number; median: number }> | undefined)
+				?.reconstruct_component_dispose_1k;
+			expect(stat, series.key).toBeDefined();
+			expect(row?.[series.key], series.key).toBe(stat?.score ?? stat?.median);
+		}
+	});
+
 	it('publishes each framework only where the checked benchmark has measurements', () => {
 		// Math.log/exp may differ by one ULP between libc implementations. Keep
 		// this snapshot check exact at a stable precision beyond the chart's display.
@@ -91,33 +165,55 @@ describe('website routes', () => {
 
 		for (const card of FRAMEWORK_CARDS) {
 			const keys = card.series.map((series) => series.key);
-			expect(keys, card.id).toContain('preact');
-			if (card.id === 'streaming-ssr') {
+			if (card.id === 'svg-dashboard') {
+				expect(keys).toEqual(['octane-tsrx', 'react', 'solid', 'svelte']);
+			} else if (card.id === 'spa-navigation') {
+				expect(keys).toEqual(['octane-tsrx', 'octane-jsx', 'react', 'solid', 'vue-vapor']);
+			} else {
+				expect(keys, card.id).toContain('preact');
+			}
+			if (card.id === 'streaming-ssr' || card.id === 'spa-navigation') {
 				expect(keys, card.id).not.toContain('svelte');
 			} else {
 				expect(keys, card.id).toContain('svelte');
 			}
 
 			for (const row of card.rows) {
-				expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
-				if (card.id !== 'streaming-ssr') {
+				if (card.id !== 'svg-dashboard' && card.id !== 'spa-navigation') {
+					expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
+				}
+				if (card.id !== 'streaming-ssr' && card.id !== 'spa-navigation') {
 					expect(typeof row.svelte, `${card.id}/${row.op}/svelte`).toBe('number');
 				}
 			}
 		}
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
-		expect(summaryKeys).toEqual(expect.arrayContaining(['preact', 'svelte']));
-		expect(summaryKeys).not.toContain('react-compiler');
+		expect(summaryKeys).toEqual(expect.arrayContaining(['react', 'preact', 'svelte']));
+		expect(summaryKeys).not.toContain('react-uncompiled');
 
 		const memoWall = FRAMEWORK_CARDS.find((card) => card.id === 'memo-wall')!;
-		expect(memoWall.series.map((series) => series.key)).toContain('react-compiler');
+		expect(memoWall.series.map((series) => series.key)).toEqual(
+			expect.arrayContaining(['react', 'react-uncompiled']),
+		);
+		const jsFramework = FRAMEWORK_CARDS.find((card) => card.id === 'js-framework')!;
+		const jsFrameworkDeopt = OCTANE_CARDS.find((card) => card.id === 'js-framework-deopt')!;
+		expect(jsFrameworkDeopt.rows.map((row) => row.op)).toEqual(
+			jsFramework.rows.map((row) => row.op),
+		);
+		for (const row of jsFrameworkDeopt.rows) {
+			for (const series of jsFrameworkDeopt.series) {
+				expect(typeof row[series.key], `${jsFrameworkDeopt.id}/${row.op}/${series.key}`).toBe(
+					'number',
+				);
+			}
+		}
 		for (const card of FRAMEWORK_CARDS) {
 			if (card.id !== 'memo-wall') {
 				expect(
 					card.series.map((series) => series.key),
 					card.id,
-				).not.toContain('react-compiler');
+				).not.toContain('react-uncompiled');
 			}
 		}
 	});
@@ -183,8 +279,8 @@ describe('website routes', () => {
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// compat, spin, explorer. (Each section carries a compiler-added scoped class
-		// after its semantic one.)
+		// compat, lynx, spin, explorer. (Each section carries a compiler-added scoped
+		// class after its semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
 		);
@@ -194,9 +290,19 @@ describe('website routes', () => {
 			'proven',
 			'why',
 			'compat',
+			'lynx',
 			'spin',
 			'explorer',
 		]);
+
+		// The Lynx section is the entry point to /docs/lynx: its own link, plus one
+		// card per packaged example. The phones behind them are deferred, so the
+		// server renders the copy and the cards mount when the section comes near.
+		const lynx = container.querySelector('section.lynx')!;
+		expect(lynx.querySelector('.lynx-title')?.textContent).toContain(
+			'Build Native Apps, with Lynx and Octane',
+		);
+		expect(findLink(lynx, '/docs/lynx')).toBeTruthy();
 
 		// The home page renders the interactive benchmark explorer from the checked-in
 		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
@@ -205,6 +311,9 @@ describe('website routes', () => {
 		const explorer = container.querySelector('section.explorer')!;
 		expect(explorer).toBeTruthy();
 		expect(explorer.querySelector('#explorer-heading')?.textContent?.trim()).toBeTruthy();
+		expect(explorer.querySelector('.explorer-sub')?.textContent).toContain(
+			'Every primary React comparison uses the official React Compiler.',
+		);
 		expect(findLink(explorer, '/benchmarks')).toBeTruthy();
 		const bx = explorer.querySelector('.bx')!;
 		expect(bx).toBeTruthy();
@@ -247,10 +356,17 @@ describe('website routes', () => {
 		const { container } = await renderRoute('/benchmarks');
 
 		expect(container.querySelector('main .benchpage')).toBeTruthy();
+		expect(container.querySelector('.benchpage-sub')?.textContent).toContain(
+			'Every primary React comparison uses the official React Compiler;',
+		);
+		expect(container.querySelector('.benchpage-sub')?.textContent).toContain(
+			'memo-wall also shows an explicitly uncompiled control.',
+		);
 		expect(container.querySelector('.recharts-wrapper')).toBeNull();
 		expect(container.querySelector('.bench-plot-shell')).toBeNull();
 		const sections = [
 			{ id: 'bench-frameworks', cards: FRAMEWORK_CARDS },
+			{ id: 'bench-targets', cards: TARGET_CARDS },
 			{ id: 'bench-internal', cards: OCTANE_CARDS },
 		];
 		for (const { id, cards } of sections) {
@@ -273,6 +389,26 @@ describe('website routes', () => {
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
 			}
 		}
+		const lighthouse = container.querySelector('#bench-weather-app-lighthouse')!;
+		expect(
+			Array.from(lighthouse.querySelectorAll('tbody th[scope="row"]')).map((row) =>
+				row.textContent?.trim(),
+			),
+		).toEqual([
+			'simulated FCP',
+			'observed FCP',
+			'simulated LCP',
+			'observed LCP',
+			'speed index',
+			'TBT',
+		]);
+		const threeRenderer = container.querySelector('#bench-three-renderer')!;
+		expect(
+			Array.from(threeRenderer.querySelectorAll('tbody th[scope="row"]')).map((row) =>
+				row.textContent?.trim(),
+			),
+		).toContain('reconstruct component + dispose 1k');
+
 		// The left sidebar scroll-spy lists every section plus a nested row per
 		// benchmark card, and each link's anchor target exists in the document: a
 		// section heading for level-2 rows, an anchored card wrapper for level-3 rows.
@@ -283,7 +419,9 @@ describe('website routes', () => {
 		const mobileToggle = container.querySelector('.benchpage-sidebar-toggle');
 		expect(container.querySelectorAll('.benchpage-sidebar-toggle')).toHaveLength(1);
 		expect(mobileToggle?.textContent).toContain('Benchmarks');
-		expect(BENCH_SECTIONS.length).toBe(3 + FRAMEWORK_CARDS.length + OCTANE_CARDS.length);
+		expect(BENCH_SECTIONS.length).toBe(
+			4 + FRAMEWORK_CARDS.length + TARGET_CARDS.length + OCTANE_CARDS.length,
+		);
 		for (const section of BENCH_SECTIONS) {
 			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
 			const target = container.querySelector(`#${section.id}`)!;

@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/mobxjs/mobx.git",
+    "version": "mobx-react-lite@4.1.1",
+    "commit": "989de2d198e7a15c1fc1b981e1a96e50083ff2a0",
+    "sourceRoot": "packages/mobx-react-lite/src",
+    "testRoot": "packages/mobx-react-lite/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:5f399b15e821be8674d185fdb810357e1147af7e69171e0438fc6e48034fe24e",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/mobx/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/mobx/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "mobx-local-observable-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "One shared fixture compares observer and useLocalObservable through an action update.",
+      "files": [
+        {
+          "path": "packages/mobx/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "973feefb8e5af5141c5ef5b855f8f786d07987e90182cc1a84bbd3e57bc9a7e7",
+          "cases": [
+            {
+              "id": "differential:local-observable",
+              "testName": "observer and useLocalObservable render action updates identically",
+              "fullName": "differential: @octanejs/mobx vs real mobx-react-lite observer and useLocalObservable render action updates identically"
+            }
+          ]
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/store.tsrx",
+          "role": "support",
+          "sha256": "d2ed1ef7226b7af56e3078aa14c9e14b1758aa2ef32c266beae750863cc598c3"
+        },
+        {
+          "path": "packages/mobx/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "b3d8c02e6143796d19968a29c8749b816e68cfff147bb495aa3d3483109814bf"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

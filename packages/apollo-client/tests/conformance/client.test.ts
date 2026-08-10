@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
 	ApolloClient,
 	ApolloLink,
@@ -6,6 +8,7 @@ import {
 	makeVar,
 	type FetchResult,
 } from '@apollo/client';
+import { createOctaneCompiler } from 'octane/compiler/bundler';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -19,6 +22,7 @@ import {
 	MutationApp,
 	ProviderApp,
 	QueryApp,
+	QuerySourceApp,
 	ReactiveVarApp,
 	SkippedSuspenseQueryApp,
 	SubscriptionApp,
@@ -34,6 +38,14 @@ type PendingOperation = {
 	next(data: Record<string, unknown>): void;
 	complete(): void;
 	fail(error: Error): void;
+};
+
+type QuerySnapshot = {
+	client: ApolloClient;
+	observable: unknown;
+	data: Record<string, unknown> | undefined;
+	previousData: Record<string, unknown> | undefined;
+	loading: boolean;
 };
 
 function createControlledClient() {
@@ -65,6 +77,16 @@ function createControlledClient() {
 }
 
 describe('@octanejs/apollo-client client hooks', () => {
+	it('useQuery source is accepted when its package opts into Strong mode', () => {
+		const packageRoot = resolve(process.cwd(), 'packages/apollo-client');
+		const filename = resolve(packageRoot, 'src/react/hooks/useQuery.js');
+		const compiler = createOctaneCompiler({ root: packageRoot, strong: true });
+
+		expect(compiler.transform(readFileSync(filename, 'utf8'), filename)?.code).toEqual(
+			expect.any(String),
+		);
+	});
+
 	it('ApolloProvider supplies useApolloClient and the explicit override wins', () => {
 		const context = createControlledClient().client;
 		const override = createControlledClient().client;
@@ -111,6 +133,165 @@ describe('@octanejs/apollo-client client hooks', () => {
 		} finally {
 			mounted.unmount();
 			client.stop();
+		}
+	});
+
+	// Per @apollo/client@4.2.6 src/react/hooks/__tests__/useQuery.test.tsx:9621.
+	it('should persist result.previousData even if query changes', async () => {
+		const { client, operations } = createControlledClient();
+		const watchQuery = vi.spyOn(client, 'watchQuery');
+		const snapshots: QuerySnapshot[] = [];
+		const onResult = (result: QuerySnapshot) => snapshots.push(result);
+		const mounted = mount(QuerySourceApp, { client, query: GET_VALUE, onResult });
+
+		try {
+			expect(mounted.find('#query-source-status').textContent).toBe('loading');
+			expect(mounted.find('#query-source-current').textContent).toBe('null');
+			expect(mounted.find('#query-source-previous').textContent).toBe('null');
+			await settle();
+			expect(operations.map(({ operationName }) => operationName)).toEqual(['GetValue']);
+
+			operations[0].resolve({ value: 'first-query' });
+			await settle();
+			expect(mounted.find('#query-source-current').textContent).toBe(
+				JSON.stringify({ value: 'first-query' }),
+			);
+			const originalObservable = snapshots.at(-1)?.observable;
+			const sourceChange = snapshots.length;
+
+			mounted.update(QuerySourceApp, { client, query: GET_MOCKED_VALUE, onResult });
+			expect(mounted.find('#query-source-status').textContent).toBe('loading');
+			expect(mounted.find('#query-source-current').textContent).toBe('null');
+			expect(mounted.find('#query-source-previous').textContent).toBe(
+				JSON.stringify({ value: 'first-query' }),
+			);
+			expect(snapshots.slice(sourceChange)).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						client,
+						data: undefined,
+						loading: true,
+						previousData: { value: 'first-query' },
+					}),
+				]),
+			);
+			expect(
+				snapshots.slice(sourceChange).every(({ observable }) => observable !== originalObservable),
+			).toBe(true);
+			await settle();
+			expect(operations.map(({ operationName }) => operationName)).toEqual([
+				'GetValue',
+				'GetMockedValue',
+			]);
+			expect(watchQuery).toHaveBeenCalledTimes(2);
+			const replacementObservable = snapshots.at(-1)?.observable;
+
+			operations[1].resolve({ mockedValue: 'second-query' });
+			await settle();
+			expect(mounted.find('#query-source-status').textContent).toBe('ready');
+			expect(mounted.find('#query-source-current').textContent).toBe(
+				JSON.stringify({ mockedValue: 'second-query' }),
+			);
+			expect(mounted.find('#query-source-previous').textContent).toBe(
+				JSON.stringify({ value: 'first-query' }),
+			);
+			expect(snapshots.at(-1)?.observable).toBe(replacementObservable);
+
+			mounted.update(QuerySourceApp, { client, query: GET_MOCKED_VALUE, onResult });
+			await settle();
+			expect(watchQuery).toHaveBeenCalledTimes(2);
+			expect(operations.map(({ operationName }) => operationName)).toEqual([
+				'GetValue',
+				'GetMockedValue',
+			]);
+			expect(snapshots.at(-1)?.observable).toBe(replacementObservable);
+		} finally {
+			mounted.unmount();
+			watchQuery.mockRestore();
+			client.stop();
+		}
+	});
+
+	it('switches Apollo clients without publishing stale query data or retaining the old observable', async () => {
+		const first = createControlledClient();
+		const second = createControlledClient();
+		const firstWatchQuery = vi.spyOn(first.client, 'watchQuery');
+		const secondWatchQuery = vi.spyOn(second.client, 'watchQuery');
+		const snapshots: QuerySnapshot[] = [];
+		const onResult = (result: QuerySnapshot) => snapshots.push(result);
+		const mounted = mount(QuerySourceApp, {
+			client: first.client,
+			query: GET_VALUE,
+			onResult,
+		});
+
+		try {
+			await settle();
+			expect(first.operations.map(({ operationName }) => operationName)).toEqual(['GetValue']);
+			first.operations[0].resolve({ value: 'first-client' });
+			await settle();
+			expect(mounted.find('#query-source-current').textContent).toBe(
+				JSON.stringify({ value: 'first-client' }),
+			);
+			const originalObservable = snapshots.at(-1)?.observable;
+			const sourceChange = snapshots.length;
+
+			mounted.update(QuerySourceApp, {
+				client: second.client,
+				query: GET_VALUE,
+				onResult,
+			});
+			expect(mounted.find('#query-source-status').textContent).toBe('loading');
+			expect(mounted.find('#query-source-current').textContent).toBe('null');
+			expect(mounted.find('#query-source-previous').textContent).toBe(
+				JSON.stringify({ value: 'first-client' }),
+			);
+			expect(
+				snapshots
+					.slice(sourceChange)
+					.every(
+						({ client, observable }) =>
+							client === second.client && observable !== originalObservable,
+					),
+			).toBe(true);
+			await settle();
+			expect(firstWatchQuery).toHaveBeenCalledTimes(1);
+			expect(secondWatchQuery).toHaveBeenCalledTimes(1);
+			expect(second.operations.map(({ operationName }) => operationName)).toEqual(['GetValue']);
+
+			first.client.writeQuery({ query: GET_VALUE, data: { value: 'retired-client' } });
+			await settle();
+			expect(mounted.find('#query-source-status').textContent).toBe('loading');
+			expect(mounted.find('#query-source-current').textContent).toBe('null');
+			expect(mounted.find('#query-source-previous').textContent).toBe(
+				JSON.stringify({ value: 'first-client' }),
+			);
+
+			second.operations[0].resolve({ value: 'second-client' });
+			await settle();
+			expect(mounted.find('#query-source-status').textContent).toBe('ready');
+			expect(mounted.find('#query-source-current').textContent).toBe(
+				JSON.stringify({ value: 'second-client' }),
+			);
+			expect(mounted.find('#query-source-previous').textContent).toBe(
+				JSON.stringify({ value: 'first-client' }),
+			);
+			expect(snapshots.at(-1)?.client).toBe(second.client);
+
+			second.client.writeQuery({ query: GET_VALUE, data: { value: 'second-client-update' } });
+			await settle();
+			expect(mounted.find('#query-source-current').textContent).toBe(
+				JSON.stringify({ value: 'second-client-update' }),
+			);
+			expect(mounted.find('#query-source-previous').textContent).toBe(
+				JSON.stringify({ value: 'second-client' }),
+			);
+		} finally {
+			mounted.unmount();
+			firstWatchQuery.mockRestore();
+			secondWatchQuery.mockRestore();
+			first.client.stop();
+			second.client.stop();
 		}
 	});
 

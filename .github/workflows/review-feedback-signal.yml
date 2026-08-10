@@ -1,0 +1,19 @@
+name: Review feedback signal
+
+# Pull request review comment workflows receive a read-only token for fork PRs.
+# This unprivileged workflow only emits a completion event; the default-branch
+# readiness workflow performs the server-side reconciliation without consuming
+# code, artifacts, or other input from this run.
+on:
+  pull_request_review_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  signal:
+    name: signal review feedback
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signal review feedback
+        run: "true"

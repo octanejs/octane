@@ -56,7 +56,7 @@ export interface ItemProps extends Record<string, unknown> {
 	className?: string;
 	variant?: VariantProps<typeof itemVariants>['variant'];
 	size?: VariantProps<typeof itemVariants>['size'];
-	// OCTANE DIVERGENCE: asChild composes element descriptors (createElement),
+	// Octane divergence (shadcn-aschild-descriptors): asChild composes element descriptors (createElement),
 	// not opaque compiled .tsrx children — the documented radix Slot contract.
 	asChild?: boolean;
 }

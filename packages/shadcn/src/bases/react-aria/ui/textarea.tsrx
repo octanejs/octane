@@ -2,7 +2,7 @@
 // (RAC TextArea, className through composeRenderProps). Class strings are the
 // package's shipped utilities-inlined flavor, matching the Radix base.
 //
-// OCTANE DIVERGENCE: per-keystroke handling is the native `onInput` event, not
+// Octane divergence (shadcn-native-input-events): per-keystroke handling is the native `onInput` event, not
 // a synthetic `onChange`; native `change` keeps its commit-on-blur meaning.
 import { composeRenderProps, TextArea as TextareaPrimitive } from '@octanejs/aria/components';
 import type { TextAreaProps as TextareaPrimitiveProps } from '@octanejs/aria/components';

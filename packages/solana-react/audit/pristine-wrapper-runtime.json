@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "solana-react-pristine",
+  "roots": ["packages/solana-react/tests"],
+  "files": ["packages/solana-react/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:dd262f2a9549786b",
+      "file": "packages/solana-react/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @solana/react 7.0.0 client/capability/query suite unchanged"
+    }
+  ],
+  "snapshots": 0
+}

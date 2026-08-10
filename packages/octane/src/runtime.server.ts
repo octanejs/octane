@@ -76,6 +76,7 @@ import {
 	markComponentFlags,
 } from './component-flags.js';
 import { formatServerError } from './error-codes.server.generated.js';
+import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
@@ -132,7 +133,9 @@ type AttributeNamespace = ParserNamespace | 'opaque';
 // Public string descriptors are HTML-ASCII-case-insensitive. Keep foreign
 // namespace inference on the same contract even though the shared table stores
 // SVG's canonical mixed-case spellings (for example foreignObject/clipPath).
-const SVG_ONLY_LOWERCASE_TAGS = new Set(Array.from(SVG_ONLY_TAGS, (tag) => tag.toLowerCase()));
+const SVG_ONLY_LOWERCASE_TAGS = /* @__PURE__ */ new Set(
+	/* @__PURE__ */ Array.from(SVG_ONLY_TAGS, (tag) => tag.toLowerCase()),
+);
 
 interface SsrElementContext {
 	tag: string;
@@ -614,6 +617,9 @@ export function createElement(
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
+	if (typeof type === 'function' && isRendererContext(type)) {
+		registerServerRendererContextProvider(renderServerContextProvider);
+	}
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
 	let kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
@@ -1099,7 +1105,7 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 
 // Guarded escapers: a single .test() scan first, so the common no-escape case
 // returns the ORIGINAL string with zero allocation (~5x on clean text). When
-// something does need escaping, the chained native .replace passes are kept —
+// something does need escaping, native replacement passes are kept —
 // measured faster than an exec-loop or replace-with-callback single pass on V8
 // for both sparse and dense escape densities.
 const HTML_ESCAPE_RE = /[&<>]/g;
@@ -1107,7 +1113,7 @@ export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
 	HTML_ESCAPE_RE.lastIndex = 0;
 	if (!HTML_ESCAPE_RE.test(s)) return s;
-	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 const ATTR_ESCAPE_RE = /[&"]/g;
@@ -1608,8 +1614,18 @@ export function encodeAsyncIdentityString(value: string): string {
 
 function asyncIdentityKey(value: unknown, objectIs: boolean, positionFallback?: string): string {
 	switch (typeof value) {
-		case 'string':
+		case 'string': {
+			if (value.length > 64 && RESOLVED !== null) {
+				const ids = RESOLVED.asyncIdentities;
+				let id = ids.get(value);
+				if (id === undefined) {
+					id = RESOLVED.nextAsyncIdentity++;
+					ids.set(value, id);
+				}
+				return 't' + id.toString(36);
+			}
 			return 's' + encodeAsyncIdentityString(value);
+		}
 		case 'number':
 			return 'n' + (objectIs && Object.is(value, -0) ? '-0' : String(value));
 		case 'bigint':
@@ -1731,6 +1747,11 @@ export function ssrAttr(
 	// setAttribute writes (hydration parity). Custom elements get their props
 	// VERBATIM (no alias tables) — React parity.
 	if (!isCustomTag) {
+		// Server markup carries browser-native autofocus even though client mounts
+		// perform focus at commit without writing this attribute.
+		if (name === 'autoFocus') {
+			return v && typeof v !== 'function' && typeof v !== 'symbol' ? ' autofocus=""' : '';
+		}
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
 	}
@@ -1954,9 +1975,6 @@ function ssrAttrEntry(
 	)
 		return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
-	// `autoFocus` never serializes (client focuses at its mount commit).
-	if (k === 'autoFocus' && (namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1))
-		return '';
 	if (k === 'style') return ssrStyle(v);
 	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag, namespace);
 	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag, namespace);
@@ -2057,11 +2075,6 @@ export function ssrAttrs(
 			const c = rawName.charCodeAt(2);
 			if (c >= 65 && c <= 90) continue;
 		}
-		if (
-			rawName === 'autoFocus' &&
-			(namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1)
-		)
-			continue;
 		const name = normalizeSsrAttributeName(rawName, tag, namespace);
 		if (!VALID_ATTR_NAME.test(name)) continue;
 		// Attribute identity is ASCII-case-insensitive in the HTML namespace.
@@ -3333,8 +3346,12 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 	'Hydrate',
 );
 
-Object.defineProperty(hydrate, '__octanePermanentStatic', { value: PermanentStaticHydrate });
-export const Hydrate: ServerComponent = hydrate;
+function initializeHydrateComponent(): ServerComponent {
+	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: PermanentStaticHydrate });
+	return hydrate;
+}
+
+export const Hydrate: ServerComponent = /* @__PURE__ */ initializeHydrateComponent();
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
@@ -3642,23 +3659,29 @@ export interface Context<T> {
 
 export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {
-		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
-		scope.$$ctxValues.set(ctx, props.value);
-		const children = props.children;
-		if (children == null) return '';
-		// `.tsrx` threads children as a render function (call it directly). `.tsx`
-		// `<Ctx.Provider>…</Ctx.Provider>` lowers to `createElement(Provider, {}, …)`,
-		// so children arrive as a descriptor / array / primitive — render whichever
-		// shape through the generic child serializer (the same path every other
-		// descriptor child uses), or direct-JSX provider SSR would drop its content.
-		return typeof children === 'function'
-			? (children(undefined, scope) ?? '')
-			: ssrChild(children, scope);
+		return renderServerContextProvider(ctx, props, scope);
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.Provider = ctx;
 	return ctx;
+}
+
+function renderServerContextProvider(
+	context: unknown,
+	props: { value: unknown; children?: unknown },
+	renderScope: object,
+): string {
+	const scope = renderScope as SSRScope;
+	if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
+	scope.$$ctxValues.set(context, props.value);
+	const children = props.children;
+	if (children == null) return '';
+	// `.tsrx` children are render functions; `.tsx` children are descriptors,
+	// arrays, or primitives and must keep the ordinary server serializer.
+	return typeof children === 'function'
+		? (children(undefined, scope) ?? '')
+		: ssrChild(children, scope);
 }
 
 function readContext<T>(ctx: Context<T>): T {
@@ -5166,7 +5189,7 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
-	/** Render-local stable ids for non-primitive control/list keys. */
+	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
 	asyncPositionIdentities: Map<string, number>;
@@ -6560,43 +6583,46 @@ export function ssrTry(
 // boundary errored (hydration client-renders it via mismatch recovery). A
 // truthy second argument removes only a server-owned permanent-static sentinel,
 // retaining its already-flushed fallback because no client graph can recover it.
-const STREAM_RUNTIME_JS =
-	'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
-	// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
-	// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
-	'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
-	'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
-	'window.$OCTRC=function(id,nc){' +
-	"var t=d.querySelector('template[" +
-	STREAM_BOUNDARY_ATTR +
-	"=\"'+id+'\"]');" +
-	"var s=d.querySelector('[" +
-	STREAM_SEGMENT_ATTR +
-	"=\"'+id+'\"]');" +
-	'if(!s)return;if(!t){s.remove();return;}' +
-	'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
-	'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
-	'var sd=c.querySelector("script[' +
-	STREAM_SEED_ATTR +
-	']");' +
-	'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
-	'if(nc)c=c.firstElementChild;' +
-	'var n=t.nextSibling,depth=1;' +
-	'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
-	'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
-	'n.parentNode.removeChild(n);n=x;}' +
-	'var p=t.parentNode;' +
-	'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
-	'p.replaceChild(d.createComment("' +
-	STREAM_SEED_COMMENT +
-	'"+id),t);' +
-	's.parentNode.removeChild(s);};' +
-	'window.$OCTRX=function(id,so){' +
-	"var t=d.querySelector('template[" +
-	STREAM_BOUNDARY_ATTR +
-	"=\"'+id+'\"]');" +
-	'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
-	'})();';
+let STREAM_RUNTIME_JS: string | undefined;
+function streamRuntimeJs(): string {
+	return (STREAM_RUNTIME_JS ??=
+		'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
+		// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
+		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
+		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
+		'window.$OCTRC=function(id,nc){' +
+		"var t=d.querySelector('template[" +
+		STREAM_BOUNDARY_ATTR +
+		"=\"'+id+'\"]');" +
+		"var s=d.querySelector('[" +
+		STREAM_SEGMENT_ATTR +
+		"=\"'+id+'\"]');" +
+		'if(!s)return;if(!t){s.remove();return;}' +
+		'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
+		'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
+		'var sd=c.querySelector("script[' +
+		STREAM_SEED_ATTR +
+		']");' +
+		'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
+		'if(nc)c=c.firstElementChild;' +
+		'var n=t.nextSibling,depth=1;' +
+		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
+		'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
+		'n.parentNode.removeChild(n);n=x;}' +
+		'var p=t.parentNode;' +
+		'while(c.firstChild)p.insertBefore(c.firstChild,n);' +
+		'p.replaceChild(d.createComment("' +
+		STREAM_SEED_COMMENT +
+		'"+id),t);' +
+		's.parentNode.removeChild(s);};' +
+		'window.$OCTRX=function(id,so){' +
+		"var t=d.querySelector('template[" +
+		STREAM_BOUNDARY_ATTR +
+		"=\"'+id+'\"]');" +
+		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
+		'})();');
+}
 
 interface StreamSink {
 	/**
@@ -7061,7 +7087,7 @@ async function runStream(
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
-		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
+		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
 	try {
 		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;

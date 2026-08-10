@@ -1,5 +1,11 @@
 {
   "upstream": { "package": "sonner", "version": "2.0.7" },
+  "provenance": {
+    "source": "https://github.com/emilkowalski/sonner/tree/v2.0.7",
+    "license": "MIT",
+    "commit": "3ba7aa17ab7e8101b9cf4893936f873b0d4769b3",
+    "verification": "recorded-unverified"
+  },
   "surface": "Complete against the published `sonner@2.0.7` public surface: `Toaster`, the callable `toast` API and all methods, `useSonner`, promise lifecycle, multiple toaster targeting, stacked layout, themes, styling, focus management, timers, and swipe dismissal.",
   "divergences": [
     "Action callbacks receive native DOM `MouseEvent`s rather than React synthetic events.",
@@ -7,6 +13,9 @@
     "The document-visibility hook is guarded during SSR; upstream 2.0.7 reads `document.hidden` during render."
   ],
   "ssr": "Supported and tested: `Toaster` server-renders without browser globals, hydrates by adopting the server host, and can show the first client-created toast without replacing it.",
-  "verified": "2026-07-13",
+  "verified": "2026-08-02",
+  "notes": [
+    "Bounded React parity runs the vendored Playwright suite unchanged against published sonner@2.0.7 plus one exact same-fixture differential lifecycle case. Renderer-divergence authentication stays in ordinary package shards and is not counted as React-parity evidence."
+  ],
   "docs": ["docs/sonner-port-plan.md"]
 }

@@ -3,7 +3,7 @@
 // dropped — octane has no RSC axis). IconPlaceholder resolves to lucide (see
 // spinner.tsrx).
 //
-// OCTANE DIVERGENCE: upstream reads the theme from next-themes' useTheme()
+// Octane divergence (shadcn-sonner-theme): upstream reads the theme from next-themes' useTheme()
 // (Next.js-specific); here `theme` is an ordinary prop with upstream's
 // 'system' default — pass your app's theme source explicitly. The icon
 // descriptors are composed with createElement (they travel through a props

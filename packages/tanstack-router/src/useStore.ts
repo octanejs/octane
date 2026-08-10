@@ -6,6 +6,7 @@
 // `useSyncExternalStore`. The atoms come from router-core's client store factory
 // (`createAtom` from `@tanstack/store`): `.subscribe(cb) → { unsubscribe }` + `.get()`.
 import { useSyncExternalStore, useCallback, useRef } from 'octane';
+import { isServer } from '@tanstack/router-core/isServer';
 import { subSlot, splitSlot } from './internal';
 
 interface Atom<T> {
@@ -25,6 +26,13 @@ export function useStore<T, S = T>(
 	slot?: symbol,
 ): S;
 export function useStore(...args: any[]): any {
+	const rawAtom = args[0] as Atom<unknown>;
+	if (isServer && typeof rawAtom.subscribe !== 'function') {
+		const value = rawAtom.get();
+		const selector = args[1];
+		return typeof selector === 'function' ? selector(value) : value;
+	}
+
 	const [user, slot] = splitSlot(args);
 	const atom = user[0] as Atom<unknown>;
 	const selector = (user[1] ?? ((s: unknown) => s)) as (s: unknown) => unknown;

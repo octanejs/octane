@@ -28,7 +28,7 @@
 
 import fs from 'node:fs';
 import { chromium } from 'playwright';
-import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
+import { deterministicCount } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
@@ -55,10 +55,21 @@ const OPS = [
 	// next op's ensureState sees 2000 rows ≠ 1000 and rebuilds via #run.
 	{ name: 'add', pre: 'rows', click: '#add' },
 	{ name: 'update', pre: 'rows', click: '#update' },
-	{ name: 'select', pre: 'rows', click: 'tbody tr:nth-child(5) td:nth-child(2) a' },
+	{
+		name: 'select',
+		pre: 'rows',
+		click: 'tbody tr:nth-child(5) td:nth-child(2) a',
+		alternateClick: 'tbody tr:nth-child(6) td:nth-child(2) a',
+	},
 	{ name: 'swap', pre: 'rows', click: '#swaprows' },
 	{ name: 'remove', pre: 'rows', click: 'tbody tr:nth-child(5) td:nth-child(3) a' },
 	{ name: 'runlots', pre: 'empty', click: '#runlots' },
+	{
+		name: 'select_lots',
+		pre: 'rows-large',
+		click: 'tbody tr:nth-child(5000) td:nth-child(2) a',
+		alternateClick: 'tbody tr:nth-child(5001) td:nth-child(2) a',
+	},
 	// Canonical js-framework-benchmark `clear` measures clearing the
 	// 10K-row table that `runlots` populated — NOT the 1K-row table from
 	// `run`. The previous `pre: 'rows'` rebuilt 1K rows before the timed
@@ -141,6 +152,190 @@ async function timeClick(page, sel) {
 	}, sel);
 }
 
+async function verifySelection(page, selector) {
+	await page.evaluate((selector) => {
+		const expected = document.querySelector(selector)?.closest('tr');
+		const selected = document.querySelectorAll('tbody tr.danger');
+		if (expected && selected.length === 1 && selected[0] === expected) return;
+
+		const rowId = (row) => row.querySelector('td')?.textContent || '(missing id)';
+		throw new Error(
+			'selection gate failed: expected only ' +
+				(expected ? rowId(expected) : '(missing row)') +
+				', found ' +
+				(Array.from(selected, rowId).join(', ') || '(none)'),
+		);
+	}, selector);
+}
+
+// Mount optimizations must retain ordinary live-parent insertion semantics.
+// Keep browser-visible instrumentation entirely outside every timed sample.
+async function verifyDirectListMount(page, operation) {
+	await ensureState(page, operation.initialRows === 0 ? 'empty' : 'rows');
+	return await page.evaluate(async (operation) => {
+		const tbody = document.querySelector('tbody');
+		if (!tbody?.isConnected) throw new Error('mount gate: missing connected table body');
+		const before = Array.from(tbody.querySelectorAll('tr'));
+		if (before.length !== operation.initialRows) {
+			throw new Error(`mount gate: expected ${operation.initialRows} initial rows`);
+		}
+		const rowId = (row) => Number(row.firstElementChild?.textContent);
+		const survivors = new Map(before.map((row) => [rowId(row), row]));
+
+		const work = { liveParentInsertions: 0, fragmentCommits: 0, fragmentRows: 0 };
+		const originals = [];
+		const instrument = (prototype, name) => {
+			const original = prototype[name];
+			if (typeof original !== 'function') return;
+			originals.push([prototype, name, original]);
+			prototype[name] = function (...args) {
+				if (this === tbody) {
+					work.liveParentInsertions++;
+					for (const node of args) {
+						if (node?.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+							work.fragmentCommits++;
+							work.fragmentRows += node.querySelectorAll('tr').length;
+						}
+					}
+				}
+				return Reflect.apply(original, this, args);
+			};
+		};
+		for (const name of ['insertBefore', 'appendChild', 'replaceChild']) {
+			instrument(Node.prototype, name);
+		}
+		for (const name of ['append', 'prepend', 'replaceChildren']) {
+			instrument(Element.prototype, name);
+		}
+
+		try {
+			const button = document.getElementById(operation.button);
+			if (!button) throw new Error(`mount gate: missing #${operation.button}`);
+			button.click();
+			if (window.__benchFlush) await window.__benchFlush();
+		} finally {
+			for (const [prototype, name, original] of originals.reverse()) {
+				prototype[name] = original;
+			}
+		}
+
+		const rows = Array.from(tbody.querySelectorAll('tr'));
+		const expectedRows = operation.initialRows + operation.addedRows;
+		if (rows.length !== expectedRows) {
+			throw new Error(`mount gate: expected ${expectedRows} rows, found ${rows.length}`);
+		}
+		const insertionIndex =
+			operation.insertion === 'prepend'
+				? 0
+				: operation.insertion === 'middle'
+					? operation.initialRows >> 1
+					: operation.initialRows;
+		const inserted = rows.slice(insertionIndex, insertionIndex + operation.addedRows);
+		const firstInsertedId = rowId(inserted[0]);
+		if (!Number.isSafeInteger(firstInsertedId)) throw new Error('mount gate: invalid row id');
+		let survivorIndex = 0;
+		for (let index = 0; index < rows.length; index++) {
+			const row = rows[index];
+			const id = rowId(row);
+			const isInserted = index >= insertionIndex && index < insertionIndex + operation.addedRows;
+			if (!row.isConnected || !Number.isSafeInteger(id)) {
+				throw new Error(`mount gate: incorrect row identity or connectivity at ${index}`);
+			}
+			if (isInserted) {
+				if (survivors.has(id) || id !== firstInsertedId + index - insertionIndex) {
+					throw new Error(`mount gate: incorrect inserted-row order at ${index}`);
+				}
+			} else if (row !== before[survivorIndex++] || survivors.get(id) !== row) {
+				throw new Error(`mount gate: survivor order or DOM identity changed at ${index}`);
+			}
+		}
+		if (survivorIndex !== before.length) throw new Error('mount gate: missing surviving rows');
+
+		const selectedRow = inserted[Math.min(4, inserted.length - 1)];
+		const action = selectedRow.querySelector('td:nth-child(2) a');
+		if (!action) throw new Error('mount gate: missing row action');
+		action.click();
+		if (window.__benchFlush) await window.__benchFlush();
+		const selected = tbody.querySelectorAll('tr.danger');
+		if (selected.length !== 1 || selected[0] !== selectedRow) {
+			throw new Error('mount gate: inserted-row identity, delegated event, or selection failed');
+		}
+
+		if (work.liveParentInsertions !== operation.addedRows || work.fragmentCommits !== 0) {
+			throw new Error(
+				`mount gate: ${operation.name} required ${operation.addedRows} direct row insertions; ` +
+					`got ${work.liveParentInsertions} live-parent insertions, ` +
+					`${work.fragmentCommits} fragment commits, ${work.fragmentRows} fragment rows`,
+			);
+		}
+		return work;
+	}, operation);
+}
+
+// Minified production bundles rename runtime helpers, so count all production
+// calls instead of pinning private aliases. A separate --jitless browser keeps
+// precise call coverage deterministic without affecting wall-clock samples.
+async function countProductionMountCalls(target) {
+	const browser = await chromium.launch({
+		headless: true,
+		args: ['--disable-extensions', '--js-flags=--jitless'],
+	});
+	const context = await browser.newContext();
+	const page = await context.newPage();
+	const cdp = await context.newCDPSession(page);
+	let profiling = false;
+	try {
+		await cdp.send('Profiler.enable');
+		await cdp.send('Profiler.startPreciseCoverage', {
+			callCount: true,
+			detailed: true,
+			allowTriggeredUpdates: false,
+		});
+		profiling = true;
+		await page.goto(target.url, { waitUntil: 'load' });
+		await page.waitForSelector(target.ready, { timeout: 10000 });
+		await cdp.send('Profiler.takePreciseCoverage');
+		await page.evaluate(async () => {
+			document.getElementById('run').click();
+			if (window.__benchFlush) await window.__benchFlush();
+		});
+		const coverage = await cdp.send('Profiler.takePreciseCoverage');
+		let calls = 0;
+		for (const script of coverage.result) {
+			if (!script.url.includes('/assets/')) continue;
+			for (const fn of script.functions) calls += fn.ranges[0]?.count || 0;
+		}
+		if (calls === 0) throw new Error('mount gate: no production asset call coverage');
+
+		await page.evaluate((expectedRows) => {
+			const rows = Array.from(document.querySelectorAll('tbody tr'));
+			if (rows.length !== expectedRows) {
+				throw new Error(`mount gate: profiled mount produced ${rows.length} rows`);
+			}
+			const first = Number(rows[0].firstElementChild?.textContent);
+			for (let index = 0; index < rows.length; index++) {
+				if (Number(rows[index].firstElementChild?.textContent) !== first + index) {
+					throw new Error(`mount gate: profiled row order changed at ${index}`);
+				}
+			}
+			const row = rows[4];
+			row.querySelector('td:nth-child(2) a').click();
+			const selected = document.querySelectorAll('tbody tr.danger');
+			if (selected.length !== 1 || selected[0] !== row) {
+				throw new Error('mount gate: profiled row event or selection failed');
+			}
+		}, ROW_COUNT);
+		return calls;
+	} finally {
+		if (profiling) {
+			await cdp.send('Profiler.stopPreciseCoverage').catch(() => {});
+			await cdp.send('Profiler.disable').catch(() => {});
+		}
+		await context.close();
+		await browser.close();
+	}
+}
+
 async function runTarget(t) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -165,25 +360,48 @@ async function runTarget(t) {
 		const samples = [];
 		for (let i = 0; i < ITER; i++) {
 			await ensureState(page, op.pre);
-			const dt = await timeClick(page, op.click);
+			const selector = i % 2 === 1 && op.alternateClick ? op.alternateClick : op.click;
+			const dt = await timeClick(page, selector);
+			if (op.alternateClick) await verifySelection(page, selector);
 			samples.push(dt);
 			await sleep(60);
 		}
 		results[op.name] = summarizeSamples(samples);
 	}
 
-	// Full steady-state DOM shape. Tracking element/text counts beside comments
-	// prevents a bookkeeping optimization from gaming the metric by replacing a
-	// comment with an invisible text node or dropping user-visible output.
-	await ensureState(page, 'rows');
-	const dom = await page.evaluate(censusDomNodes, '#main');
-	results.nodes_1k = deterministicCount(dom.total);
-	results.elements_1k = deterministicCount(dom.elements);
-	results.text_1k = deterministicCount(dom.text);
-	results.comments_1k = deterministicCount(dom.comments);
-	results.empty_text_1k = deterministicCount(dom.emptyText);
-	results.whitespace_text_1k = deterministicCount(dom.whitespaceText);
-	results.__dom = dom;
+	if (t.name === 'octane-tsrx' || t.name === 'octane-jsx') {
+		for (const operation of [
+			{ name: '1k', button: 'run', initialRows: 0, addedRows: ROW_COUNT },
+			{ name: '10k', button: 'runlots', initialRows: 0, addedRows: ROW_COUNT_LARGE },
+			{ name: 'append_1k', button: 'add', initialRows: ROW_COUNT, addedRows: ROW_COUNT },
+			{
+				name: 'prepend_100',
+				button: 'prepend100',
+				initialRows: ROW_COUNT,
+				addedRows: 100,
+				insertion: 'prepend',
+			},
+			{ name: 'append_100', button: 'append100', initialRows: ROW_COUNT, addedRows: 100 },
+			{
+				name: 'middle_100',
+				button: 'insertmid100',
+				initialRows: ROW_COUNT,
+				addedRows: 100,
+				insertion: 'middle',
+			},
+		]) {
+			const work = await verifyDirectListMount(page, operation);
+			results[`live_inserts_${operation.name}`] = deterministicCount(work.liveParentInsertions);
+			results[`fragment_commits_${operation.name}`] = deterministicCount(work.fragmentCommits);
+		}
+
+		const calls = await countProductionMountCalls(t);
+		const ceiling = t.name === 'octane-tsrx' ? 25000 : 39000;
+		if (calls > ceiling) {
+			throw new Error(`mount gate: ${t.name} made ${calls} production calls (maximum ${ceiling})`);
+		}
+		results.production_calls_1k = deterministicCount(calls);
+	}
 
 	await browser.close();
 	return results;
@@ -210,15 +428,19 @@ async function runTarget(t) {
 		console.log(row.join('| '));
 	}
 	for (const [label, op] of [
-		['#nodes', 'nodes_1k'],
-		['#elems', 'elements_1k'],
-		['#text', 'text_1k'],
-		['#cmnts', 'comments_1k'],
-		['#empty', 'empty_text_1k'],
-		['#ws', 'whitespace_text_1k'],
+		['#ins1k', 'live_inserts_1k'],
+		['#frag1k', 'fragment_commits_1k'],
+		['#ins10k', 'live_inserts_10k'],
+		['#frag10k', 'fragment_commits_10k'],
+		['#calls1k', 'production_calls_1k'],
+		['#insadd', 'live_inserts_append_1k'],
+		['#inspre', 'live_inserts_prepend_100'],
+		['#insapp', 'live_inserts_append_100'],
+		['#insmid', 'live_inserts_middle_100'],
 	]) {
+		if (!cols.some((name) => all[name][op])) continue;
 		const row = [label.padEnd(8)];
-		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
+		for (const name of cols) row.push(String(all[name][op]?.median ?? '-').padEnd(W));
 		console.log(row.join('| '));
 	}
 
@@ -250,16 +472,13 @@ async function runTarget(t) {
 			targets: TARGETS.map((t) => ({
 				name: t.name,
 				ops: Object.fromEntries(
-					Object.entries(all[t.name])
-						.filter(([name]) => name !== '__dom')
-						.map(([name, r]) => [
-							name,
-							r.score == null
-								? { median: r.median, min: r.min, samples: r.samples.length }
-								: timingStatForJson(r),
-						]),
+					Object.entries(all[t.name]).map(([name, r]) => [
+						name,
+						r.score == null
+							? { median: r.median, min: r.min, samples: r.samples.length }
+							: timingStatForJson(r),
+					]),
 				),
-				meta: { dom: all[t.name].__dom },
 			})),
 		};
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

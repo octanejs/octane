@@ -5,7 +5,14 @@ import { octane } from '../src/compiler/vite.js';
 import type { RenderResult } from '../src/runtime.server';
 
 type HydrationBinding =
-	'apollo-client' | 'aria' | 'base-ui' | 'docusaurus' | 'rainbowkit' | 'testing-library';
+	| 'apollo-client'
+	| 'aria'
+	| 'base-ui'
+	| 'docusaurus'
+	| 'rainbowkit'
+	| 'react-map-gl'
+	| 'solana-react'
+	| 'testing-library';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
@@ -45,6 +52,15 @@ function bindingAliases(binding: HydrationBinding) {
 		];
 	}
 
+	if (binding === 'solana-react') {
+		return [
+			{
+				find: /^@octanejs\/solana-react$/,
+				replacement: resolve(source, 'index.ts'),
+			},
+		];
+	}
+
 	if (binding === 'rainbowkit') {
 		return [
 			{
@@ -60,6 +76,10 @@ function bindingAliases(binding: HydrationBinding) {
 				replacement: resolve(repositoryRoot, 'packages/tanstack-query/src/index.ts'),
 			},
 		];
+	}
+
+	if (binding === 'react-map-gl') {
+		return [{ find: /^@octanejs\/react-map-gl$/, replacement: resolve(source, 'index.ts') }];
 	}
 
 	if (binding === 'testing-library') {

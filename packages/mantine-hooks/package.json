@@ -1,8 +1,9 @@
 {
   "name": "@octanejs/mantine-hooks",
-  "version": "0.1.9",
+  "version": "0.1.14",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=22.22.2"
   },
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@mantine/hooks": "9.5.0",
     "@types/react": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "vitest": "catalog:default"

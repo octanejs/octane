@@ -3,9 +3,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { octane } from 'octane/compiler/vite';
 import { threeRenderers } from '@octanejs/three/config';
+import { reactCompiler } from '../react-compiler.mjs';
 
 export default defineConfig({
-	plugins: [octane({ renderers: threeRenderers }), react()],
+	plugins: [
+		octane({ renderers: threeRenderers }),
+		react(),
+		reactCompiler({ include: /\.jsx(?:$|\?)/ }),
+	],
 	optimizeDeps: {
 		exclude: ['octane', '@octanejs/three'],
 	},
@@ -25,4 +30,10 @@ export default defineConfig({
 		},
 	},
 	server: { port: 5291, strictPort: true },
+	preview: {
+		headers: {
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'require-corp',
+		},
+	},
 });
