@@ -170,7 +170,8 @@ interface LynxQueuedNativeEventDelivery {
 interface ActiveLynxMainRoot<Node extends LynxElementRef> {
 	readonly root: number;
 	readonly container: LynxHostContainer<Node>;
-	readonly capabilities?: LynxMainThreadCapabilities;
+	capabilities?: LynxMainThreadCapabilities;
+	postFirstTreeUpgrade?: true;
 	acceptedVersion: number;
 	lastMainCall: number;
 	lastMainCallPublication: number;
@@ -460,6 +461,30 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 	return Object.freeze(handles);
 }
 
+function freezeValidatedIntrinsicRun(
+	run: Extract<UniversalHostBatch['commands'][number], { readonly op: 'mount-template-run' }>,
+): void {
+	// MessagePort structured-clones worker payloads and drops every frozen
+	// descriptor. Restore immutability only after the complete receive-boundary
+	// validator has rejected hostile prototypes, accessors, symbols, and scalars.
+	// The program is a tiny shared shape; its flat values are frozen in place.
+	const program = run.program;
+	for (const node of program.nodes) {
+		Object.freeze(node.props);
+		if (node.bindings !== undefined) {
+			for (const binding of node.bindings) Object.freeze(binding);
+			Object.freeze(node.bindings);
+		}
+		Object.freeze(node);
+	}
+	Object.freeze(program.nodes);
+	for (const event of program.events) Object.freeze(event);
+	Object.freeze(program.events);
+	Object.freeze(program);
+	Object.freeze(run.values);
+	Object.freeze(run);
+}
+
 /**
  * Install the main-thread receiver that owns one root-scoped Element PAPI host.
  * Importing this module is inert; framework bootstrap calls this function on
@@ -564,6 +589,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let dispatchingReadyRequest: number | null = null;
 	let correlatedReadySent = false;
 	let negotiatedCapabilities: LynxMainThreadCapabilities | undefined;
+	let deferredFirstTreeCapabilities: LynxMainThreadCapabilities | undefined;
 	let firstTreeSnapshotSent = false;
 	let uninstallFirstScreenHost: (() => void) | null = null;
 	const queuedCommits: LynxCommitMessage[] = [];
@@ -1252,21 +1278,15 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 							...(driver.capabilities?.templateMount === true
 								? { templateMount: 1 as const }
 								: null),
-							...(firstTree === null &&
-							snapshot === null &&
-							driver.capabilities?.templateProgramMount === true
+							...(driver.capabilities?.templateProgramMount === true
 								? { templateProgram: 1 as const }
 								: null),
 							...(request >= LYNX_LAZY_PUBLIC_INSTANCE_READY_REQUEST_BASE &&
-							firstTree === null &&
-							snapshot === null &&
 							driver.capabilities?.templateProgramMount === true &&
 							driver.capabilities?.lazyPublicInstances === true
 								? { lazyPublicInstances: 1 as const }
 								: null),
 							...(request >= LYNX_TEMPLATE_RUN_READY_REQUEST_BASE &&
-							firstTree === null &&
-							snapshot === null &&
 							driver.capabilities?.templateProgramMount === true &&
 							driver.capabilities?.templateProgramRuns === true
 								? { templateRuns: 1 as const }
@@ -1282,8 +1302,15 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		dispatch(reply);
 		if (request !== LYNX_READY_ANNOUNCEMENT_REQUEST) {
 			// Delivery must succeed before an inbound commit can exercise any optional
-			// wire behavior. First-tree peers deliberately discard every capability.
-			negotiatedCapabilities = snapshot === null ? reply.capabilities : undefined;
+			// wire behavior. Keep first-tree capabilities dormant until its exact
+			// legacy adoption has completed and the main-thread journal is released.
+			if (snapshot === null) {
+				negotiatedCapabilities = reply.capabilities;
+			} else {
+				negotiatedCapabilities = undefined;
+				deferredFirstTreeCapabilities =
+					reply.capabilities?.templateProgram === 1 ? reply.capabilities : undefined;
+			}
 		}
 		if (snapshot !== null) firstTreeSnapshotSent = true;
 		return true;
@@ -1343,6 +1370,16 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			return;
 		}
 		firstTree = null;
+	};
+
+	const activateFirstTreeCapabilities = (record: ActiveLynxMainRoot<Node>): void => {
+		if (firstTree !== null || record.faulted || deferredFirstTreeCapabilities === undefined) {
+			return;
+		}
+		record.capabilities = deferredFirstTreeCapabilities;
+		record.postFirstTreeUpgrade = true;
+		negotiatedCapabilities = deferredFirstTreeCapabilities;
+		deferredFirstTreeCapabilities = undefined;
 	};
 
 	const disposeAvailableFirstTree = (): boolean => {
@@ -1971,9 +2008,20 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			return;
 		}
 		const peerCapabilities = active === null ? negotiatedCapabilities : active.capabilities;
+		const postFirstTreeLazyPublicInstances =
+			message.instances === LYNX_LAZY_PUBLIC_INSTANCES && active !== null;
+		const incrementalRun =
+			message.batch.commands.length === 1 ? message.batch.commands[0] : undefined;
 		if (
 			message.instances === LYNX_LAZY_PUBLIC_INSTANCES &&
-			peerCapabilities?.lazyPublicInstances !== 1
+			(peerCapabilities?.lazyPublicInstances !== 1 ||
+				(postFirstTreeLazyPublicInstances &&
+					(active?.postFirstTreeUpgrade !== true ||
+						message.batch.commands.length === 0 ||
+						!message.batch.commands.every(
+							(command) =>
+								command.op === 'mount-template-range' || command.op === 'mount-template-run',
+						))))
 		) {
 			reject(identity, new Error('Octane Lynx rejected unnegotiated lazy public instances.'));
 			return;
@@ -1994,6 +2042,24 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					);
 					return;
 				}
+			}
+		}
+		let postFirstTreeIncrementalCompact = false;
+		if (
+			postFirstTreeLazyPublicInstances &&
+			active?.postFirstTreeUpgrade === true &&
+			peerCapabilities?.compactAck === 1 &&
+			peerCapabilities.templateProgram === 1 &&
+			peerCapabilities.templateRuns === 1 &&
+			message.ack === LYNX_COMPACT_ACKNOWLEDGEMENT &&
+			incrementalRun?.op === 'mount-template-run'
+		) {
+			try {
+				freezeValidatedIntrinsicRun(incrementalRun);
+				postFirstTreeIncrementalCompact = true;
+			} catch (error) {
+				reject(identity, error);
+				return;
 			}
 		}
 
@@ -2037,7 +2103,11 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 						? message.instances === LYNX_LAZY_PUBLIC_INSTANCES
 							? { compact: true, lazyPublicInstances: true }
 							: { compact: true }
-						: undefined
+						: postFirstTreeIncrementalCompact
+							? { compact: true, incrementalCompact: true, lazyPublicInstances: true }
+							: postFirstTreeLazyPublicInstances
+								? { lazyPublicInstances: true }
+								: undefined
 					: {
 							firstTree: candidateFirstTree,
 							onMismatch(error) {
@@ -2093,15 +2163,20 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			if (prepared.firstTreeAction === 'repair' || applyFailed) {
 				disposeAvailableFirstTree();
 			}
+			if (!applyFailed && prepared.firstTreeAction === 'repair') {
+				activateFirstTreeCapabilities(record);
+			}
 		}
 		const startedAck = LYNX_PROFILE ? performance.now() : 0;
 		let compactCount: number | null =
 			message.ack === LYNX_COMPACT_ACKNOWLEDGEMENT &&
-			provisional &&
+			(provisional || postFirstTreeIncrementalCompact) &&
 			!applyFailed &&
 			prepared.firstTreeAction === 'none' &&
 			prepared.listAncestryDelta.length === 0
-				? (prepared.compactHostCount ?? countLynxCompactAcknowledgementHosts(message.batch))
+				? provisional
+					? (prepared.compactHostCount ?? countLynxCompactAcknowledgementHosts(message.batch))
+					: (prepared.compactHostCount ?? null)
 				: null;
 		if (compactCount !== null && compactCount < LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS) {
 			compactCount = null;
@@ -2241,6 +2316,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			awaitingAdoption = null;
 			releaseFirstTree();
 		}
+		activateFirstTreeCapabilities(active);
 		openBackgroundCalls();
 	};
 
