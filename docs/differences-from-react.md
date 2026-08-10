@@ -713,6 +713,13 @@ const Chart = lazy(() =>
 );
 ```
 
+Creating a lazy wrapper does not call its loader. When an independently
+reachable sibling suspends, Octane may start the lazy module's existing loader
+early so its code loads alongside the pending work. The loader still runs only
+once per wrapper, and its resolved component and default-export getter are not
+evaluated until that component actually renders. Discovery does not cross a
+dormant deferred-hydration boundary.
+
 Nested lazy wrappers are rejected.
 
 React's Suspense and ViewTransition values are exotic element types and React

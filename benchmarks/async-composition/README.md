@@ -190,3 +190,20 @@ episode-agnostic resource harvest without consuming the real components'
 adoption rights. Each update therefore invokes exactly eight creators, down
 from 13, while preserving eight network starts, two request waves, the
 dependent-owner ordering, and zero mixed transition states.
+
+## Code-split module discovery
+
+The Octane dashboard includes a synchronous, dynamically imported child after
+its existing resource panels and keyed board. Its JavaScript stays in a
+separate production chunk and is not fetched before the dashboard mounts.
+
+The browser gate delays that real chunk by 35ms and requires its loader and
+network request to start before the independent `project` request settles. The
+module is loaded exactly once across the initial mount and subsequent transition;
+its rendered node must survive the update. All eight resource starts, eight
+creator calls, seven first-wave requests, two dependency waves, and zero mixed
+transition states remain mandatory.
+
+Only eligible lazy children in an already-reachable warm plan are prepared.
+Dormant deferred-hydration islands remain untouched until their own activation
+or explicitly configured prefetch strategy.

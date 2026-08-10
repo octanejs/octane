@@ -9493,12 +9493,54 @@ function resolveLazyModule(mod: any): ComponentBody<any> {
  */
 /* @__NO_SIDE_EFFECTS__ */
 export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ default: C } | C>): C {
-	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
+	let status:
+		'uninitialized' | 'pending' | 'fulfilled' | 'rejected' | 'fulfilled-error' | 'rejected-error' =
+		'uninitialized';
 	let result: any = null; // fulfilled → module value; rejected → the reason
+	let initializationError: any;
 	let thenable: TrackedThenable<any> | null = null;
 	let profiledComponent: ComponentBody<any> | null = null;
 	let memoMetadataInstalled = false;
 	let lazyWrapper!: ComponentBody<any>;
+
+	const initializeLazy = (): void => {
+		if (status !== 'uninitialized') return;
+		try {
+			const p = load();
+			thenable = p as TrackedThenable<any>;
+			p.then(
+				(mod: any) => {
+					// This handler was attached FIRST, so by the time the boundary's retry
+					// listener fires the payload is already fulfilled/rejected and the
+					// re-render takes the synchronous branch above.
+					if (status === 'uninitialized' || status === 'pending') {
+						result = mod;
+						status = 'fulfilled';
+					}
+				},
+				(err: any) => {
+					if (status === 'uninitialized' || status === 'pending') {
+						result = err;
+						status = 'rejected';
+					}
+				},
+			);
+		} catch (error) {
+			// React does not publish Pending until both load() and `.then(...)`
+			// registration return. A synchronous throw is therefore retryable on the
+			// next render instead of poisoning the wrapper with a null thenable.
+			if (status === 'uninitialized') thenable = null;
+			else if (CURRENT_WARM !== null) {
+				// A thenable may settle synchronously and then throw. Speculative
+				// warming catches that throw, so replay it on the first real render
+				// before exposing the already-settled payload on a later retry.
+				initializationError = error;
+				status = status === 'fulfilled' ? 'fulfilled-error' : 'rejected-error';
+			}
+			throw error;
+		}
+		if (status === 'uninitialized') status = 'pending';
+	};
 
 	const callResolvedComponent = (props: any, scope: Scope, extra: any): unknown => {
 		// Keep the module object, rather than only its current `.default` value. A
@@ -9544,35 +9586,14 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 			return callResolvedComponent(props, scope, extra);
 		}
 		if (status === 'rejected') throw result;
+		if (status === 'fulfilled-error' || status === 'rejected-error') {
+			status = status === 'fulfilled-error' ? 'fulfilled' : 'rejected';
+			const error = initializationError;
+			initializationError = undefined;
+			throw error;
+		}
 		if (status === 'uninitialized') {
-			try {
-				const p = load();
-				thenable = p as TrackedThenable<any>;
-				p.then(
-					(mod: any) => {
-						// This handler was attached FIRST, so by the time the boundary's retry
-						// listener fires the payload is already fulfilled/rejected and the
-						// re-render takes the synchronous branch above.
-						if (status === 'uninitialized' || status === 'pending') {
-							result = mod;
-							status = 'fulfilled';
-						}
-					},
-					(err: any) => {
-						if (status === 'uninitialized' || status === 'pending') {
-							result = err;
-							status = 'rejected';
-						}
-					},
-				);
-			} catch (error) {
-				// React does not publish Pending until both load() and `.then(...)`
-				// registration return. A synchronous throw is therefore retryable on the
-				// next render instead of poisoning the wrapper with a null thenable.
-				if (status === 'uninitialized') thenable = null;
-				throw error;
-			}
-			if (status === 'uninitialized') status = 'pending';
+			initializeLazy();
 			// PromiseLike is permitted to settle while `then` is registering. Match
 			// React's synchronous-thenable contract: render or throw immediately rather
 			// than briefly committing a fallback (or leaving partial sibling work).
@@ -9584,6 +9605,9 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 		}
 		throw new SuspenseException(thenable!);
 	};
+	// Existing ancestor warm plans can start an independently reachable module,
+	// but resolution, component execution, and deferred hydration remain lazy.
+	(lazyWrapper as any).__warm = initializeLazy;
 	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, { value: true });
 	return lazyWrapper as unknown as C;
 }
