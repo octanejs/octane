@@ -17,12 +17,14 @@ const CACHE = resolve(__dirname, '.react-cache');
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
 describe('differential: @octanejs/tanstack-query vs real @tanstack/react-query', () => {
+	// @parity-case differential:tanstack-query-cached
 	it('CachedApp: initialData query renders byte-identical result shape', async () => {
 		const d = await mountDifferential(CACHED, 'CachedApp', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-query-async
 	it('AsyncApp: pending → success renders byte-identical at both steps', async () => {
 		const d = await mountDifferential(ASYNC, 'AsyncApp', undefined, CACHE);
 		await d.step('mount (pending)', () => {});
@@ -32,6 +34,7 @@ describe('differential: @octanejs/tanstack-query vs real @tanstack/react-query',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-query-mutation
 	it('MutationApp: idle → pending → success renders byte-identical', async () => {
 		const d = await mountDifferential(ASYNC, 'MutationApp', undefined, CACHE);
 		await d.step('mount (idle)', () => {});

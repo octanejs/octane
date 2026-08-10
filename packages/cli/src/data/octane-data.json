@@ -794,8 +794,8 @@
       "divergences": [
         "Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches)."
       ],
-      "ssr": "`HydrationBoundary` fully ported (incl. streaming `promise`/`dehydratedAt` re-hydration); the SSR/streaming server entries and server-render tests are still open.",
-      "verified": "2026-07-21"
+      "ssr": "`HydrationBoundary` is fully ported (including streaming `promise`/`dehydratedAt` re-hydration), and initial query data is covered by a DOM-free Octane server-render test; dedicated streaming server entries remain open.",
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/tanstack-router",

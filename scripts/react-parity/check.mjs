@@ -320,6 +320,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			binding !== 'hook-form' &&
 		// Livestore uses adapted-upstream-suite dispositions and is verified above via
 		// verifyLivestoreTestClassifications; hook-form/streamdown share this verifier.
+		// Livestore keeps a dedicated classifier (different dispositions); other
+		// bindings with test-classifications.json share binding-classifications-lib.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))

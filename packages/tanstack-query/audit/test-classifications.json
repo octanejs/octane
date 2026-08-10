@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-query/tests/conformance/adapted-suspense.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane pending-boundary integration; unpaired from React Suspense, so it is not React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/boundaries.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane error-boundary lifecycle behavior; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane package export surface; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/extra.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks additional Octane query-hook behavior; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/followups.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane regressions and hydration behavior; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/parity.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted Query contracts; it is not a pristine or differential React suite."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/query.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks core Octane query and mutation behavior; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/suspense.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks additional Octane suspense and error-boundary cases; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-query/tests/conformance/transition-suspense.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane transition and pending-boundary coordination; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-query/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs exact cached-query, async-query, and mutation scenarios against @tanstack/react-query@5.101.3."
+    },
+    {
+      "path": "packages/tanstack-query/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering without a DOM; it is not compared with React SSR."
+    }
+  ]
+}

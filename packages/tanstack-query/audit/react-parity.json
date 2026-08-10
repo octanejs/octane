@@ -1,0 +1,135 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/query.git",
+    "version": "@tanstack/react-query@5.101.3",
+    "commit": "172ea730d03564a6f3df995b50c42d6ccad9b603",
+    "sourceRoot": "packages/react-query/src",
+    "testRoot": "packages/react-query/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:1effc6149825d93d72c8a735d9790ee7cb4d96fa149749c7eb2bba39c180755f",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-query/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-query/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "669294cd71fb4fbe6f48ede7d7a2a958c117611b45b1563eb2799226c20ed018"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-query-runtime-differential",
+      "type": "differential",
+      "oracle": "optional",
+      "environment": "workspace-node",
+      "project": "tanstack-query-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs exact cached query, asynchronous query, and mutation scenarios against @tanstack/react-query@5.101.3. Optional and ordinary-shard executed while provenance remains recorded-unverified; promote to required react-parity ownership after tag suites are fetched and verification is established.",
+      "files": [
+        {
+          "path": "packages/tanstack-query/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "99f37a8ef2a625987b316485370f1a3ce6afd5b9e174b0d4a752e9fd75da0ef5",
+          "cases": [
+            {
+              "id": "differential:tanstack-query-cached",
+              "testName": "CachedApp: initialData query renders byte-identical result shape",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query CachedApp: initialData query renders byte-identical result shape"
+            },
+            {
+              "id": "differential:tanstack-query-async",
+              "testName": "AsyncApp: pending \u2192 success renders byte-identical at both steps",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query AsyncApp: pending \u2192 success renders byte-identical at both steps"
+            },
+            {
+              "id": "differential:tanstack-query-mutation",
+              "testName": "MutationApp: idle \u2192 pending \u2192 success renders byte-identical",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query MutationApp: idle \u2192 pending \u2192 success renders byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "8cf12195e5fe493461684961480acaf19ca03acc614bd2d7f2ef71c4f17a3dbf"
+        },
+        {
+          "path": "packages/tanstack-query/tests/_fixtures/cached-diff.tsrx",
+          "role": "support",
+          "sha256": "b126b97eae02fa46b2681df67a7856998f1c7357f7e86f3d5769eaff69cd4b9e"
+        },
+        {
+          "path": "packages/tanstack-query/tests/_fixtures/async-diff.tsrx",
+          "role": "support",
+          "sha256": "12015b62a30e93c32120d866f8124ab758a789043a8d351da627b3d8b11b515e"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-adapted-types",
+      "type": "adapted-types",
+      "oracle": "optional",
+      "environment": "workspace-node",
+      "project": "tanstack-query-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the checked Octane generic query inference and cache lookup contract. Optional while provenance remains recorded-unverified and pristine/adapted type suites from the canonical tag are not registered.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-query/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "6d1563f95a35a13d96882d28d1f39503b02aaf4efdf4e68252b685e41f4d9d67",
+          "cases": [
+            {
+              "id": "types:tanstack-query-public-api",
+              "testName": "generic query inference and cache lookup",
+              "fullName": "generic query inference and cache lookup"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/typetests/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "cc3353fa75d55fd170cb70d87c802e98c9cc65e3a8ee871c2ef8a6abe6347277"
+        },
+        {
+          "path": "packages/tanstack-query/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "2f9f73a560e301d0a647f7c80c7a4f35f25ecb4c135b7ee1a0dcf70a33bdf7a1"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

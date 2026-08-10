@@ -2266,7 +2266,31 @@ export default defineConfig({
 			{
 				test: {
 					name: 'tanstack-query',
-					include: ['packages/tanstack-query/tests/**/*.test.ts'],
+					include: ['packages/tanstack-query/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-query\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Kept on ordinary shards while provenance is recorded-unverified:
+				// react-parity:check only validates metadata until verification, so
+				// react-parity ownership would drop these cases from CI entirely.
+				test: {
+					name: 'tanstack-query-differential',
+					include: ['packages/tanstack-query/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					// Differential precompile for query fixtures: rewrites
 					// `@octanejs/tanstack-query` → `@tanstack/react-query` so the React side runs
@@ -2298,6 +2322,27 @@ export default defineConfig({
 						'packages/apollo-client/tests/conformance/upstream-useApolloClient.test.ts',
 					],
 				},
+				test: {
+					name: 'tanstack-query-ssr',
+					include: ['packages/tanstack-query/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'apollo-client',
 					include: [

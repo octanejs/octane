@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "baseUrl": "../../..",
+    "paths": {
+      "@octanejs/tanstack-query": ["packages/tanstack-query/src/index.ts"]
+    }
+  },
+  "include": ["./*.test-d.ts", "../src/**/*.ts", "../src/**/*.tsrx"],
+  "exclude": ["../src/**/*.d.ts"]
+}

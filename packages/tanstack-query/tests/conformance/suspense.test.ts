@@ -23,19 +23,6 @@ async function flush() {
 }
 
 describe('suspense query', () => {
-	it('shows @pending while loading, then the data', async () => {
-		let resolveFn: (v: string) => void = () => {};
-		const queryFn = () => new Promise<string>((res) => (resolveFn = res));
-		const r = mount(SuspenseApp, { client, queryFn });
-		// First render suspends → @pending fallback.
-		expect(r.find('#fallback').textContent).toBe('loading');
-		await flush();
-		resolveFn('ready');
-		await flush();
-		expect(r.find('#data').textContent).toBe('data:ready');
-		r.unmount();
-	});
-
 	it('shows @catch when the suspense query errors', async () => {
 		let rejectFn: (e: Error) => void = () => {};
 		const queryFn = () => new Promise<string>((_res, rej) => (rejectFn = rej));
