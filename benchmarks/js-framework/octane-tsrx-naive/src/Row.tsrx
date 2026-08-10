@@ -10,9 +10,8 @@ import { actions } from './actions.js';
 //     compiled per-binding write.
 //   * member-callee handlers via the imported `actions` object — defeats the
 //     event-bundle transform, so handler slots reassign on every row re-render.
-//   * an inline style OBJECT on a cell — value-dependent (a constant object
-//     literal would be folded into the static template), so a fresh object
-//     identity per render forces the style differ to walk its keys every time.
+//   * a mixed inline style object on a cell — its fixed declaration belongs
+//     in the static template while the changing font weight updates directly.
 //
 // `onSelect`/`onRemove` are also accepted as props (the React prop contract for
 // a list row); dispatch flows through the same imported `actions` module they
@@ -30,6 +29,9 @@ export default function Row({ item, selected, onSelect, onRemove }) @{
 				<span class="glyphicon glyphicon-remove" aria-hidden="true" />
 			</a>
 		</td>
-		<td class="col-md-6" style={{ fontWeight: selected ? 'bold' : 'normal' }} />
+		<td
+			class="col-md-6"
+			style={{ fontStyle: 'normal', fontWeight: selected ? 'bold' : 'normal' }}
+		/>
 	</tr>
 }

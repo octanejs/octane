@@ -476,7 +476,9 @@ function warnHydrationStructuralMismatch(
  * client + server from the same JSX, so a differing/absent one means a DIFFERENT branch —
  * e.g. `@switch` cases all `<span>` but with a different `class`). DYNAMIC attrs are NOT in
  * the template, so they aren't checked here — a value divergence on those is handled by
- * `setAttribute` (P2).
+ * `setAttribute` (P2). A compiler-specialized mixed style bakes only its static prefix;
+ * its exact template path is supplied separately so that one style attribute waits for
+ * the complete-value hydration check without weakening other static comparisons.
  *
  * DEV then recurses into the NESTED STATIC element structure, catching same-root branches that
  * differ only in nested static markup (`<div><span/></div>` vs `<div><p/></div>`). The recursion
@@ -486,7 +488,12 @@ function warnHydrationStructuralMismatch(
  * be compared positionally and is left to the per-site recovery. This makes the check safe
  * (never false-flags a hole-bearing template) while still catching pure-static divergences.
  */
-function hydrationNodeMatches(server: Node, template: Node): boolean {
+function hydrationNodeMatches(
+	server: Node,
+	template: Node,
+	partialStyles?: string,
+	path: string = '',
+): boolean {
 	if (server.nodeType !== template.nodeType) return false;
 	if (server.nodeType !== 1) return true;
 	const s = server as Element;
@@ -499,16 +506,41 @@ function hydrationNodeMatches(server: Node, template: Node): boolean {
 	const tAttrs = t.attributes;
 	for (let i = 0; i < tAttrs.length; i++) {
 		const a = tAttrs[i];
-		if (s.getAttribute(a.name) !== a.value) return false;
+		if (
+			s.getAttribute(a.name) !== a.value &&
+			!(
+				a.name === 'style' &&
+				partialStyles !== undefined &&
+				partialStyles.includes('|' + path + '|')
+			)
+		) {
+			return false;
+		}
 	}
 	let sc = s.firstChild;
 	let tc = t.firstChild;
+	let childIndex = 0;
 	while (sc !== null && tc !== null) {
 		if (sc.nodeType === 8 || tc.nodeType === 8) return true; // hole / marker — stop comparing
 		if (sc.nodeType !== tc.nodeType) return true; // text↔element shift — ambiguous, stop
-		if (tc.nodeType === 1 && !hydrationNodeMatches(sc, tc)) return false;
+		if (
+			tc.nodeType === 1 &&
+			!hydrationNodeMatches(
+				sc,
+				tc,
+				partialStyles,
+				partialStyles === undefined
+					? ''
+					: path === ''
+						? String(childIndex)
+						: path + '.' + childIndex,
+			)
+		) {
+			return false;
+		}
 		sc = sc.nextSibling;
 		tc = tc.nextSibling;
+		childIndex++;
 	}
 	return true; // any leftover could be holes — assume a match
 }
@@ -9853,16 +9885,27 @@ class HydrationCapability {
 		return cloned;
 	}
 
-	private fragmentRemainder(template: Node, cursor: Node | null): Node | null | undefined {
+	private fragmentRemainder(
+		template: Node,
+		cursor: Node | null,
+		partialStyles?: string,
+	): Node | null | undefined {
 		let expected = template.firstChild;
 		let actual = cursor;
+		let childIndex = 0;
 		while (expected !== null) {
 			if (actual === null) return undefined;
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
-			if (expected.nodeType !== 8 && !hydrationNodeMatches(actual, expected)) return undefined;
+			if (
+				expected.nodeType !== 8 &&
+				!hydrationNodeMatches(actual, expected, partialStyles, String(childIndex))
+			) {
+				return undefined;
+			}
 			actual = this.sibling(actual, 1);
 			expected = expected.nextSibling;
+			childIndex++;
 		}
 		return actual;
 	}
@@ -9906,8 +9949,8 @@ class HydrationCapability {
 		this.abandoned = true;
 	}
 
-	clone<T extends Node>(template: T, loc?: string): T {
-		return this.adopt(template, null, loc) as T;
+	clone<T extends Node>(template: T, loc?: string, partialStyles?: string): T {
+		return this.adopt(template, null, loc, partialStyles) as T;
 	}
 
 	/**
@@ -9922,7 +9965,12 @@ class HydrationCapability {
 	}
 
 	/** `template` is null only in prod lazy mode (then `lazy` is set) — every cold path resolves it. */
-	private adopt(template: Node | null, lazy: LazyTemplateRecord | null, loc?: string): Node {
+	private adopt(
+		template: Node | null,
+		lazy: LazyTemplateRecord | null,
+		loc?: string,
+		partialStyles?: string,
+	): Node {
 		const cursor = this.node;
 		const isFragment =
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
@@ -9944,7 +9992,7 @@ class HydrationCapability {
 		// (Root claims happen once per hydrateRoot, so parsing here is cold.)
 		if (isFragment && claimsRoot) {
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			const remainder = this.fragmentRemainder(template, cursor);
+			const remainder = this.fragmentRemainder(template, cursor, partialStyles);
 			if (remainder === undefined) {
 				this.abandonRoot(
 					`a fragment starting with ${describeHydrationNode(template.firstChild)}`,
@@ -9963,7 +10011,7 @@ class HydrationCapability {
 		if (
 			!isFragment &&
 			(template !== null
-				? !hydrationNodeMatches(cursor, template)
+				? !hydrationNodeMatches(cursor, template, partialStyles)
 				: !lazyRootMatches(cursor, lazy!))
 		) {
 			if (template === null) template = resolveLazyTemplate(lazy!);
@@ -10163,7 +10211,7 @@ class HydrationCapability {
 		}
 	}
 
-	applyStyle(el: HTMLElement | SVGElement, value: any, _prev: any): boolean {
+	applyStyle(el: HTMLElement | SVGElement, value: any, _prev: any, staticCss?: string): boolean {
 		const mode = hydrationMismatchMode(el);
 		if (mode === 1) return true;
 		const style = (el as HTMLElement).style;
@@ -10178,6 +10226,7 @@ class HydrationCapability {
 		// semantically and order-equivalent (`#fff` vs rgb(), compact whitespace),
 		// while still detecting reordered, missing, added, and empty styles.
 		const expectedStyle = document.createElement('div').style;
+		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
 		applyStyleValue(expectedStyle, value, undefined);
 		const expected = expectedStyle.cssText;
 		const expectsStyleAttribute = expected !== '';
@@ -10304,7 +10353,7 @@ function parseSeedJson(raw: string): unknown[] | null {
 // Armed only around that one mapped survivor render; all other clones see null.
 let MAPPED_ITEM_ADOPTION: { node: Node | null } | null = null;
 
-export function clone<T extends Node>(node: T, loc?: string): T {
+export function clone<T extends Node>(node: T, loc?: string, partialStyles?: string): T {
 	if (MAPPED_ITEM_ADOPTION !== null && MAPPED_ITEM_ADOPTION.node !== null) {
 		const adopted = MAPPED_ITEM_ADOPTION.node;
 		MAPPED_ITEM_ADOPTION.node = null;
@@ -10353,10 +10402,14 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 			return hydration.cloneLazy(lazy, loc) as unknown as T;
 		}
 		const parsed = resolveLazyTemplate(lazy);
-		return (hydration === null ? parsed.cloneNode(true) : hydration.clone(parsed, loc)) as T;
+		return (
+			hydration === null ? parsed.cloneNode(true) : hydration.clone(parsed, loc, partialStyles)
+		) as T;
 	}
 	const hydration = activeHydration();
-	return hydration === null ? (node.cloneNode(true) as T) : hydration.clone(node, loc);
+	return hydration === null
+		? (node.cloneNode(true) as T)
+		: hydration.clone(node, loc, partialStyles);
 }
 
 /**
@@ -12188,6 +12241,34 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
 	applyStyleValue(style, value, prev);
+}
+
+/**
+ * Update one dynamic declaration after a compiler-baked static style prefix.
+ * Hydration still compares the complete style, while aborted transitions
+ * restore the entire attribute rather than only this declaration.
+ * @internal
+ */
+export function setStyleProperty(
+	el: HTMLElement | SVGElement,
+	name: string,
+	value: any,
+	staticCss: string,
+	previous: any,
+): void {
+	const hydration = activeHydration();
+	if (hydration !== null) {
+		hydration.applyStyle(el, { [name]: value }, undefined, staticCss);
+		return;
+	}
+	const remove = value == null || typeof value === 'boolean';
+	// The compiler seeds each binding with its private scope, distinguishing a
+	// genuinely absent initial longhand from a preserved suspended-mount retry.
+	if (remove && previous === CURRENT_SCOPE) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+	const style = (el as HTMLElement).style;
+	if (remove) style.removeProperty(styleName(name));
+	else applyStyleProperty(style, name, value);
 }
 
 function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): void {

@@ -386,6 +386,8 @@ function attrBindingHelper(bind) {
 			return 'setFormAction';
 		case 'style':
 			return 'setStyle';
+		case 'styleProperty':
+			return 'setStyleProperty';
 		// SVG/MathML `className` is read-only — setClassAttr sets the attribute and
 		// clsx-composes (setClassName composes on HTML).
 		case 'class':
@@ -1991,6 +1993,54 @@ function staticObjectToCssString(obj) {
 		parts.push(`${hyphenateStyleName(name)}: ${cssValue};`);
 	}
 	return parts.join(' ');
+}
+
+// Preserve both CSS declaration order and JavaScript object evaluation order:
+// only a nonempty literal prefix followed by exactly one dynamic own property
+// can move into the template plus an independently guarded scalar binding.
+function mixedStaticStyle(obj) {
+	if (obj?.type !== 'ObjectExpression' || obj.properties.length < 2) return null;
+	const seen = new Set();
+	const prefix = [];
+	let dynamic = null;
+	for (const property of obj.properties) {
+		if (
+			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
+			property.computed ||
+			property.method ||
+			(property.kind !== undefined && property.kind !== 'init')
+		) {
+			return null;
+		}
+		const key = property.key;
+		if (key?.type !== 'Identifier' && !(key?.type === 'Literal' && typeof key.value === 'string')) {
+			return null;
+		}
+		const name = key.type === 'Identifier' ? key.name : key.value;
+		const normalized = hyphenateStyleName(name);
+		if (name === '__proto__' || name === 'dangerouslySetInnerHTML' || seen.has(normalized)) {
+			return null;
+		}
+		seen.add(normalized);
+
+		const value = property.value;
+		if (value?.type === 'Literal') {
+			if (
+				dynamic !== null ||
+				(typeof value.value !== 'string' && typeof value.value !== 'number') ||
+				value.value === ''
+			) {
+				return null;
+			}
+			prefix.push(property);
+		} else {
+			if (dynamic !== null) return null;
+			dynamic = { name, key, value };
+		}
+	}
+	if (prefix.length === 0 || dynamic === null) return null;
+	const css = staticObjectToCssString({ properties: prefix });
+	return css === '' ? null : { css, ...dynamic };
 }
 
 // ===========================================================================
@@ -18700,15 +18750,22 @@ function planJsx(
 				cloneLocArg = b.literal(locString, JSON.stringify(locString));
 			}
 		}
-		mountLines.push(
-			inheritOriginLoc(
-				b.const(
-					'_root',
-					cloneLocArg ? b.call('_$clone', b.id(tpl), cloneLocArg) : b.call('_$clone', b.id(tpl)),
-				),
-				planOrigin,
-			),
-		);
+		let mixedStylePaths = '';
+		for (const binding of elementBindings) {
+			if (binding.kind === 'styleProperty') mixedStylePaths += `|${binding.path.join('.')}`;
+		}
+		const cloneCall =
+			mixedStylePaths !== ''
+				? b.call(
+						'_$clone',
+						b.id(tpl),
+						cloneLocArg ?? undefinedNode(),
+						b.literal(`${mixedStylePaths}|`),
+					)
+				: cloneLocArg
+					? b.call('_$clone', b.id(tpl), cloneLocArg)
+					: b.call('_$clone', b.id(tpl));
+		mountLines.push(inheritOriginLoc(b.const('_root', cloneCall), planOrigin));
 		elementVars = new Map();
 		let varCounter = 0;
 		// Does this template contain a control-flow / component / portal hole? If so
@@ -19076,9 +19133,12 @@ function planJsx(
 				),
 			);
 		}
-		// Const-seeded fields keep their registry strings ('null'/'undefined');
-		// resolve them to nodes only here at the factory call.
-		const constArgNode = (expr) => (expr === 'null' ? b.literal(null) : b.id(expr));
+		// Const-seeded fields keep their registry strings until the factory call.
+		// A mixed-style scalar starts at its private owning scope so its first
+		// deferred write still runs for null/undefined. The same identity lets its
+		// setter distinguish a fresh mount from a preserved suspended retry.
+		const constArgNode = (expr) =>
+			expr === 'null' ? b.literal(null) : expr === 'style-unset' ? b.id('__s') : b.id(expr);
 		const bagFieldValue = (f) => (f.constExpr !== null ? constArgNode(f.constExpr) : b.id(f.local));
 		const rootArg = () => (single ? b.id('_root') : b.literal(null));
 		if (bag.fields.length <= BAG_FACTORY_MAX) {
@@ -20083,6 +20143,7 @@ const DEFERRABLE_MOUNT_KINDS = new Set([
 	'ariaAttr',
 	'class',
 	'style',
+	'styleProperty',
 	'formAction',
 	'htmlOnlyChild',
 ]);
@@ -20285,9 +20346,12 @@ function commitSourceRows(sources, valueOf) {
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
 function emitDeferredMount(bind, elVar, bag) {
-	// `style` diffs on `_sty`; attr / class / formAction / htmlOnlyChild on `_prev`.
+	// Whole-object `style` diffs on `_sty`; scalar styles and other values on `_prev`.
 	if (!(bind.kind === 'class' && bind.fresh)) {
-		bag.constField(bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`, 'undefined');
+		bag.constField(
+			bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`,
+			bind.kind === 'styleProperty' ? 'style-unset' : 'undefined',
+		);
 	}
 	const key = `_el$${bind.id}`;
 	if (!bag.host(key, elVar)) return null;
@@ -20823,6 +20887,30 @@ function emitBindingUpdate(bind, bag) {
 						b.block([
 							b.stmt(b.call(callee(), F('_el'), V(), F('_sty'))),
 							b.stmt(b.assignment('=', F('_sty'), V())),
+						]),
+						null,
+					),
+				]),
+			);
+		}
+		case 'styleProperty': {
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_prev'), V()),
+						b.block([
+							b.stmt(
+								b.call(
+									callee(),
+									F('_el'),
+									inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
+									V(),
+									inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
+									F('_prev'),
+								),
+							),
+							b.stmt(b.assignment('=', F('_prev'), V())),
 						]),
 						null,
 					),
@@ -21891,6 +21979,37 @@ function emitElementHtml(
 					appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
 				}
 				continue;
+			}
+			if (
+				firstSpreadIdx === -1 &&
+				ctx._universalRuntimeUnit == null &&
+				!directPropNames.has('suppressHydrationWarning')
+			) {
+				const mixed = mixedStaticStyle(inner);
+				if (mixed !== null) {
+					appendBakedAttribute(
+						attrTemplate,
+						` style="${escapeAttr(mixed.css)}"`,
+						attrName,
+						attr.name,
+						inner,
+						ctx.inspect,
+					);
+					registerAttrLoweringOrigin(ctx, mixed.key, null, mixed.name);
+					bindings.push({
+						id: bindings.length,
+						kind: 'styleProperty',
+						name: mixed.name,
+						expr: tsrxExprNode(mixed.value, ctx, componentName, inlinedSubs),
+						path,
+						ns: hostNs,
+						nameOrigin: attr.name,
+						propertyOrigin: mixed.key,
+						staticOrigin: inner,
+						staticCss: mixed.css,
+					});
+					continue;
+				}
 			}
 			bindings.push({
 				id: bindings.length,

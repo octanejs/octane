@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
+import { describe, expect, it, vi } from 'vitest';
+import * as ServerRuntime from 'octane/server';
+import { flushSync, hydrateRoot } from '../src/index.js';
+import { act, mount } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import {
 	StaticStringStyle,
 	StaticObjectStyle,
@@ -25,6 +28,59 @@ import {
 	ScopedGlobal,
 	ScopedGlobalTag,
 } from './_fixtures/style.tsrx';
+
+const MIXED_INLINE_STYLE_SOURCE = `
+	export function MixedStyle(props) @{
+		<div
+			id="mixed-inline-style"
+			style={{
+				position: 'absolute',
+				display: 'block',
+				width: 120,
+				opacity: 0.5,
+				'--fixed': 12,
+				color: props.color,
+			}}
+		>
+			{'mixed'}
+		</div>
+	}
+
+	export function MixedLengthStyle(props) @{
+		<div
+			id="mixed-inline-length"
+			style={{ position: 'absolute', display: 'block', marginTop: props.offset }}
+		>
+			{'length'}
+		</div>
+	}
+
+	export function MixedCustomStyle(props) @{
+		<div
+			id="mixed-inline-custom"
+			style={{ position: 'absolute', display: 'block', '--accent': props.accent }}
+		>
+			{'custom'}
+		</div>
+	}
+
+	export function MixedSvgStyle(props) @{
+		<svg>
+			<rect
+				id="mixed-inline-svg-style"
+				style={{ fill: 'red', opacity: 0.5, stroke: props.stroke }}
+			/>
+		</svg>
+	}
+`;
+
+function loadMixedInlineStyle(source: string, id: string, mode: 'client' | 'server' = 'client') {
+	return loadCompiledFixtureSource(source, {
+		id,
+		mode,
+		compileOptions: { hmr: false, dev: false },
+	});
+}
 
 // Helper: find the module-level <style data-octane> tag for a given hash
 // and return its CSS text. Tests use this to assert how @tsrx/core's
@@ -62,6 +118,727 @@ describe('style prop — static forms', () => {
 		// Sanity: it landed in the HTML attribute, not via a runtime call.
 		expect(div.getAttribute('style')).toContain('background-color');
 		r.unmount();
+	});
+});
+
+describe('style prop — mixed static and dynamic inline objects', () => {
+	it('keeps mixed inline style literals, units, priorities, custom properties, and removals', () => {
+		const client = loadMixedInlineStyle(MIXED_INLINE_STYLE_SOURCE, 'mixed-inline-style.tsrx');
+		const root = mount(client.MixedStyle, { color: 'red !important' });
+		const element = root.find('#mixed-inline-style') as HTMLElement;
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.display).toBe('block');
+		expect(element.style.width).toBe('120px');
+		expect(element.style.opacity).toBe('0.5');
+		expect(element.style.color).toBe('red');
+		expect(element.style.getPropertyPriority('color')).toBe('important');
+		expect(element.style.getPropertyValue('--fixed')).toBe('12');
+
+		root.update(client.MixedStyle, { color: 'blue' });
+		expect(root.find('#mixed-inline-style')).toBe(element);
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.display).toBe('block');
+		expect(element.style.width).toBe('120px');
+		expect(element.style.opacity).toBe('0.5');
+		expect(element.style.color).toBe('blue');
+		expect(element.style.getPropertyPriority('color')).toBe('');
+		expect(element.style.getPropertyValue('--fixed')).toBe('12');
+
+		root.update(client.MixedStyle, { color: null });
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.width).toBe('120px');
+		expect(element.style.color).toBe('');
+		expect(element.style.getPropertyValue('--fixed')).toBe('12');
+		root.unmount();
+
+		const lengthRoot = mount(client.MixedLengthStyle, { offset: 8 });
+		const length = lengthRoot.find('#mixed-inline-length') as HTMLElement;
+		expect(length.style.position).toBe('absolute');
+		expect(length.style.marginTop).toBe('8px');
+		lengthRoot.update(client.MixedLengthStyle, { offset: null });
+		expect(length.style.position).toBe('absolute');
+		expect(length.style.marginTop).toBe('');
+		lengthRoot.update(client.MixedLengthStyle, { offset: 0 });
+		expect(length.style.marginTop).toBe('0px');
+		lengthRoot.unmount();
+
+		const customRoot = mount(client.MixedCustomStyle, { accent: 12 });
+		const custom = customRoot.find('#mixed-inline-custom') as HTMLElement;
+		expect(custom.style.getPropertyValue('--accent')).toBe('12');
+		customRoot.update(client.MixedCustomStyle, { accent: undefined });
+		expect(custom.style.position).toBe('absolute');
+		expect(custom.style.getPropertyValue('--accent')).toBe('');
+		customRoot.update(client.MixedCustomStyle, { accent: 'restored' });
+		expect(custom.style.getPropertyValue('--accent')).toBe('restored');
+		customRoot.unmount();
+	});
+
+	it.each([
+		{ mode: 'production', dev: false },
+		{ mode: 'development', dev: true },
+	])('updates mixed inline style in $mode compiler output', ({ mode, dev }) => {
+		const client = loadCompiledFixtureSource(MIXED_INLINE_STYLE_SOURCE, {
+			id: `mixed-inline-style-${mode}.tsrx`,
+			mode: 'client',
+			compileOptions: { hmr: false, dev },
+		});
+		const root = mount(client.MixedLengthStyle, { offset: 8 });
+		const element = root.find('#mixed-inline-length') as HTMLElement;
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.display).toBe('block');
+		expect(element.style.marginTop).toBe('8px');
+
+		root.update(client.MixedLengthStyle, { offset: 12 });
+		expect(root.find('#mixed-inline-length')).toBe(element);
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.marginTop).toBe('12px');
+		root.unmount();
+	});
+
+	it('preserves mixed inline style and neighboring expression evaluation order', () => {
+		const source = `
+			export function App(props) @{
+				<div
+					id="mixed-inline-style-evaluation-order"
+					data-before={props.read('before')}
+					style={{ position: 'absolute', color: props.read('style') }}
+					data-after={props.read('after')}
+				>
+					{props.read('child') as string}
+				</div>
+			}
+		`;
+		const client = loadMixedInlineStyle(source, 'mixed-inline-style-evaluation-order.tsrx');
+		const events: string[] = [];
+		let color = 'red';
+		const read = (name: string) => {
+			events.push(name);
+			return name === 'style' ? color : name;
+		};
+		const root = mount(client.App, { read });
+		const element = root.find('#mixed-inline-style-evaluation-order') as HTMLElement;
+		expect(events).toEqual(['child', 'before', 'style', 'after']);
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.color).toBe('red');
+		expect(element.textContent).toBe('child');
+
+		events.length = 0;
+		color = 'blue';
+		root.update(client.App, { read });
+		expect(events).toEqual(['child', 'before', 'style', 'after']);
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.color).toBe('blue');
+		root.unmount();
+	});
+
+	it.each([
+		{
+			shape: 'a static shorthand before a dynamic longhand',
+			style: "{ margin: '4px', marginLeft: props.value }",
+			initial: '8px',
+			updated: '12px',
+		},
+		{
+			shape: 'a dynamic longhand before a static shorthand',
+			style: "{ marginLeft: props.value, margin: '4px' }",
+			initial: '4px',
+			updated: '12px',
+		},
+		{
+			shape: 'a dynamic shorthand before a static longhand',
+			style: "{ margin: props.value, marginLeft: '6px' }",
+			initial: '6px',
+			updated: '12px',
+		},
+	])('preserves mixed inline style order for $shape', ({ shape, style, initial, updated }) => {
+		const source = `
+			export function App(props) @{
+				<div id="mixed-inline-style-order" style={${style}}>{'order'}</div>
+			}
+		`;
+		const client = loadMixedInlineStyle(
+			source,
+			`mixed-inline-style-order-${shape.replaceAll(' ', '-')}.tsrx`,
+		);
+		const root = mount(client.App, { value: '8px' });
+		const element = root.find('#mixed-inline-style-order') as HTMLElement;
+		expect(element.style.marginLeft).toBe(initial);
+
+		root.update(client.App, { value: '12px' });
+		expect(root.find('#mixed-inline-style-order')).toBe(element);
+		expect(element.style.marginLeft).toBe(updated);
+		root.unmount();
+	});
+
+	it.each([
+		{ shape: 'null', value: null },
+		{ shape: 'undefined', value: undefined },
+		{ shape: 'a boolean', value: true },
+	])(
+		'keeps static shorthand when the initial mixed inline style longhand is $shape',
+		({ value }) => {
+			const source = `
+			export function App(props) @{
+				<div
+					id="mixed-inline-style-shorthand-null"
+					style={{ margin: '4px', marginTop: props.value }}
+				>
+					{'shorthand'}
+				</div>
+			}
+		`;
+			const client = loadMixedInlineStyle(source, 'mixed-inline-style-shorthand-null.tsrx');
+			const root = mount(client.App, { value });
+			const element = root.find('#mixed-inline-style-shorthand-null') as HTMLElement;
+			expect(element.style.marginTop).toBe('4px');
+			expect(element.style.marginRight).toBe('4px');
+
+			root.update(client.App, { value: 8 });
+			expect(root.find('#mixed-inline-style-shorthand-null')).toBe(element);
+			expect(element.style.marginTop).toBe('8px');
+			expect(element.style.marginRight).toBe('4px');
+
+			root.update(client.App, { value: null });
+			expect(element.style.marginTop).toBe('');
+			expect(element.style.marginRight).toBe('4px');
+			root.unmount();
+		},
+	);
+
+	it.each([
+		{ shape: 'null', initial: 8, value: null },
+		{ shape: 'a boolean', initial: 8, value: true },
+		{ shape: 'null after a longhand matching its shorthand', initial: 4, value: null },
+	])(
+		'removes a stale mixed inline style longhand after a suspended mount retries with $shape',
+		async ({ initial, value }) => {
+			const source = `
+			import { use } from 'octane';
+
+			function Content(props) @{
+				const text = use(props.promise);
+				<span id="mixed-inline-style-retry-content">{text as string}</span>
+			}
+
+			function Panel(props) @{
+				<section
+					id="mixed-inline-style-retry-panel"
+					style={{ margin: '4px', marginTop: props.value }}
+				>
+					<Content promise={props.promise} />
+				</section>
+			}
+
+			export function App(props) @{
+				<main>
+					@try {
+						<Panel value={props.value} promise={props.promise} />
+					} @pending {
+						<span id="mixed-inline-style-retry-pending">{'pending'}</span>
+					}
+				</main>
+			}
+		`;
+			const client = loadMixedInlineStyle(source, 'mixed-inline-style-suspended-retry.tsrx');
+			let resolve!: (text: string) => void;
+			const promise = new Promise<string>((complete) => {
+				resolve = complete;
+			});
+			const root = mount(client.App, { promise, value: initial });
+
+			try {
+				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+				const preserved = root.find('#mixed-inline-style-retry-panel') as HTMLElement;
+				expect(preserved.style.marginTop).toBe(`${initial}px`);
+				expect(preserved.style.marginRight).toBe('4px');
+
+				root.update(client.App, { promise, value });
+				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+
+				await act(() => resolve('resolved'));
+				const panel = root.find('#mixed-inline-style-retry-panel') as HTMLElement;
+				expect(panel).toBe(preserved);
+				expect(root.find('#mixed-inline-style-retry-content').textContent).toBe('resolved');
+				expect(panel.style.marginTop).toBe('');
+				expect(panel.style.marginRight).toBe('4px');
+
+				root.update(client.App, { promise, value: 12 });
+				expect(root.find('#mixed-inline-style-retry-panel')).toBe(panel);
+				expect(panel.style.marginTop).toBe('12px');
+				expect(panel.style.marginRight).toBe('4px');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each([
+		{
+			shape: 'duplicate names',
+			style: "{ color: 'red', color: props.color, position: 'absolute' }",
+		},
+		{
+			shape: 'normalized duplicate names',
+			style: "{ backgroundColor: 'red', 'background-color': props.color }",
+		},
+		{
+			shape: 'computed names',
+			style: "{ position: 'absolute', [props.name]: props.color }",
+		},
+		{
+			shape: 'spread overrides',
+			style: "{ position: 'absolute', color: 'red', ...props.values, color: props.color }",
+		},
+	])('keeps mixed inline style $shape source ordered', ({ shape, style }) => {
+		const source = `
+			export function App(props) @{
+				<div id="mixed-inline-style-unsafe" style={${style}}>{'unsafe'}</div>
+			}
+		`;
+		const client = loadMixedInlineStyle(
+			source,
+			`mixed-inline-style-${shape.replaceAll(' ', '-')}.tsrx`,
+		);
+		const root = mount(client.App, {
+			name: 'color',
+			color: 'blue',
+			values: { color: 'green' },
+		});
+		const element = root.find('#mixed-inline-style-unsafe') as HTMLElement;
+		const property = shape === 'normalized duplicate names' ? 'backgroundColor' : 'color';
+		expect(element.style[property]).toBe('blue');
+
+		root.update(client.App, { name: 'color', color: 'purple', values: { color: 'orange' } });
+		expect(root.find('#mixed-inline-style-unsafe')).toBe(element);
+		expect(element.style[property]).toBe('purple');
+		root.unmount();
+	});
+
+	it('keeps mixed inline style getter and proxy spread observations in source order', () => {
+		const source = `
+			export function App(props) @{
+				<div
+					id="mixed-inline-style-getters"
+					style={{
+						position: 'absolute',
+						...props.values,
+						get color() {
+							props.observe('get:color');
+							return props.color;
+						},
+					}}
+				>
+					{'getter'}
+				</div>
+			}
+		`;
+		const client = loadMixedInlineStyle(source, 'mixed-inline-style-getters.tsrx');
+		const events: string[] = [];
+		const values = new Proxy(
+			{ display: 'block' },
+			{
+				ownKeys(target) {
+					events.push('ownKeys');
+					return Reflect.ownKeys(target);
+				},
+				getOwnPropertyDescriptor(target, key) {
+					events.push(`descriptor:${String(key)}`);
+					return Reflect.getOwnPropertyDescriptor(target, key);
+				},
+				get(target, key, receiver) {
+					events.push(`get:${String(key)}`);
+					return Reflect.get(target, key, receiver);
+				},
+			},
+		);
+		const observe = (event: string) => events.push(event);
+		const root = mount(client.App, { color: 'red', observe, values });
+		const element = root.find('#mixed-inline-style-getters') as HTMLElement;
+		expect(events).toEqual(['ownKeys', 'descriptor:display', 'get:display', 'get:color']);
+		expect(element.style.position).toBe('absolute');
+		expect(element.style.display).toBe('block');
+		expect(element.style.color).toBe('red');
+
+		events.length = 0;
+		root.update(client.App, { color: 'blue', observe, values });
+		expect(events).toEqual([
+			'ownKeys',
+			'descriptor:display',
+			'get:display',
+			'get:color',
+			'get:color',
+		]);
+		expect(root.find('#mixed-inline-style-getters')).toBe(element);
+		expect(element.style.color).toBe('blue');
+		root.unmount();
+	});
+
+	it('preserves mixed inline style precedence across neighboring host spreads', () => {
+		const source = `
+			export function App(props) @{
+				<section>
+					<div
+						id="mixed-inline-style-spread-first"
+						{...props.first}
+						style={{ position: 'absolute', color: props.color }}
+					/>
+					<div
+						id="mixed-inline-style-spread-last"
+						style={{ position: 'absolute', color: props.color }}
+						{...props.last}
+					/>
+				</section>
+			}
+		`;
+		const client = loadMixedInlineStyle(source, 'mixed-inline-style-host-spreads.tsrx');
+		const root = mount(client.App, {
+			color: 'blue',
+			first: { style: { color: 'green', display: 'grid' } },
+			last: { style: { color: 'red', display: 'flex' } },
+		});
+		const before = root.find('#mixed-inline-style-spread-first') as HTMLElement;
+		const after = root.find('#mixed-inline-style-spread-last') as HTMLElement;
+		expect(before.style.color).toBe('blue');
+		expect(before.style.position).toBe('absolute');
+		expect(before.style.display).toBe('');
+		expect(after.style.color).toBe('red');
+		expect(after.style.position).toBe('');
+		expect(after.style.display).toBe('flex');
+
+		root.update(client.App, {
+			color: 'purple',
+			first: { style: { color: 'orange' } },
+			last: { style: { color: 'yellow' } },
+		});
+		expect(before.style.color).toBe('purple');
+		expect(after.style.color).toBe('yellow');
+		expect(after.style.position).toBe('');
+		root.unmount();
+	});
+
+	it('updates mixed inline style objects on SVG elements without replacing them', () => {
+		const client = loadMixedInlineStyle(MIXED_INLINE_STYLE_SOURCE, 'mixed-inline-style-svg.tsrx');
+		const root = mount(client.MixedSvgStyle, { stroke: 'blue' });
+		const element = root.find('#mixed-inline-svg-style') as SVGElement;
+		expect(element.namespaceURI).toBe('http://www.w3.org/2000/svg');
+		expect(element.style.fill).toBe('red');
+		expect(element.style.stroke).toBe('blue');
+		expect(element.style.opacity).toBe('0.5');
+
+		root.update(client.MixedSvgStyle, { stroke: null });
+		expect(root.find('#mixed-inline-svg-style')).toBe(element);
+		expect(element.style.fill).toBe('red');
+		expect(element.style.stroke).toBe('');
+		expect(element.style.opacity).toBe('0.5');
+		root.unmount();
+	});
+
+	it('restores mixed inline style when a transition suspends before committing', async () => {
+		const source = `
+			import { use, useState, useTransition } from 'octane';
+
+			function Value(props) @{
+				const value = use(props.load(props.step));
+				<span id="mixed-inline-style-transition-value">{value as string}</span>
+			}
+
+			function Panel(props) @{
+				<section
+					id="mixed-inline-style-transition-panel"
+					style={{ position: 'absolute', color: props.step === 0 ? 'red' : 'blue' }}
+				>
+					<Value load={props.load} step={props.step} />
+				</section>
+			}
+
+			export function App(props) @{
+				const [step, setStep] = useState(0);
+				const [, start] = useTransition();
+				<div>
+					<button
+						id="mixed-inline-style-transition-update"
+						onClick={() => start(() => setStep(1))}
+					>
+						{'update'}
+					</button>
+					@try {
+						<Panel load={props.load} step={step} />
+					} @pending {
+						<span id="mixed-inline-style-transition-fallback">{'pending'}</span>
+					}
+				</div>
+			}
+		`;
+		const client = loadMixedInlineStyle(source, 'mixed-inline-style-transition.tsrx');
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((complete) => {
+			resolve = complete;
+		});
+		const fulfilled = {
+			status: 'fulfilled',
+			value: 'initial',
+			then(callback: (value: string) => void) {
+				callback('initial');
+			},
+		};
+		const root = mount(client.App, { load: (step: number) => (step === 0 ? fulfilled : pending) });
+		await act(() => {});
+		const panel = root.find('#mixed-inline-style-transition-panel') as HTMLElement;
+		expect(panel.style.position).toBe('absolute');
+		expect(panel.style.color).toBe('red');
+		expect(root.find('#mixed-inline-style-transition-value').textContent).toBe('initial');
+
+		root.click('#mixed-inline-style-transition-update');
+		expect(root.find('#mixed-inline-style-transition-panel')).toBe(panel);
+		expect(panel.style.position).toBe('absolute');
+		expect(panel.style.color).toBe('red');
+		expect(root.findAll('#mixed-inline-style-transition-fallback')).toEqual([]);
+
+		await act(() => resolve('resolved'));
+		expect(root.find('#mixed-inline-style-transition-panel')).toBe(panel);
+		expect(panel.style.position).toBe('absolute');
+		expect(panel.style.color).toBe('blue');
+		expect(root.find('#mixed-inline-style-transition-value').textContent).toBe('resolved');
+		root.unmount();
+	});
+
+	it('hydrates mixed inline style objects without disturbing static declarations or DOM', () => {
+		const id = 'mixed-inline-style-hydration.tsrx';
+		const server = loadMixedInlineStyle(MIXED_INLINE_STYLE_SOURCE, id, 'server');
+		const client = loadMixedInlineStyle(MIXED_INLINE_STYLE_SOURCE, id, 'client');
+		const initial = { color: 'red' };
+		const { html } = ServerRuntime.renderToString(server.MixedStyle, initial);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const element = container.querySelector('#mixed-inline-style') as HTMLElement;
+		const original = element.getAttribute('style');
+		const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.MixedStyle, initial);
+			flushSync(() => {});
+			expect(container.querySelector('#mixed-inline-style')).toBe(element);
+			expect(element.getAttribute('style')).toBe(original);
+			expect(element.style.position).toBe('absolute');
+			expect(element.style.width).toBe('120px');
+			expect(element.style.color).toBe('red');
+			expect(element.style.getPropertyValue('--fixed')).toBe('12');
+			expect(
+				warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
+			).toEqual([]);
+
+			flushSync(() => root!.render(client.MixedStyle, { color: 'blue' }));
+			expect(container.querySelector('#mixed-inline-style')).toBe(element);
+			expect(element.style.position).toBe('absolute');
+			expect(element.style.display).toBe('block');
+			expect(element.style.width).toBe('120px');
+			expect(element.style.opacity).toBe('0.5');
+			expect(element.style.color).toBe('blue');
+			expect(element.style.getPropertyValue('--fixed')).toBe('12');
+		} finally {
+			root?.unmount();
+			warnings.mockRestore();
+			container.remove();
+		}
+	});
+
+	it('hydrates a nested mixed inline style host beside a fully static sibling', () => {
+		const source = `
+			export function App(props) @{
+				<main id="mixed-inline-style-nested-root">
+					<div
+						id="mixed-inline-style-nested-dynamic"
+						style={{ position: 'absolute', color: props.color }}
+					>
+						{'dynamic'}
+					</div>
+					<div id="mixed-inline-style-nested-static" style={{ color: 'green' }}>
+						{'static'}
+					</div>
+				</main>
+			}
+		`;
+		const id = 'mixed-inline-style-nested-hydration.tsrx';
+		const server = loadMixedInlineStyle(source, id, 'server');
+		const client = loadMixedInlineStyle(source, id, 'client');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, { color: 'red' }).html;
+		document.body.appendChild(container);
+		const parent = container.querySelector('#mixed-inline-style-nested-root');
+		const dynamic = container.querySelector('#mixed-inline-style-nested-dynamic') as HTMLElement;
+		const sibling = container.querySelector('#mixed-inline-style-nested-static') as HTMLElement;
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.App, { color: 'red' });
+			flushSync(() => {});
+			expect(container.querySelector('#mixed-inline-style-nested-root')).toBe(parent);
+			expect(container.querySelector('#mixed-inline-style-nested-dynamic')).toBe(dynamic);
+			expect(container.querySelector('#mixed-inline-style-nested-static')).toBe(sibling);
+			expect(dynamic.style.position).toBe('absolute');
+			expect(dynamic.style.color).toBe('red');
+			expect(sibling.style.color).toBe('green');
+
+			flushSync(() => root!.render(client.App, { color: 'blue' }));
+			expect(container.querySelector('#mixed-inline-style-nested-dynamic')).toBe(dynamic);
+			expect(container.querySelector('#mixed-inline-style-nested-static')).toBe(sibling);
+			expect(dynamic.style.position).toBe('absolute');
+			expect(dynamic.style.color).toBe('blue');
+			expect(sibling.style.color).toBe('green');
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+
+	it('rebuilds a hydrated branch that differs only in its fully static inline style', () => {
+		const source = `
+			export function App(props) @{
+				@if (props.blue) {
+					<div id="mixed-inline-style-static-branch" style={{ color: 'blue' }}>{'same'}</div>
+				} @else {
+					<div id="mixed-inline-style-static-branch" style={{ color: 'red' }}>{'same'}</div>
+				}
+			}
+		`;
+		const id = 'mixed-inline-style-static-branch-hydration.tsrx';
+		const server = loadMixedInlineStyle(source, id, 'server');
+		const client = loadMixedInlineStyle(source, id, 'client');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, { blue: false }).html;
+		document.body.appendChild(container);
+		const original = container.querySelector('#mixed-inline-style-static-branch') as HTMLElement;
+		expect(original.style.color).toBe('red');
+		const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.App, { blue: true });
+			flushSync(() => {});
+			const replacement = container.querySelector(
+				'#mixed-inline-style-static-branch',
+			) as HTMLElement;
+			expect(replacement).not.toBe(original);
+			expect(replacement.style.color).toBe('blue');
+		} finally {
+			root?.unmount();
+			warnings.mockRestore();
+			container.remove();
+		}
+	});
+
+	it('hydrates mixed inline style across fragment siblings and nested SVG hosts', () => {
+		const source = `
+			export function App(props) @{
+				<>
+					<div id="mixed-inline-style-fragment-static" style={{ color: 'green' }}>
+						{'static'}
+					</div>
+					<div
+						id="mixed-inline-style-fragment-html"
+						style={{ position: 'absolute', color: props.color }}
+					>
+						{'dynamic'}
+					</div>
+					<svg id="mixed-inline-style-fragment-svg">
+						<rect
+							id="mixed-inline-style-fragment-rect"
+							style={{ fill: 'red', stroke: props.color }}
+						/>
+					</svg>
+				</>
+			}
+		`;
+		const id = 'mixed-inline-style-fragment-hydration.tsrx';
+		const server = loadMixedInlineStyle(source, id, 'server');
+		const client = loadMixedInlineStyle(source, id, 'client');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, { color: 'blue' }).html;
+		document.body.appendChild(container);
+		const sibling = container.querySelector('#mixed-inline-style-fragment-static') as HTMLElement;
+		const dynamic = container.querySelector('#mixed-inline-style-fragment-html') as HTMLElement;
+		const svg = container.querySelector('#mixed-inline-style-fragment-svg') as SVGElement;
+		const rect = container.querySelector('#mixed-inline-style-fragment-rect') as SVGElement;
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.App, { color: 'blue' });
+			flushSync(() => {});
+			expect(container.querySelector('#mixed-inline-style-fragment-static')).toBe(sibling);
+			expect(container.querySelector('#mixed-inline-style-fragment-html')).toBe(dynamic);
+			expect(container.querySelector('#mixed-inline-style-fragment-svg')).toBe(svg);
+			expect(container.querySelector('#mixed-inline-style-fragment-rect')).toBe(rect);
+			expect(sibling.style.color).toBe('green');
+			expect(dynamic.style.position).toBe('absolute');
+			expect(dynamic.style.color).toBe('blue');
+			expect(rect.style.fill).toBe('red');
+			expect(rect.style.stroke).toBe('blue');
+
+			flushSync(() => root!.render(client.App, { color: 'purple' }));
+			expect(container.querySelector('#mixed-inline-style-fragment-static')).toBe(sibling);
+			expect(container.querySelector('#mixed-inline-style-fragment-html')).toBe(dynamic);
+			expect(container.querySelector('#mixed-inline-style-fragment-rect')).toBe(rect);
+			expect(sibling.style.color).toBe('green');
+			expect(dynamic.style.color).toBe('purple');
+			expect(rect.style.fill).toBe('red');
+			expect(rect.style.stroke).toBe('purple');
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+
+	it.each([
+		{ shape: 'a null dynamic value', value: null, suppressed: false },
+		{ shape: 'an undefined dynamic value', value: undefined, suppressed: false },
+		{ shape: 'a suppressed dynamic mismatch', value: null, suppressed: true },
+	])('hydrates mixed inline style with $shape', ({ shape, value, suppressed }) => {
+		const source = `
+			export function App(props) @{
+				<div
+					id="mixed-inline-style-mismatch"
+					${suppressed ? 'suppressHydrationWarning' : ''}
+					style={{ position: 'absolute', width: 120, color: props.color }}
+				>
+					{'mismatch'}
+				</div>
+			}
+		`;
+		const id = `mixed-inline-style-hydration-${shape.replaceAll(' ', '-')}.tsrx`;
+		const server = loadMixedInlineStyle(source, id, 'server');
+		const client = loadMixedInlineStyle(source, id, 'client');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, { color: 'red' }).html;
+		document.body.appendChild(container);
+		const element = container.querySelector('#mixed-inline-style-mismatch') as HTMLElement;
+		const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.App, { color: value });
+			flushSync(() => {});
+			expect(container.querySelector('#mixed-inline-style-mismatch')).toBe(element);
+			expect(element.style.position).toBe('absolute');
+			expect(element.style.width).toBe('120px');
+			expect(element.style.color).toBe(suppressed ? 'red' : '');
+			if (suppressed) {
+				expect(
+					warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
+				).toEqual([]);
+			}
+
+			flushSync(() => root!.render(client.App, { color: 'blue' }));
+			expect(container.querySelector('#mixed-inline-style-mismatch')).toBe(element);
+			expect(element.style.position).toBe('absolute');
+			expect(element.style.width).toBe('120px');
+			expect(element.style.color).toBe('blue');
+		} finally {
+			root?.unmount();
+			warnings.mockRestore();
+			container.remove();
+		}
 	});
 });
 
