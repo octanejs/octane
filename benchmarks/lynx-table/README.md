@@ -24,7 +24,8 @@ build-flag-gated wire profiler — `globalThis.__OCTANE_LYNX_PROF` on each
 thread). Counts are deterministic for a fixed app and interaction sequence, so
 they carry ratio guards in `../baselines/ratios.json` against the
 `changed-rows-model` target — the commands and component renders a change of
-that size strictly implies. Selection allows two Row body executions;
+that size strictly implies. Creating any number of component-owned rows must
+emit one shared-template run. Selection allows two Row body executions;
 update-every-10th allows `ceil(rows / 10)`. The Row counter is compiled out of
 normal browser and production builds. These gates keep wire payload and render
 breadth proportional to change size, not tree size. The suite runs from the
@@ -38,6 +39,9 @@ Because the in-process ContextProxy is synchronous, acknowledgements return
 immediately and the storm gates see one commit per tick; the asynchronous
 "renders while a commit is in flight coalesce into the next commit" contract
 is pinned separately in `packages/octane/tests/universal-transport.test.ts`.
+This harness starts directly on the background renderer; production
+first-screen adoption and the subsequent capability handoff are covered by the
+Lynx first-screen integration tests and the real-browser harness below.
 
 ## 2. Lynx-for-Web wall-clock harness (`web/run-web.mjs`, informational)
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	type ObjectHostInstance,
 	type UniversalHostCommand,
+	createContext,
 	createObjectContainer,
 	createObjectDriver,
 	createUniversalRoot,
@@ -10,6 +11,7 @@ import {
 	hmrUniversalComponent,
 	markUniversalHostComponent,
 	universalComponent,
+	universalContext,
 	universalFor,
 	universalHostComponentLeafPlan,
 	universalPlan,
@@ -1276,6 +1278,327 @@ describe('universal prepared host SDK', () => {
 		container.dispatchEvent(first.children[0], 'select', undefined);
 		expect(selected).toEqual(['first:b', 'first:c', 'next:a']);
 		root.unmount();
+	});
+
+	it('preserves keyed component state, context, events, and effects across a shared host mount', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createTemplateObjectDriver(true, true, true, true));
+		const Theme = createContext('light');
+		const effects: string[] = [];
+		const events: string[] = [];
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [
+				['id', 0],
+				['selected', 1],
+			],
+			children: [
+				{
+					kind: 'host',
+					type: 'action',
+					bindings: [['onSelect', 2]],
+					children: [{ kind: 'slot', slot: 3 }],
+				},
+			],
+		});
+		const Row = defineUniversalComponent(
+			'object',
+			({ id, prefix, selected }: { id: string; prefix: string; selected: boolean }, context) => {
+				const theme = context.readContext(Theme);
+				const [state] = useState(`state:${id}`, 'row-state');
+				context.layoutEffect(() => {
+					effects.push(`mount:${id}`);
+					return () => effects.push(`cleanup:${id}`);
+				}, []);
+				return universalValue(plan, [
+					id,
+					selected,
+					() => events.push(`${prefix}:${theme}:${id}`),
+					`${prefix}:${theme}:${state}`,
+				]);
+			},
+		);
+		const Scene = defineUniversalComponent(
+			'object',
+			({
+				ids,
+				prefix,
+				theme,
+				selected,
+			}: {
+				ids: readonly string[];
+				prefix: string;
+				theme: string;
+				selected: string;
+			}) =>
+				universalContext(Theme, theme, () =>
+					universalFor(
+						ids,
+						(id) => id,
+						(id) =>
+							universalComponent(
+								'object',
+								Row,
+								universalProps(
+									{ id, prefix, selected: id === selected } as never,
+									undefined,
+									false,
+									true,
+								),
+							),
+						null,
+						false,
+						false,
+						undefined,
+						undefined,
+						undefined,
+						true,
+					),
+				),
+		);
+
+		const input = { ids: ['a', 'b', 'c'], prefix: 'first', theme: 'light', selected: 'a' };
+		const abandoned = root.prepare(Scene, input);
+		if (abandoned.status !== 'prepared') throw new Error('Expected a prepared component mount.');
+		const abandonedRuns = abandoned.batch.commands.filter(
+			(command) => command.op === 'mount-template-run',
+		);
+		expect(abandonedRuns).toHaveLength(1);
+		if (abandonedRuns[0].op !== 'mount-template-run') throw new Error('Expected a shared mount.');
+		expect(abandonedRuns[0].count).toBe(3);
+		expect(abandonedRuns[0].firstId).toBeGreaterThan(0);
+		expect(effects).toEqual([]);
+		abandoned.abort();
+		expect(container.children).toEqual([]);
+		expect(effects).toEqual([]);
+
+		const prepared = root.prepare(Scene, input);
+		if (prepared.status !== 'prepared') throw new Error('Expected a retried component mount.');
+		const runs = prepared.batch.commands.filter((command) => command.op === 'mount-template-run');
+		expect(runs).toHaveLength(1);
+		if (runs[0].op !== 'mount-template-run') throw new Error('Expected a shared retry mount.');
+		expect(runs[0].firstId).toBe(abandonedRuns[0].firstId);
+		expect(runs[0].count).toBe(3);
+		prepared.commit();
+		const [first, second, third] = container.children;
+		expect(effects).toEqual(['mount:a', 'mount:b', 'mount:c']);
+		expect(container.children.map((row) => row.children[0].children[0].props.value)).toEqual([
+			'first:light:state:a',
+			'first:light:state:b',
+			'first:light:state:c',
+		]);
+		container.dispatchEvent(second.children[0], 'select', undefined);
+		expect(events).toEqual(['first:light:b']);
+
+		root.render(Scene, { ...input, ids: ['c', 'a', 'b'] });
+		expect(container.children).toEqual([third, first, second]);
+		expect(effects).toEqual(['mount:a', 'mount:b', 'mount:c']);
+
+		root.render(Scene, {
+			ids: ['c', 'a', 'b'],
+			prefix: 'next',
+			theme: 'dark',
+			selected: 'c',
+		});
+		expect(container.children).toEqual([third, first, second]);
+		expect(third.props.selected).toBe(true);
+		expect(first.children[0].children[0].props.value).toBe('next:dark:state:a');
+		container.dispatchEvent(first.children[0], 'select', undefined);
+		expect(events).toEqual(['first:light:b', 'next:dark:a']);
+
+		root.render(Scene, { ids: ['b', 'c'], prefix: 'next', theme: 'dark', selected: 'c' });
+		expect(container.children).toEqual([second, third]);
+		expect(effects).toEqual(['mount:a', 'mount:b', 'mount:c', 'cleanup:a']);
+		root.unmount();
+		expect(effects.slice(4).toSorted()).toEqual(['cleanup:b', 'cleanup:c']);
+	});
+
+	it('preserves existing hosts when component mount capabilities become available later', () => {
+		const container = createObjectContainer();
+		const driver = createTemplateObjectDriver(true, true, true, false);
+		const root = createUniversalRoot(container, driver);
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['id', 0]],
+			children: [{ kind: 'host', type: 'label', children: [{ kind: 'slot', slot: 1 }] }],
+		});
+		const shellPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'shell',
+			children: [{ kind: 'slot', slot: 0 }],
+		});
+		const Row = defineUniversalComponent('object', ({ id }: { id: string }) =>
+			universalValue(rowPlan, [id, `label:${id}`]),
+		);
+		const Scene = defineUniversalComponent('object', ({ ids }: { ids: readonly string[] }) =>
+			universalValue(shellPlan, [
+				universalFor(
+					ids,
+					(id) => id,
+					(id) => universalComponent('object', Row, universalProps([['set', 'id', id]])),
+					null,
+					false,
+					false,
+					undefined,
+					undefined,
+					undefined,
+					true,
+				),
+			]),
+		);
+
+		root.render(Scene, { ids: [] });
+		const shell = container.children[0];
+		const shellId = shell.id;
+		driver.capabilities.templateProgramRuns = true;
+		const prepared = root.prepare(Scene, { ids: ['a', 'b', 'c'] });
+		if (prepared.status !== 'prepared') throw new Error('Expected a post-mount component batch.');
+		const commands = prepared.batch.commands.filter(
+			(command) => command.op === 'mount-template-run',
+		);
+		expect(commands).toHaveLength(1);
+		if (commands[0].op !== 'mount-template-run') throw new Error('Expected a shared host mount.');
+		expect(commands[0].count).toBe(3);
+		expect(commands[0].parent).toBe(shellId);
+		expect(commands[0].firstId).toBeGreaterThan(shellId);
+		prepared.commit();
+		expect(container.children).toEqual([shell]);
+		expect(shell.children.map((row) => row.children[0].children[0].props.value)).toEqual([
+			'label:a',
+			'label:b',
+			'label:c',
+		]);
+		root.unmount();
+	});
+
+	it('retains already-adopted keyed component scopes when mounting capabilities upgrade', () => {
+		const container = createObjectContainer();
+		const driver = createTemplateObjectDriver(true, true, true, false);
+		const root = createUniversalRoot(container, driver);
+		const effects: string[] = [];
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['id', 0]],
+			children: [{ kind: 'host', type: 'label', children: [{ kind: 'slot', slot: 1 }] }],
+		});
+		const Row = defineUniversalComponent('object', ({ id }: { id: string }) => {
+			const [state] = useState(`retained:${id}`, 'row-state');
+			useLayoutEffect(
+				() => {
+					effects.push(`mount:${id}`);
+					return () => effects.push(`cleanup:${id}`);
+				},
+				[],
+				'row-effect',
+			);
+			return universalValue(plan, [id, state]);
+		});
+		const Scene = defineUniversalComponent('object', ({ ids }: { ids: readonly string[] }) =>
+			universalFor(
+				ids,
+				(id) => id,
+				(id) =>
+					universalComponent(
+						'object',
+						Row,
+						universalProps({ id } as never, undefined, false, true),
+					),
+				null,
+				false,
+				false,
+				undefined,
+				undefined,
+				undefined,
+				true,
+			),
+		);
+
+		root.render(Scene, { ids: ['a', 'b'] });
+		const [first, second] = container.children;
+		expect(effects).toEqual(['mount:a', 'mount:b']);
+		driver.capabilities.templateProgramRuns = true;
+		root.render(Scene, { ids: ['b', 'a'] });
+		expect(container.children).toEqual([second, first]);
+		expect(container.children.map((row) => row.children[0].children[0].props.value)).toEqual([
+			'retained:b',
+			'retained:a',
+		]);
+		expect(effects).toEqual(['mount:a', 'mount:b']);
+		root.unmount();
+		expect(effects.slice(2).toSorted()).toEqual(['cleanup:a', 'cleanup:b']);
+	});
+
+	it('keeps an item owner when a component-prop getter reads keyed hook state', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createTemplateObjectDriver(true, true, true, true));
+		const effects: string[] = [];
+		let setGetterValue!: (next: string) => void;
+		let setRowValue!: (next: string) => void;
+		const item = {
+			id: 'one',
+			get label() {
+				const [label, setLabel] = useState('getter:first', 'getter-slot');
+				setGetterValue = setLabel;
+				return label;
+			},
+		};
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			children: [{ kind: 'host', type: 'label', children: [{ kind: 'slot', slot: 0 }] }],
+		});
+		const Row = defineUniversalComponent('object', ({ label }: { label: string }) => {
+			const [value, update] = useState('row:first', 'row-slot');
+			setRowValue = update;
+			useLayoutEffect(
+				() => {
+					effects.push('mount');
+					return () => effects.push('cleanup');
+				},
+				[],
+				'row-effect',
+			);
+			return universalValue(plan, [`${label}|${value}`]);
+		});
+		const Scene = defineUniversalComponent('object', () =>
+			universalFor(
+				[item],
+				(entry) => entry.id,
+				(entry) =>
+					universalComponent(
+						'object',
+						Row,
+						universalProps({ label: entry.label } as never, undefined, false, true),
+					),
+				null,
+				false,
+				false,
+				undefined,
+				undefined,
+				undefined,
+				true,
+			),
+		);
+
+		root.render(Scene, undefined);
+		const row = container.children[0];
+		expect(row.children[0].children[0].props.value).toBe('getter:first|row:first');
+		expect(effects).toEqual(['mount']);
+
+		flushUniversalSync(() => setGetterValue('getter:next'));
+		expect(container.children).toEqual([row]);
+		expect(row.children[0].children[0].props.value).toBe('getter:next|row:first');
+		expect(effects).toEqual(['mount']);
+
+		flushUniversalSync(() => setRowValue('row:next'));
+		expect(container.children).toEqual([row]);
+		expect(row.children[0].children[0].props.value).toBe('getter:next|row:next');
+		expect(effects).toEqual(['mount']);
+		root.unmount();
+		expect(effects).toEqual(['mount', 'cleanup']);
 	});
 
 	it('commits stable compact list state and event closures only after host acceptance', () => {

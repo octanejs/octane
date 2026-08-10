@@ -2450,6 +2450,60 @@ function templateProgramForHost(node, state) {
 	return body.length === 1 && isTemplateProgramForHost(body[0]);
 }
 
+function templateProgramForComponent(node, state) {
+	if (
+		node.empty != null ||
+		!rendererHasCapability(state, 'template-program-mount') ||
+		!isOwnerFreeForExpression(node.right) ||
+		!isOwnerFreeForExpression(node.key)
+	) {
+		return null;
+	}
+	const body = (node.body?.body ?? []).filter(
+		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
+	);
+	if (body.length !== 1) return null;
+	const component = body[0];
+	if (
+		(component.type !== 'JSXElement' && component.type !== 'Element') ||
+		!isComponentElement(component) ||
+		(component.openingElement?.name ?? component.name)?.type !== 'JSXIdentifier' ||
+		(component.children ?? []).some(
+			(child) => child.type !== 'JSXText' || normalizeJsxText(child.value ?? '') !== '',
+		)
+	) {
+		return null;
+	}
+	const names = new Set();
+	for (const attribute of component.openingElement?.attributes ?? component.attributes ?? []) {
+		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
+			return null;
+		}
+		const name = attributeName(attribute);
+		if (
+			name === null ||
+			name === 'key' ||
+			name === 'ref' ||
+			name === 'children' ||
+			name === '__proto__' ||
+			names.has(name)
+		) {
+			return null;
+		}
+		names.add(name);
+		const value = attribute.value;
+		if (value === null || value?.type === 'Literal') continue;
+		if (
+			value?.type !== 'JSXExpressionContainer' ||
+			value.expression?.type === 'JSXEmptyExpression' ||
+			!isTemplateProgramForExpression(value.expression)
+		) {
+			return null;
+		}
+	}
+	return component;
+}
+
 function allocPlan(state, root, origin = null) {
 	const name = allocName(
 		state,
@@ -3347,6 +3401,26 @@ function compileOwnerFreeThreeHostComponentAst(component, state, itemBinding, in
 	};
 }
 
+function compileTemplateProgramForComponentAst(component, state, itemBinding, indexBinding) {
+	const attributes = component.openingElement?.attributes ?? component.attributes ?? [];
+	const props = generatedCall(
+		state.helpers.props,
+		[
+			compilePlainPropsObjectAst(attributes, state, component),
+			inheritGeneratedOrigin(b.unary('void', b.literal(0)), component),
+			b.literal(false),
+			b.literal(true),
+		],
+		component,
+	);
+	const descriptor = generatedCall(
+		state.helpers.nestedComponent,
+		[b.literal(state.renderer.id), jsxNameExpressionAst(component, state), props],
+		component,
+	);
+	return generatedArrow([itemBinding, indexBinding], descriptor, component);
+}
+
 function compileForAst(node, context, state) {
 	if (node.await) {
 		throw universalError(
@@ -3369,6 +3443,10 @@ function compileForAst(node, context, state) {
 	assertNoResidualTemplate(node.key, state, '@for key');
 	const host = !state.hmr ? ownerFreeForHost(node) : null;
 	const component = host === null ? ownerFreeForThreeHostComponent(node, state) : null;
+	const templateComponent =
+		host === null && component === null && !state.hmr
+			? templateProgramForComponent(node, state)
+			: null;
 	const compactHost =
 		host === null ? null : compileOwnerFreeForHostAst(host, state, itemBinding, indexBinding);
 	const compactComponent =
@@ -3380,6 +3458,14 @@ function compileForAst(node, context, state) {
 		generatedArrow([itemBinding, indexBinding], rewriteSourceAst(node.key, state), node.key),
 		compactHost?.render ??
 			compactComponent?.render ??
+			(templateComponent === null
+				? null
+				: compileTemplateProgramForComponentAst(
+						templateComponent,
+						state,
+						itemBinding,
+						indexBinding,
+					)) ??
 			compileBlockValueAst(
 				node.body?.body ?? [],
 				state,
@@ -3403,6 +3489,16 @@ function compileForAst(node, context, state) {
 			jsxNameExpressionAst(component, state),
 			compactComponent.plan,
 			compactComponent.signature,
+		);
+	} else if (templateComponent !== null) {
+		args.push(
+			b.literal(null, 'null'),
+			b.literal(false),
+			b.literal(false),
+			inheritGeneratedOrigin(b.unary('void', b.literal(0)), templateComponent),
+			inheritGeneratedOrigin(b.unary('void', b.literal(0)), templateComponent),
+			inheritGeneratedOrigin(b.unary('void', b.literal(0)), templateComponent),
+			b.literal(true),
 		);
 	} else if (!state.hmr && templateProgramForHost(node, state)) {
 		args.push(b.literal(null, 'null'), b.literal(false), b.literal(false), b.literal(true));

@@ -258,6 +258,7 @@ export interface UniversalForValue {
 	readonly leafPlan?: UniversalPlan;
 	readonly leafSignature?: string;
 	readonly template?: boolean;
+	readonly componentScope?: boolean;
 }
 
 export interface UniversalTryValue {
@@ -1618,7 +1619,17 @@ export function universalProps(
 	entries: readonly UniversalPropEntry[],
 	children: unknown = NO_CHILDREN,
 	canonicalizeHostClass = false,
+	compilerOwnedRecord = false,
 ): UniversalPropsValue {
+	if (compilerOwnedRecord) {
+		return {
+			$$kind: UNIVERSAL_PROPS,
+			props: Object.freeze(entries as unknown as Record<string, unknown>),
+			key: null,
+			hasKey: false,
+			hasChildren: false,
+		};
+	}
 	const props: Record<string, unknown> = {};
 	if (!canonicalizeHostClass) {
 		for (const entry of entries) {
@@ -1721,7 +1732,20 @@ export function universalFor<T>(
 	hostComponent?: UniversalComponent<any> | true,
 	leafPlan?: UniversalPlan,
 	leafSignature?: string,
+	componentScope = false,
 ): UniversalForValue {
+	if (componentScope) {
+		return {
+			$$kind: UNIVERSAL_FOR,
+			items,
+			key,
+			render,
+			empty,
+			ownerless,
+			compact,
+			componentScope: true,
+		};
+	}
 	if (hostComponent === true) {
 		return { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, template: true };
 	}
@@ -2240,6 +2264,7 @@ function findClaimableChildRecord(
 	identityPath: readonly unknown[],
 	key: unknown,
 ): UniversalOwnerRecord | undefined {
+	if (parent.record.children.length === 0) return undefined;
 	// Order-stable renders resolve every claim with one positional compare; the
 	// identity-path buckets exist for reorders, insertions, and removals.
 	if (parent.childOwnerBuckets === null) {
@@ -2499,13 +2524,32 @@ function ownerRange(owner: DraftOwner, children: BlueprintNode[]): BlueprintNode
 	return [{ kind: 'range', key: owner.record.rangeKey, owner: owner.record, children }];
 }
 
+function readComponentContext<T>(context: UniversalContext<T>): T {
+	return readOwnerContext(activateLazyLeafOwner(), context);
+}
+
+function componentInsertionEffect(
+	create: () => void | (() => void),
+	deps?: readonly unknown[],
+): void {
+	enqueueUniversalEffect('insertion', create, deps);
+}
+
+function componentLayoutEffect(create: () => void | (() => void), deps?: readonly unknown[]): void {
+	enqueueUniversalEffect('layout', create, deps);
+}
+
+function componentEffect(create: () => void | (() => void), deps?: readonly unknown[]): void {
+	enqueueUniversalEffect('passive', create, deps);
+}
+
 function componentContext(renderer: string): UniversalRenderContext {
 	return {
 		renderer,
-		readContext: (context) => readOwnerContext(activateLazyLeafOwner(), context),
-		insertionEffect: (create, deps) => enqueueUniversalEffect('insertion', create, deps),
-		layoutEffect: (create, deps) => enqueueUniversalEffect('layout', create, deps),
-		effect: (create, deps) => enqueueUniversalEffect('passive', create, deps),
+		readContext: readComponentContext,
+		insertionEffect: componentInsertionEffect,
+		layoutEffect: componentLayoutEffect,
+		effect: componentEffect,
 	};
 }
 
@@ -3040,6 +3084,10 @@ function materializeValue(
 			list.template === true &&
 			currentAttempt().root.driverCapabilities().templateProgramMount === true &&
 			CURRENT_OWNER?.visibility === 'visible';
+		const compilerComponentScope =
+			list.componentScope === true &&
+			currentAttempt().root.driverCapabilities().templateProgramRuns === true &&
+			CURRENT_OWNER?.visibility === 'visible';
 		if (
 			list.ownerless &&
 			list.compact &&
@@ -3180,7 +3228,7 @@ function materializeValue(
 			compilerTemplateTree && attempt.root.driverCapabilities().templateProgramRuns === true;
 		let compactTemplateList: BlueprintCompactTemplateList | null = null;
 		const lazyOwnerScope: LazyLeafOwnerScope | null =
-			compilerLeafProps || compilerTemplateTree
+			compilerLeafProps || compilerTemplateTree || compilerComponentScope
 				? {
 						attempt,
 						parent,
@@ -3189,13 +3237,62 @@ function materializeValue(
 						owner: null,
 					}
 				: null;
+		let componentScopeEnabled = compilerComponentScope;
+		if (componentScopeEnabled) {
+			const previous = parent.record.children[parent.sequentialClaimCursor];
+			if (
+				previous?.component === null &&
+				identityPathsEqual(previous.identityPath, lazyOwnerScope!.identityPath)
+			) {
+				componentScopeEnabled = false;
+			}
+		}
+		const componentPath = componentScopeEnabled
+			? [...lazyOwnerScope!.identityPath, 'output']
+			: null;
 		let index = 0;
 		for (const item of list.items) {
 			const itemIndex = index++;
 			const itemKey = list.key(item, itemIndex);
 			if (keys.has(itemKey)) throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
 			keys.add(itemKey);
-			if (compilerTemplateTree) {
+			if (componentScopeEnabled) {
+				const rendered = renderLazyLeafItem(lazyOwnerScope!, list.render, item, itemIndex, itemKey);
+				const candidate = rendered as UniversalComponentValue;
+				if (
+					lazyOwnerScope!.owner === null &&
+					candidate?.$$kind === UNIVERSAL_COMPONENT_VALUE &&
+					candidate.renderer === expectedRenderer &&
+					!candidate.hasKey
+				) {
+					const keyed: UniversalComponentValue = {
+						...candidate,
+						key: itemKey,
+						hasKey: true,
+					};
+					output.push(...materializeComponentValue(keyed, expectedRenderer, componentPath!));
+					continue;
+				}
+				if (lazyOwnerScope!.owner === null) {
+					output.push(
+						...materializeScoped(parent, lazyOwnerScope!.identityPath, itemKey, () => rendered),
+					);
+					continue;
+				}
+				const itemOwner = lazyOwnerScope!.owner;
+				const previousOwner = CURRENT_OWNER;
+				const previousAttemptOwner = attempt.owner;
+				CURRENT_OWNER = itemOwner;
+				attempt.owner = itemOwner;
+				let nodes: BlueprintNode[];
+				try {
+					nodes = materializeValue(rendered, expectedRenderer, null, componentPath!);
+				} finally {
+					CURRENT_OWNER = previousOwner;
+					attempt.owner = previousAttemptOwner;
+				}
+				output.push(...ownerRange(itemOwner, nodes));
+			} else if (compilerTemplateTree) {
 				const rendered = renderLazyLeafItem(lazyOwnerScope!, list.render, item, itemIndex, itemKey);
 				if (compactTemplateEnabled) {
 					const candidate = rendered as UniversalPlanValue;
@@ -6476,6 +6573,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private asyncWork: Promise<void> = Promise.resolve();
 	private asyncWorkError: unknown = NO_PENDING_PASSIVE_ERROR;
 	private nextId = 1;
+	private nextLogicalRangeId = -1;
 	private nextUniversalId = 1;
 	private nextListener = NEXT_EVENT_ROOT++ * 1_000_000;
 	private nextBatchVersion = 1;
@@ -9438,10 +9536,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		scopePlacement: { parent: number | null; endAnchor: number | null } | null = null,
 	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
+		let nextLogicalRangeId = this.nextLogicalRangeId;
 		const scoped = scopeRecord !== this.rootRecord;
 		const treeFeatures = (scoped ? scopeFeatures : this.treeFeatures) | attempt.treeFeatures;
 		const templateExcludedFeatures =
 			UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION | UNIVERSAL_TREE_HIDDEN;
+		// Owner ranges never reach the host, but interleaving their logical IDs
+		// with host IDs splits component-owned template instances into separate
+		// runs. Keep their transactional identity in a disjoint namespace only
+		// when this renderer can consume the resulting contiguous host ranges.
+		const compactLogicalRangeIds =
+			this.driver.capabilities?.templateProgramRuns === true &&
+			(treeFeatures & templateExcludedFeatures) === 0;
 		if ((treeFeatures & templateExcludedFeatures) !== 0) {
 			const expandBlueprint = (node: BlueprintNode): void => {
 				if (node.kind === 'host') expandCollapsedTemplateBlueprint(node);
@@ -9519,7 +9625,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					if (child.kind === 'range' && child.retained !== undefined) {
 						child = expandRetained(child);
 					}
-					const record = createLogicalRecord(nextId++, child);
+					const record = createLogicalRecord(
+						compactLogicalRangeIds && child.kind === 'range' ? nextLogicalRangeId-- : nextId++,
+						child,
+					);
 					reserveCollapsedTemplateIds(record, child);
 					const draft: DraftRecord = {
 						record,
@@ -9629,7 +9738,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				const isNew = record === undefined;
-				record ??= createLogicalRecord(nextId++, child);
+				record ??= createLogicalRecord(
+					compactLogicalRangeIds && child.kind === 'range' ? nextLogicalRangeId-- : nextId++,
+					child,
+				);
 				if (isNew) reserveCollapsedTemplateIds(record, child);
 				else reconcileCollapsedTemplate(record, child);
 				claimed.add(record);
@@ -11045,6 +11157,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					this.publishLocalReplay(retryThenables, retryMemos, component, props);
 				}
 				this.nextId = nextId;
+				this.nextLogicalRangeId = nextLogicalRangeId;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.nextListener = nextListener;
 				this.treeFeatures = scoped
