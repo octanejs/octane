@@ -1,0 +1,107 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/reduxjs/react-redux.git",
+    "version": "9.3.0",
+    "commit": "4134f88f179c46d3ae9c4ee7baaa589ff0fecfa8",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:947436d0e52a8f4fa348aaf5708eafc8ae8395b986229f0fce5c91c81011c805",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": [
+        "packages/redux/src"
+      ],
+      "include": [
+        "\\.(?:ts|tsrx)$"
+      ],
+      "exclude": [
+        "\\.d\\.ts$"
+      ]
+    },
+    "tests": {
+      "roots": [
+        "packages/redux/tests"
+      ],
+      "include": [
+        "\\.test\\.ts$"
+      ],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e8e139c7d33a948ad914236e662293864634f765f21042a11af0dd9306c3b13c"
+    }
+  },
+  "lanes": [
+    {
+      "id": "redux-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "redux-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one counter fixture against react-redux 9.3.0 on React and @octanejs/redux on Octane, comparing byte-identical DOM after mount and three dispatch-driving interactions.",
+      "files": [
+        {
+          "path": "packages/redux/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "60b1d3aa41f72d6598c0d2b089346979b4d1a4c3a013a245eaaf43743d0c61f7",
+          "cases": [
+            {
+              "id": "differential:redux-counter",
+              "testName": "counter: mount \u2192 increment \u00d72 \u2192 decrement renders byte-identical",
+              "fullName": "differential: @octanejs/redux vs real react-redux counter: mount \u2192 increment \u00d72 \u2192 decrement renders byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/redux/tests/_fixtures/counter.tsrx",
+          "role": "support",
+          "sha256": "8883f8aa185c44bfda8fe874530c9842e32b7d2b44558fbd515d87c7ba5a1b17"
+        },
+        {
+          "path": "packages/redux/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "947fcdce7ea24d9b15019ad411e919d94af7731586a4a5fc7beaadd68e94702f"
+        },
+        {
+          "path": "packages/redux/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "15bd6113cbbefba4697ac78e1795710a2c247447901ec6192891f1318c4c7059"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "275b76fcfad8a77cb45246b70767f096773f0cf2ac85c333eb75f8e3e82be67d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

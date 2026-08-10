@@ -1956,9 +1956,39 @@ export default defineConfig({
 				},
 			},
 			{
+				// Octane-only conformance stays in ordinary shards; differential
+				// parity lives in the react-parity-owned project below.
 				test: {
 					name: 'redux',
 					include: ['packages/redux/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					exclude: ['packages/redux/tests/differential/**/*.test.ts'],
+					// Differential precompile: rewrites `@octanejs/redux` →
+					// `react-redux` so the React side runs the real binding.
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/redux$/,
+							replacement: resolve(import.meta.dirname, 'packages/redux/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/redux\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/redux/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Parity-owned: packages/redux/audit/react-parity.json requires this
+				// project as the redux-runtime-differential lane. Ordinary Octane-only
+				// redux tests stay in the separate `redux` project above.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'redux-differential',
+					include: ['packages/redux/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					// Differential precompile: rewrites `@octanejs/redux` →
 					// `react-redux` so the React side runs the real binding.

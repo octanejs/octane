@@ -59,6 +59,7 @@ test('rejects a stale divergence classification', async (t) => {
 for (const [binding, testCount] of [
 	['lexical', 16],
 	['lucide', 6],
+	['redux', 3],
 ]) {
 	test(`verifies the ${binding} classification ledger`, async (t) => {
 		const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));

@@ -427,13 +427,14 @@
       "version": "0.1.30",
       "category": "Shared state",
       "upstream": { "package": "react-redux", "version": "9.3.0" },
-      "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Export parity is pinned by test.",
+      "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Upstream runtime-export completeness is pinned by test.",
       "divergences": [
         "`connect()` (the legacy HOC surface) intentionally throws — the hooks API is the supported surface.",
-        "Error messages are octane-branded."
+        "Error messages are octane-branded.",
+        "The root also exposes createReduxContextHook, useReduxContext, createSubscription, and useSyncExternalStoreWithSelector as Octane extension exports."
       ],
       "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-      "verified": "2026-07-08"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/redux-toolkit",

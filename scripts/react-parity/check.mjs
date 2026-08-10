@@ -16,7 +16,12 @@ import { verifyPortTestClassifications } from './hook-form-classifications-lib.m
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
-import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
+import {
+	loadManifest,
+	requiredExecutableLanes,
+	verifyLaneEnvironment,
+	verifyManifestFiles,
+} from './harness-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -44,11 +49,6 @@ try {
 	verifyHookFormTypes(REPO);
 } catch (error) {
 	errors.push(`react-hook-form type evidence is invalid: ${error.message}`);
-}
-try {
-	verifyPortTestClassifications(REPO);
-} catch (error) {
-	errors.push(`react-hook-form test classifications are invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTypes(REPO);
@@ -156,11 +156,13 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
+		// Provenance verification gates completeness, not execution. Required
+		// lanes on recorded-unverified manifests (e.g. redux differential) still
+		// run so parity-owned projects are not skipped after leaving ordinary shards.
 		if (!validateOnly) {
-			// Execute every available required lane regardless of verification
-			// status. recorded-unverified means incomplete upstream evidence, not
-			// "skip registered oracles" — otherwise a failing required lane is inert.
-			execFileSync(process.execPath, [HARNESS_PATH, 'run-required', '--manifest', relativeFile], {
+			const action =
+				requiredExecutableLanes(manifest).length > 0 ? 'run-required' : 'validate';
+			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',
 			});
