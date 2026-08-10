@@ -9202,6 +9202,29 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 		CURRENT_WARM_CLAIMS?.add(entry);
 		return;
 	}
+	// A promoted transition starts a fresh warm episode, but its earlier
+	// speculative values remain in the episode-agnostic harvest. Claim the
+	// matching occurrence for this plan without consuming it: the real memo
+	// still owns adoption, and an already-adopted entry remains a tombstone for
+	// that occurrence when a later sibling suspends in the same round.
+	const held = HELD_SYNC_TRANSITION;
+	const harvest = held?.warmHarvest ?? PROMOTED_WARM_HARVEST;
+	const owner = held?.origin ?? ACTIVE_TRANSITION_ATTEMPT?.origin;
+	if (
+		harvest !== null &&
+		harvest !== undefined &&
+		owner !== undefined &&
+		blockIsAncestor(owner, CURRENT_BLOCK!)
+	) {
+		for (let i = 0; i < harvest.length; i++) {
+			const entry = harvest[i];
+			if (entry.slot !== slot || depsChanged(entry.deps, deps) || CURRENT_WARM_CLAIMS?.has(entry)) {
+				continue;
+			}
+			CURRENT_WARM_CLAIMS?.add(entry);
+			return;
+		}
+	}
 	let value: any;
 	try {
 		value = compute();

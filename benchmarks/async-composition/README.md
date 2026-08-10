@@ -174,7 +174,19 @@ unknown, mutable, or escaped list retains the ordinary rendering behavior.
 
 The existing browser gate requires all seven independent requests in the first
 wave, two waves per operation, and eight actual network starts. Its current
-factory-call ceilings are eight on initialization and 13 on an update; the
-remaining update-only replay calls reuse cached requests. Keyed board identity,
-controlled input state, fallback retention, and zero mixed transition states
-remain mandatory.
+factory-call ceilings are eight on both initialization and updates. Keyed board
+identity, controlled input state, fallback retention, and zero mixed transition
+states remain mandatory.
+
+## Held transition resource reuse
+
+After the first update wave settles, the dependent `owner` request begins the
+second wave. Transition promotion previously invoked five already-started
+resource creators again at that point, even though the application cache
+prevented duplicate network requests.
+
+The promoted warm plan now claims matching entries from the existing
+episode-agnostic resource harvest without consuming the real components'
+adoption rights. Each update therefore invokes exactly eight creators, down
+from 13, while preserving eight network starts, two request waves, the
+dependent-owner ordering, and zero mixed transition states.

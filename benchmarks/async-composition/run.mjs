@@ -26,17 +26,14 @@ const expectedSignature = (version) =>
 // These are one-way ceilings, not expected results: any improvement passes.
 // They keep known gaps visible without allowing them to silently worsen.
 //
-// update calls sits at 13, not the 8-call dependency floor: the deferred
-// transition commit holds the whole screen (mixed states 0), and its promoted
-// round after the dependent `owner` resolves re-creates the five warm-started
-// panel fetches instead of dep-hitting them. The app-level cache serves the
-// same promises, so no duplicate network occurs — the ceiling pins the
-// re-creation cost until the resume/warm work restores the floor
-// (docs/transition-deferred-commit-plan.md, P2).
+// Both operations stay at the eight-request creator floor. When the dependent
+// `owner` starts, the promoted transition claims its existing warm-resource
+// harvest instead of calling the five already-started creators again. The
+// complete dashboard remains held until the owner resolves (mixed states 0).
 const OBSERVATION_CEILINGS = {
 	'octane-tsrx': {
 		init: { waves: 2, calls: 8, mixedStates: 0 },
-		update: { waves: 2, calls: 13, mixedStates: 0 },
+		update: { waves: 2, calls: 8, mixedStates: 0 },
 	},
 	react: {
 		init: { mixedStates: 0 },

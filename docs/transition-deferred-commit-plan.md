@@ -171,10 +171,28 @@ re-render — the screen and cue were re-established in round one — so entries
 move monotonically forward. The flip-away case now re-asserts the whole held
 screen instead of tearing to the flipped text.
 
-Residual, pinned one-way in the benchmark (update calls ceiling 13): the round
-after the dependent `owner` resolves re-creates the five warm-started panel
-fetches instead of dep-hitting them — app-cache-served, zero mixed states,
-no network duplication. P2 owns walking that back to the 8-call floor.
+## P2 warm-resource reuse landed (2026-08-10)
+
+The original promoted transition still recreated five already-warmed resources
+when its second round discovered the dependent `owner` request, before that
+request resolved. The application's cache avoided duplicate network requests,
+but the async-composition benchmark recorded 13 resource-creator calls instead
+of the eight actual requests.
+
+The first held attempt already harvests warmed values outside the per-episode
+cache, and real memo adoption already consumes those values exactly once.
+Speculative warming now consults the same held or promoted harvest after its
+ordinary cache and active-memo checks. A matching slot and dependencies claim
+only the existing occurrence for the current warm plan; even an already-adopted
+entry remains an occurrence tombstone and must not restart its creator.
+
+This lookup neither consumes the harvested value nor publishes another cache
+entry. Real memo adoption remains the sole owner of `taken`, repeated matching
+occurrences stay distinct, and the existing promotion, rollback, supersession,
+and cleanup paths retain harvest ownership. No new state, allocation, runtime
+API, or ordinary render-path work is introduced. The production benchmark now
+requires exactly eight initial and eight transition-update creators, two
+request waves, eight actual requests, and zero mixed-version committed states.
 
 ## Phases
 
