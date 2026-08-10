@@ -10,9 +10,9 @@ the leaf consumers without re-running any bailed body. Both Octane dialects
 exercise production `autoMemo` on wall A: TSRX can skip the entire pure `RowsA`
 region, while returned JSX preserves its descriptor boundary and skips the
 unchanged compiled keyed list inside `RowsA`. Both dialects reuse wall B's
-imported descriptor calculation when its inputs are unchanged. TSRX additionally
-skips the unchanged renderable region while preserving context updates; changed
-inputs still exercise the value-comparing memo bail.
+imported descriptor calculation and skip its unchanged renderable region while
+preserving context updates; changed inputs still exercise the value-comparing
+memo bail.
 
 This is the canonical home for octane's `shallowEqualProps` and
 `refreshContextConsumers` numbers — if a store-fanout suite lands later it must
@@ -87,11 +87,11 @@ how `<Row>` is put on screen:
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
   arm** of `tryMemoBail`. This is the shape every `@octanejs/*` binding
-  produces. Both dialects cache the imported helper's result against its input.
-  TSRX can also reuse the compiler-proven immutable renderable region, refreshing
-  existing context consumers directly when a Provider changes. When the input
-  changes, fresh descriptors still exercise memo bailouts on prop VALUES, not
-  object identity.
+  produces. Both dialects cache the imported helper's result against its input
+  and reuse the compiler-proven immutable renderable region, refreshing existing
+  context consumers directly when a Provider changes. When the input changes,
+  fresh descriptors still exercise memo bailouts on prop VALUES, not object
+  identity.
 
 For React the A/B distinction collapses (JSX IS `createElement`); both walls
 are kept so the op list and DOM stay identical across targets. The canonical
@@ -127,10 +127,11 @@ A it requires zero list helpers, keyed survivor visits, descriptors, shallow
 memo comparisons, and row bodies (context A additionally requires exactly 1000
 Leaf refreshes). JSX retains its normal `RowsA`/descriptor entry but likewise
 requires zero keyed survivor visits, item helpers, and memo comparisons on an
-unchanged list. Wall B requires both dialects to reuse unchanged calculations;
-TSRX additionally requires zero keyed survivor visits and memo comparisons for
-equal/context-only updates, while context updates still refresh exactly 1000
-leaves. Mount and one-change A/B also carry exact compiled-work gates.
+unchanged list. Wall B requires both dialects to reuse unchanged calculations
+with zero keyed survivor visits and memo comparisons for equal/context-only
+updates; context updates still refresh exactly 1000 leaves. Returned-JSX
+wrapper descriptor counts have upper ceilings rather than exact requirements.
+Mount and one-change A/B also carry exact compiled-work gates.
 
 The React Row/Inner/Leaf counters likewise make those component bodies impure,
 so React Compiler conservatively leaves them alone; the explicit `memo`

@@ -6513,6 +6513,15 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	return ctx;
 }
 
+/**
+ * Identify the Context already provided by this deferred child's own scope
+ * without observing userland Provider accessors or Proxy traps.
+ * @internal
+ */
+export function compilerOwnsContextProvider(value: unknown): boolean {
+	return CURRENT_SCOPE?.$$ctxValues?.has(value as Context<any>) === true;
+}
+
 /** Renderer-boundary adapter; ordinary DOM roots never retain this by themselves. */
 export function renderClientContextProvider<T>(
 	context: unknown,

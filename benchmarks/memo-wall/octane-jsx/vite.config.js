@@ -11,7 +11,8 @@ export default defineConfig({
 	},
 	build: {
 		target: 'esnext',
-		minify: 'terser',
+		// Precise-call coverage needs unmangled names in its untimed production build.
+		minify: process.env.MEMO_WALL_WORK === '1' ? false : 'terser',
 		terserOptions: {
 			compress: {
 				passes: 5,

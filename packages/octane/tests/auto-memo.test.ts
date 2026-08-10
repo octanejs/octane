@@ -1769,6 +1769,489 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it('preserves returned-JSX descriptor rows, context, state, keys, refs, and effects', () => {
+		const source = `
+			import { createContext, createElement, memo, useContext, useEffect, useState } from 'octane';
+
+			const Theme = createContext('initial');
+
+			function RowImpl(props) {
+				const theme = useContext(Theme);
+				const [own, setOwn] = useState(0);
+				useEffect(() => {
+					props.onEffect('mount:' + props.id);
+					return () => props.onEffect('cleanup:' + props.id);
+				}, [props.id, props.onEffect]);
+				return (
+					<button
+						className={'returned-descriptor-row-' + props.id}
+						data-id={props.id}
+						ref={props.onRef}
+						onClick={() => setOwn(own + 1)}
+					>
+						{theme + ':' + props.label + ':' + own}
+					</button>
+				);
+			}
+			const Row = memo(RowImpl);
+
+			function selectRow(item, onEffect, onRef) {
+				return createElement(Row, {
+					key: item.id,
+					id: item.id,
+					label: item.label,
+					onEffect,
+					onRef,
+				});
+			}
+
+			function selectRows(items, onEffect, onRef) {
+				return [
+					selectRow(items[0], onEffect, onRef),
+					selectRow(items[1], onEffect, onRef),
+				];
+			}
+
+			export function App(props) {
+				const [items, setItems] = useState([
+					{ id: 1, label: 'first' },
+					{ id: 2, label: 'second' },
+				]);
+				const [theme, setTheme] = useState('initial');
+				const [tick, setTick] = useState(0);
+				const rows = selectRows(items, props.onEffect, props.onRef);
+				return (
+					<section>
+						<button id="returned-descriptor-tick" onClick={() => setTick(tick + 1)}>{tick}</button>
+						<button id="returned-descriptor-theme" onClick={() => setTheme('updated')}>theme</button>
+						<button
+							id="returned-descriptor-change"
+							onClick={() => setItems(items.map((item) => item.id === 1
+								? { ...item, label: 'changed' }
+								: item))}
+						>change</button>
+						<button id="returned-descriptor-reorder" onClick={() => setItems(items.toReversed())}>
+							reorder
+						</button>
+						<Theme.Provider value={theme}>
+							<div id="returned-descriptor-rows">{rows}</div>
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'returned-descriptor-rows.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const effects: string[] = [];
+		const attached: Element[] = [];
+		const detached: Element[] = [];
+		const root = mount(client.App, {
+			onEffect: (event: string) => effects.push(event),
+			onRef: (element: Element | null) => {
+				if (element !== null) {
+					attached.push(element);
+					return () => detached.push(element);
+				}
+			},
+		});
+		flushEffects();
+		const first = root.find('.returned-descriptor-row-1');
+		const second = root.find('.returned-descriptor-row-2');
+		expect(attached).toEqual([first, second]);
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+		expect(first.textContent).toBe('initial:first:0');
+		expect(second.textContent).toBe('initial:second:0');
+
+		root.click('.returned-descriptor-row-1');
+		expect(first.textContent).toBe('initial:first:1');
+
+		root.click('#returned-descriptor-tick');
+		expect(root.findAll('#returned-descriptor-rows > button')).toEqual([first, second]);
+		expect(first.textContent).toBe('initial:first:1');
+		expect(attached).toEqual([first, second]);
+		expect(detached).toEqual([]);
+
+		root.click('#returned-descriptor-theme');
+		expect(first.textContent).toBe('updated:first:1');
+		expect(second.textContent).toBe('updated:second:0');
+
+		root.click('#returned-descriptor-change');
+		expect(root.findAll('#returned-descriptor-rows > button')).toEqual([first, second]);
+		expect(first.textContent).toBe('updated:changed:1');
+		expect(second.textContent).toBe('updated:second:0');
+
+		root.click('#returned-descriptor-reorder');
+		expect(root.findAll('#returned-descriptor-rows > button')).toEqual([second, first]);
+		expect(first.textContent).toBe('updated:changed:1');
+		expect(second.textContent).toBe('updated:second:0');
+		flushEffects();
+		expect(attached).toEqual([first, second]);
+		expect(detached).toEqual([]);
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+
+		root.unmount();
+		flushEffects();
+		expect(detached).toHaveLength(2);
+		expect(detached).toEqual(expect.arrayContaining([first, second]));
+		expect(effects.slice(2).toSorted()).toEqual(['cleanup:1', 'cleanup:2']);
+	});
+
+	it('hydrates returned-JSX descriptor rows and preserves their nodes through provider updates', () => {
+		const source = `
+			import { createContext, createElement, memo, useContext, useState } from 'octane';
+
+			const Theme = createContext('default');
+
+			function RowImpl(props) {
+				const theme = useContext(Theme);
+				return <span id="returned-hydrated-row">{theme + ':' + props.label}</span>;
+			}
+			const Row = memo(RowImpl);
+
+			function selectRows(items) {
+				return [createElement(Row, { key: items[0].id, label: items[0].label })];
+			}
+
+			export function App(props) {
+				const [tick, setTick] = useState(0);
+				const theme = props.theme;
+				const rows = selectRows(props.items);
+				return (
+					<section>
+						<button id="returned-hydrated-tick" onClick={() => setTick(tick + 1)}>{tick}</button>
+						<Theme.Provider value={theme}>
+							<div id="returned-hydrated-rows">{rows}</div>
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const id = 'returned-descriptor-hydration.tsx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const items = [{ id: 1, label: 'row' }];
+		const { html } = ServerRuntime.renderToString(server.App, { items, theme: 'initial' });
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const row = container.querySelector('#returned-hydrated-row');
+		const list = container.querySelector('#returned-hydrated-rows');
+
+		const root = hydrateRoot(container, client.App, { items, theme: 'initial' });
+		flushSync(() => {});
+		expect(container.querySelector('#returned-hydrated-row')).toBe(row);
+		expect(container.querySelector('#returned-hydrated-rows')).toBe(list);
+		expect(row?.textContent).toBe('initial:row');
+
+		flushSync(() => (container.querySelector('#returned-hydrated-tick') as HTMLElement).click());
+		expect(container.querySelector('#returned-hydrated-row')).toBe(row);
+		expect(row?.textContent).toBe('initial:row');
+
+		flushSync(() => root.render(client.App, { items, theme: 'updated' }));
+		expect(container.querySelector('#returned-hydrated-rows')).toBe(list);
+		expect(container.querySelector('#returned-hydrated-row')).toBe(row);
+		expect(row?.textContent).toBe('updated:row');
+		root.unmount();
+		container.remove();
+	});
+
+	it.each([
+		{ shape: 'direct', shared: 'dynamic' },
+		{ shape: 'nested', shared: '[dynamic]' },
+		{
+			shape: 'fragment-wrapped',
+			shared: "[createElement(Fragment, { key: 'wrapper' }, dynamic)]",
+		},
+	])(
+		'keeps $shape returned-JSX descriptor-array getters live across parent updates',
+		({ shape, shared }) => {
+			const source = `
+				import { Fragment, createContext, createElement, useState } from 'octane';
+
+				let label = 'initial';
+				const dynamic = [];
+				Object.defineProperty(dynamic, '0', {
+					configurable: true,
+					enumerable: true,
+					get() {
+						return createElement(Row, { key: 'row', label });
+					},
+				});
+				const shared = ${shared};
+				const Context = createContext(null);
+
+				function Row(props) {
+					return <span id="returned-accessor-row">{props.label}</span>;
+				}
+
+				function selectRows(items) {
+					return shared;
+				}
+
+				export function App() {
+					const [items] = useState([0]);
+					const [tick, setTick] = useState(0);
+					const rows = selectRows(items);
+					return (
+						<section>
+							<button
+								id="returned-accessor-update"
+								onClick={() => {
+									label = 'updated';
+									setTick(tick + 1);
+								}}
+							>{tick}</button>
+							<Context.Provider value={null}>
+								<div>{rows}</div>
+							</Context.Provider>
+						</section>
+					);
+				}
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `returned-${shape}-descriptor-accessor.tsx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const root = mount(client.App);
+			const row = root.find('#returned-accessor-row');
+			expect(row.textContent).toBe('initial');
+
+			root.click('#returned-accessor-update');
+			expect(root.find('#returned-accessor-row')).toBe(row);
+			expect(row.textContent).toBe('updated');
+			root.unmount();
+		},
+	);
+
+	it.each([
+		{
+			shape: 'deferred component props',
+			entry: '<Row key="row" label={use(Theme)} />',
+		},
+		{
+			shape: 'deferred host children',
+			entry: '<span key="row" id="returned-scoped-row">{use(Theme)}</span>',
+		},
+	])('keeps returned-JSX $shape reactive inside derived descriptor arrays', ({ shape, entry }) => {
+		const source = `
+			import { createContext, use, useState } from 'octane';
+
+			const Theme = createContext('initial');
+
+			function Row(props) {
+				return <span id="returned-scoped-row">{props.label}</span>;
+			}
+
+			const shared = [${entry}];
+			function selectRows(items) {
+				return shared;
+			}
+
+			export function App() {
+				const [items] = useState([0]);
+				const [theme, setTheme] = useState('initial');
+				const rows = selectRows(items);
+				return (
+					<section>
+						<button id="returned-scoped-update" onClick={() => setTheme('updated')}>
+							update context
+						</button>
+						<Theme.Provider value={theme}>
+							<div>{rows}</div>
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: `returned-${shape.replaceAll(' ', '-')}.tsx`,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App);
+		const row = root.find('#returned-scoped-row');
+		expect(row.textContent).toBe('initial');
+
+		root.click('#returned-scoped-update');
+		expect(root.find('#returned-scoped-row')).toBe(row);
+		expect(row.textContent).toBe('updated');
+		root.unmount();
+	});
+
+	it('observes mutations to returned-JSX descriptor arrays that escape into callbacks', () => {
+		const source = `
+			import { createContext, createElement, useState } from 'octane';
+
+			const Context = createContext(null);
+
+			function Row(props) {
+				return <span id="returned-escaped-row">{props.label}</span>;
+			}
+
+			const shared = [createElement(Row, { key: 'row', label: 'initial' })];
+			function selectRows(items) {
+				return shared;
+			}
+
+			export function App() {
+				const [items] = useState([0]);
+				const [tick, setTick] = useState(0);
+				const rows = selectRows(items);
+				return (
+					<section>
+						<button
+							id="returned-escaped-update"
+							onClick={() => {
+								rows[0] = createElement(Row, { key: 'row', label: 'updated' });
+								setTick(tick + 1);
+							}}
+						>{tick}</button>
+						<Context.Provider value={null}>
+							<div>{rows}</div>
+						</Context.Provider>
+					</section>
+				);
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'returned-escaped-descriptor-array.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App);
+		const row = root.find('#returned-escaped-row');
+		expect(row.textContent).toBe('initial');
+
+		root.click('#returned-escaped-update');
+		expect(root.find('#returned-escaped-row')).toBe(row);
+		expect(row.textContent).toBe('updated');
+		root.unmount();
+	});
+
+	it.each([
+		{
+			shape: 'ordinary object',
+			provider: `
+				const Wrapper = {
+					Provider(props) {
+						props.value(isValidElement(props.children), props.children.type);
+						return props.children;
+					},
+				};
+			`,
+		},
+		{
+			shape: 'self-aliased function',
+			provider: `
+				function Wrapper(props) {
+					props.value(isValidElement(props.children), props.children.type);
+					return props.children;
+				}
+				Wrapper.Provider = Wrapper;
+			`,
+		},
+		{
+			shape: 'callable accessor',
+			provider: `
+				let providerReads = 0;
+				function Wrapper(props) {
+					const child = props.children;
+					props.value(isValidElement(child), child.type);
+					providerReads = 0;
+					return child;
+				}
+				Object.defineProperty(Wrapper, 'Provider', {
+					configurable: true,
+					get() {
+						if (++providerReads !== 1) {
+							throw new Error('Provider must only be read once');
+						}
+						return Wrapper;
+					},
+				});
+			`,
+		},
+		{
+			shape: 'throwing context-brand accessor',
+			provider: `
+				function Wrapper(props) {
+					props.value(isValidElement(props.children), props.children.type);
+					return props.children;
+				}
+				Wrapper.Provider = Wrapper;
+				Object.defineProperty(Wrapper, '$$kind', {
+					get() {
+						throw new Error('Custom provider context brand must not be inspected');
+					},
+				});
+			`,
+		},
+	])(
+		'preserves inspectable descriptor children for $shape components named Provider',
+		({ shape, provider }) => {
+			const source = `
+			import { createElement, isValidElement, useState } from 'octane';
+
+			${provider}
+
+			function Row(props) {
+				return <span id="returned-custom-provider-row">{props.label}</span>;
+			}
+
+			function selectRows(items) {
+				return [createElement(Row, { key: 'row', label: items[0] })];
+			}
+
+			export function App(props) {
+				const [items] = useState(['initial']);
+				const [tick, setTick] = useState(0);
+				const onChildren = props.onChildren;
+				const rows = selectRows(items);
+				return (
+					<section>
+						<button id="returned-custom-provider-tick" onClick={() => setTick(tick + 1)}>
+							{tick}
+						</button>
+						<Wrapper.Provider value={onChildren}>
+							<div>{rows}</div>
+						</Wrapper.Provider>
+					</section>
+				);
+			}
+		`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `returned-${shape.replaceAll(' ', '-')}-provider-descriptor.tsx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const children: Array<[boolean, unknown]> = [];
+			const root = mount(client.App, {
+				onChildren: (valid: boolean, type: unknown) => children.push([valid, type]),
+			});
+			const row = root.find('#returned-custom-provider-row');
+			expect(children.at(-1)).toEqual([true, 'div']);
+			expect(row.textContent).toBe('initial');
+
+			root.click('#returned-custom-provider-tick');
+			expect(children.at(-1)).toEqual([true, 'div']);
+			expect(root.find('#returned-custom-provider-row')).toBe(row);
+			expect(row.textContent).toBe('initial');
+			root.unmount();
+		},
+	);
+
 	it.each([
 		{ shape: 'direct', shared: 'dynamic' },
 		{ shape: 'nested', shared: '[dynamic]' },
