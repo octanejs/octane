@@ -12804,6 +12804,18 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 	function rewriteUseCall(call, activeGuards) {
 		const arg = unwrapTsExpr(call.arguments[0]);
 		if (isTrivialUseArg(arg)) return call;
+		// Only a direct creation can be paired with this exact use() on both
+		// compiles. Existing thenables, conditional references, creation chains,
+		// and another renderer's runtime must retain their original ownership.
+		const hydrationSite =
+			ctx._universalRuntimeUnit == null &&
+			call.arguments.length === 1 &&
+			(arg.type === 'CallExpression' || arg.type === 'NewExpression') &&
+			arg.optional !== true
+				? `${(ctx._hydrationSourceHash ??= hookSlotHash(ctx.mapSource))}:${
+						call.start ?? `${call.loc?.start.line ?? 0}:${call.loc?.start.column ?? 0}`
+					}`
+				: null;
 		const memoCall = makeCreationMemoCall(
 			ctx,
 			componentName,
@@ -12812,8 +12824,14 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 			locals,
 			creations,
 			call,
+			null,
+			hydrationSite,
 		);
-		return { ...call, arguments: [memoCall, ...call.arguments.slice(1)] };
+		return {
+			...call,
+			arguments: [memoCall, ...call.arguments.slice(1)],
+			...(hydrationSite === null ? null : { _octaneHydrationSite: hydrationSite }),
+		};
 	}
 }
 
@@ -12830,6 +12848,7 @@ function makeCreationMemoCall(
 	creations,
 	siteNode,
 	coarsenDepRoots = null,
+	hydrationSite = null,
 ) {
 	const symVar = allocHookSymbol(
 		ctx,
@@ -12884,10 +12903,24 @@ function makeCreationMemoCall(
 			? rtAlias(memoHelper)
 			: requireRuntimeForContext(ctx, memoHelper);
 	creations.push({ symVar, expr, deps, guards: [...guards], locals });
+	// Keep the original expression in the warm plan and on the server. Only
+	// the client-owned direct creation can consult its matching seeded site;
+	// production lowering places this callback strictly on the puTake miss.
+	const memoExpr =
+		hydrationSite !== null && ctx.mode !== 'server'
+			? inheritOriginLoc(
+					b.call(
+						requireRuntimeForContext(ctx, 'seedOrCreate'),
+						b.literal(hydrationSite, JSON.stringify(hydrationSite)),
+						b.arrow([], expr),
+					),
+					expr,
+				)
+			: expr;
 	// The minted memo wrapper maps to the authored creation expression.
 	return inheritOriginLoc(
 		{
-			...b.call(memoAlias, b.arrow([], expr), b.array(deps), b.id(symVar)),
+			...b.call(memoAlias, b.arrow([], memoExpr), b.array(deps), b.id(symVar)),
 			// Marks a compiler-minted creation memo so the inline hook-memo tier
 			// can later lower the `const x = _$useMemo(…)` statement form to the
 			// closure-free puTake/puPub ABI (production client compile).
@@ -14660,6 +14693,15 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 					return b.call(withSlotAlias, b.id(symVar), n.callee, ...args, b.id(symVar));
 				}
+				const hookArgs = appendHookSlotArgument(name, args, slot, numericSlot, n);
+				if (isServerUse && n._octaneHydrationSite !== undefined) {
+					hookArgs.push(
+						inheritOriginLoc(
+							b.literal(n._octaneHydrationSite, JSON.stringify(n._octaneHydrationSite)),
+							n,
+						),
+					);
+				}
 				return {
 					...n,
 					callee:
@@ -14668,7 +14710,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 							: n.callee._octaneGenerated
 								? b.id(runtimeAliasForContext(ctx, name))
 								: n.callee,
-					arguments: appendHookSlotArgument(name, args, slot, numericSlot, n),
+					arguments: hookArgs,
 				};
 			}
 		}

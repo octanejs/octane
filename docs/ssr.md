@@ -283,6 +283,9 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
   full pass, so hydration byte-format is identical either way. Resolved values
   and versioned rejection metadata are serialized into the seed script so
   hydration does not re-fetch, re-suspend, or replace a server `@catch` arm.
+  Compiler-owned request factories consult their matching server-provided seed
+  before running, while existing promises, contexts, and externally owned
+  hydration promises retain their original ownership.
   Rejection records preserve primitive and JSON-safe plain-object reasons plus
   Error names, messages, and enumerable custom fields. Cyclic fields are
   bounded and marked, while hostile or opaque values degrade to fixed safe
