@@ -200,12 +200,13 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						props.layoutId,
 					);
 
+		// Reason: browser bundlers replace this expression even though they do not
+		// define a global `process`; guarding `process` would silently disable strict mode.
 		if (
+			process.env.NODE_ENV !== 'production' &&
 			preloadedFeatures &&
 			lazy.provided &&
-			lazy.strict &&
-			typeof process !== 'undefined' &&
-			process.env.NODE_ENV !== 'production'
+			lazy.strict
 		) {
 			throw new Error(
 				'You have rendered a `motion` component within a strict `LazyMotion` component. Import and render from `@octanejs/motion/react-m` instead.',

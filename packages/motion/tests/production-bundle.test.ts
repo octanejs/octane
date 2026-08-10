@@ -83,4 +83,53 @@ globalThis.animationCompleted = new Promise((resolve) => {
 
 		expect(unusedBindings).toEqual([]);
 	});
+
+	it('enforces strict LazyMotion in a development browser bundle without a process global', async () => {
+		const result = await build({
+			stdin: {
+				contents: `
+import { createElement, createRoot } from 'octane';
+import { domMax, LazyMotion, motion } from '@octanejs/motion';
+
+try {
+	createRoot(document.getElementById('root')).render(LazyMotion, {
+		features: domMax,
+		strict: true,
+		children: createElement(motion.div, { id: 'strict-motion' }),
+	});
+	globalThis.strictMotionError = null;
+} catch (error) {
+	globalThis.strictMotionError = error instanceof Error ? error.message : String(error);
+}
+`,
+				resolveDir: packageDirectory,
+				sourcefile: 'strict-lazy-motion-consumer.ts',
+			},
+			bundle: true,
+			define: {
+				__OCTANE_PROFILE_ENABLED__: 'false',
+				'process.env.NODE_ENV': JSON.stringify('development'),
+			},
+			format: 'iife',
+			logLevel: 'silent',
+			platform: 'browser',
+			write: false,
+		});
+		const browser = new JSDOM('<!doctype html><div id="root"></div>', {
+			runScripts: 'dangerously',
+			pretendToBeVisual: true,
+		});
+
+		try {
+			expect('process' in browser.window).toBe(false);
+			browser.window.eval(result.outputFiles[0].text);
+
+			expect(
+				(browser.window as typeof browser.window & { strictMotionError: string | null })
+					.strictMotionError,
+			).toEqual(expect.stringContaining('strict `LazyMotion`'));
+		} finally {
+			browser.window.close();
+		}
+	});
 });
