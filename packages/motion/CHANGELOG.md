@@ -1,5 +1,28 @@
 # @octanejs/motion
 
+## 0.1.33
+
+### Patch Changes
+
+- 88c07b9: Add Motion's reduced-motion, LayoutGroup, and lazy feature-loading surfaces.
+
+  `useReducedMotion` now follows live operating-system preference changes,
+  `MotionConfig` enforces reduced motion for positional and layout animation, and
+  `LayoutGroup` isolates shared `layoutId` transitions with collision-free,
+  commit-scoped snapshots. FLIP honors `layout="position"`, `layout="size"`, and
+  `transition.layout`. `LazyMotion`, `domAnimation`, `domMax`, the `m` proxy, and the
+  complete `./react-m` named host entry support feature-gated Motion usage without
+  React. The package also explicitly exposes Motion's `Transition` and
+  `TargetAndTransition` types.
+
+- Updated dependencies [78316b4]
+- Updated dependencies [4e53ef4]
+- Updated dependencies [4cc7840]
+- Updated dependencies [39b3e19]
+- Updated dependencies [8c29020]
+- Updated dependencies [97e65b9]
+  - octane@0.1.34
+
 ## 0.1.32
 
 ### Patch Changes
