@@ -14,6 +14,7 @@ import {
 	loadManifest,
 	nodeMajorSatisfies,
 	requiredExecutableLanes,
+	selectHarnessAction,
 	summarizeRuntimeInventories,
 	toPortablePath,
 	validateManifest,
@@ -336,6 +337,20 @@ test('sonner exact selection fails closed when a declared case is renamed', asyn
 		() => verifyManifestTestSelections(renamed, process.cwd()),
 		/must match exactly one collected Vitest test/,
 	);
+});
+
+test('routes harness execution from required lanes, not provenance verification', () => {
+	const unverified = manifest();
+	unverified.provenance.verification = 'recorded-unverified';
+	assert.equal(selectHarnessAction(unverified), 'run-required');
+
+	const empty = manifest({ lanes: [] });
+	assert.equal(selectHarnessAction(empty), 'validate');
+
+	const unavailableOnly = manifest({
+		lanes: [{ ...manifest().lanes[0], available: false }],
+	});
+	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
 });
 
 test('accepts explicit TypeScript lanes and builds portable compiler argv without a shell', () => {

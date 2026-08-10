@@ -12,13 +12,13 @@ import {
 } from './inventory-lib.mjs';
 import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
-import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
+import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import {
 	loadManifest,
-	requiredExecutableLanes,
+	selectHarnessAction,
 	verifyLaneEnvironment,
 	verifyManifestFiles,
 } from './harness-lib.mjs';
@@ -142,26 +142,18 @@ for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
 		const binding = relativeFile.split('/')[1];
-		// hook-form and livestore have dedicated verifiers above with their own
-		// disposition sets; the shared helper covers the generic binding ledgers.
 		if (
-			binding !== 'hook-form' &&
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
-		) {
+		)
 			verifyPortTestClassifications(REPO, binding);
-		}
 		await verifyManifestFiles(manifest, REPO);
 		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
-		// Provenance verification gates completeness, not execution. Required
-		// lanes on recorded-unverified manifests (e.g. redux differential) still
-		// run so parity-owned projects are not skipped after leaving ordinary shards.
 		if (!validateOnly) {
-			const action =
-				requiredExecutableLanes(manifest).length > 0 ? 'run-required' : 'validate';
+			const action = selectHarnessAction(manifest);
 			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',

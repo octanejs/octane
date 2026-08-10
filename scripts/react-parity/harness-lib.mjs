@@ -913,3 +913,11 @@ export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 export function requiredExecutableLanes(manifest) {
 	return manifest.lanes.filter((lane) => lane.oracle === 'required' && lane.available !== false);
 }
+
+/**
+ * Generic parity-job routing: execute every available required lane. Provenance
+ * completeness gates public claims elsewhere; it must not skip harness execution.
+ */
+export function selectHarnessAction(manifest) {
+	return requiredExecutableLanes(manifest).length > 0 ? 'run-required' : 'validate';
+}

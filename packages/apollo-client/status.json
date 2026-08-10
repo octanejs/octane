@@ -7,6 +7,6 @@
     "React Server Components and Apollo's React Compiler-generated entry are intentionally not exposed."
   ],
   "ssr": "Dedicated Node-mode tests cover multi-pass useQuery, nested query waterfalls, per-request cache isolation, ssr:false/no-cache, render limits, and scoped CSS; client hydration verifies cache restoration, in-place adoption, and no duplicate fetch. Streaming cache patches remain open.",
-  "verified": "2026-07-25",
+  "verified": "2026-08-02",
   "docs": ["docs/apollo-client-port-plan.md"]
 }

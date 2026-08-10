@@ -1854,16 +1854,97 @@ export default defineConfig({
 				},
 			},
 			{
+				// Adapted upstream wrappers are owned by react-parity; conformance and
+				// hydration stay in ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/apollo-client/tests/conformance/upstream-ApolloProvider.test.ts',
+						'packages/apollo-client/tests/conformance/upstream-useApolloClient.test.ts',
+					],
+				},
 				test: {
 					name: 'apollo-client',
 					include: [
 						'packages/apollo-client/tests/**/*.test.ts',
 						'!packages/apollo-client/tests/ssr/**/*.test.ts',
 					],
+					exclude: ['packages/apollo-client/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
+					setupFiles: ['packages/apollo-client/tests/conformance/test-setup.ts'],
 					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
 					// inside the test body (same helper as base-ui/aria); keep the same 30s
 					// headroom so a loaded CI shard doesn't overrun the 5s vitest default.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/apollo-client\/react\/ssr$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/ssr/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/testing\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/testing/react/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react\/internal$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/internal/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/testing$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/testing/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/apollo-client/src/react/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/apollo-client$/,
+							replacement: resolve(import.meta.dirname, 'packages/apollo-client/src/index.js'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Differential lane: precompiles fixtures for the published React oracle.
+				// Only the manifest-backed parity file is owned by react-parity; setup.test.ts
+				// stays in ordinary CI via the project include.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/apollo-client/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'apollo-client-differential',
+					include: ['packages/apollo-client/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/apollo-client/tests/differential/_setup.ts'],
 					testTimeout: 30_000,
 					hookTimeout: 30_000,
 					globals: false,

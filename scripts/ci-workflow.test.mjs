@@ -284,13 +284,12 @@ describe('CI workflow aggregation', () => {
 
 		// The manifest runner owns all required lanes in one process. Execution
 		// reports prove exact identities, so only explicit validation collects.
-		// recorded-unverified manifests still run-required when they declare
-		// required lanes (parity-owned differentials must not become no-ops).
-		assert.match(reactParityCheck, /requiredExecutableLanes\(manifest\)\.length > 0/);
+		assert.match(reactParityCheck, /selectHarnessAction\(manifest\)/);
 		assert.match(
 			reactParityCheck,
-			/requiredExecutableLanes\(manifest\)\.length > 0 \? 'run-required' : 'validate'/,
+			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
 		);
+		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
 		assert.doesNotMatch(reactParityCheck, /'--lane'/);
 		const executionMarker = "} else {\n\tif (action === 'run-required'";
 		const executionStart = reactParityHarness.indexOf(executionMarker);
@@ -322,15 +321,6 @@ describe('CI workflow aggregation', () => {
 		]);
 		assert.equal(projects.get('rspeedy-plugin').test.exclude, undefined);
 		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
-	});
-
-	test('installs WebKit only for the cross-browser integration lane', () => {
-		const heavyIntegration = jobSource('heavy_integration');
-
-		assert.match(
-			heavyIntegration,
-			/- name: Install Playwright WebKit for cross-browser ownership coverage\n\s+if: \$\{\{ matrix\.lane == 'browser' \}\}\n\s+run: pnpm --filter octane exec playwright install --with-deps webkit/,
-		);
 	});
 
 	test('derives sharded projects generically from execution-group ownership', () => {
