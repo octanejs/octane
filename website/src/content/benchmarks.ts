@@ -26,6 +26,8 @@ import news from '../../../benchmarks/baselines/local/news.json';
 import portalSwarm from '../../../benchmarks/baselines/local/portal-swarm.json';
 import recursiveContext from '../../../benchmarks/baselines/local/recursive-context.json';
 import signalFavoring from '../../../benchmarks/baselines/local/signal-favoring.json';
+import lynxTableWeb from '../../../benchmarks/baselines/local/lynx-table-web.json';
+import lynxTable from '../../../benchmarks/baselines/local/lynx-table.json';
 import spaNavigation from '../../../benchmarks/baselines/local/spa-navigation.json';
 import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.json';
 import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
@@ -79,7 +81,7 @@ export interface BenchCard {
 	rows: BenchRow[];
 	iterations: number;
 	/** Value unit: absolute score milliseconds (default), bytes, or ×-vs-Octane ratio. */
-	format?: 'ms' | 'bytes' | 'x';
+	format?: 'ms' | 'bytes' | 'x' | 'count';
 }
 
 // ---------------------------------------------------------------------------
@@ -630,6 +632,93 @@ export const OCTANE_CARDS: BenchCard[] = [];
 		series,
 		rows,
 		iterations: b.iterations,
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Octane on Lynx — the dual-thread renderer against the other Lynx frameworks.
+// ---------------------------------------------------------------------------
+export const LYNX_CARDS: BenchCard[] = [];
+
+{
+	// Cross-framework wall clock on Lynx for Web: the same krausest table app
+	// per framework, served into a <lynx-view> (@lynx-js/web-core + headless
+	// Chromium) and driven by one byte-identical page driver — real clicks,
+	// shadow-piercing DOM predicates, fresh page per rep. Recorded medians from
+	// `bench.mjs --record --only lynx-table-web`; absolute ms are host-bound,
+	// the cross-framework ratios are the portable reading.
+	const b = lynxTableWeb as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane', label: 'Octane on Lynx', color: '#ff415a' },
+		{ key: 'react', label: 'ReactLynx 0.122', color: '#1e93b0' },
+		// Vue Lynx ships two renderers, so the vue entity wears an ordinal ramp
+		// of its orchid (the octane-variant precedent): brand orchid = vapor,
+		// light orchid = vdom. The lightness step keeps the pair separable under
+		// CVD, and both clear 3:1 on the panel surface.
+		{ key: 'vue-vdom', label: 'Vue Lynx vdom 3.6 beta', color: '#f0a3dc' },
+		{ key: 'vue-vapor', label: 'Vue Lynx vapor 3.6 beta', color: '#e06ec4' },
+	];
+	LYNX_CARDS.push({
+		id: 'lynx-table-web',
+		title: 'lynx-table — Lynx for Web wall clock',
+		description:
+			'The cross-framework table on the Lynx-for-Web host at 10,000 rows — Octane, ReactLynx, and both Vue Lynx renderers driven by the byte-identical page driver, medians over fresh-page reps. Host-bound milliseconds; the ratios are the portable claim.',
+		series: seriesFor(b, series),
+		rows: rowsFor(
+			b,
+			seriesFor(b, series),
+			{
+				create_10k: 'create 10k rows',
+				update10th_10k: 'update every 10th',
+				select_10k: 'select one row',
+				updateStorm_10k: 'update storm ×50',
+				selectStorm_10k: 'select storm ×30',
+			},
+			['create_10k', 'update10th_10k', 'select_10k', 'updateStorm_10k', 'selectStorm_10k'],
+		),
+		iterations: b.iterations,
+	});
+}
+
+{
+	// Lynx dual-thread wire cost — deterministic command counts from the
+	// `__OCTANE_LYNX_PROFILE__` counters, charted against the changed-rows
+	// semantic floor (the commands a change of that size strictly implies).
+	// Counts are exact and machine-independent. Today the bars are far apart:
+	// the commit wire cost scales with the tree, not the change — the KNOWN
+	// GAP the lynx-table ratio guards pin. As fixes land and tighten those
+	// guards, the two bars converge; this card is the public face of that.
+	const b = lynxTable as SuiteBaseline;
+	const series: SeriesDef[] = [
+		{ key: 'octane-lynx', label: 'Octane on Lynx', color: VARIANT_COLORS.tuned },
+		{ key: 'changed-rows-model', label: 'Changed-rows floor', color: VARIANT_COLORS.lightest },
+	];
+	LYNX_CARDS.push({
+		id: 'lynx-table-wire',
+		title: 'lynx-table — commit wire cost',
+		description:
+			'Host commands per operation crossing the background→main thread wire for the 10,000-row cross-framework table, against the changed-rows floor: the commands a change of that size strictly implies. The gap between the two bars is the tracked, CI-guarded optimization target.',
+		series,
+		rows: rowsFor(
+			b,
+			series,
+			{
+				create_commands_10k: 'create 10k rows',
+				update10th_commands_10k: 'update every 10th',
+				select_commands_10k: 'select one row',
+				update_storm_commands_10k: 'update storm ×50',
+				select_storm_commands_10k: 'select storm ×30',
+			},
+			[
+				'create_commands_10k',
+				'update10th_commands_10k',
+				'select_commands_10k',
+				'update_storm_commands_10k',
+				'select_storm_commands_10k',
+			],
+		),
+		iterations: b.iterations,
+		format: 'count',
 	});
 }
 

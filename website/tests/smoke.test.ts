@@ -19,6 +19,7 @@ import {
 import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
+	LYNX_CARDS,
 	OCTANE_CARDS,
 	TARGET_CARDS,
 	type BenchCard,
@@ -367,6 +368,7 @@ describe('website routes', () => {
 		const sections = [
 			{ id: 'bench-frameworks', cards: FRAMEWORK_CARDS },
 			{ id: 'bench-targets', cards: TARGET_CARDS },
+			{ id: 'bench-lynx', cards: LYNX_CARDS },
 			{ id: 'bench-internal', cards: OCTANE_CARDS },
 		];
 		for (const { id, cards } of sections) {
@@ -420,7 +422,7 @@ describe('website routes', () => {
 		expect(container.querySelectorAll('.benchpage-sidebar-toggle')).toHaveLength(1);
 		expect(mobileToggle?.textContent).toContain('Benchmarks');
 		expect(BENCH_SECTIONS.length).toBe(
-			4 + FRAMEWORK_CARDS.length + TARGET_CARDS.length + OCTANE_CARDS.length,
+			5 + FRAMEWORK_CARDS.length + TARGET_CARDS.length + LYNX_CARDS.length + OCTANE_CARDS.length,
 		);
 		for (const section of BENCH_SECTIONS) {
 			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
