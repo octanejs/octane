@@ -174,11 +174,14 @@ style scope), and `this` or `super` captures; move that work into a child
 component or opt out with `split={false}`. Ordinary lexical values can be
 captured by the generated child component.
 
-Generated Hydrate chunks are not eagerly module-preloaded. The Vite and Rsbuild
-app integrations still link CSS reachable from a route's deferred chunks,
-because that route's server HTML needs its styling before the child JavaScript
-loads. This eager CSS collection follows the route entry's asset graph; it does
-not turn deferred JavaScript into an eager dependency.
+Generated Hydrate chunks are not eagerly module-preloaded. Lazy-module discovery
+for independently suspended siblings never enters a dormant Hydrate boundary,
+so its child code remains deferred until activation or an explicit prefetch
+strategy. The Vite and Rsbuild app integrations still link CSS reachable from a
+route's deferred chunks, because that route's server HTML needs its styling
+before the child JavaScript loads. This eager CSS collection follows the route
+entry's asset graph; it does not turn deferred JavaScript into an eager
+dependency.
 
 ### `prefetch`
 
