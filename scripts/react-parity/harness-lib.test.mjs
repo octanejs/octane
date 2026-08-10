@@ -11,6 +11,7 @@ import {
 	buildTypeScriptCompilerArgv,
 	compareTestIdentities,
 	describeTestIdentityMismatch,
+	loadManifest,
 	nodeMajorSatisfies,
 	requiredExecutableLanes,
 	summarizeRuntimeInventories,
@@ -20,6 +21,7 @@ import {
 	verifyLaneEnvironment,
 	verifyLaneRunResult,
 	verifyManifestFiles,
+	verifyManifestTestSelections,
 } from './harness-lib.mjs';
 
 test('describeTestIdentityMismatch reports missing, unexpected, and duplicate identities', () => {
@@ -425,6 +427,18 @@ test('rejects a stale fullName that Vitest does not collect from its evidence fi
 				],
 				root,
 			),
+		/fullName must match exactly one collected Vitest test/,
+	);
+});
+
+test('jotai exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/jotai/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
 		/fullName must match exactly one collected Vitest test/,
 	);
 });

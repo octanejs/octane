@@ -343,13 +343,9 @@ See also: [`docs/plans/2026-07-30-001-feat-inertia-binding-plan.md`](plans/2026-
 
 Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.
 
-Known divergences:
-
-- `jotai/babel/*` (React-specific compile-time plugins) is not shipped.
-
 SSR / hydration: No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests.
 
-Scope/evidence last checked: 2026-07-21.
+Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/lexical
 

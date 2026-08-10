@@ -702,6 +702,37 @@ export default defineConfig({
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					exclude: ['packages/jotai/tests/differential/**/*.test.ts'],
+					// Same differential precompile, but for jotai fixtures: also rewrites
+					// `@octanejs/jotai` → `jotai` so the React side runs real jotai.
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/jotai` is the package under test; alias the public name (and
+				// its subpaths) to source so fixtures import it exactly as a consumer
+				// would (and the differential React side rewrites the same specifiers to
+				// `jotai`). Regex aliases so `@octanejs/jotai/vanilla/utils` →
+				// src/vanilla/utils.ts without the bare entry's file path swallowing the
+				// subpath.
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/jotai$/,
+							replacement: resolve(import.meta.dirname, 'packages/jotai/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/jotai\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/jotai/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'jotai-differential',
+					include: ['packages/jotai/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
 					// Same differential precompile, but for jotai fixtures: also rewrites
 					// `@octanejs/jotai` → `jotai` so the React side runs real jotai.
 					globalSetup: ['packages/jotai/tests/differential/_setup.ts'],

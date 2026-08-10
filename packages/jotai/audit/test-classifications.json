@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/jotai/tests/conformance/async.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane async atom rendering and use(thenable) integration; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/jotai/tests/conformance/binding.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane hook-slot, subscription, provider, and package export contract; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/jotai/tests/conformance/utils.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane binding-side utility implementations; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/jotai/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs every declared scenario against pinned jotai and @octanejs/jotai through the shared differential rig."
+    }
+  ]
+}
