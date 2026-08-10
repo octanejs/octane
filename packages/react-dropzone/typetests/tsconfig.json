@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "accept.tsx",
+    "all.tsx",
+    "basic.tsx",
+    "events.tsx",
+    "file-dialog.tsx",
+    "hook.tsx",
+    "plugin.tsx",
+    "refs.tsx",
+    "validator.tsx"
+  ]
+}

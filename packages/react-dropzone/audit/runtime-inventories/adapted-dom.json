@@ -1,0 +1,467 @@
+{
+  "schemaVersion": 1,
+  "project": "react-dropzone",
+  "roots": ["packages/react-dropzone/tests/adapted"],
+  "files": [
+    "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+    "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+    "packages/react-dropzone/tests/adapted/utils/index.spec.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:2dfddd9015016610:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract autofocuses on mount and removes document/window listeners on unmount"
+    },
+    {
+      "id": "runtime:e89208eae4b1731c:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract composes user handlers before library handlers and honors propagation cancellation"
+    },
+    {
+      "id": "runtime:2e8e2261f0c2ebad:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract detects native chooser cancellation on window focus"
+    },
+    {
+      "id": "runtime:87330e534652952d:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract disables click and keyboard independently"
+    },
+    {
+      "id": "runtime:2245694e543347c3:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract exposes imperative open and resets the input value before every chooser"
+    },
+    {
+      "id": "runtime:8ae9e8b2a677893d:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract merges custom refKey refs and replaces imperative refs cleanly"
+    },
+    {
+      "id": "runtime:013cb8750770f11e:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract opens and closes dialog state around native selection callbacks"
+    },
+    {
+      "id": "runtime:edfb1e450c3a17fa:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract opens from Enter and Space only when the root owns the keyboard event"
+    },
+    {
+      "id": "runtime:f7a220eaa0615209:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract renders default root/input props and preserves arbitrary overrides"
+    },
+    {
+      "id": "runtime:8249b213983c64ae:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "fullName": "react-dropzone U3 adapted root contract tracks focus and blur while disabled state masks focus"
+    },
+    {
+      "id": "runtime:acd900b3095c7ca6:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation aborts pending work on unmount so late results are inert"
+    },
+    {
+      "id": "runtime:dbcd1db53ebc3f83:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation applies size, type, limit, localization, and custom validator errors"
+    },
+    {
+      "id": "runtime:1a68bd1a3cdcaf6a:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation exposes processing and routes rejected async validation to onError"
+    },
+    {
+      "id": "runtime:af53d995c2cb1306:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation honors noDrag and noPaste controls"
+    },
+    {
+      "id": "runtime:348de1f751ad0b26:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation keeps nested drag active until every entered target leaves"
+    },
+    {
+      "id": "runtime:8cb38e3b5d0bcc45:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation processes pasted files but leaves text paste untouched"
+    },
+    {
+      "id": "runtime:5d9174912703f497:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation reports accepted, rejected, and validator-unknown drag verdicts"
+    },
+    {
+      "id": "runtime:12a1dc315cc3c57d:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation supersedes pending extraction across drop and paste sources"
+    },
+    {
+      "id": "runtime:a2aca05f2d31b951:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 acquisition and validation tracks global drags and protects document drops outside the root"
+    },
+    {
+      "id": "runtime:e1891066ca7707e7:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 file-system acquisition distinguishes picker cancellation, fallback, unexpected errors, and missing input"
+    },
+    {
+      "id": "runtime:ba4297d337312b70:1",
+      "file": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "fullName": "react-dropzone U4 file-system acquisition passes grouped picker options and commits selected handles"
+    },
+    {
+      "id": "runtime:9cefb468712914c5:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "ErrorCode should exist and have known error code properties"
+    },
+    {
+      "id": "runtime:b296fdc970340373:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() converts {accept} to an array of strings"
+    },
+    {
+      "id": "runtime:7491c43d47bb3f8a:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} drops a wildcard MIME type when it is paired with extensions"
+    },
+    {
+      "id": "runtime:8c366d0aa33f6b82:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} keeps a wildcard MIME type when no valid extensions are provided"
+    },
+    {
+      "id": "runtime:fd5d8e6c9a5b7f14:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} only drops the wildcards, keeping specific MIME types and their extensions"
+    },
+    {
+      "id": "runtime:32acb26d01c49de3:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "allFilesAccepted() rejects file when multiple accept criteria"
+    },
+    {
+      "id": "runtime:afdcabfae397a060:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "canUseFileSystemAccessAPI() should return false if not"
+    },
+    {
+      "id": "runtime:fa55bbfd8546d5d1:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "canUseFileSystemAccessAPI() should return true if yes"
+    },
+    {
+      "id": "runtime:b2ae7a7a8e528cc3:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() returns a fn"
+    },
+    {
+      "id": "runtime:5fefa1b8398e7bb1:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() runs every passed fn in order"
+    },
+    {
+      "id": "runtime:a5efd988a19da6d2:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() stops after first fn that calls stopPropagation()"
+    },
+    {
+      "id": "runtime:630b8b279e7912d7:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() stops before first fn if bubble is already canceled"
+    },
+    {
+      "id": "runtime:d78a80411d3bccb6:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts DataTransferItem with empty type during drag (Chrome .md file issue)"
+    },
+    {
+      "id": "runtime:2b10a676c7e3ecd3:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts bogus firefox file"
+    },
+    {
+      "id": "runtime:4244d22c4ce73cfb:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts file when multiple accept criteria"
+    },
+    {
+      "id": "runtime:69a282b05678093b:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts file when single accept criteria"
+    },
+    {
+      "id": "runtime:cf833c342454de2e:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() enforces the extensions when a wildcard MIME type is paired with them"
+    },
+    {
+      "id": "runtime:db8323002153f63a:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() rejects file when multiple accept criteria"
+    },
+    {
+      "id": "runtime:11034db6cdc33193:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() rejects file when single accept criteria"
+    },
+    {
+      "id": "runtime:f34a0393626b3b34:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileAccepted() rejects regular File with empty type (not DataTransferItem)"
+    },
+    {
+      "id": "runtime:580d1b1c73041d52:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file object doesn't have a {size} property"
+    },
+    {
+      "id": "runtime:20f510d03ed85878:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file {size} is less than maxSize"
+    },
+    {
+      "id": "runtime:90f93f69c65a9062:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file {size} is more than minSize"
+    },
+    {
+      "id": "runtime:273ce8d99b4461c0:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file {size} is within the [minSize, maxSize] range"
+    },
+    {
+      "id": "runtime:030766c7e9c0488b:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the minSize and maxSize were not provided"
+    },
+    {
+      "id": "runtime:0cec2cba480ab6fd:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "flattenAccept() merges groups and unions extensions of duplicate MIME keys"
+    },
+    {
+      "id": "runtime:485535e23985d8ba:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "flattenAccept() passes the object form through unchanged (as an array-valued map)"
+    },
+    {
+      "id": "runtime:11108234d31368e6:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "flattenAccept() returns undefined when accept is not provided"
+    },
+    {
+      "id": "runtime:785cc72d8c2615b7:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() prefers a confident 'reject' over 'unknown' even with a validator"
+    },
+    {
+      "id": "runtime:d46eda4cc78f8715:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'accept' when every file passes the drag-evaluable checks"
+    },
+    {
+      "id": "runtime:2a16f43e7f8c0006:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'reject' when a file falls outside the size bounds"
+    },
+    {
+      "id": "runtime:4368baddc67f6537:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'reject' when a non-empty MIME type doesn't match {accept}"
+    },
+    {
+      "id": "runtime:30ba4c0b077f3ece:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'reject' when the file count exceeds the limit"
+    },
+    {
+      "id": "runtime:69fc4e463d1be111:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'unknown' (never runs the validator) when a validator is configured and built-in checks pass"
+    },
+    {
+      "id": "runtime:c23cf7f9188763d7:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getDragVerdict() treats empty-type DataTransferItems as 'accept', or 'unknown' when a validator is set"
+    },
+    {
+      "id": "runtime:e27e17c30bb8f4aa:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getTooLargeRejectionErr() formats larger sizes using human-readable units"
+    },
+    {
+      "id": "runtime:fad11b37cc3d2208:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getTooLargeRejectionErr() prints byte when maxSize is 1"
+    },
+    {
+      "id": "runtime:cfac8426ee6eafac:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getTooLargeRejectionErr() prints bytes when maxSize 1"
+    },
+    {
+      "id": "runtime:d4d57241cbe22ddf:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getTooSmallRejectionErr() formats larger sizes using human-readable units"
+    },
+    {
+      "id": "runtime:d3ae147491fc454c:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getTooSmallRejectionErr() prints byte when minSize is 1"
+    },
+    {
+      "id": "runtime:7f26ce82c667c586:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "getTooSmallRejectionErr() prints bytes when minSize 1"
+    },
+    {
+      "id": "runtime:2db6704274114b54:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isAbort() should work as expected"
+    },
+    {
+      "id": "runtime:9c0338ea61f77790:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return false for a paste with no files (e.g. plain text)"
+    },
+    {
+      "id": "runtime:a8cab71000632ed7:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return false if items contain no file kind and types omit Files"
+    },
+    {
+      "id": "runtime:373b697c31fb6fb5:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return false otherwise"
+    },
+    {
+      "id": "runtime:b720b0b5b9855942:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if a paste carries files via clipboardData (#1210)"
+    },
+    {
+      "id": "runtime:174c49282d9de358:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if items contain a file kind even when types omit Files (#1409)"
+    },
+    {
+      "id": "runtime:402ac96d049e6b97:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if some dragged types are files"
+    },
+    {
+      "id": "runtime:5ac2a93ac84cc15d:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if the event has a target with files"
+    },
+    {
+      "id": "runtime:590f5638ca2048cc:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isExt() checks that the value is a valid file extension"
+    },
+    {
+      "id": "runtime:65d79a5774a56c0c:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return false for Chrome"
+    },
+    {
+      "id": "runtime:af56858f2122aeea:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return true for Edge"
+    },
+    {
+      "id": "runtime:add18894d676a44e:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return true for IE10"
+    },
+    {
+      "id": "runtime:3433459477914c31:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return true for IE11"
+    },
+    {
+      "id": "runtime:09c1c14237f353b1:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isKindFile() should return true for DataTransferItem of kind \"file\""
+    },
+    {
+      "id": "runtime:813a500d72c36162:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isMIMEType() checks that the value is a valid MIME type string"
+    },
+    {
+      "id": "runtime:a60ca22ef27b938d:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isMIMETypeWildcard() checks that the value is a wildcard MIME type string"
+    },
+    {
+      "id": "runtime:bb12ee6cc6e24571:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isNotAllowedError() should work as expected"
+    },
+    {
+      "id": "runtime:c8003414e387dbcd:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isPropagationStopped() should return false if isPropagationStopped and cancelBubble are missing"
+    },
+    {
+      "id": "runtime:c706fdc5b4edaf26:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isPropagationStopped() should return result of isPropagationStopped() if isPropagationStopped exists"
+    },
+    {
+      "id": "runtime:33adaa00d081a856:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isPropagationStopped() should return value of cancelBubble if isPropagationStopped doesnt exist and cancelBubble exists"
+    },
+    {
+      "id": "runtime:bd7b0ffe415c6ccc:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "isSecurityError() should work as expected"
+    },
+    {
+      "id": "runtime:ad735d8083f7444e:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() accepts a bare string extension value, matching showOpenFilePicker"
+    },
+    {
+      "id": "runtime:2d3e1993bb2c8d44:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() converts the {accept} prop to file picker options, deriving the description from the extensions"
+    },
+    {
+      "id": "runtime:bf1d9e3f66bf0fe7:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() derives a group's description from its extensions when omitted"
+    },
+    {
+      "id": "runtime:eb5e25766bec3e69:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() drops groups left with no valid entries and returns undefined when none remain"
+    },
+    {
+      "id": "runtime:b75e2bf546cfa746:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() falls back to the MIME types when a group has no extensions"
+    },
+    {
+      "id": "runtime:0879709994ad410c:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() keeps each group as its own picker entry with a custom description"
+    },
+    {
+      "id": "runtime:5e4701368bcfebc1:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() returns undefined for an empty group array"
+    },
+    {
+      "id": "runtime:afbd8fedd8426de6:1",
+      "file": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() returns undefined for an empty object form"
+    }
+  ]
+}

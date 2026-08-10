@@ -47,6 +47,7 @@ surface and evidence.
 | `@octanejs/phosphor-icons` | 0 |
 | `@octanejs/radix` | 0 |
 | `@octanejs/rainbowkit` | 0 |
+| `@octanejs/react-dropzone` | 0 |
 | `@octanejs/react-error-boundary` | 0 |
 | `@octanejs/react-map-gl` | 0 |
 | `@octanejs/recharts` | 0 |

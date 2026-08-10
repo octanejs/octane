@@ -1,0 +1,50 @@
+{
+  "source": {
+    "upstream": "upstream/canonical/src/utils/index.ts",
+    "upstreamSha256": "100fc1599de1ca93cf2ea9b1eb1c850cd410f0ef1313fef8ad7b6ff340ff4b98",
+    "adapted": "src/utils/index.ts",
+    "adaptedSha256": "9a36a6a7bc6ff651e5b1a4a1e52be8cc9e98668abc23cb52392609fd1c900600",
+    "transforms": [
+      "repository Prettier formatting",
+      "legacy attr-accept CommonJS default normalized through a namespace import for Bundler and NodeNext"
+    ]
+  },
+  "runtime": {
+    "upstream": "upstream/canonical/src/utils/index.spec.ts",
+    "adapted": "tests/adapted/utils/index.spec.ts",
+    "adaptedSha256": "c0074e0079a0416d4c653e1222c2b197c08a0ece125baa77dc7bdddad5eabecd",
+    "expectedCases": 70,
+    "transforms": [
+      "explicit Vitest imports",
+      "utility import path",
+      "repository Prettier formatting"
+    ]
+  },
+  "differential": {
+    "file": "tests/differential/utils.test.ts",
+    "sha256": "e20fb393cc1d402d200a79563e3af44954737ad5f64ca5b5a28b5e91a01ec875",
+    "cases": 3
+  },
+  "types": [
+    {
+      "upstream": "type-tests/accept.tsx",
+      "adapted": "typetests/accept.tsx",
+      "sha256": "afcf01027df1db6466379a5f207109addf906510363e340d11bd4a1625e2e89b"
+    },
+    {
+      "upstream": "type-tests/events.tsx",
+      "adapted": "typetests/events.tsx",
+      "sha256": "d8d5a5900381ddbefa546579c5ef54af90b9d05dfe2d4412506b4729b1a25dee"
+    },
+    {
+      "upstream": "type-tests/validator.tsx",
+      "adapted": "typetests/validator.tsx",
+      "sha256": "841eff5599ff6419d6d546cd2ed3a1868b1cbe6153321e39bc55c62482f213e6"
+    }
+  ],
+  "typeTransforms": [
+    "React component fixtures to structural Octane public-prop programs",
+    "React event types to native DOM event types",
+    "import root to authored Octane source"
+  ]
+}

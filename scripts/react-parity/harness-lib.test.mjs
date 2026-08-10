@@ -566,6 +566,31 @@ test('normalizes Windows identity paths and resolves full-suite inventories from
 	]);
 });
 
+test('normalizes Vitest suite separators symmetrically when a title contains greater-than', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-vitest-title-'));
+	await mkdir(join(root, 'audit'), { recursive: true });
+	const lane = {
+		...manifest().lanes[0],
+		execution: { kind: 'vitest-full', inventory: 'audit/inventory.json' },
+	};
+	await writeFile(
+		join(root, 'audit/inventory.json'),
+		JSON.stringify({
+			files: ['example.test.ts'],
+			tests: [{ file: 'example.test.ts', fullName: 'suite prints bytes when size 1' }],
+		}),
+	);
+	const result = {
+		testResults: [
+			{
+				name: join(root, 'example.test.ts'),
+				assertionResults: [{ fullName: 'suite prints bytes when size > 1', status: 'passed' }],
+			},
+		],
+	};
+	assert.equal(verifyLaneRunResult(lane, JSON.stringify(result), root), true);
+});
+
 test('runs Jest full suites directly and rejects identity or snapshot drift', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'react-parity-jest-root-'));
 	const lane = fullRuntimeLane('pristine-upstream');

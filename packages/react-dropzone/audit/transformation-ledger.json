@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "pairs": [
+    {
+      "upstream": "packages/react-dropzone/upstream/canonical/src/index.tsx",
+      "upstreamSha256": "4fc4ce4feb05906e4362ef35b927f13c750134b1d1605ec038c0cc7395fc3d41",
+      "adapted": "packages/react-dropzone/src/index.tsrx",
+      "adaptedSha256": "164322eb48340c89b11a515d61e440827df64de88166d9f361a33500d144b0a2"
+    },
+    {
+      "upstream": "packages/react-dropzone/upstream/canonical/src/utils/index.ts",
+      "upstreamSha256": "100fc1599de1ca93cf2ea9b1eb1c850cd410f0ef1313fef8ad7b6ff340ff4b98",
+      "adapted": "packages/react-dropzone/src/utils/index.ts",
+      "adaptedSha256": "9a36a6a7bc6ff651e5b1a4a1e52be8cc9e98668abc23cb52392609fd1c900600"
+    }
+  ],
+  "permitted": [
+    "React hooks mapped to Octane hooks",
+    ".tsx component syntax mapped to .tsrx templates",
+    "React synthetic event and renderable types mapped to native DOM and Octane types",
+    "forwardRef mapped to ref-as-prop authoring",
+    "React refs mapped to Octane refs and array-ref composition",
+    "async acquisition aborted on unmount",
+    "repository formatting"
+  ]
+}

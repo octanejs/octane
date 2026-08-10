@@ -16,6 +16,7 @@ import { verifyPortTestClassifications } from './binding-classifications-lib.mjs
 import { verifyIntersectionObserverTestClassifications } from './intersection-observer-classifications-lib.mjs';
 import { verifyIntersectionObserverTypes } from './intersection-observer-types-lib.mjs';
 import { verifyIntersectionObserverUpstream } from './intersection-observer-upstream-lib.mjs';
+import { verifyReactDropzoneEvidence } from './react-dropzone-evidence-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyEmblaCarouselTestClassifications } from './embla-carousel-classifications-lib.mjs';
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
@@ -110,6 +111,9 @@ try {
 	});
 } catch (error) {
 	errors.push(`swr test classifications are invalid: ${error.message}`);
+	verifyReactDropzoneEvidence(REPO);
+} catch (error) {
+	errors.push(`react-dropzone evidence is invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTypes(REPO);

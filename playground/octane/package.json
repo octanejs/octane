@@ -39,6 +39,7 @@
     "@octanejs/rainbowkit": "workspace:*",
     "@octanejs/solana-react": "workspace:*",
     "@octanejs/react-error-boundary": "workspace:*",
+    "@octanejs/react-dropzone": "workspace:*",
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",

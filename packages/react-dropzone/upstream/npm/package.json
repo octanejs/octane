@@ -1,0 +1,115 @@
+{
+  "name": "react-dropzone",
+  "version": "20.0.0",
+  "description": "Simple HTML5 drag-drop zone with React.js",
+  "keywords": [
+    "drag",
+    "drop",
+    "react",
+    "react-component",
+    "upload"
+  ],
+  "homepage": "https://github.com/react-dropzone/react-dropzone",
+  "bugs": {
+    "url": "https://github.com/react-dropzone/react-dropzone/issues"
+  },
+  "license": "MIT",
+  "author": "Param Aggarwal",
+  "contributors": [
+    "Andrey Okonetchnikov <andrey@okonet.ru> (http://okonet.ru)",
+    "Mike Olson <me@mwolson.org>",
+    "Param Aggarwal",
+    "Tyler Waters <tyler.waters@gmail.com>",
+    "Rick Markins <rmarkins@gmail.com>",
+    "Roland Groza <rolandjitsu@gmail.com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/react-dropzone/react-dropzone.git"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.spec.*"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepare": "prek install || exit 0",
+    "hooks:install": "prek install",
+    "hooks:run": "prek run --all-files",
+    "prebuild": "npm run clean",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.type-tests.json",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "lint:type-aware": "oxlint --type-aware",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "pretest:cov": "npm run type-check && npm run lint && npm run format:check",
+    "test": "vitest",
+    "test:cov": "vitest run --coverage",
+    "docs:dev": "vocs dev",
+    "docs:build": "vocs build",
+    "docs:preview": "vocs preview"
+  },
+  "dependencies": {
+    "attr-accept": "^2.2.5",
+    "file-selector": "^4.1.0"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/commit-analyzer": "^12.0.0",
+    "@semantic-release/github": "^10.0.0",
+    "@semantic-release/npm": "^13.1.3",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "@testing-library/dom": "^10.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "jsdom": "^30.0.1",
+    "oxfmt": "^0.60.0",
+    "oxlint": "^1.75.0",
+    "oxlint-tsgolint": "^0.24.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "semantic-release": "^25.0.8",
+    "styled-components": "^6.4.4",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "vocs": "^2.6.2",
+    "waku": "^1.0.0-beta.8"
+  },
+  "peerDependencies": {
+    "@types/react": "*",
+    "react": ">= 18"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">= 22"
+  }
+}

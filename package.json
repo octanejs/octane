@@ -98,7 +98,8 @@
     "tsrx-decls:check": "node scripts/check-tsrx-module-decls.mjs",
     "context:budget:check": "node scripts/check-context-budget.mjs",
     "bindings:status": "node scripts/generate-bindings-status.mjs",
-    "bindings:status:check": "node scripts/generate-bindings-status.mjs --check"
+    "bindings:status:check": "node scripts/generate-bindings-status.mjs --check",
+    "prebindings:typecheck": "pnpm --filter @octanejs/react-dropzone typecheck"
   },
   "devDependencies": {
     "@babel/core": "catalog:default",

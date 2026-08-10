@@ -1,0 +1,858 @@
+beforeEach(() => {
+  vi.resetModules();
+});
+
+describe("fileMatchSize()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should return true if the file object doesn't have a {size} property", () => {
+    expect(utils.fileMatchSize({})).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: null})).toEqual([true, null]);
+  });
+
+  it("should return true if the minSize and maxSize were not provided", () => {
+    expect(utils.fileMatchSize({size: 100})).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: 100}, undefined, undefined)).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: 100}, null, null)).toEqual([true, null]);
+  });
+
+  it("should return true if the file {size} is within the [minSize, maxSize] range", () => {
+    expect(utils.fileMatchSize({size: 100}, 10, 200)).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: 100}, 10, 99)).toEqual([
+      false,
+      {code: "file-too-large", message: "File is larger than 99 bytes"}
+    ]);
+    expect(utils.fileMatchSize({size: 100}, 101, 200)).toEqual([
+      false,
+      {code: "file-too-small", message: "File is smaller than 101 bytes"}
+    ]);
+  });
+
+  it("should return true if the file {size} is more than minSize", () => {
+    expect(utils.fileMatchSize({size: 100}, 100)).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: 100}, 101)).toEqual([
+      false,
+      {code: "file-too-small", message: "File is smaller than 101 bytes"}
+    ]);
+  });
+
+  it("should return true if the file {size} is less than maxSize", () => {
+    expect(utils.fileMatchSize({size: 100}, undefined, 100)).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: 100}, null, 100)).toEqual([true, null]);
+    expect(utils.fileMatchSize({size: 100}, undefined, 99)).toEqual([
+      false,
+      {code: "file-too-large", message: "File is larger than 99 bytes"}
+    ]);
+    expect(utils.fileMatchSize({size: 100}, null, 99)).toEqual([
+      false,
+      {code: "file-too-large", message: "File is larger than 99 bytes"}
+    ]);
+  });
+});
+
+describe("isIeOrEdge", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should return true for IE10", () => {
+    const userAgent =
+      "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; WOW64; Trident/6.0; .NET4.0E; .NET4.0C; .NET CLR 3.5.30729; .NET CLR 2.0.50727; .NET CLR 3.0.30729)";
+
+    expect(utils.isIeOrEdge(userAgent)).toBe(true);
+  });
+
+  it("should return true for IE11", () => {
+    const userAgent =
+      "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; rv:11.0) like Gecko";
+    expect(utils.isIeOrEdge(userAgent)).toBe(true);
+  });
+
+  it("should return true for Edge", () => {
+    const userAgent =
+      "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16258";
+
+    expect(utils.isIeOrEdge(userAgent)).toBe(true);
+  });
+
+  it("should return false for Chrome", () => {
+    const userAgent =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36";
+
+    expect(utils.isIeOrEdge(userAgent)).toBe(false);
+  });
+});
+
+describe("isKindFile()", () => {
+  it('should return true for DataTransferItem of kind "file"', async () => {
+    /**
+     * @constant
+     * @type {import('./index')}
+     */
+    const utils = await import("./index");
+    expect(utils.isKindFile({kind: "file"})).toBe(true);
+    expect(utils.isKindFile({kind: "text/html"})).toBe(false);
+    expect(utils.isKindFile({})).toBe(false);
+    expect(utils.isKindFile(null)).toBe(false);
+  });
+});
+
+describe("isPropagationStopped()", () => {
+  const trueFn = vi.fn(() => true);
+
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should return result of isPropagationStopped() if isPropagationStopped exists", () => {
+    expect(utils.isPropagationStopped({isPropagationStopped: trueFn})).toBe(true);
+  });
+
+  it("should return value of cancelBubble if isPropagationStopped doesnt exist and cancelBubble exists", () => {
+    expect(utils.isPropagationStopped({cancelBubble: true})).toBe(true);
+  });
+
+  it("should return false if isPropagationStopped and cancelBubble are missing", () => {
+    expect(utils.isPropagationStopped({})).toBe(false);
+  });
+});
+
+describe("isEvtWithFiles()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should return true if some dragged types are files", () => {
+    expect(utils.isEvtWithFiles({dataTransfer: {types: ["Files"]}})).toBe(true);
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: ["application/x-moz-file"]}
+      })
+    ).toBe(true);
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: ["Files", "application/x-moz-file"]}
+      })
+    ).toBe(true);
+    expect(utils.isEvtWithFiles({dataTransfer: {types: ["text/plain"]}})).toBe(false);
+    expect(utils.isEvtWithFiles({dataTransfer: {types: ["text/html"]}})).toBe(false);
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: ["Files", "application/test"]}
+      })
+    ).toBe(true);
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: ["application/x-moz-file", "application/test"]}
+      })
+    ).toBe(true);
+  });
+
+  it("should return true if items contain a file kind even when types omit Files (#1409)", () => {
+    // Some Chromium drags report only ["text/plain"] in types but still expose a
+    // kind: "file" item; detection should not depend solely on types.
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: ["text/plain"], items: [{kind: "file"}]}
+      })
+    ).toBe(true);
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: [], items: [{kind: "string"}, {kind: "file"}]}
+      })
+    ).toBe(true);
+  });
+
+  it("should return false if items contain no file kind and types omit Files", () => {
+    expect(
+      utils.isEvtWithFiles({
+        dataTransfer: {types: ["text/plain"], items: [{kind: "string"}]}
+      })
+    ).toBe(false);
+    expect(utils.isEvtWithFiles({dataTransfer: {types: ["text/plain"], items: []}})).toBe(false);
+  });
+
+  it("should return true if a paste carries files via clipboardData (#1210)", () => {
+    expect(utils.isEvtWithFiles({clipboardData: {types: ["Files"]}})).toBe(true);
+    expect(utils.isEvtWithFiles({clipboardData: {types: ["Files", "text/html"]}})).toBe(true);
+    // Some browsers only expose the file via items, not types.
+    expect(
+      utils.isEvtWithFiles({
+        clipboardData: {types: [], items: [{kind: "file"}]}
+      })
+    ).toBe(true);
+  });
+
+  it("should return false for a paste with no files (e.g. plain text)", () => {
+    expect(utils.isEvtWithFiles({clipboardData: {types: ["text/plain"]}})).toBe(false);
+    expect(
+      utils.isEvtWithFiles({
+        clipboardData: {types: ["text/plain"], items: [{kind: "string"}]}
+      })
+    ).toBe(false);
+  });
+
+  it("should return true if the event has a target with files", () => {
+    expect(utils.isEvtWithFiles({target: {files: []}})).toBe(true);
+  });
+
+  it("should return false otherwise", () => {
+    expect(utils.isEvtWithFiles({})).toBe(false);
+  });
+});
+
+describe("composeEventHandlers()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("returns a fn", () => {
+    const fn = utils.composeEventHandlers(() => {});
+    expect(typeof fn).toBe("function");
+  });
+
+  it("runs every passed fn in order", () => {
+    const fn1 = vi.fn();
+    const fn2 = vi.fn();
+    const fn = utils.composeEventHandlers(fn1, fn2);
+    const event = {type: "click"};
+    const data = {ping: true};
+    fn(event, data);
+    expect(fn1).toHaveBeenCalledWith(event, data);
+    expect(fn2).toHaveBeenCalledWith(event, data);
+  });
+
+  it("stops after first fn that calls stopPropagation()", () => {
+    const fn1 = vi.fn().mockImplementation(event => {
+      Object.defineProperty(event, "cancelBubble", {value: true});
+      return event;
+    });
+    const fn2 = vi.fn();
+    const fn = utils.composeEventHandlers(fn1, fn2);
+    const event = new MouseEvent("click");
+    fn(event);
+    expect(fn1).toHaveBeenCalledWith(event);
+    expect(fn2).not.toHaveBeenCalled();
+  });
+
+  it("stops before first fn if bubble is already canceled", () => {
+    const fn1 = vi.fn();
+    const fn2 = vi.fn();
+    const fn = utils.composeEventHandlers(fn1, fn2);
+    const event = new MouseEvent("click");
+    Object.defineProperty(event, "cancelBubble", {value: true});
+    fn(event);
+    expect(fn1).not.toHaveBeenCalled();
+    expect(fn2).not.toHaveBeenCalled();
+  });
+});
+
+describe("fileAccepted()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("accepts bogus firefox file", () => {
+    const file = createFile("bogus.png", 100, "application/x-moz-file");
+    expect(utils.fileAccepted(file, ".pdf")).toEqual([true, null]);
+  });
+
+  it("accepts DataTransferItem with empty type during drag (Chrome .md file issue)", () => {
+    // Simulate Chrome's DataTransferItem during drag with empty type
+    const dataTransferItem = {
+      type: "",
+      kind: "file",
+      getAsFile: () => createFile("README.md", 100, "")
+    };
+    expect(utils.fileAccepted(dataTransferItem, "text/markdown")).toEqual([true, null]);
+  });
+
+  it("rejects regular File with empty type (not DataTransferItem)", () => {
+    // Regular File objects (on drop) with empty type should still be rejected
+    const file = createFile("unknown.xyz", 100, "");
+    expect(utils.fileAccepted(file, "text/markdown")).toEqual([
+      false,
+      {
+        code: "file-invalid-type",
+        message: "File type must be text/markdown"
+      }
+    ]);
+  });
+
+  it("accepts file when single accept criteria", () => {
+    const file = createFile("hamster.pdf", 100, "application/pdf");
+    expect(utils.fileAccepted(file, ".pdf")).toEqual([true, null]);
+  });
+
+  it("accepts file when multiple accept criteria", () => {
+    const file = createFile("hamster.pdf", 100, "application/pdf");
+    expect(utils.fileAccepted(file, ".pdf,.png")).toEqual([true, null]);
+  });
+
+  it("rejects file when single accept criteria", () => {
+    const file = createFile("hamster.pdf", 100, "application/pdf");
+    expect(utils.fileAccepted(file, ".png")).toEqual([
+      false,
+      {code: "file-invalid-type", message: "File type must be .png"}
+    ]);
+  });
+
+  it("rejects file when multiple accept criteria", () => {
+    const file = createFile("hamster.pdf", 100, "application/pdf");
+    expect(utils.fileAccepted(file, ".gif,.png")).toEqual([
+      false,
+      {
+        code: "file-invalid-type",
+        message: "File type must be one of .gif, .png"
+      }
+    ]);
+  });
+
+  // https://github.com/react-dropzone/react-dropzone/issues/1220
+  it("enforces the extensions when a wildcard MIME type is paired with them", () => {
+    const accept = utils.acceptPropAsAcceptAttr(
+      {"image/*": [".jpeg", ".png"]},
+      {omitWildcardMimeTypesWithExtensions: true}
+    );
+
+    const png = createFile("cats.png", 100, "image/png");
+    expect(utils.fileAccepted(png, accept)).toEqual([true, null]);
+
+    const gif = createFile("cats.gif", 100, "image/gif");
+    expect(utils.fileAccepted(gif, accept)).toEqual([
+      false,
+      {code: "file-invalid-type", message: "File type must be one of .jpeg, .png"}
+    ]);
+  });
+});
+
+describe("getTooLargeRejectionErr()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("prints byte when maxSize is 1", () => {
+    expect(utils.getTooLargeRejectionErr(1).message).toEqual("File is larger than 1 byte");
+  });
+
+  it("prints bytes when maxSize > 1", () => {
+    expect(utils.getTooLargeRejectionErr(100).message).toEqual("File is larger than 100 bytes");
+  });
+
+  it("formats larger sizes using human-readable units", () => {
+    expect(utils.getTooLargeRejectionErr(1024).message).toEqual("File is larger than 1 KB");
+    expect(utils.getTooLargeRejectionErr(1536).message).toEqual("File is larger than 1.5 KB");
+    expect(utils.getTooLargeRejectionErr(1111).message).toEqual("File is larger than 1.08 KB");
+    expect(utils.getTooLargeRejectionErr(5 * 1024 * 1024).message).toEqual("File is larger than 5 MB");
+  });
+});
+
+describe("getTooSmallRejectionErr()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("prints byte when minSize is 1", () => {
+    expect(utils.getTooSmallRejectionErr(1).message).toEqual("File is smaller than 1 byte");
+  });
+
+  it("prints bytes when minSize > 1", () => {
+    expect(utils.getTooSmallRejectionErr(100).message).toEqual("File is smaller than 100 bytes");
+  });
+
+  it("formats larger sizes using human-readable units", () => {
+    expect(utils.getTooSmallRejectionErr(1024).message).toEqual("File is smaller than 1 KB");
+    expect(utils.getTooSmallRejectionErr(1112).message).toEqual("File is smaller than 1.09 KB");
+    expect(utils.getTooSmallRejectionErr(5 * 1024 * 1024).message).toEqual("File is smaller than 5 MB");
+  });
+});
+
+describe("allFilesAccepted()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+  it("rejects file when multiple accept criteria", () => {
+    const files = [createFile("hamster.pdf", 100, "application/pdf"), createFile("fish.pdf", 100, "application/pdf")];
+    const images = [createFile("cats.gif", 1234, "image/gif"), createFile("dogs.gif", 2345, "image/jpeg")];
+    expect(utils.allFilesAccepted({files, multiple: true})).toEqual(true);
+    expect(utils.allFilesAccepted({files, multiple: true, maxFiles: 10})).toEqual(true);
+    expect(utils.allFilesAccepted({files, multiple: false, maxFiles: 10})).toEqual(false);
+    expect(utils.allFilesAccepted({files, multiple: true, accept: "image/jpeg"})).toEqual(false);
+    expect(
+      utils.allFilesAccepted({
+        files: images,
+        multiple: true,
+        accept: "image/*"
+      })
+    ).toEqual(true);
+    expect(utils.allFilesAccepted({files, multiple: true, minSize: 110})).toEqual(false);
+    expect(utils.allFilesAccepted({files, multiple: true, maxSize: 99})).toEqual(false);
+    expect(utils.allFilesAccepted({files, multiple: true, maxFiles: 1})).toEqual(false);
+
+    expect(
+      utils.allFilesAccepted({
+        files,
+        validator: () => ({code: "not-allowed", message: "Cannot do this!"})
+      })
+    ).toEqual(false);
+  });
+});
+
+describe("getDragVerdict()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  const pdfs = () => [
+    createFile("hamster.pdf", 100, "application/pdf"),
+    createFile("fish.pdf", 100, "application/pdf")
+  ];
+
+  it("returns 'accept' when every file passes the drag-evaluable checks", () => {
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true})).toEqual("accept");
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, accept: "application/pdf"})).toEqual("accept");
+  });
+
+  it("returns 'reject' when the file count exceeds the limit", () => {
+    expect(utils.getDragVerdict({files: pdfs(), multiple: false})).toEqual("reject");
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, maxFiles: 1})).toEqual("reject");
+  });
+
+  it("returns 'reject' when a non-empty MIME type doesn't match {accept}", () => {
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, accept: "image/*"})).toEqual("reject");
+  });
+
+  it("returns 'reject' when a file falls outside the size bounds", () => {
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, minSize: 110})).toEqual("reject");
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, maxSize: 99})).toEqual("reject");
+  });
+
+  it("returns 'unknown' (never runs the validator) when a validator is configured and built-in checks pass", () => {
+    const validator = vi.fn(() => ({code: "not-allowed", message: "Cannot do this!"}));
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, validator})).toEqual("unknown");
+    // The validator must not run during a drag - it's typed (file: File) and would throw on a
+    // DataTransferItem. See https://github.com/react-dropzone/react-dropzone/issues/1408
+    expect(validator).not.toHaveBeenCalled();
+  });
+
+  it("prefers a confident 'reject' over 'unknown' even with a validator", () => {
+    const validator = () => null;
+    expect(utils.getDragVerdict({files: pdfs(), multiple: true, accept: "image/*", validator})).toEqual("reject");
+    expect(utils.getDragVerdict({files: pdfs(), multiple: false, validator})).toEqual("reject");
+  });
+
+  it("treats empty-type DataTransferItems as 'accept', or 'unknown' when a validator is set", () => {
+    const emptyTypeItems = [
+      {type: "", getAsFile: () => null},
+      {type: "", getAsFile: () => null}
+    ];
+    expect(utils.getDragVerdict({files: emptyTypeItems, multiple: true, accept: "text/markdown,.md"})).toEqual(
+      "accept"
+    );
+    expect(
+      utils.getDragVerdict({files: emptyTypeItems, multiple: true, accept: "text/markdown,.md", validator: () => null})
+    ).toEqual("unknown");
+  });
+});
+
+describe("ErrorCode", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should exist and have known error code properties", () => {
+    expect(utils.ErrorCode.FileInvalidType).toEqual(utils.FILE_INVALID_TYPE);
+    expect(utils.ErrorCode.FileTooLarge).toEqual(utils.FILE_TOO_LARGE);
+    expect(utils.ErrorCode.FileTooSmall).toEqual(utils.FILE_TOO_SMALL);
+    expect(utils.ErrorCode.TooManyFiles).toEqual(utils.TOO_MANY_FILES);
+  });
+});
+
+describe("canUseFileSystemAccessAPI()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should return false if not", () => {
+    expect(utils.canUseFileSystemAccessAPI()).toBe(false);
+  });
+
+  it("should return true if yes", () => {
+    // TODO: If we use these in other tests, restore once test is done
+    window.showOpenFilePicker = vi.fn();
+    expect(utils.canUseFileSystemAccessAPI()).toBe(true);
+  });
+});
+
+describe("pickerOptionsFromAccept()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("converts the {accept} prop to file picker options, deriving the description from the extensions", () => {
+    expect(
+      utils.pickerOptionsFromAccept({
+        "image/*": [".png", ".jpg"], // ok
+        "text/*": [".txt", ".pdf"], // ok
+        "audio/*": ["mp3"], // not ok
+        "*": [".p12"] // not ok
+      })
+    ).toEqual([
+      {
+        description: ".png, .jpg, .txt, .pdf",
+        accept: {
+          "image/*": [".png", ".jpg"],
+          "text/*": [".txt", ".pdf"]
+        }
+      }
+    ]);
+  });
+
+  it("returns undefined for an empty object form", () => {
+    expect(utils.pickerOptionsFromAccept({})).toBeUndefined();
+  });
+
+  it("keeps each group as its own picker entry with a custom description", () => {
+    expect(
+      utils.pickerOptionsFromAccept([
+        {description: "Images", accept: {"image/jpeg": [".jpg", ".jpeg"], "image/png": []}},
+        {description: "Documents", accept: {"application/pdf": [".pdf"]}}
+      ])
+    ).toEqual([
+      {description: "Images", accept: {"image/jpeg": [".jpg", ".jpeg"], "image/png": []}},
+      {description: "Documents", accept: {"application/pdf": [".pdf"]}}
+    ]);
+  });
+
+  it("derives a group's description from its extensions when omitted", () => {
+    expect(utils.pickerOptionsFromAccept([{accept: {"image/jpeg": [".jpg", ".jpeg"], "image/png": [".png"]}}])).toEqual(
+      [{description: ".jpg, .jpeg, .png", accept: {"image/jpeg": [".jpg", ".jpeg"], "image/png": [".png"]}}]
+    );
+  });
+
+  it("falls back to the MIME types when a group has no extensions", () => {
+    expect(utils.pickerOptionsFromAccept([{accept: {"image/jpeg": [], "image/png": []}}])).toEqual([
+      {description: "image/jpeg, image/png", accept: {"image/jpeg": [], "image/png": []}}
+    ]);
+  });
+
+  it("accepts a bare string extension value, matching showOpenFilePicker", () => {
+    expect(utils.pickerOptionsFromAccept([{description: "PDF", accept: {"application/pdf": ".pdf"}}])).toEqual([
+      {description: "PDF", accept: {"application/pdf": [".pdf"]}}
+    ]);
+  });
+
+  it("drops groups left with no valid entries and returns undefined when none remain", () => {
+    expect(
+      utils.pickerOptionsFromAccept([
+        {description: "Bad", accept: {"audio/*": ["mp3"], "*": [".p12"]}},
+        {description: "Empty", accept: {}}
+      ])
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for an empty group array", () => {
+    expect(utils.pickerOptionsFromAccept([])).toBeUndefined();
+  });
+});
+
+describe("flattenAccept()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("returns undefined when accept is not provided", () => {
+    expect(utils.flattenAccept(undefined)).toBeUndefined();
+  });
+
+  it("passes the object form through unchanged (as an array-valued map)", () => {
+    expect(utils.flattenAccept({"image/png": [".png"], "application/pdf": ".pdf"})).toEqual({
+      "image/png": [".png"],
+      "application/pdf": [".pdf"]
+    });
+  });
+
+  it("merges groups and unions extensions of duplicate MIME keys", () => {
+    expect(
+      utils.flattenAccept([
+        {description: "A", accept: {"image/*": [".png"], "application/pdf": [".pdf"]}},
+        {description: "B", accept: {"image/*": [".png", ".jpg"]}}
+      ])
+    ).toEqual({
+      "image/*": [".png", ".jpg"],
+      "application/pdf": [".pdf"]
+    });
+  });
+});
+
+describe("acceptPropAsAcceptAttr()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("converts {accept} to an array of strings", () => {
+    expect(
+      utils.acceptPropAsAcceptAttr({
+        "image/*": [".png", ".jpg"],
+        "text/*": [".txt", ".pdf"],
+        "audio/*": ["mp3"], // `mp3` not ok
+        "*": [".p12"] // `*` not ok
+      })
+    ).toEqual("image/*,.png,.jpg,text/*,.txt,.pdf,audio/*,.p12");
+  });
+
+  // https://github.com/react-dropzone/react-dropzone/issues/1220
+  describe("with {omitWildcardMimeTypesWithExtensions}", () => {
+    const opts = {omitWildcardMimeTypesWithExtensions: true};
+
+    it("drops a wildcard MIME type when it is paired with extensions", () => {
+      expect(utils.acceptPropAsAcceptAttr({"image/*": [".jpeg", ".png"]}, opts)).toEqual(".jpeg,.png");
+    });
+
+    it("only drops the wildcards, keeping specific MIME types and their extensions", () => {
+      expect(
+        utils.acceptPropAsAcceptAttr(
+          {
+            "image/*": [".png", ".jpg"], // wildcard dropped in favour of extensions
+            "text/*": [".txt", ".pdf"], // wildcard dropped in favour of extensions
+            "audio/*": ["mp3"], // `mp3` not a valid extension, so the wildcard is kept
+            "application/pdf": [".pdf"] // specific MIME type is always kept
+          },
+          opts
+        )
+      ).toEqual(".png,.jpg,.txt,.pdf,audio/*,application/pdf,.pdf");
+    });
+
+    it("keeps a wildcard MIME type when no valid extensions are provided", () => {
+      expect(utils.acceptPropAsAcceptAttr({"image/*": []}, opts)).toEqual("image/*");
+      expect(utils.acceptPropAsAcceptAttr({"image/*": ["png"]}, opts)).toEqual("image/*");
+    });
+  });
+});
+
+describe("isMIMEType()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("checks that the value is a valid MIME type string", () => {
+    expect(utils.isMIMEType("text/html")).toBe(true);
+    expect(utils.isMIMEType("text/*")).toBe(true);
+    expect(utils.isMIMEType("image/*")).toBe(true);
+    expect(utils.isMIMEType("video/*")).toBe(true);
+    expect(utils.isMIMEType("audio/*")).toBe(true);
+    expect(utils.isMIMEType("application/*")).toBe(true);
+    expect(utils.isMIMEType("test/*")).toBe(false);
+    expect(utils.isMIMEType("text")).toBe(false);
+    expect(utils.isMIMEType("")).toBe(false);
+    expect(utils.isMIMEType(undefined)).toBe(false);
+  });
+});
+
+describe("isMIMETypeWildcard()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("checks that the value is a wildcard MIME type string", () => {
+    expect(utils.isMIMETypeWildcard("image/*")).toBe(true);
+    expect(utils.isMIMETypeWildcard("audio/*")).toBe(true);
+    expect(utils.isMIMETypeWildcard("*/*")).toBe(true);
+    expect(utils.isMIMETypeWildcard("image/png")).toBe(false);
+    expect(utils.isMIMETypeWildcard(".png")).toBe(false);
+    expect(utils.isMIMETypeWildcard("")).toBe(false);
+  });
+});
+
+describe("isExt()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("checks that the value is a valid file extension", () => {
+    expect(utils.isExt(".jpg")).toBe(true);
+    expect(utils.isExt("me.jpg")).toBe(true);
+    expect(utils.isExt("me.prev.png")).toBe(true);
+    expect(utils.isExt("")).toBe(false);
+    expect(utils.isExt("text")).toBe(false);
+    expect(utils.isExt(undefined)).toBe(false);
+  });
+});
+
+describe("isAbort()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should work as expected", () => {
+    expect(utils.isAbort(new DOMException())).toBe(false);
+    expect(utils.isAbort(new DOMException("some err"))).toBe(false);
+    expect(utils.isAbort(new DOMException("some err", "Noop"))).toBe(false);
+    expect(utils.isAbort(new DOMException("some err", "AbortError"))).toBe(true);
+    const err = new DOMException("some err");
+    const e = new Proxy(err, {
+      get(t, p) {
+        if (p === "code") {
+          return 20;
+        }
+        return t[p];
+      }
+    });
+    expect(utils.isAbort(e)).toBe(true);
+  });
+});
+
+describe("isSecurityError()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should work as expected", () => {
+    expect(utils.isSecurityError(new DOMException())).toBe(false);
+    expect(utils.isSecurityError(new DOMException("some err"))).toBe(false);
+    expect(utils.isSecurityError(new DOMException("some err", "Noop"))).toBe(false);
+    expect(utils.isSecurityError(new DOMException("some err", "SecurityError"))).toBe(true);
+    const err = new DOMException("some err");
+    const e = new Proxy(err, {
+      get(t, p) {
+        if (p === "code") {
+          return 18;
+        }
+        return t[p];
+      }
+    });
+    expect(utils.isSecurityError(e)).toBe(true);
+  });
+});
+
+describe("isNotAllowedError()", () => {
+  /**
+   * @constant
+   * @type {import('./index')}
+   */
+  let utils;
+  beforeEach(async () => {
+    utils = await import("./index");
+  });
+
+  it("should work as expected", () => {
+    expect(utils.isNotAllowedError(new Error("some err"))).toBe(false);
+    expect(utils.isNotAllowedError(new DOMException())).toBe(false);
+    expect(utils.isNotAllowedError(new DOMException("some err"))).toBe(false);
+    expect(utils.isNotAllowedError(new DOMException("some err", "Noop"))).toBe(false);
+    expect(utils.isNotAllowedError(new DOMException("some err", "SecurityError"))).toBe(false);
+    expect(utils.isNotAllowedError(new DOMException("some err", "NotAllowedError"))).toBe(true);
+  });
+});
+
+function createFile(name, size, type) {
+  const file = new File([], name, {type});
+  Object.defineProperty(file, "size", {
+    get() {
+      return size;
+    }
+  });
+  return file;
+}

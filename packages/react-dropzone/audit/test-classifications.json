@@ -1,0 +1,1759 @@
+{
+  "schemaVersion": 1,
+  "upstreamCases": [
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook {open} can open file dialog programmatically",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook {open} does not throw if <input> is missing",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook {open} does nothing if {disabled} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook {open} sets {isFileDialogActive} state",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook accessibility sets the role attribute to button by default on the root",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook accessibility users can override the default role attribute on the root",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator awaits the validator and splits accepted/rejected files by its resolved result",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator routes a rejected validator to onError, does not call onDrop, and clears {isProcessing}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator sets {isProcessing} while a validator is pending and clears it once resolved, deferring onDrop",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator sets {isProcessing} while an async getFilesFromEvent runs, even without a validator",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator still caps accepted files at {maxFiles} after async validation resolves",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator supersedes a run whose getFilesFromEvent is still pending when a newer drop lands",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook async validator supersedes an in-flight validation when a second drop lands, only committing the latest",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior {aria-disabled} is not set if {disabled} is false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior {aria-disabled} is true if {disabled} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior {rootRef, inputRef} are exposed",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior {tabindex} is 0 if {disabled} is false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior {tabindex} is not set if {disabled} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior {tabindex} is not set if {noKeyboard} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior <Dropzone> doesn't invoke the ref fn if it hasn't changed",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior <Dropzone> exposes and sets the ref if using a ref fn",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior <Dropzone> exposes and sets the ref if using a ref object",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior click events originating from <label> should not trigger file dialog open twice",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior hides the <input> without {position: absolute} (#1413) while keeping it focusable (#1268)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior labels the hidden file input for accessibility",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior refs are set when {refKey} is set to a different value",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior renders the root and input nodes with the necessary props",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior runs no callback handlers if {disabled} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior runs the custom callback handlers provided to the input props getter",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior runs the custom callback handlers provided to the root props getter",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior sets {accept} prop on the <input>",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior sets {isFocused} to false if {disabled} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior sets {multiple} prop on the <input>",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior sets any props passed to the input props getter on the <input>",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior sets any props passed to the root props getter on the root node",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior updates {multiple} prop on the <input> when it changes",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook behavior updates {multiple} prop on the <input> when it changes",
+      "occurrence": 2,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection does not prevent stray drops when {preventDropOnDocument} is false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection installs hooks to prevent stray drops from taking over the browser window",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection permits drags and drops on elements inside our dropzone",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection prevents the browser from opening a file dropped on a {disabled} dropzone",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection prevents the browser from opening a file dropped on a {noDrag} dropzone",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection removes document hooks when unmounted",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection still lets an enabled dropzone handle its own drops (no double prevent)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook document drop protection terminates drags and drops on elements outside our dropzone",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook event propagation drag events do not propagate from the inner dropzone to parent dropzone if {noDragEventsBubbling} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook event propagation drag events do not propagate from the inner dropzone to parent dropzone if user invoked stopPropagation() on the events",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook event propagation drag events propagate from the inner dropzone to parents",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook event propagation onDragLeave is not invoked for the parent dropzone if it was invoked for an inner dropzone",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook file dialog open (#1455) ignores files dropped on the dropzone while the file picker dialog is open",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook file dialog open (#1455) resumes accepting drops after the dialog closes",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook file dialog open (#1455) still processes a file selected from the open dialog (input change)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook getErrorMessage also overrides custom validator error messages",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook getErrorMessage overrides built-in rejection messages by code and receives the file",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook getErrorMessage overrides the too-many-files rejection message",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onBlur does not unset focus state if {noKeyboard} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onBlur does not unset focus state if user stopped event propagation",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onBlur restores blur behavior if {noKeyboard} is set back to false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onBlur unsets focus state",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick if showOpenFilePicker() is supported and {useFsAccessApi} is true, and the user cancels it should call onFileDialogCancel",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick if showOpenFilePicker() is supported and {useFsAccessApi} is true, it should work without the <input>",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick passes grouped {accept} to showOpenFilePicker() as separate picker types and flattens it for the <input>",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick restores click behavior if {noClick} is set back to false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should continue event propagation if {noClick} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should not not proxy the click event to the input if {noClick} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should not not proxy the click event to the input if event propagation was stopped",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should not use showOpenFilePicker() if supported and {isSecureContext} is not true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should not use showOpenFilePicker() if supported and {useFsAccessApi} is not true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should proxy the click event to the input",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should schedule input click on next tick in Edge",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should try to use showOpenFilePicker() and fallback to input in case of a not allowed error",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should try to use showOpenFilePicker() and fallback to input in case of a security error",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick should use showOpenFilePicker() if supported and {useFsAccessApi} is true, and not trigger click on input",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick showOpenFilePicker() should call {onError} when a security error occurs and no <input> was provided",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick showOpenFilePicker() should call {onError} when an unexpected error occurs",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick window focus evt is bound if showOpenFilePicker() is supported but errors due to a security error",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onClick window focus evt is not bound if showOpenFilePicker() is supported and {useFsAccessApi} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* accepts files with empty type during dragenter (Chrome .md file issue)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* does not invoke callbacks if {noDrag} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* does not invoke callbacks if no files are detected",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* invokes callbacks for the appropriate events",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* invokes callbacks for the appropriate events even if it cannot access the data",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* keeps {isDragActive} if dragleave is triggered for some arbitrary node",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* resets {isDragActive, isDragAccept, isDragReject} on dragleave",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* restores drag behavior if {noDrag} is set back to false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* sets {isDragActive, isDragAccept, isDragReject} if any files are rejected and {multiple} is false on dragenter",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* sets {isDragActive} and {isDragAccept} if some files are accepted on dragenter",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* sets {isDragActive} and {isDragReject} of some files are not accepted on dragenter",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrag* sets {isDragReject} if some files are too large",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts a dropped image when Firefox provides a bogus file type",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts a single files if {multiple} is false and {accept} criteria is met",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts all files if {multiple} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts multiple files if {multiple} is true and {accept} criteria is met",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts the first file and rejects the surplus if {multiple} is false and {accept} criteria is met",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts up to {maxFiles} and rejects the surplus if {multiple} is true and {accept} criteria is met",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop accepts up to {maxFiles} and rejects the surplus when {maxFiles} is updated to be less than files",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop callback is invoked when <input> change event occurs",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop filters files according to {maxSize}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop filters files according to {minSize}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop gets invoked with both accepted/rejected files",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop isDragReject is false after rejected drop and updates correctly on new drag",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop onDropAccepted callback is invoked if some files are accepted",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop onDropRejected callback is invoked if some files are rejected",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop rejects all files if {multiple} is false and {accept} criteria is not met",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop resets {isDragActive, isDragAccept, isDragReject}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop resets {isFileDialogActive} state once a file is selected",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop sets {acceptedFiles, fileRejections, isDragReject}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop sets {isDragGlobal} to false when drag leaves document",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop sets {isDragGlobal} to false when dragend occurs on document",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop sets {isDragGlobal} to false when drop occurs on document",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop sets {isDragGlobal} to true when drag event is detected on document",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop when more files are dropped than allowed accepts the first {maxFiles} valid files and rejects only the surplus (issue #1355)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop when more files are dropped than allowed accepts the first valid file and rejects the rest when {multiple} is false (issue #1355)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop when more files are dropped than allowed keeps a valid file within the limit and rejects the one failing its own check (issue #1358)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop wildcard MIME type paired with extensions accepts files whose extension matches and rejects the others on drop",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop wildcard MIME type paired with extensions sets only the extensions on the <input> {accept} attribute",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onDrop wildcard MIME type paired with extensions still reacts with {isDragAccept} via the MIME type during a drag",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogCancel does not throw if callback is not provided",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogCancel is not invoked every time window receives focus",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogCancel is not invoked if <input> is not rendered",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogCancel is not invoked if files were selected",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogCancel resets {isFileDialogActive}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogOpen is invoked when opening the file dialog",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFileDialogOpen is invoked when opening the file dialog programmatically",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFocus {autoFocus} sets the focus state on render",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFocus does not set focus state if {noKeyboard} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFocus does not set focus state if user stopped event propagation",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFocus restores focus behavior if {noKeyboard} is set back to false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onFocus sets focus state",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onKeyDown does not trigger the click event on the input for other keys",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onKeyDown does not trigger the click event on the input if {noKeyboard} is true",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onKeyDown does not trigger the click event on the input if event propagation was stopped",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onKeyDown does not trigger the click event on the input if the dropzone is not in focus",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onKeyDown restores the keydown behavior when {noKeyboard} is set back to false",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onKeyDown triggers the click event on the input if the SPACE/ENTER keys are pressed",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) does not handle pastes when {disabled}",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) does not handle pastes when {noPaste} is set",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) ignores a paste that carries no files (e.g. plain text) and does not preventDefault",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) invokes onDrop with the files carried by a paste",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) preventDefault()s a paste that carries files",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) runs pasted files through {accept} validation",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook onPaste (#1210) still calls a user-supplied onPaste passed through getRootProps",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook plugin integration calls {onError} when getFilesFromEvent() rejects",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook plugin integration uses provided getFilesFromEvent()",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook validator keeps {isDragReject} over {isDragUnknown} when a file's MIME type is confidently rejected",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook validator rejects with custom error",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook validator sets {isDragUnknown} during a drag when a validator is set",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/index.spec.tsx",
+      "fullName": "useDropzone() hook validator still activates the drag when a validator reads file.name (#1408)",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this state-machine case; adapted contract, acquisition, and differential lanes cover its observable Octane boundary."
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() converts {accept} to an array of strings",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["acceptPropAsAcceptAttr() converts {accept} to an array of strings"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} drops a wildcard MIME type when it is paired with extensions",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} drops a wildcard MIME type when it is paired with extensions"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} keeps a wildcard MIME type when no valid extensions are provided",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} keeps a wildcard MIME type when no valid extensions are provided"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} only drops the wildcards, keeping specific MIME types and their extensions",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "acceptPropAsAcceptAttr() with {omitWildcardMimeTypesWithExtensions} only drops the wildcards, keeping specific MIME types and their extensions"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "allFilesAccepted() rejects file when multiple accept criteria",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "allFilesAccepted() rejects file when multiple accept criteria",
+        "fileAccepted() rejects file when multiple accept criteria"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "canUseFileSystemAccessAPI() should return false if not",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["canUseFileSystemAccessAPI() should return false if not"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "canUseFileSystemAccessAPI() should return true if yes",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["canUseFileSystemAccessAPI() should return true if yes"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() returns a fn",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["composeEventHandlers() returns a fn"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() runs every passed fn in order",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["composeEventHandlers() runs every passed fn in order"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() stops after first fn that calls stopPropagation()",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "composeEventHandlers() stops after first fn that calls stopPropagation()"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "composeEventHandlers() stops before first fn if bubble is already canceled",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "composeEventHandlers() stops before first fn if bubble is already canceled"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "ErrorCode should exist and have known error code properties",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["ErrorCode should exist and have known error code properties"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts bogus firefox file",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["fileAccepted() accepts bogus firefox file"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts DataTransferItem with empty type during drag (Chrome .md file issue)",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileAccepted() accepts DataTransferItem with empty type during drag (Chrome .md file issue)"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts file when multiple accept criteria",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["fileAccepted() accepts file when multiple accept criteria"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() accepts file when single accept criteria",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["fileAccepted() accepts file when single accept criteria"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() enforces the extensions when a wildcard MIME type is paired with them",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileAccepted() enforces the extensions when a wildcard MIME type is paired with them"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() rejects file when multiple accept criteria",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "allFilesAccepted() rejects file when multiple accept criteria",
+        "fileAccepted() rejects file when multiple accept criteria"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() rejects file when single accept criteria",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["fileAccepted() rejects file when single accept criteria"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileAccepted() rejects regular File with empty type (not DataTransferItem)",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileAccepted() rejects regular File with empty type (not DataTransferItem)"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file {size} is less than maxSize",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileMatchSize() should return true if the file {size} is less than maxSize"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file {size} is more than minSize",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileMatchSize() should return true if the file {size} is more than minSize"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file {size} is within the [minSize, maxSize] range",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileMatchSize() should return true if the file {size} is within the [minSize, maxSize] range"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the file object doesn't have a {size} property",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileMatchSize() should return true if the file object doesn't have a {size} property"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "fileMatchSize() should return true if the minSize and maxSize were not provided",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "fileMatchSize() should return true if the minSize and maxSize were not provided"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "flattenAccept() merges groups and unions extensions of duplicate MIME keys",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "flattenAccept() merges groups and unions extensions of duplicate MIME keys"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "flattenAccept() passes the object form through unchanged (as an array-valued map)",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "flattenAccept() passes the object form through unchanged (as an array-valued map)"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "flattenAccept() returns undefined when accept is not provided",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["flattenAccept() returns undefined when accept is not provided"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() prefers a confident 'reject' over 'unknown' even with a validator",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() prefers a confident 'reject' over 'unknown' even with a validator"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'accept' when every file passes the drag-evaluable checks",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() returns 'accept' when every file passes the drag-evaluable checks"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'reject' when a file falls outside the size bounds",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() returns 'reject' when a file falls outside the size bounds"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'reject' when a non-empty MIME type doesn't match {accept}",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() returns 'reject' when a non-empty MIME type doesn't match {accept}"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'reject' when the file count exceeds the limit",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() returns 'reject' when the file count exceeds the limit"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() returns 'unknown' (never runs the validator) when a validator is configured and built-in checks pass",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() returns 'unknown' (never runs the validator) when a validator is configured and built-in checks pass"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getDragVerdict() treats empty-type DataTransferItems as 'accept', or 'unknown' when a validator is set",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getDragVerdict() treats empty-type DataTransferItems as 'accept', or 'unknown' when a validator is set"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getTooLargeRejectionErr() formats larger sizes using human-readable units",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getTooLargeRejectionErr() formats larger sizes using human-readable units",
+        "getTooSmallRejectionErr() formats larger sizes using human-readable units"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getTooLargeRejectionErr() prints byte when maxSize is 1",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["getTooLargeRejectionErr() prints byte when maxSize is 1"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getTooLargeRejectionErr() prints bytes when maxSize > 1",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this utility case; the adapted utility table and live differential lanes cover the Octane boundary."
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getTooSmallRejectionErr() formats larger sizes using human-readable units",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "getTooLargeRejectionErr() formats larger sizes using human-readable units",
+        "getTooSmallRejectionErr() formats larger sizes using human-readable units"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getTooSmallRejectionErr() prints byte when minSize is 1",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["getTooSmallRejectionErr() prints byte when minSize is 1"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "getTooSmallRejectionErr() prints bytes when minSize > 1",
+      "occurrence": 1,
+      "disposition": "pristine-oracle-plus-contract",
+      "rationale": "The byte-exact React oracle executes this utility case; the adapted utility table and live differential lanes cover the Octane boundary."
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isAbort() should work as expected",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isAbort() should work as expected",
+        "isNotAllowedError() should work as expected",
+        "isSecurityError() should work as expected"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return false for a paste with no files (e.g. plain text)",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isEvtWithFiles() should return false for a paste with no files (e.g. plain text)"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return false if items contain no file kind and types omit Files",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isEvtWithFiles() should return false if items contain no file kind and types omit Files"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return false otherwise",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isEvtWithFiles() should return false otherwise"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if a paste carries files via clipboardData (#1210)",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isEvtWithFiles() should return true if a paste carries files via clipboardData (#1210)"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if items contain a file kind even when types omit Files (#1409)",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isEvtWithFiles() should return true if items contain a file kind even when types omit Files (#1409)"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if some dragged types are files",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isEvtWithFiles() should return true if some dragged types are files"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isEvtWithFiles() should return true if the event has a target with files",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isEvtWithFiles() should return true if the event has a target with files"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isExt() checks that the value is a valid file extension",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isExt() checks that the value is a valid file extension"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return false for Chrome",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isIeOrEdge should return false for Chrome"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return true for Edge",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isIeOrEdge should return true for Edge"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return true for IE10",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isIeOrEdge should return true for IE10"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isIeOrEdge should return true for IE11",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isIeOrEdge should return true for IE11"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isKindFile() should return true for DataTransferItem of kind \"file\"",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isKindFile() should return true for DataTransferItem of kind \"file\""]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isMIMEType() checks that the value is a valid MIME type string",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["isMIMEType() checks that the value is a valid MIME type string"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isMIMETypeWildcard() checks that the value is a wildcard MIME type string",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isMIMETypeWildcard() checks that the value is a wildcard MIME type string"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isNotAllowedError() should work as expected",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isAbort() should work as expected",
+        "isNotAllowedError() should work as expected",
+        "isSecurityError() should work as expected"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isPropagationStopped() should return false if isPropagationStopped and cancelBubble are missing",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isPropagationStopped() should return false if isPropagationStopped and cancelBubble are missing"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isPropagationStopped() should return result of isPropagationStopped() if isPropagationStopped exists",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isPropagationStopped() should return result of isPropagationStopped() if isPropagationStopped exists"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isPropagationStopped() should return value of cancelBubble if isPropagationStopped doesnt exist and cancelBubble exists",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isPropagationStopped() should return value of cancelBubble if isPropagationStopped doesnt exist and cancelBubble exists"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "isSecurityError() should work as expected",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "isAbort() should work as expected",
+        "isNotAllowedError() should work as expected",
+        "isSecurityError() should work as expected"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() accepts a bare string extension value, matching showOpenFilePicker",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "pickerOptionsFromAccept() accepts a bare string extension value, matching showOpenFilePicker"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() converts the {accept} prop to file picker options, deriving the description from the extensions",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "pickerOptionsFromAccept() converts the {accept} prop to file picker options, deriving the description from the extensions"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() derives a group's description from its extensions when omitted",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "pickerOptionsFromAccept() derives a group's description from its extensions when omitted"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() drops groups left with no valid entries and returns undefined when none remain",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "pickerOptionsFromAccept() drops groups left with no valid entries and returns undefined when none remain"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() falls back to the MIME types when a group has no extensions",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "pickerOptionsFromAccept() falls back to the MIME types when a group has no extensions"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() keeps each group as its own picker entry with a custom description",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": [
+        "pickerOptionsFromAccept() keeps each group as its own picker entry with a custom description"
+      ]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() returns undefined for an empty group array",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["pickerOptionsFromAccept() returns undefined for an empty group array"]
+    },
+    {
+      "file": "src/utils/index.spec.ts",
+      "fullName": "pickerOptionsFromAccept() returns undefined for an empty object form",
+      "occurrence": 1,
+      "disposition": "adapted-title-match",
+      "adaptedFullNames": ["pickerOptionsFromAccept() returns undefined for an empty object form"]
+    }
+  ],
+  "portAuthored": [
+    {
+      "path": "packages/react-dropzone/tests/adapted/index-u3.spec.ts",
+      "disposition": "adapted-octane-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/adapted/index-u4.spec.ts",
+      "disposition": "adapted-octane-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/adapted/utils/index.spec.ts",
+      "disposition": "adapted-octane-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/adoption/package-contract.test.mjs",
+      "disposition": "octane-only-adoption"
+    },
+    {
+      "path": "packages/react-dropzone/tests/adoption/playground.browser.test.mjs",
+      "disposition": "octane-only-adoption"
+    },
+    {
+      "path": "packages/react-dropzone/tests/differential/acquisition-u4.test.ts",
+      "disposition": "react-octane-differential"
+    },
+    {
+      "path": "packages/react-dropzone/tests/differential/root-u3.test.ts",
+      "disposition": "react-octane-differential"
+    },
+    {
+      "path": "packages/react-dropzone/tests/differential/utils.test.ts",
+      "disposition": "react-octane-differential"
+    },
+    {
+      "path": "packages/react-dropzone/tests/pristine/upstream-runtime.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper"
+    },
+    {
+      "path": "packages/react-dropzone/tests/probes/architecture.test.ts",
+      "disposition": "octane-only-framework-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/probes/browser/browser.test.ts",
+      "disposition": "octane-only-framework-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/probes/hydration.test.ts",
+      "disposition": "octane-only-framework-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/probes/packed-exports.test.mjs",
+      "disposition": "octane-only-framework-contract"
+    },
+    {
+      "path": "packages/react-dropzone/tests/probes/server.test.ts",
+      "disposition": "octane-only-framework-contract"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/accept.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/all.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/basic.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/events.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/file-dialog.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/hook.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/plugin.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/accept.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/all.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/basic.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/events.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/file-dialog.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/hook.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/plugin.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/refs.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/pristine/validator.tsx",
+      "disposition": "type-evidence-pristine-copy"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/refs.tsx",
+      "disposition": "type-evidence-adapted"
+    },
+    {
+      "path": "packages/react-dropzone/typetests/validator.tsx",
+      "disposition": "type-evidence-adapted"
+    }
+  ]
+}

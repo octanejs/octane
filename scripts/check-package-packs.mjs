@@ -14,7 +14,7 @@ import {
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
 	getWorkspacePackages,
 	REPO_ROOT,
@@ -399,6 +399,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 					'@octanejs/alien-signals': `file:${requireArchive(archives, '@octanejs/alien-signals')}`,
 					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
+					'@octanejs/react-dropzone': `file:${requireArchive(archives, '@octanejs/react-dropzone')}`,
 					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
 					'@types/three': '0.172.0',
 					graphql: '^16.11.0',
@@ -407,7 +408,9 @@ async function validatePackedConsumer(tempRoot, archives) {
 					three: '0.172.0',
 				},
 				devDependencies: {
+					'@tsrx/typescript-plugin': tsrxTypeScriptPluginVersion,
 					'@types/node': nodeTypesVersion,
+					typescript: typescriptVersion,
 					vite: viteVersion,
 				},
 			},
@@ -421,6 +424,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
 import { createComputed, createSignal, useSignalValue } from '@octanejs/alien-signals';
 import { useForm } from '@octanejs/hook-form';
+import { useDropzone } from '@octanejs/react-dropzone';
 import { Canvas } from '@octanejs/three';
 import { ThreeScene } from './ThreeScene.three.tsrx';
 
@@ -436,11 +440,16 @@ function ApolloProbe() @{
 export function App() @{
 	const form = useForm({ defaultValues: { name: 'Ada' } });
 	const signalValue = useSignalValue(doubled);
+	const dropzone = useDropzone({ noClick: true });
 	<div data-probe="bindings-ran">
 		<span data-alien-signals={signalValue as string}>Alien Signals</span>
 		<form>
 			<input {...form.register('name')} />
 		</form>
+		<div {...dropzone.getRootProps()}>
+			<input {...dropzone.getInputProps()} />
+			<span>{dropzone.isProcessing ? 'Processing' : 'Drop files'}</span>
+		</div>
 		<ApolloProvider client={client}>
 			<ApolloProbe />
 		</ApolloProvider>
@@ -471,6 +480,24 @@ import * as coreApi from '@octanejs/three/core';
 import * as rendererApi from '@octanejs/three/renderer';
 import config, { threeRenderers } from '@octanejs/three/config';
 import testing, { create, fireEvent } from '@octanejs/three/testing';
+import Dropzone, {
+	ErrorCode,
+	useDropzone,
+	type Accept,
+	type AcceptGroup,
+	type DropEvent,
+	type DropzoneInputProps,
+	type DropzoneOptions,
+	type DropzoneProps,
+	type DropzoneRef,
+	type DropzoneRootProps,
+	type DropzoneState,
+	type FileError,
+	type FileRejection,
+	type FileWithPath,
+	type ValidatorResult,
+} from '@octanejs/react-dropzone';
+import dropzonePackage from '@octanejs/react-dropzone/package.json' with { type: 'json' };
 import { map_iterable } from 'octane/tsrx-iterable';
 import {
 	normalize_spread_props,
@@ -494,14 +521,43 @@ const intrinsicMesh: IntrinsicMesh = { position: [1, 2, 3] };
 const runtimeMesh: RuntimeMesh = intrinsicMesh;
 const rootMesh: RootMesh = runtimeMesh;
 const reconcilerRoot: ReconcilerRoot<HTMLCanvasElement> | undefined = undefined;
+const dropzoneOptions: DropzoneOptions = { maxFiles: 2, noClick: true };
+const dropzoneState: DropzoneState | undefined = undefined;
+const fileRejections: readonly FileRejection[] = [];
+type DropzonePublicTypeSurface = [
+	Accept,
+	AcceptGroup,
+	DropEvent,
+	DropzoneInputProps,
+	DropzoneOptions,
+	DropzoneProps,
+	DropzoneRef,
+	DropzoneRootProps,
+	DropzoneState,
+	FileError,
+	FileRejection,
+	FileWithPath,
+	ValidatorResult,
+];
+type DropzonePublicTypeArity = DropzonePublicTypeSurface['length'];
+const dropzonePublicTypeArity: DropzonePublicTypeArity = 13;
 
 export function packageSurfaceProbe() {
 	void octaneDevRuntimeDiv;
 	void rootMesh;
 	void reconcilerRoot;
+	void dropzoneState;
+	void fileRejections;
 	return {
 		config: config === threeRenderers,
 		core: typeof coreApi.createRoot === 'function',
+		dropzone:
+			typeof Dropzone === 'function' &&
+			typeof useDropzone === 'function' &&
+			ErrorCode.FileInvalidType === 'file-invalid-type' &&
+			dropzoneOptions.maxFiles === 2 &&
+			dropzonePublicTypeArity === 13 &&
+			dropzonePackage.name === '@octanejs/react-dropzone',
 		iterable: typeof map_iterable === 'function',
 		publicApi: typeof publicApi.Canvas === 'function',
 		renderer: typeof rendererApi.createUniversalRoot === 'function',
@@ -557,6 +613,11 @@ export function renderProbe() {
 		JSON.stringify(
 			{
 				compilerOptions: {
+					allowImportingTsExtensions: true,
+					allowSyntheticDefaultImports: true,
+					esModuleInterop: true,
+					jsx: 'react-jsx',
+					jsxImportSource: 'octane',
 					lib: ['dom', 'dom.iterable', 'esnext'],
 					module: 'esnext',
 					moduleResolution: 'bundler',
@@ -565,8 +626,38 @@ export function renderProbe() {
 					strict: true,
 					target: 'esnext',
 					types: ['node'],
+					plugins: [{ name: '@tsrx/typescript-plugin' }],
 				},
 				include: ['src/compiler-plugin.ts', 'src/package-surface.ts'],
+				tsrx: { compiler: 'octane/compiler/volar' },
+			},
+			null,
+			2,
+		) + '\n',
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.nodenext.json'),
+		JSON.stringify(
+			{
+				compilerOptions: {
+					allowImportingTsExtensions: true,
+					allowSyntheticDefaultImports: true,
+					esModuleInterop: true,
+					jsx: 'react-jsx',
+					jsxImportSource: 'octane',
+					lib: ['dom', 'dom.iterable', 'esnext'],
+					module: 'nodenext',
+					moduleResolution: 'nodenext',
+					noEmit: true,
+					resolveJsonModule: true,
+					skipLibCheck: false,
+					strict: true,
+					target: 'esnext',
+					types: ['node'],
+					plugins: [{ name: '@tsrx/typescript-plugin' }],
+				},
+				include: ['src/package-surface.ts'],
+				tsrx: { compiler: 'octane/compiler/volar' },
 			},
 			null,
 			2,
@@ -585,6 +676,7 @@ export function renderProbe() {
 			'--ignore-scripts',
 			'--no-frozen-lockfile',
 			'--config.auto-install-peers=false',
+			'--config.node-linker=hoisted',
 		],
 		{
 			cwd: consumerDirectory,
@@ -639,6 +731,41 @@ process.stdout.write(JSON.stringify(result));`,
 			`Alien Signals binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${alienSignalsPeerRuntime}`,
 		);
 	}
+	const dropzoneEntry = consumerRequire.resolve('@octanejs/react-dropzone');
+	const dropzonePackageEntry = consumerRequire.resolve('@octanejs/react-dropzone/package.json');
+	const esmDropzoneEntries = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'-e',
+				`process.stdout.write(JSON.stringify({ root: import.meta.resolve('@octanejs/react-dropzone'), packageJson: import.meta.resolve('@octanejs/react-dropzone/package.json') }));`,
+			],
+			{ cwd: consumerDirectory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
+		),
+	);
+	if (!dropzoneEntry.endsWith(path.join('src', 'index.tsrx'))) {
+		throw new Error(`packed CommonJS condition resolved unexpected entry: ${dropzoneEntry}`);
+	}
+	if (!dropzonePackageEntry.endsWith('package.json')) {
+		throw new Error(`packed CommonJS package-json export failed: ${dropzonePackageEntry}`);
+	}
+	if (!fileURLToPath(esmDropzoneEntries.root).endsWith(path.join('src', 'index.tsrx'))) {
+		throw new Error(`packed ESM condition resolved unexpected entry: ${esmDropzoneEntries.root}`);
+	}
+	if (!fileURLToPath(esmDropzoneEntries.packageJson).endsWith('package.json')) {
+		throw new Error(`packed ESM package-json export failed: ${esmDropzoneEntries.packageJson}`);
+	}
+	const dropzoneRequire = createRequire(dropzoneEntry);
+	const dropzonePeerRuntime = realpathSync(dropzoneRequire.resolve('octane'));
+	if (dropzonePeerRuntime !== directRuntime) {
+		throw new Error(
+			`React Dropzone binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${dropzonePeerRuntime}`,
+		);
+	}
+	for (const dependency of ['attr-accept', 'file-selector']) {
+		dropzoneRequire.resolve(dependency);
+	}
 	const threeEntry = consumerRequire.resolve('@octanejs/three');
 	const threeRequire = createRequire(threeEntry);
 	const threePeerRuntime = realpathSync(threeRequire.resolve('octane'));
@@ -656,9 +783,12 @@ process.stdout.write(JSON.stringify(result));`,
 	}
 	const virtualStoreEntries = readdirSync(path.join(consumerDirectory, 'node_modules/.pnpm'));
 	const installedRuntimes = virtualStoreEntries.filter((entry) => /^octane@/.test(entry));
-	if (installedRuntimes.length !== 1) {
+	// Isolated pnpm installs record the runtime in .pnpm; a hoisted layout records
+	// none there. The concrete directRuntime exists and every binding peer above is
+	// asserted equal to it, so only multiple virtual-store runtimes are invalid.
+	if (installedRuntimes.length > 1) {
 		throw new Error(
-			`expected one physical Octane install, found ${installedRuntimes.length}: ${installedRuntimes.join(', ')}`,
+			`expected one physical Octane install, found multiple virtual-store entries: ${installedRuntimes.join(', ')}`,
 		);
 	}
 
@@ -682,15 +812,16 @@ process.stdout.write(JSON.stringify(result));`,
 		},
 	);
 	const { threeRenderers } = await import(pathToFileURL(threeConfigBundle).href);
-	execFileSync(
-		process.execPath,
-		[repositoryRequire.resolve('typescript/bin/tsc'), '--noEmit', '-p', 'tsconfig.json'],
-		{
-			cwd: consumerDirectory,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.json'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
+	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.nodenext.json'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
 	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);
 	await viteBuild({
 		root: consumerDirectory,
