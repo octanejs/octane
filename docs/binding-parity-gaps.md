@@ -60,6 +60,7 @@ surface and evidence.
 | `@octanejs/streamdown` | 0 |
 | `@octanejs/styled-components` | 0 |
 | `@octanejs/stylex` | 0 |
+| `@octanejs/swr` | 0 |
 | `@octanejs/tanstack-ai` | 0 |
 | `@octanejs/tanstack-devtools` | 0 |
 | `@octanejs/tanstack-form` | 0 |

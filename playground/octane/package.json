@@ -42,6 +42,7 @@
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",
+    "@octanejs/swr": "workspace:*",
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/three": "workspace:*",
     "@octanejs/wagmi": "workspace:*",

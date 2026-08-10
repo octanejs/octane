@@ -103,6 +103,12 @@ try {
 	});
 } catch (error) {
 	errors.push(`Drei parity evidence is invalid: ${error.message}`);
+	verifyPortTestClassifications(REPO, 'swr', {
+		includeUpstream: true,
+		includeTypetests: true,
+	});
+} catch (error) {
+	errors.push(`swr test classifications are invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTypes(REPO);

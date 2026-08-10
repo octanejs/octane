@@ -22,6 +22,7 @@
       "@octanejs/apollo-client",
       "@octanejs/livestore",
       "@octanejs/dexie",
+      "@octanejs/swr",
       "@octanejs/tanstack-query",
       "@octanejs/tanstack-router",
       "@octanejs/tanstack-router-ssr-query",

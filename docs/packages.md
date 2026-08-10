@@ -66,6 +66,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.13` | 6 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.26` | 1 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.33` | 2 |
+| `@octanejs/swr` | [`packages/swr`](../packages/swr) | framework binding | `0.0.1` | 7 |
 | `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.28` | 1 |
 | `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.28` | 1 |
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.28` | 1 |

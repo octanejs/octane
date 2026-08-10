@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "skipLibCheck": true,
+    "customConditions": ["react-server"]
+  },
+  "files": ["react-server.ts"]
+}

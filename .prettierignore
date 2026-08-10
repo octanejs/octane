@@ -128,5 +128,11 @@ packages/tanstack-devtools/tests/_fixtures/*.tsrx
 
 # Byte-exact evidence pinned from input-otp; formatting would invalidate provenance.
 packages/input-otp/upstream/
+
+# SWR's source-near root hook preserves deeply nested generic callbacks from the
+# pinned source. The TSRX Prettier parser is not idempotent for this module.
+packages/swr/src/index/use-swr.tsrx
+packages/swr/src/infinite/infinite.tsrx
+packages/swr/src/mutation/mutation.tsrx
 dist-redact
 .content-collections
