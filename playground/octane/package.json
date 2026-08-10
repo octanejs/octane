@@ -28,6 +28,7 @@
     "@octanejs/gsap": "workspace:*",
     "@octanejs/intersection-observer": "workspace:*",
     "@octanejs/drei": "workspace:*",
+    "@octanejs/input-otp": "workspace:*",
     "@octanejs/livestore": "workspace:*",
     "@octanejs/lucide": "workspace:*",
     "@octanejs/mantine-hooks": "workspace:*",

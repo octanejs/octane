@@ -145,6 +145,12 @@ describe('CI workflow aggregation', () => {
 		}
 	});
 
+	test('keeps all Input OTP browser suites out of sharded unit tests', () => {
+		const shard = jobSource('test_shard');
+		assert.match(shard, /--exclude "packages\/input-otp\/tests\/browser\/\*\*\/\*"/);
+		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
+	});
+
 	test('skips expensive jobs only after the committed scope classifier opts out', () => {
 		assert.match(
 			jobSource('release_change'),

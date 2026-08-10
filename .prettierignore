@@ -125,5 +125,8 @@ packages/tanstack-ai/tests/_fixtures/*.tsrx
 packages/tanstack-devtools/src/*.tsrx
 packages/tanstack-devtools/src/*.tsrx.d.ts
 packages/tanstack-devtools/tests/_fixtures/*.tsrx
+
+# Byte-exact evidence pinned from input-otp; formatting would invalidate provenance.
+packages/input-otp/upstream/
 dist-redact
 .content-collections

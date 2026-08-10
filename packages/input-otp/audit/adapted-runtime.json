@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "project": "input-otp",
+  "roots": ["packages/input-otp/tests"],
+  "files": [
+    "packages/input-otp/tests/conformance/input.test.ts",
+    "packages/input-otp/tests/hydration/input.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:input-otp:0001",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection calls onComplete only when crossing from shorter to maxLength"
+    },
+    {
+      "id": "runtime:input-otp:0002",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection exposes the native input through the public ref"
+    },
+    {
+      "id": "runtime:input-otp:0003",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection forwards disabled and supports disabling the no-script fallback"
+    },
+    {
+      "id": "runtime:input-otp:0004",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection forwards intrinsic props and composes consumer focus, blur, paste, and mouse callbacks"
+    },
+    {
+      "id": "runtime:input-otp:0005",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection keeps controlled value authoritative and exposes render-prop slots"
+    },
+    {
+      "id": "runtime:input-otp:0006",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection projects placeholder, focus, active slot, fake caret, and hover state"
+    },
+    {
+      "id": "runtime:input-otp:0007",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection renders one real input with upstream attributes and context slots"
+    },
+    {
+      "id": "runtime:input-otp:0008",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection updates uncontrolled state through native input and rejects pattern-invalid edits"
+    },
+    {
+      "id": "runtime:input-otp:0009",
+      "file": "packages/input-otp/tests/hydration/input.test.ts",
+      "fullName": "@octanejs/input-otp hydration and cleanup adopts the server input and remains editable"
+    },
+    {
+      "id": "runtime:input-otp:0010",
+      "file": "packages/input-otp/tests/hydration/input.test.ts",
+      "fullName": "@octanejs/input-otp hydration and cleanup removes selection listeners, disconnects observers, and clears timers on unmount"
+    }
+  ]
+}

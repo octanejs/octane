@@ -14,6 +14,7 @@ import { DoomDemo } from './demos/doom/Doom.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { GSAPDemo } from './demos/GSAP.tsrx';
 import { IntersectionObserverDemo } from './demos/IntersectionObserver.tsrx';
+import { InputOTPDemo } from './demos/InputOTP.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
 import { ReactSpringDemo } from './demos/ReactSpring.tsrx';
 import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
@@ -43,6 +44,7 @@ import doomAssetsSource from './demos/doom/assets.ts?raw';
 import inputsSource from './demos/Inputs.tsrx?raw';
 import gsapSource from './demos/GSAP.tsrx?raw';
 import intersectionObserverSource from './demos/IntersectionObserver.tsrx?raw';
+import inputOTPSource from './demos/InputOTP.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
 import reactSpringSource from './demos/ReactSpring.tsrx?raw';
 import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
@@ -154,6 +156,10 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'React Spring',
 				Component: ReactSpringDemo,
 				source: reactSpringSource,
+				id: 'input-otp',
+				title: 'Input OTP',
+				Component: InputOTPDemo,
+				source: inputOTPSource,
 			},
 			{
 				id: 'animejs',

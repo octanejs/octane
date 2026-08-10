@@ -71,6 +71,7 @@
     "description": "Forms, rich-text editing, streaming Markdown, MDX, and translations.",
     "packages": [
       "@octanejs/hook-form",
+      "@octanejs/input-otp",
       "@octanejs/tanstack-form",
       "@octanejs/lexical",
       "@octanejs/tiptap",

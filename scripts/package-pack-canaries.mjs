@@ -60,6 +60,7 @@ export function renderPackedExampleWorkspace(archiveSpecs) {
 export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/cmdk',
 	'@octanejs/floating-ui',
+	'@octanejs/input-otp',
 	'@octanejs/radix',
 	'@octanejs/react-spring',
 	'@octanejs/sonner',
@@ -194,6 +195,7 @@ export function renderPackedTsrxConsumerSource() {
 	return `import { Command } from '@octanejs/cmdk';
 import { animated, useSpring } from '@octanejs/react-spring';
 import { Parallax, ParallaxLayer } from '@octanejs/react-spring/parallax';
+import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 import { toast, Toaster } from '@octanejs/sonner';
 import {
 	Editor,
@@ -244,6 +246,13 @@ export function PublishedSourceConsumer() @{
 			position="bottom-right"
 			style={{ '--consumer-offset': '8px', maxWidth: 360 }}
 		/>
+		<OTPInput
+			maxLength={6}
+			pattern={REGEXP_ONLY_DIGITS}
+			aria-label="Verification code"
+		>
+			<span>Verification slots</span>
+		</OTPInput>
 		<EditorProvider
 			extensions={[]}
 			immediatelyRender={false}
@@ -264,6 +273,7 @@ export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
 import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/react-spring';
 import type { IParallax, ParallaxProps } from '@octanejs/react-spring/parallax';
+import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
 import { Toaster, useSonner, type ToasterProps } from '@octanejs/sonner';
 import {
 	EditorContent,
@@ -286,6 +296,8 @@ const parallaxApiIsPrecise: AssertNotAny<IParallax> = true;
 const springController = new Controller<{ x: number }>({ from: { x: 0 } });
 const springPosition: number = springController.springs.x.get();
 const commandComponentPropsArePrecise: AssertNotAny<Parameters<typeof Command>[0]> = true;
+const otpPropsArePrecise: AssertNotAny<OTPInputProps> = true;
+const otpComponentPropsArePrecise: AssertNotAny<Parameters<typeof OTPInput>[0]> = true;
 const toasterPropsArePrecise: AssertNotAny<ToasterProps> = true;
 const toasterComponentPropsArePrecise: AssertNotAny<Parameters<typeof Toaster>[0]> = true;
 const toastStateIsPrecise: AssertNotAny<ReturnType<typeof useSonner>> = true;
@@ -302,6 +314,8 @@ const customPropertyToast: ToasterProps = {
 
 // @ts-expect-error Command callbacks receive the selected string.
 const invalidCommand: CommandProps = { onValueChange: (value: number) => value };
+// @ts-expect-error maxLength is required.
+const invalidOtp: OTPInputProps = { children: 'slots' };
 // @ts-expect-error Toast positions must remain the published position union.
 const invalidToaster: ToasterProps = { position: 'middle-center' };
 // @ts-expect-error Native CSS properties cannot accept arbitrary booleans.
@@ -325,6 +339,7 @@ export const verifiedPublishedTypes = {
 	editorComponentPropsArePrecise,
 	editorPropsArePrecise,
 	invalidCommand,
+	invalidOtp,
 	invalidEditorContent,
 	invalidTiptapContent,
 	invalidToastCustomProperty,
@@ -337,6 +352,8 @@ export const verifiedPublishedTypes = {
 	springController,
 	springPosition,
 	springValueIsPrecise,
+	otpComponentPropsArePrecise,
+	otpPropsArePrecise,
 	tiptapContentPropsArePrecise,
 	toastStateIsPrecise,
 	toasterComponentPropsArePrecise,

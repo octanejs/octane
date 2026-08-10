@@ -5344,6 +5344,94 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'input-otp-pristine-browser',
+					include: ['packages/input-otp/tests/pristine/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+				testExecution: { group: 'react-parity' },
+			},
+			{
+				test: {
+					name: 'input-otp-differential',
+					include: ['packages/input-otp/tests/differential/**/*.test.tsx'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/input-otp$/,
+							replacement: resolve(import.meta.dirname, 'packages/input-otp/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'input-otp',
+					include: [
+						'packages/input-otp/tests/conformance/**/*.test.ts',
+						'packages/input-otp/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/input-otp$/,
+							replacement: resolve(import.meta.dirname, 'packages/input-otp/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'input-otp-server',
+					include: ['packages/input-otp/tests/ssr/**/*.server.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/input-otp$/,
+							replacement: resolve(import.meta.dirname, 'packages/input-otp/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'input-otp-browser',
+					include: [
+						'packages/input-otp/tests/browser/**/*.spec.ts',
+						'packages/input-otp/tests/browser/**/*.browser.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+				testExecution: { group: 'react-parity' },
+			},
+			{
+				test: {
 					name: 'website-mcp-unit',
 					include: ['website-mcp/tests/**/*.test.ts'],
 					exclude: ['website-mcp/tests/built-handler.e2e.test.ts'],
