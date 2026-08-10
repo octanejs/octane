@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/wojtekmaj/react-pdf.git",
+    "version": "10.4.1",
+    "commit": "5338e7a24c7ad17d1028146cf8a025a75e0abe79",
+    "sourceRoot": "packages/react-pdf/src",
+    "testRoot": "packages/react-pdf/src",
+    "license": "MIT",
+    "integrity": "sha256:afc69e121c7f845dbc6bf88e584c5a7a74154c3e2b89c35ce42b3b3bb93d86ce",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/pdf/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/pdf/tests/runtime"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 10,
+    "uniqueIdentities": 10,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "cc4e3fd313734d1340da61e3b4d7f97e5147d7fa407982548ac8b0a473dde958"
+    }
+  },
+  "lanes": [
+    {
+      "id": "pdf-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pdf-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact react-pdf 10.4.1 Vitest browser suite against the vendored React binding and checks every passed identity against the committed inventory.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/pdf/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/pdf/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "00b42c967bfb11af931a146fa727cd2e329440aa26d226bb2b270df1c4f98fb1"
+        },
+        {
+          "path": "packages/pdf/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "7ee0306e0376b94f9342e6e3c7a1b12eef9871f73e7be31f0099208de379d9fa"
+        },
+        {
+          "path": "packages/pdf/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "e74ebe1371913b274207d6dd71d6b4f3122914d35ec5a2b958d500e1786cb446"
+        },
+        {
+          "path": "scripts/react-parity/pdf-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "6a874a62d093d6618b84a74d050ce59317fa8de9097538b4e6009f9f812f9390"
+        },
+        {
+          "path": "packages/pdf/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "d155a5536d000a8cfc0ef0ff3ffb8500df5a72b7d5adf498688ace5c6e42d081"
+        },
+        {
+          "path": "packages/pdf/upstream/support/test-utils.ts",
+          "role": "support",
+          "sha256": "5067a04350acefaa99f177c4dd8d22ec8bbee274003f49986f8cfad521959c4d"
+        }
+      ]
+    },
+    {
+      "id": "pdf-adapted-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pdf",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the one-for-one adapted private upstream helpers; remaining upstream identities are explicit pending-adaptation dispositions in audit/case-map.json.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/pdf/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/pdf/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "cf02180f1e4992d024b8f3ee84bc35ab66b5f597478100eeb772627a4ea40c81"
+        },
+        {
+          "path": "packages/pdf/tests/runtime/private-evidence.test.ts",
+          "role": "support",
+          "sha256": "a077efb37bdf8356af40f431730113b9b20699a296b39cfeefd3bedbd0a9f430"
+        }
+      ]
+    },
+    {
+      "id": "pdf-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pdf-parity",
+      "evidenceOrigin": "repo-authored",
+      "files": [
+        {
+          "path": "packages/pdf/tests/parity/shells.test.ts",
+          "role": "test",
+          "sha256": "3f8a65099a6c41f154d7158b2cb5a6ce32988e7a6e076c29130a442e08b7ef10",
+          "cases": [
+            {
+              "id": "differential:react-pdf-document-shells",
+              "testName": "matches Document no-data and loading server markup",
+              "fullName": "@octanejs/pdf pristine React shell parity matches Document no-data and loading server markup"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pdf-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pdf-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Executes the paired pristine type probe in typetests/tsconfig.pristine.json against the pinned react-pdf React type oracle, including positive assertions and negative @ts-expect-error controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/pdf/typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/pdf/typetests/pristine.test.tsx",
+          "role": "test",
+          "sha256": "a3ab4df7fcaafb24fb00caa7d02e2a326b2d6b08863f9d041e0e865884b4b703",
+          "cases": [
+            {
+              "id": "types:pdf-pristine",
+              "testName": "paired pristine type probe",
+              "fullName": "react-pdf paired pristine type probe"
+            }
+          ]
+        },
+        {
+          "path": "packages/pdf/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "07d6d72bb1fc14016203ad4c6e307486a10be8179be0948c9ac0acd4ff072c9d"
+        },
+        {
+          "path": "packages/pdf/typetests/assertions.md",
+          "role": "support",
+          "sha256": "8772a387d0bf490e5e824a7dcabcd7f9cbea4d348fb3789fa94bf49b338e1ba4"
+        }
+      ]
+    },
+    {
+      "id": "pdf-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pdf-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Executes the paired adapted type probes in typetests/tsconfig.adapted.json against @octanejs/pdf, including positive assertions and negative @ts-expect-error controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/pdf/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/pdf/typetests/adapted.test.tsrx",
+          "role": "test",
+          "sha256": "5ac2315896c5ce3e3cb00aa286938b2a2163e87aef0d066ff8cd37e29a2fd1c0",
+          "cases": [
+            {
+              "id": "types:pdf-adapted",
+              "testName": "paired adapted type probe",
+              "fullName": "@octanejs/pdf paired adapted type probe"
+            }
+          ]
+        },
+        {
+          "path": "packages/pdf/typetests/adapted-negative.test.ts",
+          "role": "test",
+          "sha256": "8f95cb1b1c6675d6ceeb974adc00f9661def54f74e40ab35bc5003ad8bd43c2c",
+          "cases": [
+            {
+              "id": "types:pdf-adapted-negative",
+              "testName": "paired adapted negative type controls",
+              "fullName": "@octanejs/pdf paired adapted negative type controls"
+            }
+          ]
+        },
+        {
+          "path": "packages/pdf/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "5a081a84d2df9cd17439d1df3f298afe891e107c8c56183d873034a59159fd0d"
+        },
+        {
+          "path": "packages/pdf/typetests/assertions.md",
+          "role": "support",
+          "sha256": "8772a387d0bf490e5e824a7dcabcd7f9cbea4d348fb3789fa94bf49b338e1ba4"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "pdf-octane-node-ref-event-types",
+      "caseIds": ["differential:react-pdf-document-shells"],
+      "upstreamResult": "React's public declarations use ReactNode, React ref types, synthetic event types, and React CSS property types.",
+      "octaneResult": "The binding declares OctaneNode, refs-as-props, native DOM events, and Octane class/style values.",
+      "rationale": "Octane deliberately exposes native event and ref-prop contracts instead of React's synthetic and forwardRef-oriented types.",
+      "classification": "intentional-framework-divergence",
+      "consumerImpact": "Type-only React node, ref, event, and CSS annotations need Octane equivalents when migrating an application.",
+      "migrationGuidance": "Use OctaneNode, plain ref props, native event types, and Octane-supported class/style values.",
+      "owner": "@octanejs/pdf",
+      "reviewCondition": "Revisit if Octane adopts a compatibility type layer without changing native runtime semantics."
+    },
+    {
+      "id": "pdf-star-export-surface",
+      "caseIds": ["types:pdf-adapted"],
+      "upstreamResult": "The upstream package's permissive wildcard exposes implementation and source artifacts through undocumented deep imports.",
+      "octaneResult": "The binding supports only the root entry point and the two documented CSS subpaths.",
+      "rationale": "Framework-private upstream implementation artifacts are pinned as audit evidence, not public Octane API.",
+      "classification": "intentional-public-surface-divergence",
+      "consumerImpact": "Consumers relying on undocumented react-pdf deep imports must migrate to documented root exports or CSS paths.",
+      "migrationGuidance": "Import public symbols from @octanejs/pdf and styles only from the documented CSS subpaths.",
+      "owner": "@octanejs/pdf",
+      "reviewCondition": "Revisit only when a documented upstream subpath becomes a supported binding export."
+    }
+  ]
+}

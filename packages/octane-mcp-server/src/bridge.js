@@ -43,6 +43,7 @@ export const KNOWN_BINDINGS = {
 	cmdk: '@octanejs/cmdk',
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
+	'react-pdf': '@octanejs/pdf',
 	'@monaco-editor/react': '@octanejs/monaco-editor',
 	'lucide-react': '@octanejs/lucide',
 	'@phosphor-icons/react': '@octanejs/phosphor-icons',

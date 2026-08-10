@@ -22,6 +22,7 @@ import { verifyEmblaCarouselTestClassifications } from './embla-carousel-classif
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
 import { verifyReactTransitionGroupTypes } from './react-transition-group-types-lib.mjs';
 import { verifyReactTransitionGroupTestClassifications } from './react-transition-group-classifications-lib.mjs';
+import { verifyPdfTestClassifications } from './pdf-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
 import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
@@ -368,6 +369,9 @@ try {
 	verifyPopperTestClassifications(REPO);
 } catch (error) {
 	errors.push(`@octanejs/popper test classifications are invalid: ${error.message}`);
+	verifyPdfTestClassifications(REPO);
+} catch (error) {
+	errors.push(`pdf test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

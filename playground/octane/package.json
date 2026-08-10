@@ -47,6 +47,7 @@
     "@octanejs/react-draggable": "workspace:*",
     "@octanejs/colorful": "workspace:*",
     "@octanejs/popper": "workspace:*",
+    "@octanejs/pdf": "workspace:*",
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",
@@ -61,6 +62,7 @@
     "clsx": "catalog:default",
     "gsap": "catalog:default",
     "octane": "workspace:*",
+    "pdfjs-dist": "5.4.296",
     "rxjs": "catalog:default",
     "tailwind-merge": "catalog:default",
     "three": "catalog:default"

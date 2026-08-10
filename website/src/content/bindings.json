@@ -84,6 +84,7 @@
       "@octanejs/tiptap",
       "@octanejs/markdown",
       "@octanejs/streamdown",
+      "@octanejs/pdf",
       "@octanejs/monaco-editor",
       "@octanejs/syntax-highlighter",
       "@octanejs/mdx",

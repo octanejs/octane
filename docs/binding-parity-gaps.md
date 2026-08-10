@@ -45,6 +45,7 @@ surface and evidence.
 | `@octanejs/monaco-editor` | 0 |
 | `@octanejs/motion` | 0 |
 | `@octanejs/nuqs` | 0 |
+| `@octanejs/pdf` | 0 |
 | `@octanejs/phosphor-icons` | 0 |
 | `@octanejs/popper` | 0 |
 | `@octanejs/radix` | 0 |

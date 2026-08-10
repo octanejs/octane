@@ -1,0 +1,1001 @@
+{
+  "schemaVersion": 1,
+  "project": "pdf-pristine",
+  "roots": ["packages/pdf/upstream/tag"],
+  "files": [
+    "packages/pdf/upstream/tag/src/Document.spec.tsx",
+    "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+    "packages/pdf/upstream/tag/src/OutlineItem.spec.tsx",
+    "packages/pdf/upstream/tag/src/Page.spec.tsx",
+    "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+    "packages/pdf/upstream/tag/src/Page/Canvas.spec.tsx",
+    "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+    "packages/pdf/upstream/tag/src/Ref.spec.ts",
+    "packages/pdf/upstream/tag/src/StructTree.spec.tsx",
+    "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+    "packages/pdf/upstream/tag/src/index.spec.ts",
+    "packages/pdf/upstream/tag/src/shared/utils.spec.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:4a2623da8ad25d21",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document calls onClick callback when clicked a document (sample of mouse events family)"
+    },
+    {
+      "id": "runtime:90d28b5d043cdc29",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document calls onTouchStart callback when touched a document (sample of touch events family)"
+    },
+    {
+      "id": "runtime:281049cd803798f3",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document does not throw an error on unmount"
+    },
+    {
+      "id": "runtime:773dbc1159f87ee3",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document does not warn if file prop was memoized"
+    },
+    {
+      "id": "runtime:4b906d28a310e4fa",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document does not warn if file prop was not memoized, but was changed"
+    },
+    {
+      "id": "runtime:85b81292ed96c440",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document does not warn if options prop was memoized"
+    },
+    {
+      "id": "runtime:cd603d0ea2d2ad44",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document does not warn if options prop was not memoized, but was changed"
+    },
+    {
+      "id": "runtime:5dfbb496d37f66dd",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkRel = 'nofollow' given externalLinkRel prop = 'nofollow'"
+    },
+    {
+      "id": "runtime:f1a9637e89d9281a",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkRel = 'noopener noreferrer nofollow' given externalLinkRel prop = null"
+    },
+    {
+      "id": "runtime:ac1afc9f5380f507",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkRel = 'noopener' given externalLinkRel prop = 'noopener'"
+    },
+    {
+      "id": "runtime:9500eacf1269c477",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkRel = 'noreferrer' given externalLinkRel prop = 'noreferrer'"
+    },
+    {
+      "id": "runtime:81849937c6403050",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkTarget = '' given externalLinkTarget prop = null"
+    },
+    {
+      "id": "runtime:486a2acd07d31179",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkTarget = '_blank' given externalLinkTarget prop = '_blank'"
+    },
+    {
+      "id": "runtime:21d04aae9b297f3f",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkTarget = '_parent' given externalLinkTarget prop = '_parent'"
+    },
+    {
+      "id": "runtime:b2af12b1958506d7",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkTarget = '_self' given externalLinkTarget prop = '_self'"
+    },
+    {
+      "id": "runtime:9ea63395016eaeea",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document linkService returns externalLinkTarget = '_top' given externalLinkTarget prop = '_top'"
+    },
+    {
+      "id": "runtime:48c1551ce0e1ccfc",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading fails to load a file and calls onSourceError given invalid file source"
+    },
+    {
+      "id": "runtime:5c8cb27cc9735259",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading loads a file and calls onSourceSuccess and onLoadSuccess callbacks via ArrayBuffer properly"
+    },
+    {
+      "id": "runtime:374d0cad2f79e5c9",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading loads a file and calls onSourceSuccess and onLoadSuccess callbacks via Blob properly"
+    },
+    {
+      "id": "runtime:2234a6a9102b09e6",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading loads a file and calls onSourceSuccess and onLoadSuccess callbacks via File properly"
+    },
+    {
+      "id": "runtime:d7a3133d2e364a7f",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading loads a file and calls onSourceSuccess and onLoadSuccess callbacks via data URI properly"
+    },
+    {
+      "id": "runtime:10b88351a095fa3a",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading loads a file and calls onSourceSuccess and onLoadSuccess callbacks via data URI properly (param object)"
+    },
+    {
+      "id": "runtime:6eac08b50549e1de",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document loading replaces a file properly"
+    },
+    {
+      "id": "runtime:883270601cd5fdc1",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering applies className to its wrapper when given a string"
+    },
+    {
+      "id": "runtime:18ca1f3f4a676eb7",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering does not overwrite renderMode prop in its children when given renderMode prop to both Document and its children"
+    },
+    {
+      "id": "runtime:cbd779dc5a9926e6",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering does not overwrite rotate prop in its children when given rotate prop to both Document and its children"
+    },
+    {
+      "id": "runtime:8d6946bb319626e6",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering does not overwrite scale prop in its children when given scale prop to both Document and its children"
+    },
+    {
+      "id": "runtime:a15b05118b615dcf",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering passes container element to inputRef properly"
+    },
+    {
+      "id": "runtime:95c6596c65532096",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering passes renderMode prop to its children"
+    },
+    {
+      "id": "runtime:f583d2170d19dd95",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering passes rotate prop to its children"
+    },
+    {
+      "id": "runtime:0ee74c3b8e57a487",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering passes scale prop to its children"
+    },
+    {
+      "id": "runtime:89df5a66f878cb8b",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders \"Failed to load PDF file.\" when failed to load a document"
+    },
+    {
+      "id": "runtime:21a3f512348e3824",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders \"Loading PDF…\" when loading a file"
+    },
+    {
+      "id": "runtime:7613f7f30e1a4a91",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders \"No PDF file specified.\" when given nothing"
+    },
+    {
+      "id": "runtime:b015390da62cacae",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders custom error message when failed to load a document and error prop is given"
+    },
+    {
+      "id": "runtime:a7ae41f50f0e0a5d",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders custom error message when failed to load a document and error prop is given as a function"
+    },
+    {
+      "id": "runtime:0fc6e451e8ad273f",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders custom loading message when loading a file and loading prop is given"
+    },
+    {
+      "id": "runtime:5c05bab6a4c84865",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders custom loading message when loading a file and loading prop is given as a function"
+    },
+    {
+      "id": "runtime:4dcb8bb6a8be4971",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders custom no data message when given nothing and noData prop is given"
+    },
+    {
+      "id": "runtime:7748a55008f7f6df",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering renders custom no data message when given nothing and noData prop is given as a function"
+    },
+    {
+      "id": "runtime:9eb839e823c398a7",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document rendering supports function as children"
+    },
+    {
+      "id": "runtime:6f6ab3d47826d6d4",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document viewer attempts to find a page and scroll it into view if onItemClick is not given"
+    },
+    {
+      "id": "runtime:4c5feb2e9f9425b4",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document viewer calls onItemClick if defined"
+    },
+    {
+      "id": "runtime:c1f342b56dbfa287",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document warns if file prop was not memoized"
+    },
+    {
+      "id": "runtime:b521195d40cbc1b9",
+      "file": "packages/pdf/upstream/tag/src/Document.spec.tsx",
+      "fullName": "Document warns if options prop was not memoized"
+    },
+    {
+      "id": "runtime:334a1bdefe0010cc",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline loading calls onLoadError when failed to load an outline"
+    },
+    {
+      "id": "runtime:8f9eb7e4219b33d1",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline loading loads an outline and calls onLoadSuccess callback properly when pdf prop is passed"
+    },
+    {
+      "id": "runtime:34ac61fd127d52cc",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline loading loads an outline and calls onLoadSuccess callback properly when placed inside Document"
+    },
+    {
+      "id": "runtime:1bddf511fae3be3d",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline loading replaces an outline properly when pdf is changed"
+    },
+    {
+      "id": "runtime:ca9a357513da2774",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline loading throws an error when placed outside Document without pdf prop passed"
+    },
+    {
+      "id": "runtime:bd01b8a94ce88ddf",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline rendering applies className to its wrapper when given a string"
+    },
+    {
+      "id": "runtime:6580527129402166",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline rendering passes container element to inputRef properly"
+    },
+    {
+      "id": "runtime:4d639422a8a05fbb",
+      "file": "packages/pdf/upstream/tag/src/Outline.spec.tsx",
+      "fullName": "Outline rendering renders OutlineItem components properly"
+    },
+    {
+      "id": "runtime:3e9e3698e02b4a1c",
+      "file": "packages/pdf/upstream/tag/src/OutlineItem.spec.tsx",
+      "fullName": "OutlineItem rendering calls onItemClick with proper arguments multiple times when clicked a link multiple times"
+    },
+    {
+      "id": "runtime:9369a6f6861f0856",
+      "file": "packages/pdf/upstream/tag/src/OutlineItem.spec.tsx",
+      "fullName": "OutlineItem rendering calls onItemClick with proper arguments when clicked a link"
+    },
+    {
+      "id": "runtime:e4a2d884cba6277f",
+      "file": "packages/pdf/upstream/tag/src/OutlineItem.spec.tsx",
+      "fullName": "OutlineItem rendering renders an item properly"
+    },
+    {
+      "id": "runtime:91a04d6cc369f38a",
+      "file": "packages/pdf/upstream/tag/src/OutlineItem.spec.tsx",
+      "fullName": "OutlineItem rendering renders item's subitems properly"
+    },
+    {
+      "id": "runtime:d733dee389cd06af",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page calls onClick callback when clicked a page (sample of mouse events family)"
+    },
+    {
+      "id": "runtime:b52c42733fd491b6",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page calls onTouchStart callback when touched a page (sample of touch events family)"
+    },
+    {
+      "id": "runtime:49ad8afaa0f35660",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page handles rotated page dimensions correctly in onLoadPage callback"
+    },
+    {
+      "id": "runtime:3f6e45d34cd8e77f",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading calls onLoadError when failed to load a page"
+    },
+    {
+      "id": "runtime:a1dd4907d8738a00",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading calls registerPage when loaded a page"
+    },
+    {
+      "id": "runtime:ece52e9538ddc565",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading calls unregisterPage on unmount"
+    },
+    {
+      "id": "runtime:7b423ccb360f0ca7",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading loads a page and calls onLoadSuccess callback properly when pdf prop is passed"
+    },
+    {
+      "id": "runtime:7b9d33e19bb8a3da",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading loads a page and calls onLoadSuccess callback properly when placed inside Document"
+    },
+    {
+      "id": "runtime:727ee6f6afe27e4f",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading loads page of a given number when given conflicting pageNumber and pageIndex"
+    },
+    {
+      "id": "runtime:d2424fd0360c1ea1",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading loads page when given pageIndex"
+    },
+    {
+      "id": "runtime:47fccb1afa5f5c28",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading loads page when given pageNumber"
+    },
+    {
+      "id": "runtime:3e505fe6c44b77d6",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading replaces a page properly when pageNumber is changed"
+    },
+    {
+      "id": "runtime:f121f1fe1eefa656",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading replaces a page properly when pdf is changed"
+    },
+    {
+      "id": "runtime:1ae2e5f3732f8e9a",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading returns all desired parameters in onLoadSuccess callback"
+    },
+    {
+      "id": "runtime:aee672c51ae6d6cc",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page loading throws an error when placed outside Document without pdf prop passed"
+    },
+    {
+      "id": "runtime:62fa7be2fcfa4c94",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering applies className to its wrapper when given a string"
+    },
+    {
+      "id": "runtime:8ef336aebd5e41c2",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering does not request annotations to be rendered when given renderAnnotationLayer = false"
+    },
+    {
+      "id": "runtime:7d517172ce56d394",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering does not request text content to be rendered when given renderTextLayer = false"
+    },
+    {
+      "id": "runtime:625f10b792dc3511",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering ignores pageIndex when given pageIndex and pageNumber"
+    },
+    {
+      "id": "runtime:a142b7977096a947",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering passes canvas element to Canvas properly"
+    },
+    {
+      "id": "runtime:1837825533a5a888",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering passes container element to inputRef properly"
+    },
+    {
+      "id": "runtime:df9f35a356382f19",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders \"Loading page…\" when loading a page"
+    },
+    {
+      "id": "runtime:8279f6a86e13677c",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders \"No page specified.\" when given neither pageIndex nor pageNumber"
+    },
+    {
+      "id": "runtime:b98211089a2f09e5",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders TextLayer when given renderMode = \"canvas\""
+    },
+    {
+      "id": "runtime:e600905d7741173d",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders TextLayer when given renderMode = \"custom\""
+    },
+    {
+      "id": "runtime:89b82341f1c4d139",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders custom loading message when loading a page and loading prop is given"
+    },
+    {
+      "id": "runtime:1c41a7a584dc1598",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders custom loading message when loading a page and loading prop is given as a function"
+    },
+    {
+      "id": "runtime:48771cfdd813707e",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders custom no data message when given nothing and noData is given"
+    },
+    {
+      "id": "runtime:8183bbf6f9fb37ec",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering renders custom no data message when given nothing and noData is given as a function"
+    },
+    {
+      "id": "runtime:f1565606d0c80114",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests annotations to be rendered by default"
+    },
+    {
+      "id": "runtime:8a4d9e9c4cc6ae5e",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests annotations to be rendered when given renderAnnotationLayer = true"
+    },
+    {
+      "id": "runtime:2f26e31ee4cde74d",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests page not to be rendered when given renderMode = \"none\""
+    },
+    {
+      "id": "runtime:f046cdd9cb4335b1",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests page to be rendered in canvas mode by default"
+    },
+    {
+      "id": "runtime:fadb5d7083f5bfd4",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests page to be rendered in canvas mode when given renderMode = \"canvas\""
+    },
+    {
+      "id": "runtime:cabe71c25ea9e63a",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests page to be rendered in custom mode when given renderMode = \"custom\""
+    },
+    {
+      "id": "runtime:de08ff7dd42a6760",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests page to be rendered with default rotation when given nothing"
+    },
+    {
+      "id": "runtime:e817aca7bd97ecd0",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests page to be rendered with given rotation when given rotate prop"
+    },
+    {
+      "id": "runtime:0aa447912a0a3f50",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests text content to be rendered by default"
+    },
+    {
+      "id": "runtime:3273a657e694c50c",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering requests text content to be rendered when given renderTextLayer = true"
+    },
+    {
+      "id": "runtime:2c6d3ac8b2e6b5b1",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page rendering supports function as children"
+    },
+    {
+      "id": "runtime:e333329db580ff15",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered at its original size given nothing"
+    },
+    {
+      "id": "runtime:220a4456abc0b4b9",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given height"
+    },
+    {
+      "id": "runtime:ae12ef8563256ff8",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given height and scale (multiplies)"
+    },
+    {
+      "id": "runtime:33b61cb5f41cb5ca",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given scale"
+    },
+    {
+      "id": "runtime:30d5338bf2ab33c4",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given width"
+    },
+    {
+      "id": "runtime:232b83a8aec6de3c",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given width and height (ignores height)"
+    },
+    {
+      "id": "runtime:184887775063880f",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given width and scale (multiplies)"
+    },
+    {
+      "id": "runtime:3daa24b8b2fe0e0f",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with a proper scale when given width, height and scale (ignores height, multiplies)"
+    },
+    {
+      "id": "runtime:d58c554be697bb1d",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered with forms given renderForms = true"
+    },
+    {
+      "id": "runtime:17efb0c53b97f151",
+      "file": "packages/pdf/upstream/tag/src/Page.spec.tsx",
+      "fullName": "Page requests page to be rendered without forms by default"
+    },
+    {
+      "id": "runtime:14b9fdce88c413e9",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer loading calls onGetAnnotationsError when failed to load annotations"
+    },
+    {
+      "id": "runtime:60dd65bbedd0ff9b",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer loading loads annotations and calls onGetAnnotationsSuccess callback properly"
+    },
+    {
+      "id": "runtime:f8abe9125443b169",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer loading replaces annotations properly when page is changed"
+    },
+    {
+      "id": "runtime:0309046fc340446e",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer loading throws an error when placed outside Page"
+    },
+    {
+      "id": "runtime:c406f9d5a72f8d73",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with rel 'noopener noreferrer nofollow' given externalLinkRel = null"
+    },
+    {
+      "id": "runtime:ad779ca6f165ba59",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with rel 'noopener' given externalLinkRel = 'noopener'"
+    },
+    {
+      "id": "runtime:b3cced7857291a99",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with target '' given externalLinkTarget = null"
+    },
+    {
+      "id": "runtime:6d453bac307c117b",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with target '_blank' given externalLinkTarget = '_blank'"
+    },
+    {
+      "id": "runtime:2202dd15958215ec",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with target '_parent' given externalLinkTarget = '_parent'"
+    },
+    {
+      "id": "runtime:3dd4d6c8bdeee186",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with target '_self' given externalLinkTarget = '_self'"
+    },
+    {
+      "id": "runtime:9774737a8c2fa95d",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders all links with target '_top' given externalLinkTarget = '_top'"
+    },
+    {
+      "id": "runtime:1fa167fc900a8839",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders annotations properly"
+    },
+    {
+      "id": "runtime:4af896cd58fcd9b6",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders annotations with the default imageResourcesPath given no imageResourcesPath"
+    },
+    {
+      "id": "runtime:0347b42d81dcb580",
+      "file": "packages/pdf/upstream/tag/src/Page/AnnotationLayer.spec.tsx",
+      "fullName": "AnnotationLayer rendering renders annotations with the specified imageResourcesPath given imageResourcesPath"
+    },
+    {
+      "id": "runtime:1c9e0c377568cd33",
+      "file": "packages/pdf/upstream/tag/src/Page/Canvas.spec.tsx",
+      "fullName": "Canvas loading calls onRenderError when failed to render canvas"
+    },
+    {
+      "id": "runtime:c595fe25560bad10",
+      "file": "packages/pdf/upstream/tag/src/Page/Canvas.spec.tsx",
+      "fullName": "Canvas loading renders a page and calls onRenderSuccess callback properly"
+    },
+    {
+      "id": "runtime:607bb4232881e3d4",
+      "file": "packages/pdf/upstream/tag/src/Page/Canvas.spec.tsx",
+      "fullName": "Canvas rendering does not request structure tree to be rendered when renderTextLayer = false"
+    },
+    {
+      "id": "runtime:0830f3972fc9abf0",
+      "file": "packages/pdf/upstream/tag/src/Page/Canvas.spec.tsx",
+      "fullName": "Canvas rendering passes canvas element to canvasRef properly"
+    },
+    {
+      "id": "runtime:b77d13ad3e5e1cb1",
+      "file": "packages/pdf/upstream/tag/src/Page/Canvas.spec.tsx",
+      "fullName": "Canvas rendering renders StructTree when given renderTextLayer = true"
+    },
+    {
+      "id": "runtime:0269238bda584de7",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer loading calls onGetTextError when failed to load text content"
+    },
+    {
+      "id": "runtime:700122550a35f3b7",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer loading loads text content and calls onGetTextSuccess callback properly"
+    },
+    {
+      "id": "runtime:f32f0fd1ea9f3c38",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer loading replaces text content properly"
+    },
+    {
+      "id": "runtime:7291e2f3fbb42e7f",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer loading throws an error when placed outside Page"
+    },
+    {
+      "id": "runtime:3473457ca3ffce69",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering calls customTextRenderer with necessary arguments"
+    },
+    {
+      "id": "runtime:a5474e4e9f4e7e13",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering does not execute scripts from customTextRenderer output"
+    },
+    {
+      "id": "runtime:d9b8c174f1fb298f",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering does not render blocked tags from customTextRenderer output"
+    },
+    {
+      "id": "runtime:b8e003f51a0d2ffa",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering maps textContent items to actual TextLayer children properly"
+    },
+    {
+      "id": "runtime:bc308ad7302231bf",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering renders HTML formatting from customTextRenderer output"
+    },
+    {
+      "id": "runtime:f6296b0dbdf873a6",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering renders text content properly"
+    },
+    {
+      "id": "runtime:b672fd0abdb90a23",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering renders text content properly given customTextRenderer"
+    },
+    {
+      "id": "runtime:b672fd0abdb90a23:2",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering renders text content properly given customTextRenderer"
+    },
+    {
+      "id": "runtime:f35bb7da5b05c612",
+      "file": "packages/pdf/upstream/tag/src/Page/TextLayer.spec.tsx",
+      "fullName": "TextLayer rendering renders text content properly given customTextRenderer and untagged document"
+    },
+    {
+      "id": "runtime:38d3fcf03ee38aaa",
+      "file": "packages/pdf/upstream/tag/src/Ref.spec.ts",
+      "fullName": "Ref returns proper reference for given num and gen"
+    },
+    {
+      "id": "runtime:8f5e7b1fa263255f",
+      "file": "packages/pdf/upstream/tag/src/Ref.spec.ts",
+      "fullName": "Ref returns proper reference for given num and gen when gen = 0"
+    },
+    {
+      "id": "runtime:765d1fa1b578bd2f",
+      "file": "packages/pdf/upstream/tag/src/StructTree.spec.tsx",
+      "fullName": "StructTree loading calls onGetStructTreeError when failed to load annotations"
+    },
+    {
+      "id": "runtime:e2e21e32d63e480f",
+      "file": "packages/pdf/upstream/tag/src/StructTree.spec.tsx",
+      "fullName": "StructTree loading loads structure tree and calls onGetStructTreeSuccess callback properly"
+    },
+    {
+      "id": "runtime:0ca12a6769c67be2",
+      "file": "packages/pdf/upstream/tag/src/StructTree.spec.tsx",
+      "fullName": "StructTree loading replaces structure tree properly when page is changed"
+    },
+    {
+      "id": "runtime:9edabd373d011ff1",
+      "file": "packages/pdf/upstream/tag/src/StructTree.spec.tsx",
+      "fullName": "StructTree loading throws an error when placed outside Page"
+    },
+    {
+      "id": "runtime:10c5cacc853115a4",
+      "file": "packages/pdf/upstream/tag/src/StructTree.spec.tsx",
+      "fullName": "StructTree rendering renders structure tree properly"
+    },
+    {
+      "id": "runtime:83118cab6064c6f0",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail calls onClick callback when clicked a page (sample of mouse events family)"
+    },
+    {
+      "id": "runtime:8d52c2cbf42f6560",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail calls onTouchStart callback when touched a page (sample of touch events family)"
+    },
+    {
+      "id": "runtime:c2f1949ad71db142",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading calls onLoadError when failed to load a page"
+    },
+    {
+      "id": "runtime:8004f33d19a40294",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading loads a page and calls onLoadSuccess callback properly when pdf prop is passed"
+    },
+    {
+      "id": "runtime:25b70f7d70ee38fa",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading loads a page and calls onLoadSuccess callback properly when placed inside Document"
+    },
+    {
+      "id": "runtime:eea28cedf82c0260",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading loads page of a given number when given conflicting pageNumber and pageIndex"
+    },
+    {
+      "id": "runtime:5203c2a6e6466e32",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading loads page when given pageIndex"
+    },
+    {
+      "id": "runtime:e0cacf061a1c83c7",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading loads page when given pageNumber"
+    },
+    {
+      "id": "runtime:bc0bbd8a188917c7",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading replaces a page properly when pageNumber is changed"
+    },
+    {
+      "id": "runtime:a5af8e44daeea121",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading replaces a page properly when pdf is changed"
+    },
+    {
+      "id": "runtime:04cc891b450f533d",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading returns all desired parameters in onLoadSuccess callback"
+    },
+    {
+      "id": "runtime:48fe74814b3531f6",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail loading throws an error when placed outside Document without pdf prop passed"
+    },
+    {
+      "id": "runtime:c4d41be796066287",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering applies className to its wrapper when given a string"
+    },
+    {
+      "id": "runtime:dcd0b8af93811173",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering ignores pageIndex when given pageIndex and pageNumber"
+    },
+    {
+      "id": "runtime:cd26ddb1c0cd8fe0",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering passes canvas element to ThumbnailCanvas properly"
+    },
+    {
+      "id": "runtime:602132bb6d25ceb7",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering passes container element to inputRef properly"
+    },
+    {
+      "id": "runtime:081fc210df5146b3",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering renders \"Loading page…\" when loading a page"
+    },
+    {
+      "id": "runtime:4a1ad448cd215100",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering renders \"No page specified.\" when given neither pageIndex nor pageNumber"
+    },
+    {
+      "id": "runtime:8b5dfba57d4fe7ae",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering renders custom loading message when loading a page and loading prop is given"
+    },
+    {
+      "id": "runtime:afad2e63f12af678",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering renders custom loading message when loading a page and loading prop is given as a function"
+    },
+    {
+      "id": "runtime:ca57df24dfbfef88",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering renders custom no data message when given nothing and noData is given"
+    },
+    {
+      "id": "runtime:0d3fb97a7c267c21",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering renders custom no data message when given nothing and noData is given as a function"
+    },
+    {
+      "id": "runtime:dace392c26072fd9",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering requests page not to be rendered when given renderMode = \"none\""
+    },
+    {
+      "id": "runtime:79540f604189e1f1",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering requests page to be rendered in canvas mode by default"
+    },
+    {
+      "id": "runtime:15992ac5cc88f9be",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering requests page to be rendered in canvas mode when given renderMode = \"canvas\""
+    },
+    {
+      "id": "runtime:0f64182c8a4ad2a8",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering requests page to be rendered in custom mode when given renderMode = \"custom\""
+    },
+    {
+      "id": "runtime:677f77aeb48c9539",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering requests page to be rendered with default rotation when given nothing"
+    },
+    {
+      "id": "runtime:7b9acef3e70ee0c7",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail rendering requests page to be rendered with given rotation when given rotate prop"
+    },
+    {
+      "id": "runtime:9067c10f908d79c8",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered at its original size given nothing"
+    },
+    {
+      "id": "runtime:9283df7357b237da",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given height"
+    },
+    {
+      "id": "runtime:079c993182764ab9",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given height and scale (multiplies)"
+    },
+    {
+      "id": "runtime:0d5281b4f82d9999",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given scale"
+    },
+    {
+      "id": "runtime:28b6e21b945f39da",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given width"
+    },
+    {
+      "id": "runtime:857b6142f1ffff88",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given width and height (ignores height)"
+    },
+    {
+      "id": "runtime:aadfb499c19f222e",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given width and scale (multiplies)"
+    },
+    {
+      "id": "runtime:c67832c83f6b8203",
+      "file": "packages/pdf/upstream/tag/src/Thumbnail.spec.tsx",
+      "fullName": "Thumbnail requests page to be rendered with a proper scale when given width, height and scale (ignores height, multiplies)"
+    },
+    {
+      "id": "runtime:4ebf39e7acf91365",
+      "file": "packages/pdf/upstream/tag/src/index.spec.ts",
+      "fullName": "default entry has Document exported properly"
+    },
+    {
+      "id": "runtime:622d93ba891fbaee",
+      "file": "packages/pdf/upstream/tag/src/index.spec.ts",
+      "fullName": "default entry has Outline exported properly"
+    },
+    {
+      "id": "runtime:69f612917615e8df",
+      "file": "packages/pdf/upstream/tag/src/index.spec.ts",
+      "fullName": "default entry has Page exported properly"
+    },
+    {
+      "id": "runtime:28a1289da6a7f4ff",
+      "file": "packages/pdf/upstream/tag/src/index.spec.ts",
+      "fullName": "default entry has Thumbnail exported properly"
+    },
+    {
+      "id": "runtime:693d7584e9521298",
+      "file": "packages/pdf/upstream/tag/src/index.spec.ts",
+      "fullName": "default entry has pdfjs exported properly has GlobalWorkerOptions exported properly"
+    },
+    {
+      "id": "runtime:dc170cf381a16ba7",
+      "file": "packages/pdf/upstream/tag/src/index.spec.ts",
+      "fullName": "default entry has pdfjs exported properly has pdfjs.version exported properly"
+    },
+    {
+      "id": "runtime:49558e3dc932e614",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "dataURItoByteString() returns a byte string given base64 PDF data URI"
+    },
+    {
+      "id": "runtime:933276f4eb76e314",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "dataURItoByteString() returns a byte string given base64 PDF data URI with filename"
+    },
+    {
+      "id": "runtime:1a437ec20f82f018",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "dataURItoByteString() returns a byte string given base64 data URI"
+    },
+    {
+      "id": "runtime:b9c86e1d2cf0d0c9",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "dataURItoByteString() returns a byte string given plain text data URI"
+    },
+    {
+      "id": "runtime:641018155a8ea2a2",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "dataURItoByteString() throws given invalid data URI"
+    },
+    {
+      "id": "runtime:5e909f3bec663224",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "isDataURI() returns false given 'potato'"
+    },
+    {
+      "id": "runtime:db098440ad1415e2",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "isDataURI() returns true given 'data:,Hello%2C%20world%21'"
+    },
+    {
+      "id": "runtime:a6cea37b2a49f86c",
+      "file": "packages/pdf/upstream/tag/src/shared/utils.spec.ts",
+      "fullName": "isDataURI() returns true given 'data:text/plain;base64,SGVsbG8sIHdvcm…'"
+    }
+  ]
+}

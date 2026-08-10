@@ -374,6 +374,139 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'pdf-feasibility',
+					include: ['packages/pdf/tests/feasibility/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/pdf/tests/feasibility/*.server.test.ts',
+						'packages/pdf/tests/feasibility/*.hydration.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'pdf-feasibility-ssr',
+					include: ['packages/pdf/tests/feasibility/*.server.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'pdf-feasibility-hydration',
+					include: ['packages/pdf/tests/feasibility/*.hydration.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'pdf-browser',
+					include: ['packages/pdf/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/pdf/tests/runtime/private-evidence.test.ts'],
+				},
+				test: {
+					name: 'pdf',
+					include: [
+						'packages/pdf/tests/runtime/**/*.test.ts',
+						'packages/pdf/tests/contracts/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'pdf-pristine',
+					include: ['packages/pdf/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 180_000,
+					hookTimeout: 180_000,
+				},
+			},
+			{
+				test: {
+					name: 'pdf-packed',
+					include: ['packages/pdf/tests/packed/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'pdf-parity',
+					include: ['packages/pdf/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'pdf-ssr',
+					include: ['packages/pdf/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/pdf$/,
+							replacement: resolve(import.meta.dirname, 'packages/pdf/src/index.server.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'octane',
 					// The individual cases here run in milliseconds; the 5s default was
 					// being tripped by machine contention, not by the code under test
