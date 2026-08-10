@@ -752,6 +752,17 @@
       ],
       "ssr": "Supported and tested: browser-global-free server condition exports, deterministic fallback output, Octane streaming/hydration architecture gates, and pinned fallback/preload revalidation semantics.",
       "verified": ""
+      "name": "@octanejs/syntax-highlighter",
+      "version": "0.1.0",
+      "category": "Forms and content",
+      "upstream": { "package": "react-syntax-highlighter", "version": "16.1.1" },
+      "surface": "Complete against react-syntax-highlighter 16.1.1: default, Light, Prism, async and async-light components; static registration and language lists; custom renderers and tags; all pinned Highlight.js and Prism languages and styles; and all ESM/CJS deep-import aliases.",
+      "divergences": [
+        "PreTag and CodeTag accept native tag names or Octane function components. React class components require a function adapter because React instance identity is renderer-owned.",
+        "In .tsrx, source text must use the explicit children={source} prop. Nested component children compile to an opaque renderer block that a text-inspecting component cannot unwrap."
+      ],
+      "ssr": "Synchronous variants emit highlighted server HTML without DOM globals. Async variants emit the same deterministic plain-code fallback and hydrate by adopting the existing pre, code, and token nodes before live updates.",
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/tanstack-ai",
@@ -1223,6 +1234,7 @@
     "react-stately": "@octanejs/aria",
     "react-transition-group": "@octanejs/transition-group",
     "react-textarea-autosize": "@octanejs/textarea-autosize",
+    "react-syntax-highlighter": "@octanejs/syntax-highlighter",
     "recharts": "@octanejs/recharts",
     "shadcn": "@octanejs/shadcn",
     "sonner": "@octanejs/sonner",

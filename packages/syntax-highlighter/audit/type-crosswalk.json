@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "allowedTransformations": [
+    "React.createElement to Octane createElement",
+    "React component identity to Octane ComponentBody",
+    "adapted-only runtime statics that exist beyond the pinned declaration package"
+  ],
+  "pristine": [
+    {
+      "id": "props",
+      "adaptedOnly": false,
+      "sha256": "48575f6e871c5ee2c1c5f17c63d8ae1f39fae7e293b25eafb316c0229f895774"
+    },
+    {
+      "id": "render",
+      "adaptedOnly": false,
+      "sha256": "10b70ffe898972c9ba9ba0643972583bbdfd7cbf85e01b954b8f29f5cabd992b"
+    },
+    {
+      "id": "light-register",
+      "adaptedOnly": false,
+      "sha256": "463d0aa77233832c12228683ed70649080ac0a7e6a3ace0a6569910e6563535a"
+    },
+    {
+      "id": "prism-alias-name",
+      "adaptedOnly": false,
+      "sha256": "c02b4006b838b03481612fa98d5c98bfeb3cb973c7655cfc3f281900c882de56"
+    },
+    {
+      "id": "prism-alias-map",
+      "adaptedOnly": false,
+      "sha256": "dfad41d5e557233668c29cf150ad72a8bf6737628ac3a63ea6bd87dbf9e81f00"
+    },
+    {
+      "id": "default-supported",
+      "adaptedOnly": false,
+      "sha256": "76b0d680112cd2dbf3fb12e5c07e094728b2b0d532b04be19c068ae6113ec65f"
+    },
+    {
+      "id": "prism-supported",
+      "adaptedOnly": false,
+      "sha256": "44a1a750f7bea63d684d8c82cc92c9e33c932b73190fbb38d1c61719526cd4fd"
+    },
+    {
+      "id": "missing-children",
+      "adaptedOnly": false,
+      "sha256": "674ad7d00333b3f59248af79e89d188c8bc8fe8b31421ae3c017441e5051ce34"
+    },
+    {
+      "id": "non-string-children",
+      "adaptedOnly": false,
+      "sha256": "f6a39eac2167428aaa979b8968081067dc5107eb161ab4985b72594a0fd34945"
+    }
+  ],
+  "adapted": [
+    {
+      "id": "props",
+      "adaptedOnly": false,
+      "sha256": "75502831f50efca0f7474d83aafca8c7c8264ae3108ebfdb829de964bc3383e3"
+    },
+    {
+      "id": "render",
+      "adaptedOnly": false,
+      "sha256": "b2245411fcc7f8936c2952a568b80a884c4f7976db30116df417254985182331"
+    },
+    {
+      "id": "light-register",
+      "adaptedOnly": false,
+      "sha256": "463d0aa77233832c12228683ed70649080ac0a7e6a3ace0a6569910e6563535a"
+    },
+    {
+      "id": "prism-alias-name",
+      "adaptedOnly": false,
+      "sha256": "c02b4006b838b03481612fa98d5c98bfeb3cb973c7655cfc3f281900c882de56"
+    },
+    {
+      "id": "prism-alias-map",
+      "adaptedOnly": false,
+      "sha256": "dfad41d5e557233668c29cf150ad72a8bf6737628ac3a63ea6bd87dbf9e81f00"
+    },
+    {
+      "id": "default-supported",
+      "adaptedOnly": false,
+      "sha256": "76b0d680112cd2dbf3fb12e5c07e094728b2b0d532b04be19c068ae6113ec65f"
+    },
+    {
+      "id": "prism-supported",
+      "adaptedOnly": false,
+      "sha256": "44a1a750f7bea63d684d8c82cc92c9e33c932b73190fbb38d1c61719526cd4fd"
+    },
+    {
+      "id": "async-preload",
+      "adaptedOnly": true,
+      "sha256": "2eb901db915f2d2b1044835e96a55b4bae8fd80d358ef02ddee0f23575b352fa"
+    },
+    {
+      "id": "async-load-language",
+      "adaptedOnly": true,
+      "sha256": "b165e605fab9105102181a1262433a20da389138ddfa9565f2664915c2b54e71"
+    },
+    {
+      "id": "async-supported",
+      "adaptedOnly": true,
+      "sha256": "1924fec525e87cd85b2001915b120610616fec0e2cde399c3e9573dd66513fd2"
+    },
+    {
+      "id": "async-registered",
+      "adaptedOnly": true,
+      "sha256": "8c84b54cc7dc3b7116c5d066d84505081c5f6ae94925f11ffb9f91968f471791"
+    },
+    {
+      "id": "light-no-supported",
+      "adaptedOnly": true,
+      "sha256": "9d66837104e4467448cc02086448abab7808f7e6fff7110907f0f50a7e2a1e00"
+    },
+    {
+      "id": "prism-async-no-register",
+      "adaptedOnly": true,
+      "sha256": "663882f168fa8a6c5a57163a1762c73cb5d6bcb3ef601f439c0f392d58e84a01"
+    },
+    {
+      "id": "prism-light-no-supported",
+      "adaptedOnly": true,
+      "sha256": "b8d0dfd3dec27bee3ab2682ba54c760a4cc33f8dc49ea1d5068c6d04936b82b4"
+    },
+    {
+      "id": "missing-children",
+      "adaptedOnly": false,
+      "sha256": "674ad7d00333b3f59248af79e89d188c8bc8fe8b31421ae3c017441e5051ce34"
+    },
+    {
+      "id": "non-string-children",
+      "adaptedOnly": false,
+      "sha256": "f6a39eac2167428aaa979b8968081067dc5107eb161ab4985b72594a0fd34945"
+    }
+  ]
+}

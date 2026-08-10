@@ -400,6 +400,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
 					'@octanejs/react-dropzone': `file:${requireArchive(archives, '@octanejs/react-dropzone')}`,
+					'@octanejs/syntax-highlighter': `file:${requireArchive(archives, '@octanejs/syntax-highlighter')}`,
 					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
 					'@types/three': '0.172.0',
 					graphql: '^16.11.0',
@@ -425,12 +426,16 @@ import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
 import { createComputed, createSignal, useSignalValue } from '@octanejs/alien-signals';
 import { useForm } from '@octanejs/hook-form';
 import { useDropzone } from '@octanejs/react-dropzone';
+import { Light, Prism, PrismAsync } from '@octanejs/syntax-highlighter';
+import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
+import vscDarkPlus from '@octanejs/syntax-highlighter/dist/cjs/styles/prism/vsc-dark-plus';
 import { Canvas } from '@octanejs/three';
 import { ThreeScene } from './ThreeScene.three.tsrx';
 
 const client = new ApolloClient({ cache: new InMemoryCache() });
 const count = createSignal(2);
 const doubled = createComputed(() => count() * 2);
+Light.registerLanguage('javascript', javascript);
 
 function ApolloProbe() @{
 	const activeClient = useApolloClient();
@@ -453,6 +458,22 @@ export function App() @{
 		<ApolloProvider client={client}>
 			<ApolloProbe />
 		</ApolloProvider>
+		<Light
+			data-packed-syntax="light"
+			language="javascript"
+			children={'const packedLight = true;'}
+		/>
+		<Prism
+			data-packed-syntax="prism"
+			language="javascript"
+			style={vscDarkPlus}
+			children={'const packedPrism = true;'}
+		/>
+		<PrismAsync
+			data-packed-syntax="async"
+			language="javascript"
+			children={'const packedAsync = true;'}
+		/>
 		<Canvas frameloop="never" style={{ width: 64, height: 64 }}>
 			<ThreeScene />
 		</Canvas>
@@ -498,6 +519,11 @@ import Dropzone, {
 	type ValidatorResult,
 } from '@octanejs/react-dropzone';
 import dropzonePackage from '@octanejs/react-dropzone/package.json' with { type: 'json' };
+import * as syntaxApi from '@octanejs/syntax-highlighter';
+import LightAsync from '@octanejs/syntax-highlighter/dist/esm/light-async';
+import PrismLight from '@octanejs/syntax-highlighter/dist/cjs/prism-light.js';
+import syntaxJavascript from '@octanejs/syntax-highlighter/dist/cjs/languages/hljs/javascript.js';
+import syntaxVscDarkPlus from '@octanejs/syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus.js';
 import { map_iterable } from 'octane/tsrx-iterable';
 import {
 	normalize_spread_props,
@@ -560,6 +586,12 @@ export function packageSurfaceProbe() {
 			dropzonePackage.name === '@octanejs/react-dropzone',
 		iterable: typeof map_iterable === 'function',
 		publicApi: typeof publicApi.Canvas === 'function',
+		syntax:
+			typeof syntaxApi.Prism === 'function' &&
+			typeof LightAsync.preload === 'function' &&
+			typeof PrismLight.registerLanguage === 'function' &&
+			typeof syntaxJavascript === 'function' &&
+			typeof syntaxVscDarkPlus === 'object',
 		renderer: typeof rendererApi.createUniversalRoot === 'function',
 		spread:
 			typeof normalize_spread_props === 'function' &&
@@ -766,6 +798,13 @@ process.stdout.write(JSON.stringify(result));`,
 	for (const dependency of ['attr-accept', 'file-selector']) {
 		dropzoneRequire.resolve(dependency);
 	}
+	const syntaxEntry = consumerRequire.resolve('@octanejs/syntax-highlighter');
+	const syntaxPeerRuntime = realpathSync(createRequire(syntaxEntry).resolve('octane'));
+	if (syntaxPeerRuntime !== directRuntime) {
+		throw new Error(
+			`Syntax Highlighter resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${syntaxPeerRuntime}`,
+		);
+	}
 	const threeEntry = consumerRequire.resolve('@octanejs/three');
 	const threeRequire = createRequire(threeEntry);
 	const threePeerRuntime = realpathSync(threeRequire.resolve('octane'));
@@ -880,6 +919,12 @@ process.stdout.write(output, () => process.exit(0));
 		!html.includes('data-alien-signals="4"') ||
 		!html.includes('name="name"') ||
 		!html.includes('data-apollo="connected"') ||
+		!html.includes('data-packed-syntax="light"') ||
+		!html.includes('data-packed-syntax="prism"') ||
+		!html.includes('data-packed-syntax="async"') ||
+		!html.includes('packedLight') ||
+		!html.includes('packedPrism') ||
+		!html.includes('packedAsync') ||
 		!html.includes('<canvas')
 	) {
 		throw new Error(`executed packed consumer probe returned unexpected HTML: ${html}`);
@@ -889,7 +934,7 @@ process.stdout.write(output, () => process.exit(0));
 	}
 
 	console.log(
-		'installed packed octane + Alien Signals + Hook Form + Apollo Client + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
+		'installed packed octane + Alien Signals + Hook Form + Apollo Client + Syntax Highlighter + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
 	);
 }
 

@@ -149,6 +149,7 @@ describe('packed TSRX source consumers', () => {
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
 		'@octanejs/react-spring': 'file:/tmp/react-spring.tgz',
 		'@octanejs/sonner': 'file:/tmp/sonner.tgz',
+		'@octanejs/syntax-highlighter': 'file:/tmp/syntax-highlighter.tgz',
 		'@octanejs/textarea-autosize': 'file:/tmp/react-textarea-autosize.tgz',
 		'@octanejs/tiptap': 'file:/tmp/tiptap.tgz',
 		octane: 'file:/tmp/octane.tgz',
@@ -201,6 +202,7 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /from '@octanejs\/sonner'/);
 		assert.match(source, /from '@octanejs\/react-spring'/);
 		assert.match(source, /from '@octanejs\/react-spring\/parallax'/);
+		assert.match(source, /from '@octanejs\/syntax-highlighter'/);
 		assert.match(source, /from '@octanejs\/textarea-autosize'/);
 		assert.match(source, /from '@octanejs\/tiptap'/);
 		assert.match(source, /<Command\b/);
@@ -208,6 +210,7 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /<Toaster\b/);
 		assert.match(source, /<animated\.div\b/);
 		assert.match(source, /<Parallax\b/);
+		assert.match(source, /<Light\b/);
 		assert.match(source, /<TextareaAutosize\b/);
 		assert.match(source, /<EditorProvider\b/);
 		assert.match(source, /<Tiptap\b/);
@@ -225,6 +228,7 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /AssertNotAny<EditorContentProps>/);
 		assert.match(source, /AssertNotAny<SpringValue<number>>/);
 		assert.match(source, /AssertNotAny<ParallaxProps>/);
+		assert.match(source, /AssertNotAny<SyntaxHighlighterProps>/);
 		assert.match(source, /AssertNotAny<TextareaAutosizeProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof EditorContent>\[0\]>/);
 		assert.match(source, /--consumer-offset/);

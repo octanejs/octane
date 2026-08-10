@@ -42,6 +42,7 @@
     "@octanejs/react-dropzone": "workspace:*",
     "@octanejs/markdown": "workspace:*",
     "@octanejs/textarea-autosize": "workspace:*",
+    "@octanejs/syntax-highlighter": "workspace:*",
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",

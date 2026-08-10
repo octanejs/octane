@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter isRegistered when astGenerator is defined it should call isLanguageRegistered",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter isRegistered when astGenerator is not defined it checks the languages array",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter isRegistered when registerLanguage is not defined",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter loadAstGenerator should return the promise of the loader",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter loadAstGenerator when astGenerator resolves",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter loadAstGenerator when astGenerator resolves and it has languages in the language array",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter registerLanguage when registerLanguage & astGenerator is defined",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter registerLanguage when registerLanguage is defined but astGenerator isn't",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter registerLanguage when registerLanguage is undefined",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter when a supportedLanguages array is passed in it should be set to the supported languages static field",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/async-syntax-highlighter.js",
+      "fullName": "AsyncSyntaxHighlighter when language loaders are passed in, it should set the keys to the supported languages static field",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/code-style-passed-to-line-numbers.js",
+      "fullName": "SyntaxHighlighter component passes along code style to non-inline line numbers element",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/custom-code.js",
+      "fullName": "SyntaxHighlighter component renders custom react component where code tag is by default",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/custom-code.js",
+      "fullName": "SyntaxHighlighter renders div where code tag is by default",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/custom-pre.js",
+      "fullName": "SyntaxHighlighter component renders custom react component where pre tag is by default",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/custom-pre.js",
+      "fullName": "SyntaxHighlighter renders div where pre tag is by default",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/light-async.js",
+      "fullName": "SyntaxHighlighter render as text if language doesnt exist",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/light-async.js",
+      "fullName": "SyntaxHighlighter renders fortran highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/light-async.js",
+      "fullName": "SyntaxHighlighter renders javascript highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/light-async.js",
+      "fullName": "SyntaxHighlighter renders text while language loads",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/light-async.js",
+      "fullName": "When the code split is loaded - SyntaxHighlighter renders jsx highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter allows lineNumberStyle as function",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter allows lineNumberStyle as function for inline line numbers",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter allows lineNumberStyle as object",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter component does not render line numbers if showInlineNumbers === true && showLineNumbers === undefined",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter component does not render line numbers if showLineNumbers === undefined",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter component renders correctly",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/line-numbers.js",
+      "fullName": "SyntaxHighlighter component renders line numbers if showLineNumbers === true",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/multiline-comments.js",
+      "fullName": "Syntaxhighliter correctly renders multi-line comments in arduino language",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/no-inline.js",
+      "fullName": "SyntaxHighlighter component renders correctly without inline styles when useInlineStyles=false",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/no-language.js",
+      "fullName": "SyntaxHighlighter component renders correctly",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async-light.js",
+      "fullName": "SyntaxHighlighter renders jsx highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async-light.js",
+      "fullName": "SyntaxHighlighter should just render text if syntax is not registered",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async-light.js",
+      "fullName": "When the code split is loaded - SyntaxHighlighter renders python highlighted text after async loading python",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async.js",
+      "fullName": "Prism SyntaxHighlighter renders template strings and JSX correctly",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async.js",
+      "fullName": "SyntaxHighlighter renders jsx highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async.js",
+      "fullName": "SyntaxHighlighter should just render text if syntax is not registered",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-async.js",
+      "fullName": "When the code split is loaded - SyntaxHighlighter renders jsx highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-light.js",
+      "fullName": "SyntaxHighlighter renders jsx highlighted text",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/prism-light.js",
+      "fullName": "SyntaxHighlighter should just render text if syntax is not registered",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/refractor.js",
+      "fullName": "SyntaxHighlighter component renders correctly with refractor instead of lowlight",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/render-plain-string.js",
+      "fullName": "SyntaxHighlighter renders childre unadultered when no language disocvered in highlight auto",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/render.js",
+      "fullName": "SyntaxHighlighter component renders correctly",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/text-language.js",
+      "fullName": "SyntaxHighlighter component renders monospace text when text is passed as language",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/unknown-language.js",
+      "fullName": "SyntaxHighlighter component renders correctly by falling back to highlightAuto if unknown language provided",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/vue-language.js",
+      "fullName": "SyntaxHighlighter component renders vue",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/wrap-lines.js",
+      "fullName": "Prism SyntaxHighlighter renders JSX code correctly with wrapLines",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/wrap-lines.js",
+      "fullName": "SyntaxHighlighter allows lineProps as an object",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/wrap-lines.js",
+      "fullName": "SyntaxHighlighter allows lineProps as function",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/wrap-lines.js",
+      "fullName": "SyntaxHighlighter component renders correctly",
+      "status": "passed"
+    },
+    {
+      "file": "__tests__/wrap-lines.js",
+      "fullName": "SyntaxHighlighter renders java code correctly with wrapLines",
+      "status": "passed"
+    }
+  ],
+  "snapshots": 40,
+  "root": "packages/syntax-highlighter/upstream"
+}

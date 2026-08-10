@@ -62,6 +62,7 @@ export const KNOWN_BINDINGS = {
 	'react-markdown': '@octanejs/markdown',
 	'react-textarea-autosize': '@octanejs/textarea-autosize',
 	streamdown: '@octanejs/streamdown',
+	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.
 	// The bundled bridge skill documents each exact import rewrite.
 	'@streamdown/code': '@octanejs/streamdown',

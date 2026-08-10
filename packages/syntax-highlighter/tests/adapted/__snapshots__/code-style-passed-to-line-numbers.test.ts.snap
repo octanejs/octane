@@ -1,0 +1,465 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SyntaxHighlighter component passes along code style to non-inline line numbers element 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                "1
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "2
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "3
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "4
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "5
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "6
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "7
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "8
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "9
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+            {
+              "children": [
+                "10
+",
+              ],
+              "props": {
+                "className": "react-syntax-highlighter-line-number",
+              },
+              "type": "span",
+            },
+          ],
+          "props": {
+            "style": {
+              "color": "blue",
+              "float": "left",
+              "paddingRight": "10px",
+            },
+          },
+          "type": "code",
+        },
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " woah = ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "fun",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " => ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "fun",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " + 1;",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " dude = woah(",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "2",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ") + ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "function thisIsAFunction() {
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " [",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "2",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "].map(n => n + ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ").filter(n !== ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ");
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+        {
+          "children": [
+            "console.log(",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'making up fake code is really hard'",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ");
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        "function itIs() {
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'no seriously really it is'",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+      ],
+      "props": {
+        "style": {
+          "color": "blue",
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(240, 240, 240)",
+      "color": "rgb(68, 68, 68)",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    },
+  },
+  "type": "pre",
+}
+`;

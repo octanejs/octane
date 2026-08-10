@@ -82,6 +82,7 @@
       "@octanejs/markdown",
       "@octanejs/streamdown",
       "@octanejs/monaco-editor",
+      "@octanejs/syntax-highlighter",
       "@octanejs/mdx",
       "@octanejs/i18next"
     ]

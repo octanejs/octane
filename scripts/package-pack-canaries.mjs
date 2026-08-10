@@ -64,6 +64,7 @@ export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/radix',
 	'@octanejs/react-spring',
 	'@octanejs/sonner',
+	'@octanejs/syntax-highlighter',
 	'@octanejs/textarea-autosize',
 	'@octanejs/tiptap',
 	'octane',
@@ -198,6 +199,9 @@ import { animated, useSpring } from '@octanejs/react-spring';
 import { Parallax, ParallaxLayer } from '@octanejs/react-spring/parallax';
 import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 import { toast, Toaster } from '@octanejs/sonner';
+import { Light } from '@octanejs/syntax-highlighter';
+import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
+import docco from '@octanejs/syntax-highlighter/dist/esm/styles/hljs/docco';
 import TextareaAutosize from '@octanejs/textarea-autosize';
 import {
 	Editor,
@@ -209,6 +213,7 @@ import {
 import { useRef } from 'octane';
 
 const editor = new Editor({ extensions: [] });
+Light.registerLanguage('javascript', javascript);
 
 function EditorStateProbe() @{
 	const currentEditor = useTiptap();
@@ -257,8 +262,11 @@ export function PublishedSourceConsumer() @{
 		</OTPInput>
 		<label>
 			Message
-			<TextareaAutosize minRows={2} maxRows={6} defaultValue="Packed source" />
+		<TextareaAutosize minRows={2} maxRows={6} defaultValue="Packed source" />
 		</label>
+		<Light language="javascript" style={docco} showLineNumbers>
+			{'const packed = true;'}
+		</Light>
 		<EditorProvider
 			extensions={[]}
 			immediatelyRender={false}
@@ -281,6 +289,7 @@ import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/react-
 import type { IParallax, ParallaxProps } from '@octanejs/react-spring/parallax';
 import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
 import { Toaster, useSonner, type ToasterProps } from '@octanejs/sonner';
+import SyntaxHighlighter, { type SyntaxHighlighterProps } from '@octanejs/syntax-highlighter';
 import TextareaAutosize, { type TextareaAutosizeProps } from '@octanejs/textarea-autosize';
 import {
 	EditorContent,
@@ -309,6 +318,8 @@ const toasterPropsArePrecise: AssertNotAny<ToasterProps> = true;
 const toasterComponentPropsArePrecise: AssertNotAny<Parameters<typeof Toaster>[0]> = true;
 const textareaPropsArePrecise: AssertNotAny<TextareaAutosizeProps> = true;
 const textareaComponentPropsArePrecise: AssertNotAny<Parameters<typeof TextareaAutosize>[0]> = true;
+const syntaxPropsArePrecise: AssertNotAny<SyntaxHighlighterProps> = true;
+const syntaxComponentPropsArePrecise: AssertNotAny<Parameters<typeof SyntaxHighlighter>[0]> = true;
 const toastStateIsPrecise: AssertNotAny<ReturnType<typeof useSonner>> = true;
 const editorPropsArePrecise: AssertNotAny<EditorContentProps> = true;
 const editorComponentPropsArePrecise: AssertNotAny<Parameters<typeof EditorContent>[0]> = true;
@@ -333,6 +344,8 @@ const invalidToastStyle: ToasterProps = { style: { maxWidth: true } };
 const invalidToastCustomProperty: ToasterProps = { style: { '--consumer-offset': true } };
 // @ts-expect-error TextareaAutosize owns vertical sizing through row bounds.
 const invalidTextareaStyle: TextareaAutosizeProps = { style: { minHeight: 20 } };
+// @ts-expect-error Highlighted children are source text, not arbitrary nodes.
+const invalidSyntaxChildren: SyntaxHighlighterProps = { children: 42 };
 // @ts-expect-error EditorContent must own an explicit editor, including null.
 const invalidEditorContent: EditorContentProps = {};
 // @ts-expect-error Tiptap.Content reads its editor from context.
@@ -356,6 +369,7 @@ export const verifiedPublishedTypes = {
 	invalidToastCustomProperty,
 	invalidToastStyle,
 	invalidTextareaStyle,
+	invalidSyntaxChildren,
 	invalidToaster,
 	providerComponentPropsArePrecise,
 	providerPropsArePrecise,
@@ -372,6 +386,8 @@ export const verifiedPublishedTypes = {
 	toasterPropsArePrecise,
 	textareaComponentPropsArePrecise,
 	textareaPropsArePrecise,
+	syntaxComponentPropsArePrecise,
+	syntaxPropsArePrecise,
 };
 `;
 }

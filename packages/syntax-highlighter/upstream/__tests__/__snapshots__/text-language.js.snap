@@ -1,0 +1,50 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SyntaxHighlighter component renders monospace text when text is passed as language 1`] = `
+<pre
+  style={
+    Object {
+      "background": "#F0F0F0",
+      "color": "#444",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    }
+  }
+>
+  <code
+    className="language-text"
+    style={
+      Object {
+        "whiteSpace": "pre",
+      }
+    }
+  >
+    <span
+      style={Object {}}
+    >
+      const woah = fun =&gt; fun + 1;
+
+    </span>
+    const dude = woah(2) + 3;
+
+    function thisIsAFunction() {
+
+      return [1,2,3].map(n =&gt; n + 1).filter(n !== 3);
+
+    }
+
+    console.log('making up fake code is really hard');
+
+    
+
+    function itIs() {
+
+      return 'no seriously really it is';
+
+    }
+
+    
+  </code>
+</pre>
+`;

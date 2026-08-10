@@ -26,6 +26,9 @@ describe('the shipped catalog', () => {
 		expect(resolveBinding('react-textarea-autosize')?.binding.name).toBe(
 			'@octanejs/textarea-autosize',
 		);
+		expect(resolveBinding('react-syntax-highlighter')?.binding.name).toBe(
+			'@octanejs/syntax-highlighter',
+		);
 		expect(resolveBinding('react-select')).toBe(null);
 	});
 

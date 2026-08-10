@@ -289,6 +289,68 @@ export default defineConfig({
 		silent: true,
 		projects: [
 			{
+				// Adapted upstream suite is parity-owned; feasibility, races, hydration,
+				// and negative controls remain ordinary Octane conformance coverage.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/syntax-highlighter/tests/adapted/**/*.test.ts'],
+				},
+				test: {
+					name: 'syntax-highlighter',
+					fileParallelism: false,
+					include: [
+						'packages/syntax-highlighter/tests/**/*.test.ts',
+						'!packages/syntax-highlighter/tests/ssr/**/*.test.ts',
+						'!packages/syntax-highlighter/tests/browser/**/*.test.ts',
+						'!packages/syntax-highlighter/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'syntax-highlighter-differential',
+					include: ['packages/syntax-highlighter/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'syntax-highlighter-browser',
+					include: ['packages/syntax-highlighter/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 120_000,
+					hookTimeout: 120_000,
+				},
+				plugins: [octane()],
+			},
+			{
+				// Octane-only SSR assertions (no React/upstream oracle) stay ordinary.
+				test: {
+					name: 'syntax-highlighter-ssr',
+					include: ['packages/syntax-highlighter/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'octane',
 					// The individual cases here run in milliseconds; the 5s default was
