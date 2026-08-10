@@ -124,6 +124,47 @@ function loadMappedComponentHydrationComponents() {
 	};
 }
 
+function loadReturnedProviderComponentMapFixture() {
+	const source = `
+		import { createContext, memo, useState } from 'octane';
+
+		const Theme = createContext(null);
+
+		function RowImpl(props) {
+			return <span className="returned-provider-map-row">{props.label}</span>;
+		}
+		const Row = memo(RowImpl);
+
+		function Rows(props) {
+			return (
+				<div id="returned-provider-map-rows">
+					{props.items.map((item) => <Row key={item.id} label={item.label} />)}
+				</div>
+			);
+		}
+
+		export function App(props) {
+			const [tick, setTick] = useState(0);
+			const items = props.items;
+			return (
+				<section>
+					<button id="returned-provider-map-update" onClick={() => setTick(tick + 1)}>
+						{tick}
+					</button>
+					<Theme.Provider value={null}>
+						<Rows items={items} />
+					</Theme.Provider>
+				</section>
+			);
+		}
+	`;
+	return loadCompiledFixtureSource(source, {
+		id: 'returned-provider-component-map.tsx',
+		mode: 'client',
+		compileOptions: { hmr: false, dev: false },
+	});
+}
+
 describe('compiler-owned component-region memoization', () => {
 	it('preserves an independently updating pure hookful child under its hookful parent', () => {
 		const source = `
@@ -2432,6 +2473,642 @@ describe('compiler-owned component-region memoization', () => {
 		expect(root.find('.own-1')).toBe(button);
 		expect(button.textContent).toBe('t0:stable:0:updated:1');
 		root.unmount();
+	});
+
+	it('preserves returned-JSX provider component rows, context, state, keys, refs, and effects', () => {
+		const source = `
+			import { createContext, memo, useContext, useEffect, useState } from 'octane';
+
+			const Theme = createContext('initial');
+
+			function RowImpl(props) {
+				const theme = useContext(Theme);
+				const [own, setOwn] = useState(0);
+				useEffect(() => {
+					props.onEffect('mount:' + props.id);
+					return () => props.onEffect('cleanup:' + props.id);
+				}, [props.id, props.onEffect]);
+				return (
+					<button
+						className={'provider-component-row-' + props.id}
+						ref={props.onRef}
+						onClick={() => setOwn(own + 1)}
+					>
+						{theme + ':' + props.label + ':' + own}
+					</button>
+				);
+			}
+			const Row = memo(RowImpl);
+
+			function Rows(props) {
+				return (
+					<div id="provider-component-rows">
+						{props.items.map((item) => (
+							<Row
+								key={item.id}
+								id={item.id}
+								label={item.label}
+								onEffect={item.onEffect}
+								onRef={item.onRef}
+							/>
+						))}
+					</div>
+				);
+			}
+
+			export function App(props) {
+				const [items, setItems] = useState(props.items);
+				const [theme, setTheme] = useState('initial');
+				const [tick, setTick] = useState(0);
+				return (
+					<section>
+						<button id="provider-component-tick" onClick={() => setTick(tick + 1)}>{tick}</button>
+						<button id="provider-component-theme" onClick={() => setTheme('updated')}>theme</button>
+						<button
+							id="provider-component-change"
+							onClick={() => setItems(items.map((item) => item.id === 1
+								? { ...item, label: 'changed' }
+								: item))}
+						>change</button>
+						<button id="provider-component-reorder" onClick={() => setItems(items.toReversed())}>
+							reorder
+						</button>
+						<Theme.Provider value={theme}>
+							<Rows items={items} />
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'returned-provider-component-rows.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const effects: string[] = [];
+		const attached: Element[] = [];
+		const detached: Element[] = [];
+		const onEffect = (event: string) => effects.push(event);
+		const onRef = (element: Element | null) => {
+			if (element !== null) {
+				attached.push(element);
+				return () => detached.push(element);
+			}
+		};
+		const items = [
+			{ id: 1, label: 'first', onEffect, onRef },
+			{ id: 2, label: 'second', onEffect, onRef },
+		];
+		const root = mount(client.App, { items });
+		flushEffects();
+		const first = root.find('.provider-component-row-1');
+		const second = root.find('.provider-component-row-2');
+		expect(attached).toEqual([first, second]);
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+
+		root.click('.provider-component-row-1');
+		expect(first.textContent).toBe('initial:first:1');
+		root.click('#provider-component-tick');
+		expect(root.findAll('#provider-component-rows > button')).toEqual([first, second]);
+		expect(first.textContent).toBe('initial:first:1');
+
+		root.click('#provider-component-theme');
+		expect(first.textContent).toBe('updated:first:1');
+		expect(second.textContent).toBe('updated:second:0');
+		root.click('#provider-component-change');
+		expect(root.findAll('#provider-component-rows > button')).toEqual([first, second]);
+		expect(first.textContent).toBe('updated:changed:1');
+		root.click('#provider-component-reorder');
+		expect(root.findAll('#provider-component-rows > button')).toEqual([second, first]);
+		expect(first.textContent).toBe('updated:changed:1');
+		expect(attached).toEqual([first, second]);
+		expect(detached).toEqual([]);
+		flushEffects();
+		expect(effects).toEqual(['mount:1', 'mount:2']);
+
+		root.unmount();
+		flushEffects();
+		expect(detached).toEqual(expect.arrayContaining([first, second]));
+		expect(detached).toHaveLength(2);
+		expect(effects.slice(2).toSorted()).toEqual(['cleanup:1', 'cleanup:2']);
+	});
+
+	it('reruns effects in unmemoized returned-JSX provider component rows', () => {
+		const source = `
+			import { createContext, useEffect, useState } from 'octane';
+
+			const Theme = createContext(null);
+
+			function Row(props) {
+				useEffect(() => {
+					props.onEffect('effect:' + props.label);
+					return () => props.onEffect('cleanup:' + props.label);
+				}, null);
+				return <span id="provider-component-plain-row">{props.label}</span>;
+			}
+
+			function Rows(props) {
+				return (
+					<div id="provider-component-plain-rows">
+						{props.items.map((item) => (
+							<Row key={item.id} label={item.label} onEffect={item.onEffect} />
+						))}
+					</div>
+				);
+			}
+
+			export function App(props) {
+				const [tick, setTick] = useState(0);
+				const items = props.items;
+				return (
+					<section>
+						<button id="provider-component-plain-update" onClick={() => setTick(tick + 1)}>
+							{tick}
+						</button>
+						<Theme.Provider value={null}>
+							<Rows items={items} />
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'returned-provider-component-plain-row-effect.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const effects: string[] = [];
+		const root = mount(client.App, {
+			items: [{ id: 1, label: 'row', onEffect: (event: string) => effects.push(event) }],
+		});
+		flushEffects();
+		const row = root.find('#provider-component-plain-row');
+		expect(effects).toEqual(['effect:row']);
+
+		effects.length = 0;
+		root.click('#provider-component-plain-update');
+		flushEffects();
+		expect(root.find('#provider-component-plain-row')).toBe(row);
+		expect(effects).toEqual(['cleanup:row', 'effect:row']);
+		root.unmount();
+	});
+
+	it('preserves observable returned-JSX provider component map accessors and receivers', () => {
+		const client = loadReturnedProviderComponentMapFixture();
+		const events: string[] = [];
+		let label = 'initial';
+		const items = [{ id: 1, label: 'ignored' }];
+		Object.defineProperty(items, 'map', {
+			configurable: true,
+			get() {
+				events.push('get:map');
+				return function <Result>(
+					this: typeof items,
+					callback: (item: (typeof items)[number], index: number, array: typeof items) => Result,
+				): Result[] {
+					if (this !== items) throw new Error('custom map lost its receiver');
+					events.push('call:map');
+					return [callback({ id: 1, label }, 0, items)];
+				};
+			},
+		});
+		const root = mount(client.App, { items });
+		const row = root.find('.returned-provider-map-row');
+		expect(events).toEqual(['get:map', 'call:map']);
+		expect(row.textContent).toBe('initial');
+
+		events.length = 0;
+		label = 'updated';
+		root.click('#returned-provider-map-update');
+		expect(events).toEqual(['get:map', 'call:map']);
+		expect(root.find('.returned-provider-map-row')).toBe(row);
+		expect(row.textContent).toBe('updated');
+		root.unmount();
+	});
+
+	it('observes returned-JSX provider component map overrides installed after mounting', () => {
+		const client = loadReturnedProviderComponentMapFixture();
+		const items = [{ id: 1, label: 'native' }];
+		const originalMap = Array.prototype.map;
+		const root = mount(client.App, { items });
+		const row = root.find('.returned-provider-map-row');
+		expect(row.textContent).toBe('native');
+
+		try {
+			Object.defineProperty(items, 'map', {
+				configurable: true,
+				value<Result>(
+					this: typeof items,
+					callback: (item: (typeof items)[number], index: number, array: typeof items) => Result,
+				): Result[] {
+					if (this !== items) throw new Error('installed map lost its receiver');
+					return [callback({ id: 1, label: 'own override' }, 0, items)];
+				},
+			});
+			root.click('#returned-provider-map-update');
+			expect(root.find('.returned-provider-map-row')).toBe(row);
+			expect(row.textContent).toBe('own override');
+
+			delete (items as { map?: unknown }).map;
+			Array.prototype.map = function <Item, Result>(
+				this: Item[],
+				callback: (item: Item, index: number, array: Item[]) => Result,
+				thisArg?: unknown,
+			): Result[] {
+				if ((this as unknown) === items) {
+					return originalMap.call(
+						[{ id: 1, label: 'prototype override' }],
+						callback,
+						thisArg,
+					) as Result[];
+				}
+				return originalMap.call(this, callback, thisArg) as Result[];
+			};
+			root.click('#returned-provider-map-update');
+			expect(root.find('.returned-provider-map-row')).toBe(row);
+			expect(row.textContent).toBe('prototype override');
+
+			Array.prototype.map = originalMap;
+			root.click('#returned-provider-map-update');
+			expect(root.find('.returned-provider-map-row')).toBe(row);
+			expect(row.textContent).toBe('native');
+		} finally {
+			Array.prototype.map = originalMap;
+			delete (items as { map?: unknown }).map;
+			root.unmount();
+		}
+	});
+
+	it('preserves returned-JSX provider component proxy-backed map behavior', () => {
+		const client = loadReturnedProviderComponentMapFixture();
+		const events: string[] = [];
+		let label = 'initial';
+		const target = [{ id: 1, label: 'ignored' }];
+		const items = new Proxy(target, {
+			get(current, property, receiver) {
+				if (property === 'map') {
+					events.push('get:map');
+					return function <Result>(
+						this: typeof target,
+						callback: (
+							item: (typeof target)[number],
+							index: number,
+							array: typeof target,
+						) => Result,
+					): Result[] {
+						if (this !== items) throw new Error('proxy map lost its receiver');
+						events.push('call:map');
+						return [callback({ id: 1, label }, 0, items)];
+					};
+				}
+				return Reflect.get(current, property, receiver);
+			},
+			getPrototypeOf(current) {
+				events.push('get:prototype');
+				return Reflect.getPrototypeOf(current);
+			},
+			getOwnPropertyDescriptor(current, property) {
+				if (property === 'map') events.push('get:map descriptor');
+				return Reflect.getOwnPropertyDescriptor(current, property);
+			},
+		});
+		const root = mount(client.App, { items });
+		const row = root.find('.returned-provider-map-row');
+		expect(events).toEqual(['get:map', 'get:prototype', 'call:map']);
+		expect(row.textContent).toBe('initial');
+
+		events.length = 0;
+		label = 'updated';
+		root.click('#returned-provider-map-update');
+		expect(events).toEqual(['get:map', 'get:prototype', 'call:map']);
+		expect(root.find('.returned-provider-map-row')).toBe(row);
+		expect(row.textContent).toBe('updated');
+		root.unmount();
+	});
+
+	it.each(['sparse indexed accessor', 'custom array species'] as const)(
+		'preserves returned-JSX provider component rows with a %s',
+		(shape) => {
+			const client = loadReturnedProviderComponentMapFixture();
+			const events: string[] = [];
+			let current = { id: 1, label: 'initial' };
+			const items: Array<typeof current> = [];
+
+			if (shape === 'sparse indexed accessor') {
+				items.length = 2;
+				Object.defineProperty(items, '1', {
+					configurable: true,
+					enumerable: true,
+					get() {
+						events.push('get:item');
+						return current;
+					},
+				});
+			} else {
+				items.push(current);
+				Object.defineProperty(items, 'constructor', {
+					configurable: true,
+					value: {
+						[Symbol.species]: function (length: number) {
+							events.push('species');
+							return new Array(length);
+						},
+					},
+				});
+			}
+
+			const expected = shape === 'sparse indexed accessor' ? ['get:item'] : ['species'];
+			const root = mount(client.App, { items });
+			const row = root.find('.returned-provider-map-row');
+			expect(events).toEqual(expected);
+			expect(row.textContent).toBe('initial');
+
+			events.length = 0;
+			current = { id: 1, label: 'updated' };
+			root.click('#returned-provider-map-update');
+			expect(events).toEqual(expected);
+			expect(root.find('.returned-provider-map-row')).toBe(row);
+			expect(row.textContent).toBe(shape === 'sparse indexed accessor' ? 'updated' : 'initial');
+			root.unmount();
+		},
+	);
+
+	it('observes inherited returned-JSX provider component defaultProps accessors', () => {
+		const client = loadReturnedProviderComponentMapFixture();
+		const items = [{ id: 1, label: 'initial' }];
+		const events: string[] = [];
+		const root = mount(client.App, { items });
+		const row = root.find('.returned-provider-map-row');
+		const original = Object.getOwnPropertyDescriptor(Function.prototype, 'defaultProps');
+
+		try {
+			Object.defineProperty(Function.prototype, 'defaultProps', {
+				configurable: true,
+				get(this: Function) {
+					if (this.name === 'Rows') events.push('get:defaultProps');
+					return undefined;
+				},
+			});
+
+			root.click('#returned-provider-map-update');
+			expect(events).toEqual(['get:defaultProps']);
+			expect(root.find('.returned-provider-map-row')).toBe(row);
+			expect(row.textContent).toBe('initial');
+
+			events.length = 0;
+			root.update(client.App, { items: [{ id: 1, label: 'updated' }] });
+			expect(events).toEqual(['get:defaultProps']);
+			expect(root.find('.returned-provider-map-row')).toBe(row);
+			expect(row.textContent).toBe('updated');
+		} finally {
+			if (original === undefined) {
+				delete (Function.prototype as { defaultProps?: unknown }).defaultProps;
+			} else {
+				Object.defineProperty(Function.prototype, 'defaultProps', original);
+			}
+			root.unmount();
+		}
+	});
+
+	it('keeps returned-JSX provider component defaultProps accessors observable', () => {
+		const source = `
+			import { createContext, memo, useState } from 'octane';
+
+			const Theme = createContext(null);
+			let current = 'initial';
+			export function updateDefault() {
+				current = 'updated';
+			}
+
+			function RowImpl(props) {
+				return <span id="provider-component-default-row">{props.label}</span>;
+			}
+			const Row = memo(RowImpl);
+
+			function Rows(props) {
+				return (
+					<div id="provider-component-default-rows" data-default={props.suffix}>
+						{props.items.map((item) => <Row key={item.id} label={item.label} />)}
+					</div>
+				);
+			}
+			Object.defineProperty(Rows, 'defaultProps', {
+				configurable: true,
+				get() {
+					return { suffix: current };
+				},
+			});
+
+			export function App(props) {
+				const [tick, setTick] = useState(0);
+				const items = props.items;
+				return (
+					<section>
+						<button id="provider-component-default-update" onClick={() => setTick(tick + 1)}>
+							{tick}
+						</button>
+						<Theme.Provider value={null}>
+							<Rows items={items} />
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'returned-provider-component-default-props.tsx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App, { items: [{ id: 1, label: 'row' }] });
+		const rows = root.find('#provider-component-default-rows');
+		expect(rows.getAttribute('data-default')).toBe('initial');
+
+		client.updateDefault();
+		root.click('#provider-component-default-update');
+		expect(root.find('#provider-component-default-rows')).toBe(rows);
+		expect(rows.getAttribute('data-default')).toBe('updated');
+		root.unmount();
+	});
+
+	it.each([
+		{
+			shape: 'ordinary object',
+			wrapper: 'const Wrapper = { Provider: Fake };',
+		},
+		{
+			shape: 'throwing provider accessor',
+			wrapper: `
+				let reads = 0;
+				const Wrapper = Fake;
+				Object.defineProperty(Wrapper, 'Provider', {
+					get() {
+						if (++reads !== 1) throw new Error('Provider getter read twice');
+						return Wrapper;
+					},
+				});
+			`,
+		},
+		{
+			shape: 'throwing callable proxy',
+			wrapper: `
+				const Wrapper = new Proxy(Fake, {
+					get(target, property, receiver) {
+						if (property === 'Provider') return receiver;
+						if (property === '$$kind') throw new Error('private brand getter must stay unread');
+						return Reflect.get(target, property, receiver);
+					},
+				});
+			`,
+		},
+	])(
+		'preserves inspectable returned-JSX provider component children for a $shape',
+		({ shape, wrapper }) => {
+			const source = `
+				import { isValidElement, useState } from 'octane';
+
+				function Rows(props) {
+					return (
+						<div id="provider-component-fake-rows">
+							{props.items.map((item) => <span key={item.id}>{item.label}</span>)}
+						</div>
+					);
+				}
+
+				function Fake(props) {
+					const child = props.children;
+					props.value(isValidElement(child), child.type.name === 'Rows');
+					${shape === 'throwing provider accessor' ? 'reads = 0;' : ''}
+					return child;
+				}
+				${wrapper}
+
+				export function App(props) {
+					const [tick, setTick] = useState(0);
+					const items = props.items;
+					const onChildren = props.onChildren;
+					return (
+						<section>
+							<button id="provider-component-fake-update" onClick={() => setTick(tick + 1)}>
+								{tick}
+							</button>
+							<Wrapper.Provider value={onChildren}>
+								<Rows items={items} />
+							</Wrapper.Provider>
+						</section>
+					);
+				}
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `returned-provider-component-${shape.replaceAll(' ', '-')}.tsx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const observations: Array<[boolean, boolean]> = [];
+			const root = mount(client.App, {
+				items: [{ id: 1, label: 'initial' }],
+				onChildren: (valid: boolean, correctType: boolean) => {
+					observations.push([valid, correctType]);
+				},
+			});
+			const rows = root.find('#provider-component-fake-rows');
+			expect(rows.textContent).toBe('initial');
+			expect(observations.at(-1)).toEqual([true, true]);
+
+			root.click('#provider-component-fake-update');
+			expect(root.find('#provider-component-fake-rows')).toBe(rows);
+			expect(observations.at(-1)).toEqual([true, true]);
+			root.unmount();
+		},
+	);
+
+	it('hydrates returned-JSX provider component rows and preserves nodes across updates', () => {
+		const source = `
+			import { createContext, memo, useContext, useState } from 'octane';
+
+			const Theme = createContext('default');
+
+			function RowImpl(props) {
+				const theme = useContext(Theme);
+				const [own, setOwn] = useState(0);
+				return (
+					<button id="provider-component-hydrated-row" onClick={() => setOwn(own + 1)}>
+						{theme + ':' + props.label + ':' + own}
+					</button>
+				);
+			}
+			const Row = memo(RowImpl);
+
+			function Rows(props) {
+				return (
+					<div id="provider-component-hydrated-rows">
+						{props.items.map((item) => <Row key={item.id} label={item.label} />)}
+					</div>
+				);
+			}
+
+			export function App(props) {
+				const [tick, setTick] = useState(0);
+				const items = props.items;
+				const theme = props.theme;
+				return (
+					<section>
+						<button id="provider-component-hydrated-update" onClick={() => setTick(tick + 1)}>
+							{tick}
+						</button>
+						<Theme.Provider value={theme}>
+							<Rows items={items} />
+						</Theme.Provider>
+					</section>
+				);
+			}
+		`;
+		const id = 'returned-provider-component-hydration.tsx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const items = [{ id: 1, label: 'initial' }];
+		const { html } = ServerRuntime.renderToString(server.App, { items, theme: 'initial' });
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const rows = container.querySelector('#provider-component-hydrated-rows');
+		const row = container.querySelector('#provider-component-hydrated-row');
+
+		const root = hydrateRoot(container, client.App, { items, theme: 'initial' });
+		flushSync(() => {});
+		expect(container.querySelector('#provider-component-hydrated-rows')).toBe(rows);
+		expect(container.querySelector('#provider-component-hydrated-row')).toBe(row);
+		expect(row?.textContent).toBe('initial:initial:0');
+
+		flushSync(() => (row as HTMLElement).click());
+		expect(row?.textContent).toBe('initial:initial:1');
+		flushSync(() =>
+			(container.querySelector('#provider-component-hydrated-update') as HTMLElement).click(),
+		);
+		expect(container.querySelector('#provider-component-hydrated-row')).toBe(row);
+		expect(row?.textContent).toBe('initial:initial:1');
+
+		flushSync(() => root.render(client.App, { items, theme: 'updated' }));
+		expect(container.querySelector('#provider-component-hydrated-rows')).toBe(rows);
+		expect(container.querySelector('#provider-component-hydrated-row')).toBe(row);
+		expect(row?.textContent).toBe('updated:initial:1');
+		flushSync(() =>
+			root.render(client.App, {
+				items: [{ id: 1, label: 'changed' }],
+				theme: 'updated',
+			}),
+		);
+		expect(container.querySelector('#provider-component-hydrated-row')).toBe(row);
+		expect(row?.textContent).toBe('updated:changed:1');
+		root.unmount();
+		container.remove();
 	});
 
 	it('preserves returned-JSX descriptor rows, context, state, keys, refs, and effects', () => {

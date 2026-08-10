@@ -8,11 +8,11 @@ gets absorbed by 1000 shallow-equal prop comparisons, a single prop change must
 re-render exactly one row, and a context bump above the wall must refresh only
 the leaf consumers without re-running any bailed body. Both Octane dialects
 exercise production `autoMemo` on wall A: TSRX can skip the entire pure `RowsA`
-region, while returned JSX preserves its descriptor boundary and skips the
-unchanged compiled keyed list inside `RowsA`. Both dialects reuse wall B's
-imported descriptor calculation and skip its unchanged renderable region while
-preserving context updates; changed inputs still exercise the value-comparing
-memo bail.
+region, while returned JSX preserves and reuses its descriptor boundary,
+skipping `RowsA` and its unchanged compiled keyed list. Both dialects reuse
+wall B's imported descriptor calculation and skip its unchanged renderable
+region while preserving context updates; changed inputs still exercise the
+value-comparing memo bail.
 
 This is the canonical home for octane's `shallowEqualProps` and
 `refreshContextConsumers` numbers — if a store-fanout suite lands later it must
@@ -78,11 +78,11 @@ how `<Row>` is put on screen:
   the compiled forBlock under host-only ancestors; the Octane, React, and
   Preact fixtures keep the identical structure so those columns stay comparable.
   The default production `autoMemo` transform caches the TSRX call to pure
-  `RowsA` by its inferred `items` capture. For returned JSX, `RowsA` still
-  enters through its normal descriptor boundary, but its dense native Array
-  `.map` uses the same whole-list and per-item guards. Custom or overridden map
-  methods, sparse arrays, and calls with additional arguments retain normal
-  JavaScript dispatch.
+  `RowsA` by its inferred `items` capture. For returned JSX, the genuine
+  Provider reuses the private `RowsA` component descriptor when its dense
+  native Array `.map` has already passed the same whole-list and per-item
+  guards. Custom or overridden map methods, sparse arrays, and calls with
+  additional arguments retain normal JavaScript dispatch.
 - **wall B — value-position**: a plain-`.ts` helper (`src/wall-b.ts`) builds
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
@@ -125,12 +125,13 @@ disable automatic memoization. `work.mjs` provides the stronger, untimed gate
 after compilation using Chromium precise call coverage. For TSRX equal/context
 A it requires zero list helpers, keyed survivor visits, descriptors, shallow
 memo comparisons, and row bodies (context A additionally requires exactly 1000
-Leaf refreshes). JSX retains its normal `RowsA`/descriptor entry but likewise
-requires zero keyed survivor visits, item helpers, and memo comparisons on an
-unchanged list. Wall B requires both dialects to reuse unchanged calculations
-with zero keyed survivor visits and memo comparisons for equal/context-only
-updates; context updates still refresh exactly 1000 leaves. Returned-JSX
-wrapper descriptor counts have upper ceilings rather than exact requirements.
+Leaf refreshes). JSX likewise requires zero `RowsA` entries, keyed survivor
+visits, item helpers, and memo comparisons on an unchanged list, retaining at
+most one wrapper descriptor (plus the 1000 refreshed Leaves for context A).
+Wall B requires both dialects to reuse unchanged calculations with zero keyed
+survivor visits and memo comparisons for equal/context-only updates; context
+updates still refresh exactly 1000 leaves. Returned-JSX wrapper descriptor
+counts have upper ceilings rather than exact requirements.
 Mount and one-change A/B also carry exact compiled-work gates.
 
 The React Row/Inner/Leaf counters likewise make those component bodies impure,
@@ -206,9 +207,10 @@ per-operation counts.
   successful prop bails around the single miss. This is the intended "one
   change amid a wall" workload, not a pure single-row-render cost.
 - The uncompiled React control's `parent_rerender_equal` recreates or reconciles
-  1000 row descriptions. Both Octane dialects skip wall A's unchanged keyed list; JSX
-  retains its descriptor-wrapper overhead. Unchanged wall-B helper output can
-  also be cached, while changed inputs exercise descriptor reconciliation.
+  1000 row descriptions. Both Octane dialects skip wall A's unchanged `RowsA`
+  region; JSX retains one outer descriptor wrapper. Unchanged wall-B helper
+  output can also be cached, while changed inputs exercise descriptor
+  reconciliation.
   React Compiler caches both the `.map` and imported helper call. The
   cross-framework ratio is the honest end-to-end cost of each production
   compiler, not an instruction-level apples-to-apples comparison.

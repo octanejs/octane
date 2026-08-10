@@ -18446,6 +18446,40 @@ export function compilerCacheArray(value: unknown, previous: unknown): boolean {
 	return renderable;
 }
 
+/**
+ * Reuse only an immutable array snapshot already proven safe by native mapSlot.
+ *
+ * Probe the private WeakMap first: a custom receiver or observable map getter
+ * that never passed the native path must not acquire new proxy traps or getter
+ * reads merely because its parent region is eligible. Recheck the constant-size
+ * intrinsic/override surface without invoking those getters. Decline own or
+ * inherited default props so their public descriptor read stays observable;
+ * indexed stability follows the existing immutable-snapshot contract.
+ * @internal
+ */
+export function compilerCacheMappedArray(value: unknown, component: unknown): boolean {
+	const cached = NATIVE_ARRAY_ACCESSORS.get(value as object);
+	if (
+		cached === undefined ||
+		typeof component !== 'function' ||
+		'defaultProps' in component ||
+		cached.accessor ||
+		cached.renderable !== undefined ||
+		cached.length !== (value as any[]).length
+	) {
+		return false;
+	}
+
+	return (
+		Object.getPrototypeOf(value) === Array.prototype &&
+		!hasOwnProp.call(value, 'map') &&
+		!hasOwnProp.call(value, 'constructor') &&
+		Object.getOwnPropertyDescriptor(Array.prototype, 'map')?.value === NATIVE_ARRAY_MAP &&
+		Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value === Array &&
+		Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get === NATIVE_ARRAY_SPECIES_GETTER
+	);
+}
+
 /** Shared compiler ABI: native-array eligibility query plus stable keyed map dispatch. */
 export function mapSlot(
 	scopeOrItems: any,

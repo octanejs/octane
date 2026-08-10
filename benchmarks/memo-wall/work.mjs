@@ -152,9 +152,9 @@ const OPS = [
 // visit the survivors but run exactly one item/row/inner/leaf body.
 const JSX_EXPECTATIONS = {
 	mount: { createElement: 11007 },
-	equal_A: { RowsA: 1, createElement: 3 },
+	equal_A: { RowsA: 0, createElement: 1 },
 	one_change_A: { createElement: 8 },
-	context_A: { RowsA: 1, createElement: ROWS + 3 },
+	context_A: { RowsA: 0, createElement: ROWS + 1 },
 	one_change_B: { createElement: ROWS + 6 },
 	context_B: {
 		updateSurvivor: 0,
@@ -174,6 +174,8 @@ const JSX_EXPECTATIONS = {
 // These ceilings allow equivalent returned-JSX output to allocate fewer while
 // keeping row/context execution and keyed-list visits exact.
 const JSX_MAXIMUMS = {
+	equal_A: { createElement: 1 },
+	context_A: { createElement: ROWS + 1 },
 	context_B: { createElement: ROWS + 1 },
 	equal_B_control: { createElement: 1 },
 };
