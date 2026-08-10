@@ -1,0 +1,364 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/store.git",
+    "version": "@tanstack/react-store@0.11.0",
+    "commit": "83e2978f627ec53616249b2bda1037749b18b6ab",
+    "sourceRoot": "packages/react-store/src",
+    "testRoot": "packages/react-store/tests",
+    "license": "MIT",
+    "integrity": "sha256:00e8fa1891d1b70a83838b15aec65ea5817c7b88aa737ead07dea9dbce14897f",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-store/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-store/tests/conformance"],
+      "include": ["upstream-index\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 30,
+    "uniqueIdentities": 30,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "2f12206d595e23940425db8561b90212741437c7038c51631e00eb6ffad39aea"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-store-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-store-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact @tanstack/react-store@0.11.0 Vitest suite after vendored-byte verification.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-store/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-store/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "9ab9e8f8fb87e6521c01403d652b9a2a169f83412708cc6928c59dd9bded8f6a"
+        },
+        {
+          "path": "packages/tanstack-store/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "00062ee440ee8c637aeca4c521cb1dc875ca8c256234f34f755c4be46a3c3ad3"
+        },
+        {
+          "path": "packages/tanstack-store/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "b170c981f491d3501cb76a7ba1003ea88a38ba0804ea0706936bdf7985b79b37"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-store-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "cd6455a8f3ea984d4d0adbefb270d82cb811ec5bac2f3dcf739d27c60966282d"
+        },
+        {
+          "path": "packages/tanstack-store/scripts/run-pristine-upstream.mjs",
+          "role": "support",
+          "sha256": "04da786339b230abe5c0511d8b658a7fcdb8fc85e80a27fb1d03bcca65bf52be"
+        },
+        {
+          "path": "packages/tanstack-store/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "682394291a575181d26118f9037f589cd19311025f5bd6895cbf7027cfa92e91"
+        },
+        {
+          "path": "packages/tanstack-store/scripts/verify-upstream.mjs",
+          "role": "support",
+          "sha256": "082590c6edb1bf9bd11c20ed5659763853fe83a511e584d7f3cb123dd03b330c"
+        },
+        {
+          "path": "packages/tanstack-store/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "edaa458866b5a172ae1dcdca7aa36a0378efd4ddf3dfb6904e6923727857ee95"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-store-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-store",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the one-for-one adapted packages/react-store/tests/index.test.tsx suite with an executable assertion-group crosswalk and allowed-transformation ledger. Upstream _useStore cases are classified not-applicable outside this adapted evidence.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-store/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-store/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "e25cbd446e9231d1de9fd02573c71339cf90d240ab32a38e8992d25164e5fd7d"
+        },
+        {
+          "path": "packages/tanstack-store/audit/runtime-parity.json",
+          "role": "support",
+          "sha256": "afd3e1a97c823c561988cb7071c7a6561f91f7a26772a4136cb76fb3ae6039c3"
+        },
+        {
+          "path": "packages/tanstack-store/tests/conformance/upstream-index.test.ts",
+          "role": "support",
+          "sha256": "4e9ce9ec53c7ff7e480e7a994980435a0a926448224d5109c165f04a36e45f32"
+        },
+        {
+          "path": "packages/tanstack-store/tests/_fixtures/upstream/index.tsrx",
+          "role": "support",
+          "sha256": "1f432dac06f6668c94f85b209a6731667b79373c091aee777b2d8e7a719c4ce0"
+        },
+        {
+          "path": "packages/tanstack-store/tests/conformance/test-setup.ts",
+          "role": "support",
+          "sha256": "631944237a0593316c06b531b9b1874e190360fb14074da6acc715713ed332b9"
+        },
+        {
+          "path": "packages/tanstack-store/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "edaa458866b5a172ae1dcdca7aa36a0378efd4ddf3dfb6904e6923727857ee95"
+        },
+        {
+          "path": "packages/tanstack-store/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "db8e4a7c35caaf6d2c0f61ad034935a7eb9306af91800b815049e0774580f5fa"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-store-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-store-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs vendored packages/react-store/tests/test.test-d.ts with tsc against @tanstack/react-store@0.11.0, including _useStore typetests.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-store/audit/upstream-typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-store/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "c28643e83a20c9e8c9580aa37dc324b3b50fd98abf21097a854797b16baaa1e7",
+          "cases": [
+            {
+              "id": "types:tanstack-store-pristine-upstream",
+              "testName": "packages/react-store/tests/test.test-d.ts",
+              "fullName": "packages/react-store/tests/test.test-d.ts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-store/audit/type-parity.json",
+          "role": "support",
+          "sha256": "a760aeb5dede692fff87767aba80ceeb3ac4d926cd56fa4447e33e25b98920d8"
+        },
+        {
+          "path": "packages/tanstack-store/audit/upstream-typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "bdb0c155420d9b2158a62d65109b4ca7230b46998978216dba846209e142eeba"
+        },
+        {
+          "path": "packages/tanstack-store/upstream/tests/test.test-d.ts",
+          "role": "support",
+          "sha256": "db885a95b7220f9db79b0edd5d49e767c6e19fae0f685553c42021fdfa61e0bf"
+        },
+        {
+          "path": "packages/tanstack-store/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "edaa458866b5a172ae1dcdca7aa36a0378efd4ddf3dfb6904e6923727857ee95"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-store-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-store-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the structurally equivalent Octane typetest after permitted import-root transformation via parity-only tsconfig.adapted.json. The _useStore omission typetest is executed by tanstack-store-useStore-omission-types, not this lane.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-store/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-store/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "7c60fde11c510f1de2218f7c150a6c2311908834522fbb25cffbaf7969a80618",
+          "cases": [
+            {
+              "id": "types:tanstack-store-adapted-upstream",
+              "testName": "packages/react-store/tests/test.test-d.ts adapted contract",
+              "fullName": "packages/react-store/tests/test.test-d.ts adapted contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-store/typetests/test.test-d.ts",
+          "role": "support",
+          "sha256": "62a83619637b787a44a2dadfa9cbb59c1c9e9df1c1acd8844a869e583cd5b3a9"
+        },
+        {
+          "path": "packages/tanstack-store/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "4985ef1a507c2d236fad7c923bff3655286b4667c789ea3ea212f54b119dccdf"
+        },
+        {
+          "path": "packages/tanstack-store/audit/type-parity.json",
+          "role": "support",
+          "sha256": "a760aeb5dede692fff87767aba80ceeb3ac4d926cd56fa4447e33e25b98920d8"
+        },
+        {
+          "path": "packages/tanstack-store/audit/pristine-types.json",
+          "role": "support",
+          "sha256": "c28643e83a20c9e8c9580aa37dc324b3b50fd98abf21097a854797b16baaa1e7"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-store-useStore-omission-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-store-useStore-omission-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the authenticated Octane-only _useStore omission typetest with tsrx-tsc. Paired ordinary runtime evidence stays in experimental-use-store.parity.test.ts outside react-parity ownership.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-store/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-store/typetests/_useStore-omission.test-d.ts",
+          "role": "test",
+          "sha256": "fdcc64ae88377f5b802a6429efb94ccf88d7e182f1b26d191bcadd226e2900ba",
+          "cases": [
+            {
+              "id": "types:tanstack-store-useStore-omission",
+              "testName": "omits the upstream experimental _useStore hook",
+              "fullName": "omits the upstream experimental _useStore hook"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-store/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "c045d177e942c1dc1ec3b5bc8ebc1718a976f23c888171fc01764cfbb606fa67"
+        },
+        {
+          "path": "packages/tanstack-store/audit/type-parity.json",
+          "role": "support",
+          "sha256": "a760aeb5dede692fff87767aba80ceeb3ac4d926cd56fa4447e33e25b98920d8"
+        },
+        {
+          "path": "packages/tanstack-store/audit/adapted-types.json",
+          "role": "support",
+          "sha256": "7c60fde11c510f1de2218f7c150a6c2311908834522fbb25cffbaf7969a80618"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-store-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-store-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the exact selector, atom, created-store, action, and context scenario against @tanstack/react-store@0.11.0.",
+      "files": [
+        {
+          "path": "packages/tanstack-store/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "c0e5f9c50d87145f3306532144fea7ad8e4cc3b9b36385f72ecce7a45b49c575",
+          "cases": [
+            {
+              "id": "differential:tanstack-store-public-contract",
+              "testName": "updates selectors, atoms, created stores, actions, and context identically",
+              "fullName": "differential: @octanejs/tanstack-store vs @tanstack/react-store updates selectors, atoms, created stores, actions, and context identically"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-store/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "f9f5a54a2fa499c0ee2c9a112ef36394e729dbc302156d72291244ce9725fa7d"
+        },
+        {
+          "path": "packages/tanstack-store/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "1657529172f3d6beab732c51edd124d3a54b1caf679806a5bc8f405a7dc2d33c"
+        },
+        {
+          "path": "packages/tanstack-store/tests/_fixtures/differential/parity.tsrx",
+          "role": "support",
+          "sha256": "7aff5688701aaba0cd483a9231c2834d2b2a1525f04b52583fe204402a3e61e7"
+        },
+        {
+          "path": "packages/tanstack-store/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "db8e4a7c35caaf6d2c0f61ad034935a7eb9306af91800b815049e0774580f5fa"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "tanstack-store-experimental-use-store",
+      "caseIds": ["types:tanstack-store-useStore-omission"],
+      "upstreamResult": "@tanstack/react-store exports the experimental _useStore hook.",
+      "octaneResult": "@octanejs/tanstack-store intentionally omits _useStore while retaining the stable useSelector and useStore APIs.",
+      "rationale": "The experimental hook is not part of the supported stable binding surface.",
+      "classification": "intentional-omission",
+      "consumerImpact": "Consumers cannot import _useStore from the Octane binding.",
+      "migrationGuidance": "Use useSelector with store actions or setState, or the deprecated stable useStore compatibility hook.",
+      "owner": "@octanejs/tanstack-store",
+      "reviewCondition": "Review if TanStack promotes _useStore to a stable public API."
+    }
+  ]
+}

@@ -30,6 +30,8 @@ import { verifyAlienSignalsTypes } from './alien-signals-types-lib.mjs';
 import { verifyAlienSignalsTestClassifications } from './alien-signals-classifications-lib.mjs';
 import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.mjs';
 import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtime.mjs';
+import { verifyTanstackStoreTypes } from './tanstack-store-types-lib.mjs';
+import { verifyTanstackStoreUpstreamEvidence } from './tanstack-store-upstream-lib.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
@@ -135,6 +137,14 @@ try {
 	verifyIntersectionObserverTestClassifications(REPO);
 } catch (error) {
 	errors.push(`intersection-observer test classifications are invalid: ${error.message}`);
+	verifyTanstackStoreTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tanstack-store type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyTanstackStoreUpstreamEvidence(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tanstack-store upstream evidence is invalid: ${error.message}`);
 }
 try {
 	verifySolanaReactTypes(REPO);
@@ -322,6 +332,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// verifyLivestoreTestClassifications; hook-form/streamdown share this verifier.
 		// Livestore keeps a dedicated classifier (different dispositions); other
 		// bindings with test-classifications.json share binding-classifications-lib.
+		// Livestore keeps a dedicated disposition vocabulary and verifier.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))

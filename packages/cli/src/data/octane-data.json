@@ -831,7 +831,7 @@
         "The upstream experimental `_useStore` hook is intentionally omitted; use `useSelector` with `store.actions` or `store.setState` instead."
       ],
       "ssr": "Supported: selectors, writable atoms, and store context read their current snapshots during server rendering; the adapter has no browser-only initialization.",
-      "verified": "2026-07-15"
+      "verified": "2026-08-09"
     },
     {
       "name": "@octanejs/tanstack-table",

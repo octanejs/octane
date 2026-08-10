@@ -2,10 +2,11 @@ import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
 import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
 
-const fixture = resolve(__dirname, '../_fixtures/parity.tsrx');
+const fixture = resolve(__dirname, '../_fixtures/differential/parity.tsrx');
 const cache = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/tanstack-store vs @tanstack/react-store', () => {
+	// @parity-case differential:tanstack-store-public-contract
 	it('updates selectors, atoms, created stores, actions, and context identically', async () => {
 		const differential = await mountDifferential(fixture, 'StoreParity', undefined, cache);
 

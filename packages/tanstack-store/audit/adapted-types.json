@@ -1,0 +1,31 @@
+[
+  {
+    "path": "test.test-d.ts",
+    "sha256": "62a83619637b787a44a2dadfa9cbb59c1c9e9df1c1acd8844a869e583cd5b3a9",
+    "assertionGroups": [
+      "ea32e265ede59f6c487e2e997d2167076d39f06b112df11ca777b7b13ba390ef",
+      "ded1af4a0a5f8017da9f88b0058dffd5c457eef0dd8cf0381cae1f5c4a29adca",
+      "3376089c69058bcfa5c5cf701e753b50791b274e43aeac2537e29633e4e494de",
+      "993c19ecb18ca1cf3082537e2c166a08b64ebc2394016e3d1524ca3a8883e6cf",
+      "993c19ecb18ca1cf3082537e2c166a08b64ebc2394016e3d1524ca3a8883e6cf",
+      "823015726856d0e596c3c8401dd4540dcffc4423dbab8ac3bd7f66d00c0e43b5",
+      "316b2726796fb4c1bbba9e2d1129b83c6991aa9cc7472a7954604b7209076d85",
+      "6b60c0e980deec153699cd18b2e007e0e45e83ba20f75be0bebd7c35014092fe",
+      "cb713c2de9d5ce71aae9161ae4df026b46e5b030d208c80930e40d63835566e2",
+      "b89752ad1af8cf663f64d84d3de95e76a7521ef0631f0ca6094124317ecd7e50",
+      "1725515c4d23f9576c33a649e6b4c730199eb83b76148011a1ddb47c9bdc013b",
+      "cde078baccbb527f9ac028118b7f3e63f217289ed07ec7c2aa1cca25d270c8f0",
+      "b90cacc964167adf22535e6b92b5cdd868830421bf240ccfe40554e5258817a5",
+      "782585d6fb3be41e822bb7d45cf0816689ee4de2e82eb1a078a2fa555c606aa6"
+    ]
+  },
+  {
+    "path": "packages/tanstack-store/typetests/_useStore-omission.test-d.ts",
+    "role": "divergence-evidence",
+    "sha256": "fdcc64ae88377f5b802a6429efb94ccf88d7e182f1b26d191bcadd226e2900ba",
+    "assertionGroups": [
+      "02eb07c2398e64f5da8916c7dc021fc6f9068cbd82b2fc6c2a014387602e31b7",
+      "bc1fd238357a95d030dcec0b4192c13cd9a08edfd98af03be345b597a6880e26"
+    ]
+  }
+]

@@ -1573,12 +1573,57 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-store-pristine',
+					include: ['packages/tanstack-store/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-store/tests/conformance/upstream-index.test.ts'],
+				},
 				test: {
 					name: 'tanstack-store',
 					include: [
 						'packages/tanstack-store/tests/conformance/**/*.test.ts',
-						'packages/tanstack-store/tests/differential/**/*.test.ts',
+						'packages/tanstack-store/tests/differential/setup.test.ts',
 					],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/tanstack-store/tests/upstream-original.test.ts',
+					],
+					environment: 'jsdom',
+					setupFiles: ['packages/tanstack-store/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-store-differential',
+					include: ['packages/tanstack-store/tests/differential/parity.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/tanstack-store/tests/differential/_setup.ts'],
 					globals: false,
