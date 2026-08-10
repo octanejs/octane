@@ -43,6 +43,8 @@ import { verifyTiptapTypes } from './tiptap-types-lib.mjs';
 import { verifyTiptapRuntimeCrosswalk } from './tiptap-runtime-lib.mjs';
 import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mjs';
 import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
+import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
+import { verifyVisxTypes } from './visx-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -275,6 +277,14 @@ try {
 	verifyTanstackHotkeysTestClassifications(REPO);
 } catch (error) {
 	errors.push(`tanstack-hotkeys test classifications are invalid: ${error.message}`);
+	verifyVisxTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/visx type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyVisxTestClassifications(REPO);
+} catch (error) {
+	errors.push(`visx test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components
@@ -349,6 +359,9 @@ for (const relativeFile of CLAIM_FILES) {
 			errors.push(`${relativeFile} contains a misleading React-port count claim (${pattern}).`);
 	}
 }
+// Bindings that opt into the shared hook-form disposition schema fail closed here.
+// livestore uses its own verifier; bindings without classifications stay optional.
+const PORT_TEST_CLASSIFICATION_BINDINGS = new Set(['hook-form']);
 for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
@@ -383,6 +396,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		)
+		if (PORT_TEST_CLASSIFICATION_BINDINGS.has(binding))
 			verifyPortTestClassifications(REPO, binding);
 		await verifyManifestFiles(manifest, REPO);
 		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });

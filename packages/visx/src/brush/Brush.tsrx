@@ -1,3 +1,5 @@
+// OCTANE DIVERGENCE[visx-functional-controllers-no-class-refs][differential:visx-functional-controllers]:
+// Brush is a functional TSRX controller and intentionally omits upstream's legacy class-instance innerRef handle.
 import type { SVGProps } from 'react';
 import type { OctaneNode } from 'octane';
 import BaseBrush from './BaseBrush.tsrx';

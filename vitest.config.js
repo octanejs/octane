@@ -3355,9 +3355,25 @@ export default defineConfig({
 					name: 'visx',
 					include: [
 						'packages/visx/tests/conformance/**/*.test.ts',
-						'packages/visx/tests/differential/**/*.test.ts',
 						'packages/visx/tests/hydration/**/*.test.ts',
 					],
+					exclude: ['packages/visx/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					testTimeout: 30_000,
+					server: { deps: { inline: [/^@visx\//] } },
+				},
+				plugins: [octane(), visxCoverageSource()],
+				resolve: { alias: VISX_ALIASES },
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/visx/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'visx-differential',
+					include: ['packages/visx/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/visx/tests/differential/_setup.ts'],
 					globals: false,
