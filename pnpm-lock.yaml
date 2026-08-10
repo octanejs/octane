@@ -5,6 +5,19 @@ settings:
   excludeLinksFromLockfile: false
 
 catalogs:
+  cmdk-react-oracle:
+    '@types/react':
+      specifier: 19.2.17
+      version: 19.2.17
+    '@types/react-dom':
+      specifier: 19.2.3
+      version: 19.2.3
+    react:
+      specifier: 19.2.7
+      version: 19.2.7
+    react-dom:
+      specifier: 19.2.7
+      version: 19.2.7
   default:
     '@apollo/client':
       specifier: 4.2.6
@@ -4405,6 +4418,12 @@ importers:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.56(react@19.2.7)
+      '@types/react':
+        specifier: catalog:cmdk-react-oracle
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: catalog:cmdk-react-oracle
+        version: 19.2.3(@types/react@19.2.17)
       cmdk:
         specifier: catalog:default
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -4415,10 +4434,10 @@ importers:
         specifier: workspace:*
         version: link:../octane
       react:
-        specifier: catalog:default
+        specifier: catalog:cmdk-react-oracle
         version: 19.2.7
       react-dom:
-        specifier: catalog:default
+        specifier: catalog:cmdk-react-oracle
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default

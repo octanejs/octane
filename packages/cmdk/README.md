@@ -15,7 +15,9 @@ wiring to Octane (native events, ref-as-prop, `useId`), and building on
 > and `defaultFilter` — with filtering, score sorting, keyboard navigation,
 > controlled modes, and SSR + hydration. `asChild` is the one unsupported prop.
 > A differential suite runs the same fixture through this port and the published
-> `cmdk@1.1.1` on React and asserts byte-equal HTML. See
+> `cmdk@1.1.1` on React and asserts byte-equal HTML for its declared cases. The
+> canonical upstream Playwright suite is vendored but not yet adapted
+> exhaustively, so parity remains recorded-unverified. See [`UPSTREAM.md`](./UPSTREAM.md),
 > [`docs/cmdk-port-plan.md`](../../docs/cmdk-port-plan.md) and the authoritative
 > [`docs/bindings-status.md`](../../docs/bindings-status.md).
 
@@ -47,9 +49,10 @@ Standard Octane binding adaptations (see
   on. Upstream never registers them, so it does neither.
 - `Command.Dialog` also accepts `defaultOpen` and `modal`; upstream forwards
   only `open`/`onOpenChange`.
-- After a search is cleared, items stay in the order `sort()` left them rather
-  than returning to source order — octane's reconciler does not reposition nodes
-  it did not move. Same items, same selection; only the residual order differs.
+- Score ranking uses CSS `order` while filtering instead of physically moving
+  renderer-owned nodes. Clearing the search removes those declarations and
+  restores source order; DOM-order selectors can differ from visual order while
+  a filter is active.
 
 ## License
 

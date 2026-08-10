@@ -6,6 +6,7 @@ import type { EmptyProps } from '../types';
 export function Empty(props: EmptyProps) @{
 	const store = useStore()!;
 
+	// OCTANE DIVERGENCE[force-mount-empty-count][differential:cmdk-force-mount-empty]:
 	// Force-mounted items never enter `filtered.count`, so consult both: "no
 	// results" must not render while any item is visible.
 	const snapshot = () => {
@@ -13,6 +14,7 @@ export function Empty(props: EmptyProps) @{
 		return state.filtered.count === 0 && state.forceMountedCount === 0;
 	};
 
+	// OCTANE DIVERGENCE[ssr-empty-suppressed][differential:cmdk-ssr-empty]:
 	// The server snapshot is `false`. Items register in layout effects, which do
 	// not run on the server, so the count is unavoidably 0 there — rendering on
 	// that would ship "No results found." above a fully-populated list on every
