@@ -3,14 +3,20 @@
 // Four sections: the normalized at-a-glance explorer (the same linked bar/heatmap
 // component the home page stages, fed the matrix recomputed from FRAMEWORK_CARDS so
 // it can never drift from the cards below), then the cross-framework comparisons,
-// then the head-to-head stack targets, then the octane-internal de-opt
+// then the head-to-head stack targets, then the Lynx dual-thread renderer
+// suites, then the octane-internal de-opt
 // ("authoring cliff") suites. All numbers are the
 // checked-in benchmark scores; the page cannot drift from the repo because the
 // JSON is imported at build time.
 import { BenchBars } from '../../components/BenchBars.tsrx';
 import { BenchmarkExplorer } from '../../components/BenchmarkExplorer.tsrx';
 import { OnThisPage } from '../../components/OnThisPage.tsrx';
-import { FRAMEWORK_CARDS, OCTANE_CARDS, TARGET_CARDS } from '../../content/benchmarks.ts';
+import {
+	FRAMEWORK_CARDS,
+	LYNX_CARDS,
+	OCTANE_CARDS,
+	TARGET_CARDS,
+} from '../../content/benchmarks.ts';
 import { createHomeSummary } from '../../content/home-benchmark.ts';
 import { useAnimatedMobileNavigation } from '../../hooks/use-animated-mobile-navigation.ts';
 import { useTitle } from '../../hooks/use-title.ts';
@@ -34,6 +40,8 @@ export const BENCH_SECTIONS: readonly { id: string; title: string; level?: 2 | 3
 	),
 	{ id: 'bench-targets', title: 'Head-to-head targets' },
 	...TARGET_CARDS.map((card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const })),
+	{ id: 'bench-lynx', title: 'Octane on Lynx' },
+	...LYNX_CARDS.map((card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const })),
 	{ id: 'bench-internal', title: 'The authoring cliff' },
 	...OCTANE_CARDS.map((card) => ({ id: cardAnchor(card), title: card.title, level: 3 as const })),
 ];
@@ -137,6 +145,30 @@ export function Benchmarks() @{
 					</p>
 					<div class="benchpage-grid">
 						@for (const card of TARGET_CARDS; key card.id) {
+							<div
+								class="benchpage-anchor"
+								id={cardAnchor(card)}
+								role="group"
+								aria-label={card.title}
+							>
+								<BenchBars card={card} />
+							</div>
+						}
+					</div>
+				</section>
+
+				<section class="benchpage-section" aria-labelledby="bench-lynx">
+					<h2 id="bench-lynx" class="benchpage-h2">Octane on Lynx</h2>
+					<p class="benchpage-note">
+						The dual-thread Lynx renderer on the same cross-framework table app as ReactLynx and
+						both Vue Lynx renderers, measured two ways: wall clock on the Lynx-for-Web host with one
+						shared page driver, and the deterministic wire cost of each commit — command counts
+						against the changed-rows floor, exact and machine-independent, gated in CI. The gap
+						between the wire bars is a KNOWN GAP the lynx-table ratio guards track; fixes tighten
+						the guards and close the bars.
+					</p>
+					<div class="benchpage-grid">
+						@for (const card of LYNX_CARDS; key card.id) {
 							<div
 								class="benchpage-anchor"
 								id={cardAnchor(card)}

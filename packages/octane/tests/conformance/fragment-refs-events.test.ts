@@ -132,6 +132,68 @@ describe('FragmentInstance.addEventListener / removeEventListener', () => {
 		r.unmount();
 	});
 
+	// Per ReactDOMFragmentRefs-test.js:2872.
+	it('treats passive:true and passive:false as same listener per DOM spec', () => {
+		const fragRef = makeRef();
+		const r = mount(SingleChild, { fragRef });
+		const child = r.find('#k');
+		let fired = 0;
+		const handler = () => fired++;
+		fragRef.current!.addEventListener('click', handler, { passive: false });
+		fragRef.current!.addEventListener('click', handler, { passive: true });
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js:2911.
+	it('removes a listener registered with passive:false when removed with passive:true', () => {
+		const fragRef = makeRef();
+		const r = mount(SingleChild, { fragRef });
+		const child = r.find('#k');
+		let fired = 0;
+		const handler = () => fired++;
+		fragRef.current!.addEventListener('click', handler, { passive: false });
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		fragRef.current!.removeEventListener('click', handler, { passive: true });
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js:850.
+	it('removes a capture listener registered with boolean when removed with options object', () => {
+		const fragRef = makeRef();
+		const r = mount(SingleChild, { fragRef });
+		const child = r.find('#k');
+		let fired = 0;
+		const handler = () => fired++;
+		fragRef.current!.addEventListener('click', handler, true);
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		fragRef.current!.removeEventListener('click', handler, { capture: true });
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js:887.
+	it('removes a capture listener registered with options object when removed with boolean', () => {
+		const fragRef = makeRef();
+		const r = mount(SingleChild, { fragRef });
+		const child = r.find('#k');
+		let fired = 0;
+		const handler = () => fired++;
+		fragRef.current!.addEventListener('click', handler, { capture: true });
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		fragRef.current!.removeEventListener('click', handler, true);
+		child.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(fired).toBe(1);
+		r.unmount();
+	});
+
 	it('addEventListener supports object listeners ({ handleEvent })', () => {
 		const fragRef = makeRef();
 		const r = mount(SingleChild, { fragRef });

@@ -6,8 +6,39 @@ import { createContext, useContext } from 'octane';
 export interface MotionConfigValue {
 	transition?: any;
 	reducedMotion?: 'always' | 'never' | 'user';
+	shouldReduceMotion?: boolean;
 }
-export const MotionConfigContext = createContext<MotionConfigValue>({});
+export const MotionConfigContext = createContext<MotionConfigValue>({
+	reducedMotion: 'never',
+	shouldReduceMotion: false,
+});
+
+// LayoutGroup namespaces shared layout ids. Nested groups inherit and compose
+// ids by default, matching Motion's `parent-child-layoutId` convention.
+export interface LayoutGroupValue {
+	id?: string;
+	/** @internal Collision-free namespace segments used by the layoutId registry. */
+	layoutIdNamespace?: readonly string[];
+}
+export const LayoutGroupContext = createContext<LayoutGroupValue>({});
+
+export interface MotionFeatureBundle {
+	animation: boolean;
+	gestures: boolean;
+	drag: boolean;
+	layout: boolean;
+}
+
+export interface LazyMotionValue {
+	features: MotionFeatureBundle | null;
+	strict: boolean;
+	provided: boolean;
+}
+export const LazyMotionContext = createContext<LazyMotionValue>({
+	features: null,
+	strict: false,
+	provided: false,
+});
 
 // Variant labels propagated from a parent motion element to its descendants, so a
 // child with `variants` but no explicit `animate` inherits the parent's active

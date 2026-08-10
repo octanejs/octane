@@ -14,7 +14,12 @@ import { beforeAll, describe, it, expect, inject } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { waitForReadyState } from './support/server-process.ts';
-import { FRAMEWORK_CARDS, OCTANE_CARDS, TARGET_CARDS } from '../src/content/benchmarks.ts';
+import {
+	FRAMEWORK_CARDS,
+	LYNX_CARDS,
+	OCTANE_CARDS,
+	TARGET_CARDS,
+} from '../src/content/benchmarks.ts';
 
 const origin = inject('productionOrigin');
 const outputDir = inject('productionOutputDir');
@@ -137,7 +142,7 @@ describe('built Start server', () => {
 	// slower CI runners.
 	it('server-renders /benchmarks with complete bar charts and table data', async () => {
 		const { response, html } = await get('/benchmarks');
-		const cards = [...FRAMEWORK_CARDS, ...TARGET_CARDS, ...OCTANE_CARDS];
+		const cards = [...FRAMEWORK_CARDS, ...TARGET_CARDS, ...LYNX_CARDS, ...OCTANE_CARDS];
 		// Each card server-renders its default "overall" view: one geomean bar per
 		// series with a computable ratio vs the reference (rows where either side
 		// is missing or zero drop out); single-series cards chart every operation.
@@ -165,6 +170,7 @@ describe('built Start server', () => {
 		expect(classCount(html, 'benchpage')).toBeGreaterThan(0);
 		expect(html).toContain('aria-labelledby="bench-frameworks"');
 		expect(html).toContain('aria-labelledby="bench-targets"');
+		expect(html).toContain('aria-labelledby="bench-lynx"');
 		expect(html).toContain('aria-labelledby="bench-internal"');
 		// Every no-JS benchmark card ships both the real chart and its accessible table.
 		expect(classCount(html, 'bench-card')).toBe(cards.length);

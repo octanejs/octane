@@ -738,6 +738,44 @@ function Search({ ref }) @{
 A ref may be a callback, a `{ current }` object, or an array of refs as shown
 above.
 
+### Fragment refs
+
+An explicit `<Fragment ref={ref}>` provides a typed `FragmentInstance` without
+adding a wrapper element. This matches React's Canary Fragment-ref API; the
+`<>...</>` shorthand cannot accept a ref.
+
+Refs also work through imported aliases, namespace members, JSX spreads, and
+`createElement(Fragment, { ref }, ...)` descriptors.
+
+```tsx
+import { Fragment, type FragmentInstance, useRef } from 'octane';
+
+function SearchFields() {
+  const fields = useRef<FragmentInstance | null>(null);
+
+  return (
+    <Fragment ref={fields}>
+      <input />
+      <button onClick={() => fields.current?.focus()}>Focus first field</button>
+    </Fragment>
+  );
+}
+```
+
+`FragmentInstance` exposes `addEventListener`, `removeEventListener`,
+`dispatchEvent`, `focus`, `focusLast`, `blur`, `observeUsing`, `unobserveUsing`,
+`getClientRects`, `getRootNode`, `compareDocumentPosition`, and
+`scrollIntoView`. Event listeners, observers, geometry, and scrolling target the
+Fragment's first-level DOM children; focus searches descendants depth-first.
+`scrollIntoView` accepts only an optional alignment boolean, not an options
+object. First-level children expose their owning instances through
+`reactFragments: Set<FragmentInstance>`.
+
+Fragment refs are inactive during server rendering and attach during client
+hydration. Octane roots require an `Element`, so React's empty-fragment scrolling
+fallbacks for roots mounted directly into a `ShadowRoot` or `DocumentFragment`
+are outside the supported root-container surface.
+
 ## SSR and streaming
 
 ### Rendering surface

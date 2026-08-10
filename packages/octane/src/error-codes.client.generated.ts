@@ -36,6 +36,8 @@ type ClientErrorArguments = {
 	28: [];
 	29: [];
 	46: [unknown, unknown];
+	49: [];
+	50: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -176,6 +178,13 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					'Expected %s listener to be a function, instead got a value of `%s` type.',
 					args,
 				);
+			case 49:
+				return formatDevErrorMessage(
+					'FragmentInstance.scrollIntoView() does not support scrollIntoViewOptions. Use the alignToTop boolean instead.',
+					args,
+				);
+			case 50:
+				return formatDevErrorMessage('Unclosed server-rendered Fragment descriptor.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

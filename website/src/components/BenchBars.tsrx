@@ -34,6 +34,15 @@ function fmtX(value: unknown): string {
 	return n.toFixed(2) + '×';
 }
 
+// Deterministic operation counters (format: 'count') — exact integers with
+// thousands separators; no unit suffix and no decimal padding.
+function fmtCount(value: unknown): string {
+	const n =
+		typeof value === 'number' ? value : Number(value);
+	if (!Number.isFinite(n)) return '—';
+	return Math.round(n).toLocaleString('en-US');
+}
+
 function fmtBytes(value: unknown): string {
 	const n =
 		typeof value === 'number' ? value : Number(value);
@@ -85,13 +94,17 @@ export function BenchBars(props: { card: BenchCard }) @{
 			? fmtX
 			: card.format === 'bytes'
 				? fmtBytes
-				: fmt;
+				: card.format === 'count'
+					? fmtCount
+					: fmt;
 	const tableCaption =
 		card.format === 'x'
 			? 'Data table (× vs Octane, geometric mean across operations)'
 			: card.format === 'bytes'
 				? 'Data table (production build bytes)'
-				: 'Data table (score ms, ' + card.iterations + ' iterations)';
+				: card.format === 'count'
+					? 'Data table (deterministic counts)'
+					: 'Data table (score ms, ' + card.iterations + ' iterations)';
 	// Multi-series cards compare frameworks within one operation at a time —
 	// opening on the "overall" summary (each series' geometric mean across the
 	// card's operations, × vs the first series). Single-series cards compare

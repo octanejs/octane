@@ -15,8 +15,8 @@
  * server renderer does — effects no-op, memo runs once, ids are deterministic).
  * Every dynamic site is
  * wrapped in the hydration markers (`constants.ts`) the client `hydrateRoot`
- * cursor adopts. Events and refs are dropped (no DOM on the server); fragment
- * refs (`<Fragment ref={…}>`) are rejected by the compiler in server mode.
+ * cursor adopts. Events and refs are dropped (no DOM on the server); Fragment
+ * refs retain their range markers only when producing hydratable output.
  */
 
 // ---------------------------------------------------------------------------
@@ -668,6 +668,27 @@ function fragmentDescriptorChildren(value: ElementDescriptor): any[] {
 	return Array.isArray(children) ? children : [children];
 }
 
+/** Server counterpart of the client's cold ref-bearing Fragment wrapper. */
+function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor {
+	return {
+		$$kind: ELEMENT_TAG,
+		type: renderFragmentRefDescriptor,
+		props: value,
+		key: value.key,
+		ref: null,
+		children: null,
+	};
+}
+
+/** Retain the exact range adopted by the client without attaching its ref. */
+function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: SSRScope): string {
+	return (
+		ssrFragmentMarker(true, descriptor.ref) +
+		ssrChild(descriptor.children, scope) +
+		ssrFragmentMarker(false)
+	);
+}
+
 type SsrDeoptWrapperKind = 'array' | 'fragment';
 
 interface PreparedSsrDeoptList {
@@ -708,6 +729,11 @@ function flattenSsrChildContainer(
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
+			if (item.ref != null || Object.prototype.hasOwnProperty.call(item.props, 'ref')) {
+				outItems.push(fragmentRefDescriptor(item));
+				outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+				continue;
+			}
 			const nested = fragmentDescriptorChildren(item);
 			if (item.key != null) {
 				flattenSsrChildContainer(outItems, outKeys, nested, 'fragment', [
@@ -747,6 +773,12 @@ function prepareSsrDeoptList(value: any, includeKeyedSingle: boolean): PreparedS
 	// descriptor, text, null) is the common one — build the two output arrays only
 	// once a list regime is established. Mirrors prepareDeoptList in runtime.ts.
 	if (isFragmentDescriptor(value)) {
+		if (value.ref != null || Object.prototype.hasOwnProperty.call(value.props, 'ref')) {
+			return {
+				items: [fragmentRefDescriptor(value)],
+				keys: [scopedSsrDeoptKey([], value, 0, value.key ?? 0)],
+			};
+		}
 		const items: any[] = [];
 		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
@@ -1557,6 +1589,15 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  */
 export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+}
+
+/**
+ * Preserve a Fragment ref's authored evaluation order without attaching its
+ * value. Hydratable output needs the exact comments its client template adopts;
+ * static markup omits them along with every other hydration-only marker.
+ */
+export function ssrFragmentMarker(open: boolean, _ref?: unknown): string {
+	return MARKERS ? (open ? '<!--frag-->' : '<!--/frag-->') : '';
 }
 
 /**
@@ -3327,14 +3368,18 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 						permanentStaticAncestor,
 						streamTokenForPendingHtml(children),
 					);
-					const seedSidecar =
+					const seedJson =
 						permanentStaticAncestor || childSeeds.length === 0
+							? null
+							: serializeSuspenseSeedJson(childSeeds);
+					const seedSidecar =
+						seedJson === null || seedJson === '[]'
 							? ''
 							: '<script type="application/json" ' +
 								HYDRATE_SEED_ATTR +
 								NONCE_ATTR +
 								'>' +
-								serializeSuspenseSeedJson(childSeeds) +
+								seedJson +
 								'</script>';
 
 					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
@@ -3715,8 +3760,14 @@ type HydrationRejectionPayload =
 	| { kind: 'fallback'; message: string };
 
 const HYDRATION_REJECTION_SEED = Symbol('octane.ssr.hydration-rejection-seed');
+const HYDRATION_SITE_EVENT = Symbol('octane.ssr.hydration-site');
 interface HydrationRejectionSeed {
 	[HYDRATION_REJECTION_SEED]: HydrationRejectionPayload;
+}
+
+interface HydrationSiteEvent {
+	[HYDRATION_SITE_EVENT]: string;
+	value: unknown;
 }
 
 interface ReasonSnapshotState {
@@ -3891,8 +3942,28 @@ function isHydrationRejectionSeed(value: unknown): value is HydrationRejectionSe
 	);
 }
 
-function recordHydrationRejection(serial: unknown[] | null, reason: unknown): void {
-	if (serial !== null) serial.push(hydrationRejectionSeed(reason));
+function recordHydrationSeed(serial: unknown[] | null, value: unknown, directSite?: string): void {
+	if (serial === null) return;
+	serial.push(
+		directSite === undefined
+			? value
+			: {
+					[HYDRATION_SITE_EVENT]: directSite,
+					value,
+				},
+	);
+}
+
+function recordSkippedHydrationSite(serial: unknown[] | null, directSite?: string): void {
+	if (directSite !== undefined) recordHydrationSeed(serial, HYDRATION_SITE_EVENT, directSite);
+}
+
+function recordHydrationRejection(
+	serial: unknown[] | null,
+	reason: unknown,
+	directSite?: string,
+): void {
+	recordHydrationSeed(serial, hydrationRejectionSeed(reason), directSite);
 }
 
 function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
@@ -3909,14 +3980,22 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 export function use<T>(
 	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
 	siteKey?: symbol | string,
+	directSite?: string,
 ): T;
 export function use<T>(
 	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
 	siteKey?: ServerHookSlot,
+	directSite?: string,
 ): T {
-	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
-	const serial = hasExternalHydrationOwner(usable as PromiseLike<unknown>) ? null : SERIAL;
+	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
+		recordSkippedHydrationSite(SERIAL, directSite);
+		return readContext(usable as Context<T>);
+	}
+	const externalOwner = hasExternalHydrationOwner(usable as PromiseLike<unknown>);
+	const serial = externalOwner ? null : SERIAL;
+	if (externalOwner) recordSkippedHydrationSite(SERIAL, directSite);
 	if (usable == null || typeof (usable as any).then !== 'function') {
+		if (!externalOwner) recordSkippedHydrationSite(SERIAL, directSite);
 		// Cold path: a FOREIGN host context inside a hosted server pass reads
 		// through the installed host hook (§6.4); anything else diagnoses.
 		return readHostedForeignContext(usable, 'use');
@@ -3955,10 +4034,10 @@ export function use<T>(
 			// Livelock-guard consumption mark (armed only after a first strike).
 			RESOLVED.pu.touched?.add(usable as PromiseLike<unknown>);
 			if ('reason' in entryT) {
-				recordHydrationRejection(serial, entryT.reason);
+				recordHydrationRejection(serial, entryT.reason, directSite);
 				throw entryT.reason;
 			}
-			if (serial !== null) serial.push(entryT.value);
+			recordHydrationSeed(serial, entryT.value, directSite);
 			return entryT.value as T;
 		}
 	}
@@ -3979,11 +4058,11 @@ export function use<T>(
 		// Serialize a typed rejection seed first so hydration takes the same catch
 		// arm even when the client receives a fresh, still-pending thenable.
 		if ('reason' in entry) {
-			recordHydrationRejection(serial, entry.reason);
+			recordHydrationRejection(serial, entry.reason, directSite);
 			throw entry.reason;
 		}
 		// Resolved → return it, and record it (in render order) for client seeding.
-		if (serial !== null) serial.push(entry.value);
+		recordHydrationSeed(serial, entry.value, directSite);
 		return entry.value as T;
 	}
 	// React-compatible instrumented thenables expose their synchronous state on
@@ -3999,11 +4078,11 @@ export function use<T>(
 	let status = instrumented.status;
 	const wasUninstrumented = status === undefined;
 	if (status === 'fulfilled') {
-		if (serial !== null) serial.push(instrumented.value);
+		recordHydrationSeed(serial, instrumented.value, directSite);
 		return instrumented.value as T;
 	}
 	if (status === 'rejected') {
-		recordHydrationRejection(serial, instrumented.reason);
+		recordHydrationRejection(serial, instrumented.reason, directSite);
 		throw instrumented.reason;
 	}
 	if (wasUninstrumented) {
@@ -4029,11 +4108,11 @@ export function use<T>(
 		);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
-			if (serial !== null) serial.push(instrumented.value);
+			recordHydrationSeed(serial, instrumented.value, directSite);
 			return instrumented.value as T;
 		}
 		if (status === 'rejected') {
-			recordHydrationRejection(serial, instrumented.reason);
+			recordHydrationRejection(serial, instrumented.reason, directSite);
 			throw instrumented.reason;
 		}
 	}
@@ -4041,11 +4120,11 @@ export function use<T>(
 		instrumented.then(NOOP, NOOP);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
-			if (serial !== null) serial.push(instrumented.value);
+			recordHydrationSeed(serial, instrumented.value, directSite);
 			return instrumented.value as T;
 		}
 		if (status === 'rejected') {
-			recordHydrationRejection(serial, instrumented.reason);
+			recordHydrationRejection(serial, instrumented.reason, directSite);
 			throw instrumented.reason;
 		}
 	}
@@ -5108,25 +5187,50 @@ export function getSsrSuspenseTimeout(): number {
 function serializeSuspenseSeedJson(values: unknown[]): string {
 	let wireValues: unknown[] | null = null;
 	let rejections: Array<[number, HydrationRejectionPayload]> | null = null;
+	let sites: Array<[string, number]> | null = null;
+	let hasSeededSite = false;
 	for (let i = 0; i < values.length; i++) {
-		const value = values[i];
-		if (!isHydrationRejectionSeed(value)) continue;
-		wireValues ??= values.slice();
-		rejections ??= [];
-		wireValues[i] = null;
-		rejections.push([i, value[HYDRATION_REJECTION_SEED]]);
+		let value = values[i];
+		if (
+			value !== null &&
+			typeof value === 'object' &&
+			Object.prototype.hasOwnProperty.call(value, HYDRATION_SITE_EVENT)
+		) {
+			wireValues ??= values.slice(0, i);
+			sites ??= [];
+			const event = value as HydrationSiteEvent;
+			value = event.value;
+			if (value === HYDRATION_SITE_EVENT) {
+				sites.push([event[HYDRATION_SITE_EVENT], -1]);
+				continue;
+			}
+			hasSeededSite = true;
+			sites.push([event[HYDRATION_SITE_EVENT], wireValues.length]);
+		}
+		if (isHydrationRejectionSeed(value)) {
+			wireValues ??= values.slice(0, i);
+			rejections ??= [];
+			rejections.push([wireValues.length, value[HYDRATION_REJECTION_SEED]]);
+			wireValues.push(null);
+		} else if (wireValues !== null) {
+			wireValues.push(value);
+		}
 	}
-	// Successful seeds retain the established compact array format. Rejections
-	// use renderer-owned TOP-LEVEL metadata, so a fulfilled user value shaped
-	// like the old in-band sentinel can never be mistaken for control data.
+	const actualValues = wireValues ?? values;
+	// Successful untagged seeds retain the established compact array format.
+	// Rejections and compiler-owned site outcomes use renderer-owned TOP-LEVEL
+	// metadata so fulfilled user values cannot collide with either protocol.
+	// Unseeded site outcomes matter only when a seeded site exists in the same
+	// scope; otherwise the client can safely execute every request factory.
 	const payload =
-		rejections === null
-			? values
+		rejections === null && !hasSeededSite
+			? actualValues
 			: {
 					[REJECTION_SENTINEL_KEY]: {
 						version: 1,
-						values: wireValues!,
-						rejections,
+						values: actualValues,
+						rejections: rejections ?? [],
+						...(hasSeededSite ? { sites: sites! } : {}),
 					},
 				};
 	const undefinedWire = SUSPENSE_SEED_WIRE_PREFIX + 'u';
@@ -5152,6 +5256,7 @@ function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
 	// the client — not `null`. Prefix-leading user strings are escaped first, so
 	// neither sentinel-shaped objects nor user strings can collide with it.
 	const json = serializeSuspenseSeedJson(values);
+	if (json === '[]') return '';
 	return (
 		'<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + nonceAttr + '>' + json + '</script>'
 	);
@@ -6769,8 +6874,15 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	let seedScript = '';
 	if (b.seeds.length > 0) {
 		const json = serializeSuspenseSeedJson(b.seeds);
-		seedScript =
-			'<script type="application/json" ' + STREAM_SEED_ATTR + nonceAttr + '>' + json + '</script>';
+		if (json !== '[]') {
+			seedScript =
+				'<script type="application/json" ' +
+				STREAM_SEED_ATTR +
+				nonceAttr +
+				'>' +
+				json +
+				'</script>';
+		}
 	}
 	// ViewTransition arm candidates are renderer-only staging attributes. Strip
 	// them while this is still markup: once the parsing-safe carrier below turns

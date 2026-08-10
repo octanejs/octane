@@ -327,13 +327,13 @@
       "version": "0.1.32",
       "category": "UI and interaction",
       "upstream": { "package": "motion", "version": "12.42.2" },
-      "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, and the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
+      "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
       "divergences": [
         "Exit animations run via cleanup-before-detach instead of React's deferred-deletion machinery.",
         "`layout`/`layoutId` use single-element FLIP, not the full projection tree."
       ],
       "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-      "verified": "2026-07-21"
+      "verified": "2026-07-31"
     },
     {
       "name": "@octanejs/nuqs",
@@ -1240,6 +1240,16 @@
     "48": {
       "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
       "runtime": ["server"],
+      "status": "active"
+    },
+    "49": {
+      "message": "FragmentInstance.scrollIntoView() does not support scrollIntoViewOptions. Use the alignToTop boolean instead.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "50": {
+      "message": "Unclosed server-rendered Fragment descriptor.",
+      "runtime": ["client"],
       "status": "active"
     }
   }

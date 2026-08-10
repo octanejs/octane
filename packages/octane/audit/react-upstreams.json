@@ -326,6 +326,16 @@
       "rationale": "Remaining function-component, element, JSX-runtime, context, transition, and diagnostic outcomes require exact Octane public-API evidence or a narrower case-level divergence disposition."
     },
     {
+      "id": "fragment-refs",
+      "workstream": "Fragment refs",
+      "filePattern": "/ReactDOMFragmentRefs-test\\.js$",
+      "risk": "high",
+      "status": "covered",
+      "classification": "adaptable",
+      "owner": "runtime + compiler + SSR + hydration",
+      "rationale": "All 61 stable/canary FragmentInstance scenarios have exact executable public evidence for typed refs, lifecycle, native listeners, observers, focus, geometry, document position, scrolling, portals, Activity visibility, and text nodes; buffered/streaming SSR and matching hydration additionally prove server refs stay inactive until client attachment."
+    },
+    {
       "id": "react-dom-residual",
       "workstream": "React DOM residual audit",
       "filePattern": "^packages/react-dom/",
