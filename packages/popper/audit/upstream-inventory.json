@@ -1,0 +1,739 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "package": "react-popper",
+    "version": "2.3.0",
+    "tag": "v2.3.0",
+    "commit": "b636fa3ceee14245d670a0c438fe4343c31258e5",
+    "npmIntegrity": "sha512-e1hj8lL3uM+sgSR4Lxzn5h1GxBlpa4CQz0XLF8kx4MDrDRWY0Ena4c97PUeSX9i5W3UAfDP0z0FXCTQkoXUl3Q==",
+    "npmShasum": "17891c620e1320dce318bad9fede46a5f71c70ba",
+    "license": "MIT"
+  },
+  "publicSurface": {
+    "runtimeExports": [
+      "Manager",
+      "Popper",
+      "Reference",
+      "usePopper"
+    ],
+    "typeExports": [
+      "ManagerProps",
+      "Modifier",
+      "PopperArrowProps",
+      "PopperChildrenProps",
+      "PopperProps",
+      "RefHandler",
+      "ReferenceChildrenProps",
+      "ReferenceProps",
+      "StrictModifier"
+    ],
+    "subpaths": [
+      "."
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "npm/CHANGELOG.md",
+      "bytes": 4421,
+      "sha256": "11b07932fef5b54ec451223318c27e10829932f706a40575046a22ecbbd9c1a7"
+    },
+    {
+      "path": "npm/LICENSE",
+      "bytes": 1087,
+      "sha256": "7d8e07a60e4aa02d24648ce987b644c2e0978234d209fe454a4fe91701867355"
+    },
+    {
+      "path": "npm/README.md",
+      "bytes": 2501,
+      "sha256": "7f772a57916fdf1e11bcaa78d798378f29987ee30a085eb35b44ded73f65731a"
+    },
+    {
+      "path": "npm/dist/index.umd.js",
+      "bytes": 15806,
+      "sha256": "eedf40457c84b0905c81b6ac1f45b7ca26177136d0c6e777e9a427c4d626fc7f"
+    },
+    {
+      "path": "npm/dist/index.umd.min.js",
+      "bytes": 5279,
+      "sha256": "ed3e3a2c6b2c196ea0aad1ccd1217782b888497d08d78ca8097083a3c807ddbb"
+    },
+    {
+      "path": "npm/lib/cjs/Manager.js",
+      "bytes": 2215,
+      "sha256": "8312b8b29421b65cb8640c8f6d9aeada8fb8208fa089edb4ae9465782c030c83"
+    },
+    {
+      "path": "npm/lib/cjs/Manager.js.flow",
+      "bytes": 1053,
+      "sha256": "26415a5f1845b6b2c7277b7b4c4c14dbe961a3e279a338500172577e65c6d28f"
+    },
+    {
+      "path": "npm/lib/cjs/Popper.js",
+      "bytes": 3743,
+      "sha256": "9a19f9002e4649ae294bd290fe0d2b690e1be4c801be4454b3a70343856324cf"
+    },
+    {
+      "path": "npm/lib/cjs/Popper.js.flow",
+      "bytes": 3111,
+      "sha256": "a6929e66f38708a82956bbb7a8c075eb19dbfb22d447aa8a645998d05800b083"
+    },
+    {
+      "path": "npm/lib/cjs/RefTypes.js",
+      "bytes": 13,
+      "sha256": "5ecf2f4d83e6260dabd6ec48e76d8ddebccf956563f34072221bf960d3b8c255"
+    },
+    {
+      "path": "npm/lib/cjs/RefTypes.js.flow",
+      "bytes": 145,
+      "sha256": "4cd9ff503628dbc3acf21178c163b1eee888b8b900c9d6815afdcf54cb2cd895"
+    },
+    {
+      "path": "npm/lib/cjs/Reference.js",
+      "bytes": 2177,
+      "sha256": "1a29f3db610dd63e1c95b70126650bc665cb7f9aa1bdde1121f5d98b568231a8"
+    },
+    {
+      "path": "npm/lib/cjs/Reference.js.flow",
+      "bytes": 1142,
+      "sha256": "b235575de82747b5db05e39352c2bcd31db4bedaa20e333fca3eb8c083dd5076"
+    },
+    {
+      "path": "npm/lib/cjs/__typings__/main-test.js",
+      "bytes": 3345,
+      "sha256": "a4981ad8d60572bb9e4c7bfee63e81370b51f43e676a436eb392b72dc6b629dd"
+    },
+    {
+      "path": "npm/lib/cjs/index.js",
+      "bytes": 746,
+      "sha256": "e81ac236e73917a359adf1b9e49d8e21088ffa5419bd73cac77e5330c6fcbc27"
+    },
+    {
+      "path": "npm/lib/cjs/index.js.flow",
+      "bytes": 607,
+      "sha256": "4b486c41a7d1e4ca54607f0a354cc25e213d7d8c08c51b061c6287f62e063774"
+    },
+    {
+      "path": "npm/lib/cjs/usePopper.js",
+      "bytes": 4723,
+      "sha256": "cf5b140be932361b6a79a63d1cecdb75a0b1314c573862142342a78c5056b118"
+    },
+    {
+      "path": "npm/lib/cjs/usePopper.js.flow",
+      "bytes": 4052,
+      "sha256": "af02977b0dbc10a8d820cad5e2b1ddad787e8ae9cd12c53a62baf8fb5c43a38a"
+    },
+    {
+      "path": "npm/lib/cjs/utils.js",
+      "bytes": 2879,
+      "sha256": "b309136ff11ea30e4aab2e952a3a1356b806c35afc73b14ddd7be2d40a9df5b7"
+    },
+    {
+      "path": "npm/lib/cjs/utils.js.flow",
+      "bytes": 1497,
+      "sha256": "170a157e45f2c8667977cf3e8282ed60a23371d9f3ae82a778f073dc69448dff"
+    },
+    {
+      "path": "npm/lib/esm/Manager.js",
+      "bytes": 905,
+      "sha256": "3e73fc83e0c80e0c35bf189331b8a8a4c06e285ca6bb78067c7f47f60942a7e7"
+    },
+    {
+      "path": "npm/lib/esm/Popper.js",
+      "bytes": 2638,
+      "sha256": "118b1c0ea8857887578c354fc76c5fd1ec056b2794fc0a6b3917d78e2f351df4"
+    },
+    {
+      "path": "npm/lib/esm/RefTypes.js",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "npm/lib/esm/Reference.js",
+      "bytes": 934,
+      "sha256": "0a62825cbb8ced7d53a83cfea2eba8ff4421e038e193ab6d2feda99c08dab07f"
+    },
+    {
+      "path": "npm/lib/esm/__typings__/main-test.js",
+      "bytes": 2380,
+      "sha256": "fef92f79104bf4cbcdc7b28851f88333fc4ff7575ea422678f43633310cbf1dd"
+    },
+    {
+      "path": "npm/lib/esm/index.js",
+      "bytes": 240,
+      "sha256": "f2768a5c76bbabb51001060a5e574ef43ffda38f42fa8dd74a1d71c5bd34e117"
+    },
+    {
+      "path": "npm/lib/esm/usePopper.js",
+      "bytes": 3430,
+      "sha256": "503872388b7245fee5ffd83ebb6610fb1a58e6f2cc5dd0ddbe92a8467d164088"
+    },
+    {
+      "path": "npm/lib/esm/utils.js",
+      "bytes": 1524,
+      "sha256": "1ec62056330598737d4ddfcb39d9fdd6c1fac944ff4dc558cb7b85785198735c"
+    },
+    {
+      "path": "npm/package.json",
+      "bytes": 3751,
+      "sha256": "6961cfbc8c882e5c7f5df7477f4e811dbb3043c71631c17a691a247e1719eedb"
+    },
+    {
+      "path": "npm/typings/react-popper.d.ts",
+      "bytes": 2708,
+      "sha256": "7ed8a817989d55241e710dd80af79d02004ca675ad73d92894c0d61248ad423d"
+    },
+    {
+      "path": "tag/.babelrc",
+      "bytes": 411,
+      "sha256": "c532f0920c29fe0c90be84fa10c2c3ed70ecd3af925c89802a759708cccbe4bd"
+    },
+    {
+      "path": "tag/LICENSE",
+      "bytes": 1087,
+      "sha256": "7d8e07a60e4aa02d24648ce987b644c2e0978234d209fe454a4fe91701867355"
+    },
+    {
+      "path": "tag/README.md",
+      "bytes": 2501,
+      "sha256": "7f772a57916fdf1e11bcaa78d798378f29987ee30a085eb35b44ded73f65731a"
+    },
+    {
+      "path": "tag/jest.setup.js",
+      "bytes": 42,
+      "sha256": "7955e0090caa8832514604367b8c9dccc91498631711e8c401108fa9a4b49abf"
+    },
+    {
+      "path": "tag/package.json",
+      "bytes": 3751,
+      "sha256": "6961cfbc8c882e5c7f5df7477f4e811dbb3043c71631c17a691a247e1719eedb"
+    },
+    {
+      "path": "tag/src/Manager.js",
+      "bytes": 1053,
+      "sha256": "26415a5f1845b6b2c7277b7b4c4c14dbe961a3e279a338500172577e65c6d28f"
+    },
+    {
+      "path": "tag/src/Manager.test.js",
+      "bytes": 934,
+      "sha256": "3454fb4539fbac0ed3727dced7ed8d1c8f3d7303f86c492cdd22351f5197db94"
+    },
+    {
+      "path": "tag/src/Popper.js",
+      "bytes": 3111,
+      "sha256": "a6929e66f38708a82956bbb7a8c075eb19dbfb22d447aa8a645998d05800b083"
+    },
+    {
+      "path": "tag/src/Popper.test.js",
+      "bytes": 3907,
+      "sha256": "bb85e876aa913a4c8d3415e9bc0ba38084f17f65c9940e4148870af3ad1a6a04"
+    },
+    {
+      "path": "tag/src/RefTypes.js",
+      "bytes": 145,
+      "sha256": "4cd9ff503628dbc3acf21178c163b1eee888b8b900c9d6815afdcf54cb2cd895"
+    },
+    {
+      "path": "tag/src/Reference.js",
+      "bytes": 1142,
+      "sha256": "b235575de82747b5db05e39352c2bcd31db4bedaa20e333fca3eb8c083dd5076"
+    },
+    {
+      "path": "tag/src/Reference.test.js",
+      "bytes": 1980,
+      "sha256": "79ddcc803fc4a813c2e37c74f61a8c8f0bc798a6f8f3f015841b4cd0609010a9"
+    },
+    {
+      "path": "tag/src/__snapshots__/Manager.test.js.snap",
+      "bytes": 226,
+      "sha256": "216a5973588d3eea671f6b02018c1b3f6a750c781f9ecfae2c7ed8cc8bd53721"
+    },
+    {
+      "path": "tag/src/__snapshots__/Popper.test.js.snap",
+      "bytes": 392,
+      "sha256": "5f196fea8eb332feb834e5ead074de3e2e4c6fced020f7f5480f8a3409bad682"
+    },
+    {
+      "path": "tag/src/__snapshots__/Reference.test.js.snap",
+      "bytes": 175,
+      "sha256": "3b513d7160533381778eb38cd57d799fcbc3f0886134558db15d830b4080e3c2"
+    },
+    {
+      "path": "tag/src/__typings__/main-test.js",
+      "bytes": 1509,
+      "sha256": "9d1af983b63c6569f8aaf2d197377a43b019ddc2eea6dc186253c01675d11abd"
+    },
+    {
+      "path": "tag/src/index.js",
+      "bytes": 607,
+      "sha256": "4b486c41a7d1e4ca54607f0a354cc25e213d7d8c08c51b061c6287f62e063774"
+    },
+    {
+      "path": "tag/src/usePopper.js",
+      "bytes": 4052,
+      "sha256": "af02977b0dbc10a8d820cad5e2b1ddad787e8ae9cd12c53a62baf8fb5c43a38a"
+    },
+    {
+      "path": "tag/src/usePopper.test.js",
+      "bytes": 3398,
+      "sha256": "60f890fb6e93b511f046e1d2a5927a93768121e8224aac0e77e97c34756c1ba7"
+    },
+    {
+      "path": "tag/src/utils.js",
+      "bytes": 1497,
+      "sha256": "170a157e45f2c8667977cf3e8282ed60a23371d9f3ae82a778f073dc69448dff"
+    },
+    {
+      "path": "tag/typings/react-popper.d.ts",
+      "bytes": 2708,
+      "sha256": "7ed8a817989d55241e710dd80af79d02004ca675ad73d92894c0d61248ad423d"
+    },
+    {
+      "path": "tag/typings/tests/main-test.tsx",
+      "bytes": 2033,
+      "sha256": "01a7c18182a94ababe7be342aa4f48dde561d48679e82847186860b1a51ac684"
+    },
+    {
+      "path": "tag/typings/tests/svg-test.tsx",
+      "bytes": 1116,
+      "sha256": "0e84b6ac8cd2372d87288d4cebd5fee6c466077e63b6a095e8cad03a3fd0d68e"
+    },
+    {
+      "path": "tag/typings/tests/tsconfig.json",
+      "bytes": 235,
+      "sha256": "d5a914de8df64ea5bff38115a097b0b41fa5688accf91621138f965fc787731a"
+    }
+  ],
+  "upstreamCases": [
+    {
+      "id": "tag/src/Manager.test.js::renders the expected markup",
+      "file": "tag/src/Manager.test.js",
+      "line": 10,
+      "name": "renders the expected markup",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Manager.test.js::connects Popper and Reference",
+      "file": "tag/src/Manager.test.js",
+      "line": 19,
+      "name": "connects Popper and Reference",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Popper.test.js::renders the expected markup",
+      "file": "tag/src/Popper.test.js",
+      "line": 35,
+      "name": "renders the expected markup",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Popper.test.js::handles changing refs gracefully",
+      "file": "tag/src/Popper.test.js",
+      "line": 44,
+      "name": "handles changing refs gracefully",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Popper.test.js::accepts a ref function",
+      "file": "tag/src/Popper.test.js",
+      "line": 66,
+      "name": "accepts a ref function",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Popper.test.js::accepts a ref object",
+      "file": "tag/src/Popper.test.js",
+      "line": 83,
+      "name": "accepts a ref object",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Popper.test.js::accepts a `referenceElement` property",
+      "file": "tag/src/Popper.test.js",
+      "line": 100,
+      "name": "accepts a `referenceElement` property",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Popper.test.js::should update placement when property is changed",
+      "file": "tag/src/Popper.test.js",
+      "line": 122,
+      "name": "should update placement when property is changed",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Reference.test.js::renders the expected markup",
+      "file": "tag/src/Reference.test.js",
+      "line": 18,
+      "name": "renders the expected markup",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Reference.test.js::consumes the ManagerReferenceNodeSetterContext from Manager",
+      "file": "tag/src/Reference.test.js",
+      "line": 29,
+      "name": "consumes the ManagerReferenceNodeSetterContext from Manager",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Reference.test.js::warns when setReferenceNode is present",
+      "file": "tag/src/Reference.test.js",
+      "line": 40,
+      "name": "warns when setReferenceNode is present",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/Reference.test.js::does not warn when setReferenceNode is not present",
+      "file": "tag/src/Reference.test.js",
+      "line": 54,
+      "name": "does not warn when setReferenceNode is not present",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/usePopper.test.js::initializes the Popper instance",
+      "file": "tag/src/usePopper.test.js",
+      "line": 15,
+      "name": "initializes the Popper instance",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/usePopper.test.js::doesn't update Popper instance on props update if not needed by Popper",
+      "file": "tag/src/usePopper.test.js",
+      "line": 25,
+      "name": "doesn't update Popper instance on props update if not needed by Popper",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/usePopper.test.js::updates Popper on explicitly listed props change",
+      "file": "tag/src/usePopper.test.js",
+      "line": 42,
+      "name": "updates Popper on explicitly listed props change",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/usePopper.test.js::does not update Popper on generic props change",
+      "file": "tag/src/usePopper.test.js",
+      "line": 60,
+      "name": "does not update Popper on generic props change",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/usePopper.test.js::destroys Popper on instance on unmount",
+      "file": "tag/src/usePopper.test.js",
+      "line": 79,
+      "name": "destroys Popper on instance on unmount",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/src/usePopper.test.js::Initializes the arrow positioning",
+      "file": "tag/src/usePopper.test.js",
+      "line": 94,
+      "name": "Initializes the arrow positioning",
+      "kind": "runtime"
+    },
+    {
+      "id": "tag/typings/tests/main-test.tsx::type program",
+      "file": "tag/typings/tests/main-test.tsx",
+      "line": 1,
+      "name": "type program",
+      "kind": "types"
+    },
+    {
+      "id": "tag/typings/tests/svg-test.tsx::type program",
+      "file": "tag/typings/tests/svg-test.tsx",
+      "line": 1,
+      "name": "type program",
+      "kind": "types"
+    }
+  ],
+  "crosswalk": [
+    {
+      "upstream": "tag/src/Manager.test.js::renders the expected markup",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Manager.test.tsx::renders the expected markup",
+      "adaptedStructure": {
+        "title": "renders the expected markup",
+        "tokens": [
+          "assert:elements.toHaveLength",
+          "assert:elements[0].tagName.toBe",
+          "assert:elements[0].id.toBe",
+          "assert:elements[1].tagName.toBe",
+          "assert:elements[1].id.toBe"
+        ],
+        "sha256": "3695c0157f0c1ba27410cf522c19ab74b719b3a8f52b3b51d2167fb31aa77217"
+      }
+    },
+    {
+      "upstream": "tag/src/Manager.test.js::connects Popper and Reference",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Manager.test.tsx::connects Popper and Reference",
+      "adaptedStructure": {
+        "title": "connects Popper and Reference",
+        "tokens": [
+          "assert:spy.toHaveBeenCalled",
+          "assert:spy.mock.calls[0][0].toBeInstanceOf",
+          "assert:spy.mock.calls[0][1].toBeInstanceOf",
+          "spy:Popperjs, 'createPopper'",
+          "matcher:toHaveBeenCalled:",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "901ebf93f805db2939296f615353280f05ed53de613609fe94b6dae77aea3b16"
+      }
+    },
+    {
+      "upstream": "tag/src/Popper.test.js::renders the expected markup",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Popper.test.tsx::renders the expected markup",
+      "adaptedStructure": {
+        "title": "renders the expected markup",
+        "tokens": [
+          "assert:popper.getAttribute('data-placement'",
+          "assert:popper.style.position.toBe",
+          "assert:popper.style.left.toBe",
+          "assert:popper.style.top.toBe",
+          "assert:popper.style.transform.toBe",
+          "assert:arrow.style.position.toBe",
+          "assert:arrow.style.left.toBe",
+          "assert:arrow.style.transform.toBe",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "42a1b74b1cf38e93dbb77c0c603ef0cb6fb2b61b4cf5cdaef74838e6ce3a62cc"
+      }
+    },
+    {
+      "upstream": "tag/src/Popper.test.js::handles changing refs gracefully",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Popper.test.tsx::handles changing refs gracefully",
+      "adaptedStructure": {
+        "title": "handles changing refs gracefully",
+        "tokens": [
+          "assert:function mountTwice("
+        ],
+        "sha256": "662f589ebd1ee5eef0d595956448b4a89a6b4455c1f0052490900d59b09dba61"
+      }
+    },
+    {
+      "upstream": "tag/src/Popper.test.js::accepts a ref function",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Popper.test.tsx::accepts a ref function",
+      "adaptedStructure": {
+        "title": "accepts a ref function",
+        "tokens": [
+          "assert:myRef.toHaveBeenCalledWith",
+          "spy:",
+          "matcher:toHaveBeenCalled:root.find('#popper'",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "7a84fe1c50fbd80ca5c803a961b51d4c848a9b4640cf17faf7b988a3521d8e21"
+      }
+    },
+    {
+      "upstream": "tag/src/Popper.test.js::accepts a ref object",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Popper.test.tsx::accepts a ref object",
+      "adaptedStructure": {
+        "title": "accepts a ref object",
+        "tokens": [
+          "assert:myRef.current.toBe",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "7bbdf71c8e603b07d8c8ebd47615589780cbd608156e7b0984149107236fd992"
+      }
+    },
+    {
+      "upstream": "tag/src/Popper.test.js::accepts a `referenceElement` property",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Popper.test.tsx::accepts a `referenceElement` property",
+      "adaptedStructure": {
+        "title": "accepts a `referenceElement` property",
+        "tokens": [
+          "assert:spy.mock.calls[0][0].toBe",
+          "spy:PopperJs, 'createPopper'",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "d133848282971d42060e2543fc61138c5bb65cee50ac82ce9264c9f5638428a3"
+      }
+    },
+    {
+      "upstream": "tag/src/Popper.test.js::should update placement when property is changed",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Popper.test.tsx::should update placement when property is changed",
+      "adaptedStructure": {
+        "title": "should update placement when property is changed",
+        "tokens": [
+          "assert:root.find('#popper'.getAttribute",
+          "assert:root.find('#popper'",
+          "assert:popper.getAttribute('data-placement'"
+        ],
+        "sha256": "5ebb85498b5c4302a1015678fe19b3ff46c9c5b241998fa35b6da4c8caf862e8"
+      }
+    },
+    {
+      "upstream": "tag/src/Reference.test.js::renders the expected markup",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Reference.test.tsx::renders the expected markup",
+      "adaptedStructure": {
+        "title": "renders the expected markup",
+        "tokens": [
+          "assert:reference.toBeInstanceOf",
+          "assert:reference.tagName.toBe",
+          "assert:reference.childNodes.length.toBe",
+          "assert:root.container.querySelectorAll('*'.length",
+          "assert:root.container.firstElementChild.toBe",
+          "spy:"
+        ],
+        "sha256": "57b14a8726c24fedc6e58fd9a838c69e82213d542d14644991c8509fcf2b17a9"
+      }
+    },
+    {
+      "upstream": "tag/src/Reference.test.js::consumes the ManagerReferenceNodeSetterContext from Manager",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Reference.test.tsx::consumes the ManagerReferenceNodeSetterContext from Manager",
+      "adaptedStructure": {
+        "title": "consumes the ManagerReferenceNodeSetterContext from Manager",
+        "tokens": [
+          "assert:setReferenceNode.toHaveBeenCalled",
+          "spy:",
+          "matcher:toHaveBeenCalled:"
+        ],
+        "sha256": "1a2f6db8d668649cf1127efec4a5f07b1fe1477284bf9c6e125c9febc2d2ff16"
+      }
+    },
+    {
+      "upstream": "tag/src/Reference.test.js::warns when setReferenceNode is present",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Reference.test.tsx::warns when setReferenceNode is present",
+      "adaptedStructure": {
+        "title": "warns when setReferenceNode is present",
+        "tokens": [
+          "assert:error.not",
+          "spy:console, 'error'",
+          "spy:",
+          "matcher:toHaveBeenCalled:"
+        ],
+        "sha256": "f661bdb2254454466bcb7e64507f4583d4d45b916e3daf6e47317a17c0125595"
+      }
+    },
+    {
+      "upstream": "tag/src/Reference.test.js::does not warn when setReferenceNode is not present",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/Reference.test.tsx::does not warn when setReferenceNode is not present",
+      "adaptedStructure": {
+        "title": "does not warn when setReferenceNode is not present",
+        "tokens": [
+          "assert:root.container.querySelectorAll('*'.length",
+          "assert:root.find('#reference'",
+          "assert:error.toHaveBeenCalledWith",
+          "spy:console, 'error'",
+          "matcher:toHaveBeenCalled:'Warning: `Reference` should not be used outside of a `Manager` component.',"
+        ],
+        "sha256": "e06147ad1f12529e22bc9bf312b462116f2dd7cd9de2dbc99880341a15dd9f6c"
+      }
+    },
+    {
+      "upstream": "tag/src/usePopper.test.js::initializes the Popper instance",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/usePopper.test.tsx::initializes the Popper instance",
+      "adaptedStructure": {
+        "title": "initializes the Popper instance",
+        "tokens": [
+          "assert:mock.createPopper.toHaveBeenCalledTimes",
+          "assert:root.find('#result'.getAttribute",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "478d2694636bd8f5f1911a63fb2658f2c59328aa8228b42548f5baf2a10ca8c2"
+      }
+    },
+    {
+      "upstream": "tag/src/usePopper.test.js::doesn't update Popper instance on props update if not needed by Popper",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/usePopper.test.tsx::doesn't update Popper instance on props update if not needed by Popper",
+      "adaptedStructure": {
+        "title": "doesn't update Popper instance on props update if not needed by Popper",
+        "tokens": [
+          "assert:mock.createPopper.toHaveBeenCalledTimes",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "68d458957ef59c82fdeb45a35b19fbc74713aad7f8d72fc32366ff6ffd12cfe4"
+      }
+    },
+    {
+      "upstream": "tag/src/usePopper.test.js::updates Popper on explicitly listed props change",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/usePopper.test.tsx::updates Popper on explicitly listed props change",
+      "adaptedStructure": {
+        "title": "updates Popper on explicitly listed props change",
+        "tokens": [
+          "assert:mock.createPopper.toHaveBeenCalledTimes",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "68d458957ef59c82fdeb45a35b19fbc74713aad7f8d72fc32366ff6ffd12cfe4"
+      }
+    },
+    {
+      "upstream": "tag/src/usePopper.test.js::does not update Popper on generic props change",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/usePopper.test.tsx::does not update Popper on generic props change",
+      "adaptedStructure": {
+        "title": "does not update Popper on generic props change",
+        "tokens": [
+          "assert:mock.createPopper.toHaveBeenCalledTimes",
+          "assert:(mock.instances[0].setOptions as any.mock",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "03900070c7f291e3d6fb6d78133747d6386a58416c7815615ce2e7ae3b93c2dc"
+      }
+    },
+    {
+      "upstream": "tag/src/usePopper.test.js::destroys Popper on instance on unmount",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/usePopper.test.tsx::destroys Popper on instance on unmount",
+      "adaptedStructure": {
+        "title": "destroys Popper on instance on unmount",
+        "tokens": [
+          "assert:mock.instances[0].destroy.toHaveBeenCalled",
+          "matcher:toHaveBeenCalled:",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "97b8eafc3980b1a8bb62f1a46712f9be928a282293d74b03b538ed9415b3495e"
+      }
+    },
+    {
+      "upstream": "tag/src/usePopper.test.js::Initializes the arrow positioning",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/usePopper.test.tsx::Initializes the arrow positioning",
+      "adaptedStructure": {
+        "title": "Initializes the arrow positioning",
+        "tokens": [
+          "assert:root.find('#result'.getAttribute",
+          "assert:root.find('#result'.getAttribute",
+          "assert:root.find('#result'.getAttribute",
+          "scenario:async function",
+          "scenario:await Promise.resolve"
+        ],
+        "sha256": "c6fdcc50d6f0d06349ccb2c7b596e20929342eabc4931a160510207c45b8a421"
+      }
+    },
+    {
+      "upstream": "tag/typings/tests/main-test.tsx::type program",
+      "disposition": "adapted-and-executable",
+      "evidence": "typescript::typetests/main-test.tsx",
+      "adaptedStructure": null
+    },
+    {
+      "upstream": "tag/typings/tests/svg-test.tsx::type program",
+      "disposition": "adapted-and-executable",
+      "evidence": "typescript::typetests/svg-test.tsx",
+      "adaptedStructure": null
+    }
+  ]
+}

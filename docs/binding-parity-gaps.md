@@ -46,6 +46,7 @@ surface and evidence.
 | `@octanejs/motion` | 0 |
 | `@octanejs/nuqs` | 0 |
 | `@octanejs/phosphor-icons` | 0 |
+| `@octanejs/popper` | 0 |
 | `@octanejs/radix` | 0 |
 | `@octanejs/rainbowkit` | 0 |
 | `@octanejs/react-dropzone` | 0 |

@@ -50,6 +50,7 @@
       "@octanejs/floating-ui",
       "@octanejs/animejs",
       "@octanejs/gsap",
+      "@octanejs/popper",
       "@octanejs/motion",
       "@octanejs/react-spring",
       "@octanejs/dnd-kit",

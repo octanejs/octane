@@ -1,0 +1,14 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Popper component renders the expected markup 1`] = `
+<DocumentFragment>
+  <div
+    data-placement="bottom"
+    style="position: absolute; left: 0px; top: 0px; transform: translate(0px, 0px);"
+  >
+    <div
+      style="position: absolute; left: 0px; transform: translate(0px, 0px);"
+    />
+  </div>
+</DocumentFragment>
+`;

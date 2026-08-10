@@ -59,6 +59,8 @@ import { verifyReactDraggableTypes } from './react-draggable-types-lib.mjs';
 import { verifyReactColorfulTypes } from './react-colorful-types-lib.mjs';
 import { verifyReactColorfulUpstream } from './react-colorful-upstream-lib.mjs';
 import { verifyReactColorfulTestClassifications } from './react-colorful-classifications-lib.mjs';
+import { verifyPopperTestClassifications } from './popper-classifications-lib.mjs';
+import { verifyPopperTypes } from './popper-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -358,6 +360,14 @@ try {
 	verifyReactDraggableTestClassifications(REPO);
 } catch (error) {
 	errors.push(`react-draggable test classifications are invalid: ${error.message}`);
+	verifyPopperTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/popper type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyPopperTestClassifications(REPO);
+} catch (error) {
+	errors.push(`@octanejs/popper test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

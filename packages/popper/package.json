@@ -1,0 +1,86 @@
+{
+  "name": "@octanejs/popper",
+  "version": "0.0.1",
+  "description": "Exact Octane binding for react-popper 2.3.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/popper"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "pnpm upstream:verify && pnpm test:audit && pnpm test:type-parity && pnpm typecheck && vitest run --root ../.. --project popper --project popper-ssr --project popper-hydration --project popper-differential",
+    "upstream:verify": "node audit/upstream-inventory.mjs",
+    "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
+    "test:type-parity": "node ../../scripts/react-parity/popper-types.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.public-api.json && tsc --noEmit -p typetests/tsconfig.pristine.json"
+  },
+  "dependencies": {
+    "react-fast-compare": "^3.2.2"
+  },
+  "peerDependencies": {
+    "@popperjs/core": "^2.0.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/polyfill": "^7.12.1",
+    "@babel/preset-env": "^7.28.0",
+    "@babel/preset-flow": "^7.27.1",
+    "@babel/preset-react": "^7.27.1",
+    "@popperjs/core": "2.11.8",
+    "@popperjs/core-pristine": "npm:@popperjs/core@2.3.3",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/react-hooks": "8.0.1",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "babel-jest": "30.4.1",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "pretty-format": "30.4.1",
+    "react": "catalog:default",
+    "react-18": "npm:react@18.3.1",
+    "react-dom": "catalog:default",
+    "react-dom-18": "npm:react-dom@18.3.1",
+    "react-popper": "2.3.0",
+    "react-test-renderer-18": "npm:react-test-renderer@18.3.1",
+    "vite": "catalog:default",
+    "vitest": "catalog:default",
+    "warning": "^4.0.3"
+  }
+}

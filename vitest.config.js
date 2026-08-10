@@ -6236,6 +6236,22 @@ export default defineConfig({
 						'!packages/vaul/tests/browser-conformance/**/*.test.ts',
 						'!packages/vaul/tests/differential/**/*.test.ts',
 						'!packages/vaul/tests/upstream-original.test.ts',
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/popper/tests/upstream/**/*.test.ts',
+						'packages/popper/tests/upstream/**/*.test.tsx',
+					],
+				},
+				test: {
+					name: 'popper',
+					include: [
+						'packages/popper/tests/runtime/**/*.test.ts',
+						'packages/popper/tests/upstream/**/*.test.ts',
+						'packages/popper/tests/upstream/**/*.test.tsx',
+					],
+					exclude: [
+						...configDefaults.exclude,
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -6250,6 +6266,8 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
 							find: /^@octanejs\/vaul$/,
 							replacement: resolve(import.meta.dirname, 'packages/vaul/src/index.tsrx'),
+							find: /^@octanejs\/popper$/,
+							replacement: resolve(import.meta.dirname, 'packages/popper/src/index.ts'),
 						},
 					],
 				},
@@ -6271,6 +6289,9 @@ export default defineConfig({
 				test: {
 					name: 'vaul-differential',
 					include: ['packages/vaul/tests/differential/**/*.test.ts'],
+				test: {
+					name: 'popper-hydration',
+					include: ['packages/popper/tests/hydration/**/*.test.ts'],
 					environment: 'jsdom',
 					globals: false,
 				},
@@ -6283,12 +6304,37 @@ export default defineConfig({
 						},
 					],
 					dedupe: ['react', 'react-dom'],
+							find: /^@octanejs\/popper$/,
+							replacement: resolve(import.meta.dirname, 'packages/popper/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'popper-differential',
+					include: ['packages/popper/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/popper/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/popper$/,
+							replacement: resolve(import.meta.dirname, 'packages/popper/src/index.ts'),
+						},
+					],
 				},
 			},
 			{
 				test: {
 					name: 'vaul-ssr',
 					include: ['packages/vaul/tests/ssr/**/*.test.ts'],
+					name: 'popper-ssr',
+					include: ['packages/popper/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
@@ -6306,6 +6352,8 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/day-picker/src/index.ts'),
 							find: /^@octanejs\/vaul$/,
 							replacement: resolve(import.meta.dirname, 'packages/vaul/src/index.tsrx'),
+							find: /^@octanejs\/popper$/,
+							replacement: resolve(import.meta.dirname, 'packages/popper/src/index.ts'),
 						},
 					],
 				},
@@ -6347,6 +6395,8 @@ export default defineConfig({
 				test: {
 					name: 'vaul-browser-conformance',
 					include: ['packages/vaul/tests/browser-conformance/**/*.test.ts'],
+					name: 'popper-browser',
+					include: ['packages/popper/tests/browser/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 					testTimeout: 60_000,

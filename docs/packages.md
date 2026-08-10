@@ -49,6 +49,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.33` | 2 |
 | `@octanejs/nuqs` | [`packages/nuqs`](../packages/nuqs) | framework binding | `0.1.23` | 7 |
 | `@octanejs/phosphor-icons` | [`packages/phosphor-icons`](../packages/phosphor-icons) | framework binding | `0.0.14` | 2 |
+| `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.1` | 2 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.33` | 1 |
 | `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.14` | 2 |
 | `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.15` | 2 |

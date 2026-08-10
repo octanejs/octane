@@ -47,6 +47,7 @@ export const KNOWN_BINDINGS = {
 	'lucide-react': '@octanejs/lucide',
 	'@phosphor-icons/react': '@octanejs/phosphor-icons',
 	'@floating-ui/react': '@octanejs/floating-ui',
+	'react-popper': '@octanejs/popper',
 	'react-aria': '@octanejs/aria',
 	'react-aria-components': '@octanejs/aria',
 	'react-stately': '@octanejs/aria',

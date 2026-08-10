@@ -22,6 +22,7 @@ import { LiveStoreDemo } from './demos/LiveStore.tsrx';
 import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
 import { ReactSyntaxHighlighterDemo } from './demos/ReactSyntaxHighlighter.tsrx';
 import { ReactColorfulDemo } from './demos/ReactColorful.tsrx';
+import { PopperDemo } from './demos/Popper.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
 import { ReactDraggableDemo } from './demos/ReactDraggable.tsrx';
 import { MobxDemo } from './demos/Mobx.tsrx';
@@ -60,6 +61,7 @@ import liveStoreSource from './demos/LiveStore.tsrx?raw';
 import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
 import reactSyntaxHighlighterSource from './demos/ReactSyntaxHighlighter.tsrx?raw';
 import reactColorfulSource from './demos/ReactColorful.tsrx?raw';
+import popperSource from './demos/Popper.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
 import reactDraggableSource from './demos/ReactDraggable.tsrx?raw';
 import mobxSource from './demos/Mobx.tsrx?raw';
@@ -318,6 +320,10 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Color picker',
 				Component: ReactColorfulDemo,
 				source: reactColorfulSource,
+				id: 'popper',
+				title: 'Popper',
+				Component: PopperDemo,
+				source: popperSource,
 			},
 		],
 	},
