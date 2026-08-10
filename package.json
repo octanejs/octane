@@ -122,6 +122,7 @@
     "babel-plugin-react-compiler": "catalog:default",
     "prettier": "catalog:default",
     "prettier-plugin-svelte": "catalog:default",
+    "playwright": "catalog:default",
     "rulesync": "catalog:default",
     "svelte-check": "catalog:default",
     "typescript": "catalog:default",

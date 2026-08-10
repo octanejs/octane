@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { renderToString } from 'octane/server';
 import { octane } from 'octane/compiler/vite';
@@ -46,13 +47,7 @@ beforeAll(async () => {
 	const address = server.httpServer!.address();
 	if (!address || typeof address === 'string') throw new Error('Vite did not expose a TCP port');
 	baseUrl = `http://127.0.0.1:${address.port}`;
-	try {
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			`Chromium is required for deferred hydration event replay evidence (run \`pnpm --filter octane exec playwright install chromium\`): ${String(error)}`,
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 });
 
 afterEach(async () => {

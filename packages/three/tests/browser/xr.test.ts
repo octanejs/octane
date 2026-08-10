@@ -2,8 +2,10 @@
 import { createServer as createNetServer } from 'node:net';
 import { resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Browser, Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from '../../../octane/src/compiler/vite.js';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { threeRenderers } from '../../src/config.js';
 
 interface XRProofSnapshot {
@@ -56,8 +58,8 @@ function getFreePort(): Promise<number> {
 }
 
 let viteServer: ViteDevServer;
-let browser: import('playwright').Browser;
-let page: import('playwright').Page;
+let browser: Browser;
+let page: Page;
 let origin = '';
 let errors: string[];
 
@@ -73,17 +75,7 @@ async function callProof<T>(method: keyof BrowserXRProof, ...args: unknown[]): P
 }
 
 beforeAll(async () => {
-	let chromium: typeof import('playwright').chromium;
-	try {
-		({ chromium } = await import('playwright'));
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			'[@octanejs/three XR] Chromium is required ' +
-				'(run `pnpm exec playwright install chromium`): ' +
-				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 
 	const port = await getFreePort();
 	viteServer = await createServer({

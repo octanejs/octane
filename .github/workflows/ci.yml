@@ -322,8 +322,11 @@ jobs:
                 "React parity checks",
                 "typecheck",
                 "validate publishable packages",
-                ...["package-builds", "eval-corpus", "browser"].map(
+                ...["package-builds", "eval-corpus"].map(
                   (lane) => `heavy integration (${lane})`,
+                ),
+                ...["chromium", "firefox"].map(
+                  (engine) => `heavy integration (browser - ${engine})`,
                 ),
                 ...["1/3", "2/3", "3/3"].map(
                   (shard) => `example apps (${shard})`,
@@ -579,7 +582,7 @@ jobs:
           --maxWorkers=1
 
   heavy_integration:
-    name: heavy integration (${{ matrix.lane }})
+    name: heavy integration (${{ matrix.lane }}${{ matrix.playwright_browser && format(' - {0}', matrix.playwright_browser) || '' }})
     needs: release_change
     # Run build and browser coverage once on the newest supported Node. The
     # ordinary suite still runs on both Node 22 and 24 above.
@@ -602,7 +605,14 @@ jobs:
             chromium: false
             specs: packages/octane-evals/tests/user-app-corpus.test.ts
           - lane: browser
-            chromium: true
+            playwright_browser: chromium
+            specs: >-
+              packages/octane/tests/browser
+              packages/dexie/tests/browser
+              packages/tiptap/tests/browser
+              packages/three/tests/browser
+          - lane: browser
+            playwright_browser: firefox
             specs: >-
               packages/octane/tests/browser
               packages/dexie/tests/browser
@@ -642,6 +652,14 @@ jobs:
         if: ${{ matrix.chromium && matrix.lane != 'astro' }}
         run: pnpm --filter website exec playwright install --with-deps chromium
 
+      - name: Install selected Playwright browser
+        if: ${{ matrix.lane == 'browser' }}
+        run: pnpm exec playwright install --with-deps ${{ matrix.playwright_browser }}
+
+      - name: Install Playwright Chromium for ownership coverage
+        if: ${{ matrix.lane == 'browser' && matrix.playwright_browser != 'chromium' }}
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Install Playwright WebKit for cross-browser ownership coverage
         if: ${{ matrix.lane == 'browser' }}
         run: pnpm --filter octane exec playwright install --with-deps webkit
@@ -651,6 +669,8 @@ jobs:
         run: pnpm --filter @octanejs/astro exec playwright install --with-deps chromium
 
       - name: Run ${{ matrix.lane }} integration tests
+        env:
+          PLAYWRIGHT_BROWSER: ${{ matrix.playwright_browser }}
         run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
 
       - name: Run Bun compiler-preload integration test

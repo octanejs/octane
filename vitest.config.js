@@ -352,6 +352,17 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'playwright-browser-selector',
+					include: [
+						'test-utils/playwright-browser.test.ts',
+						'test-utils/three-playwright-launch.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'octane',
 					// The individual cases here run in milliseconds; the 5s default was
 					// being tripped by machine contention, not by the code under test
