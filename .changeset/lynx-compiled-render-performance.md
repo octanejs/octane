@@ -1,6 +1,5 @@
 ---
 'octane': patch
-'@octanejs/lynx': patch
 ---
 
 Speed up universal and Lynx rendering with shared compiled host-template
