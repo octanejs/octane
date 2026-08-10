@@ -47,6 +47,7 @@ import {
 	type LynxHostFaultMessage,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
+	type LynxMainThreadCapabilities,
 	type LynxMainThreadWorkletWireDescriptor,
 	type LynxTransportCommitMessage,
 	type LynxTransportAcknowledgement,
@@ -153,6 +154,7 @@ interface PendingCommit {
 	readonly token: PreparedTokenState;
 	state: 'waiting-ready' | 'sent' | 'acknowledged';
 	compactRequested: boolean;
+	incrementalCompactRequested: boolean;
 	compactHostCount: number | null;
 	abortRequested: boolean;
 	deferredResponse: CommitSettlement | null;
@@ -277,6 +279,8 @@ export function createLynxBackgroundTransport(
 	let readyReceived = false;
 	let compactAcknowledgements = false;
 	let lazyPublicInstances = false;
+	let postFirstTreeLazyPublicInstances = false;
+	let deferredFirstTreeCapabilities: LynxMainThreadCapabilities | undefined;
 	let readinessRetrySent = false;
 	let disposeDeferred: Deferred<void> | null = null;
 	let disposeIdentity: UniversalTransportIdentity | null = null;
@@ -748,7 +752,15 @@ export function createLynxBackgroundTransport(
 		if (readyReceived || readyDeferred.settled) {
 			return;
 		}
-		const capabilities = message.firstTree === undefined ? message.capabilities : undefined;
+		const adoptingFirstTree = message.firstTree !== undefined;
+		const capabilities = adoptingFirstTree ? undefined : message.capabilities;
+		// The first background batch must preserve main's exact first-screen IDs.
+		// New peers can advertise future intrinsic programs on the same correlated
+		// reply; older peers never advertised templateProgram alongside firstTree.
+		deferredFirstTreeCapabilities =
+			adoptingFirstTree && message.capabilities?.templateProgram === 1
+				? message.capabilities
+				: undefined;
 		compactAcknowledgements = capabilities?.compactAck === 1;
 		lazyPublicInstances = capabilities?.lazyPublicInstances === 1;
 		setLynxClientCapabilities(container, capabilities);
@@ -771,7 +783,11 @@ export function createLynxBackgroundTransport(
 		const previousAccepted = accepted;
 		try {
 			if (message.encoding === LYNX_COMPACT_ACKNOWLEDGEMENT) {
-				if (!compactAcknowledgements || !entry.compactRequested) {
+				if (
+					!compactAcknowledgements ||
+					!entry.compactRequested ||
+					(previousAccepted !== null && !entry.incrementalCompactRequested)
+				) {
 					throw new Error('Octane Lynx received an unnegotiated compact acknowledgement.');
 				}
 				handles = prepareLynxCompactHandleDeltas(
@@ -780,6 +796,7 @@ export function createLynxBackgroundTransport(
 					message.count,
 					message,
 					entry.compactHostCount ?? undefined,
+					entry.incrementalCompactRequested,
 				);
 			} else {
 				handles = prepareLynxHandleDeltas(container, entry.batch, message.handles, message);
@@ -816,6 +833,20 @@ export function createLynxBackgroundTransport(
 				);
 				return;
 			}
+		}
+		if (
+			(message.adoption === 'adopted' || message.adoption === 'repaired') &&
+			deferredFirstTreeCapabilities !== undefined
+		) {
+			// Main releases the adopted journal synchronously while handling
+			// adoption-ready; repaired journals are disposed before their ACK.
+			// The first adopted batch remains legacy. A later safe run can reuse
+			// compact-v1 only after this identity-correlated handoff completes.
+			setLynxClientCapabilities(container, deferredFirstTreeCapabilities);
+			compactAcknowledgements = deferredFirstTreeCapabilities.compactAck === 1;
+			lazyPublicInstances = deferredFirstTreeCapabilities.lazyPublicInstances === 1;
+			postFirstTreeLazyPublicInstances = deferredFirstTreeCapabilities.lazyPublicInstances === 1;
+			deferredFirstTreeCapabilities = undefined;
 		}
 		publishAcknowledgementMainCalls(message);
 		// The acknowledgement just published this batch's hosts, which is what a
@@ -1472,6 +1503,7 @@ export function createLynxBackgroundTransport(
 						token,
 						state: 'waiting-ready',
 						compactRequested: false,
+						incrementalCompactRequested: false,
 						compactHostCount: null,
 						abortRequested: false,
 						deferredResponse: null,
@@ -1488,10 +1520,26 @@ export function createLynxBackgroundTransport(
 							const compact = count !== null;
 							entry.compactRequested = compact;
 							entry.compactHostCount = count;
+							const incrementalRun =
+								preparedBatch.commands.length === 1 ? preparedBatch.commands[0] : undefined;
+							entry.incrementalCompactRequested =
+								compact &&
+								accepted !== null &&
+								postFirstTreeLazyPublicInstances &&
+								incrementalRun?.op === 'mount-template-run' &&
+								Object.isFrozen(incrementalRun) &&
+								Object.isFrozen(incrementalRun.program) &&
+								Object.isFrozen(incrementalRun.values);
 							const deferPublicInstances =
 								compact &&
 								lazyPublicInstances &&
-								accepted === null &&
+								(accepted === null ||
+									(postFirstTreeLazyPublicInstances &&
+										preparedBatch.commands.every(
+											(command) =>
+												command.op === 'mount-template-range' ||
+												command.op === 'mount-template-run',
+										))) &&
 								preparedBatch.commands.some(
 									(command) =>
 										command.op === 'mount-template-range' || command.op === 'mount-template-run',

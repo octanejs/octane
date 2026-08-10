@@ -1,9 +1,11 @@
 import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing-environment';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { deserialize, serialize } from 'node:v8';
 import { JSDOM } from 'jsdom';
 import {
 	defineUniversalComponent,
+	universalComponent,
 	universalFor,
 	universalPlan,
 	universalProps,
@@ -28,16 +30,22 @@ import {
 } from '../src/main-renderer.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
+	LYNX_COMPACT_ACKNOWLEDGEMENT,
+	LYNX_LAZY_PUBLIC_INSTANCES,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
 	type LynxBackgroundInboundMessage,
+	type LynxBackgroundOutboundMessage,
 	type LynxContextProxy,
 } from '../src/core/protocol.js';
 
 interface SceneProps {
 	readonly id: string;
 	readonly items: readonly string[];
+	readonly componentItems?: readonly string[];
+	readonly rowPrefix?: string;
+	readonly onRowTap?: (id: string) => void;
 	readonly onTap: (payload: unknown) => void;
 	readonly onEffect: (owner: 'main' | 'background') => void;
 }
@@ -58,16 +66,24 @@ const mainPlan = firstScreenPlan('lynx', {
 	propsSlot: 0,
 });
 
+const mainScenePlan = firstScreenPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	propsSlot: 0,
+	children: [{ kind: 'slot', slot: 1 }],
+});
+
 const MainScene = defineFirstScreenComponent('lynx', (props: SceneProps) => {
 	useFirstScreenLayoutEffect(() => {
 		props.onEffect('main');
 	});
 	return [
-		firstScreenValue(mainPlan, [
+		firstScreenValue(mainScenePlan, [
 			firstScreenProps([
 				['set', 'id', props.id],
 				['set', 'bindtap', firstScreenEvent],
 			]),
+			null,
 		]),
 		firstScreenFor(
 			props.items,
@@ -191,16 +207,66 @@ const backgroundPlan = universalPlan('lynx', {
 	propsSlot: 0,
 });
 
+const backgroundScenePlan = universalPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	propsSlot: 0,
+	children: [{ kind: 'slot', slot: 1 }],
+});
+
+const postAdoptionRowPlan = universalPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	bindings: [['id', 0]],
+	children: [
+		{
+			kind: 'host',
+			type: 'text',
+			bindings: [['bindtap', 2]],
+			children: [{ kind: 'slot', slot: 1 }],
+		},
+	],
+});
+
+const PostAdoptionRow = defineUniversalComponent(
+	'lynx',
+	({
+		id,
+		label,
+		onTap,
+	}: {
+		readonly id: string;
+		readonly label: string;
+		readonly onTap: (id: string) => void;
+	}) => universalValue(postAdoptionRowPlan, [id, label, () => onTap(id)]),
+);
+
 const BackgroundScene = defineUniversalComponent('lynx', (props: SceneProps) => {
 	useLayoutEffect(() => {
 		props.onEffect('background');
 	}, []);
 	return [
-		universalValue(backgroundPlan, [
+		universalValue(backgroundScenePlan, [
 			universalProps([
 				['set', 'id', props.id],
 				['set', 'bindtap', props.onTap],
 			]),
+			props.componentItems === undefined
+				? null
+				: universalFor(
+						props.componentItems,
+						(id) => id,
+						(id) =>
+							universalComponent(
+								'lynx',
+								PostAdoptionRow,
+								universalProps([
+									['set', 'id', id],
+									['set', 'label', `${props.rowPrefix ?? 'label'}:${id}`],
+									['set', 'onTap', props.onRowTap ?? (() => {})],
+								]),
+							),
+					),
 		]),
 		universalFor(
 			props.items,
@@ -348,8 +414,12 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 	it('paints synchronously, gates background startup, adopts node identity, and replays events', async () => {
 		const { dom, main, registrations } = installEnvironment();
 		const inbound: LynxBackgroundInboundMessage[] = [];
+		const outbound: LynxBackgroundOutboundMessage[] = [];
 		mainContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
 			inbound.push(event.data as LynxBackgroundInboundMessage);
+		});
+		mainContext().addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
+			outbound.push(event.data as LynxBackgroundOutboundMessage);
 		});
 		const effects: string[] = [];
 		const events: unknown[] = [];
@@ -390,6 +460,29 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		main.dispatchNativeEvent(placeholderToken!, { type: 'tap', detail: { phase: 'first' } });
 
 		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		const context = backgroundContext();
+		const dispatch = context.dispatchEvent.bind(context);
+		const clonedRuns: boolean[] = [];
+		context.dispatchEvent = (event) => {
+			const data = deserialize(serialize(event.data)) as unknown;
+			if (
+				data !== null &&
+				typeof data === 'object' &&
+				'type' in data &&
+				data.type === 'commit' &&
+				'batch' in data
+			) {
+				const batch = data.batch as { commands?: readonly unknown[] };
+				const run = batch.commands?.[0] as
+					{ op?: string; program?: object; values?: readonly unknown[] } | undefined;
+				if (run?.op === 'mount-template-run') {
+					clonedRuns.push(
+						!Object.isFrozen(run) && !Object.isFrozen(run.program) && !Object.isFrozen(run.values),
+					);
+				}
+			}
+			return dispatch({ ...event, data });
+		};
 		backgroundRoot = createLynxRoot();
 		const rendering = backgroundRoot.render(BackgroundScene, props);
 		let settled = false;
@@ -421,8 +514,67 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		expect(ready[0]).toMatchObject({
 			type: 'main-ready',
 			firstTree: { root: 1, version: 1 },
+			capabilities: { templateProgram: 1, templateRuns: 1, lazyPublicInstances: 1 },
 		});
 		expect((ready[0] as { request: number }).request).toBeGreaterThan(0);
+		const adoptionCommit = outbound.find((message) => message.type === 'commit');
+		expect(adoptionCommit).not.toHaveProperty('ack');
+		expect(adoptionCommit).not.toHaveProperty('instances');
+
+		const componentItems = ['row-a', 'row-b', 'row-c', 'row-d', 'row-e', 'row-f', 'row-g', 'row-h'];
+		const rowTaps: string[] = [];
+		await backgroundRoot.render(BackgroundScene, {
+			...props,
+			componentItems,
+			onRowTap: (id) => rowTaps.push(id),
+		});
+		expect(dom.window.document.querySelector('#first-screen')).toBe(firstNode);
+		expect(dom.window.document.querySelector('#a')).toBe(firstA);
+		expect(dom.window.document.querySelector('#b')).toBe(firstB);
+		expect(
+			componentItems.map((id) => dom.window.document.querySelector(`#${id}`)?.textContent),
+		).toEqual(componentItems.map((id) => `label:${id}`));
+		const creation = outbound.filter((message) => message.type === 'commit').at(-1);
+		expect(creation).toMatchObject({
+			ack: LYNX_COMPACT_ACKNOWLEDGEMENT,
+			instances: LYNX_LAZY_PUBLIC_INSTANCES,
+			batch: { commands: [{ op: 'mount-template-run' }] },
+		});
+		const creationAcknowledgement = inbound.find(
+			(message) => message.type === 'ack' && message.version === creation!.version,
+		);
+		expect(creationAcknowledgement).toMatchObject({
+			encoding: LYNX_COMPACT_ACKNOWLEDGEMENT,
+			count: componentItems.length * 3,
+		});
+		expect(creationAcknowledgement).not.toHaveProperty('handles');
+		expect(clonedRuns).toEqual([true]);
+		const lastRowListener = registrations.at(-1)?.listener;
+		expect(lastRowListener).toBeTypeOf('string');
+		main.dispatchNativeEvent(lastRowListener!, { type: 'tap' });
+		expect(rowTaps).toEqual(['row-h']);
+		expect(main.diagnostics()).toEqual([]);
+
+		await backgroundRoot.render(BackgroundScene, {
+			...props,
+			componentItems,
+			rowPrefix: 'updated',
+			onRowTap: (id) => rowTaps.push(id),
+		});
+		expect(dom.window.document.querySelector('#row-a')?.textContent).toBe('updated:row-a');
+		expect(dom.window.document.querySelector('#first-screen')).toBe(firstNode);
+
+		await backgroundRoot.render(BackgroundScene, {
+			...props,
+			componentItems: componentItems.slice(0, -1),
+			rowPrefix: 'updated',
+			onRowTap: (id) => rowTaps.push(id),
+		});
+		expect(dom.window.document.querySelector('#row-h')).toBeNull();
+		expect(dom.window.document.querySelector('#first-screen')).toBe(firstNode);
+		main.dispatchNativeEvent(lastRowListener!, { type: 'tap' });
+		expect(rowTaps).toEqual(['row-h']);
+		expect(main.diagnostics().at(-1)?.message).toMatch(/stale, hidden, removed, or foreign/);
 	});
 
 	it('defers an engine-mode first screen until __RenderPage arrives', () => {

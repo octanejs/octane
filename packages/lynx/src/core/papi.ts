@@ -85,6 +85,7 @@ export interface LynxElementPAPIGlobals<Node extends LynxElementRef = LynxElemen
 	__GetElementUniqueID(node: Node): number;
 	__GetParent?(node: Node): Node | null | undefined;
 	__ElementIsEqual?(first: Node, second: Node): boolean;
+	__AppendElement?(parent: Node, child: Node): unknown;
 	__InsertElementBefore(parent: Node, child: Node, before?: Node): unknown;
 	__RemoveElement(parent: Node, child: Node): unknown;
 	__ReplaceElement(replacement: Node, previous: Node): void;
@@ -102,12 +103,20 @@ export interface LynxElementPAPIGlobals<Node extends LynxElementRef = LynxElemen
 export interface LynxElementPAPI<Node extends LynxElementRef = LynxElementRef> {
 	createPage(componentId: string, cssId: number): Node;
 	createElement(type: string, parentComponentUniqueId: number, text: string): Node;
+	/** Optional receiver-bound native factories for prevalidated dense host programs. */
+	readonly intrinsics?: Readonly<{
+		view: (parentComponentUniqueId: number) => Node;
+		text: (parentComponentUniqueId: number) => Node;
+		rawText: (text: string) => Node;
+	}>;
 	/** Present when the runtime publishes the native list callback API. */
 	readonly list?: LynxListPAPI<Node>;
 	getUniqueId(node: Node): number;
 	getParent(node: Node): Node | null;
 	isEqual(first: Node, second: Node): boolean;
 	isChild(parent: Node, child: Node): boolean;
+	/** Optional public native append operation for known append-only host programs. */
+	readonly append?: (parent: Node, child: Node) => void;
 	insertBefore(parent: Node, child: Node, before: Node | null): void;
 	remove(parent: Node, child: Node): void;
 	replace(replacement: Node, previous: Node): void;
@@ -226,6 +235,8 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 		target,
 		'__InsertElementBefore',
 	);
+	const appendValue = (target as LynxElementPAPIGlobals<Node>).__AppendElement;
+	const append = typeof appendValue === 'function' ? appendValue.bind(target) : undefined;
 	const remove = requireFunction<Node, '__RemoveElement'>(target, '__RemoveElement');
 	const replace = requireFunction<Node, '__ReplaceElement'>(target, '__ReplaceElement');
 	const setClasses = requireFunction<Node, '__SetClasses'>(target, '__SetClasses');
@@ -239,6 +250,12 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 
 	const papi: LynxElementPAPI<Node> = {
 		...(list === undefined ? null : { list }),
+		...(append === undefined ? null : { append }),
+		intrinsics: Object.freeze({
+			view: createView,
+			text: createText,
+			rawText: createRawText,
+		}),
 		createPage(componentId, cssId) {
 			return createPage(componentId, cssId);
 		},
