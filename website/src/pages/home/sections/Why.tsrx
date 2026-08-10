@@ -6,10 +6,11 @@
 // Layout: a centered title over a two-column question/answer grid (the question
 // labels the left rail, its prose fills the right), collapsing to a single stacked
 // column on narrow screens. The coda closes it as a pull-quote. On wide screens a
-// decorative rail of ported-library marks (./library-icons.ts) fills the space to
-// the right of the prose; it duplicates the ecosystem list in Proven, so it stays
-// aria-hidden and disappears below the two-column breakpoint.
+// rail of ported-library marks (./library-icons.ts) fills the space to the right
+// of the prose. Each mark links to its binding on GitHub; the rail disappears
+// below the two-column breakpoint.
 import { Link } from '@octanejs/tanstack-router';
+import { bindingRepositoryHref } from '../../../content/bindings.ts';
 import { LIBRARY_ICONS } from './library-icons.ts';
 
 export function Why() @{
@@ -63,15 +64,22 @@ export function Why() @{
 				</blockquote>
 			</div>
 
-			<div class="why-rail" aria-hidden="true">
+			<div class="why-rail">
 				<div class="why-rail-inner">
 					<div class="why-rail-grid">
 						@for (const lib of LIBRARY_ICONS; key lib.slug) {
-							<div class="why-rail-tile" title={lib.name}>
+							<a
+								class="why-rail-tile"
+								href={bindingRepositoryHref(lib.packageName)}
+								target="_blank"
+								rel="noopener noreferrer"
+								aria-label={`View the ${lib.name} binding on GitHub`}
+								title={lib.name}
+							>
 								<svg viewBox="0 0 24 24" fill="currentColor">
 									<path d={lib.path} />
 								</svg>
-							</div>
+							</a>
 						}
 					</div>
 					<p class="why-rail-caption">The libraries you already use, ported.</p>
@@ -172,6 +180,7 @@ export function Why() @{
 				/* Same faint accent wash the Proven stat cards use. */
 				background: linear-gradient(160deg, rgba(255, 65, 90, 0.05), transparent 55%), var(--panel);
 				color: var(--text-secondary);
+				text-decoration: none;
 				transition:
 					color 0.15s ease,
 					border-color 0.15s ease;
@@ -184,6 +193,10 @@ export function Why() @{
 			.why-rail-tile:hover {
 				color: var(--text);
 				border-color: var(--border-strong);
+			}
+			.why-rail-tile:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 3px;
 			}
 			.why-rail-tile svg {
 				width: 1.9rem;
