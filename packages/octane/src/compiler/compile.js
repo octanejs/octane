@@ -4483,6 +4483,177 @@ function collectPrivateUnescapedComponents(body, ctx) {
 	return candidates;
 }
 
+function onlyMeaningfulJsxChild(children) {
+	let result = null;
+	for (const child of children || []) {
+		if (child?.type === 'JSXText' || child?.type === 'Text') {
+			const text = child.value ?? child.raw;
+			if (typeof text === 'string' && /^\s*$/.test(text) && /[\n\r]/.test(text)) continue;
+		}
+		if (result !== null) return null;
+		result = child;
+	}
+	return result;
+}
+
+// A Provider may retain one unchanged component descriptor only when that
+// private component does nothing except return a keyed native-map host. Every
+// reference to its FunctionDeclaration must be one of these exact JSX children:
+// escaping it would expose live defaultProps, identity, or an observable call.
+function collectPrivateMappedProviderComponents(body, ctx) {
+	const candidates = new Map();
+	for (const declaration of body) {
+		if (
+			declaration.type !== 'FunctionDeclaration' ||
+			declaration.id?.type !== 'Identifier' ||
+			ctx.componentInfo.get(declaration.id.name)?.returnJsx !== true ||
+			!ctx.moduleFunctionDeclarations.has(declaration.id.name) ||
+			declaration.params?.length !== 1 ||
+			declaration.params[0]?.type !== 'Identifier' ||
+			declaration.body.body?.length !== 1
+		) {
+			continue;
+		}
+		const statement = declaration.body.body[0];
+		const host = statement.type === 'ReturnStatement' ? statement.argument : null;
+		if ((host?.type !== 'Element' && host?.type !== 'JSXElement') || isComponentTag(host)) {
+			continue;
+		}
+		let hostSafe = true;
+		for (const attribute of host.attributes || host.openingElement?.attributes || []) {
+			if (
+				(attribute.type !== 'Attribute' && attribute.type !== 'JSXAttribute') ||
+				['key', 'ref', 'children', 'dangerouslySetInnerHTML'].includes(jsxAttrRawName(attribute)) ||
+				(attribute.value != null &&
+					attribute.value.type !== 'Literal' &&
+					attribute.value.type !== 'StringLiteral')
+			) {
+				hostSafe = false;
+				break;
+			}
+		}
+		if (!hostSafe) continue;
+		const child = onlyMeaningfulJsxChild(host.children);
+		const map = child?.type === 'JSXExpressionContainer' ? unwrapTsExpr(child.expression) : null;
+		const method = map?.callee;
+		const receiver = method?.object;
+		const callback = map?.arguments?.[0];
+		if (
+			map?.type !== 'CallExpression' ||
+			map.optional ||
+			map.arguments.length !== 1 ||
+			method?.type !== 'MemberExpression' ||
+			method.computed ||
+			method.optional ||
+			method.property?.name !== 'map' ||
+			receiver?.type !== 'MemberExpression' ||
+			receiver.computed ||
+			receiver.optional ||
+			receiver.object?.type !== 'Identifier' ||
+			receiver.object.name !== declaration.params[0].name ||
+			receiver.property?.type !== 'Identifier' ||
+			['key', 'ref', 'children', 'current', '__proto__'].includes(receiver.property.name) ||
+			callback?.type !== 'ArrowFunctionExpression' ||
+			callback.async ||
+			callback.params.length !== 1 ||
+			callback.params[0]?.type !== 'Identifier' ||
+			(callback.body?.type !== 'Element' && callback.body?.type !== 'JSXElement') ||
+			mapCallbackCapturesLexicalReceiver(callback.body) ||
+			containsRenderCall([callback.body], ctx) ||
+			containsAutoMemoUnsafeStructure([callback.body]) ||
+			containsImportedMemberRead(callback.body, ctx.importedNames)
+		) {
+			continue;
+		}
+		if (isComponentTag(callback.body)) {
+			const name = tagBindingName(callback.body);
+			if (name === null || (!ctx.importedNames.has(name) && !ctx.defaultMemoBindings.has(name))) {
+				continue;
+			}
+		}
+		const attributes = callback.body.attributes || callback.body.openingElement?.attributes || [];
+		if (!attributes.some((attribute) => jsxAttrRawName(attribute) === 'key')) continue;
+
+		const captures = new Set();
+		let safe = true;
+		for (const name of collectFreeIdentifiers(callback.body, new Set([callback.params[0].name]))) {
+			if (ctx.importNamespaceNames.has(name) || ctx._octaneBoundaryNames.has(name)) {
+				safe = false;
+				break;
+			}
+			if (ctx.importedNames.has(name)) {
+				captures.add(name);
+			} else if (!ctx.defaultMemoBindings.has(name) && !ctx.moduleFunctionDeclarations.has(name)) {
+				safe = false;
+				break;
+			}
+		}
+		if (!safe) continue;
+		candidates.set(declaration.id.name, {
+			prop: receiver.property.name,
+			captures: [...captures].sort(),
+			witnesses: [...collectImportedComponentReferences(callback.body, ctx.importedNames)].sort(),
+			calls: new Set(),
+		});
+	}
+	if (candidates.size === 0) return candidates;
+
+	const allowed = new Set();
+	const seen = new WeakSet();
+	(function walk(node) {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (node.type === 'Element' || node.type === 'JSXElement') {
+			const name = node.openingElement?.name || node.id;
+			if (
+				(name?.type === 'MemberExpression' || name?.type === 'JSXMemberExpression') &&
+				name.property?.name === 'Provider'
+			) {
+				const child = onlyMeaningfulJsxChild(node.children);
+				const candidate =
+					child?.type === 'Element' || child?.type === 'JSXElement'
+						? candidates.get(tagBindingName(child))
+						: undefined;
+				const attributes = child?.attributes || child?.openingElement?.attributes || [];
+				const value = attributes[0]?.value;
+				if (
+					candidate !== undefined &&
+					attributes.length === 1 &&
+					(attributes[0].type === 'Attribute' || attributes[0].type === 'JSXAttribute') &&
+					jsxAttrRawName(attributes[0]) === candidate.prop &&
+					value?.type === 'JSXExpressionContainer' &&
+					unwrapTsExpr(value.expression)?.type === 'Identifier' &&
+					(child.children?.length ?? 0) === 0
+				) {
+					allowed.add(child);
+					candidate.calls.add(child);
+				}
+			}
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	})(body);
+
+	const escaped = collectFreeIdentifiers(body, [], allowed);
+	for (const [name, candidate] of candidates) {
+		const declaration = ctx.moduleFunctionDeclarations.get(name);
+		if (
+			candidate.calls.size === 0 ||
+			escaped.has(name) ||
+			collectFreeIdentifiers(declaration.body, [], allowed).has(name)
+		) {
+			candidates.delete(name);
+		}
+	}
+	return candidates;
+}
+
 // Conservative semantic boundary for compiler-owned component-region memoization.
 // The cached region assumes React Compiler's pure-render / immutable-snapshot
 // contract, but still fails closed for constructs whose commit or retry behavior
@@ -7916,7 +8087,10 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			}
 		}
 	}
-	if (ctx.autoMemo) classifyStableHookfulChildCalls(ast.body, ctx);
+	if (ctx.autoMemo) {
+		classifyStableHookfulChildCalls(ast.body, ctx);
+		ctx.privateMappedProviderComponents = collectPrivateMappedProviderComponents(ast.body, ctx);
+	}
 	// Single-root output is transitive across same-module `@if` arms (see
 	// collectSingleRootIfDeps): flip false → true until stable so declaration
 	// order and recursion through a proven base case don't matter. Pessimistic —
@@ -16693,19 +16867,17 @@ function jsxValueChildrenNeedRenderScope(node, descendantElementsOwnChildren = f
 }
 
 // A returned host preserves nested component children as inspectable
-// descriptors. An actual Octane Context can reuse its static host descriptor
-// while a compiler-proven plain descriptor array stays unchanged; the existing
-// implicit element bailout then skips its list without changing the children
-// representation or hydration ranges. Admit only one ordinary `.Provider`, its
-// `value`, and one static host whose sole child is the exact non-escaping
-// calculation Identifier.
+// descriptors. An actual Octane Context can reuse either its static host over
+// one proven descriptor array, or one private mapped component over a receiver
+// already classified native. Both keep the original descriptor ownership and
+// hydration ranges; the component proof additionally rejects every escape that
+// could expose live defaultProps or the function's observable call identity.
 function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 	if (
 		!ctx.autoMemo ||
 		ctx._universalRuntimeUnit != null ||
 		ctx._foldCtx?.immediateRenderedOutput !== true ||
 		!Array.isArray(ctx._foldCtx.compInlinedSubs) ||
-		ctx.currentAutoCalculatedRenderableRefs === null ||
 		(nameNode?.type !== 'MemberExpression' && nameNode?.type !== 'JSXMemberExpression') ||
 		(nameNode.object?.type !== 'Identifier' && nameNode.object?.type !== 'JSXIdentifier') ||
 		nameNode.property?.name !== 'Provider'
@@ -16733,24 +16905,48 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 		return null;
 	}
 
-	const onlyMeaningfulChild = (children) => {
-		let result = null;
-		for (const child of children || []) {
-			if (child?.type === 'JSXText' || child?.type === 'Text') {
-				const text = child.value ?? child.raw;
-				if (typeof text === 'string' && /^\s*$/.test(text) && /[\n\r]/.test(text)) {
-					continue;
-				}
-			}
-			if (result !== null) return null;
-			result = child;
-		}
-		return result;
-	};
-	const host = onlyMeaningfulChild(node.children);
-	if ((host?.type !== 'Element' && host?.type !== 'JSXElement') || isComponentTag(host)) {
+	const host = onlyMeaningfulJsxChild(node.children);
+	if (host?.type !== 'Element' && host?.type !== 'JSXElement') {
 		return null;
 	}
+	if (isComponentTag(host)) {
+		const name = tagBindingName(host);
+		const candidate = ctx.privateMappedProviderComponents?.get(name);
+		if (candidate === undefined || ctx.currentComponentLocals?.has(name)) {
+			return null;
+		}
+		let provenCall = candidate.calls.has(host);
+		if (!provenCall && typeof host.start === 'number' && typeof host.end === 'number') {
+			for (const call of candidate.calls) {
+				if (call.start === host.start && call.end === host.end) {
+					provenCall = true;
+					break;
+				}
+			}
+		}
+		if (!provenCall) return null;
+		const attributes = host.attributes || host.openingElement?.attributes || [];
+		const items = unwrapTsExpr(attributes[0]?.value?.expression);
+		if (
+			items?.type !== 'Identifier' ||
+			!ctx.currentComponentLocals?.has(items.name) ||
+			ctx.currentAutoMemoLocalHazards?.has(items.name)
+		) {
+			return null;
+		}
+		for (const capture of candidate.captures) {
+			if (ctx.currentComponentLocals?.has(capture)) return null;
+		}
+		return {
+			host,
+			contextName: nameNode.object.name,
+			rows: items,
+			component: name,
+			captures: candidate.captures,
+			witnesses: candidate.witnesses,
+		};
+	}
+	if (ctx.currentAutoCalculatedRenderableRefs === null) return null;
 	for (const attribute of host.attributes || host.openingElement?.attributes || []) {
 		if (attribute.type !== 'Attribute' && attribute.type !== 'JSXAttribute') return null;
 		const name = jsxAttrRawName(attribute);
@@ -16770,7 +16966,7 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 			return null;
 		}
 	}
-	const child = onlyMeaningfulChild(host.children);
+	const child = onlyMeaningfulJsxChild(host.children);
 	if (child?.type !== 'JSXExpressionContainer' || child.expression?.type !== 'Identifier') {
 		return null;
 	}
@@ -16902,8 +17098,8 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		let childrenValue = loweredChildren[0];
 		let memoizedChildrenBody = null;
 		if (autoMemoProviderChild !== null && loweredChildren.length === 1) {
-			const { host, contextName, rows } = autoMemoProviderChild;
-			ctx.runtimeNeeded.add('compilerCacheArray');
+			const { host, contextName, rows, component, captures, witnesses } = autoMemoProviderChild;
+			if (component === undefined) ctx.runtimeNeeded.add('compilerCacheArray');
 			// `.Provider` is a public property and can belong to any component.
 			// Ask the runtime whether this exact value is provided by the CURRENT
 			// scope. Its identity-map lookup never re-reads `.Provider`, invokes
@@ -16936,22 +17132,30 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 						[],
 						b.sequence([b.assignment('=', b.id(freshName), b.literal(true)), childrenValue]),
 					),
-					b.array([rows]),
+					b.array([rows, ...(captures ?? []).map((name) => inheritOriginLoc(b.id(name), host))]),
 					b.id(slot),
 				),
 				host,
 			);
+			let reusable =
+				component === undefined
+					? b.call('_$compilerCacheArray', rows, rows)
+					: b.call(
+							requireRuntimeForContext(ctx, 'compilerCacheMappedArray'),
+							rows,
+							inheritOriginLoc(b.id(component), host),
+						);
+			if (witnesses?.length) reusable = b.logical('&&', reusable, witnessOkChain(witnesses));
 			// A fresh descriptor must reconcile regardless of array contents.
 			// Inspect dense/accessor/scoped eligibility only when the memo HIT
-			// could actually skip reconciliation, just like compilerCacheArray's
-			// ordinary previous-value path. This keeps mount and changed inputs
-			// free of an extra linear scan.
+			// could actually skip reconciliation. Mapped children reuse their
+			// existing native-map classification instead of rescanning every row.
 			const cacheable = b.logical(
 				'&&',
 				genuineContext,
 				b.sequence([
 					b.assignment('=', b.id(childName), memoizedDescriptor),
-					b.logical('||', b.id(freshName), b.call('_$compilerCacheArray', rows, rows)),
+					b.logical('||', b.id(freshName), reusable),
 				]),
 			);
 			memoizedChildrenBody = inheritOriginLoc(

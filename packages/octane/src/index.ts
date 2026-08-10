@@ -201,6 +201,7 @@ export {
 	componentSlotVoid,
 	componentSlotLite,
 	compilerCacheArray,
+	compilerCacheMappedArray,
 	compilerCacheContext,
 	compilerOwnsContextProvider,
 	markSingleRoot,
