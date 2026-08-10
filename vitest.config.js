@@ -2900,6 +2900,108 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-spring-pristine',
+					include: ['packages/react-spring/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+					testTimeout: 180_000,
+					hookTimeout: 180_000,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-spring/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'react-spring',
+					include: [
+						'packages/react-spring/tests/conformance/**/*.test.ts',
+						'packages/react-spring/tests/hydration/**/*.test.ts',
+						'packages/react-spring/tests/upstream/**/*.test.ts',
+					],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/react-spring/tests/upstream-original.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/react-spring$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-spring/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/react-spring\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-spring/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'react-spring-ssr',
+					include: ['packages/react-spring/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/react-spring$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-spring/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/react-spring\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-spring/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'react-spring-browser',
+					include: ['packages/react-spring/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-spring-differential',
+					include: ['packages/react-spring/tests/differential/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/react-spring$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-spring/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/react-spring\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/react-spring/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'dnd-kit',
 					include: [

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "react-spring-pristine",
+  "roots": ["packages/react-spring/tests"],
+  "files": ["packages/react-spring/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:3a27a20257e92b8f",
+      "file": "packages/react-spring/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned react-spring 10.1.2 unit suite unchanged"
+    }
+  ]
+}

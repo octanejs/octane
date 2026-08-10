@@ -61,6 +61,7 @@ export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/cmdk',
 	'@octanejs/floating-ui',
 	'@octanejs/radix',
+	'@octanejs/react-spring',
 	'@octanejs/sonner',
 	'@octanejs/tiptap',
 	'octane',
@@ -191,6 +192,8 @@ export function createPackedTsrxConsumerConfig() {
 
 export function renderPackedTsrxConsumerSource() {
 	return `import { Command } from '@octanejs/cmdk';
+import { animated, useSpring } from '@octanejs/react-spring';
+import { Parallax, ParallaxLayer } from '@octanejs/react-spring/parallax';
 import { toast, Toaster } from '@octanejs/sonner';
 import {
 	Editor,
@@ -216,8 +219,15 @@ export function PublishedSourceConsumer() @{
 	const commandRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const toasterRef = useRef<HTMLElement | null>(null);
+	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
+		<animated.div style={springStyles}>Packed spring</animated.div>
+		<div style={{ height: 120 }}>
+			<Parallax pages={2}>
+				<ParallaxLayer offset={1} speed={0.5}>Packed Parallax</ParallaxLayer>
+			</Parallax>
+		</div>
 		<Command ref={commandRef} label="Commands">
 			<Command.Input ref={inputRef} placeholder="Search commands" />
 			<Command.List>
@@ -252,6 +262,8 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
+import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/react-spring';
+import type { IParallax, ParallaxProps } from '@octanejs/react-spring/parallax';
 import { Toaster, useSonner, type ToasterProps } from '@octanejs/sonner';
 import {
 	EditorContent,
@@ -267,6 +279,12 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
 type AssertNotAny<T> = IsAny<T> extends false ? true : never;
 
 const commandPropsArePrecise: AssertNotAny<CommandProps> = true;
+const springValueIsPrecise: AssertNotAny<SpringValue<number>> = true;
+const controllerUpdateIsPrecise: AssertNotAny<ControllerUpdate<{ x: number }>> = true;
+const parallaxPropsArePrecise: AssertNotAny<ParallaxProps> = true;
+const parallaxApiIsPrecise: AssertNotAny<IParallax> = true;
+const springController = new Controller<{ x: number }>({ from: { x: 0 } });
+const springPosition: number = springController.springs.x.get();
 const commandComponentPropsArePrecise: AssertNotAny<Parameters<typeof Command>[0]> = true;
 const toasterPropsArePrecise: AssertNotAny<ToasterProps> = true;
 const toasterComponentPropsArePrecise: AssertNotAny<Parameters<typeof Toaster>[0]> = true;
@@ -301,6 +319,7 @@ export function verifyTypedEditorSelection(): string {
 
 export const verifiedPublishedTypes = {
 	commandComponentPropsArePrecise,
+	controllerUpdateIsPrecise,
 	commandPropsArePrecise,
 	customPropertyToast,
 	editorComponentPropsArePrecise,
@@ -313,6 +332,11 @@ export const verifiedPublishedTypes = {
 	invalidToaster,
 	providerComponentPropsArePrecise,
 	providerPropsArePrecise,
+	parallaxApiIsPrecise,
+	parallaxPropsArePrecise,
+	springController,
+	springPosition,
+	springValueIsPrecise,
 	tiptapContentPropsArePrecise,
 	toastStateIsPrecise,
 	toasterComponentPropsArePrecise,

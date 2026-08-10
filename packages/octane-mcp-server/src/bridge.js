@@ -32,6 +32,8 @@ export const KNOWN_BINDINGS = {
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
+	'@react-spring/web': '@octanejs/react-spring',
+	'@react-spring/parallax': '@octanejs/react-spring',
 	'@stylexjs/stylex': '@octanejs/stylex',
 	'styled-components': '@octanejs/styled-components',
 	'react-router': '@octanejs/remix-router',

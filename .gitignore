@@ -66,3 +66,6 @@ website/public/lynx-runtime
 
 # Pristine vitest cache for tanstack-hotkeys upstream suite
 packages/tanstack-hotkeys/.vite-pristine/
+
+packages/react-spring/.pristine-vite-cache/
+packages/react-spring/.pristine-upstream-*/

@@ -12,6 +12,7 @@ import { DynamicDemo } from './demos/Dynamic.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { GSAPDemo } from './demos/GSAP.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
+import { ReactSpringDemo } from './demos/ReactSpring.tsrx';
 import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
 import { LiveStoreDemo } from './demos/LiveStore.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
@@ -33,6 +34,7 @@ import dynamicSource from './demos/Dynamic.tsrx?raw';
 import inputsSource from './demos/Inputs.tsrx?raw';
 import gsapSource from './demos/GSAP.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
+import reactSpringSource from './demos/ReactSpring.tsrx?raw';
 import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
 import liveStoreSource from './demos/LiveStore.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
@@ -107,6 +109,12 @@ export const GROUPS: readonly DemoGroup[] = [
 		id: 'components',
 		label: 'Components',
 		demos: [
+			{
+				id: 'react-spring',
+				title: 'React Spring',
+				Component: ReactSpringDemo,
+				source: reactSpringSource,
+			},
 			{
 				id: 'animejs',
 				title: 'Anime.js',

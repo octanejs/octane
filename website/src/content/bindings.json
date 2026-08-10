@@ -46,6 +46,7 @@
       "@octanejs/animejs",
       "@octanejs/gsap",
       "@octanejs/motion",
+      "@octanejs/react-spring",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
       "@octanejs/react-error-boundary",

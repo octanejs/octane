@@ -30,6 +30,7 @@
     "@octanejs/mobx": "workspace:*",
     "@octanejs/phosphor-icons": "workspace:*",
     "@octanejs/radix": "workspace:*",
+    "@octanejs/react-spring": "workspace:*",
     "@octanejs/rainbowkit": "workspace:*",
     "@octanejs/solana-react": "workspace:*",
     "@octanejs/react-error-boundary": "workspace:*",
