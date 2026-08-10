@@ -149,6 +149,7 @@ export {
 	ssrComponentNS,
 	ssrInNamespace,
 	ssrBlock,
+	ssrFragmentMarker,
 	ssrActivity,
 	ssrForBlock,
 	mapSlot,

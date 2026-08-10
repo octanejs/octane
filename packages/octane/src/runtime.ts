@@ -2495,6 +2495,9 @@ const refAttachQueue: RefAttach[] = [];
 // trampoline. The common drain remains branch-free, and Fragment instances do not
 // allocate a getter closure.
 function attachLiveFragmentRef(instance: FragmentInstance): void {
+	// Portal slots mount after the fragment binding but before commit. Publish all
+	// logically owned child handles before handing the instance to its callback.
+	instance._reapply();
 	attachRef(instance._currentRef, instance);
 }
 
@@ -2550,12 +2553,10 @@ interface OffscreenWip {
 	refDetachCheckpoint: number;
 }
 
-// FragmentInstances that currently hold event listeners and/or observers. After
-// each commit we re-apply their stored bindings to their CURRENT children, so a
-// child that mounts into a fragment later picks up the listeners/observers added
-// earlier — React's `commitNewChildToFragmentInstance` future-children contract.
-// Empty for any app that doesn't use fragment-ref listeners (the common case),
-// so the per-commit cost is a single `size` check.
+// Live fragment refs need a commit-time child diff even before a listener or
+// observer is installed: each current first-level host child exposes its owning
+// FragmentInstances through `reactFragments`. Apps without fragment refs keep
+// the same single-size-check commit fast path.
 const activeFragments = new Set<FragmentInstance>();
 
 function reapplyFragmentBindings(): void {
@@ -10800,8 +10801,8 @@ export function attachRef(
 
 /** Fragment ref forms (fragment-refs parity): callback, object, or arrays. */
 type FragmentRefValue =
-	| ((instance: unknown) => void | (() => void))
-	| { current: unknown }
+	| ((instance: FragmentInstance | null) => void | (() => void))
+	| { current: FragmentInstance | null }
 	| readonly FragmentRefValue[]
 	| null;
 
@@ -10835,13 +10836,19 @@ export class FragmentInstance {
 	_endMarker: Comment;
 	_destroyed: boolean;
 	/**
+	 * Committed direct hosts and a reusable scratch set. Swapping the sets at
+	 * each commit avoids allocating per render while ensuring registrations are
+	 * applied only to genuinely new children.
+	 */
+	_children: Set<Element | Text>;
+	_pendingChildren: Set<Element | Text>;
+	/** Following DOM anchor -> logically owned portal ranges; allocated on demand. */
+	_portalAnchors: Map<Node, Set<PortalSlot>> | null;
+	/**
 	 * Registry of listeners added via addEventListener, deduped by
 	 * (type, listener, capture). `null` until the first addEventListener — zero
-	 * per-instance cost for fragments that never use the listener API. Stored
-	 * (not snapshotted onto specific elements) so they can be RE-APPLIED to
-	 * children that mount later: `_reapply` (run after every commit) attaches
-	 * each stored listener to the current children, matching React's
-	 * future-children contract.
+	 * listener-registry cost for fragments that never use the listener API.
+	 * Stored bindings apply only when a new direct child joins the fragment.
 	 */
 	_listeners: Array<{
 		type: string;
@@ -10849,8 +10856,8 @@ export class FragmentInstance {
 		options: AddEventListenerOptions | boolean | undefined;
 	}> | null;
 	/**
-	 * Observers registered via observeUsing, re-applied to future children the
-	 * same way as `_listeners`. `null` until the first observeUsing.
+	 * Observers registered via observeUsing. New direct children inherit each
+	 * observer; retained children are never redundantly observed on commit.
 	 */
 	_observers: Set<{ observe(target: Element): void; unobserve(target: Element): void }> | null;
 	/**
@@ -10865,113 +10872,157 @@ export class FragmentInstance {
 		this._startMarker = startMarker;
 		this._endMarker = endMarker;
 		this._destroyed = false;
+		this._children = new Set();
+		this._pendingChildren = new Set();
+		this._portalAnchors = null;
 		this._listeners = null;
 		this._observers = null;
 		this._currentRef = null;
+		for (const child of fragmentDirectNodes(this)) {
+			this._children.add(child);
+			this._attachChild(child);
+		}
+		activeFragments.add(this);
 	}
 
 	_destroy(): void {
 		this._destroyed = true;
 		activeFragments.delete(this);
-		// Detach any still-registered listeners from the current children (cleanups
-		// run before the DOM range is removed, so the children are still attached)
-		// so stale closures don't keep nodes/scopes alive after unmount. Observers
-		// are NOT explicitly unobserved — like React, we rely on the browser
-		// dropping disconnected nodes; the observer's owner manages its lifecycle.
-		if (this._listeners) {
-			for (const el of fragmentDirectChildren(this)) {
-				for (const e of this._listeners) {
-					el.removeEventListener(e.type, e.listener, e.options as any);
-				}
-			}
-			this._listeners = null;
-		}
+		// React removes listeners and fragment handles from disappearing children,
+		// but does not call observer.unobserve during deletion or fragment teardown.
+		for (const child of this._children) this._detachChild(child);
+		this._children.clear();
+		this._pendingChildren.clear();
+		this._portalAnchors?.clear();
+		this._portalAnchors = null;
+		this._listeners = null;
 		this._observers = null;
 	}
 
-	/** Deregister from the commit re-apply set once no bindings remain. */
-	_maybeDeactivate(): void {
-		if (
-			(this._listeners === null || this._listeners.length === 0) &&
-			(this._observers === null || this._observers.size === 0)
-		) {
-			activeFragments.delete(this);
+	/** Associate a foreign portal range with its authored following sibling. */
+	_registerPortal(portal: PortalSlot, anchor: Node): void {
+		if (this._destroyed) return;
+		const anchors = (this._portalAnchors ??= new Map());
+		let portals = anchors.get(anchor);
+		if (portals === undefined) anchors.set(anchor, (portals = new Set()));
+		portals.add(portal);
+	}
+
+	/** Forget a removed portal before its foreign DOM range is torn down. */
+	_unregisterPortal(portal: PortalSlot, anchor: Node): void {
+		const anchors = this._portalAnchors;
+		const portals = anchors?.get(anchor);
+		if (portals === undefined || !portals.delete(portal)) return;
+		if (portals.size === 0) anchors!.delete(anchor);
+		if (anchors!.size === 0) this._portalAnchors = null;
+		let child: ChildNode | null = portal.start?.nextSibling ?? null;
+		while (child !== null && child !== portal.end) {
+			const next = child.nextSibling;
+			if (
+				(child.nodeType === 1 || child.nodeType === 3) &&
+				this._children.delete(child as Element | Text)
+			) {
+				this._detachChild(child as Element | Text);
+			}
+			child = next;
 		}
 	}
 
+	/** Attach inherited bindings and publish this fragment's public DOM handle. */
+	_attachChild(child: Element | Text): void {
+		if (this._listeners !== null) {
+			for (const entry of this._listeners) {
+				child.addEventListener(entry.type, entry.listener, entry.options as any);
+			}
+		}
+		if (child.nodeType === 1 && this._observers !== null) {
+			for (const observer of this._observers) observer.observe(child as Element);
+		}
+		const host = child as (Element | Text) & { reactFragments?: Set<FragmentInstance> };
+		(host.reactFragments ??= new Set()).add(this);
+	}
+
+	/** Remove only this fragment's registrations; nested fragment handles stay. */
+	_detachChild(child: Element | Text): void {
+		if (this._listeners !== null) {
+			for (const entry of this._listeners) {
+				child.removeEventListener(entry.type, entry.listener, entry.options as any);
+			}
+		}
+		(child as (Element | Text) & { reactFragments?: Set<FragmentInstance> }).reactFragments?.delete(
+			this,
+		);
+	}
+
 	/**
-	 * Re-apply every stored listener + observer to the CURRENT direct children.
-	 * Run after each commit (reapplyFragmentBindings) so children that mounted
-	 * since the last pass pick up the fragment's bindings. addEventListener and
-	 * observer.observe are idempotent for an already-wired (element, binding)
-	 * pair, so re-applying is safe.
+	 * Diff current hosts after each commit. Reattaching a retained listener would
+	 * revive an exhausted `{ once: true }` registration; calling observe again is
+	 * also observable, so only newly inserted children inherit those bindings.
 	 */
 	_reapply(): void {
 		if (this._destroyed) return;
-		for (const el of fragmentDirectChildren(this)) {
-			if (this._listeners) {
-				for (const e of this._listeners) el.addEventListener(e.type, e.listener, e.options as any);
-			}
-			if (this._observers) {
-				for (const ob of this._observers) ob.observe(el);
-			}
+		const previous = this._children;
+		const current = this._pendingChildren;
+		for (const child of fragmentDirectNodes(this)) {
+			current.add(child);
+			if (!previous.has(child)) this._attachChild(child);
 		}
+		for (const child of previous) {
+			if (!current.has(child)) this._detachChild(child);
+		}
+		previous.clear();
+		this._children = current;
+		this._pendingChildren = previous;
 	}
 
 	// ─── focus / focusLast / blur (Stage 2) ─────────────────────────────
 	/**
-	 * Focus the first focusable element inside the fragment, in tree order.
-	 * Mirrors React FragmentInstance.focus: matches `<input>`, `<button>`,
-	 * `<select>`, `<textarea>`, `<a href>`, `[contenteditable="true"]`, and
-	 * anything with an explicit tabIndex >= 0. Skips disabled/hidden and
-	 * tabIndex=-1 elements. No-op if the fragment has no focusable descendants.
+	 * Focus the first element for which the browser actually accepts focus.
+	 * Listening for the focus event handles labels, shadow delegation, disabled
+	 * controls, and programmatically focusable tabIndex=-1 elements correctly.
 	 */
 	focus(options?: FocusOptions): void {
 		if (this._destroyed) return;
 		for (const el of fragmentDescendants(this)) {
-			if (isFocusable(el)) {
-				(el as HTMLElement).focus(options);
-				return;
-			}
+			if (focusFragmentElement(el, options)) return;
 		}
 	}
 
 	/**
-	 * Focus the LAST focusable element inside the fragment, in tree order.
-	 * Same focusability rules as `focus()`.
+	 * Focus the last programmatically focusable element, trying descendants in
+	 * reverse tree order until the browser accepts one.
 	 */
 	focusLast(options?: FocusOptions): void {
 		if (this._destroyed) return;
-		let last: Element | null = null;
-		for (const el of fragmentDescendants(this)) {
-			if (isFocusable(el)) last = el;
+		const descendants = Array.from(fragmentDescendants(this));
+		for (let i = descendants.length - 1; i >= 0; i--) {
+			if (focusFragmentElement(descendants[i], options)) return;
 		}
-		if (last) (last as HTMLElement).focus(options);
 	}
 
 	/**
-	 * Blur the currently-focused element if it's inside the fragment range.
-	 * No-op if focus is outside the fragment (matches React's "owned" scope —
-	 * we don't blur arbitrary other elements just because they happen to be
-	 * active when blur() is called).
+	 * Blur the focused element only when a logical fragment child owns it,
+	 * including children rendered into foreign portal containers.
 	 */
 	blur(): void {
 		if (this._destroyed) return;
 		const doc = this._startMarker.ownerDocument || document;
 		const active = doc.activeElement;
 		if (!active || active === doc.body) return;
-		if (isInsideFragment(this, active)) {
-			(active as HTMLElement).blur();
+		for (const child of fragmentDirectChildren(this)) {
+			if (child === active || child.contains(active)) {
+				(active as HTMLElement).blur();
+				return;
+			}
 		}
 	}
 
 	// ─── addEventListener / removeEventListener (Stage 3) ───────────────
 	/**
-	 * Attaches a listener to every DIRECT (host-Element) child of the fragment.
-	 * The (type, listener, capture) tuple is stored and RE-APPLIED after each
-	 * commit, so children inserted into the fragment LATER also get the listener
-	 * — React's future-children contract. Deduped by (type, listener, capture)
-	 * like the DOM, so repeat calls are no-ops.
+	 * Attaches a listener to every first-level Element or Text child.
+	 * The (type, listener, capture) tuple is stored so children inserted into
+	 * the fragment later inherit the listener. Deduped by that same tuple,
+	 * matching the DOM's listener identity rules.
 	 */
 	addEventListener(
 		type: string,
@@ -10991,10 +11042,9 @@ export class FragmentInstance {
 			}
 		}
 		this._listeners.push({ type, listener, options });
-		for (const el of fragmentDirectChildren(this)) {
-			el.addEventListener(type, listener, options as any);
+		for (const child of fragmentDirectNodes(this)) {
+			child.addEventListener(type, listener, options as any);
 		}
-		activeFragments.add(this);
 	}
 
 	/**
@@ -11016,11 +11066,10 @@ export class FragmentInstance {
 			if (entry.type !== type) continue;
 			if (entry.listener !== listener) continue;
 			if (listenerCapturePhase(entry.options) !== wantCapture) continue;
-			for (const el of fragmentDirectChildren(this)) {
-				el.removeEventListener(type, listener, entry.options as any);
+			for (const child of fragmentDirectNodes(this)) {
+				child.removeEventListener(type, listener, entry.options as any);
 			}
 			this._listeners.splice(i, 1);
-			this._maybeDeactivate();
 			return;
 		}
 	}
@@ -11038,131 +11087,235 @@ export class FragmentInstance {
 		unobserve(target: Element): void;
 	}): void {
 		if (this._destroyed) return;
+		if (process.env.NODE_ENV !== 'production') {
+			let hasText = false;
+			let hasElement = false;
+			for (const child of this._children) {
+				if (child.nodeType === 1) {
+					hasElement = true;
+					break;
+				}
+				if (child.nodeType === 3) hasText = true;
+			}
+			if (hasText && !hasElement) {
+				console.error(
+					'observeUsing() was called on a FragmentInstance with only text children. ' +
+						'Observers do not work on text nodes.',
+				);
+			}
+		}
 		if (!this._observers) this._observers = new Set();
 		this._observers.add(observer);
 		for (const el of fragmentDirectChildren(this)) observer.observe(el);
-		activeFragments.add(this);
 	}
 
 	/**
 	 * Stops observing with the given observer: unobserves the current children
-	 * and stops re-applying it to future ones. (The walk runs even without a
-	 * preceding observeUsing, matching the DOM's tolerant unobserve.)
+	 * and stops applying it to future ones. An unregistered observer is not
+	 * touched and produces React's diagnostic in development.
 	 */
 	unobserveUsing(observer: {
 		observe(target: Element): void;
 		unobserve(target: Element): void;
 	}): void {
 		if (this._destroyed) return;
-		if (this._observers) this._observers.delete(observer);
+		if (this._observers === null || !this._observers.has(observer)) {
+			if (process.env.NODE_ENV !== 'production') {
+				console.error(
+					'You are calling unobserveUsing() with an observer that is not being observed with this fragment ' +
+						'instance. First attach the observer with observeUsing()',
+				);
+			}
+			return;
+		}
+		this._observers.delete(observer);
 		for (const el of fragmentDirectChildren(this)) observer.unobserve(el);
-		this._maybeDeactivate();
 	}
 
 	/**
-	 * Concatenates the client rects of every direct fragment child. The
-	 * returned array is a flat list of DOMRects in tree order — useful for
-	 * tooltip positioning that needs to span multiple sibling elements.
-	 * After unmount returns [].
+	 * Concatenates direct host-element and text-node rectangles in logical tree
+	 * order. Text uses Range because Text does not expose getClientRects itself.
 	 */
 	getClientRects(): DOMRect[] {
 		const out: DOMRect[] = [];
 		if (this._destroyed) return out;
-		let node: ChildNode | null = this._startMarker.nextSibling;
-		while (node && node !== this._endMarker) {
-			if (node.nodeType === 1) {
+		for (const node of fragmentDirectNodes(this)) {
+			if (node.nodeType === 3) {
+				const range = node.ownerDocument.createRange();
+				range.selectNodeContents(node);
+				// Lightweight DOM environments do not implement Range geometry.
+				if (typeof range.getClientRects !== 'function') continue;
+				const rects = range.getClientRects();
+				for (let i = 0; i < rects.length; i++) out.push(rects[i]);
+			} else {
 				const rects = (node as Element).getClientRects();
 				for (let i = 0; i < rects.length; i++) out.push(rects[i]);
 			}
-			node = node.nextSibling;
 		}
 		return out;
 	}
 
 	/**
-	 * Returns the rootNode of the fragment (its document or shadow root).
-	 * Falls back to the start-marker's owner document if the fragment has
-	 * no direct children yet — keeps the contract "always returns a Node"
-	 * so callers don't need null-checks.
+	 * Resolve the owning host parent's root, forwarding composed shadow-root
+	 * options. A detached FragmentInstance is its own root, matching React.
 	 */
-	getRootNode(): Node {
-		if (this._destroyed) return this._startMarker.getRootNode();
-		let node: ChildNode | null = this._startMarker.nextSibling;
-		while (node && node !== this._endMarker) {
-			if (node.nodeType === 1) return (node as Element).getRootNode();
-			node = node.nextSibling;
-		}
-		return this._startMarker.getRootNode();
+	getRootNode(options?: GetRootNodeOptions): Node | FragmentInstance {
+		if (this._destroyed) return this;
+		const parent = this._startMarker.parentNode;
+		return parent === null ? this : parent.getRootNode(options);
 	}
 
 	// ─── compareDocumentPosition / dispatchEvent (Stage 5) ──────────────
 	/**
-	 * Compares `other` against the fragment's span. The returned bitmask
-	 * uses the same Node constants the platform's compareDocumentPosition
-	 * uses, with `CONTAINED_BY` indicating that `other` lives strictly
-	 * between the fragment's start and end markers (in document order).
-	 *
-	 *   - other before the start marker     → DOCUMENT_POSITION_PRECEDING
-	 *   - other after the end marker        → DOCUMENT_POSITION_FOLLOWING
-	 *   - other between start & end markers → DOCUMENT_POSITION_CONTAINED_BY |
-	 *                                          DOCUMENT_POSITION_FOLLOWING
-	 *   - other not in the same tree        → DOCUMENT_POSITION_DISCONNECTED
+	 * Preserve the platform's directional/ancestor bits while returning exact
+	 * CONTAINED_BY for logical children. Empty ranges have no DOM position of
+	 * their own, so their derived result is IMPLEMENTATION_SPECIFIC.
 	 */
 	compareDocumentPosition(other: Node): number {
 		if (this._destroyed) return Node.DOCUMENT_POSITION_DISCONNECTED;
-		const startRel = this._startMarker.compareDocumentPosition(other);
-		if (startRel & Node.DOCUMENT_POSITION_DISCONNECTED) return startRel;
-		const endRel = this._endMarker.compareDocumentPosition(other);
-		const followsStart = (startRel & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-		const precedesEnd = (endRel & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
-		if (followsStart && precedesEnd) {
-			return Node.DOCUMENT_POSITION_CONTAINED_BY | Node.DOCUMENT_POSITION_FOLLOWING;
+		const parent = this._startMarker.parentNode;
+		if (parent === null) return Node.DOCUMENT_POSITION_DISCONNECTED;
+
+		let first: Element | Text | null = null;
+		let last: Element | Text | null = null;
+		for (const child of fragmentDirectNodes(this)) {
+			first ??= child;
+			last = child;
+			if (child === other || (child.nodeType === 1 && (child as Element).contains(other))) {
+				return parent.contains(child)
+					? Node.DOCUMENT_POSITION_CONTAINED_BY
+					: Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
+			}
 		}
-		if (startRel & Node.DOCUMENT_POSITION_PRECEDING) {
-			return Node.DOCUMENT_POSITION_PRECEDING;
+
+		if (first === null || last === null) {
+			// A Fragment rendered directly inside a portal has a physical parent
+			// in the foreign container, but its ordering is relative to the portal's
+			// authored host. Portal mounting stamps that logical host on its direct
+			// children, including this Fragment's boundary comment.
+			const logicalParent =
+				(this._startMarker as Comment & { $$portalParent?: Node }).$$portalParent ?? parent;
+			let result = logicalParent.compareDocumentPosition(other);
+			if (logicalParent === other) {
+				result = Node.DOCUMENT_POSITION_CONTAINS;
+			} else if ((result & Node.DOCUMENT_POSITION_CONTAINED_BY) !== 0) {
+				const next = fragmentNearestSibling(this._endMarker, true);
+				result =
+					next !== null &&
+					(next === other ||
+						(next.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
+						? Node.DOCUMENT_POSITION_FOLLOWING
+						: Node.DOCUMENT_POSITION_PRECEDING;
+			}
+			return result | Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 		}
-		return Node.DOCUMENT_POSITION_FOLLOWING;
+
+		const firstResult = first.compareDocumentPosition(other);
+		if ((firstResult & Node.DOCUMENT_POSITION_DISCONNECTED) !== 0) return firstResult;
+		const lastResult = last.compareDocumentPosition(other);
+		if (
+			parent.contains(first) &&
+			parent.contains(last) &&
+			(firstResult & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
+			(lastResult & Node.DOCUMENT_POSITION_PRECEDING) !== 0
+		) {
+			return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
+		}
+		// A portal moves its entire Fragment outside the authored host. A node
+		// still inside that host cannot have a trustworthy DOM position relative
+		// to the Fragment's foreign range, so React reports a logical-tree/DOM
+		// mismatch instead of leaking the foreign container's document order.
+		const portalMarker = this._startMarker as Comment & {
+			$$portalParent?: Node;
+			$$portalSourceAnchor?: Node;
+		};
+		const logicalParent = portalMarker.$$portalParent;
+		if (logicalParent !== undefined && logicalParent !== parent && logicalParent.contains(other)) {
+			const sourceAnchor = portalMarker.$$portalSourceAnchor;
+			if (sourceAnchor === undefined) return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
+			const directionMask = Node.DOCUMENT_POSITION_PRECEDING | Node.DOCUMENT_POSITION_FOLLOWING;
+			const logicalDirection = sourceAnchor.compareDocumentPosition(other) & directionMask;
+			if ((firstResult & directionMask) !== logicalDirection) {
+				return Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
+			}
+		}
+		return firstResult;
 	}
 
 	/**
-	 * Dispatches `event` on the fragment's parent host element so the
-	 * event bubbles into the surrounding handler tree the way native
-	 * EventTarget.dispatchEvent does. Mirrors React's FragmentInstance:
-	 * because the fragment itself has no DOM node, the dispatch target is
-	 * the parent (`return.stateNode` in React's fiber model).
-	 *
-	 * Returns false if the event's default action was cancelled — matches
-	 * EventTarget.dispatchEvent's return contract so callers can branch
-	 * on preventDefault() like they would on any other DOM dispatch.
+	 * Dispatch bubbling events directly on the parent unless fragment listeners
+	 * or a non-bubbling event require React's temporary fragment-local target.
 	 */
 	dispatchEvent(event: Event): boolean {
 		if (this._destroyed) return true;
 		const parent = this._startMarker.parentNode;
 		if (!parent) return true;
-		return (parent as unknown as EventTarget).dispatchEvent(event);
+		const listeners = this._listeners;
+		if (event.bubbles && (listeners === null || listeners.length === 0)) {
+			return parent.dispatchEvent(event);
+		}
+
+		const target = (parent.ownerDocument || document).createTextNode('');
+		if (listeners !== null) {
+			for (const entry of listeners) {
+				target.addEventListener(entry.type, entry.listener, entry.options);
+			}
+		}
+		parent.appendChild(target);
+		try {
+			return target.dispatchEvent(event);
+		} finally {
+			if (listeners !== null) {
+				for (const entry of listeners) {
+					target.removeEventListener(entry.type, entry.listener, entry.options);
+				}
+			}
+			if (target.parentNode === parent) parent.removeChild(target);
+		}
 	}
 
 	// ─── scrollIntoView (Stage 6) ───────────────────────────────────────
 	/**
-	 * Scrolls the fragment into view. Picks the first focusable descendant
-	 * if one exists (matches what tab-focus would land on), falling back to
-	 * the first element child otherwise. Mirrors React's FragmentInstance
-	 * choice — for tooltip / anchor-scroll use cases the "natural target"
-	 * is usually a focusable element, not an arbitrary wrapper div.
+	 * Scroll every logical first-level host child so the final scroll position
+	 * settles on the first child by default, or the last child for `false`.
+	 * Empty fragments use their nearest sibling, then their host parent.
 	 */
-	scrollIntoView(arg?: boolean | ScrollIntoViewOptions): void {
-		if (this._destroyed) return;
-		let firstFocusable: Element | null = null;
-		let firstAny: Element | null = null;
-		for (const el of fragmentDescendants(this)) {
-			if (!firstAny) firstAny = el;
-			if (isFocusable(el)) {
-				firstFocusable = el;
-				break;
-			}
+	scrollIntoView(alignToTop?: boolean): void {
+		if (typeof alignToTop === 'object') {
+			throw new Error(formatClientError(49));
 		}
-		const target = firstFocusable || firstAny;
-		if (target) (target as HTMLElement).scrollIntoView(arg as any);
+		if (this._destroyed) return;
+		const alignStart = alignToTop !== false;
+		const children = Array.from(fragmentDirectNodes(this));
+		if (children.length === 0) {
+			const following = fragmentNearestSibling(this._endMarker, true);
+			const preceding = fragmentNearestSibling(this._startMarker, false);
+			const target = alignStart
+				? following || preceding || this._startMarker.parentNode
+				: preceding || following;
+			if (target === null || target === undefined || target.nodeType === 9) return;
+			if (target.nodeType === 11) {
+				const host = (target as ShadowRoot).host;
+				if (host) host.scrollIntoView(alignToTop);
+				return;
+			}
+			if (target.nodeType === 3) {
+				scrollFragmentTextNode(target as Text, alignStart);
+			} else {
+				(target as Element).scrollIntoView(alignToTop);
+			}
+			return;
+		}
+
+		for (
+			let index = alignStart ? children.length - 1 : 0;
+			alignStart ? index >= 0 : index < children.length;
+			index += alignStart ? -1 : 1
+		) {
+			const child = children[index];
+			if (child.nodeType === 3) scrollFragmentTextNode(child as Text, alignStart);
+			else (child as Element).scrollIntoView(alignToTop);
+		}
 	}
 }
 
@@ -11178,83 +11331,108 @@ function listenerCapturePhase(o: AddEventListenerOptions | boolean | undefined):
 }
 
 /**
- * Walk every Element strictly between the start and end markers of the
- * fragment, in document (tree) order. Uses a TreeWalker rooted at each
- * top-level child between the markers so the iteration is O(n) over the
- * fragment's subtree (not the whole document). Comment / Text nodes are
- * skipped — fragment ref methods only care about Elements.
+ * Yield first-level authored host nodes in logical order. Comment boundaries
+ * are implementation details; text remains observable to fragment geometry.
  */
-function* fragmentDescendants(fi: FragmentInstance): Generator<Element> {
+function* fragmentDirectNodes(fi: FragmentInstance): Generator<Element | Text> {
+	const portalAnchors = fi._portalAnchors;
 	let node: ChildNode | null = fi._startMarker.nextSibling;
-	while (node && node !== fi._endMarker) {
+	while (node !== null) {
 		const next = node.nextSibling;
-		if (node.nodeType === 1) {
-			const top = node as Element;
-			yield top;
-			// SHOW_ELEMENT (filter 1) keeps us off Text/Comment.
-			const walker = (top.ownerDocument || document).createTreeWalker(top, 1);
-			let descendant = walker.nextNode() as Element | null;
-			while (descendant) {
-				yield descendant;
-				descendant = walker.nextNode() as Element | null;
+		const portals = portalAnchors === null ? undefined : portalAnchors.get(node);
+		if (portals !== undefined) {
+			// A portal containing a Fragment ref may grow around a later independent
+			// portal targeting the same container. Empty entries identify those
+			// foreign ranges without changing the ordinary direct-child fast path.
+			if (portals.size === 0) {
+				const foreignEnd = (node as any).$$portalEnd as Node | undefined;
+				if (foreignEnd !== undefined) {
+					node = nodeAfterPortalRange(node, foreignEnd) as ChildNode | null;
+					continue;
+				}
 			}
+			for (const portal of portals) {
+				// Portals are physically outside Activity's hidden host range. Their
+				// logical Block ancestry, not their target DOM, determines visibility.
+				if (portal.block === null || findHiddenActivity(portal.block) !== null) continue;
+				let child: ChildNode | null = portal.start?.nextSibling ?? null;
+				while (child !== null && child !== portal.end) {
+					const nextChild = child.nextSibling;
+					if ((child.nodeType === 1 || child.nodeType === 3) && fragmentHostVisible(child)) {
+						yield child as Element | Text;
+					}
+					child = nextChild;
+				}
+			}
+		}
+		if (node === fi._endMarker) return;
+		if ((node.nodeType === 1 || node.nodeType === 3) && fragmentHostVisible(node)) {
+			yield node as Element | Text;
 		}
 		node = next;
 	}
 }
 
 /**
- * Yield the DIRECT (first-level) Element children between the fragment markers,
- * in document order. This is the membership set for the per-child operations
- * (event listeners, observers) — matching React's first-level traverse — as
- * opposed to fragmentDescendants which deep-walks (used by focus/scrollIntoView).
+ * First-level host elements are the membership set for fragment listeners,
+ * observers, and public `reactFragments` handles.
  */
 function* fragmentDirectChildren(fi: FragmentInstance): Generator<Element> {
-	let node: ChildNode | null = fi._startMarker.nextSibling;
-	while (node && node !== fi._endMarker) {
-		const next = node.nextSibling;
+	for (const node of fragmentDirectNodes(fi)) {
 		if (node.nodeType === 1) yield node as Element;
-		node = next;
 	}
 }
 
-/**
- * Is `node` strictly between the fragment's start and end markers in
- * document order? Uses compareDocumentPosition so the check works for
- * arbitrary descendants — not just immediate children — and returns false
- * for detached / unrelated nodes (which is what blur containment expects).
- */
-function isInsideFragment(fi: FragmentInstance, node: Node): boolean {
-	const startRel = fi._startMarker.compareDocumentPosition(node);
-	const endRel = fi._endMarker.compareDocumentPosition(node);
-	const followsStart = (startRel & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-	const precedesEnd = (endRel & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
-	return followsStart && precedesEnd;
+/** Deep-walk each first-level host subtree without scanning the entire document. */
+function* fragmentDescendants(fi: FragmentInstance): Generator<Element> {
+	for (const top of fragmentDirectChildren(fi)) {
+		yield top;
+		const walker = (top.ownerDocument || document).createTreeWalker(top, 1);
+		let descendant = walker.nextNode() as Element | null;
+		while (descendant) {
+			yield descendant;
+			descendant = walker.nextNode() as Element | null;
+		}
+	}
 }
 
-/**
- * Mirrors the focusability check React's FragmentInstance uses:
- *  - inherently-focusable tags: <input>, <select>, <textarea>, <button>
- *    (not disabled), <a> (with href).
- *  - explicit tabIndex >= 0 OR contenteditable="true" on any tag.
- *  - tabIndex === -1 → not in sequential order, NOT picked by focus() /
- *    focusLast(). (Still focusable via .focus() directly — we just skip
- *    them when walking, matching React's behavior.)
- *  - hidden / disabled → never focusable.
- */
-function isFocusable(el: Element): boolean {
-	if ((el as HTMLElement).hidden === true) return false;
-	const tabAttr = el.getAttribute('tabindex');
-	const explicitTab = tabAttr === null ? null : parseInt(tabAttr, 10);
-	if (explicitTab !== null && explicitTab < 0) return false;
-	const tag = el.tagName;
-	if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
-		return !(el as HTMLInputElement).disabled;
+/** Ask the DOM whether focusing succeeded, including delegated/redirected focus. */
+function focusFragmentElement(node: Element, options?: FocusOptions): boolean {
+	const element = node as HTMLElement;
+	const owner = element.ownerDocument;
+	if (owner.activeElement === element) return true;
+	let focused = false;
+	const onFocus = () => {
+		focused = true;
+	};
+	owner.addEventListener('focus', onFocus, true);
+	try {
+		(element.focus || HTMLElement.prototype.focus).call(element, options);
+	} finally {
+		owner.removeEventListener('focus', onFocus, true);
 	}
-	if (tag === 'A' && el.hasAttribute('href')) return true;
-	if (explicitTab !== null && explicitTab >= 0) return true;
-	if (el.getAttribute('contenteditable') === 'true') return true;
-	return false;
+	return focused;
+}
+
+/** Skip implementation-only markers when locating an empty fragment's host sibling. */
+function fragmentNearestSibling(marker: Node, forward: boolean): Element | Text | null {
+	let sibling = forward ? marker.nextSibling : marker.previousSibling;
+	while (sibling !== null) {
+		if (sibling.nodeType === 1 || sibling.nodeType === 3) return sibling as Element | Text;
+		sibling = forward ? sibling.nextSibling : sibling.previousSibling;
+	}
+	return null;
+}
+
+/** Text nodes expose geometry through Range rather than Element.scrollIntoView. */
+function scrollFragmentTextNode(node: Text, alignToTop: boolean): void {
+	const range = node.ownerDocument.createRange();
+	range.selectNodeContents(node);
+	if (typeof range.getBoundingClientRect !== 'function') return;
+	const rect = range.getBoundingClientRect();
+	const view = node.ownerDocument.defaultView || window;
+	const y = alignToTop ? view.scrollY + rect.top : view.scrollY + rect.bottom - view.innerHeight;
+	view.scrollTo(view.scrollX + rect.left, y);
 }
 
 /**
@@ -14650,6 +14828,10 @@ interface PortalSlot {
 	target: Element | null;
 	start: Comment | null;
 	end: Comment | null;
+	fragmentOwners?: FragmentInstance | readonly FragmentInstance[];
+	fragmentAnchor?: Node;
+	sourceAnchor?: Node;
+	interleavedFragment?: FragmentInstance;
 }
 
 /**
@@ -14668,8 +14850,19 @@ export function portal(
 	// Hoisted-helper env tuple (compiled-output Phase 2): the `__portal$N`
 	// body's captured parent locals — stamped as block.extra below.
 	env?: any[],
+	// Present only when this portal is a direct logical child of Fragment refs.
+	fragmentOwners?: FragmentInstance | readonly FragmentInstance[],
+	fragmentAnchor?: Node,
 ): void {
 	const prev = parentScope.slots[slotKey] as PortalSlot | undefined;
+	if (
+		fragmentAnchor !== undefined &&
+		fragmentOwners === undefined &&
+		prev !== undefined &&
+		prev.target === target
+	) {
+		prepareFragmentPortalInterleaving(prev);
+	}
 	const state = renderPortalState(
 		prev ?? null,
 		parentScope.block,
@@ -14687,6 +14880,198 @@ export function portal(
 	if (prev !== state) {
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
+	}
+	if (fragmentOwners !== undefined && fragmentAnchor !== undefined) {
+		registerFragmentPortalOwners(state, fragmentOwners, fragmentAnchor);
+	} else if (fragmentAnchor !== undefined) {
+		// A Fragment ref rendered inside this portal belongs to its source-tree
+		// position, not the foreign target's physical position. Only the rare
+		// compiler-normalized root portal passes this ownerless source anchor.
+		state.sourceAnchor = fragmentAnchor;
+		let child: ChildNode | null = state.start!.nextSibling;
+		while (child !== null && child !== state.end) {
+			if (child.nodeType === 8) {
+				const foreignEnd = (child as any).$$portalEnd as Node | undefined;
+				if (foreignEnd !== undefined) {
+					child = nodeAfterPortalRange(child, foreignEnd) as ChildNode | null;
+					continue;
+				}
+				(child as any).$$portalSourceAnchor = fragmentAnchor;
+			}
+			child = child.nextSibling;
+		}
+	}
+}
+
+/**
+ * Match React's append-to-container semantics for the narrow case where a
+ * portal-root Fragment gains a trailing child after another portal mounted in
+ * the same target. Keep foreign ranges inside the owner's markers temporarily;
+ * a cold cleanup evacuates them before its ordinary contiguous-range teardown.
+ */
+function prepareFragmentPortalInterleaving(portal: PortalSlot): void {
+	const start = portal.start;
+	const end = portal.end;
+	const target = portal.target;
+	const block = portal.block;
+	if (start === null || end === null || target === null || block === null) return;
+	const firstForeign = end.nextSibling;
+	if (firstForeign === null || (firstForeign as any).$$portalEnd === undefined) return;
+
+	let fragment = portal.interleavedFragment;
+	if (fragment === undefined) {
+		for (const candidate of activeFragments) {
+			if (
+				candidate._ownerBlock === block &&
+				candidate._startMarker.previousSibling === start &&
+				candidate._endMarker.nextSibling === end
+			) {
+				fragment = candidate;
+				break;
+			}
+		}
+		if (fragment === undefined) return;
+	}
+
+	let lastChild: Element | Text | null = null;
+	for (const child of fragmentDirectNodes(fragment)) lastChild = child;
+	const tail = lastChild === null ? fragment._startMarker.nextSibling : lastChild.nextSibling;
+	if (tail === null || tail === end) return;
+	for (let node: ChildNode | null = tail; node !== end; node = node.nextSibling) {
+		if (node === null || node.nodeType !== 8) return;
+	}
+
+	const foreignStarts: Node[] = [];
+	let after: ChildNode | null = firstForeign;
+	while (after !== null) {
+		const foreignEnd = (after as any).$$portalEnd as Node | undefined;
+		if (foreignEnd === undefined || foreignEnd.parentNode !== target) break;
+		foreignStarts.push(after);
+		after = foreignEnd.nextSibling;
+	}
+	if (foreignStarts.length === 0) return;
+
+	let cursor: ChildNode | null = tail;
+	while (cursor !== null) {
+		const next: ChildNode | null = cursor.nextSibling;
+		target.insertBefore(cursor, after);
+		if (cursor === end) break;
+		cursor = next;
+	}
+
+	const anchors = (fragment._portalAnchors ??= new Map());
+	for (const foreignStart of foreignStarts) anchors.set(foreignStart, new Set());
+	if (portal.interleavedFragment === undefined) {
+		portal.interleavedFragment = fragment;
+		(block.cleanups ??= []).push(() => evacuateInterleavedPortalRanges(portal));
+	}
+}
+
+/** Move independent nested portal ranges outside their temporary owner. */
+function evacuateInterleavedPortalRanges(portal: PortalSlot): void {
+	const start = portal.start;
+	const end = portal.end;
+	const target = portal.target;
+	if (start === null || end === null || target === null || end.parentNode !== target) return;
+	const destination = end.nextSibling;
+	let node: ChildNode | null = start.nextSibling;
+	while (node !== null && node !== end) {
+		const foreignEnd = (node as any).$$portalEnd as Node | undefined;
+		if (foreignEnd === undefined || foreignEnd.parentNode !== target) {
+			node = node.nextSibling;
+			continue;
+		}
+		const following = foreignEnd.nextSibling;
+		let cursor: Node | null = node;
+		while (cursor !== null) {
+			const next: Node | null = cursor.nextSibling;
+			target.insertBefore(cursor, destination);
+			if (cursor === foreignEnd) break;
+			cursor = next;
+		}
+		node = following;
+	}
+}
+
+function registerFragmentPortalOwners(
+	portal: PortalSlot,
+	owners: FragmentInstance | readonly FragmentInstance[],
+	anchor: Node,
+): void {
+	const previous = portal.fragmentOwners;
+	if (previous !== undefined) {
+		if (portal.fragmentAnchor === anchor) {
+			if (!Array.isArray(previous) && !Array.isArray(owners) && previous === owners) return;
+			if (Array.isArray(previous) && Array.isArray(owners) && previous.length === owners.length) {
+				let sameOwners = true;
+				for (let index = 0; index < previous.length; index++) {
+					if (previous[index] !== owners[index]) {
+						sameOwners = false;
+						break;
+					}
+				}
+				if (sameOwners) return;
+			}
+		}
+		unregisterFragmentPortalOwners(portal);
+	}
+	portal.fragmentOwners = owners;
+	portal.fragmentAnchor = anchor;
+	if (Array.isArray(owners)) {
+		for (const owner of owners) owner._registerPortal(portal, anchor);
+	} else {
+		(owners as FragmentInstance)._registerPortal(portal, anchor);
+	}
+	if (previous === undefined) {
+		(portal.block!.cleanups ??= []).push(() => unregisterFragmentPortalOwners(portal));
+	}
+}
+
+function unregisterFragmentPortalOwners(portal: PortalSlot): void {
+	const owners = portal.fragmentOwners;
+	const anchor = portal.fragmentAnchor;
+	if (owners === undefined || anchor === undefined) return;
+	portal.fragmentOwners = undefined;
+	portal.fragmentAnchor = undefined;
+	if (Array.isArray(owners)) {
+		for (const owner of owners) owner._unregisterPortal(portal, anchor);
+	} else {
+		(owners as FragmentInstance)._unregisterPortal(portal, anchor);
+	}
+}
+
+/** Infer owner refs for a value-position portal from its stable source anchor. */
+function registerValuePortalFragmentOwners(
+	portal: PortalSlot,
+	parentBlock: Block,
+	anchor: Node,
+): void {
+	let firstOwner: FragmentInstance | null = null;
+	let nestedOwners: FragmentInstance[] | null = null;
+	for (const fragment of activeFragments) {
+		const owner = fragment._ownerBlock;
+		if (owner !== parentBlock && !blockIsAncestorOf(owner, parentBlock)) continue;
+		if (fragment._startMarker.parentNode !== anchor.parentNode) continue;
+		if (
+			(fragment._startMarker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) ===
+			0
+		) {
+			continue;
+		}
+		if (
+			(fragment._endMarker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_PRECEDING) ===
+			0
+		) {
+			continue;
+		}
+		if (firstOwner === null) {
+			firstOwner = fragment;
+		} else {
+			(nestedOwners ??= [firstOwner]).push(fragment);
+		}
+	}
+	if (firstOwner !== null) {
+		registerFragmentPortalOwners(portal, nestedOwners ?? firstOwner, anchor);
 	}
 }
 
@@ -14767,9 +15152,21 @@ function renderPortalState(
 	// continuing into the portal target's natural ancestors — mirroring React's
 	// per-fiber portal walk so a click inside a modal bubbles up the logical tree.
 	let n: ChildNode | null = state.start!.nextSibling;
-	while (n !== null && n !== state.end) {
-		(n as any).$$portalParent = host;
-		n = n.nextSibling;
+	if (state.interleavedFragment === undefined) {
+		while (n !== null && n !== state.end) {
+			(n as any).$$portalParent = host;
+			n = n.nextSibling;
+		}
+	} else {
+		while (n !== null && n !== state.end) {
+			const foreignEnd = (n as any).$$portalEnd as Node | undefined;
+			if (foreignEnd !== undefined) {
+				n = nodeAfterPortalRange(n, foreignEnd) as ChildNode | null;
+				continue;
+			}
+			(n as any).$$portalParent = host;
+			n = n.nextSibling;
+		}
 	}
 	return state;
 }
@@ -16758,6 +17155,62 @@ function fragmentDescriptorChildren(value: ElementDescriptor): any[] {
 	return Array.isArray(children) ? children : [children];
 }
 
+/** Preserve a ref-bearing public Fragment descriptor as a real lifecycle boundary. */
+function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor<ElementDescriptor> {
+	return {
+		$$kind: ELEMENT_TAG,
+		type: renderFragmentRefDescriptor,
+		props: value,
+		key: value.key,
+		ref: null,
+		children: null,
+	};
+}
+
+/** Cold component body used only by `createElement(Fragment, { ref }, ...)`. */
+function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope): void {
+	const block = scope.block;
+	let instance = block.slots[1] as FragmentInstance | undefined;
+	if (instance === undefined) {
+		const hydration = activeHydration();
+		let start: Comment;
+		let end: Comment;
+		const opening = hydration?.node;
+		if (opening?.nodeType === 8 && (opening as Comment).data === 'frag') {
+			start = opening as Comment;
+			let depth = 1;
+			let cursor: Node | null = start.nextSibling;
+			while (cursor !== null) {
+				if (cursor.nodeType === 8) {
+					if ((cursor as Comment).data === 'frag') depth++;
+					else if ((cursor as Comment).data === '/frag' && --depth === 0) break;
+				}
+				cursor = cursor.nextSibling;
+			}
+			if (cursor === null) throw new Error(formatClientError(50));
+			end = cursor as Comment;
+			hydration!.node = start.nextSibling;
+		} else {
+			start = document.createComment('frag');
+			end = document.createComment('/frag');
+			block.parentNode.insertBefore(start, block.endMarker);
+			block.parentNode.insertBefore(end, block.endMarker);
+		}
+		instance = mountFragmentRef(scope, start, end, descriptor.ref);
+		block.slots[0] = { a: instance };
+		block.slots[1] = instance;
+		block.refFields = ['f', 'a', ''];
+	} else if (instance._currentRef !== descriptor.ref) {
+		if (instance._currentRef != null) queueRefDetach(instance._currentRef, instance);
+		if (descriptor.ref != null) queueRefAttach(scope, descriptor.ref, instance);
+		instance._currentRef = descriptor.ref;
+	}
+
+	childSlot(scope, 2, block.parentNode, descriptor.children, instance._endMarker);
+	const hydration = activeHydration();
+	if (hydration !== null) hydration.node = instance._endMarker.nextSibling;
+}
+
 function deoptWrapperKind(value: any[]): DeoptWrapperKind {
 	return POSITIONAL_CHILDREN.has(value as object) ? 'fragment' : 'array';
 }
@@ -16804,6 +17257,11 @@ function flattenReactChildContainer(
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
+			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
+				outItems.push(fragmentRefDescriptor(item));
+				outKeys.push(scopedDeoptKey(path, item, i, keyFn(item, i)));
+				continue;
+			}
 			const nested = fragmentDescriptorChildren(item);
 			if (item.key != null) {
 				flattenReactChildContainer(outItems, outKeys, nested, 'fragment', [
@@ -16847,6 +17305,12 @@ function prepareDeoptList(
 	// non-list answer (a lone component descriptor, text, null) is the common one
 	// — build the two output arrays only once a list regime is established.
 	if (isFragmentDescriptor(value)) {
+		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
+			return {
+				items: [fragmentRefDescriptor(value)],
+				keys: [scopedDeoptKey([], value, 0, value.key ?? 0)],
+			};
+		}
 		const items: any[] = [];
 		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
@@ -18294,6 +18758,12 @@ export function childSlot(
 			// The DOM element containing this hole is the portal's logical parent.
 			domParent,
 		);
+		// Conditional portals and portals inside directive helpers use childSlot
+		// rather than the compiler's direct portal helper. Their retained end anchor
+		// still locates the authored position inside any enclosing Fragment refs.
+		if (activeFragments.size !== 0 && state.end !== null) {
+			registerValuePortalFragmentOwners(state.portal, parentBlock, state.end);
+		}
 		return;
 	}
 
@@ -19545,6 +20015,33 @@ interface SuspenseHiddenDom {
 // restore it only after the last owner reveals, independent of hide/reveal order.
 const HIDDEN_DISPLAYS = new WeakMap<HTMLElement, HiddenDisplay>();
 const HIDDEN_TEXTS = new WeakMap<Text, HiddenText>();
+let HIDDEN_ACTIVITY_NODES: WeakMap<Node, number> | null = null;
+let hiddenActivityNodeOwners = 0;
+
+function retainHiddenActivityNode(node: Node): void {
+	const hidden = (HIDDEN_ACTIVITY_NODES ??= new WeakMap<Node, number>());
+	hidden.set(node, (hidden.get(node) ?? 0) + 1);
+	hiddenActivityNodeOwners++;
+}
+
+function releaseHiddenActivityNode(node: Node): void {
+	const hidden = HIDDEN_ACTIVITY_NODES;
+	const owners = hidden?.get(node);
+	if (owners === undefined) return;
+	if (owners === 1) hidden!.delete(node);
+	else hidden!.set(node, owners - 1);
+	hiddenActivityNodeOwners--;
+}
+
+/** Activity hides exclude their preserved hosts from every Fragment-ref API. */
+function fragmentHostVisible(node: Node): boolean {
+	if (hiddenActivityNodeOwners === 0) return true;
+	const hidden = HIDDEN_ACTIVITY_NODES!;
+	for (let current: Node | null = node; current !== null; current = current.parentNode) {
+		if (hidden.has(current)) return false;
+	}
+	return true;
+}
 
 function enforceHiddenDisplay(el: HTMLElement): void {
 	const hidden = HIDDEN_DISPLAYS.get(el);
@@ -22902,6 +23399,8 @@ interface ActivitySlot {
 	__kind: 'activityBlockSlot';
 	block: Block | null;
 	hidden: boolean;
+	/** Hidden-host ownership is released even when a hidden Activity unmounts. */
+	fragmentVisibilityCleanupRegistered: boolean;
 	/** Invalidates a queued visible→hidden commit when a newer render wins. */
 	commitVersion: number;
 	/** The visible effects still need their commit-phase deactivation. */
@@ -22925,18 +23424,27 @@ interface ActivitySlot {
 function hideActivityRange(state: ActivitySlot): void {
 	const b = state.block;
 	if (!b) return;
+	if (!state.fragmentVisibilityCleanupRegistered) {
+		state.fragmentVisibilityCleanupRegistered = true;
+		(b.cleanups ??= []).push(() => {
+			for (const el of state.hiddenDisplays) releaseHiddenActivityNode(el);
+			for (const text of state.hiddenTexts) releaseHiddenActivityNode(text);
+		});
+	}
 	// Branch switches and HMR can replace direct roots while the Activity stays
 	// hidden. Drop detached entries now so a long-hidden, frequently updated
 	// boundary does not retain every outgoing host node until it reveals.
 	for (const el of state.hiddenDisplays) {
 		if (el.parentNode !== b.parentNode) {
 			state.hiddenDisplays.delete(el);
+			releaseHiddenActivityNode(el);
 			releaseHiddenDisplay(el, false);
 		}
 	}
 	for (const text of state.hiddenTexts) {
 		if (text.parentNode !== b.parentNode) {
 			state.hiddenTexts.delete(text);
+			releaseHiddenActivityNode(text);
 			releaseHiddenText(text);
 		}
 	}
@@ -22946,6 +23454,7 @@ function hideActivityRange(state: ActivitySlot): void {
 			const el = node as HTMLElement;
 			if (!state.hiddenDisplays.has(el)) {
 				state.hiddenDisplays.add(el);
+				retainHiddenActivityNode(el);
 				retainHiddenDisplay(el, false);
 			} else {
 				enforceHiddenDisplay(el);
@@ -22954,6 +23463,7 @@ function hideActivityRange(state: ActivitySlot): void {
 			const t = node as Text;
 			if (!state.hiddenTexts.has(t)) {
 				state.hiddenTexts.add(t);
+				retainHiddenActivityNode(t);
 				retainHiddenText(t);
 			}
 			enforceHiddenText(t);
@@ -22972,9 +23482,15 @@ function rehideActivityAfterDescendantRender(state: ActivitySlot): void {
 
 /** Release this Activity's hide ownership, restoring nodes with no other owner. */
 function showActivityRange(state: ActivitySlot): void {
-	for (const el of state.hiddenDisplays) releaseHiddenDisplay(el, false);
+	for (const el of state.hiddenDisplays) {
+		releaseHiddenActivityNode(el);
+		releaseHiddenDisplay(el, false);
+	}
 	state.hiddenDisplays.clear();
-	for (const text of state.hiddenTexts) releaseHiddenText(text);
+	for (const text of state.hiddenTexts) {
+		releaseHiddenActivityNode(text);
+		releaseHiddenText(text);
+	}
 	state.hiddenTexts.clear();
 }
 
@@ -23048,6 +23564,7 @@ export function activityBlock(
 			__kind: 'activityBlockSlot',
 			block: b,
 			hidden: false,
+			fragmentVisibilityCleanupRegistered: false,
 			commitVersion: 0,
 			deactivationPending: false,
 			hiddenDisplays: new Set(),

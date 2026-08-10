@@ -4,17 +4,18 @@
 //   - tree order, depth-first
 //   - inherently focusable tags (input/button/select/textarea/a[href]) +
 //     elements with tabIndex >= 0 OR contenteditable="true"
-//   - disabled and tabIndex < 0 → skipped
+//   - disabled controls are skipped; programmatically focusable tabIndex < 0 is valid
 //   - hidden → skipped
 //   - blur() only affects the active element when it lives INSIDE the
 //     fragment range (no surprise blurs of elements outside the scope)
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount } from '../_helpers';
 import { FragmentInstance } from '../../src/index.js';
 import {
 	TwoInputs,
 	DisabledThenButton,
 	NonFocusableBeforeButton,
+	FocusableFieldset,
 	NoFocusable,
 	ExplicitTabIndex,
 	SkipsNegativeTabIndex,
@@ -50,6 +51,20 @@ describe('FragmentInstance.focus / focusLast / blur', () => {
 		r.unmount();
 	});
 
+	// Per ReactDOMFragmentRefs-test.js: "keeps focus on the first focusable child if already focused".
+	it('does not refocus an already focused first child', () => {
+		const fragRef = makeRef();
+		const r = mount(TwoInputs, { fragRef });
+		const first = r.find('#a') as HTMLInputElement;
+		first.focus();
+		const focus = vi.spyOn(first, 'focus');
+		fragRef.current!.focus();
+		expect(document.activeElement).toBe(first);
+		expect(focus).not.toHaveBeenCalled();
+		focus.mockRestore();
+		r.unmount();
+	});
+
 	it('focus() skips disabled controls', () => {
 		const fragRef = makeRef();
 		const r = mount(DisabledThenButton, { fragRef });
@@ -64,6 +79,15 @@ describe('FragmentInstance.focus / focusLast / blur', () => {
 		const r = mount(NonFocusableBeforeButton, { fragRef });
 		fragRef.current!.focus();
 		expect(document.activeElement).toBe(r.find('#target'));
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "focuses the first focusable child in a fieldset".
+	it('focuses the first focusable child in a fieldset', () => {
+		const fragRef = makeRef();
+		const r = mount(FocusableFieldset, { fragRef });
+		fragRef.current!.focus();
+		expect(document.activeElement).toBe(r.find('#street'));
 		r.unmount();
 	});
 
@@ -85,11 +109,12 @@ describe('FragmentInstance.focus / focusLast / blur', () => {
 		r.unmount();
 	});
 
-	it('focus() / focusLast() skip elements with tabIndex=-1', () => {
+	// Per React's setFocusIfFocusable: tabIndex=-1 excludes tab order, not programmatic focus.
+	it('focus() includes programmatically focusable elements with tabIndex=-1', () => {
 		const fragRef = makeRef();
 		const r = mount(SkipsNegativeTabIndex, { fragRef });
 		fragRef.current!.focus();
-		expect(document.activeElement).toBe(r.find('#keep'));
+		expect(document.activeElement).toBe(r.find('#skip'));
 		fragRef.current!.focusLast();
 		expect(document.activeElement).toBe(r.find('#keep'));
 		r.unmount();

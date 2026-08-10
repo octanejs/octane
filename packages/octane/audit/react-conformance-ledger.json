@@ -1450,15 +1450,27 @@
     },
     {
       "caseId": "react-case-v1:041fdaa40423fbb1ddfe",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles empty fragment instances",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “marks empty-fragment sibling positions as implementation-specific” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "marks empty-fragment sibling positions as implementation-specific",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "reports exact parent and ancestor flags for empty fragments",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:042e3e7c677ecb76023d",
@@ -2080,15 +2092,27 @@
     },
     {
       "caseId": "react-case-v1:0656d8c2f0ae875addf9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles multiple portals to the same element",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “validates logical position when sibling portals share the same host” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "validates logical position when sibling portals share the same host",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "distinguishes multiple Fragment-owned portals sharing one foreign target",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:065bc978f82e495d9f45",
@@ -4879,15 +4903,22 @@
     },
     {
       "caseId": "react-case-v1:0ecd921450d3affe00a4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "returns the topmost disconnected element if the fragment and parent are unmounted",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "The upstream title describes a future TODO, but its executable assertion returns the FragmentInstance itself; the local unmount oracle verifies that exact current React behavior.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "returns the captured fragment instance after it has been unmounted",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0ed024dc7b1f228424c1",
@@ -5467,15 +5498,22 @@
     },
     {
       "caseId": "react-case-v1:116d56e35cce2924f26c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focuses deeply nested focusable children, depth first",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focuses deeply nested focusable children depth-first with focusLast()” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "focuses deeply nested focusable children depth-first with focusLast()",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1175aa2e84e6427ca3a1",
@@ -9303,15 +9341,22 @@
     },
     {
       "caseId": "react-case-v1:1f0c66661b9c83c7719f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "fires events on self, and only self if bubbles=false",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “delivers non-bubbling events only to listeners attached to the fragment” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "delivers non-bubbling events only to listeners attached to the fragment",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1f186bc09d19a3f73dc5",
@@ -10666,15 +10711,42 @@
     },
     {
       "caseId": "react-case-v1:23949c272332c1d6d6c1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "returns the relationship between the fragment instance and a given node",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “returns PRECEDING for a sibling rendered BEFORE the fragment” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns PRECEDING for a sibling rendered BEFORE the fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns FOLLOWING for a sibling rendered AFTER the fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns exactly CONTAINED_BY for a child inside the fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "reports that ancestors precede and contain a nonempty fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns DISCONNECTED for a node in a different tree",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2398df958cd9d886f0aa",
@@ -13598,15 +13670,22 @@
     },
     {
       "caseId": "react-case-v1:2e0695c3fe0d8e2a4268",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "scrollIntoView works on text-only fragment using Range API",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls text nodes through their Range geometry” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "scrolls text nodes through their Range geometry",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2e1314e68cb6d9c5e788",
@@ -14507,15 +14586,22 @@
     },
     {
       "caseId": "react-case-v1:316b267707a069d15187",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focuses the first focusable child in a fieldset",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focuses the first focusable child in a fieldset” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-focus.test.ts",
+          "testName": "focuses the first focusable child in a fieldset",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:31742d208d6c771dabe9",
@@ -14925,15 +15011,27 @@
     },
     {
       "caseId": "react-case-v1:32c22401baf414f567f9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "warns when unobserveUsing() is called with an observer that was not observed",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “warns without unobserving when the observer was never registered” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "warns without unobserving when the observer was never registered",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "warns without touching a different observer while keeping the registered one",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:32c71cf3d1f38a811314",
@@ -16085,15 +16183,32 @@
     },
     {
       "caseId": "react-case-v1:35d5bc87428c28449118",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "attaches a ref to Fragment",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence verifies FragmentInstance attachment; buffered/streaming SSR keeps refs inactive, and matching hydration attaches the same public ref without replacing server-rendered nodes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs.test.ts",
+          "testName": "attaches a FragmentInstance to an object ref",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr.test.ts",
+          "testName": "renders Fragment refs without attaching them and keeps static markup markerless",
+          "modes": ["server-string", "server-stream", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/control-fold.test.ts",
+          "testName": "hydrates a returned Fragment ref without replacing existing stateful children",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:35ec3918e5b346381639",
@@ -16217,15 +16332,22 @@
     },
     {
       "caseId": "react-case-v1:367bfb5780a4a79b2232",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "adds and removes event listeners from children with multiple fragments",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “adds and removes event listeners from children with multiple fragments” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "adds and removes event listeners from children with multiple fragments",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:36844f75cf34a2c591cb",
@@ -17833,15 +17955,22 @@
     },
     {
       "caseId": "react-case-v1:3b4b6e0069e08961dda5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "allows adding and cleaning up listeners in effects",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “allows adding and cleaning up listeners in effects” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs.test.ts",
+          "testName": "allows adding and cleaning up listeners in effects",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3b4cbca5c3ab6ffd9b99",
@@ -18399,15 +18528,22 @@
     },
     {
       "caseId": "react-case-v1:3d75738d4902fac81efd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focuses the first focusable child",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focus() focuses the first focusable child in tree order” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-focus.test.ts",
+          "testName": "focus() focuses the first focusable child in tree order",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3d9ef04bfe60138640f8",
@@ -19140,15 +19276,22 @@
     },
     {
       "caseId": "react-case-v1:3fb3431d530b43122080",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "returns the root node of the parent",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “returns the document when the fragment is rendered into the main tree” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "returns the document when the fragment is rendered into the main tree",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3fc44375f0deeea2a3d2",
@@ -20388,15 +20531,22 @@
     },
     {
       "caseId": "react-case-v1:442d7e4d1437c778a697",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "accepts a ref callback",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “accepts a callback ref and fires it with the FragmentInstance” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs.test.ts",
+          "testName": "accepts a callback ref and fires it with the FragmentInstance",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:44333e4c44e15a2b07b6",
@@ -20770,15 +20920,22 @@
     },
     {
       "caseId": "react-case-v1:4527bf998e0cc7b3965e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "does not remove focus from elements outside of the Fragment",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “blur() is a no-op when the focused element is OUTSIDE the fragment” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-focus.test.ts",
+          "testName": "blur() is a no-op when the focused element is OUTSIDE the fragment",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4537db70213c37e28dc5",
@@ -21395,15 +21552,32 @@
     },
     {
       "caseId": "react-case-v1:4768a94d52bec599c860",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "attaches intersection observers to children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “observeUsing forwards .observe to every direct fragment child” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "observeUsing forwards .observe to every direct fragment child",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "unobserveUsing forwards .unobserve to every direct fragment child",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "observes each retained or added child only when it first joins the fragment",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:47899b37f97008d1d115",
@@ -22129,15 +22303,22 @@
     },
     {
       "caseId": "react-case-v1:4a0e893cdce7c0eabf84",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "getClientRects includes both text and element bounds",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “preserves document order across mixed text and element rectangles” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "preserves document order across mixed text and element rectangles",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4a2c179f7ef0613293e7",
@@ -24585,15 +24766,32 @@
     },
     {
       "caseId": "react-case-v1:5293aa4b0eb351fe1a8f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "attaches fragment handles to nodes",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “publishes fragment handles for existing, added, and removed children” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "publishes fragment handles for existing, added, and removed children",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "records both fragment handles on children shared by nested fragments",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "publishes fragment ownership on direct text nodes",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:529e0cc56dd6118e107e",
@@ -30605,15 +30803,22 @@
     },
     {
       "caseId": "react-case-v1:6690c335519aeef3aebd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "is available in effects",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “is populated by the time useLayoutEffect AND useEffect run” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs.test.ts",
+          "testName": "is populated by the time useLayoutEffect AND useEffect run",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:66b790106a842abbdb9a",
@@ -31901,15 +32106,22 @@
     },
     {
       "caseId": "react-case-v1:6b29697621bf1110b570",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "compareDocumentPosition works with text children",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “reports exact containment for direct text children” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "reports exact containment for direct text children",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6b2a397f55d5cf7536b7",
@@ -33195,15 +33407,27 @@
     },
     {
       "caseId": "react-case-v1:700812d6940eac0f16de",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles Activity modes switching",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “disconnects preserved hidden children and reconnects them when Activity reveals” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-activity.test.ts",
+          "testName": "disconnects preserved hidden children and reconnects them when Activity reveals",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-activity.test.ts",
+          "testName": "excludes logically owned portal children while their Activity is hidden",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:700fe59b480918133db6",
@@ -34116,15 +34340,27 @@
     },
     {
       "caseId": "react-case-v1:731fb899f22fcdc6de5f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "attaches handles to observed elements to allow caching of observers",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “records both fragment handles on children shared by nested fragments” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "records both fragment handles on children shared by nested fragments",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "includes only logically owned portal children in handles, listeners, and observers",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:732fa4aa635962e37d42",
@@ -36766,15 +37002,22 @@
     },
     {
       "caseId": "react-case-v1:7d03654b5ab64cf98a39",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles portaled elements",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “marks logically owned portaled children as implementation-specific” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "marks logically owned portaled children as implementation-specific",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7d1d2409a71d981cd068",
@@ -37252,15 +37495,22 @@
     },
     {
       "caseId": "react-case-v1:7e9f9e85bfc66ab23448",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "applies event listeners to host children nested within non-host children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “applies event listeners to host children nested within non-host children” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs.test.ts",
+          "testName": "applies event listeners to host children nested within non-host children",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7ebcb648e61c6352ad84",
@@ -39330,15 +39580,22 @@
     },
     {
       "caseId": "react-case-v1:85982959e1580268e736",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles empty fragments",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “compares an empty Fragment rendered into a portal” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "compares an empty Fragment rendered into a portal",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:85bd80af6389dcf9cb01",
@@ -41439,15 +41696,22 @@
     },
     {
       "caseId": "react-case-v1:8c27bddd50dc4df19ec2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "calls scrollIntoView on the last child if alignToTop is false",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls children in tree order when aligning to the bottom” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "scrolls children in tree order when aligning to the bottom",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8c456100810f08f5b9d0",
@@ -41907,15 +42171,27 @@
     },
     {
       "caseId": "react-case-v1:8de6a39bb4dca5fbb3c7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "applies event listeners to portaled children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “includes only logically owned portal children in handles, listeners, and observers” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "includes only logically owned portal children in handles, listeners, and observers",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "inherits and removes Fragment bindings when a conditional portal mounts and unmounts",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8de72e5781320b235ab0",
@@ -42450,15 +42726,22 @@
     },
     {
       "caseId": "react-case-v1:8fb520604b2e579a256a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles portaled elements -- different scroll container",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls portaled children in order across different scroll containers” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "scrolls portaled children in order across different scroll containers",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8fbc270ed918adee7950",
@@ -42954,15 +43237,22 @@
     },
     {
       "caseId": "react-case-v1:916f6cd728a763d665ff",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "calls scrollIntoView on the prev sibling if alignToTop is false",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls toward the previous sibling for bottom-aligned empty fragments” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "scrolls toward the previous sibling for bottom-aligned empty fragments",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9181b63208a7dc5530f8",
@@ -44874,15 +45164,22 @@
     },
     {
       "caseId": "react-case-v1:98e1614147450a8fb338",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "treats passive:true and passive:false as same listener per DOM spec",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “treats passive:true and passive:false as same listener per DOM spec” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-events.test.ts",
+          "testName": "treats passive:true and passive:false as same listener per DOM spec",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:991a7e659eb45955b2a1",
@@ -45379,15 +45676,22 @@
     },
     {
       "caseId": "react-case-v1:9b1847125334393a6990",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "calls scrollIntoView on the next sibling by default, or if alignToTop=true",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls toward the next sibling for empty fragments by default” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "scrolls toward the next sibling for empty fragments by default",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9b34f755256112b37e8d",
@@ -45704,15 +46008,22 @@
     },
     {
       "caseId": "react-case-v1:9c2870a5515f335fa072",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focuses deeply nested focusable children, depth first",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focuses deeply nested focusable children depth-first with focus()” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "focuses deeply nested focusable children depth-first with focus()",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9c5785aad9ca755d61fe",
@@ -46838,15 +47149,22 @@
     },
     {
       "caseId": "react-case-v1:a05d84773b15410d1bbb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "returns self when only the fragment was unmounted",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “returns the captured fragment instance after it has been unmounted” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "returns the captured fragment instance after it has been unmounted",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a078d1d8465ffbe11871",
@@ -47288,15 +47606,27 @@
     },
     {
       "caseId": "react-case-v1:a1a1e1b12b467ccbf3a5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "adds and removes event listeners from children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “addEventListener attaches the listener to ALL direct fragment children” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-events.test.ts",
+          "testName": "addEventListener attaches the listener to ALL direct fragment children",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-events.test.ts",
+          "testName": "removeEventListener detaches the listener from every direct child",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a1b64012843fa133d868",
@@ -48161,15 +48491,22 @@
     },
     {
       "caseId": "react-case-v1:a498a77e4bdbad99defd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "keeps focus on a nested child if already focused",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “keeps focus on a nested child if already focused” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "keeps focus on a nested child if already focused",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a4a62a13b9ef428fd5b2",
@@ -48288,15 +48625,22 @@
     },
     {
       "caseId": "react-case-v1:a52c6c7e687bdf1b1def",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "preserves document order when adding and removing children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “preserves document order when adding and removing focusable children” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "preserves document order when adding and removing focusable children",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a534f872607cb6c98b99",
@@ -48761,15 +49105,22 @@
     },
     {
       "caseId": "react-case-v1:a6b52c753673261f070a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "does not apply event listeners to hidden trees",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “excludes hidden Activity children from listeners and fragment ownership” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-activity.test.ts",
+          "testName": "excludes hidden Activity children from listeners and fragment ownership",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a6b8e80ea67e620352d6",
@@ -50477,15 +50828,22 @@
     },
     {
       "caseId": "react-case-v1:ace6a30b720022c65b60",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "removes a capture listener registered with boolean when removed with options object",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “removes a capture listener registered with boolean when removed with options object” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-events.test.ts",
+          "testName": "removes a capture listener registered with boolean when removed with options object",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:acebc7fd28d462938df6",
@@ -51624,15 +51982,22 @@
     },
     {
       "caseId": "react-case-v1:b0e42d4b956975616588",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "calls scrollIntoView on the parent if there are no siblings",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls the parent when an empty fragment has no siblings” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "scrolls the parent when an empty fragment has no siblings",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b0eb83a6710b84594296",
@@ -54334,15 +54699,22 @@
     },
     {
       "caseId": "react-case-v1:b964f2da0ce9712cc2fa",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "removes a capture listener registered with options object when removed with boolean",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “removes a capture listener registered with options object when removed with boolean” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-events.test.ts",
+          "testName": "removes a capture listener registered with options object when removed with boolean",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b9660a84f03656b1f3d9",
@@ -54495,15 +54867,22 @@
     },
     {
       "caseId": "react-case-v1:b9fa428077b26f92c54e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "adds an event listener to a newly added child",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “a listener added before a child existed still fires on that child once it mounts” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "a listener added before a child existed still fires on that child once it mounts",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b9fe26cb94bd610e247d",
@@ -54848,15 +55227,27 @@
     },
     {
       "caseId": "react-case-v1:bbd224db0e1ba8fd9c25",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles nested children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “inner fragment.contains a child only of the inner range” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "inner fragment.contains a child only of the inner range",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns exactly CONTAINED_BY for a descendant of a fragment child",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bbecf8eb04ff88db71a5",
@@ -55818,15 +56209,22 @@
     },
     {
       "caseId": "react-case-v1:bea592a31d269ae9f177",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "keeps focus on the first focusable child if already focused",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “does not refocus an already focused first child” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-focus.test.ts",
+          "testName": "does not refocus an already focused first child",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bea5f71c6511b4f4641b",
@@ -56848,15 +57246,27 @@
     },
     {
       "caseId": "react-case-v1:c292e0a6dc7e37126618",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "applies event listeners to visible trees",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “disconnects preserved hidden children and reconnects them when Activity reveals” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-activity.test.ts",
+          "testName": "disconnects preserved hidden children and reconnects them when Activity reveals",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-activity.test.ts",
+          "testName": "connects an initially hidden portal only after its Activity reveals",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c29357777c98818aa4f4",
@@ -57121,15 +57531,22 @@
     },
     {
       "caseId": "react-case-v1:c3241a23bf573696d49b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "does not yet support options",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “rejects scroll options objects instead of passing them to DOM elements” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "rejects scroll options objects instead of passing them to DOM elements",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c33c9eed58315f728723",
@@ -57427,15 +57844,22 @@
     },
     {
       "caseId": "react-case-v1:c4056310f68da7c2778f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focus is a no-op on text-only fragment",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focus / focusLast / blur are no-ops” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "focus / focusLast / blur are no-ops",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c41936a14958d7f8be55",
@@ -58733,15 +59157,22 @@
     },
     {
       "caseId": "react-case-v1:c7c9b30edb12d0eac8d8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focuses the last focusable child",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focusLast() focuses the LAST focusable child in tree order” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-focus.test.ts",
+          "testName": "focusLast() focuses the LAST focusable child in tree order",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c7cb6118b145cfb48f1c",
@@ -59421,15 +59852,22 @@
     },
     {
       "caseId": "react-case-v1:ca4a79c5455e43cb1485",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "does not apply removed event listeners to new children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “removeEventListener stops future children from getting the listener” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-future-children.test.ts",
+          "testName": "removeEventListener stops future children from getting the listener",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ca4bd6dcc1265c24676f",
@@ -59980,15 +60418,27 @@
     },
     {
       "caseId": "react-case-v1:cb6d851c376a456c1fa6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "removes focus from an element inside of the Fragment",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “blur() blurs an active element that lives inside the fragment” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-focus.test.ts",
+          "testName": "blur() blurs an active element that lives inside the fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "removes focus from a nested element inside the Fragment",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:cb759a759584c4426cbd",
@@ -63568,15 +64018,22 @@
     },
     {
       "caseId": "react-case-v1:d766abb61dd5ac915e90",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "getClientRects includes text node bounds",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “includes text-node client rectangles when the Range API provides them” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "includes text-node client rectangles when the Range API provides them",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d76947e79014045a38a6",
@@ -63953,15 +64410,22 @@
     },
     {
       "caseId": "react-case-v1:d896ffd5097f17bd9080",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "focusLast is a no-op on text-only fragment",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “focus / focusLast / blur are no-ops” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "focus / focusLast / blur are no-ops",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d89d1703277db6e26e19",
@@ -64020,15 +64484,32 @@
     },
     {
       "caseId": "react-case-v1:d8d42281a83467c3bf65",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles fragment instances with one child",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “returns PRECEDING for a sibling rendered BEFORE the fragment” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns PRECEDING for a sibling rendered BEFORE the fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns FOLLOWING for a sibling rendered AFTER the fragment",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "returns exactly CONTAINED_BY for a child inside the fragment",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d8e0010c5e7314270e6c",
@@ -65682,15 +66163,22 @@
     },
     {
       "caseId": "react-case-v1:de8b75bcb79bda8bb79a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "warns when observeUsing is called on text-only fragment",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “warns when an observer is attached to a fragment containing only text” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "warns when an observer is attached to a fragment containing only text",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:de950c5617a92d80bcfc",
@@ -66845,15 +67333,22 @@
     },
     {
       "caseId": "react-case-v1:e260d2777bc35a1d741f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "compares a root-level Fragment",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “compares a root-level Fragment and its empty Fragment sibling” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "compares a root-level Fragment and its empty Fragment sibling",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e273b8577509edc25b64",
@@ -67169,15 +67664,27 @@
     },
     {
       "caseId": "react-case-v1:e35dab67a2154ef1a78e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "fires events on the host parent if bubbles=true",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “dispatches on the parent host element and bubbles to its listeners” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "dispatches on the parent host element and bubbles to its listeners",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-position.test.ts",
+          "testName": "delivers bubbling events to the fragment before their host parent",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e365e0867402afc834b4",
@@ -67411,15 +67918,22 @@
     },
     {
       "caseId": "react-case-v1:e428fad5293d20d9c6cb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "settles scroll on the first child by default, or if alignToTop=true",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “scrolls children in reverse order so the first child receives final focus” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "scrolls children in reverse order so the first child receives final focus",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e44005d824716b525b20",
@@ -69106,15 +69620,22 @@
     },
     {
       "caseId": "react-case-v1:ea5f7a6138b443c3fc9f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "returns disconnected for comparison with an unmounted fragment instance",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “returns disconnected for comparison with an unmounted fragment instance” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-parity-ledger.test.ts",
+          "testName": "returns disconnected for comparison with an unmounted fragment instance",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ea6272128aa272849989",
@@ -69602,15 +70123,22 @@
     },
     {
       "caseId": "react-case-v1:ebcf97cd31c5cf4621b8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "returns the bounding client rects of all children",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “returns the concatenated rects of every direct fragment child in tree order” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-observers.test.ts",
+          "testName": "returns the concatenated rects of every direct fragment child in tree order",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ebdd6ba7debad55b8a9c",
@@ -73301,15 +73829,22 @@
     },
     {
       "caseId": "react-case-v1:f851b1903939625f1ec5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "removes a listener registered with passive:false when removed with passive:true",
       "baselines": ["canary"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “removes a listener registered with passive:false when removed with passive:true” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-events.test.ts",
+          "testName": "removes a listener registered with passive:false when removed with passive:true",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f8656a65d339df828d5c",
@@ -75255,15 +75790,22 @@
     },
     {
       "caseId": "react-case-v1:ffa5750e9f0140c80bec",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFragmentRefs-test.js",
       "title": "handles portaled elements -- same scroll container",
       "baselines": ["canary", "stable"],
       "classification": "adaptable",
-      "owner": "runtime + SSR + hydration",
-      "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "owner": "runtime + compiler + SSR + hydration",
+      "workstream": "Fragment refs",
+      "rationale": "Executable client and production-compile evidence in “measures and scrolls portaled children in their authored logical order” verifies the exact upstream FragmentInstance public outcome.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fragment-refs-misc.test.ts",
+          "testName": "measures and scrolls portaled children in their authored logical order",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ffaff32cb060f212e22d",

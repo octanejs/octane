@@ -11,7 +11,7 @@
 //   - Fragments WITHOUT a ref still flatten their children (the non-ref
 //     path stays identical to `<>` shorthand)
 //   - long-form `<Fragment>` with no ref does not allocate a FragmentInstance
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount } from '../_helpers';
 import { FragmentInstance, flushSync } from '../../src/index.js';
 import {
@@ -104,18 +104,26 @@ describe('FragmentInstance.observeUsing — repeated calls', () => {
 		r.unmount();
 	});
 
-	it('unobserveUsing without a preceding observe still walks and calls .unobserve (DOM-spec parity)', () => {
+	// Per ReactDOMFragmentRefs-test.js:1255.
+	it('unobserveUsing without a preceding observe warns and leaves the observer untouched', () => {
 		const fragRef = makeRef();
 		const r = mount(Single, { fragRef });
 		const obs = {
 			seen: [] as Element[],
+			observe() {},
 			unobserve(t: Element) {
 				this.seen.push(t);
 			},
 		};
-		fragRef.current!.unobserveUsing(obs);
-		expect(obs.seen).toHaveLength(1);
-		r.unmount();
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			fragRef.current!.unobserveUsing(obs);
+			expect(error).toHaveBeenCalledOnce();
+			expect(obs.seen).toHaveLength(0);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 });
 

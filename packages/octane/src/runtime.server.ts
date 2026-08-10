@@ -15,8 +15,8 @@
  * server renderer does — effects no-op, memo runs once, ids are deterministic).
  * Every dynamic site is
  * wrapped in the hydration markers (`constants.ts`) the client `hydrateRoot`
- * cursor adopts. Events and refs are dropped (no DOM on the server); fragment
- * refs (`<Fragment ref={…}>`) are rejected by the compiler in server mode.
+ * cursor adopts. Events and refs are dropped (no DOM on the server); Fragment
+ * refs retain their range markers only when producing hydratable output.
  */
 
 // ---------------------------------------------------------------------------
@@ -668,6 +668,27 @@ function fragmentDescriptorChildren(value: ElementDescriptor): any[] {
 	return Array.isArray(children) ? children : [children];
 }
 
+/** Server counterpart of the client's cold ref-bearing Fragment wrapper. */
+function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor {
+	return {
+		$$kind: ELEMENT_TAG,
+		type: renderFragmentRefDescriptor,
+		props: value,
+		key: value.key,
+		ref: null,
+		children: null,
+	};
+}
+
+/** Retain the exact range adopted by the client without attaching its ref. */
+function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: SSRScope): string {
+	return (
+		ssrFragmentMarker(true, descriptor.ref) +
+		ssrChild(descriptor.children, scope) +
+		ssrFragmentMarker(false)
+	);
+}
+
 type SsrDeoptWrapperKind = 'array' | 'fragment';
 
 interface PreparedSsrDeoptList {
@@ -708,6 +729,11 @@ function flattenSsrChildContainer(
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
+			if (item.ref != null || Object.prototype.hasOwnProperty.call(item.props, 'ref')) {
+				outItems.push(fragmentRefDescriptor(item));
+				outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+				continue;
+			}
 			const nested = fragmentDescriptorChildren(item);
 			if (item.key != null) {
 				flattenSsrChildContainer(outItems, outKeys, nested, 'fragment', [
@@ -747,6 +773,12 @@ function prepareSsrDeoptList(value: any, includeKeyedSingle: boolean): PreparedS
 	// descriptor, text, null) is the common one — build the two output arrays only
 	// once a list regime is established. Mirrors prepareDeoptList in runtime.ts.
 	if (isFragmentDescriptor(value)) {
+		if (value.ref != null || Object.prototype.hasOwnProperty.call(value.props, 'ref')) {
+			return {
+				items: [fragmentRefDescriptor(value)],
+				keys: [scopedSsrDeoptKey([], value, 0, value.key ?? 0)],
+			};
+		}
 		const items: any[] = [];
 		const keys: any[] = [];
 		const path = value.key == null ? [] : ['keyed-fragment', value.key];
@@ -1557,6 +1589,15 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  */
 export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+}
+
+/**
+ * Preserve a Fragment ref's authored evaluation order without attaching its
+ * value. Hydratable output needs the exact comments its client template adopts;
+ * static markup omits them along with every other hydration-only marker.
+ */
+export function ssrFragmentMarker(open: boolean, _ref?: unknown): string {
+	return MARKERS ? (open ? '<!--frag-->' : '<!--/frag-->') : '';
 }
 
 /**

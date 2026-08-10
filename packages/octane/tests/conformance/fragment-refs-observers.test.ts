@@ -6,10 +6,12 @@
 // order. getRootNode delegates to the first child (falling back to the
 // start marker's document when the fragment has no children) so tooltip
 // libraries can resolve the right ownerDocument / ShadowRoot.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount } from '../_helpers';
 import { FragmentInstance } from '../../src/index.js';
 import { ThreeSiblings } from './_fixtures/fragment-refs-observers.tsrx';
+import { TextOnly } from './_fixtures/fragment-refs-misc.tsrx';
+import { EmptyFragment } from './_fixtures/fragment-refs-events.tsrx';
 
 function makeRef(): { current: FragmentInstance | null } {
 	return { current: null };
@@ -52,6 +54,79 @@ describe('FragmentInstance.observeUsing / unobserveUsing', () => {
 		fragRef.current!.unobserveUsing(obs);
 		expect(obs.unobserved.map((e) => e.id)).toEqual(['x', 'y', 'z']);
 		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js:1255.
+	it('warns without unobserving when the observer was never registered', () => {
+		const fragRef = makeRef();
+		const r = mount(ThreeSiblings, { fragRef });
+		const observer = makeMockObserver();
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			fragRef.current!.unobserveUsing(observer);
+			expect(error).toHaveBeenCalledWith(
+				'You are calling unobserveUsing() with an observer that is not being observed with this fragment ' +
+					'instance. First attach the observer with observeUsing()',
+			);
+			expect(observer.unobserved).toEqual([]);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMFragmentRefs-test.js:1255.
+	it('warns without touching a different observer while keeping the registered one', () => {
+		const fragRef = makeRef();
+		const r = mount(ThreeSiblings, { fragRef });
+		const registered = makeMockObserver();
+		const unrelated = makeMockObserver();
+		fragRef.current!.observeUsing(registered);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			fragRef.current!.unobserveUsing(unrelated);
+			expect(error).toHaveBeenCalledOnce();
+			expect(unrelated.unobserved).toEqual([]);
+			fragRef.current!.unobserveUsing(registered);
+			expect(registered.unobserved.map((element) => element.id)).toEqual(['x', 'y', 'z']);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMFragmentRefs-test.js:2774.
+	it('warns when an observer is attached to a fragment containing only text', () => {
+		const fragRef = makeRef();
+		const r = mount(TextOnly, { fragRef });
+		const observer = makeMockObserver();
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			fragRef.current!.observeUsing(observer);
+			expect(error).toHaveBeenCalledWith(
+				'observeUsing() was called on a FragmentInstance with only text children. ' +
+					'Observers do not work on text nodes.',
+			);
+			expect(observer.observed).toEqual([]);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
+	});
+
+	it('does not warn when an observer is attached to an empty fragment', () => {
+		const fragRef = makeRef();
+		const r = mount(EmptyFragment, { fragRef });
+		const observer = makeMockObserver();
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			fragRef.current!.observeUsing(observer);
+			expect(error).not.toHaveBeenCalled();
+			expect(observer.observed).toEqual([]);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 });
 

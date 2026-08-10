@@ -34,7 +34,7 @@
  * `.tsx` sources) can type-check JSX against octane's real contract.
  */
 import type * as React from 'react';
-import type { ElementDescriptor } from './index.js';
+import type { ElementDescriptor, FragmentInstance } from './index.js';
 
 /**
  * Octane's element type — the analog of React's `ReactElement`, and what a
@@ -566,5 +566,5 @@ export declare function jsxDEV(
 export declare function Fragment(props: {
 	children?: unknown;
 	key?: Octane.Key | null | undefined;
-	ref?: Octane.Ref<unknown>;
+	ref?: Octane.Ref<FragmentInstance>;
 }): OctaneElement;

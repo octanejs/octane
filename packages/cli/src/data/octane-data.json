@@ -1227,6 +1227,16 @@
       "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
       "runtime": ["server"],
       "status": "active"
+    },
+    "49": {
+      "message": "FragmentInstance.scrollIntoView() does not support scrollIntoViewOptions. Use the alignToTop boolean instead.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "50": {
+      "message": "Unclosed server-rendered Fragment descriptor.",
+      "runtime": ["client"],
+      "status": "active"
     }
   }
 }

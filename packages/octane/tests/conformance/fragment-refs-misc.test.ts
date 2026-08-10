@@ -1,21 +1,26 @@
 // FragmentInstance — remaining React canary parity tests.
 //
 // Stage 6 covers:
-//   - scrollIntoView (prefers focusable child, falls back to first element)
-//   - text-only fragments (no host children → every method is a no-op)
+//   - React's first-level-child scrolling, alignment, and empty-fragment fallbacks
+//   - text-node geometry and scrolling
 //   - nested fragments (each ref binds to its own marker range)
 //   - sibling fragments (refs don't cross-contaminate)
 //   - array refs (multi-ref attach)
 //   - conditional fragments (ref attaches on mount, clears on unmount)
 //   - dispatchEvent integration with the surrounding component event tree
 //   - re-mount semantics (ref toggles correctly on remount)
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushEffects } from '../_helpers';
-import { FragmentInstance, flushSync } from '../../src/index.js';
+import { FragmentInstance, createRoot, flushSync } from '../../src/index.js';
 import {
 	ScrollTarget,
 	ScrollNonFocusable,
+	ScrollNestedFocusable,
+	EmptyFragmentWithSiblings,
+	EmptyFragmentWithoutSiblings,
+	EmptyFragmentWithTextSiblings,
 	TextOnly,
+	MixedTextAndElements,
 	NestedFragments,
 	SiblingFragments,
 	ArrayRef,
@@ -23,13 +28,15 @@ import {
 	setShow,
 	DispatchParent,
 } from './_fixtures/fragment-refs-misc.tsrx';
+import { FragmentPortalChildren } from './_fixtures/fragment-future.tsrx';
 
 function makeRef(): { current: FragmentInstance | null } {
 	return { current: null };
 }
 
 describe('FragmentInstance.scrollIntoView', () => {
-	it('calls scrollIntoView on the first focusable descendant', () => {
+	// Per ReactDOMFragmentRefs-test.js: "settles scroll on the first child by default".
+	it('forwards the original argument to its first-level host child', () => {
 		const fragRef = makeRef();
 		const r = mount(ScrollTarget, { fragRef });
 		const btn = r.find('#btn') as HTMLButtonElement;
@@ -37,27 +44,69 @@ describe('FragmentInstance.scrollIntoView', () => {
 		btn.scrollIntoView = function (arg?: any) {
 			calls.push(arg);
 		};
-		fragRef.current!.scrollIntoView({ block: 'center' });
-		expect(calls).toEqual([{ block: 'center' }]);
+		fragRef.current!.scrollIntoView();
+		expect(calls).toEqual([undefined]);
 		r.unmount();
 	});
 
-	it('falls back to the first descendant element when nothing is focusable', () => {
+	it('scrolls children in reverse order so the first child receives final focus', () => {
 		const fragRef = makeRef();
 		const r = mount(ScrollNonFocusable, { fragRef });
 		const first = r.find('#first') as HTMLElement;
 		const second = r.find('#second') as HTMLElement;
-		let firstCalled = 0;
-		let secondCalled = 0;
+		const calls: string[] = [];
 		first.scrollIntoView = () => {
-			firstCalled++;
+			calls.push('first');
 		};
 		second.scrollIntoView = () => {
-			secondCalled++;
+			calls.push('second');
 		};
 		fragRef.current!.scrollIntoView();
-		expect(firstCalled).toBe(1);
-		expect(secondCalled).toBe(0);
+		expect(calls).toEqual(['second', 'first']);
+		calls.length = 0;
+		fragRef.current!.scrollIntoView(true);
+		expect(calls).toEqual(['second', 'first']);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "calls scrollIntoView on the last child if alignToTop is false".
+	it('scrolls children in tree order when aligning to the bottom', () => {
+		const fragRef = makeRef();
+		const r = mount(ScrollNonFocusable, { fragRef });
+		const calls: Array<[string, boolean | undefined]> = [];
+		for (const id of ['first', 'second']) {
+			(r.find('#' + id) as HTMLElement).scrollIntoView = (alignToTop?: boolean) => {
+				calls.push([id, alignToTop]);
+			};
+		}
+		fragRef.current!.scrollIntoView(false);
+		expect(calls).toEqual([
+			['first', false],
+			['second', false],
+		]);
+		r.unmount();
+	});
+
+	it('scrolls first-level children, not their focusable descendants', () => {
+		const fragRef = makeRef();
+		const r = mount(ScrollNestedFocusable, { fragRef });
+		const calls: string[] = [];
+		for (const id of ['first', 'second', 'nested']) {
+			(r.find('#' + id) as HTMLElement).scrollIntoView = () => calls.push(id);
+		}
+		fragRef.current!.scrollIntoView();
+		expect(calls).toEqual(['second', 'first']);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "does not yet support options".
+	it('rejects scroll options objects instead of passing them to DOM elements', () => {
+		const fragRef = makeRef();
+		const r = mount(ScrollTarget, { fragRef });
+		expect(() => fragRef.current!.scrollIntoView({ block: 'center' } as any)).toThrow(
+			'FragmentInstance.scrollIntoView() does not support scrollIntoViewOptions. Use the alignToTop boolean instead.',
+		);
+		expect(() => fragRef.current!.scrollIntoView(null as any)).toThrow(/alignToTop boolean/);
 		r.unmount();
 	});
 
@@ -71,6 +120,43 @@ describe('FragmentInstance.scrollIntoView', () => {
 		};
 		fragRef.current!.scrollIntoView(true);
 		expect(calls).toEqual([true]);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "calls scrollIntoView on the next sibling by default".
+	it('scrolls toward the next sibling for empty fragments by default', () => {
+		const fragRef = makeRef();
+		const r = mount(EmptyFragmentWithSiblings, { fragRef });
+		const calls: string[] = [];
+		(r.find('#before') as HTMLElement).scrollIntoView = () => calls.push('before');
+		(r.find('#after') as HTMLElement).scrollIntoView = () => calls.push('after');
+		fragRef.current!.scrollIntoView();
+		fragRef.current!.scrollIntoView(true);
+		expect(calls).toEqual(['after', 'after']);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "calls scrollIntoView on the prev sibling if alignToTop is false".
+	it('scrolls toward the previous sibling for bottom-aligned empty fragments', () => {
+		const fragRef = makeRef();
+		const r = mount(EmptyFragmentWithSiblings, { fragRef });
+		const calls: string[] = [];
+		(r.find('#before') as HTMLElement).scrollIntoView = () => calls.push('before');
+		(r.find('#after') as HTMLElement).scrollIntoView = () => calls.push('after');
+		fragRef.current!.scrollIntoView(false);
+		expect(calls).toEqual(['before']);
+		r.unmount();
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "calls scrollIntoView on the parent if there are no siblings".
+	it('scrolls the parent when an empty fragment has no siblings', () => {
+		const fragRef = makeRef();
+		const r = mount(EmptyFragmentWithoutSiblings, { fragRef });
+		const parent = r.find('#parent') as HTMLElement;
+		const scroll = vi.fn();
+		parent.scrollIntoView = scroll;
+		fragRef.current!.scrollIntoView();
+		expect(scroll).toHaveBeenCalledWith(undefined);
 		r.unmount();
 	});
 });
@@ -94,6 +180,106 @@ describe('FragmentInstance — text-only fragment (no host children)', () => {
 		r.unmount();
 	});
 
+	// Per ReactDOMFragmentRefs-test.js: "getClientRects includes text node bounds".
+	it('includes text-node client rectangles when the Range API provides them', () => {
+		const fragRef = makeRef();
+		const r = mount(TextOnly, { fragRef });
+		const rect = { width: 80, height: 16 } as DOMRect;
+		const selected: Node[] = [];
+		const createRange = vi.spyOn(document, 'createRange').mockImplementation(
+			() =>
+				({
+					selectNodeContents(node: Node) {
+						selected.push(node);
+					},
+					getClientRects: () => [rect],
+				}) as unknown as Range,
+		);
+		try {
+			expect(fragRef.current!.getClientRects()).toEqual([rect]);
+			expect(selected.map((node) => node.textContent)).toEqual(['just text']);
+		} finally {
+			createRange.mockRestore();
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "getClientRects includes both text and element bounds".
+	it('preserves document order across mixed text and element rectangles', () => {
+		const fragRef = makeRef();
+		const r = mount(MixedTextAndElements, { fragRef });
+		const elementRect = { width: 100 } as DOMRect;
+		(r.find('#middle') as HTMLElement).getClientRects = () => [elementRect] as any;
+		const createRange = vi.spyOn(document, 'createRange').mockImplementation(() => {
+			let node: Node;
+			return {
+				selectNodeContents(selected: Node) {
+					node = selected;
+				},
+				getClientRects: () => [{ width: node.textContent === 'before' ? 60 : 40 }],
+			} as unknown as Range;
+		});
+		try {
+			expect(fragRef.current!.getClientRects().map((rect) => rect.width)).toEqual([60, 100, 40]);
+		} finally {
+			createRange.mockRestore();
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "scrollIntoView works on text-only fragment using Range API".
+	it('scrolls text nodes through their Range geometry', () => {
+		const fragRef = makeRef();
+		const r = mount(TextOnly, { fragRef });
+		const createRange = vi.spyOn(document, 'createRange').mockImplementation(
+			() =>
+				({
+					selectNodeContents() {},
+					getBoundingClientRect: () => ({ left: 100, top: 200, bottom: 216 }),
+				}) as unknown as Range,
+		);
+		const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+		try {
+			fragRef.current!.scrollIntoView();
+			expect(scroll).toHaveBeenLastCalledWith(window.scrollX + 100, window.scrollY + 200);
+			fragRef.current!.scrollIntoView(false);
+			expect(scroll).toHaveBeenLastCalledWith(
+				window.scrollX + 100,
+				window.scrollY + 216 - window.innerHeight,
+			);
+		} finally {
+			scroll.mockRestore();
+			createRange.mockRestore();
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMFragmentRefs-test.js: "scrollIntoView scrolls to text siblings of an empty fragment".
+	it('uses the correct neighboring text node when an empty fragment scrolls', () => {
+		const fragRef = makeRef();
+		const r = mount(EmptyFragmentWithTextSiblings, { fragRef });
+		const selected: string[] = [];
+		const createRange = vi.spyOn(document, 'createRange').mockImplementation(
+			() =>
+				({
+					selectNodeContents(node: Node) {
+						selected.push(node.textContent!);
+					},
+					getBoundingClientRect: () => ({ left: 0, top: 0, bottom: 10 }),
+				}) as unknown as Range,
+		);
+		const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+		try {
+			fragRef.current!.scrollIntoView();
+			fragRef.current!.scrollIntoView(false);
+			expect(selected).toEqual(['after', 'before']);
+		} finally {
+			scroll.mockRestore();
+			createRange.mockRestore();
+			r.unmount();
+		}
+	});
+
 	it('getRootNode falls back to the start marker document', () => {
 		const fragRef = makeRef();
 		const r = mount(TextOnly, { fragRef });
@@ -103,15 +289,113 @@ describe('FragmentInstance — text-only fragment (no host children)', () => {
 		r.unmount();
 	});
 
-	it('addEventListener is a no-op (no children to attach to)', () => {
+	// Per ReactDOMFragmentRefs-test.js: "returns self when only the fragment was unmounted".
+	it('returns the captured fragment instance after it has been unmounted', () => {
 		const fragRef = makeRef();
 		const r = mount(TextOnly, { fragRef });
-		let fired = 0;
-		fragRef.current!.addEventListener('click', () => fired++);
-		// No host children → nothing to dispatch on. The fragment's text
-		// content stays unaffected. Verifies no crash and no spurious wire-up.
-		expect(fired).toBe(0);
+		const instance = fragRef.current!;
 		r.unmount();
+		expect(instance.getRootNode()).toBe(instance);
+	});
+
+	it('forwards composed root lookup options through shadow boundaries', () => {
+		const fragRef = makeRef();
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const shadow = host.attachShadow({ mode: 'open' });
+		const container = document.createElement('div');
+		shadow.appendChild(container);
+		const root = createRoot(container);
+		try {
+			root.render(ScrollTarget, { fragRef });
+			flushSync(() => {});
+			expect(fragRef.current!.getRootNode()).toBe(shadow);
+			expect(fragRef.current!.getRootNode({ composed: true })).toBe(document);
+		} finally {
+			root.unmount();
+			host.remove();
+		}
+	});
+
+	// Per ReactFiberConfigDOM: text hosts retain their owning Fragment handles.
+	it('publishes fragment ownership on direct text nodes', () => {
+		const fragRef = makeRef();
+		const r = mount(TextOnly, { fragRef });
+		const text = Array.from(r.find('#parent').childNodes).find(
+			(node) => node.nodeType === Node.TEXT_NODE,
+		) as Text & { reactFragments?: Set<FragmentInstance> };
+		const fragment = fragRef.current!;
+		expect(text.reactFragments?.has(fragment)).toBe(true);
+		r.unmount();
+		expect(text.reactFragments?.has(fragment)).toBe(false);
+	});
+
+	// Per ReactFiberConfigDOM: fragment event listeners include direct text hosts.
+	it('attaches and removes event listeners on direct text children', () => {
+		const fragRef = makeRef();
+		const r = mount(TextOnly, { fragRef });
+		const text = Array.from(r.find('#parent').childNodes).find(
+			(node) => node.nodeType === Node.TEXT_NODE,
+		)!;
+		let fired = 0;
+		const listener = () => fired++;
+		fragRef.current!.addEventListener('customping', listener);
+		text.dispatchEvent(new Event('customping'));
+		expect(fired).toBe(1);
+		fragRef.current!.removeEventListener('customping', listener);
+		text.dispatchEvent(new Event('customping'));
+		expect(fired).toBe(1);
+		r.unmount();
+	});
+});
+
+describe('FragmentInstance — portaled imperative children', () => {
+	// Per ReactDOMFragmentRefs-test.js: "handles portaled elements -- same scroll container".
+	it('measures and scrolls portaled children in their authored logical order', () => {
+		const target = document.createElement('section');
+		document.body.appendChild(target);
+		const fragRef = makeRef();
+		const r = mount(FragmentPortalChildren, { fragRef, target });
+		try {
+			const before = r.find('#inline-before') as HTMLElement;
+			const portal = target.querySelector('#owned-portal') as HTMLElement;
+			const after = r.find('#inline-after') as HTMLElement;
+			const children = [before, portal, after];
+			for (const child of children) {
+				child.getClientRects = () => [{ width: children.indexOf(child) + 1 }] as any;
+			}
+			expect(fragRef.current!.getClientRects().map((rect) => rect.width)).toEqual([1, 2, 3]);
+
+			const calls: string[] = [];
+			for (const child of children) child.scrollIntoView = () => calls.push(child.id);
+			fragRef.current!.scrollIntoView();
+			expect(calls).toEqual(['inline-after', 'owned-portal', 'inline-before']);
+			calls.length = 0;
+			fragRef.current!.scrollIntoView(false);
+			expect(calls).toEqual(['inline-before', 'owned-portal', 'inline-after']);
+		} finally {
+			r.unmount();
+			target.remove();
+		}
+	});
+
+	it('focuses and blurs the logically owned focusable portal child', () => {
+		const target = document.createElement('section');
+		document.body.appendChild(target);
+		const fragRef = makeRef();
+		const r = mount(FragmentPortalChildren, { fragRef, target });
+		try {
+			(r.find('#inline-before') as HTMLButtonElement).disabled = true;
+			(r.find('#inline-after') as HTMLButtonElement).disabled = true;
+			const portal = target.querySelector('#owned-portal') as HTMLButtonElement;
+			fragRef.current!.focus();
+			expect(document.activeElement).toBe(portal);
+			fragRef.current!.blur();
+			expect(document.activeElement).not.toBe(portal);
+		} finally {
+			r.unmount();
+			target.remove();
+		}
 	});
 });
 
