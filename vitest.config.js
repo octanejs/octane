@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
@@ -1098,6 +1099,132 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/usehooks-ts$/,
 							replacement: resolve(import.meta.dirname, 'packages/usehooks-ts/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-pristine',
+					include: ['packages/intersection-observer/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-pristine-browser',
+					include: ['packages/intersection-observer/tests/upstream-browser-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+					testTimeout: 120_000,
+					hookTimeout: 120_000,
+				},
+			},
+			{
+				test: {
+					name: 'intersection-observer',
+					include: [
+						'packages/intersection-observer/tests/**/*.test.ts',
+						'packages/intersection-observer/tests/**/*.test.tsx',
+					],
+					exclude: [
+						'packages/intersection-observer/tests/upstream/**/*.test.ts',
+						'packages/intersection-observer/tests/upstream/**/*.test.tsx',
+						'packages/intersection-observer/tests/upstream-original.test.ts',
+						'packages/intersection-observer/tests/upstream-browser-original.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/intersection-observer$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/src/index.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/intersection-observer\/test-utils$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/src/test-utils.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-adapted',
+					include: [
+						'packages/intersection-observer/tests/upstream/**/*.test.ts',
+						'packages/intersection-observer/tests/upstream/**/*.test.tsx',
+					],
+					exclude: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
+					environment: 'jsdom',
+					globals: false,
+					setupFiles: ['packages/intersection-observer/tests/upstream/_setup.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/intersection-observer$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/src/index.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/intersection-observer\/test-utils$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/src/test-utils.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-adapted-browser',
+					include: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+					browser: {
+						enabled: true,
+						provider: playwright(),
+						headless: true,
+						instances: [{ browser: 'chromium' }],
+					},
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/intersection-observer$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/src/index.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/intersection-observer\/test-utils$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/src/test-utils.ts',
+							),
 						},
 					],
 				},

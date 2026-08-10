@@ -30,6 +30,7 @@ surface and evidence.
 | `@octanejs/hook-form` | 0 |
 | `@octanejs/i18next` | 0 |
 | `@octanejs/inertia` | 0 |
+| `@octanejs/intersection-observer` | 0 |
 | `@octanejs/jotai` | 0 |
 | `@octanejs/lexical` | 0 |
 | `@octanejs/livestore` | 0 |

@@ -57,6 +57,7 @@
       "@octanejs/lucide",
       "@octanejs/phosphor-icons",
       "@octanejs/usehooks-ts",
+      "@octanejs/intersection-observer",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer"
     ]

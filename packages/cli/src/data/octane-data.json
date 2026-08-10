@@ -238,6 +238,28 @@
       "verified": "2026-07-30"
     },
     {
+      "name": "@octanejs/intersection-observer",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "react-intersection-observer",
+        "version": "10.1.0",
+        "source": "https://github.com/thebuilder/react-intersection-observer/tree/v10.1.0",
+        "license": "MIT"
+      },
+      "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities. Pinned upstream unit and browser suites plus one-for-one adapted runtime/type probes are registered with react-parity:check.",
+      "divergences": [
+        "Public node and prop types use Octane structural types and do not import React.",
+        "InView is implemented as a function component while preserving the upstream render-prop and wrapper behavior.",
+        "In TSRX, an InView render function must be supplied through the children prop; nested children compile to an opaque render block.",
+        "Unsupported false fallback (`fallbackInView={false}` / `defaultFallbackInView(false)`) does not emit `onChange(false)` on mount under Octane (`intersection-observer-initial-false-onchange`): treat the default hidden state as authoritative rather than waiting for that callback.",
+        "Unsupported IntersectionObserver without a fallback surfaces as a passive-effect `console.error` under Octane rather than a synchronous mount throw (`intersection-observer-unsupported-mount-error-surface`); wrap with an error boundary/`tryBlock` or supply `fallbackInView`/`defaultFallbackInView` instead of try/catch around render.",
+        "`@octanejs/intersection-observer/test-utils` does not auto-register Vitest/Jest beforeEach/afterEach (`intersection-observer-test-utils-manual-setup`); call `setupIntersectionMocking`/`resetIntersectionMocking` in the test setup file."
+      ],
+      "ssr": "Supported. Observation begins in an effect; initialInView controls deterministic server output.",
+      "verified": "2026-07-30"
+    },
+    {
       "name": "@octanejs/jotai",
       "version": "0.1.31",
       "category": "Shared state",

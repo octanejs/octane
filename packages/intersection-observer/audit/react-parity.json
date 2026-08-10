@@ -1,0 +1,369 @@
+{
+	"$schema": "../../hook-form/audit/react-parity.schema.json",
+	"schemaVersion": 1,
+	"provenance": {
+		"repo": "https://github.com/thebuilder/react-intersection-observer.git",
+		"version": "10.1.0",
+		"commit": "5f82a7328fb63a2e54729f2205278209c14e30e8",
+		"sourceRoot": "src",
+		"testRoot": "src/__tests__",
+		"license": "MIT",
+		"integrity": "sha256:24ccd051d0e1945d76d7b005c1a90829e07a15303618b704e01fc918f59d22c9",
+		"verification": "verified"
+	},
+	"upstreamSuites": {
+		"runtime": "present",
+		"types": "absent"
+	},
+	"adaptedRoots": {
+		"source": {
+			"roots": [
+				"packages/intersection-observer/src"
+			],
+			"include": [
+				"\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
+			],
+			"exclude": []
+		},
+		"tests": {
+			"roots": [
+				"packages/intersection-observer/tests/upstream"
+			],
+			"include": [
+				"\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
+			],
+			"exclude": []
+		}
+	},
+	"adaptedRuntimeSummary": {
+		"inventoryEntries": 65,
+		"uniqueIdentities": 65,
+		"duplicateEntriesWithinLanes": 0,
+		"identitiesSharedAcrossLanes": 0
+	},
+	"environments": {
+		"workspace-node": {
+			"node": ">=22",
+			"platform": "any",
+			"arch": "any",
+			"packageManager": "pnpm@11.15.1",
+			"lockfile": "pnpm-lock.yaml",
+			"lockfileSha256": "45202ae9c017feda3fb907c0e74af06ddfa9b851d02a8f959a3ee3b9c591313e"
+		}
+	},
+	"lanes": [
+		{
+			"id": "intersection-observer-pristine-upstream",
+			"type": "pristine-upstream",
+			"oracle": "required",
+			"environment": "workspace-node",
+			"project": "intersection-observer-pristine",
+			"evidenceOrigin": "upstream-suite",
+			"notes": "Runs the byte-exact react-intersection-observer 10.1.0 Vitest unit suite (jsdom) against the vendored React binding and checks every passed identity against the committed inventory. Browser-provider cases run in the separate intersection-observer-pristine-browser lane.",
+			"execution": {
+				"kind": "vitest-full",
+				"inventory": "packages/intersection-observer/audit/pristine-wrapper-runtime.json"
+			},
+			"files": [
+				{
+					"path": "packages/intersection-observer/audit/pristine-wrapper-runtime.json",
+					"role": "support",
+					"sha256": "f09de723ea2e690f1d3d0bc158f4f7889cf076da29777b0a6a0eb0d1443c9fc6"
+				},
+				{
+					"path": "packages/intersection-observer/audit/pristine-runtime.json",
+					"role": "support",
+					"sha256": "1132832d81cacc183acfdc9381fde2fe088fcc72f5a1b66be2126fa8f6d51fce"
+				},
+				{
+					"path": "packages/intersection-observer/tests/upstream-original.test.ts",
+					"role": "support",
+					"sha256": "7f9c86df16a6e6b66250e2fb94c35a6af7a00496abe55bcde784f7408912df12"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-pristine-runtime.mjs",
+					"role": "support",
+					"sha256": "f0c11a10edb0006af6463d2992b34620e23162fbd4acb63f7a321117655dc1b0"
+				},
+				{
+					"path": "packages/intersection-observer/scripts/verify-upstream.mjs",
+					"role": "support",
+					"sha256": "303f439586d4e6eddfca6ee6ed7c3d752f7f09e31efb27695ab456a8dfcd3600"
+				},
+				{
+					"path": "packages/intersection-observer/tests/upstream-vitest.config.ts",
+					"role": "support",
+					"sha256": "c22c6e110f42fe05e4e5bd0d97b0d942f40878c1e78fe4c77a07e5c6a721c662"
+				},
+				{
+					"path": "packages/intersection-observer/tests/_harness/pristine-setup.ts",
+					"role": "support",
+					"sha256": "6a86e241e7819dd4517bd7fb4d8d8105cee34ff0140b6f14fc5c46c0df65488f"
+				},
+				{
+					"path": "packages/intersection-observer/tests/_harness/vitest-browser-stub.ts",
+					"role": "support",
+					"sha256": "90d547a4fd3ba0143501da57b51e154cc9232b103fd01502ea3a32676f6cabae"
+				},
+				{
+					"path": "packages/intersection-observer/upstream/SHA256SUMS",
+					"role": "support",
+					"sha256": "24ccd051d0e1945d76d7b005c1a90829e07a15303618b704e01fc918f59d22c9"
+				},
+				{
+					"path": "packages/intersection-observer/audit/upstream-adapted.SHA256SUMS",
+					"role": "support",
+					"sha256": "e93313e361a968279724007c8b593cc176977a2480007738e180347966f1f29d"
+				},
+				{
+					"path": "packages/intersection-observer/audit/test-classifications.json",
+					"role": "support",
+					"sha256": "899ad9a6a89128169dca55f564f88b1308c71e925385e6a4e7b1d526390e90c9"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-upstream-lib.mjs",
+					"role": "support",
+					"sha256": "6a0d09a1bfe208bdf23e0292c4ec83c50b5b868eb313e805f30f34a39195cc63"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-classifications-lib.mjs",
+					"role": "support",
+					"sha256": "c6ab1d2a1be11adcd0ee458b9f1a8ffce5ef9352fdfc35ef38627bf486340366"
+				}
+			]
+		},
+		{
+			"id": "intersection-observer-adapted-full-suite",
+			"type": "adapted-octane",
+			"oracle": "required",
+			"environment": "workspace-node",
+			"project": "intersection-observer-adapted",
+			"evidenceOrigin": "upstream-suite",
+			"notes": "Runs the one-for-one adapted upstream unit suite with exact test identities. Browser-provider cases run in the separate intersection-observer-adapted-browser lane.",
+			"execution": {
+				"kind": "vitest-full",
+				"inventory": "packages/intersection-observer/audit/adapted-runtime.json"
+			},
+			"files": [
+				{
+					"path": "packages/intersection-observer/audit/adapted-runtime.json",
+					"role": "support",
+					"sha256": "3aaf3494a2e8442072c49aa9a15e8326ff647cd4cc96659a1274d921dcf9db32"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-runtime-inventory.mjs",
+					"role": "support",
+					"sha256": "405e1507c5b693e7c18bc647c0530520d00a07d2e0d54ea2416dd38db6b9116c"
+				},
+				{
+					"path": "packages/intersection-observer/audit/upstream-adapted.SHA256SUMS",
+					"role": "support",
+					"sha256": "e93313e361a968279724007c8b593cc176977a2480007738e180347966f1f29d"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-upstream-lib.mjs",
+					"role": "support",
+					"sha256": "6a0d09a1bfe208bdf23e0292c4ec83c50b5b868eb313e805f30f34a39195cc63"
+				}
+			]
+		},
+		{
+			"id": "intersection-observer-pristine-browser",
+			"type": "pristine-upstream",
+			"oracle": "required",
+			"environment": "workspace-node",
+			"project": "intersection-observer-pristine-browser",
+			"evidenceOrigin": "upstream-suite",
+			"notes": "Runs the byte-exact react-intersection-observer 10.1.0 browser.test.tsx suite against the vendored React binding under Vitest browser/Playwright Chromium.",
+			"execution": {
+				"kind": "vitest-full",
+				"inventory": "packages/intersection-observer/audit/pristine-browser-wrapper-runtime.json"
+			},
+			"files": [
+				{
+					"path": "packages/intersection-observer/audit/pristine-browser-wrapper-runtime.json",
+					"role": "support",
+					"sha256": "a3273685359de724da7006b9ca58d759ec039757a6194cec0896a6f3e748d7b0"
+				},
+				{
+					"path": "packages/intersection-observer/audit/pristine-browser-runtime.json",
+					"role": "support",
+					"sha256": "9cfcee95928410b57980273a92e1bd0e0455409515b7e1437ccacc34f11c3dee"
+				},
+				{
+					"path": "packages/intersection-observer/tests/upstream-browser-original.test.ts",
+					"role": "support",
+					"sha256": "f8ee4eaf7f693a3b7ab6b0b5125f192085bddd32a5e15fe9347c08f759670ae8"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-pristine-runtime.mjs",
+					"role": "support",
+					"sha256": "f0c11a10edb0006af6463d2992b34620e23162fbd4acb63f7a321117655dc1b0"
+				},
+				{
+					"path": "packages/intersection-observer/scripts/verify-upstream.mjs",
+					"role": "support",
+					"sha256": "303f439586d4e6eddfca6ee6ed7c3d752f7f09e31efb27695ab456a8dfcd3600"
+				},
+				{
+					"path": "packages/intersection-observer/tests/upstream-browser-vitest.config.ts",
+					"role": "support",
+					"sha256": "381d32dc0b0c2277347bcf58158cb86c6ab282c3e037399a365c0030551d153b"
+				},
+				{
+					"path": "packages/intersection-observer/upstream/SHA256SUMS",
+					"role": "support",
+					"sha256": "24ccd051d0e1945d76d7b005c1a90829e07a15303618b704e01fc918f59d22c9"
+				}
+			]
+		},
+		{
+			"id": "intersection-observer-adapted-browser",
+			"type": "adapted-octane",
+			"oracle": "required",
+			"environment": "workspace-node",
+			"project": "intersection-observer-adapted-browser",
+			"evidenceOrigin": "upstream-suite",
+			"notes": "One-for-one adapted browser.test.tsx scenarios for @octanejs/intersection-observer under Vitest browser/Playwright Chromium.",
+			"execution": {
+				"kind": "vitest-full",
+				"inventory": "packages/intersection-observer/audit/adapted-browser-runtime.json"
+			},
+			"files": [
+				{
+					"path": "packages/intersection-observer/audit/adapted-browser-runtime.json",
+					"role": "support",
+					"sha256": "d6a42d5f6b841be9165a7cfcf02bcfd9f4359844d97e296b95036624c89505f5"
+				},
+				{
+					"path": "packages/intersection-observer/tests/upstream/browser.test.tsx",
+					"role": "support",
+					"sha256": "08db700cbdf10d629d869f7a19d6be3535c8e8d87cc7d855517f7963b5c6b640"
+				},
+				{
+					"path": "scripts/react-parity/intersection-observer-runtime-inventory.mjs",
+					"role": "support",
+					"sha256": "405e1507c5b693e7c18bc647c0530520d00a07d2e0d54ea2416dd38db6b9116c"
+				}
+			]
+		},
+		{
+			"id": "intersection-observer-pristine-types",
+			"type": "pristine-types",
+			"oracle": "required",
+			"environment": "workspace-node",
+			"project": "intersection-observer-pristine-types",
+			"evidenceOrigin": "repo-authored",
+			"notes": "Repo-authored React declaration probes against the vendored react-intersection-observer 10.1.0 surface, including negative controls.",
+			"execution": {
+				"kind": "typescript",
+				"compiler": "tsc",
+				"project": "packages/intersection-observer/audit/type-probes/tsconfig.pristine.json"
+			},
+			"files": [
+				{
+					"path": "packages/intersection-observer/audit/pristine-types.json",
+					"role": "test",
+					"sha256": "0c5a661f3e1469b06a374432c79e4bf830bff220f5839fec903e059678334ced",
+					"cases": [
+						{
+							"id": "types:intersection-observer-pristine",
+							"testName": "pinned React declaration probes",
+							"fullName": "pinned React declaration probes"
+						}
+					]
+				},
+				{
+					"path": "packages/intersection-observer/audit/type-probes/public-api.test-d.ts",
+					"role": "support",
+					"sha256": "43c264dbf02ce621b231570672999a56ee62af72bbb74dee932ecd6d3f613be5"
+				},
+				{
+					"path": "packages/intersection-observer/audit/type-probes/tsconfig.pristine.json",
+					"role": "support",
+					"sha256": "62d63a5cab0e1fc17ae87132ef75baa469f60be856b13c09f0b6bf8115b87d7b"
+				},
+				{
+					"path": "packages/intersection-observer/audit/type-parity.json",
+					"role": "support",
+					"sha256": "a821188dbf56048192e6a9d336f75423683cae33181082172dd1c52fbf5f5b72"
+				}
+			]
+		},
+		{
+			"id": "intersection-observer-adapted-types",
+			"type": "adapted-types",
+			"oracle": "required",
+			"environment": "workspace-node",
+			"project": "intersection-observer-adapted-types",
+			"evidenceOrigin": "repo-authored",
+			"notes": "Octane public type probes with matching negative controls after permitted transformations.",
+			"execution": {
+				"kind": "typescript",
+				"compiler": "tsrx-tsc",
+				"project": "packages/intersection-observer/typetests/tsconfig.json"
+			},
+			"files": [
+				{
+					"path": "packages/intersection-observer/audit/adapted-types.json",
+					"role": "test",
+					"sha256": "cfcf62a7de01328e4c45b5075355e8f46f3d1917a5b59c92d8fa1d35029cd192",
+					"cases": [
+						{
+							"id": "types:intersection-observer-adapted",
+							"testName": "adapted Octane declaration probes",
+							"fullName": "adapted Octane declaration probes"
+						}
+					]
+				},
+				{
+					"path": "packages/intersection-observer/typetests/public-api.test-d.ts",
+					"role": "support",
+					"sha256": "1e94b4805d77c880279e817903c35c42ed0e5a3cd582a3407c063bf7d20d3f79"
+				},
+				{
+					"path": "packages/intersection-observer/typetests/tsconfig.json",
+					"role": "support",
+					"sha256": "3e5a10a15c7cfc431288f01fe2a1a279724e378d6ab0f154297d6f708dab6417"
+				},
+				{
+					"path": "packages/intersection-observer/audit/type-parity.json",
+					"role": "support",
+					"sha256": "a821188dbf56048192e6a9d336f75423683cae33181082172dd1c52fbf5f5b72"
+				}
+			]
+		}
+	],
+	"divergences": [
+		{
+			"id": "intersection-observer-initial-false-onchange",
+			"caseIds": [
+				"runtime:87f04d520e6196ac",
+				"runtime:96c5c288913a844e"
+			],
+			"upstreamResult": "React class InView often observes twice, so an unsupported false fallback can still reach onChange after the initial-false gate.",
+			"octaneResult": "Octane observes once, so the documented initial-false skip suppresses onChange for unsupported false fallback.",
+			"rationale": "Both runtimes ignore the first false notification; React double-observe accidentally clears the gate.",
+			"classification": "testing-runtime",
+			"consumerImpact": "Unsupported false fallback does not emit an onChange(false) on mount under Octane.",
+			"migrationGuidance": "Treat unsupported false as the default hidden state rather than waiting for an onChange(false).",
+			"owner": "@octanejs/intersection-observer",
+			"reviewCondition": "Review if Octane InView gains a class-component-equivalent observe lifecycle."
+		},
+		{
+			"id": "intersection-observer-unsupported-mount-error-surface",
+			"caseIds": [
+				"runtime:4ded56f226061c62",
+				"runtime:c0bb0181b9e6cedf"
+			],
+			"upstreamResult": "Mounting InView/useInView without a fallback throws synchronously when IntersectionObserver is missing.",
+			"octaneResult": "Observation runs in a passive effect, so the same constructor error is reported via console.error/tryBlock after commit. The adapted InView fallback cases exercise the same public-API surface alongside intersection-observer-initial-false-onchange.",
+			"rationale": "Octane has no class-component componentDidMount observe path; useInView always observes from useEffect.",
+			"classification": "framework-runtime",
+			"consumerImpact": "try/catch around render does not catch unsupported IntersectionObserver errors under Octane.",
+			"migrationGuidance": "Supply fallbackInView/defaultFallbackInView, or catch with tryBlock/an error boundary around the observing tree.",
+			"owner": "@octanejs/intersection-observer",
+			"reviewCondition": "Review if Octane gains a synchronous observe-on-mount path for unsupported environments."
+		}
+	]
+}

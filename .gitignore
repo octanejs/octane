@@ -42,6 +42,10 @@ benchmarks/lynx-table/results/
 # differential test rigs regenerate under each package's tests on every run.
 .react-cache/
 
+# Local Vitest/Vite caches for intersection-observer pristine browser/unit runs.
+packages/intersection-observer/.vite-cache*/
+packages/intersection-observer/.pristine-upstream-*/
+
 # Pinned radix-ui/primitives checkout — the porting source-of-truth for @octanejs/radix
 # (see docs/radix-migration-plan.md; clone is re-created on demand, never committed).
 .radix-primitives/
