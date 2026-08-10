@@ -5,7 +5,9 @@
 The react-redux 9.3.0 hooks + `Provider` surface (`useSelector`, `useDispatch`,
 `useStore`, and the custom-context factory variants) reimplemented on octane's
 `useSyncExternalStore` — works with any Redux 5 / Redux Toolkit store by
-changing the import. Export parity with react-redux is pinned by test.
+changing the import. Upstream runtime-export completeness is pinned by test;
+the package also exposes the Octane extension helpers documented in
+[`UPSTREAM.md`](./UPSTREAM.md).
 
 ```tsx
 import { Provider, useSelector, useDispatch } from '@octanejs/redux';

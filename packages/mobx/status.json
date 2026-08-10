@@ -11,6 +11,12 @@
     "React-specific batching, prop-types validation, React DevTools integration, and useDebugValue output are omitted."
   ],
   "ssr": "enableStaticRendering(true) renders observed components without creating a Reaction or retaining observable subscriptions.",
-  "verified": "2026-07-28",
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/mobxjs/mobx",
+    "license": "MIT",
+    "commit": "989de2d198e7a15c1fc1b981e1a96e50083ff2a0",
+    "verification": "recorded-unverified"
+  },
   "notes": []
 }

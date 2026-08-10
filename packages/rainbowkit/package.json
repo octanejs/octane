@@ -46,6 +46,7 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@rainbow-me/rainbowkit": "2.2.11",
     "@octanejs/tanstack-query": "workspace:*",
     "@testing-library/jest-dom": "catalog:default",
     "@tsrx/react": "catalog:default",

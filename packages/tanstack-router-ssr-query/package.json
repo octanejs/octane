@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "vitest run --project tanstack-router-ssr-query",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json"
   },
   "dependencies": {
     "@tanstack/router-ssr-query-core": "1.169.1"
@@ -26,7 +26,22 @@
   "devDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
+    "@tanstack/react-query": "catalog:default",
+    "@tanstack/react-router": "catalog:default",
+    "@tanstack/react-router-ssr-query": "1.167.1",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "typescript55": "npm:typescript@5.5.4",
+    "typescript56": "npm:typescript@5.6.3",
+    "typescript57": "npm:typescript@5.7.3",
+    "typescript58": "npm:typescript@5.8.3",
+    "typescript59": "npm:typescript@5.9.3",
+    "typescript60": "npm:typescript@6.0.2",
     "vitest": "catalog:default"
   },
   "engines": {

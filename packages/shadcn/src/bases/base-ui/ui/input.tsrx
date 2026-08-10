@@ -9,7 +9,7 @@
 // than transcribed from upstream's Base UI source. Nothing in it keys off a primitive-emitted
 // attribute, so it is a lower-risk case than `separator` — but verify before treating as ported.
 //
-// OCTANE DIVERGENCE: per-keystroke handling is the native `onInput` event; native `change`
+// Octane divergence (shadcn-native-input-events): per-keystroke handling is the native `onInput` event; native `change`
 // keeps its commit-on-blur meaning.
 import { Input as InputPrimitive } from '@octanejs/base-ui/input';
 

@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/re-rxjs/react-rxjs.git",
+    "version": "@react-rxjs/core@0.10.8",
+    "commit": "330f4c329f635c577e39655bd46c0d80a13f3a41",
+    "sourceRoot": "packages/core/src",
+    "testRoot": "packages/core/src",
+    "license": "MIT",
+    "integrity": "sha256:f1311219e6503a768463a4319b9fc264438c62b774b9ef81feaa21085edfd65a",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/rxjs/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/rxjs/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "rxjs-bind-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "rxjs-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "One shared fixture compares bind snapshots and later emissions with real @react-rxjs/core. Outside testExecution until provenance is verified so ordinary CI executes the lane.",
+      "files": [
+        {
+          "path": "packages/rxjs/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "96b3aaef47867106259d95fbd325aa5ad4d68a9440717c68150e141251366152",
+          "cases": [
+            {
+              "id": "differential:bound-value",
+              "testName": "bind renders current values and later emissions byte-identically",
+              "fullName": "differential: @octanejs/rxjs vs real @react-rxjs/core bind renders current values and later emissions byte-identically"
+            }
+          ]
+        },
+        {
+          "path": "packages/rxjs/tests/_fixtures/parity.tsrx",
+          "role": "support",
+          "sha256": "bade9a89853f40d2f82aeb04cd08c85829a2d9026ef780c545a61beadb3d6c53"
+        },
+        {
+          "path": "packages/rxjs/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "58fc1278cdd3f4fed985c036509a0078e662dbd8e26dd5aedfed9673188b214c"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

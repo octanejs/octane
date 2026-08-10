@@ -1,0 +1,127 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pmndrs/jotai.git",
+    "version": "2.20.2",
+    "commit": "5c4ca26b0db5571114be58393e17854a771f7790",
+    "sourceRoot": "src",
+    "testRoot": "tests",
+    "license": "MIT",
+    "integrity": "sha256:52c820bc338cbbcc1b58c7758c9603b61ca9fc17526adecd84045a15e91c0157",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/jotai/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/jotai/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "jotai-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "jotai-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same four .tsrx fixtures against jotai 2.20.2 on React and @octanejs/jotai on Octane, comparing primitive and derived atoms, setters, provider scopes, splitAtom lists, and async atom resolution after identical interactions.",
+      "files": [
+        {
+          "path": "packages/jotai/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "5dd6a651f9e1461afa1442963500108d28cde7693f7efb3ca1542fbaacc0b0db",
+          "cases": [
+            {
+              "id": "differential:jotai-counter",
+              "testName": "Counter: primitive + derived + write-only setter, byte-identical",
+              "fullName": "differential: @octanejs/jotai vs real jotai on React Counter: primitive + derived + write-only setter, byte-identical"
+            },
+            {
+              "id": "differential:jotai-providers",
+              "testName": "Providers: default / outer / nested-shadowing scopes, byte-identical",
+              "fullName": "differential: @octanejs/jotai vs real jotai on React Providers: default / outer / nested-shadowing scopes, byte-identical"
+            },
+            {
+              "id": "differential:jotai-split-atom",
+              "testName": "Todos: splitAtom add/toggle/remove keyed list, byte-identical",
+              "fullName": "differential: @octanejs/jotai vs real jotai on React Todos: splitAtom add/toggle/remove keyed list, byte-identical"
+            },
+            {
+              "id": "differential:jotai-async-atom",
+              "testName": "AsyncApp: pending fallback \u2192 resolved value, byte-identical at both steps",
+              "fullName": "differential: @octanejs/jotai vs real jotai on React AsyncApp: pending fallback \u2192 resolved value, byte-identical at both steps"
+            }
+          ]
+        },
+        {
+          "path": "packages/jotai/tests/_fixtures/counter-diff.tsrx",
+          "role": "support",
+          "sha256": "da9bf8889c07aa0480ccdd56488ffe539666d22b3af2ba8e1c1549f438299f06"
+        },
+        {
+          "path": "packages/jotai/tests/_fixtures/providers-diff.tsrx",
+          "role": "support",
+          "sha256": "51df31bb17f61b3199a68a59b3ce75c39075ff242b8e2a9999d3a73196ab472d"
+        },
+        {
+          "path": "packages/jotai/tests/_fixtures/split-diff.tsrx",
+          "role": "support",
+          "sha256": "98e8ab19e17485fd8df300cdb286299abf642ae9c1c049ef2c602653b47c6d87"
+        },
+        {
+          "path": "packages/jotai/tests/_fixtures/async-diff.tsrx",
+          "role": "support",
+          "sha256": "55369525c098fa0f9d25dd0f995d0df27e861e16b259a642cff1e6519acb1a39"
+        },
+        {
+          "path": "packages/jotai/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "4ed8564d86835eef591614bb4594d6bb416c178d51f389b07bf4bc25d3fca73a"
+        },
+        {
+          "path": "packages/jotai/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "a9cf762a1aa9ecde1b31471d1f08a81bfa24f2464461b458b885c10e7c9f897e"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

@@ -8,7 +8,7 @@
       "path": "ui/spinner.tsrx",
       "type": "registry:ui",
       "target": "components/ui/spinner.tsrx",
-      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/spinner.tsx.\n//\n// OCTANE DIVERGENCE: upstream's IconPlaceholder (the CLI-resolved iconLibrary\n// axis) is resolved at port time to the default library, lucide, via\n// @octanejs/lucide. Other icon libraries are a registry-emit concern.\nimport { Loader2Icon } from '@octanejs/lucide';\n\nimport { cn } from '@/lib/utils';\n\nexport interface SpinnerProps extends Record<string, unknown> {\n\tclassName?: string;\n}\n\nexport function Spinner({ className, ...props }: SpinnerProps) @{\n\t<Loader2Icon\n\t\tdata-slot=\"spinner\"\n\t\trole=\"status\"\n\t\taria-label=\"Loading\"\n\t\tclassName={cn('size-4 animate-spin', className)}\n\t\t{...props}\n\t/>\n}\n"
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/spinner.tsx.\n//\n// Octane divergence (shadcn-icon-resolution): upstream's IconPlaceholder (the CLI-resolved iconLibrary\n// axis) is resolved at port time to the default library, lucide, via\n// @octanejs/lucide. Other icon libraries are a registry-emit concern.\nimport { Loader2Icon } from '@octanejs/lucide';\n\nimport { cn } from '@/lib/utils';\n\nexport interface SpinnerProps extends Record<string, unknown> {\n\tclassName?: string;\n}\n\nexport function Spinner({ className, ...props }: SpinnerProps) @{\n\t<Loader2Icon\n\t\tdata-slot=\"spinner\"\n\t\trole=\"status\"\n\t\taria-label=\"Loading\"\n\t\tclassName={cn('size-4 animate-spin', className)}\n\t\t{...props}\n\t/>\n}\n"
     }
   ],
   "dependencies": [

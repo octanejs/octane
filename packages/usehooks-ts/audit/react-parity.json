@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/juliencrn/usehooks-ts.git",
+    "version": "3.1.1",
+    "commit": "61949134144d3690fe9f521260a16c779a6d3797",
+    "sourceRoot": "packages/usehooks-ts/src",
+    "testRoot": "packages/usehooks-ts/src",
+    "license": "MIT",
+    "integrity": "sha256:bc0080ec78244f8d7adeddcad45b270d726e599e6ead2e8183b42bbf97f1701a",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/usehooks-ts/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/usehooks-ts/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "usehooks-state-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "usehooks-ts-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "One shared fixture compares the supported state-hook cohort through six interactions.",
+      "files": [
+        {
+          "path": "packages/usehooks-ts/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "eda225e4f3d0862735bc04ca7970521236191c64300d70ce83207b20a5d73995",
+          "cases": [
+            {
+              "id": "differential:state-hooks",
+              "testName": "state hooks render the same interaction sequence",
+              "fullName": "differential: @octanejs/usehooks-ts vs real usehooks-ts state hooks render the same interaction sequence"
+            }
+          ]
+        },
+        {
+          "path": "packages/usehooks-ts/tests/_fixtures/hooks.tsrx",
+          "role": "support",
+          "sha256": "36d54b6596ff98d94dbd13c2a8103bbba967fbfad2866eb9cec22078bdc7aad2"
+        },
+        {
+          "path": "packages/usehooks-ts/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "45080e54949f213911b29a0998e1d7a72c4627c5892f06fa47074599fc2f64f3"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

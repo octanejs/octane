@@ -1,0 +1,139 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/emilkowalski/sonner.git",
+    "version": "2.0.7",
+    "commit": "3ba7aa17ab7e8101b9cf4893936f873b0d4769b3",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:eb0f5dd35d890d38e8dcba1b242e9ac38cf45cc92c02aa914f144d98cfa7ce8f",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/sonner/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/sonner/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "sonner-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "sonner-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the vendored Playwright suite unchanged against published sonner@2.0.7 (chromium project) via the generic playwright-full runner.",
+      "execution": {
+        "kind": "playwright-full",
+        "config": "packages/sonner/scripts/pristine-playwright.json",
+        "root": "packages/sonner/upstream",
+        "inventory": "packages/sonner/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/sonner/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "ab64849f62fdc1a07136b600e04c204cacf3e4acbcbb45074a1ff461d3048bff"
+        },
+        {
+          "path": "packages/sonner/scripts/pristine-playwright.json",
+          "role": "support",
+          "sha256": "77197e0b45c37c5c543612d7a48d5feb9f500e7561d6b0fceb3e9c3e94ac4724"
+        },
+        {
+          "path": "scripts/react-parity/playwright-full-runner.mjs",
+          "role": "support",
+          "sha256": "680661aba23652cd276867bdef6a1abd89ff32772d81c20f23efe7b3e7374227"
+        },
+        {
+          "path": "packages/sonner/upstream/playwright.config.ts",
+          "role": "support",
+          "sha256": "89d9018cb3efcf73e6b267f4414aabf0eab3f98105ea8157cd6a6a5f9f0b24af"
+        },
+        {
+          "path": "packages/sonner/upstream/test/tests/basic.spec.ts",
+          "role": "support",
+          "sha256": "76d2900a8a42c7b6b364bf5272b32537da5f1f68f9153de4b632f82cffe1e7ee"
+        }
+      ]
+    },
+    {
+      "id": "sonner-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "sonner-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one exact same-fixture lifecycle case against the published sonner@2.0.7 React runtime.",
+      "files": [
+        {
+          "path": "packages/sonner/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "e336b7de15920066f95c7368c6eba7faceb8c6e75072b30b358b97843c4b9439",
+          "cases": [
+            {
+              "id": "differential:sonner-toast-lifecycle",
+              "testName": "matches mount, toast creation, updates and actions",
+              "fullName": "differential: @octanejs/sonner vs sonner@2.0.7 matches mount, toast creation, updates and actions"
+            }
+          ]
+        },
+        {
+          "path": "packages/sonner/tests/_fixtures/sonner-diff.tsrx",
+          "role": "support",
+          "sha256": "fced8881426c0fbe32434311cbedd2202b145565830980074112411a93cd043d"
+        },
+        {
+          "path": "packages/sonner/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "9301fc5bcae367e4ee0f3dbff5f662899b1505da2cb3da2d79f11106e55264ae"
+        },
+        {
+          "path": "packages/sonner/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "ad128f6a3181486a1048014767ffb1ec2560a9a16b2b9afd39bf58cbbc3379cf"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

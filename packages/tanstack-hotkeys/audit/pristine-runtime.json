@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-hotkeys-pristine",
+  "roots": ["packages/tanstack-hotkeys/upstream/package/tests"],
+  "files": [
+    "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+    "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+    "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+    "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:d861b736703d1f65",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey should call callback when hotkey matches"
+    },
+    {
+      "id": "runtime:2ce0010e98e3cd57",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey should not call callback when hotkey does not match"
+    },
+    {
+      "id": "runtime:d5d2c49e460b4502",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey should register a hotkey handler"
+    },
+    {
+      "id": "runtime:58abff873b526cae",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey should remove handler on unmount"
+    },
+    {
+      "id": "runtime:cf60ca9d4cdc8189",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey should use keyup event when specified"
+    },
+    {
+      "id": "runtime:d310ce4df9fab422",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey stale closure prevention should have access to latest state values in callback"
+    },
+    {
+      "id": "runtime:fb1532c17193c26b",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey stale closure prevention should preserve registration id when toggling enabled"
+    },
+    {
+      "id": "runtime:372a2eb006ed8412",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey stale closure prevention should sync enabled option on every render"
+    },
+    {
+      "id": "runtime:e1dc4beb2f73b7c8",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkey.test.tsx",
+      "fullName": "useHotkey target handling should wait for ref to be attached"
+    },
+    {
+      "id": "runtime:9ee3c1bfba6ef559",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should include meta accessible via options.meta"
+    },
+    {
+      "id": "runtime:105bb105c5aebcf2",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should not expose callback on hotkey registrations"
+    },
+    {
+      "id": "runtime:80405f59c179fe1f",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should return both hotkeys and sequences"
+    },
+    {
+      "id": "runtime:4c77d933de3bcf8c",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should return empty arrays when no registrations exist"
+    },
+    {
+      "id": "runtime:2bbf16604a803e90",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should return hotkey registrations after registering hotkeys"
+    },
+    {
+      "id": "runtime:6ad577e57364c010",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should return sequence registrations after registering sequences"
+    },
+    {
+      "id": "runtime:d9cb131f66f55e20",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should update reactively when hotkey registrations are added"
+    },
+    {
+      "id": "runtime:eead9f805c143955",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should update reactively when hotkey registrations are removed"
+    },
+    {
+      "id": "runtime:61203a38694d5fbb",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should update reactively when sequence registrations are added"
+    },
+    {
+      "id": "runtime:e5dc83d65ac9674b",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeyRegistrations.test.tsx",
+      "fullName": "useHotkeyRegistrations should work without HotkeysProvider (standalone)"
+    },
+    {
+      "id": "runtime:b5cb24f5b41c479f",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should call the correct callback for each sequence"
+    },
+    {
+      "id": "runtime:fbe256e078b18453",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should handle an empty array as a no-op"
+    },
+    {
+      "id": "runtime:adc81e447ab08cc6",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should handle dynamic array changes (add sequence)"
+    },
+    {
+      "id": "runtime:fb7eb1b51e9a551b",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should move a sequence registration when only the target changes"
+    },
+    {
+      "id": "runtime:ed8153f42895aac5",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should register disabled sequences and keep them in the manager"
+    },
+    {
+      "id": "runtime:fba6cd96965fd49a",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should register multiple sequence handlers"
+    },
+    {
+      "id": "runtime:96589078a3dd092c",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should skip definitions with an empty sequence"
+    },
+    {
+      "id": "runtime:fb2c254c79399ac3",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences should unregister all sequences on unmount"
+    },
+    {
+      "id": "runtime:5148e636f03943b9",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences stale closure prevention should have access to latest state values in callbacks"
+    },
+    {
+      "id": "runtime:86831dc953c5a06d",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences stale closure prevention should preserve registration id when toggling enabled"
+    },
+    {
+      "id": "runtime:1d503730dfce2dc5",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeySequences.test.tsx",
+      "fullName": "useHotkeySequences stale closure prevention should sync enabled option on every render"
+    },
+    {
+      "id": "runtime:e14a44f444862f86",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should call the correct callback for each hotkey"
+    },
+    {
+      "id": "runtime:971befda8f0e7380",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should handle an empty array as a no-op"
+    },
+    {
+      "id": "runtime:762387c2dfa17fbe",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should handle dynamic array changes (add hotkey)"
+    },
+    {
+      "id": "runtime:8cb9311488b8aae9",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should handle dynamic array changes (remove hotkey)"
+    },
+    {
+      "id": "runtime:3cecf92e130dbfac",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should merge commonOptions with per-definition options"
+    },
+    {
+      "id": "runtime:190f43b1e87e0748",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should move a registration when only the target changes"
+    },
+    {
+      "id": "runtime:e04c5bcdc388dbc8",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should register multiple hotkey handlers"
+    },
+    {
+      "id": "runtime:e9f96758881e0bec",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys should unregister all hotkeys on unmount"
+    },
+    {
+      "id": "runtime:bf9a12bf23acf049",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys stale closure prevention should have access to latest state values in callbacks"
+    },
+    {
+      "id": "runtime:2ed03866295fb410",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys stale closure prevention should preserve registration id when toggling enabled"
+    },
+    {
+      "id": "runtime:ded7429c15f645e2",
+      "file": "packages/tanstack-hotkeys/upstream/package/tests/useHotkeys.test.tsx",
+      "fullName": "useHotkeys stale closure prevention should sync enabled option on every render"
+    }
+  ],
+  "snapshots": 0
+}

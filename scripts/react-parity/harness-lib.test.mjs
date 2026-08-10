@@ -9,10 +9,13 @@ import test from 'node:test';
 import {
 	buildLaneArgv,
 	buildTypeScriptCompilerArgv,
+	buildTypeScriptCompilerRuns,
 	compareTestIdentities,
 	describeTestIdentityMismatch,
+	loadManifest,
 	nodeMajorSatisfies,
 	requiredExecutableLanes,
+	selectHarnessAction,
 	summarizeRuntimeInventories,
 	toPortablePath,
 	validateManifest,
@@ -20,6 +23,7 @@ import {
 	verifyLaneEnvironment,
 	verifyLaneRunResult,
 	verifyManifestFiles,
+	verifyManifestTestSelections,
 } from './harness-lib.mjs';
 
 test('describeTestIdentityMismatch reports missing, unexpected, and duplicate identities', () => {
@@ -250,7 +254,7 @@ test('validates exact focused Vitest identities from the execution report', () =
 	);
 });
 
-test('selects every available required lane for aggregate execution', () => {
+test('selects every available required lane for recorded-unverified aggregate execution', () => {
 	const value = manifest();
 	value.lanes.push(
 		{ ...value.lanes[0], id: 'differential', type: 'differential' },
@@ -261,6 +265,93 @@ test('selects every available required lane for aggregate execution', () => {
 		requiredExecutableLanes(value).map((lane) => lane.id),
 		['adapted', 'differential'],
 	);
+	value.provenance.verification = 'verified';
+	assert.deepEqual(
+		requiredExecutableLanes(value).map((lane) => lane.id),
+		['adapted', 'differential'],
+	);
+});
+
+test('lexical exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/lexical/audit/react-parity.json');
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('lucide exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/lucide/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('redux exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/redux/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('redux-toolkit exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/redux-toolkit/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('shadcn exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/shadcn/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('sonner exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/sonner/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const differential = value.lanes.find((lane) => lane.id === 'sonner-runtime-differential');
+	assert.ok(differential);
+	const renamed = structuredClone(value);
+	const lane = renamed.lanes.find((entry) => entry.id === 'sonner-runtime-differential');
+	lane.files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('routes harness execution from required lanes, not provenance verification', () => {
+	const unverified = manifest();
+	unverified.provenance.verification = 'recorded-unverified';
+	assert.equal(selectHarnessAction(unverified), 'run-required');
+
+	const empty = manifest({ lanes: [] });
+	assert.equal(selectHarnessAction(empty), 'validate');
+
+	const unavailableOnly = manifest({
+		lanes: [{ ...manifest().lanes[0], available: false }],
+	});
+	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
 });
 
 test('accepts explicit TypeScript lanes and builds portable compiler argv without a shell', () => {
@@ -310,6 +401,59 @@ test('uses Node package entrypoints for every TypeScript compiler', () => {
 			expected,
 		);
 	}
+});
+
+test('expands optional compilerBins into one TypeScript run per binary', () => {
+	const lane = {
+		id: 'matrix-types',
+		type: 'pristine-types',
+		oracle: 'required',
+		environment: 'workspace-node',
+		project: 'matrix-types',
+		evidenceOrigin: 'upstream-suite',
+		execution: {
+			kind: 'typescript',
+			compiler: 'tsc',
+			compilerBins: [
+				'node_modules/typescript55/lib/tsc.js',
+				'node_modules/typescript60/lib/tsc.js',
+			],
+			project: 'packages/example/tsconfig.json',
+		},
+		files: [
+			{
+				path: 'packages/example/src/index.ts',
+				role: 'test',
+				sha256: '0'.repeat(64),
+				cases: [
+					{
+						id: 'types:example',
+						testName: 'example',
+						fullName: 'example',
+					},
+				],
+			},
+		],
+	};
+	assert.deepEqual(buildTypeScriptCompilerRuns(lane), [
+		[
+			process.execPath,
+			'node_modules/typescript55/lib/tsc.js',
+			'--noEmit',
+			'-p',
+			'packages/example/tsconfig.json',
+		],
+		[
+			process.execPath,
+			'node_modules/typescript60/lib/tsc.js',
+			'--noEmit',
+			'-p',
+			'packages/example/tsconfig.json',
+		],
+	]);
+	assert.throws(function rejectsMultiRunLaneArgv() {
+		buildLaneArgv(lane);
+	}, /declares 2 TypeScript compiler runs; use buildTypeScriptCompilerRuns/);
 });
 
 test('normalizes Windows identity paths and resolves full-suite inventories from the harness root', async () => {
@@ -420,6 +564,18 @@ test('rejects a stale fullName that Vitest does not collect from its evidence fi
 				],
 				root,
 			),
+		/fullName must match exactly one collected Vitest test/,
+	);
+});
+
+test('jotai exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/jotai/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
 		/fullName must match exactly one collected Vitest test/,
 	);
 });

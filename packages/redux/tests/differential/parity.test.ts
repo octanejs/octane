@@ -13,6 +13,7 @@ const FIXTURE = resolve(__dirname, '../_fixtures/counter.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/redux vs real react-redux', () => {
+	// @parity-case differential:redux-counter
 	it('counter: mount → increment ×2 → decrement renders byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'CounterApp', undefined, CACHE);
 		await d.step('mount', () => {});

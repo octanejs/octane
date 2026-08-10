@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'octane';
 import { formatHotkeySequence, getSequenceManager } from '@tanstack/hotkeys';
 import { useDefaultHotkeysOptions } from './context';
-import { isRef } from './utils';
+import { isRef, withoutSlotOption } from './utils';
 import type { UseHotkeySequenceOptions } from './useHotkeySequence';
 import type { HotkeyCallback, HotkeySequence, SequenceRegistrationHandle } from '@tanstack/hotkeys';
 
@@ -56,13 +56,14 @@ export function useHotkeySequences(
 		target: Document | HTMLElement | Window;
 	};
 
+	const resolvedCommonOptions = withoutSlotOption(commonOptions) ?? {};
 	const defaultOptions = useDefaultHotkeysOptions().hotkeySequence;
 	const manager = getSequenceManager();
 
 	const registrationsRef = useRef<Map<string, RegistrationRecord>>(new Map());
 	const definitionsRef = useRef(definitions);
 	const sequenceStringsRef = useRef<Array<string>>([]);
-	const commonOptionsRef = useRef(commonOptions);
+	const commonOptionsRef = useRef(resolvedCommonOptions);
 	const defaultOptionsRef = useRef(defaultOptions);
 	const managerRef = useRef(manager);
 
@@ -70,7 +71,7 @@ export function useHotkeySequences(
 
 	definitionsRef.current = definitions;
 	sequenceStringsRef.current = sequenceStrings;
-	commonOptionsRef.current = commonOptions;
+	commonOptionsRef.current = resolvedCommonOptions;
 	defaultOptionsRef.current = defaultOptions;
 	managerRef.current = manager;
 
@@ -177,7 +178,7 @@ export function useHotkeySequences(
 			handle.callback = def.callback;
 			const mergedOptions = {
 				...defaultOptions,
-				...commonOptions,
+				...resolvedCommonOptions,
 				...def.options,
 			} as UseHotkeySequenceOptions;
 			const { target: _target, ...optionsWithoutTarget } = mergedOptions;

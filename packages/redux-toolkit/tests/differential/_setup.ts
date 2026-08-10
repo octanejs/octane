@@ -5,7 +5,7 @@
  */
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,27 +24,21 @@ function hashString(value: string): string {
 
 function compileOne(sourcePath: string): void {
 	const source = readFileSync(sourcePath, 'utf8');
-	let compiled;
-	try {
-		compiled = compileToReact(source, sourcePath);
-	} catch {
-		return;
+	const compiled = compileToReact(source, sourcePath);
+	if (compiled.errors?.length) {
+		throw new Error(
+			`React differential precompile failed for ${sourcePath}:\n${compiled.errors.join('\n')}`,
+		);
 	}
-	if (compiled.errors?.length) return;
 
-	let transformed;
-	try {
-		transformed = esbuildTransformSync(compiled.code, {
-			loader: 'tsx',
-			jsx: 'automatic',
-			jsxImportSource: 'react',
-			target: 'esnext',
-			format: 'esm',
-			sourcefile: sourcePath,
-		});
-	} catch {
-		return;
-	}
+	const transformed = esbuildTransformSync(compiled.code, {
+		loader: 'tsx',
+		jsx: 'automatic',
+		jsxImportSource: 'react',
+		target: 'esnext',
+		format: 'esm',
+		sourcefile: sourcePath,
+	});
 
 	const rewritten = transformed.code
 		.replaceAll('@octanejs/redux-toolkit/query/react', '@reduxjs/toolkit/query/react')
@@ -57,20 +51,10 @@ function compileOne(sourcePath: string): void {
 	writeFileSync(join(cacheDirectory, `${slug}-${hashString(sourcePath)}.js`), rewritten);
 }
 
-function walk(directory: string): string[] {
-	const output: string[] = [];
-	for (const name of readdirSync(directory)) {
-		const fullPath = join(directory, name);
-		if (statSync(fullPath).isDirectory()) output.push(...walk(fullPath));
-		else if (fullPath.endsWith('.tsrx')) output.push(fullPath);
-	}
-	return output;
-}
-
 export async function setup(): Promise<void> {
-	if (!existsSync(cacheDirectory)) mkdirSync(cacheDirectory, { recursive: true });
-	if (!existsSync(fixtureDirectory)) return;
-	for (const file of walk(fixtureDirectory)) compileOne(file);
+	rmSync(cacheDirectory, { recursive: true, force: true });
+	mkdirSync(cacheDirectory, { recursive: true });
+	compileOne(join(fixtureDirectory, 'rtk-query.tsrx'));
 }
 
 export async function teardown(): Promise<void> {}

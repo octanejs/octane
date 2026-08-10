@@ -85,6 +85,11 @@ allowBuilds:
   # LiveStore's test-only telemetry closure uses protobufjs; its postinstall
   # prints a donation notice and does not generate runtime artifacts.
   protobufjs: false
+  # Wallet/WebSocket parity dependencies expose optional native accelerators;
+  # Node and the packages themselves provide JavaScript fallbacks.
+  bufferutil: false
+  keccak: false
+  utf-8-validate: false
 
 # Variables
 esrap_common: &esrap_common ^2.3.0

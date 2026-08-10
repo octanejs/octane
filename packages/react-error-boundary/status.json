@@ -10,5 +10,11 @@
     "Server rendering that must match upstream error propagation uses the explicit @octanejs/react-error-boundary/server entry."
   ],
   "ssr": "The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2.",
-  "verified": "2026-07-29"
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/bvaughn/react-error-boundary",
+    "license": "MIT",
+    "commit": "90b9a7e8766faa7890eff14ffedc77ea80740179",
+    "verification": "recorded-unverified"
+  }
 }

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/shadcn/tests/badge.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane Badge contract; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/base-ui-smoke.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the partial Octane Base UI component base; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/composites.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane composite components and interactions; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/cross-base.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks structural consistency between Octane component bases; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Same-fixture runtime comparison citing pinned shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 sources apps/v4/registry/bases/radix/ui/{badge,button,tabs,dialog,dropdown-menu}.tsx; dialog/dropdown-menu keep import-path-only transforms, while badge/button/tabs document port-selected class-hook adaptations. The local React references are not themselves the pinned oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates documented Octane runtime divergences (native onInput, descriptor asChild, Lucide icon resolution) outside the React-parity lane."
+    },
+    {
+      "path": "packages/shadcn/tests/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane package export map; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server-to-client hydration adoption; it is not compared with React hydration."
+    },
+    {
+      "path": "packages/shadcn/tests/inputs.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane input component behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/menus.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane menu component behavior and portal contracts; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/overlays.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane overlay component behavior and portal contracts; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/react-aria-field-error.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane React Aria FieldError adapter; it is not a React differential."
+    },
+    {
+      "path": "packages/shadcn/tests/react-aria-smoke.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that the Octane React Aria base mounts; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/react-aria.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane React Aria component contracts; it is not a React differential."
+    },
+    {
+      "path": "packages/shadcn/tests/registry-serve.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks registry server path containment on posix and win32; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/registry-styles.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks multi-base registry style artifacts and cross-references; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/registry.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the generated Octane registry and dependency pins; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/sonner.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates the documented Sonner theme/wrapper adaptation outside the React-parity lane; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/ssr/server-tier2.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering for portal-free tier-two components; it is not compared with React SSR."
+    },
+    {
+      "path": "packages/shadcn/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering for tier-one components; it is not compared with React SSR."
+    },
+    {
+      "path": "packages/shadcn/tests/structure.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane source and distribution structure; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/tier1.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane tier-one component contracts; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/utils.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane package utility behavior; it is not a React differential."
+    }
+  ]
+}

@@ -31,7 +31,7 @@
         "React Server Components and Apollo's React Compiler-generated entry are intentionally not exposed."
       ],
       "ssr": "Dedicated Node-mode tests cover multi-pass useQuery, nested query waterfalls, per-request cache isolation, ssr:false/no-cache, render limits, and scoped CSS; client hydration verifies cache restoration, in-place adoption, and no duplicate fetch. Streaming cache patches remain open.",
-      "verified": "2026-07-25"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/aria",
@@ -205,7 +205,7 @@
         "The React/Babel-specific `icu.macro` subpath is not shipped; the runtime IcuTrans APIs are fully supported."
       ],
       "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/inertia",
@@ -225,22 +225,22 @@
       "category": "Shared state",
       "upstream": { "package": "jotai", "version": "2.20.2" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.",
-      "divergences": ["`jotai/babel/*` (React-specific compile-time plugins) is not shipped."],
+      "divergences": [],
       "ssr": "No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests.",
-      "verified": "2026-07-21"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/lexical",
       "version": "0.1.32",
       "category": "Forms and content",
       "upstream": { "package": "@lexical/react", "version": "0.46.0" },
-      "surface": "35 of 39 `@lexical/react` modules ported: composer + contexts, the editable surface, plain/rich text, and the full plugin/menu set (history, lists + check-list, links, tables, markdown shortcuts, the typeahead/node-menu/context-menu family, draggable-block, character-limit, …) plus the `useLexical*` hooks.",
+      "surface": "The 35 legacy `@lexical/react` modules represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set, and the `useLexical*` hooks. The 0.46.0 extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
       "divergences": [
         "Positioning uses `@floating-ui/dom` instead of `@floating-ui/react`.",
-        "The class-based `LexicalErrorBoundary` becomes an octane error boundary; `forwardRef` becomes ref-as-prop."
+        "The class-based `LexicalErrorBoundary` becomes an Octane error boundary; `forwardRef` becomes ref-as-prop."
       ],
       "ssr": "No dedicated SSR/hydration tests.",
-      "verified": "2026-07-09"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/livestore",
@@ -267,7 +267,7 @@
         "Event callbacks receive native DOM events rather than React synthetic events."
       ],
       "ssr": "Supported and tested: icons and provider defaults render through `octane/server`, and client hydration adopts the server-rendered SVG element.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/mantine-hooks",
@@ -307,7 +307,7 @@
         "React-specific batching, prop-types validation, React DevTools integration, and useDebugValue output are omitted."
       ],
       "ssr": "enableStaticRendering(true) renders observed components without creating a Reaction or retaining observable subscriptions.",
-      "verified": "2026-07-28"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/motion",
@@ -349,7 +349,7 @@
         "The React package's SSR namespace is unnecessary because Octane icons use the same components on client and server."
       ],
       "ssr": "Supported and tested against @phosphor-icons/react/ssr for every weight; hydration adopts and updates server-rendered SVG hosts.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/radix",
@@ -378,7 +378,7 @@
         "rainbowTheme is an explicitly documented Octane-only purple/rounded preset; it is not an upstream RainbowKit export."
       ],
       "ssr": "The provider and controls emit deterministic disconnected markup without browser wallet access. Connector discovery and live Wagmi state become authoritative after hydration; no hydrated UI state authorizes wallet actions.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/react-error-boundary",
@@ -392,7 +392,7 @@
         "Server rendering that must match upstream error propagation uses the explicit @octanejs/react-error-boundary/server entry."
       ],
       "ssr": "The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/react-map-gl",
@@ -420,20 +420,21 @@
         "Chart events coordinate through octane's native delegated events rather than React's synthetic layer."
       ],
       "ssr": "Untested; text measurement (`getStringSize`) returns 0×0 under SSR.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/redux",
       "version": "0.1.30",
       "category": "Shared state",
       "upstream": { "package": "react-redux", "version": "9.3.0" },
-      "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Export parity is pinned by test.",
+      "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Upstream runtime-export completeness is pinned by test.",
       "divergences": [
         "`connect()` (the legacy HOC surface) intentionally throws — the hooks API is the supported surface.",
-        "Error messages are octane-branded."
+        "Error messages are octane-branded.",
+        "The root also exposes createReduxContextHook, useReduxContext, createSubscription, and useSyncExternalStoreWithSelector as Octane extension exports."
       ],
       "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-      "verified": "2026-07-08"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/redux-toolkit",
@@ -446,7 +447,7 @@
         "`useDebugValue` is octane's no-op compatibility hook; observable query behavior is unchanged."
       ],
       "ssr": "Preloaded RTK Query state renders through the traditional @octanejs/redux Provider; effects and browser listeners remain client-only. Dedicated SSR and hydration tests are included.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/remix-router",
@@ -478,7 +479,7 @@
         "@react-rxjs/dom is omitted because octane batches updates without ReactDOM.unstable_batchedUpdates."
       ],
       "ssr": "useSyncExternalStore supplies the state snapshot during server rendering; browser-only ReactDOM batching helpers are intentionally absent.",
-      "verified": "2026-07-30"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/shadcn",
@@ -540,7 +541,7 @@
         "The document-visibility hook is guarded during SSR; upstream 2.0.7 reads `document.hidden` during render."
       ],
       "ssr": "Supported and tested: `Toaster` server-renders without browser globals, hydrates by adopting the server host, and can show the first client-created toast without replacing it.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/streamdown",
@@ -640,12 +641,12 @@
       "version": "0.0.22",
       "category": "UI and interaction",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
-      "surface": "Complete: the full upstream hook surface (`useHotkey`, `useHotkeys`, `useHeldKeys`, `useHeldKeyCodes`, `useKeyHold`, `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`, `useHotkeySequenceRecorder`, `useHotkeyRegistrations`) plus `HotkeysProvider`/`useHotkeysContext`/`useDefaultHotkeysOptions`, re-exporting the framework-agnostic `@tanstack/hotkeys@0.8.0` core unchanged; store subscriptions go through `@octanejs/tanstack-store`.",
+      "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
       "divergences": [
         "`target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical."
       ],
       "ssr": "Supported: every hook registers listeners in effects and resolves `document` lazily, so server rendering produces no registrations and no browser access (matching upstream's `typeof document` guards).",
-      "verified": "2026-07-20"
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/tanstack-pacer",
@@ -690,10 +691,10 @@
       "version": "0.0.22",
       "category": "AI, data, and routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
-      "surface": "Complete: `setupRouterSsrQueryIntegration` (the package's only export) delegating to `@tanstack/router-ssr-query-core@1.169.1`, with the QueryClientProvider Wrap composition on Octane.",
+      "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
       "divergences": [],
       "ssr": "Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider).",
-      "verified": "2026-07-20"
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/tanstack-store",
@@ -817,7 +818,7 @@
         "Public setter types are structurally equivalent to React Dispatch/SetStateAction without importing React types."
       ],
       "ssr": "Supported for the listed cohort. Effects and timers do not run during server rendering; hydration activates lifecycle and timing work without requiring browser reads during render.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/valtio",
@@ -861,7 +862,7 @@
         "EIP-1193 event validation, duplicate coalescing, and connector-generation invalidation are delegated unchanged to @wagmi/core 3.6.4. This binding does not add a second provider-event layer or claim independent normalization behavior."
       ],
       "ssr": "WagmiProvider supports ssr:true and initialState through @wagmi/core hydrate. parseHydratedState accepts only a versioned, 16 KiB-bounded public-state hint and rejects malformed or privileged material; a hydrated connection is never authority for signing or submission.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/zustand",

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@tanstack/hotkeys": ["../hotkeys/src"]
+    }
+  },
+  "include": ["src"]
+}
