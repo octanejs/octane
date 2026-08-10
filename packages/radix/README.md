@@ -39,7 +39,7 @@ children-position `<Trigger asChild><button/></Trigger>`.
 
 ## Status
 
-**Complete against the unified `radix-ui@1.6.1` component surface.** Landed:
+**Surface-present against the unified `radix-ui@1.6.4` component exports.** Landed:
 
 - Composition foundation — `Slot`, `Slottable`, `Primitive.<tag>` (`asChild`), `mergeProps`
   (event chaining, `style` merge, clsx-style `class` composition), `composeRefs` /
@@ -86,12 +86,13 @@ children-position `<Trigger asChild><button/></Trigger>`.
   `useScrollLock` (a focused `react-remove-scroll` replacement — see `scroll-lock.ts`),
   with the framework-agnostic `aria-hidden` package reused as-is.
 
-**Verified against real Radix**: the differential suite
+**Bounded evidence against real Radix**: the differential suite
 (`tests/differential/parity.test.ts`) runs the SAME fixture through `@octanejs/radix` and
 the real `radix-ui` package on React, asserting byte-identical DOM after every interaction
 step; portal'd overlays (which the rig can't see) carry dedicated focus/keyboard/dismiss
-unit suites. Ports come from the pinned radix-ui/primitives source checkout
-(`.radix-primitives/`); every file header cites its source path.
+unit suites. The exact transitive source and test boundary is authenticated in
+[`UPSTREAM.md`](./UPSTREAM.md). The 16-case differential is not exhaustive verification of the
+complete canonical suite, so status remains `recorded-unverified`.
 
 Remaining (documented in
 [`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): SSR/hydration
