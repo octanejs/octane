@@ -2644,6 +2644,124 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'react-window-feasibility',
+					include: ['packages/window/tests/feasibility/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-window-pristine',
+					include: ['packages/window/upstream/lib/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					setupFiles: ['packages/window/upstream/vitest.setup.js'],
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/window/tests/upstream/**/*.test.{ts,tsx}'],
+				},
+				test: {
+					name: 'react-window-adapted',
+					include: ['packages/window/tests/upstream/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					setupFiles: ['packages/window/tests/upstream-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'react-window',
+					include: [
+						'packages/window/tests/runtime/**/*.test.ts',
+						'packages/window/tests/hydration.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-window-differential',
+					include: ['packages/window/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/window/tests/differential/_setup.ts'],
+					setupFiles: ['packages/window/tests/upstream-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/window$/,
+							replacement: resolve(import.meta.dirname, 'packages/window/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'react-window-ssr',
+					include: ['packages/window/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'wagmi',
 					include: ['packages/wagmi/tests/**/*.test.ts'],
 					environment: 'jsdom',

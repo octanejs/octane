@@ -402,6 +402,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 					'@octanejs/react-dropzone': `file:${requireArchive(archives, '@octanejs/react-dropzone')}`,
 					'@octanejs/syntax-highlighter': `file:${requireArchive(archives, '@octanejs/syntax-highlighter')}`,
 					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
+					'@octanejs/window': `file:${requireArchive(archives, '@octanejs/window')}`,
 					'@types/three': '0.172.0',
 					graphql: '^16.11.0',
 					octane: `file:${requireArchive(archives, 'octane')}`,
@@ -429,6 +430,7 @@ import { useDropzone } from '@octanejs/react-dropzone';
 import { Light, Prism, PrismAsync } from '@octanejs/syntax-highlighter';
 import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
 import vscDarkPlus from '@octanejs/syntax-highlighter/dist/cjs/styles/prism/vsc-dark-plus';
+import { Grid, List, type CellComponentProps, type RowComponentProps } from '@octanejs/window';
 import { Canvas } from '@octanejs/three';
 import { ThreeScene } from './ThreeScene.three.tsrx';
 
@@ -440,6 +442,14 @@ Light.registerLanguage('javascript', javascript);
 function ApolloProbe() @{
 	const activeClient = useApolloClient();
 	<span data-apollo={activeClient === client ? 'connected' : 'missing'}>Apollo</span>
+}
+
+function PackedRow({ ariaAttributes, index, style }: RowComponentProps) {
+	return <div {...ariaAttributes} data-packed-row={index} style={style}>{'Row ' + index}</div>;
+}
+
+function PackedCell({ ariaAttributes, columnIndex, rowIndex, style }: CellComponentProps) {
+	return <div {...ariaAttributes} data-packed-cell={rowIndex + ':' + columnIndex} style={style}>{rowIndex + ':' + columnIndex}</div>;
 }
 
 export function App() @{
@@ -473,6 +483,25 @@ export function App() @{
 			data-packed-syntax="async"
 			language="javascript"
 			children={'const packedAsync = true;'}
+		/>
+		<List
+			data-testid="packed-list"
+			defaultHeight={40}
+			rowComponent={PackedRow}
+			rowCount={100}
+			rowHeight={20}
+			rowProps={{}}
+		/>
+		<Grid
+			cellComponent={PackedCell}
+			cellProps={{}}
+			columnCount={100}
+			columnWidth={20}
+			data-testid="packed-grid"
+			defaultHeight={40}
+			defaultWidth={40}
+			rowCount={100}
+			rowHeight={20}
 		/>
 		<Canvas frameloop="never" style={{ width: 64, height: 64 }}>
 			<ThreeScene />
@@ -524,6 +553,24 @@ import LightAsync from '@octanejs/syntax-highlighter/dist/esm/light-async';
 import PrismLight from '@octanejs/syntax-highlighter/dist/cjs/prism-light.js';
 import syntaxJavascript from '@octanejs/syntax-highlighter/dist/cjs/languages/hljs/javascript.js';
 import syntaxVscDarkPlus from '@octanejs/syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus.js';
+import {
+	Grid,
+	List,
+	getScrollbarSize,
+	useDynamicRowHeight,
+	useGridCallbackRef,
+	useGridRef,
+	useListCallbackRef,
+	useListRef,
+	type Align,
+	type CellComponentProps,
+	type DynamicRowHeight,
+	type GridImperativeAPI,
+	type GridProps,
+	type ListImperativeAPI,
+	type ListProps,
+	type RowComponentProps,
+} from '@octanejs/window';
 import { map_iterable } from 'octane/tsrx-iterable';
 import {
 	normalize_spread_props,
@@ -567,6 +614,14 @@ type DropzonePublicTypeSurface = [
 ];
 type DropzonePublicTypeArity = DropzonePublicTypeSurface['length'];
 const dropzonePublicTypeArity: DropzonePublicTypeArity = 13;
+const align: Align = 'smart';
+const listProps: ListProps = { rowComponent: () => null, rowCount: 0, rowHeight: 20, rowProps: {} };
+const gridProps: GridProps = { cellComponent: () => null, cellProps: {}, columnCount: 0, columnWidth: 20, rowCount: 0, rowHeight: 20 };
+const rowProps: RowComponentProps | undefined = undefined;
+const cellProps: CellComponentProps | undefined = undefined;
+const dynamicHeight: DynamicRowHeight | undefined = undefined;
+const listApi: ListImperativeAPI | undefined = undefined;
+const gridApi: GridImperativeAPI | undefined = undefined;
 
 export function packageSurfaceProbe() {
 	void octaneDevRuntimeDiv;
@@ -574,6 +629,14 @@ export function packageSurfaceProbe() {
 	void reconcilerRoot;
 	void dropzoneState;
 	void fileRejections;
+	void align;
+	void listProps;
+	void gridProps;
+	void rowProps;
+	void cellProps;
+	void dynamicHeight;
+	void listApi;
+	void gridApi;
 	return {
 		config: config === threeRenderers,
 		core: typeof coreApi.createRoot === 'function',
@@ -586,6 +649,15 @@ export function packageSurfaceProbe() {
 			dropzonePackage.name === '@octanejs/react-dropzone',
 		iterable: typeof map_iterable === 'function',
 		publicApi: typeof publicApi.Canvas === 'function',
+		reactWindow:
+			typeof Grid === 'function' &&
+			typeof List === 'function' &&
+			typeof getScrollbarSize === 'function' &&
+			typeof useDynamicRowHeight === 'function' &&
+			typeof useGridCallbackRef === 'function' &&
+			typeof useGridRef === 'function' &&
+			typeof useListCallbackRef === 'function' &&
+			typeof useListRef === 'function',
 		syntax:
 			typeof syntaxApi.Prism === 'function' &&
 			typeof LightAsync.preload === 'function' &&
@@ -805,6 +877,13 @@ process.stdout.write(JSON.stringify(result));`,
 			`Syntax Highlighter resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${syntaxPeerRuntime}`,
 		);
 	}
+	const reactWindowEntry = consumerRequire.resolve('@octanejs/window');
+	const reactWindowPeerRuntime = realpathSync(createRequire(reactWindowEntry).resolve('octane'));
+	if (reactWindowPeerRuntime !== directRuntime) {
+		throw new Error(
+			`react-window binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${reactWindowPeerRuntime}`,
+		);
+	}
 	const threeEntry = consumerRequire.resolve('@octanejs/three');
 	const threeRequire = createRequire(threeEntry);
 	const threePeerRuntime = realpathSync(threeRequire.resolve('octane'));
@@ -925,6 +1004,10 @@ process.stdout.write(output, () => process.exit(0));
 		!html.includes('packedLight') ||
 		!html.includes('packedPrism') ||
 		!html.includes('packedAsync') ||
+		!html.includes('data-testid="packed-list"') ||
+		!html.includes('data-packed-row="0"') ||
+		!html.includes('data-testid="packed-grid"') ||
+		!html.includes('data-packed-cell="0:0"') ||
 		!html.includes('<canvas')
 	) {
 		throw new Error(`executed packed consumer probe returned unexpected HTML: ${html}`);
@@ -934,7 +1017,7 @@ process.stdout.write(output, () => process.exit(0));
 	}
 
 	console.log(
-		'installed packed octane + Alien Signals + Hook Form + Apollo Client + Syntax Highlighter + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
+		'installed packed octane + Alien Signals + Hook Form + react-window + Apollo Client + Syntax Highlighter + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
 	);
 }
 

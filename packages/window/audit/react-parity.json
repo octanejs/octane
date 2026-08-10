@@ -1,0 +1,327 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/bvaughn/react-window.git",
+    "version": "2.3.0",
+    "commit": "4d9eebbb510262b3b7e95463cf49a10de53ea77d",
+    "sourceRoot": "lib",
+    "testRoot": "lib",
+    "license": "MIT",
+    "integrity": "sha256:d0b66c0138c6355051a75086ce0681aa5880249c0d14f1e9759185daee16e452",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/window/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/window/tests/upstream"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 117,
+    "uniqueIdentities": 117,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5863213178679d44030900647009b88871f52e05355b6e76a1537d622943f5f8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-window-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-window-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 14 byte-exact upstream React test files and all 117 inventoried cases unchanged.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/window/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/window/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "3a2fc37af94500e7975d5faa0ffb5c2983739ad4b486d691cfb282bd5e4c3ed6"
+        },
+        {
+          "path": "packages/window/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "69d0a2e15466c0f44a6cd477835631f14f181eac149dbdbaa1ed0e01996c56ba"
+        }
+      ]
+    },
+    {
+      "id": "react-window-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-window-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 117 adapted upstream cases against the source-correspondent Octane production modules, with every transformation generated and audited.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/window/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/window/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "fac9b17df1dd4ed40c11d2d37c1447ad9b4e0d6178f3fe8c46bf3a0aeb431a62"
+        },
+        {
+          "path": "packages/window/audit/adapted-transformations.json",
+          "role": "support",
+          "sha256": "045249c61dc37184b40debe36317deb19c49e43fd92e32f90fdeac50c9910160"
+        },
+        {
+          "path": "packages/window/tests/generate-adapted-tests.mjs",
+          "role": "support",
+          "sha256": "584515f956967578e1f4414bbf1b5d1b510f65316919d6ce5470aa79e9c22747"
+        }
+      ]
+    },
+    {
+      "id": "react-window-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-window-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the shared parity program against the byte-exact published npm declaration bundle.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/window/typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/window/typetests/parity.test-d.ts",
+          "role": "test",
+          "sha256": "05b1d2752a494c5abb84977bec12e9534af6333c5370ab341fc301fe76c6246c",
+          "cases": [
+            {
+              "id": "types:react-window-pristine:component-props",
+              "testName": "component-props",
+              "fullName": "published react-window declaration contract: component-props"
+            },
+            {
+              "id": "types:react-window-pristine:list-grid-props",
+              "testName": "list-grid-props",
+              "fullName": "published react-window declaration contract: list-grid-props"
+            },
+            {
+              "id": "types:react-window-pristine:components",
+              "testName": "components",
+              "fullName": "published react-window declaration contract: components"
+            },
+            {
+              "id": "types:react-window-pristine:utilities",
+              "testName": "utilities",
+              "fullName": "published react-window declaration contract: utilities"
+            },
+            {
+              "id": "types:react-window-pristine:dynamic-height",
+              "testName": "dynamic-height",
+              "fullName": "published react-window declaration contract: dynamic-height"
+            },
+            {
+              "id": "types:react-window-pristine:ref-hooks",
+              "testName": "ref-hooks",
+              "fullName": "published react-window declaration contract: ref-hooks"
+            },
+            {
+              "id": "types:react-window-pristine:imperative-api",
+              "testName": "imperative-api",
+              "fullName": "published react-window declaration contract: imperative-api"
+            },
+            {
+              "id": "types:react-window-pristine:forbidden-generated-props",
+              "testName": "forbidden-generated-props",
+              "fullName": "published react-window declaration contract: forbidden-generated-props"
+            },
+            {
+              "id": "types:react-window-pristine:missing-grid-coordinate",
+              "testName": "missing-grid-coordinate",
+              "fullName": "published react-window declaration contract: missing-grid-coordinate"
+            },
+            {
+              "id": "types:react-window-pristine:absent-v1-api",
+              "testName": "absent-v1-api",
+              "fullName": "published react-window declaration contract: absent-v1-api"
+            }
+          ]
+        },
+        {
+          "path": "packages/window/audit/type-contract.json",
+          "role": "support",
+          "sha256": "15fdc0bd2fc50105b8c4e42399ee6a47be49a3aa8a1e76ea05341c385ff344b0"
+        }
+      ]
+    },
+    {
+      "id": "react-window-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-window-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the identical parity program against the Octane package source with tsrx-tsc.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/window/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/window/typetests/parity.test-d.ts",
+          "role": "test",
+          "sha256": "05b1d2752a494c5abb84977bec12e9534af6333c5370ab341fc301fe76c6246c",
+          "cases": [
+            {
+              "id": "types:react-window-adapted:component-props",
+              "testName": "component-props",
+              "fullName": "Octane react-window declaration contract: component-props"
+            },
+            {
+              "id": "types:react-window-adapted:list-grid-props",
+              "testName": "list-grid-props",
+              "fullName": "Octane react-window declaration contract: list-grid-props"
+            },
+            {
+              "id": "types:react-window-adapted:components",
+              "testName": "components",
+              "fullName": "Octane react-window declaration contract: components"
+            },
+            {
+              "id": "types:react-window-adapted:utilities",
+              "testName": "utilities",
+              "fullName": "Octane react-window declaration contract: utilities"
+            },
+            {
+              "id": "types:react-window-adapted:dynamic-height",
+              "testName": "dynamic-height",
+              "fullName": "Octane react-window declaration contract: dynamic-height"
+            },
+            {
+              "id": "types:react-window-adapted:ref-hooks",
+              "testName": "ref-hooks",
+              "fullName": "Octane react-window declaration contract: ref-hooks"
+            },
+            {
+              "id": "types:react-window-adapted:imperative-api",
+              "testName": "imperative-api",
+              "fullName": "Octane react-window declaration contract: imperative-api"
+            },
+            {
+              "id": "types:react-window-adapted:forbidden-generated-props",
+              "testName": "forbidden-generated-props",
+              "fullName": "Octane react-window declaration contract: forbidden-generated-props"
+            },
+            {
+              "id": "types:react-window-adapted:missing-grid-coordinate",
+              "testName": "missing-grid-coordinate",
+              "fullName": "Octane react-window declaration contract: missing-grid-coordinate"
+            },
+            {
+              "id": "types:react-window-adapted:absent-v1-api",
+              "testName": "absent-v1-api",
+              "fullName": "Octane react-window declaration contract: absent-v1-api"
+            }
+          ]
+        },
+        {
+          "path": "packages/window/audit/type-contract.json",
+          "role": "support",
+          "sha256": "15fdc0bd2fc50105b8c4e42399ee6a47be49a3aa8a1e76ea05341c385ff344b0"
+        }
+      ]
+    },
+    {
+      "id": "react-window-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-window-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the same TSX fixture for Octane and React, then byte-compares List and Grid DOM after native scrolling.",
+      "files": [
+        {
+          "path": "packages/window/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "57634fa9ed0c0633d90d648fba9f247005262ee0ed2c099725a27e5bccc9d66e",
+          "cases": [
+            {
+              "id": "differential:react-window-list",
+              "testName": "List renders and scrolls through the same bounded rows",
+              "fullName": "differential: @octanejs/window vs react-window List renders and scrolls through the same bounded rows"
+            },
+            {
+              "id": "differential:react-window-grid",
+              "testName": "Grid renders and scrolls through the same bounded cells",
+              "fullName": "differential: @octanejs/window vs react-window Grid renders and scrolls through the same bounded cells"
+            }
+          ]
+        },
+        {
+          "path": "packages/window/tests/_fixtures/virtualizers.tsrx",
+          "role": "support",
+          "sha256": "4e9170dc2c43dde1832daf39d5297f924b06a192102978711829a21071cdfa86"
+        },
+        {
+          "path": "packages/window/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "6b6079402ebdd644af705f1b88a6302421f509c09355259d856e40bb7f4422e8"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "react-window-component-call-abi",
+      "caseIds": ["runtime:react-window-adapted-048", "runtime:react-window-adapted-049"],
+      "upstreamResult": "React invokes function components with public props and an undefined legacy second argument.",
+      "octaneResult": "Octane invokes compiled components with the same public props and reserves the second argument for its internal block ABI.",
+      "rationale": "The second argument is renderer plumbing, not part of the component's public consumer contract.",
+      "classification": "framework-abi",
+      "consumerImpact": "Mocks that assert the complete raw component invocation tuple observe an Octane internal object as the second argument.",
+      "migrationGuidance": "Assert component props or rendered behavior instead of React's undocumented second invocation argument.",
+      "owner": "@octanejs/window",
+      "reviewCondition": "Review if Octane removes the internal component block argument or React changes its component invocation ABI."
+    },
+    {
+      "id": "react-window-keyed-effect-order",
+      "caseIds": ["runtime:react-window-adapted-004", "runtime:react-window-adapted-054"],
+      "upstreamResult": "React reruns keyed child effects in new visual order, including an unchanged center List row.",
+      "octaneResult": "Octane preserves the same keyed state and DOM identity but may run moved effects in prior block order and memoize an unchanged center row.",
+      "rationale": "Effect scheduling order and equal-prop memoization are renderer-specific while keyed state identity is the public behavior under test.",
+      "classification": "scheduling",
+      "consumerImpact": "Effect-log order and render-count assertions may differ after reversing keyed rows while visible content and state identity remain equal.",
+      "migrationGuidance": "Do not depend on sibling effect ordering or rerenders of equal-prop keyed children; assert identity and final rendered state.",
+      "owner": "@octanejs/window",
+      "reviewCondition": "Review if Octane changes keyed reconciliation or effect scheduling semantics."
+    }
+  ]
+}

@@ -28,6 +28,7 @@ import { RxJSDemo } from './demos/RxJS.tsrx';
 import { RainbowKitDemo } from './demos/RainbowKit.tsrx';
 import { ReactDropzoneDemo } from './demos/ReactDropzone.tsrx';
 import { ReactMarkdownDemo } from './demos/ReactMarkdown.tsrx';
+import { ReactWindowDemo } from './demos/ReactWindow.tsrx';
 import { ShadcnBasesDemo } from './demos/ShadcnBases.tsrx';
 import { SolanaDemo } from './demos/Solana.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
@@ -63,6 +64,7 @@ import rxjsSource from './demos/RxJS.tsrx?raw';
 import rainbowKitSource from './demos/RainbowKit.tsrx?raw';
 import reactDropzoneSource from './demos/ReactDropzone.tsrx?raw';
 import reactMarkdownSource from './demos/ReactMarkdown.tsrx?raw';
+import reactWindowSource from './demos/ReactWindow.tsrx?raw';
 import shadcnSource from './demos/ShadcnBases.tsrx?raw';
 import solanaSource from './demos/Solana.tsrx?raw';
 import suspenseSource from './demos/Suspense.tsrx?raw';
@@ -228,6 +230,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Phosphor Icons',
 				Component: PhosphorIconsDemo,
 				source: phosphorIconsSource,
+			},
+			{
+				id: 'react-window',
+				title: 'react-window',
+				Component: ReactWindowDemo,
+				source: reactWindowSource,
 			},
 			{
 				id: 'solana',

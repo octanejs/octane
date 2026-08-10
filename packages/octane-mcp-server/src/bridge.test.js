@@ -284,6 +284,10 @@ describe('KNOWN_BINDINGS', () => {
 		expect(KNOWN_BINDINGS['react-textarea-autosize']).toBe('@octanejs/textarea-autosize');
 	});
 
+	it('maps react-window to its exact official Octane binding', () => {
+		expect(KNOWN_BINDINGS['react-window']).toBe('@octanejs/window');
+	});
+
 	it('maps Streamdown and every official plugin package to the consolidated binding', () => {
 		const upstreamPackages = [
 			'streamdown',
