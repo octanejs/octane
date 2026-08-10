@@ -1,0 +1,1131 @@
+{
+  "schemaVersion": 1,
+  "publicEntrypoints": [
+    {
+      "path": ".",
+      "octanePath": ".",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./async-batcher",
+      "octanePath": "./async-batcher",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./async-debouncer",
+      "octanePath": "./async-debouncer",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./async-queuer",
+      "octanePath": "./async-queuer",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./async-rate-limiter",
+      "octanePath": "./async-rate-limiter",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./async-retryer",
+      "octanePath": "./async-retryer",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./async-throttler",
+      "octanePath": "./async-throttler",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./batcher",
+      "octanePath": "./batcher",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./debouncer",
+      "octanePath": "./debouncer",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./provider",
+      "octanePath": "./provider",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./queuer",
+      "octanePath": "./queuer",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./rate-limiter",
+      "octanePath": "./rate-limiter",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./throttler",
+      "octanePath": "./throttler",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./types",
+      "octanePath": "./types",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./utils",
+      "octanePath": "./utils",
+      "disposition": "surface-present-unverified"
+    },
+    {
+      "path": "./package.json",
+      "disposition": "metadata-only"
+    }
+  ],
+  "exports": [
+    {
+      "name": "* from @tanstack/pacer",
+      "kind": "star-reexport",
+      "entrypoint": ".",
+      "source": "upstream/package/src/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "PacerProvider",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "PacerProviderOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "PacerProviderProps",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncBatcher",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-batcher/useAsyncBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncBatcherOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-batcher/useAsyncBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncDebouncer",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncDebouncerOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncQueuer",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncQueuerOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncRateLimiter",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncRateLimiterOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncThrottler",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactAsyncThrottlerOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactBatcher",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/batcher/useBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactBatcherOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/batcher/useBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactDebouncer",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/debouncer/useDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactDebouncerOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/debouncer/useDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactQueuer",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/queuer/useQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactQueuerOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/queuer/useQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactRateLimiter",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/rate-limiter/useRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactRateLimiterOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/rate-limiter/useRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactThrottler",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/throttler/useThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "ReactThrottlerOptions",
+      "kind": "type",
+      "entrypoint": ".",
+      "source": "upstream/package/src/throttler/useThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncBatchedCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-batcher/useAsyncBatchedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncBatcher",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-batcher/useAsyncBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncDebouncedCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncDebouncer",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncQueuedState",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuedState.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncQueuer",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncRateLimitedCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncRateLimiter",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncThrottledCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottledCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useAsyncThrottler",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useBatchedCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/batcher/useBatchedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useBatcher",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/batcher/useBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useDebouncedCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/debouncer/useDebouncedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useDebouncedState",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/debouncer/useDebouncedState.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useDebouncedValue",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/debouncer/useDebouncedValue.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useDebouncer",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/debouncer/useDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useDefaultPacerOptions",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "usePacerContext",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useQueuedState",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/queuer/useQueuedState.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useQueuedValue",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/queuer/useQueuedValue.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useQueuer",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/queuer/useQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useRateLimitedCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/rate-limiter/useRateLimitedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useRateLimitedState",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/rate-limiter/useRateLimitedState.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useRateLimitedValue",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/rate-limiter/useRateLimitedValue.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useRateLimiter",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/rate-limiter/useRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useThrottledCallback",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/throttler/useThrottledCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useThrottledState",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/throttler/useThrottledState.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useThrottledValue",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/throttler/useThrottledValue.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "useThrottler",
+      "kind": "value",
+      "entrypoint": ".",
+      "source": "upstream/package/src/throttler/useThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+      "note": "Also published from the package root entrypoint."
+    },
+    {
+      "name": "* from @tanstack/pacer/async-batcher",
+      "kind": "star-reexport",
+      "entrypoint": "./async-batcher",
+      "source": "upstream/package/src/async-batcher/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactAsyncBatcher",
+      "kind": "type",
+      "entrypoint": "./async-batcher",
+      "source": "upstream/package/src/async-batcher/useAsyncBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactAsyncBatcherOptions",
+      "kind": "type",
+      "entrypoint": "./async-batcher",
+      "source": "upstream/package/src/async-batcher/useAsyncBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncBatchedCallback",
+      "kind": "value",
+      "entrypoint": "./async-batcher",
+      "source": "upstream/package/src/async-batcher/useAsyncBatchedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncBatcher",
+      "kind": "value",
+      "entrypoint": "./async-batcher",
+      "source": "upstream/package/src/async-batcher/useAsyncBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/async-debouncer",
+      "kind": "star-reexport",
+      "entrypoint": "./async-debouncer",
+      "source": "upstream/package/src/async-debouncer/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactAsyncDebouncer",
+      "kind": "type",
+      "entrypoint": "./async-debouncer",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactAsyncDebouncerOptions",
+      "kind": "type",
+      "entrypoint": "./async-debouncer",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncDebouncedCallback",
+      "kind": "value",
+      "entrypoint": "./async-debouncer",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncDebouncer",
+      "kind": "value",
+      "entrypoint": "./async-debouncer",
+      "source": "upstream/package/src/async-debouncer/useAsyncDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/async-queuer",
+      "kind": "star-reexport",
+      "entrypoint": "./async-queuer",
+      "source": "upstream/package/src/async-queuer/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactAsyncQueuer",
+      "kind": "type",
+      "entrypoint": "./async-queuer",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactAsyncQueuerOptions",
+      "kind": "type",
+      "entrypoint": "./async-queuer",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncQueuedState",
+      "kind": "value",
+      "entrypoint": "./async-queuer",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuedState.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncQueuer",
+      "kind": "value",
+      "entrypoint": "./async-queuer",
+      "source": "upstream/package/src/async-queuer/useAsyncQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/async-rate-limiter",
+      "kind": "star-reexport",
+      "entrypoint": "./async-rate-limiter",
+      "source": "upstream/package/src/async-rate-limiter/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactAsyncRateLimiter",
+      "kind": "type",
+      "entrypoint": "./async-rate-limiter",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactAsyncRateLimiterOptions",
+      "kind": "type",
+      "entrypoint": "./async-rate-limiter",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncRateLimitedCallback",
+      "kind": "value",
+      "entrypoint": "./async-rate-limiter",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncRateLimiter",
+      "kind": "value",
+      "entrypoint": "./async-rate-limiter",
+      "source": "upstream/package/src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/async-retryer",
+      "kind": "star-reexport",
+      "entrypoint": "./async-retryer",
+      "source": "upstream/package/src/async-retryer/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "* from @tanstack/pacer/async-throttler",
+      "kind": "star-reexport",
+      "entrypoint": "./async-throttler",
+      "source": "upstream/package/src/async-throttler/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactAsyncThrottler",
+      "kind": "type",
+      "entrypoint": "./async-throttler",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactAsyncThrottlerOptions",
+      "kind": "type",
+      "entrypoint": "./async-throttler",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncThrottledCallback",
+      "kind": "value",
+      "entrypoint": "./async-throttler",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottledCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useAsyncThrottler",
+      "kind": "value",
+      "entrypoint": "./async-throttler",
+      "source": "upstream/package/src/async-throttler/useAsyncThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/batcher",
+      "kind": "star-reexport",
+      "entrypoint": "./batcher",
+      "source": "upstream/package/src/batcher/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactBatcher",
+      "kind": "type",
+      "entrypoint": "./batcher",
+      "source": "upstream/package/src/batcher/useBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactBatcherOptions",
+      "kind": "type",
+      "entrypoint": "./batcher",
+      "source": "upstream/package/src/batcher/useBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useBatchedCallback",
+      "kind": "value",
+      "entrypoint": "./batcher",
+      "source": "upstream/package/src/batcher/useBatchedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useBatcher",
+      "kind": "value",
+      "entrypoint": "./batcher",
+      "source": "upstream/package/src/batcher/useBatcher.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "note": "Exercised by the representative differential lifecycle."
+    },
+    {
+      "name": "* from @tanstack/pacer/debouncer",
+      "kind": "star-reexport",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactDebouncer",
+      "kind": "type",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/useDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactDebouncerOptions",
+      "kind": "type",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/useDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useDebouncedCallback",
+      "kind": "value",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/useDebouncedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "note": "Exercised by the representative differential lifecycle."
+    },
+    {
+      "name": "useDebouncedState",
+      "kind": "value",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/useDebouncedState.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Uses local Dispatch/SetStateAction aliases; covered by ordinary typetests/octane-only setter probe."
+    },
+    {
+      "name": "useDebouncedValue",
+      "kind": "value",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/useDebouncedValue.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Uses local Dispatch/SetStateAction aliases; covered by ordinary typetests/octane-only setter probe."
+    },
+    {
+      "name": "useDebouncer",
+      "kind": "value",
+      "entrypoint": "./debouncer",
+      "source": "upstream/package/src/debouncer/useDebouncer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "PacerProvider",
+      "kind": "value",
+      "entrypoint": "./provider",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "PacerProviderOptions",
+      "kind": "type",
+      "entrypoint": "./provider",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "PacerProviderProps",
+      "kind": "type",
+      "entrypoint": "./provider",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useDefaultPacerOptions",
+      "kind": "value",
+      "entrypoint": "./provider",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "usePacerContext",
+      "kind": "value",
+      "entrypoint": "./provider",
+      "source": "upstream/package/src/provider/PacerProvider.tsx",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/queuer",
+      "kind": "star-reexport",
+      "entrypoint": "./queuer",
+      "source": "upstream/package/src/queuer/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactQueuer",
+      "kind": "type",
+      "entrypoint": "./queuer",
+      "source": "upstream/package/src/queuer/useQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactQueuerOptions",
+      "kind": "type",
+      "entrypoint": "./queuer",
+      "source": "upstream/package/src/queuer/useQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useQueuedState",
+      "kind": "value",
+      "entrypoint": "./queuer",
+      "source": "upstream/package/src/queuer/useQueuedState.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useQueuedValue",
+      "kind": "value",
+      "entrypoint": "./queuer",
+      "source": "upstream/package/src/queuer/useQueuedValue.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useQueuer",
+      "kind": "value",
+      "entrypoint": "./queuer",
+      "source": "upstream/package/src/queuer/useQueuer.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/rate-limiter",
+      "kind": "star-reexport",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactRateLimiter",
+      "kind": "type",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/useRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactRateLimiterOptions",
+      "kind": "type",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/useRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useRateLimitedCallback",
+      "kind": "value",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/useRateLimitedCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useRateLimitedState",
+      "kind": "value",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/useRateLimitedState.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Uses local Dispatch/SetStateAction aliases; covered by ordinary typetests/octane-only setter probe."
+    },
+    {
+      "name": "useRateLimitedValue",
+      "kind": "value",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/useRateLimitedValue.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Uses local Dispatch/SetStateAction aliases; covered by ordinary typetests/octane-only setter probe."
+    },
+    {
+      "name": "useRateLimiter",
+      "kind": "value",
+      "entrypoint": "./rate-limiter",
+      "source": "upstream/package/src/rate-limiter/useRateLimiter.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/throttler",
+      "kind": "star-reexport",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "ReactThrottler",
+      "kind": "type",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/useThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "ReactThrottlerOptions",
+      "kind": "type",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/useThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "useThrottledCallback",
+      "kind": "value",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/useThrottledCallback.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "note": "Exercised by the representative differential lifecycle."
+    },
+    {
+      "name": "useThrottledState",
+      "kind": "value",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/useThrottledState.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Uses local Dispatch/SetStateAction aliases; covered by ordinary typetests/octane-only setter probe."
+    },
+    {
+      "name": "useThrottledValue",
+      "kind": "value",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/useThrottledValue.ts",
+      "disposition": "adapted-divergence",
+      "evidence": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "note": "Uses local Dispatch/SetStateAction aliases; covered by ordinary typetests/octane-only setter probe."
+    },
+    {
+      "name": "useThrottler",
+      "kind": "value",
+      "entrypoint": "./throttler",
+      "source": "upstream/package/src/throttler/useThrottler.ts",
+      "disposition": "surface-present-unverified",
+      "evidence": "packages/tanstack-pacer/audit/upstream-crosswalk.json"
+    },
+    {
+      "name": "* from @tanstack/pacer/types",
+      "kind": "star-reexport",
+      "entrypoint": "./types",
+      "source": "upstream/package/src/types/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    },
+    {
+      "name": "* from @tanstack/pacer/utils",
+      "kind": "star-reexport",
+      "entrypoint": "./utils",
+      "source": "upstream/package/src/utils/index.ts",
+      "disposition": "reused-byte-identically",
+      "evidence": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "note": "Framework-neutral @tanstack/pacer@0.21.1 re-export; Octane reuses the same package identity."
+    }
+  ],
+  "expectedTotals": {
+    "exports": 118,
+    "adapterValues": 60,
+    "adapterTypes": 44,
+    "coreStarReexports": 14
+  },
+  "coreReexport": {
+    "package": "@tanstack/pacer",
+    "version": "0.21.1",
+    "disposition": "reused-byte-identically"
+  },
+  "upstreamTests": [],
+  "typeSuite": {
+    "disposition": "compile-only",
+    "reason": "Upstream test:types runs tsc over package source with no dedicated assertion files. Pristine and adapted compile lanes inventory that accept evidence; setter-type accept/reject assertions cover the documented adaptation.",
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
+      "inventory": "packages/tanstack-pacer/audit/upstream-types.json"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/tanstack-pacer/typetests/adapted/tsconfig.json",
+      "inventory": "packages/tanstack-pacer/audit/adapted-types.json"
+    }
+  }
+}

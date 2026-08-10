@@ -48,6 +48,7 @@ import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
 import { verifyVisxTypes } from './visx-types-lib.mjs';
 import { verifyMotionTypes } from './motion-types-lib.mjs';
 import { verifyNuqsTypes } from './nuqs-types-lib.mjs';
+import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -196,6 +197,9 @@ try {
 	verifyNuqsTypes(REPO);
 } catch (error) {
 	errors.push(`@octanejs/nuqs type evidence is invalid: ${error.message}`);
+	verifyTanstackPacerTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/tanstack-pacer type evidence is invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTestClassifications(REPO);

@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "types": ["node"],
+    "paths": {
+      "@octanejs/tanstack-pacer": ["../../src/index.ts"],
+      "@octanejs/tanstack-pacer/*": ["../../src/*/index.ts"],
+      "@octanejs/tanstack-store": ["../../../tanstack-store/src/index.ts"],
+      "octane": ["../../../octane/src/index.ts"]
+    }
+  },
+  "include": ["../../src/**/*.ts", "../../src/**/*.tsrx"]
+}

@@ -21,7 +21,7 @@
  *     rig diff-asserts `i.container.innerHTML === r.container.innerHTML`
  *     after a brief normalisation pass.
  */
-import { expect } from 'vitest';
+import { expect, vi } from 'vitest';
 import {
 	createRoot as octaneCreateRoot,
 	flushSync as octaneFlushSync,
@@ -469,9 +469,16 @@ export async function mountDifferential(
 		// Drain React commits + effects, including external stores that chain work
 		// from a renderer-completion promise. Keeping one macrotask inside act()
 		// gives those promise continuations a chance to enqueue their final commit
-		// without escaping React's test boundary.
+		// without escaping React's test boundary. When Vitest fake timers are
+		// active, flush the 0-delay timer explicitly so the await can resolve.
 		await reactAct(async () => {
-			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			const wait = new Promise<void>(function (resolve) {
+				setTimeout(resolve, 0);
+			});
+			if (typeof vi.isFakeTimers === 'function' && vi.isFakeTimers()) {
+				await vi.advanceTimersByTimeAsync(0);
+			}
+			await wait;
 		});
 	}
 

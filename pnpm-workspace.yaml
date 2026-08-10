@@ -125,6 +125,11 @@ packageExtensions:
       '@rspack/core': 2.1.3
 
 catalogs:
+  tanstack-pacer-react-oracle:
+    '@types/react': 19.2.17
+    '@types/react-dom': 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
   livestore-react-oracle:
     '@livestore/utils-dev': 0.4.0
     '@opentelemetry/sdk-trace-base': 2.2.0
