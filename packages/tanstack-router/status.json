@@ -6,11 +6,12 @@
     "Link callbacks receive native DOM events rather than React synthetic events.",
     "Router devtools are distributed separately."
   ],
-  "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by retained upstream conformance tests.",
-  "verified": "2026-07-21",
+  "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by Octane-only framework-contract tests in ordinary shards (not a React SSR oracle).",
+  "verified": "2026-08-02",
   "notes": [
     "The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.",
-    "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator."
+    "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator.",
+    "React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately."
   ],
   "docs": ["docs/tanstack-parity-audit.md"]
 }

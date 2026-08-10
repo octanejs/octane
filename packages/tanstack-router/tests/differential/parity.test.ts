@@ -17,6 +17,7 @@ const CACHE = resolve(__dirname, '.react-cache');
 const settle = () => new Promise((r) => setTimeout(r, 25));
 
 describe('differential: @octanejs/tanstack-router vs real @tanstack/react-router', () => {
+	// @parity-case differential:tanstack-router-initial
 	it('initial load renders byte-identical layout + index route + link states', async () => {
 		const d = await mountDifferential(FIXTURE, 'BasicApp', undefined, CACHE);
 		await d.step('mount + load', async () => {
@@ -25,6 +26,7 @@ describe('differential: @octanejs/tanstack-router vs real @tanstack/react-router
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-router-navigation
 	it('Link navigation: index → about → params route → back to index', async () => {
 		const d = await mountDifferential(FIXTURE, 'BasicApp', undefined, CACHE);
 		await d.step('mount + load', async () => {
@@ -48,6 +50,7 @@ describe('differential: @octanejs/tanstack-router vs real @tanstack/react-router
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-router-not-found
 	it('unknown URL renders the notFoundComponent identically inside the layout', async () => {
 		const d = await mountDifferential(
 			FIXTURE,

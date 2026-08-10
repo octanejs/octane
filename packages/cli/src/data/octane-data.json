@@ -809,7 +809,7 @@
         "Router devtools are distributed separately."
       ],
       "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by retained upstream conformance tests.",
-      "verified": "2026-07-21"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",

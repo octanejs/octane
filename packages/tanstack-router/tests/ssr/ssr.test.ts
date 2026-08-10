@@ -1,5 +1,3 @@
-// @vitest-environment node
-
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'octane/server';
 import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
@@ -10,6 +8,7 @@ import { makeSsrRouter } from '../_fixtures/ssr.tsrx';
 describe('@octanejs/tanstack-router SSR', () => {
 	// Per TanStack/router PR #7847 snapshot 753f919e,
 	// packages/octane-router/tests/conformance/ssr.test.ts:14.
+	// @parity-case adapted:tanstack-router-ssr
 	it('renders the route-owned document and app mount boundary', async () => {
 		const router = makeSsrRouter();
 		attachRouterServerSsrUtils({ router, manifest: undefined });
@@ -100,6 +99,7 @@ describe('@octanejs/tanstack-router SSR', () => {
 
 	// Per TanStack/router PR #7847 snapshot 753f919e,
 	// packages/octane-router/tests/conformance/ssr.test.ts:52.
+	// @parity-case adapted:tanstack-router-ssr-scroll
 	it('emits the pre-hydration scroll restoration script when enabled', async () => {
 		const router = makeSsrRouter({ scrollRestoration: true });
 		attachRouterServerSsrUtils({ router, manifest: undefined });
@@ -119,27 +119,35 @@ describe('@octanejs/tanstack-router SSR', () => {
 
 	// Per TanStack/router PR #7847 snapshot 753f919e,
 	// packages/octane-router/tests/conformance/ssr.test.ts:71.
-	it.each([false, 'data-only'] as const)(
-		'does not render route UI when ssr is %s',
-		async (routeSsr) => {
-			const router = makeSsrRouter({ routeSsr });
-			attachRouterServerSsrUtils({ router, manifest: undefined });
-			await router.load();
-			await router.serverSsr.dehydrate();
+	async function assertSsrDisabledRouteUi(routeSsr: false | 'data-only') {
+		const router = makeSsrRouter({ routeSsr });
+		attachRouterServerSsrUtils({ router, manifest: undefined });
+		await router.load();
+		await router.serverSsr.dehydrate();
 
-			const response = await renderRouterToString({
-				router,
-				responseHeaders: new Headers({ 'content-type': 'text/html' }),
-				App: RouterServer,
-			});
+		const response = await renderRouterToString({
+			router,
+			responseHeaders: new Headers({ 'content-type': 'text/html' }),
+			App: RouterServer,
+		});
 
-			expect(await response.text()).not.toContain('Rendered on the server');
-		},
-	);
+		expect(await response.text()).not.toContain('Rendered on the server');
+	}
+
+	// @parity-case adapted:tanstack-router-ssr-disabled-false
+	it('does not render route UI when ssr is false', async () => {
+		await assertSsrDisabledRouteUi(false);
+	});
+
+	// @parity-case adapted:tanstack-router-ssr-disabled-data-only
+	it('does not render route UI when ssr is data-only', async () => {
+		await assertSsrDisabledRouteUi('data-only');
+	});
 
 	// Per TanStack/router PR #7847 snapshot 753f919e,
 	// packages/octane-router/tests/conformance/ssr.test.ts:90, as retained by
 	// the native StreamOptions.injection patch in this repository.
+	// @parity-case adapted:tanstack-router-ssr-stream
 	it('places shell styles inside the route-owned head when streaming', async () => {
 		const router = makeSsrRouter();
 		attachRouterServerSsrUtils({ router, manifest: undefined });

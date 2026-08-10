@@ -8,9 +8,26 @@ import {
 	createLink,
 } from '@octanejs/tanstack-router';
 
+let lastLinkEvent: Event | undefined;
+let lastLinkRef: HTMLAnchorElement | undefined;
+
+export function resetLinkEvidence() {
+	lastLinkEvent = undefined;
+	lastLinkRef = undefined;
+}
+
+export function getLinkEvidence() {
+	return { event: lastLinkEvent, ref: lastLinkRef };
+}
+
 function RootLayout() @{
 	<div class="root">
 		<nav>
+			<Link
+				to="/about"
+				class="l-evidence"
+				onClick={(event) => (lastLinkEvent = event)}
+			>{'Evidence'}</Link>
 			<Link to="/" class="l-home">{'Home'}</Link>
 			<Link to="/about" class="l-about">{'About'}</Link>
 			<Link to="/about-us" class="l-about-us">{'About us'}</Link>
@@ -45,7 +62,11 @@ export const FancyLink = createLink(FancyAnchor);
 
 function CreateLinkPage() @{
 	<div class="cl-page">
-		<FancyLink to="/about" class="l-fancy">{'Fancy'}</FancyLink>
+		<FancyLink
+			to="/about"
+			class="l-fancy"
+			ref={(node) => (lastLinkRef = node)}
+		>{'Fancy'}</FancyLink>
 	</div>
 }
 

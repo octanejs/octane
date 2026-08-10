@@ -3328,9 +3328,37 @@ export default defineConfig({
 				},
 			},
 			{
+				// Ordinary package shards: conformance, divergences, and harness negatives.
+				// Only the differential project is react-parity-owned.
 				test: {
 					name: 'tanstack-router',
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					exclude: [
+						'packages/tanstack-router/tests/differential/**/*.test.ts',
+						'packages/tanstack-router/tests/ssr/**/*.test.ts',
+					],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-differential',
+					include: ['packages/tanstack-router/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					// Differential precompile for router fixtures: rewrites
 					// `@octanejs/tanstack-router` → `@tanstack/react-router` so the React side
@@ -3341,6 +3369,32 @@ export default defineConfig({
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Octane-only Node SSR framework contract; not a React SSR oracle.
+				test: {
+					name: 'tanstack-router-ssr',
+					include: ['packages/tanstack-router/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
 						{
 							find: /^@octanejs\/tanstack-router$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
