@@ -296,6 +296,54 @@ describe('focus and text selection survive DOM updates', () => {
 		}
 	});
 
+	it.each([1, 2])('restores focus and selection inside %i open shadow roots', (depth) => {
+		const host = document.createElement('section');
+		document.body.appendChild(host);
+		let shadow = host.attachShadow({ mode: 'open' });
+		for (let level = 1; level < depth; level++) {
+			const nestedHost = document.createElement('section');
+			shadow.appendChild(nestedHost);
+			shadow = nestedHost.attachShadow({ mode: 'open' });
+		}
+		const container = document.createElement('div');
+		shadow.appendChild(container);
+		const root = createRoot(container);
+		root.render(FastHostControlledList, { items: rows });
+		flushSync(() => {});
+		const input = container.querySelectorAll('input')[1]!;
+		input.focus();
+		input.setSelectionRange(2, 9);
+		expect(shadow.activeElement).toBe(input);
+		const parent = container.querySelector('#fast-host-controlled-list')!;
+		const originalInsert = parent.insertBefore;
+		let lostFocus = false;
+		const move = vi.spyOn(parent, 'insertBefore').mockImplementation(function <T extends Node>(
+			node: T,
+			anchor: Node | null,
+		): T {
+			const result = originalInsert.call(this, node, anchor) as T;
+			if (!lostFocus) {
+				input.blur();
+				input.setSelectionRange(0, 0);
+				lostFocus = shadow.activeElement !== input;
+			}
+			return result;
+		});
+		try {
+			flushSync(() => root.render(FastHostControlledList, { items: rows.toReversed() }));
+
+			expect(lostFocus).toBe(true);
+			expect(container.querySelectorAll('input')[2]).toBe(input);
+			expect(document.activeElement).toBe(host);
+			expect(shadow.activeElement).toBe(input);
+			expect([input.selectionStart, input.selectionEnd]).toEqual([2, 9]);
+		} finally {
+			move.mockRestore();
+			root.unmount();
+			host.remove();
+		}
+	});
+
 	it('restores focus to a moved content-editable host with an active selection', () => {
 		const rendered = mount(EditableRows, { items: rows });
 		try {

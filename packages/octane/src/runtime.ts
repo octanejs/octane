@@ -3148,7 +3148,7 @@ function restoreFocusSelection(snapshot: FocusSelectionSnapshot | null): void {
 	if (snapshot === null) return;
 	const { focused } = snapshot;
 	const doc = focused.ownerDocument;
-	if (activeElementForDocument(doc) === focused || !doc.documentElement.contains(focused)) return;
+	if (activeElementForDocument(doc) === focused || !focused.isConnected) return;
 	if (snapshot.start !== -1) {
 		if (snapshot.contentEditable) {
 			const selection = doc.getSelection();

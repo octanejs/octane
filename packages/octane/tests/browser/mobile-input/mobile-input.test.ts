@@ -160,6 +160,61 @@ describe.sequential('real-browser mobile input continuity', () => {
 	);
 
 	it.each([
+		{ kind: 'compiled' as const, id: 2 },
+		{ kind: 'descriptor' as const, id: 3 },
+	])('restores a blurred $kind shadow-root editor and its selection', async ({ kind, id }) => {
+		const current = await openCase(true, true);
+		const restored = await current.evaluate(
+			({ listKind, focusedId }) => {
+				window.__mobileInput.mount(listKind, focusedId, true);
+				const host = document.querySelector<HTMLElement>('#shadow-host')!;
+				const shadow = host.shadowRoot!;
+				const input =
+					listKind === 'compiled'
+						? shadow.querySelector<HTMLInputElement>('.nested-conditional-editor')!
+						: shadow.querySelector<HTMLInputElement>(`[data-row="${focusedId}"]`)!;
+				input.focus();
+				input.setSelectionRange(2, 9);
+				const parent = shadow.querySelector(
+					listKind === 'compiled' ? '#nested-conditional-list' : '#descriptor-rows',
+				)!;
+				const originalInsert = parent.insertBefore;
+				let lostFocus = false;
+				parent.insertBefore = function <T extends Node>(node: T, anchor: Node | null): T {
+					const result = originalInsert.call(this, node, anchor) as T;
+					if (!lostFocus) {
+						input.blur();
+						input.setSelectionRange(0, 0);
+						lostFocus = shadow.activeElement !== input;
+					}
+					return result;
+				};
+				try {
+					return {
+						...window.__mobileInput.reverse(),
+						lostFocus,
+						documentFocused: document.activeElement === host,
+					};
+				} finally {
+					parent.insertBefore = originalInsert;
+				}
+			},
+			{ listKind: kind, focusedId: id },
+		);
+
+		expect(restored).toMatchObject({
+			order: [4, 3, 2, 1],
+			lostFocus: true,
+			documentFocused: true,
+			focused: true,
+			connected: true,
+			same: true,
+			selection: [2, 9],
+		});
+		expect(restored.interruptions).toEqual(['blur', 'focusout']);
+	});
+
+	it.each([
 		{ name: 'touchstart' as const, capture: false },
 		{ name: 'touchstart' as const, capture: true },
 		{ name: 'touchmove' as const, capture: false },
