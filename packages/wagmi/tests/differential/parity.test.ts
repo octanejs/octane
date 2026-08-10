@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import {
-	mountDifferential,
-	type DiffMount,
-} from '../../../octane/tests/differential/_rig.js';
+import { mountDifferential, type DiffMount } from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/parity.tsrx');
 const cache = resolve(__dirname, '.react-cache');

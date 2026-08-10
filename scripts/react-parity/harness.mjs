@@ -86,7 +86,10 @@ if (action === 'validate') {
 				child.on('error', reject);
 				child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
 			});
-			if (exitCode !== 0) process.exit(exitCode);
+			if (exitCode !== 0) {
+				if (stdout) process.stderr.write(stdout);
+				process.exit(exitCode);
+			}
 		}
 		verifyLaneRunResult(lane, stdout, root);
 	}

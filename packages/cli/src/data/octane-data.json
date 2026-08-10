@@ -349,7 +349,7 @@
         "The React package's SSR namespace is unnecessary because Octane icons use the same components on client and server."
       ],
       "ssr": "Supported and tested against @phosphor-icons/react/ssr for every weight; hydration adopts and updates server-rendered SVG hosts.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/radix",
@@ -378,7 +378,7 @@
         "rainbowTheme is an explicitly documented Octane-only purple/rounded preset; it is not an upstream RainbowKit export."
       ],
       "ssr": "The provider and controls emit deterministic disconnected markup without browser wallet access. Connector discovery and live Wagmi state become authoritative after hydration; no hydrated UI state authorizes wallet actions.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/react-error-boundary",
@@ -818,7 +818,7 @@
         "Public setter types are structurally equivalent to React Dispatch/SetStateAction without importing React types."
       ],
       "ssr": "Supported for the listed cohort. Effects and timers do not run during server rendering; hydration activates lifecycle and timing work without requiring browser reads during render.",
-      "verified": "2026-07-29"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/valtio",

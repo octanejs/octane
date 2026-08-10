@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "1d8f1420afbf3e32c2ecc7c12a159167d0cd37303db26dea5f4bcf5872d91fae"
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
     }
   },
   "lanes": [
@@ -70,7 +70,7 @@
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "e02bfba644d9be83df2fa541c74051079f3394ae8bd328bc19882f2db31a9a28"
+          "sha256": "ae1b744b96e0e1996d4acba2fb8a24ffa1147805e4aabb6b889f34de790a1b6c"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-pristine.vitest.config.ts",
@@ -207,7 +207,7 @@
         {
           "path": "packages/tanstack-hotkeys/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "53ff1ec34139b367d5c0ad01f70e27ceed40c74846287a9d4536b378d6d51a4f",
+          "sha256": "bc4dfc1d3a47aec6a5ba85bbeebb4441ff9818a606ad770ee59214d500fb1052",
           "cases": [
             {
               "id": "differential:tanstack-hotkeys-keyboard-lifecycle",
@@ -224,7 +224,7 @@
         {
           "path": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys-diff.tsrx",
           "role": "support",
-          "sha256": "1dbacd017f141037898426eac4f644cbd1b284f743be091f1ab2517dc4af7e11"
+          "sha256": "24386b24df08d080b3705ffcccd6a2f3456c003ee63d50a6cf0f8bd33b959421"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -234,7 +234,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "e731d56e03979da8be5f48b31d9b8aa7ff2881f87db1ac86239db278d286efbe"
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
         }
       ]
     }

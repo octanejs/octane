@@ -35,32 +35,26 @@ export function HotkeysParity() {
 		],
 		{ target: rootRef },
 	);
-	useHotkeySequence(
-		['G', 'G'],
-		function onSequence() {
-			setSequence(function increment(value: number) {
-				return value + 1;
-			});
-		},
-		{ target: rootRef },
-	);
+	useHotkeySequence(['G', 'G'], function onSequence() {
+		setSequence(function increment(value: number) {
+			return value + 1;
+		});
+	}, { target: rootRef });
 
-	return (
-		<main id="hotkeys-parity" ref={rootRef}>
-			<button
-				id="toggle"
-				onClick={function onToggle() {
-					setEnabled(function toggle(value: boolean) {
-						return !value;
-					});
-				}}
-			>
-				{'enabled:' + enabled}
-			</button>
-			<output id="single">{'single:' + single}</output>
-			<output id="first">{'first:' + first}</output>
-			<output id="second">{'second:' + second}</output>
-			<output id="sequence">{'sequence:' + sequence}</output>
-		</main>
-	);
+	return <main id="hotkeys-parity" ref={rootRef}>
+		<button
+			id="toggle"
+			onClick={function onToggle() {
+				setEnabled(function toggle(value: boolean) {
+					return !value;
+				});
+			}}
+		>
+			{'enabled:' + enabled}
+		</button>
+		<output id="single">{'single:' + single}</output>
+		<output id="first">{'first:' + first}</output>
+		<output id="second">{'second:' + second}</output>
+		<output id="sequence">{'sequence:' + sequence}</output>
+	</main>;
 }

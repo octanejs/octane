@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/jotai/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
+      "roots": ["packages/jotai/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/jotai/tests"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/jotai/tests"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "7197f3e0d5509ad99f0f18b45536bfb3fca68c958f9d8c11010732d7c727a324"
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
     }
   },
   "lanes": [
@@ -64,7 +56,7 @@
         {
           "path": "packages/jotai/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "03430ba2836374e91f0624ac9eeaeb91a0610b4227a3472e8efd9611c00f08d2",
+          "sha256": "5dd6a651f9e1461afa1442963500108d28cde7693f7efb3ca1542fbaacc0b0db",
           "cases": [
             {
               "id": "differential:jotai-counter",
@@ -111,7 +103,7 @@
         {
           "path": "packages/jotai/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "aec55dc61725515bec29ba4235c178d2efdb044cbf03504c7e1c48f64ecef276"
+          "sha256": "4ed8564d86835eef591614bb4594d6bb416c178d51f389b07bf4bc25d3fca73a"
         },
         {
           "path": "packages/jotai/audit/test-classifications.json",
@@ -126,7 +118,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "a993e974e43ba3deae97667b68fe9eccc4f1ded543e93e8a92c58df652774158"
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
         }
       ]
     }

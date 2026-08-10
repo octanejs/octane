@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/rainbowkit/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/rainbowkit/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/rainbowkit/tests/differential"
-      ],
-      "include": [
-        "\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/rainbowkit/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5316200f0e89da100ee313c7c7372eeac2bd44ad60fcfb304b1f7996a07dede1"
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
     }
   },
   "lanes": [
@@ -91,7 +83,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d224fdd39c80a78227604dda8dbdda02364ae0c7270006c5454ec0bc44cf9fa8"
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
         }
       ]
     }

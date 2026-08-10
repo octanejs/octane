@@ -107,7 +107,6 @@ function compileFixture(srcPath: string): void {
 	writeFileSync(outFile, rewritten);
 }
 
-
 function walk(directory: string): string[] {
 	const files: string[] = [];
 	for (const name of readdirSync(directory)) {

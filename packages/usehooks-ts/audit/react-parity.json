@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/usehooks-ts/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/usehooks-ts/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/usehooks-ts/tests/differential"
-      ],
-      "include": [
-        "\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/usehooks-ts/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "69a513f2ba73540358146c882972223ad3caed4e9dd9d3280961128751c2044d"
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
     }
   },
   "lanes": [
@@ -91,7 +83,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "07dcbc8521e0bd4aa6270ff446594964b8a98bdc0437a3ba96a64a7b7504cb79"
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
         }
       ]
     }

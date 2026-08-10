@@ -107,9 +107,7 @@ function ContextReader() @{
 
 	<main id="context-probe">
 		<output id="has-context">{String(context !== null) as string}</output>
-		<output id="default-enabled">
-			{String(defaults.hotkey?.enabled === false) as string}
-		</output>
+		<output id="default-enabled">{String(defaults.hotkey?.enabled === false) as string}</output>
 	</main>
 }
 

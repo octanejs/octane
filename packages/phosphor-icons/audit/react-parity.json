@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/phosphor-icons/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/phosphor-icons/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/phosphor-icons/tests/differential"
-      ],
-      "include": [
-        "\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/phosphor-icons/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "adec1b757d1429e85099ae71a8bb213a6a049ffb40d8500be5a930c0f79f8eff"
+      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
     }
   },
   "lanes": [
@@ -91,7 +83,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "54dc364c6f14ef6167f25481fa17d5ddbec31d9c6df714a17129932b96ee7fec"
+          "sha256": "70f1fe350c43ed3e89b8ac71567b150db64c4ea2c517f7114ce3389caab9360d"
         }
       ]
     }

@@ -12,7 +12,7 @@ import {
 } from './inventory-lib.mjs';
 import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
-import { verifyPortTestClassifications } from './hook-form-classifications-lib.mjs';
+import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';

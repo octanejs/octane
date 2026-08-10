@@ -289,10 +289,7 @@ describe('CI workflow aggregation', () => {
 		// The manifest runner owns all required lanes in one process for both
 		// verification states. recorded-unverified limits the claim, not execution.
 		assert.doesNotMatch(reactParityCheck, /provenance\.verification/);
-		assert.match(
-			reactParityCheck,
-			/if \(!validateOnly\) \{\s+runRequiredBindingLanes\(\{/,
-		);
+		assert.match(reactParityCheck, /if \(!validateOnly\) \{\s+runRequiredBindingLanes\(\{/);
 		assert.match(
 			reactParityCheckLib,
 			/\[harnessPath, 'run-required', '--manifest', relativeFile\]/,
