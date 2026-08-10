@@ -392,6 +392,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 			binding !== 'livestore' &&
 			binding !== 'tanstack-table' &&
 		// Livestore has its own disposition set; verified above via verifyLivestore*.
+		// livestore keeps a binding-specific classifier (different dispositions);
+		// other bindings with classifications use the shared verifier.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))

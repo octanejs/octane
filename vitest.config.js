@@ -522,9 +522,46 @@ export default defineConfig({
 				},
 			},
 			{
+				// All zustand conformance (including the unstable-selector divergence)
+				// stays in ordinary shards; only differential parity.test.ts is
+				// react-parity-owned.
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					exclude: ['packages/zustand/tests/differential/**/*.test.ts'],
+					// Same differential precompile, but for zustand fixtures: also rewrites
+					// `@octanejs/zustand` → `zustand` so the React side runs real zustand.
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/zustand` is the package under test; alias the public name
+				// (and its subpaths) to source so fixtures import it exactly as a consumer
+				// would (and the differential React side rewrites the same specifiers to
+				// `zustand`). Regex aliases so `@octanejs/zustand/shallow` → src/shallow.ts
+				// without the bare entry's file path swallowing the subpath.
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/zustand$/,
+							replacement: resolve(import.meta.dirname, 'packages/zustand/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/zustand\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// parity.test.ts is parity-owned; setup.test.ts stays ordinary CI.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/zustand/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'zustand-differential',
+					include: ['packages/zustand/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					// Same differential precompile, but for zustand fixtures: also rewrites
 					// `@octanejs/zustand` → `zustand` so the React side runs real zustand.

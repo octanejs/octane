@@ -17,6 +17,7 @@ const MULTISTORE = resolve(__dirname, '../_fixtures/multistore-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/zustand vs real zustand on React', () => {
+	// @parity-case differential:zustand-counter
 	it('Counter: independent slices + derived selector + action, byte-identical', async () => {
 		const d = await mountDifferential(COUNTER, 'Counter', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -39,6 +40,7 @@ describe('differential: @octanejs/zustand vs real zustand on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:zustand-multistore
 	it('Zoo: two independent stores in one component, byte-identical', async () => {
 		const d = await mountDifferential(MULTISTORE, 'Zoo', undefined, CACHE);
 		await d.step('mount', () => {});

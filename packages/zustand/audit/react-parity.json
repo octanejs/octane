@@ -1,0 +1,130 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pmndrs/zustand.git",
+    "version": "zustand@5.0.14",
+    "commit": "bfb2a9e7ce52608d54d8a077fb87ac9d12e73c58",
+    "sourceRoot": "src",
+    "testRoot": "tests",
+    "license": "MIT",
+    "integrity": "sha256:c1fad9e123a79d12f56b4ef8aece6abd6036df164b01d7ffb52d40b08956e96b",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/zustand/src"],
+      "include": ["\\.ts$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/zustand/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5966e99698b5f8099e3ef2e62625cc31f3a3e60305f1def8d4066c6cd9f98824"
+    }
+  },
+  "lanes": [
+    {
+      "id": "zustand-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "zustand-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs exact selection, derived-state, action, reset, and multiple-store scenarios against zustand@5.0.14.",
+      "files": [
+        {
+          "path": "packages/zustand/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "dbdd1d378565d17f8b5f2ef939ac7f631fbca5b6bb911ce7e93dbbef264732bd",
+          "cases": [
+            {
+              "id": "differential:zustand-counter",
+              "testName": "Counter: independent slices + derived selector + action, byte-identical",
+              "fullName": "differential: @octanejs/zustand vs real zustand on React Counter: independent slices + derived selector + action, byte-identical"
+            },
+            {
+              "id": "differential:zustand-multistore",
+              "testName": "Zoo: two independent stores in one component, byte-identical",
+              "fullName": "differential: @octanejs/zustand vs real zustand on React Zoo: two independent stores in one component, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/zustand/tests/_fixtures/shallow.tsrx",
+          "role": "support",
+          "sha256": "d009c8ddd24a552821e47145ccda57c6a22682c2553113520ff5c292cea02104"
+        },
+        {
+          "path": "packages/zustand/tests/_fixtures/middleware.tsrx",
+          "role": "support",
+          "sha256": "8f2ea0eae2a4086fd5dd47a50ceab820958d2e8339ebf41792f180a8f55eb2c5"
+        },
+        {
+          "path": "packages/zustand/tests/_fixtures/stores.tsrx",
+          "role": "support",
+          "sha256": "817c4a301a22fc58e8e6a6bb8f97b89a0692dcc51672d0b94473111c088ea26f"
+        }
+      ]
+    },
+    {
+      "id": "zustand-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "zustand-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles create, UseBoundStore, selector, and traditional equality inference.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/zustand/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/zustand/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "f388e5e070a28d257663d1cd92acd8eca27f3f7113c4b7933ab4e1b28b757e35",
+          "cases": [
+            {
+              "id": "types:zustand-public-api",
+              "testName": "create and selector public inference",
+              "fullName": "create and selector public inference"
+            }
+          ]
+        },
+        {
+          "path": "packages/zustand/typetests/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "3733b825c55dde044bdda98c1bfe3cfbf52e21577caa0fb26f1544c58442acb6"
+        },
+        {
+          "path": "packages/zustand/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "d9433c155d7cbd58d462e12960140ce259f8bf0ef84d45bf748c78703ed0c791"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
