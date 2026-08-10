@@ -6,6 +6,7 @@ const fixture = resolve(__dirname, '../_fixtures/parity.tsrx');
 const cache = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/tanstack-form vs @tanstack/react-form', () => {
+	// @parity-case differential:tanstack-form-interactions
 	it('matches values, validation, arrays, and reset', async () => {
 		const differential = await mountDifferential(fixture, 'FormParity', undefined, cache);
 

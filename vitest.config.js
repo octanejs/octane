@@ -1701,15 +1701,54 @@ export default defineConfig({
 				},
 			},
 			{
+				// Faithful adapted upstream wrappers are parity-owned. StrictMode
+				// divergences, repository-only regressions, and other Octane-only
+				// conformance stay in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/tanstack-form/tests/conformance/createFormHook.test.ts',
+						'packages/tanstack-form/tests/conformance/useField.test.ts',
+						'packages/tanstack-form/tests/conformance/useForm.test.ts',
+						'packages/tanstack-form/tests/conformance/useFormGroup.test.ts',
+					],
+				},
 				test: {
 					name: 'tanstack-form',
-					include: [
-						'packages/tanstack-form/tests/conformance/**/*.test.ts',
+					include: ['packages/tanstack-form/tests/conformance/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
 						'packages/tanstack-form/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
-					globalSetup: ['packages/tanstack-form/tests/differential/_setup.ts'],
 					setupFiles: ['packages/tanstack-form/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-form-differential',
+					include: ['packages/tanstack-form/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-form/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

@@ -759,7 +759,7 @@
         "Component registration accepts Octane function components; class components are not supported by Octane."
       ],
       "ssr": "Supported and tested: fields and form subscriptions render their initial snapshots through octane/server without a DOM.",
-      "verified": "2026-07-15"
+      "verified": "2026-08-09"
     },
     {
       "name": "@octanejs/tanstack-hotkeys",

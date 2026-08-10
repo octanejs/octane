@@ -1,0 +1,380 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-form",
+  "roots": [
+    "packages/tanstack-form/tests/conformance"
+  ],
+  "files": [
+    "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+    "packages/tanstack-form/tests/conformance/useField.test.ts",
+    "packages/tanstack-form/tests/conformance/useForm.test.ts",
+    "packages/tanstack-form/tests/conformance/useFormGroup.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:0fa6810b0da4d6bd",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook extendForm should include both parent and extended field components"
+    },
+    {
+      "id": "runtime:2fe7950ba6a89dc9",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook extendForm should include both parent and extended form components"
+    },
+    {
+      "id": "runtime:10c105cdb365e3c2",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook extendForm should return a new extendForm from the extended hook"
+    },
+    {
+      "id": "runtime:e3e500c2f1ff1cac",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook extendForm should support chaining multiple extendForm calls"
+    },
+    {
+      "id": "runtime:6aae8576fa418a38",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook extendForm should work with withForm after extendForm"
+    },
+    {
+      "id": "runtime:1b2c7c3a4b6fc261",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should accept formId and return it"
+    },
+    {
+      "id": "runtime:7615ea63712c7894",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should allow mapping withFieldGroup to different values"
+    },
+    {
+      "id": "runtime:8eb95e96ac728776",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should allow nesting withFieldGroup in other withFieldGroups"
+    },
+    {
+      "id": "runtime:97d00ce883406ae9",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should allow to set default value"
+    },
+    {
+      "id": "runtime:e496da4cfda34674",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should allow using typed app form"
+    },
+    {
+      "id": "runtime:ee7e6511d01a0dc7",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should allow using typed app form with form components"
+    },
+    {
+      "id": "runtime:3ccf49d63532bd95",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should forward Field and Subscribe to the form"
+    },
+    {
+      "id": "runtime:891d9678276698f4",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should handle withFieldGroup types properly"
+    },
+    {
+      "id": "runtime:1e324692644a5945",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should handle withForm types properly"
+    },
+    {
+      "id": "runtime:89d7f8f95f90a041",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should not lose focus on update with withFieldGroup"
+    },
+    {
+      "id": "runtime:0b682469e4683521",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should remap FieldGroupApi.Field validators to the correct names"
+    },
+    {
+      "id": "runtime:3f922f8360abcff8",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should render FieldGroup Subscribe without selector (default identity)"
+    },
+    {
+      "id": "runtime:b36c317a4415a3e4",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should throw if `useTypedAppFormContext` is used without AppForm"
+    },
+    {
+      "id": "runtime:1a8407650a87150d",
+      "file": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+      "fullName": "createFormHook should use the correct field name in Field with withFieldGroup"
+    },
+    {
+      "id": "runtime:e547028ccad491b5",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should allow field-level defaultValue"
+    },
+    {
+      "id": "runtime:36f0e695901420ad",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should allow to set default value"
+    },
+    {
+      "id": "runtime:7c303f8d11d38135",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should call onUnmount listener when a field is conditionally removed"
+    },
+    {
+      "id": "runtime:b2296ac5e1a46004",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should handle arrays with primitive values"
+    },
+    {
+      "id": "runtime:3580c32bee8fafd4",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should handle arrays with subvalues"
+    },
+    {
+      "id": "runtime:7d23852aa9767686",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should handle defaultValue without setstate-in-render error"
+    },
+    {
+      "id": "runtime:34c7b5e541e839f1",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should handle removing element from array"
+    },
+    {
+      "id": "runtime:53b96326ab4217e5",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should handle sync linked fields"
+    },
+    {
+      "id": "runtime:3aba74fc1ad6eba9",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should not keep hidden field submit errors after unmount"
+    },
+    {
+      "id": "runtime:b51a4f9a5a70428e",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should not rerender array field when child field value changes"
+    },
+    {
+      "id": "runtime:02a016d83c9ff3f5",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should not rerender unrelated fields"
+    },
+    {
+      "id": "runtime:2dc337bc0756a1de",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should not surface undefined for shifted items when a non-last stably-keyed array item is removed"
+    },
+    {
+      "id": "runtime:cb0e9118d1d19e03",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should not validate on change if isTouched is false"
+    },
+    {
+      "id": "runtime:b2165b0e7f38a8c5",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should properly update conditionally rendered fields"
+    },
+    {
+      "id": "runtime:c06f71fcb8bfcfe8",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should rerender array field on swapFieldValues even when length is unchanged"
+    },
+    {
+      "id": "runtime:2fac6ef4ffad0ab5",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should rerender array field when async defaultValues resolve"
+    },
+    {
+      "id": "runtime:52e26f0c6eba79b1",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should use field default value first"
+    },
+    {
+      "id": "runtime:7dabf2c4528ec226",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate allow pushvalue to implicitly set a default value"
+    },
+    {
+      "id": "runtime:3c4ce0f5a01d30f6",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate allow pushvalue to implicitly set a pushed default value"
+    },
+    {
+      "id": "runtime:c83b3a24128bd8da",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate async on change"
+    },
+    {
+      "id": "runtime:ca17814a72a4f89e",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate async on change and async on blur"
+    },
+    {
+      "id": "runtime:52814a1110d1de7a",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate async on change with debounce"
+    },
+    {
+      "id": "runtime:660722c2a19c089d",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate async on submit without debounce"
+    },
+    {
+      "id": "runtime:ba81fa524bb7c649",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate on change and on blur"
+    },
+    {
+      "id": "runtime:f0a65a092f225bb5",
+      "file": "packages/tanstack-form/tests/conformance/useField.test.ts",
+      "fullName": "useField should validate on change if isTouched is true"
+    },
+    {
+      "id": "runtime:e7cf01486c2d3a96",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm form should reset default value when resetting in onSubmit"
+    },
+    {
+      "id": "runtime:0fbaffcdb04fab6f",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm preserves field state"
+    },
+    {
+      "id": "runtime:30c766bb5ed4b33f",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should accept formId and return it"
+    },
+    {
+      "id": "runtime:8bbcf9910a66650a",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should allow custom component keys for arrays"
+    },
+    {
+      "id": "runtime:f60c1140e471141f",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should allow default values to be set"
+    },
+    {
+      "id": "runtime:5b50b6ac9a7a90f3",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should handle stable transforms to update the base form on first render"
+    },
+    {
+      "id": "runtime:2614ac47f36df29f",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should handle stable transforms to update the base form on subsequent renders"
+    },
+    {
+      "id": "runtime:77ff4c3549bf4dc7",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should handle submitting properly"
+    },
+    {
+      "id": "runtime:e1b8cc50d47e11f7",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should not cause infinite re-renders when listening to state"
+    },
+    {
+      "id": "runtime:b34e9d45d7b5e00e",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should not cause infinite re-renders when listening to state.errors"
+    },
+    {
+      "id": "runtime:2ae4e4f1a4fac146",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should not error when using deleteField in edge cases"
+    },
+    {
+      "id": "runtime:1921be64f52a66d2",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should not validate on change if isTouched is false"
+    },
+    {
+      "id": "runtime:a06d4d273e1a39f9",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should render Subscribe without selector (default identity)"
+    },
+    {
+      "id": "runtime:5e1f0447975f0bf1",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should run on form mount"
+    },
+    {
+      "id": "runtime:fadce95dc983dd3a",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should set errors on the fields from the form's onChange validator"
+    },
+    {
+      "id": "runtime:58401bb82de58ae0",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should set field errors from the field's validators"
+    },
+    {
+      "id": "runtime:56c45074ce489abb",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should set field errors from the form's onChangeAsync validator"
+    },
+    {
+      "id": "runtime:0bfea53cf4f9e1df",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should validate async on change"
+    },
+    {
+      "id": "runtime:822cc3433cd1ff24",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should validate async on change and async on blur"
+    },
+    {
+      "id": "runtime:29914cfa40627692",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should validate async on change for the form"
+    },
+    {
+      "id": "runtime:a7167a6a0d90c4e0",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should validate async on change with debounce"
+    },
+    {
+      "id": "runtime:08a2eb899e182104",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should validate on change and on blur"
+    },
+    {
+      "id": "runtime:652eb8b5d6c76b04",
+      "file": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+      "fullName": "useForm should validate on change if isTouched is true"
+    },
+    {
+      "id": "runtime:4c6674e29afbc34e",
+      "file": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+      "fullName": "form.FormGroup should call onGroupSubmit but not the form onSubmit when submitting the group"
+    },
+    {
+      "id": "runtime:f3b7112c053992a9",
+      "file": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+      "fullName": "form.FormGroup should call onGroupSubmitInvalid when group-level validation fails"
+    },
+    {
+      "id": "runtime:59c2610691acc082",
+      "file": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+      "fullName": "form.FormGroup should expose group state value reactively"
+    },
+    {
+      "id": "runtime:f94b8c4a87a53578",
+      "file": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+      "fullName": "form.FormGroup should ignore form-level field errors outside the group when submitting the group"
+    },
+    {
+      "id": "runtime:43348058b8294759",
+      "file": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+      "fullName": "form.FormGroup should pass submit meta through handleSubmit"
+    },
+    {
+      "id": "runtime:36dc00fbf571c4ef",
+      "file": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+      "fullName": "form.FormGroup should rerender group.state.meta.isSubmitting during an async submit"
+    }
+  ]
+}

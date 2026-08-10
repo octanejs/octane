@@ -1,6 +1,6 @@
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync } from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,16 +39,13 @@ function compileFixture(sourcePath: string): void {
 	writeFileSync(join(cacheDirectory, `${slug}-${hashString(sourcePath)}.js`), rewritten);
 }
 
-function findFixtures(directory: string): string[] {
-	return readdirSync(directory).flatMap((name) => {
-		const path = join(directory, name);
-		return statSync(path).isDirectory() ? findFixtures(path) : path.endsWith('.tsrx') ? [path] : [];
-	});
-}
-
 export async function setup(): Promise<void> {
-	if (!existsSync(cacheDirectory)) mkdirSync(cacheDirectory, { recursive: true });
-	for (const fixture of findFixtures(fixtureDirectory)) compileFixture(fixture);
+	rmSync(cacheDirectory, { recursive: true, force: true });
+	mkdirSync(cacheDirectory, { recursive: true });
+	const fixture = join(fixtureDirectory, 'parity.tsrx');
+	if (!existsSync(fixture))
+		throw new Error(`Missing declared TanStack Form parity fixture: ${fixture}`);
+	compileFixture(fixture);
 }
 
 export async function teardown(): Promise<void> {}

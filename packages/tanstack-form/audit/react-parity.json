@@ -1,0 +1,220 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/form.git",
+    "version": "@tanstack/react-form@1.33.2",
+    "commit": "5d1128141a705ebb24ade1275b3117bb4c8b1bdc",
+    "sourceRoot": "packages/react-form/src",
+    "testRoot": "packages/react-form/tests",
+    "license": "MIT",
+    "integrity": "sha256:db24c9288d56428e8f67742ca9e0fcf314917c21c8d8d4ff095aee8043602606",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-form/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-form/tests/conformance"],
+      "include": ["(?:createFormHook|useField|useForm|useFormGroup)\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 73,
+    "uniqueIdentities": 73,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e8e139c7d33a948ad914236e662293864634f765f21042a11af0dd9306c3b13c"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-form-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-form-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one exact shared values, validation, array, and reset scenario against @tanstack/react-form@1.33.2.",
+      "files": [
+        {
+          "path": "packages/tanstack-form/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "143cdf40f65c1bc44ff20551d337379bf86b6dc1d72a0a87a8499413afddd0bc",
+          "cases": [
+            {
+              "id": "differential:tanstack-form-interactions",
+              "testName": "matches values, validation, arrays, and reset",
+              "fullName": "differential: @octanejs/tanstack-form vs @tanstack/react-form matches values, validation, arrays, and reset"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-form/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "67e39b57c0dcddb42307cff40f2bb2cd7431d0569398e17512ba20f16684e182"
+        },
+        {
+          "path": "packages/tanstack-form/tests/_fixtures/parity.tsrx",
+          "role": "support",
+          "sha256": "99090526cd01879e1a479225af0b9486a15f7f3281e666d10ae5d839103ecc7c"
+        },
+        {
+          "path": "packages/tanstack-form/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "a5d4378ef69b3c29e26d40ce774c5ef9149c357318f26de63bfc695f2b616fd4"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "2fb7353cd9227ed997b06e01b1e27bc62e7737d6ffa9ac2661b4e5a0505f761b"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-form-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-form",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the faithful adapted-upstream-suite createFormHook, useField, useForm, and useFormGroup wrappers against the Octane renderer.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-form/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-form/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "5d18b502d695f01378454bd2957bea590d931e1f1bd8a57c27f2702476547e9e"
+        },
+        {
+          "path": "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
+          "role": "support",
+          "sha256": "758c069e6e554ab82102464110343f0424517b98177384eb55a4e5859f6c9e5e"
+        },
+        {
+          "path": "packages/tanstack-form/tests/conformance/useField.test.ts",
+          "role": "support",
+          "sha256": "ca73b7635d02b0eb8227838cba30a96e9da4cca81adc8afd95e3c8b3527706f8"
+        },
+        {
+          "path": "packages/tanstack-form/tests/conformance/useForm.test.ts",
+          "role": "support",
+          "sha256": "d79bc692669b66448580f46e8f4eb56f9f64ac9ed2d6e561ef3e9116202095c4"
+        },
+        {
+          "path": "packages/tanstack-form/tests/conformance/useFormGroup.test.ts",
+          "role": "support",
+          "sha256": "29d2147dd0457ef5c599d936741275002fb7f326e4542a33deb1b1282b2babdb"
+        },
+        {
+          "path": "packages/tanstack-form/tests/_fixtures/upstream/createFormHook.tsrx",
+          "role": "support",
+          "sha256": "64aa8c0656542fc26e641c9312edd03ffd324c5c0299ec83ab497e5e4029c585"
+        },
+        {
+          "path": "packages/tanstack-form/tests/_fixtures/upstream/useField.tsrx",
+          "role": "support",
+          "sha256": "59048dc5ce4fdb02adb39045045639d8215d9d741f462ae44bf44f52b82ee877"
+        },
+        {
+          "path": "packages/tanstack-form/tests/_fixtures/upstream/useForm.tsrx",
+          "role": "support",
+          "sha256": "078157bdd42f70365f5b30ae5989a19d2495ce195efeca321ce95d7a6cb065b5"
+        },
+        {
+          "path": "packages/tanstack-form/tests/_fixtures/upstream/useFormGroup.tsrx",
+          "role": "support",
+          "sha256": "cb5360f6c93bf58eac0bcb5c4ca1b2977678e30f2797ebc6630262678e525d19"
+        },
+        {
+          "path": "packages/tanstack-form/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "a5d4378ef69b3c29e26d40ce774c5ef9149c357318f26de63bfc695f2b616fd4"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "2fb7353cd9227ed997b06e01b1e27bc62e7737d6ffa9ac2661b4e5a0505f761b"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-form-adapted-types",
+      "type": "adapted-types",
+      "oracle": "optional",
+      "environment": "workspace-node",
+      "project": "tanstack-form-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Optional package type-contract lane only: not paired fail-closed type parity. Kept out of required React-parity evidence until pristine/adapted type inventories land.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-form/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-form/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "2860a294e1771231be138b52c72808394a89e1cebebdf26dc5b2140a4f54815e",
+          "cases": [
+            {
+              "id": "types:tanstack-form-adapter",
+              "testName": "Octane adapter type contract",
+              "fullName": "Octane adapter type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-form/typetests/createFormHook.test-d.tsx",
+          "role": "support",
+          "sha256": "919249164828917e26354f87a649fac2d2b5fe2b4597296a287af2a39f0458fa"
+        },
+        {
+          "path": "packages/tanstack-form/typetests/useField.test-d.tsx",
+          "role": "support",
+          "sha256": "50cf05a147d2f504334b09cf0b2ac1233ea7240774c695127169e1f5dc16386a"
+        },
+        {
+          "path": "packages/tanstack-form/typetests/useForm.test-d.tsx",
+          "role": "support",
+          "sha256": "eeb7238eea0384198548839b224472d5a7e9349dd2dfd89ebe15940b8f64d016"
+        },
+        {
+          "path": "packages/tanstack-form/typetests/useFormGroup.test-d.tsx",
+          "role": "support",
+          "sha256": "cfa1ba62f54f33d8aa50462b81871eb846eb602d9eacd7daf53c3c067e84432d"
+        },
+        {
+          "path": "packages/tanstack-form/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "9df6d95808c5ba22be1b2826a2d2c97ea22673dbcc5d840bb862cd4684c7a0aa"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
