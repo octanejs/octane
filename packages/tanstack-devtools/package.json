@@ -40,8 +40,15 @@
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
+    "@tanstack/react-devtools": "0.10.7",
     "@testing-library/jest-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:tanstack-devtools-react-oracle",
+    "@types/react-dom": "catalog:tanstack-devtools-react-oracle",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
+    "react": "catalog:tanstack-devtools-react-oracle",
+    "react-dom": "catalog:tanstack-devtools-react-oracle",
     "vitest": "catalog:default"
   }
 }

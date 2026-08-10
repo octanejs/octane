@@ -2184,6 +2184,40 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-devtools-differential',
+					include: ['packages/tanstack-devtools/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-devtools/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+						{
+							find: /^@tanstack\/react-devtools$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-devtools/tests/differential/.react-cache/react-devtools.js',
+							),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-devtools-parity-audit',
+					include: ['packages/tanstack-devtools/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-devtools-ssr',
 					include: ['packages/tanstack-devtools/tests/ssr/**/*.test.ts'],
 					environment: 'node',
