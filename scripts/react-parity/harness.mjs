@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
 	buildLaneArgv,
+	buildTypeScriptCompilerRuns,
 	loadManifest,
 	requiredExecutableLanes,
 	verifyLaneEnvironment,
@@ -67,21 +68,26 @@ if (action === 'validate') {
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 	for (const lane of selected) {
 		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
-		const [command, ...commandArgs] = buildLaneArgv(lane, root);
-		console.log(`running ${lane.id}: ${JSON.stringify([command, ...commandArgs])}`);
+		const runs =
+			lane.execution?.kind === 'typescript'
+				? buildTypeScriptCompilerRuns(lane)
+				: [buildLaneArgv(lane, root)];
 		let stdout = '';
-		const exitCode = await new Promise((resolveExit, reject) => {
-			const captureResult = lane.execution?.kind !== 'typescript';
-			const child = spawn(command, commandArgs, {
-				cwd: root,
-				shell: false,
-				stdio: captureResult ? ['inherit', 'pipe', 'inherit'] : 'inherit',
+		for (const [command, ...commandArgs] of runs) {
+			console.log(`running ${lane.id}: ${JSON.stringify([command, ...commandArgs])}`);
+			const exitCode = await new Promise((resolveExit, reject) => {
+				const captureResult = lane.execution?.kind !== 'typescript';
+				const child = spawn(command, commandArgs, {
+					cwd: root,
+					shell: false,
+					stdio: captureResult ? ['inherit', 'pipe', 'inherit'] : 'inherit',
+				});
+				if (captureResult) child.stdout.on('data', (chunk) => (stdout += chunk));
+				child.on('error', reject);
+				child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
 			});
-			if (captureResult) child.stdout.on('data', (chunk) => (stdout += chunk));
-			child.on('error', reject);
-			child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
-		});
-		if (exitCode !== 0) process.exit(exitCode);
+			if (exitCode !== 0) process.exit(exitCode);
+		}
 		verifyLaneRunResult(lane, stdout, root);
 	}
 }

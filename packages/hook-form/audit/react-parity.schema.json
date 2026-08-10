@@ -458,6 +458,7 @@
                 "not": {
                   "anyOf": [
                     { "required": ["compiler"] },
+                    { "required": ["compilerBins"] },
                     { "required": ["project"] },
                     { "required": ["config"] },
                     { "required": ["root"] }
@@ -468,7 +469,11 @@
                 "properties": { "kind": { "const": "jest-full" } },
                 "required": ["kind", "config", "root", "inventory"],
                 "not": {
-                  "anyOf": [{ "required": ["compiler"] }, { "required": ["project"] }]
+                  "anyOf": [
+                    { "required": ["compiler"] },
+                    { "required": ["compilerBins"] },
+                    { "required": ["project"] }
+                  ]
                 }
               },
               {
@@ -482,6 +487,11 @@
             "properties": {
               "kind": { "enum": ["typescript", "vitest-full", "jest-full", "playwright-full"] },
               "compiler": { "enum": ["tsc", "tsgo", "tsrx-tsc"] },
+              "compilerBins": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
               "project": { "type": "string", "minLength": 1 },
               "inventory": { "type": "string", "minLength": 1 },
               "config": { "type": "string", "minLength": 1 },

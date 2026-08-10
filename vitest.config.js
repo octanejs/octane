@@ -2765,7 +2765,11 @@ export default defineConfig({
 			{
 				test: {
 					name: 'tanstack-router-ssr-query',
-					include: ['packages/tanstack-router-ssr-query/tests/**/*.test.ts'],
+					include: [
+						'packages/tanstack-router-ssr-query/tests/**/*.test.ts',
+						'!packages/tanstack-router-ssr-query/tests/differential/**/*.test.ts',
+						'!packages/tanstack-router-ssr-query/tests/parity/**/*.test.ts',
+					],
 					environment: 'node',
 					globals: false,
 				},
@@ -2792,6 +2796,48 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query-differential',
+					include: ['packages/tanstack-router-ssr-query/tests/differential/**/*.test.ts'],
+					environment: 'node',
+					globalSetup: ['packages/tanstack-router-ssr-query/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router-ssr-query$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-router-ssr-query/src/index.tsrx',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query-parity-audit',
+					include: ['packages/tanstack-router-ssr-query/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
 				},
 			},
 			{

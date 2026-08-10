@@ -60,7 +60,15 @@ const LANE_KEYS = new Set([
 	'execution',
 	'evidenceOrigin',
 ]);
-const EXECUTION_KEYS = new Set(['kind', 'compiler', 'project', 'inventory', 'config', 'root']);
+const EXECUTION_KEYS = new Set([
+	'kind',
+	'compiler',
+	'compilerBins',
+	'project',
+	'inventory',
+	'config',
+	'root',
+]);
 const SUITE_STATES = new Set(['present', 'absent', 'insufficient']);
 const TYPE_EVIDENCE_ORIGINS = new Set(['upstream-suite', 'repo-authored']);
 const FULL_RUNTIME_EXECUTIONS = new Set(['vitest-full', 'jest-full', 'playwright-full']);
@@ -322,10 +330,22 @@ export function validateManifest(manifest) {
 				if (lane.execution.inventory !== undefined)
 					fail(`lane ${lane.id} TypeScript execution must not declare an inventory`);
 				if (lane.execution.config !== undefined || lane.execution.root !== undefined)
-					fail(`lane ${lane.id} TypeScript execution only accepts compiler and project`);
+					fail(`lane ${lane.id} TypeScript execution must not declare config or root`);
+				if (lane.execution.compilerBins !== undefined) {
+					if (
+						!Array.isArray(lane.execution.compilerBins) ||
+						lane.execution.compilerBins.length === 0
+					) {
+						fail(`lane ${lane.id} compilerBins must be a non-empty array`);
+					}
+					for (const bin of lane.execution.compilerBins) {
+						exactPath(bin, `lane ${lane.id} compilerBins entry`);
+					}
+				}
 			} else if (lane.execution.kind === 'vitest-full') {
 				if (
 					lane.execution.compiler !== undefined ||
+					lane.execution.compilerBins !== undefined ||
 					lane.execution.project !== undefined ||
 					lane.execution.config !== undefined ||
 					lane.execution.root !== undefined
@@ -333,7 +353,11 @@ export function validateManifest(manifest) {
 					fail(`lane ${lane.id} full-suite execution only accepts an inventory`);
 				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
 			} else {
-				if (lane.execution.compiler !== undefined || lane.execution.project !== undefined)
+				if (
+					lane.execution.compiler !== undefined ||
+					lane.execution.compilerBins !== undefined ||
+					lane.execution.project !== undefined
+				)
 					fail(
 						`lane ${lane.id} ${lane.execution.kind} execution must not declare a compiler or project`,
 					);
@@ -781,12 +805,28 @@ export function buildTypeScriptCompilerArgv(compiler, project) {
 	return [process.execPath, compilerEntrypoints[compiler], '--noEmit', '-p', project];
 }
 
+export function buildTypeScriptCompilerRuns(lane) {
+	const project = lane.execution.project;
+	if (Array.isArray(lane.execution.compilerBins) && lane.execution.compilerBins.length > 0) {
+		return lane.execution.compilerBins.map(function toArgv(bin) {
+			return [process.execPath, bin, '--noEmit', '-p', project];
+		});
+	}
+	return [buildTypeScriptCompilerArgv(lane.execution.compiler, project)];
+}
+
 export function buildLaneArgv(lane, root = process.cwd()) {
 	if (lane.available === false) {
 		throw new Error(`${lane.oracle} oracle is unavailable; parity not established`);
 	}
 	if (lane.execution?.kind === 'typescript') {
-		return buildTypeScriptCompilerArgv(lane.execution.compiler, lane.execution.project);
+		const runs = buildTypeScriptCompilerRuns(lane);
+		if (runs.length !== 1) {
+			throw new Error(
+				`lane ${lane.id} declares ${runs.length} TypeScript compiler runs; use buildTypeScriptCompilerRuns`,
+			);
+		}
+		return runs[0];
 	}
 	if (lane.execution?.kind === 'vitest-full') {
 		const inventory = JSON.parse(readFileSync(resolve(root, lane.execution.inventory), 'utf8'));

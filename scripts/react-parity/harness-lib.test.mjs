@@ -9,6 +9,7 @@ import test from 'node:test';
 import {
 	buildLaneArgv,
 	buildTypeScriptCompilerArgv,
+	buildTypeScriptCompilerRuns,
 	compareTestIdentities,
 	describeTestIdentityMismatch,
 	loadManifest,
@@ -400,6 +401,59 @@ test('uses Node package entrypoints for every TypeScript compiler', () => {
 			expected,
 		);
 	}
+});
+
+test('expands optional compilerBins into one TypeScript run per binary', () => {
+	const lane = {
+		id: 'matrix-types',
+		type: 'pristine-types',
+		oracle: 'required',
+		environment: 'workspace-node',
+		project: 'matrix-types',
+		evidenceOrigin: 'upstream-suite',
+		execution: {
+			kind: 'typescript',
+			compiler: 'tsc',
+			compilerBins: [
+				'node_modules/typescript55/lib/tsc.js',
+				'node_modules/typescript60/lib/tsc.js',
+			],
+			project: 'packages/example/tsconfig.json',
+		},
+		files: [
+			{
+				path: 'packages/example/src/index.ts',
+				role: 'test',
+				sha256: '0'.repeat(64),
+				cases: [
+					{
+						id: 'types:example',
+						testName: 'example',
+						fullName: 'example',
+					},
+				],
+			},
+		],
+	};
+	assert.deepEqual(buildTypeScriptCompilerRuns(lane), [
+		[
+			process.execPath,
+			'node_modules/typescript55/lib/tsc.js',
+			'--noEmit',
+			'-p',
+			'packages/example/tsconfig.json',
+		],
+		[
+			process.execPath,
+			'node_modules/typescript60/lib/tsc.js',
+			'--noEmit',
+			'-p',
+			'packages/example/tsconfig.json',
+		],
+	]);
+	assert.throws(function rejectsMultiRunLaneArgv() {
+		buildLaneArgv(lane);
+	}, /declares 2 TypeScript compiler runs; use buildTypeScriptCompilerRuns/);
 });
 
 test('normalizes Windows identity paths and resolves full-suite inventories from the harness root', async () => {

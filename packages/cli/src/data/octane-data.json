@@ -691,10 +691,10 @@
       "version": "0.0.22",
       "category": "AI, data, and routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
-      "surface": "Complete: `setupRouterSsrQueryIntegration` (the package's only export) delegating to `@tanstack/router-ssr-query-core@1.169.1`, with the QueryClientProvider Wrap composition on Octane.",
+      "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
       "divergences": [],
       "ssr": "Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider).",
-      "verified": "2026-07-20"
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/tanstack-store",
