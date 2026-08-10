@@ -59,6 +59,7 @@
       "@octanejs/transition-group",
       "@octanejs/day-picker",
       "@octanejs/textarea-autosize",
+      "@octanejs/colorful",
       "@octanejs/cmdk",
       "@octanejs/shadcn",
       "@octanejs/lucide",

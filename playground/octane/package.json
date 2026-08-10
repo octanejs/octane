@@ -45,6 +45,7 @@
     "@octanejs/syntax-highlighter": "workspace:*",
     "@octanejs/window": "workspace:*",
     "@octanejs/react-draggable": "workspace:*",
+    "@octanejs/colorful": "workspace:*",
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",

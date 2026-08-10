@@ -21,6 +21,7 @@ import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
 import { LiveStoreDemo } from './demos/LiveStore.tsrx';
 import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
 import { ReactSyntaxHighlighterDemo } from './demos/ReactSyntaxHighlighter.tsrx';
+import { ReactColorfulDemo } from './demos/ReactColorful.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
 import { ReactDraggableDemo } from './demos/ReactDraggable.tsrx';
 import { MobxDemo } from './demos/Mobx.tsrx';
@@ -58,6 +59,7 @@ import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
 import liveStoreSource from './demos/LiveStore.tsrx?raw';
 import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
 import reactSyntaxHighlighterSource from './demos/ReactSyntaxHighlighter.tsrx?raw';
+import reactColorfulSource from './demos/ReactColorful.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
 import reactDraggableSource from './demos/ReactDraggable.tsrx?raw';
 import mobxSource from './demos/Mobx.tsrx?raw';
@@ -312,6 +314,10 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'React Syntax Highlighter',
 				Component: ReactSyntaxHighlighterDemo,
 				source: reactSyntaxHighlighterSource,
+				id: 'react-colorful',
+				title: 'Color picker',
+				Component: ReactColorfulDemo,
+				source: reactColorfulSource,
 			},
 		],
 	},

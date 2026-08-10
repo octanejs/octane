@@ -56,6 +56,9 @@ import { verifyReactTextareaAutosizeCrosswalk } from './react-textarea-autosize-
 import { verifyReactTextareaAutosizeTypes } from './react-textarea-autosize-types-lib.mjs';
 import { verifyReactDraggableTestClassifications } from './react-draggable-classifications-lib.mjs';
 import { verifyReactDraggableTypes } from './react-draggable-types-lib.mjs';
+import { verifyReactColorfulTypes } from './react-colorful-types-lib.mjs';
+import { verifyReactColorfulUpstream } from './react-colorful-upstream-lib.mjs';
+import { verifyReactColorfulTestClassifications } from './react-colorful-classifications-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -210,6 +213,19 @@ try {
 	verifyTanstackPacerTypes(REPO);
 } catch (error) {
 	errors.push(`@octanejs/tanstack-pacer type evidence is invalid: ${error.message}`);
+	await verifyReactColorfulUpstream(REPO);
+} catch (error) {
+	errors.push(`@octanejs/colorful upstream evidence is invalid: ${error.message}`);
+}
+try {
+	verifyReactColorfulTypes(REPO);
+} catch (error) {
+	errors.push(`@octanejs/colorful type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyReactColorfulTestClassifications(REPO);
+} catch (error) {
+	errors.push(`@octanejs/colorful test classifications are invalid: ${error.message}`);
 }
 try {
 	verifyLivestoreTestClassifications(REPO);

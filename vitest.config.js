@@ -1392,6 +1392,74 @@ export default defineConfig({
 				},
 			},
 			{
+				// Fully parity-owned: omit testExecution.include so the sharded
+				// view drops the whole project instead of retaining an empty one.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'colorful-upstream',
+					include: ['packages/colorful/tests/upstream/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'colorful',
+					include: ['packages/colorful/tests/runtime/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'colorful-differential',
+					include: ['packages/colorful/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/colorful/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'colorful-hydration',
+					include: ['packages/colorful/tests/hydration/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'colorful-ssr',
+					include: ['packages/colorful/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'colorful-browser',
+					include: ['packages/colorful/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'intersection-observer-pristine',

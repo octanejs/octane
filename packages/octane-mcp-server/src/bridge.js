@@ -63,6 +63,7 @@ export const KNOWN_BINDINGS = {
 	'react-markdown': '@octanejs/markdown',
 	'react-textarea-autosize': '@octanejs/textarea-autosize',
 	'react-draggable': '@octanejs/react-draggable',
+	'react-colorful': '@octanejs/colorful',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.
