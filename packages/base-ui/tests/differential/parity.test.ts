@@ -99,6 +99,8 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// OCTANE DIVERGENCE[ref-as-prop-class-composition][differential:base-ui-render-element]
+	// @parity-case differential:base-ui-render-element
 	it('Separator: render-prop element form (clones onto <hr>, className concatenates)', async () => {
 		const d = await mountDifferential(FIXTURE, 'SeparatorRenderElement', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -271,6 +273,8 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// OCTANE DIVERGENCE[native-event-semantics][differential:base-ui-switch-native-input]
+	// @parity-case differential:base-ui-switch-native-input
 	it('Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)', async () => {
 		const d = await mountDifferential(FIXTURE, 'SwitchBasic', undefined, CACHE);
 		await d.step('mount (unchecked)', () => {});
@@ -357,6 +361,7 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:base-ui-number-field
 	it('NumberField: Root/Group/Input/steppers render the formatted value byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'NumberFieldBasic', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -381,6 +386,7 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:base-ui-dialog-open
 	it('Dialog: open modal (Portal/Backdrop/Popup/Title/Description/Close) renders byte-identically', async () => {
 		const d = await mountDifferential(FIXTURE, 'DialogOpen', undefined, CACHE);
 		await d.step('mount (open)', () => {});
@@ -411,6 +417,7 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:base-ui-slider-keyboard
 	it('Slider: ArrowUp on the thumb steps the value (aria-valuenow + indicator % + output re-render)', async () => {
 		const d = await mountDifferential(FIXTURE, 'SliderBasic', undefined, CACHE);
 		await d.step('mount (30)', () => {});
@@ -558,6 +565,7 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:base-ui-tooltip-open
 	it('Tooltip: open (portal + anchored positioner + popup + arrow)', async () => {
 		const d = await mountDifferential(FIXTURE, 'TooltipOpen', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -653,6 +661,7 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	// does not even destructure `mounted`). Porting the "fix" would diverge from the real
 	// `@base-ui/react`; this step is the proof that both runtimes drop it on the same commit, and
 	// the guard against a future well-meant repair.
+	// @parity-case differential:base-ui-menu-checkbox
 	it('Menu: toggling a checkbox item matches Base UI, including the immediate indicator unmount', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenCheckboxItems', undefined, CACHE);
 		await stepUndoingFocusDisable(d, 'mount (open, first item checked)');
@@ -721,6 +730,7 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:base-ui-toast-limit
 	it('Toast: limit marks older toasts limited rather than removing them', async () => {
 		const d = await mountDifferential(FIXTURE, 'ToastLimited', undefined, CACHE);
 		await d.step('add a toast', async (i, r) => {

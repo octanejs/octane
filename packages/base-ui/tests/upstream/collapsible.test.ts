@@ -63,6 +63,7 @@ async function clickAndSettle(el: HTMLElement): Promise<void> {
 describe('<Collapsible.Root />', () => {
 	describe('ARIA attributes', () => {
 		// Per CollapsibleRoot.test.tsx:19
+		// @parity-case adapted:base-ui-collapsible-aria
 		it('sets ARIA attributes', async () => {
 			const m = mount(() =>
 				createElement(Collapsible.Root, {
@@ -188,6 +189,7 @@ describe('<Collapsible.Root />', () => {
 		});
 
 		// Per CollapsibleRoot.test.tsx:110
+		// @parity-case adapted:base-ui-collapsible-cancel
 		it('eventDetails.cancel() prevents opening while uncontrolled', async () => {
 			const handleOpenChange = vi.fn((_nextOpen: boolean, eventDetails: any) => {
 				eventDetails.cancel();

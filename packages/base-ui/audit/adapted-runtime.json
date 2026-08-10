@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "project": "base-ui-upstream-adapted",
+  "roots": [
+    "packages/base-ui/tests/upstream"
+  ],
+  "files": [
+    "packages/base-ui/tests/upstream/accordion.test.ts",
+    "packages/base-ui/tests/upstream/collapsible.test.ts",
+    "packages/base-ui/tests/upstream/tabs.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:9484ffc5d42a69fd",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Panel /> passes root hiddenUntilFound to closed panels and allows panel overrides"
+    },
+    {
+      "id": "runtime:69ced2bf8de902e5",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Panel /> passes root keepMounted to closed panels"
+    },
+    {
+      "id": "runtime:5b53f13101772caf",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> ARIA attributes references manual panel id in trigger aria-controls"
+    },
+    {
+      "id": "runtime:ad882920afd387ab",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> ARIA attributes references manual trigger id in panel aria-labelledby"
+    },
+    {
+      "id": "runtime:a8966f36268ea92b",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> ARIA attributes renders correct ARIA attributes"
+    },
+    {
+      "id": "runtime:bde2d1839d5cd5dd",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> ARIA attributes restores panel labeling when a manual trigger id is removed"
+    },
+    {
+      "id": "runtime:f22f867c99e7460c",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> ARIA attributes updates panel labeling when a manual trigger id is added or changed"
+    },
+    {
+      "id": "runtime:b284817f3ece6ea8",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> BaseUIChangeEventDetails onOpenChange cancel() prevents onValueChange while controlled"
+    },
+    {
+      "id": "runtime:3b325e2b73242fab",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> BaseUIChangeEventDetails onOpenChange cancel() prevents opening while uncontrolled"
+    },
+    {
+      "id": "runtime:9c33379ddd49ef8c",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> BaseUIChangeEventDetails onValueChange cancel() prevents opening while multiple"
+    },
+    {
+      "id": "runtime:00831f9a0c9e7d73",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> BaseUIChangeEventDetails onValueChange cancel() prevents opening while uncontrolled"
+    },
+    {
+      "id": "runtime:e546abb0601f2f2c",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> controlled prop: value — custom item value"
+    },
+    {
+      "id": "runtime:086a16f3d9d0e65f",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> prop: disabled can disable one accordion item"
+    },
+    {
+      "id": "runtime:489ea6660643dead",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> prop: disabled can disable the whole accordion"
+    },
+    {
+      "id": "runtime:d40fb4968abceb10",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> single mode toggling (not covered by the jsdom-runnable upstream cases) clicking an open item closes it"
+    },
+    {
+      "id": "runtime:3b94b76b15d35d2a",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> single mode toggling (not covered by the jsdom-runnable upstream cases) multiple keeps both items open"
+    },
+    {
+      "id": "runtime:795c76125d3dc5a0",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> single mode toggling (not covered by the jsdom-runnable upstream cases) opening a second item closes the first"
+    },
+    {
+      "id": "runtime:b591bdd628b60aee",
+      "file": "packages/base-ui/tests/upstream/accordion.test.ts",
+      "fullName": "<Accordion.Root /> uncontrolled prop: defaultValue — custom item value"
+    },
+    {
+      "id": "runtime:823916213ea52752",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Panel /> prop: keepMounted — does not unmount the panel when true"
+    },
+    {
+      "id": "runtime:e2d7625ce8ea020c",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Panel /> suppresses the initial keyframe animation from inline styles when rendered open"
+    },
+    {
+      "id": "runtime:817c26fd0e79daab",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Panel /> suppresses the initial keyframe animation when rendered open"
+    },
+    {
+      "id": "runtime:26b35f7e3f3e07ab",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> ARIA attributes references manual panel id in trigger aria-controls"
+    },
+    {
+      "id": "runtime:b8a598b2aa6db234",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> ARIA attributes sets ARIA attributes"
+    },
+    {
+      "id": "runtime:c69e386f06bf3c82",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> BaseUIChangeEventDetails calls onOpenChange with eventDetails"
+    },
+    {
+      "id": "runtime:78635a11ec23311a",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> BaseUIChangeEventDetails eventDetails.cancel() prevents closing while uncontrolled"
+    },
+    {
+      "id": "runtime:4e5f2a481d4976b3",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> BaseUIChangeEventDetails eventDetails.cancel() prevents opening while uncontrolled"
+    },
+    {
+      "id": "runtime:72a21b576b735d17",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> collapsible status disabled status"
+    },
+    {
+      "id": "runtime:297b3ad46d6f776e",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> collapsible status does not toggle or call onOpenChange when clicked while disabled"
+    },
+    {
+      "id": "runtime:c472a57a86cf44f2",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> open state controlled mode"
+    },
+    {
+      "id": "runtime:77847189e2df60f4",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> open state controlled trigger presses request open and close state changes"
+    },
+    {
+      "id": "runtime:c7aabfbca217a4db",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> open state does not change controlled open state without an external update"
+    },
+    {
+      "id": "runtime:a508ac466478f7e8",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> open state uncontrolled mode"
+    },
+    {
+      "id": "runtime:59543782d5154572",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Root /> state callbacks passes state to className and style callbacks"
+    },
+    {
+      "id": "runtime:1fe3fe4dd13d4d89",
+      "file": "packages/base-ui/tests/upstream/collapsible.test.ts",
+      "fullName": "<Collapsible.Trigger /> forwards the id prop"
+    },
+    {
+      "id": "runtime:301c52f74a55b5a5",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) falls back to the first enabled tab when the implicit selection is disabled"
+    },
+    {
+      "id": "runtime:d022d8ce3ba63541",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) gives the list a tablist role and marks vertical orientation for assistive tech"
+    },
+    {
+      "id": "runtime:c821d3d27752716f",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) hides unselected panels and keeps them out of tab order"
+    },
+    {
+      "id": "runtime:1f8c67b7f2aca355",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) honors an explicit defaultValue that points at a disabled tab"
+    },
+    {
+      "id": "runtime:1a0797a073f44e58",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) leaves a controlled root on a disabled selection instead of falling back"
+    },
+    {
+      "id": "runtime:eafdc9cef88443a7",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) marks only the active tab aria-selected"
+    },
+    {
+      "id": "runtime:069e4ed6aff81944",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) publishes orientation as data-orientation at this pin"
+    },
+    {
+      "id": "runtime:35d75baaf6b134e8",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) puts only the selected tab in tab order"
+    },
+    {
+      "id": "runtime:b273b6b600ad20d2",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) reports an automatic initial selection through onValueChange"
+    },
+    {
+      "id": "runtime:7ee60de2c0687b0c",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) selects a tab on click and moves the panel with it"
+    },
+    {
+      "id": "runtime:7162ce7ab01014cb",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) skips past every disabled tab when falling back"
+    },
+    {
+      "id": "runtime:ab80d5aa16c2a49d",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) supports non-numeric values"
+    },
+    {
+      "id": "runtime:3caf55b4d68c3bd5",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) throws a clear error when a part is used outside Tabs.Root"
+    },
+    {
+      "id": "runtime:ee000653cbbcd7d0",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) unmounts a hidden panel unless keepMounted is set"
+    },
+    {
+      "id": "runtime:6bb898e1d40a9e26",
+      "file": "packages/base-ui/tests/upstream/tabs.test.ts",
+      "fullName": "@octanejs/base-ui — Tabs (ported upstream cases) wires aria-controls and aria-labelledby between each tab and its panel"
+    }
+  ]
+}

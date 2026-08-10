@@ -948,3 +948,4 @@ export const NumberField = {
 	Increment: NumberFieldIncrement,
 	Decrement: NumberFieldDecrement,
 };
+// OCTANE DIVERGENCE[number-field-interaction-gaps][differential:base-ui-number-field]

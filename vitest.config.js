@@ -4685,6 +4685,8 @@ export default defineConfig({
 						'packages/base-ui/tests/**/*.test.ts',
 						'packages/base-ui/tests/**/*.test.tsx',
 						'!packages/base-ui/tests/ssr/**/*.test.ts',
+						'!packages/base-ui/tests/differential/**/*.test.ts',
+						'!packages/base-ui/tests/upstream/**/*.test.ts',
 					],
 					environment: 'jsdom',
 					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
@@ -4692,15 +4694,69 @@ export default defineConfig({
 					// default. Match the other differential-bearing projects at 30s.
 					testTimeout: 30_000,
 					hookTimeout: 30_000,
-					// Differential precompile for base-ui fixtures: rewrites `@octanejs/base-ui/<sub>`
-					// → `@base-ui-components/react/<sub>` so the React side runs real Base UI.
-					globalSetup: ['packages/base-ui/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				// base-ui's `.ts` foundation forwards the caller's slot via subSlot (as does
 				// @octanejs/floating-ui, which base-ui's overlays build on) — both declare
 				// manual hook slots in their package.json, so the auto-slotting pass skips
 				// them.
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/base-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/base-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'base-ui-differential',
+					include: ['packages/base-ui/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/base-ui/tests/differential/_setup.ts'],
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/base-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/base-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'base-ui-upstream-adapted',
+					include: ['packages/base-ui/tests/upstream/**/*.test.ts'],
+					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
 				plugins: [octane()],
 				resolve: {
 					alias: [

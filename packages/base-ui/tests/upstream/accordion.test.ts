@@ -77,6 +77,7 @@ function item(value: any, triggerLabel: string, panelContent: string, extra: any
 describe('<Accordion.Root />', () => {
 	describe('ARIA attributes', () => {
 		// Per AccordionRoot.test.tsx:20
+		// @parity-case adapted:base-ui-accordion-aria
 		it('renders correct ARIA attributes', async () => {
 			const m = mount(() =>
 				createElement(Accordion.Root, {
@@ -227,6 +228,7 @@ describe('<Accordion.Root />', () => {
 
 	describe('uncontrolled', () => {
 		// Per AccordionRoot.test.tsx:195
+		// @parity-case adapted:base-ui-accordion-default-value
 		it('prop: defaultValue — custom item value', async () => {
 			const m = mount(() =>
 				createElement(Accordion.Root, {
