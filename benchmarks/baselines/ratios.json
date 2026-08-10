@@ -1536,6 +1536,38 @@
     "note": "30 select ticks x 2 changed rows = 60 commands, measured exactly 1.0x the floor on 2026-08-08 (was 900000 before the fix)."
   },
   {
+    "suite": "lynx-render",
+    "op": "create_1k_rows_ms",
+    "target": "octane-lynx",
+    "reference": "react-lynx",
+    "maxRatio": 1.8,
+    "note": "Same-run compiled ReactLynx guard on an identical 9,008-host tree with 2,000 verified native handlers. A 21-sample run measured Octane 3.67 ms vs ReactLynx 3.85 ms (0.95x); the wider bound tolerates sub-5-ms timing and GC noise."
+  },
+  {
+    "suite": "lynx-render",
+    "op": "create_10k_rows_ms",
+    "target": "octane-lynx",
+    "reference": "react-lynx",
+    "maxRatio": 1.4,
+    "note": "Same-run production ReactLynx parity guard on an identical 90,008-host tree with 20,000 verified native handlers. One 21-sample run measured Octane 43.76 ms vs ReactLynx 45.57 ms (0.96x); structural gates also require one compiled run and 15 total mount commands."
+  },
+  {
+    "suite": "lynx-render",
+    "op": "update_1k_rows_ms",
+    "target": "octane-lynx",
+    "reference": "react-lynx",
+    "maxRatio": 1.8,
+    "note": "First real native tap after the identical 1,000-row mount, including visible state updates. A 21-sample run measured Octane 0.83 ms vs ReactLynx 0.81 ms (1.03x); the wider ceiling accommodates sub-millisecond scheduling noise."
+  },
+  {
+    "suite": "lynx-render",
+    "op": "update_10k_rows_ms",
+    "target": "octane-lynx",
+    "reference": "react-lynx",
+    "maxRatio": 1.5,
+    "note": "First real native tap after the identical 10,000-row mount. A 21-sample run measured Octane 7.62 ms vs ReactLynx 9.06 ms (0.84x); the guard prevents mount work from moving into the first interaction."
+  },
+  {
     "suite": "lynx-bundle-size",
     "op": "bundle_gzip",
     "target": "octane-ifr",

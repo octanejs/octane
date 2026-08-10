@@ -40,7 +40,12 @@ describe('@octanejs/lynx renderer preset', () => {
 			server: 'unsupported',
 			intrinsics: '@octanejs/lynx/intrinsics',
 			text: 'host',
-			capabilities: ['class-name-alias', 'thread-functions', 'visibility'],
+			capabilities: [
+				'class-name-alias',
+				'template-program-mount',
+				'thread-functions',
+				'visibility',
+			],
 			validation: expect.objectContaining({
 				textHosts: ['raw-text'],
 				textParents: ['text'],
@@ -95,5 +100,8 @@ describe('@octanejs/lynx renderer preset', () => {
 			mainThread.forbiddenImports.filter((name) => name !== '@octanejs/lynx/platform'),
 		).toEqual(background.forbiddenImports);
 		expect(mainThread.hostProps).toBe(background.hostProps);
+		expect(
+			normalizeRendererConfig(lynxRspeedyMainThreadRenderers).registry.lynx.capabilities,
+		).not.toContain('template-program-mount');
 	});
 });

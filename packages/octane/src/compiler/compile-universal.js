@@ -2352,6 +2352,104 @@ function ownerFreeForThreeHostComponent(node, state) {
 	return binding?.scope === trusted.lexical.rootScope ? component : null;
 }
 
+function isTemplateProgramForExpression(node) {
+	if (isOwnerFreeForExpression(node)) return true;
+	if (!node || typeof node !== 'object') return false;
+	if (node.type === 'TemplateLiteral') {
+		return (node.expressions ?? []).every(isTemplateProgramForExpression);
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			isTemplateProgramForExpression(node.test) &&
+			isTemplateProgramForExpression(node.consequent) &&
+			isTemplateProgramForExpression(node.alternate)
+		);
+	}
+	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+		return isTemplateProgramForExpression(node.left) && isTemplateProgramForExpression(node.right);
+	}
+	if (node.type === 'UnaryExpression') return isTemplateProgramForExpression(node.argument);
+	if (
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression' ||
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'TypeCastExpression'
+	) {
+		return isTemplateProgramForExpression(node.expression);
+	}
+	return false;
+}
+
+function isTemplateProgramForHost(node) {
+	if (
+		(node.type !== 'JSXElement' && node.type !== 'Element') ||
+		isComponentElement(node) ||
+		jsxName(node) === 'Activity'
+	) {
+		return false;
+	}
+	const type = jsxName(node);
+	if (type === null || !/^[a-z]/.test(type) || type === 'list' || type === 'list-item') {
+		return false;
+	}
+	for (const attribute of node.openingElement?.attributes ?? node.attributes ?? []) {
+		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
+			return false;
+		}
+		const name = attributeName(attribute);
+		if (
+			name === null ||
+			name === 'key' ||
+			name === 'ref' ||
+			name === 'children' ||
+			name === 'hidden' ||
+			name === 'attach' ||
+			name === 'onUpdate' ||
+			name.startsWith('main-thread:')
+		) {
+			return false;
+		}
+		const value = attribute.value;
+		if (value === null || value?.type === 'Literal') continue;
+		if (value?.type !== 'JSXExpressionContainer') return false;
+		const expression = value.expression;
+		if (expression?.type === 'JSXEmptyExpression') return false;
+		const event = /^(?:bind|catch|capture-bind|capture-catch|global-bind)/.test(name);
+		if (
+			event &&
+			(expression.type === 'ArrowFunctionExpression' || expression.type === 'FunctionExpression')
+		) {
+			continue;
+		}
+		if (!isTemplateProgramForExpression(expression)) return false;
+	}
+	for (const child of node.children ?? []) {
+		if (child.type === 'JSXText') continue;
+		if (child.type === 'JSXExpressionContainer') {
+			if (!isTemplateProgramForExpression(child.expression)) return false;
+			continue;
+		}
+		if (!isTemplateProgramForHost(child)) return false;
+	}
+	return true;
+}
+
+function templateProgramForHost(node, state) {
+	if (
+		node.empty != null ||
+		!rendererHasCapability(state, 'template-program-mount') ||
+		!isOwnerFreeForExpression(node.right) ||
+		!isOwnerFreeForExpression(node.key)
+	) {
+		return false;
+	}
+	const body = (node.body?.body ?? []).filter(
+		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
+	);
+	return body.length === 1 && isTemplateProgramForHost(body[0]);
+}
+
 function allocPlan(state, root, origin = null) {
 	const name = allocName(
 		state,
@@ -3306,6 +3404,8 @@ function compileForAst(node, context, state) {
 			compactComponent.plan,
 			compactComponent.signature,
 		);
+	} else if (!state.hmr && templateProgramForHost(node, state)) {
+		args.push(b.literal(null, 'null'), b.literal(false), b.literal(false), b.literal(true));
 	} else if (node.empty) {
 		args.push(compileBlockValueAst(node.empty?.body ?? [], state, [], node.empty));
 	}

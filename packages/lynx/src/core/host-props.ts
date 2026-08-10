@@ -400,13 +400,47 @@ function sameStructuredValue(first: unknown, second: unknown): boolean {
 }
 
 const NO_MAIN_THREAD_EVENT_PROPS: readonly string[] = Object.freeze([]);
+const NO_MAIN_THREAD_EVENT_PATCHES: readonly LynxMainThreadEventPatch[] = Object.freeze([]);
+const NO_ATTRIBUTE_PATCHES: readonly LynxAttributePatch[] = Object.freeze([]);
+const EMPTY_HOST_PROP_PATCH: LynxHostPropPatch = Object.freeze({
+	attributes: NO_ATTRIBUTE_PATCHES,
+	mainThreadEvents: NO_MAIN_THREAD_EVENT_PATCHES,
+	requiresRecreate: false,
+});
+const MAX_CACHED_CLASS_PATCHES = 128;
+const MAX_CACHED_CLASS_LENGTH = 256;
+const CLASS_HOST_PROP_PATCHES = new Map<string, LynxHostPropPatch>();
 const MAIN_THREAD_PREFIX = 'main-thread:';
 
+function localPlainPropBag(value: Readonly<Record<string, unknown>>): boolean {
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === null || prototype === Object.prototype;
+}
+
+function classHostPropPatch(value: string): LynxHostPropPatch {
+	if (value.length === 0) return EMPTY_HOST_PROP_PATCH;
+	const cached = CLASS_HOST_PROP_PATCHES.get(value);
+	if (cached !== undefined) return cached;
+	const patch: LynxHostPropPatch = Object.freeze({
+		attributes: NO_ATTRIBUTE_PATCHES,
+		mainThreadEvents: NO_MAIN_THREAD_EVENT_PATCHES,
+		requiresRecreate: false,
+		classes: Object.freeze({ value }),
+	});
+	if (value.length > MAX_CACHED_CLASS_LENGTH) return patch;
+	if (CLASS_HOST_PROP_PATCHES.size === MAX_CACHED_CLASS_PATCHES) {
+		const oldest = CLASS_HOST_PROP_PATCHES.keys().next().value;
+		if (oldest !== undefined) CLASS_HOST_PROP_PATCHES.delete(oldest);
+	}
+	CLASS_HOST_PROP_PATCHES.set(value, patch);
+	return patch;
+}
+
 function collectMainThreadEventPropNames(
-	props: Readonly<Record<string, unknown>>,
+	propNames: readonly string[],
 	names: Set<string> | null,
 ): Set<string> | null {
-	for (const name of Object.keys(props)) {
+	for (const name of propNames) {
 		// Cheap prefix test before the regex: this runs for every prop of every
 		// node, and a main-thread event prop is rare.
 		if (!name.startsWith(MAIN_THREAD_PREFIX)) continue;
@@ -416,12 +450,12 @@ function collectMainThreadEventPropNames(
 }
 
 function mainThreadEventPropNames(
-	previous: Readonly<Record<string, unknown>>,
-	next: Readonly<Record<string, unknown>>,
+	previousNames: readonly string[],
+	nextNames: readonly string[],
 ): readonly string[] {
 	const names = collectMainThreadEventPropNames(
-		next,
-		collectMainThreadEventPropNames(previous, null),
+		nextNames,
+		collectMainThreadEventPropNames(previousNames, null),
 	);
 	return names === null ? NO_MAIN_THREAD_EVENT_PROPS : [...names].sort();
 }
@@ -440,8 +474,15 @@ const EMPTY_DATASET: Readonly<Record<string, unknown>> = Object.freeze(Object.cr
 export function normalizeLynxDataset(
 	props: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
+	return normalizeLynxDatasetFromNames(props, Object.keys(props));
+}
+
+function normalizeLynxDatasetFromNames(
+	props: Readonly<Record<string, unknown>>,
+	names: readonly string[],
+): Readonly<Record<string, unknown>> {
 	let dataset: Record<string, unknown> | null = null;
-	for (const name of Object.keys(props)) {
+	for (const name of names) {
 		if (!name.startsWith('data-')) continue;
 		const key = name.slice(5);
 		if (key.length === 0) throw propError('dataset prop `data-` requires a non-empty key.');
@@ -488,20 +529,85 @@ function attributeValue(type: string, name: string, value: unknown): unknown {
 	return value === null || value === undefined ? null : value;
 }
 
+function textOnlyPropNames(names: readonly string[]): boolean {
+	for (const name of names) {
+		if (name !== 'value' && name !== LYNX_CSS_SCOPE_PROP) return false;
+	}
+	return true;
+}
+
+function planTextOnlyHostPropPatch(
+	previous: Readonly<Record<string, unknown>>,
+	next: Readonly<Record<string, unknown>>,
+): LynxHostPropPatch {
+	const previousValue = hasOwn(previous, 'value')
+		? attributeValue('#text', 'value', previous.value)
+		: null;
+	const nextValue = hasOwn(next, 'value') ? attributeValue('#text', 'value', next.value) : null;
+	const patch: {
+		attributes: readonly LynxAttributePatch[];
+		mainThreadEvents: readonly LynxMainThreadEventPatch[];
+		cssScope?: LynxValuePatch<NormalizedLynxCSSScope>;
+		requiresRecreate: boolean;
+	} = {
+		attributes: Object.is(previousValue, nextValue)
+			? NO_ATTRIBUTE_PATCHES
+			: Object.freeze([Object.freeze({ name: 'value', value: nextValue })]),
+		mainThreadEvents: NO_MAIN_THREAD_EVENT_PATCHES,
+		requiresRecreate: false,
+	};
+	const previousScope = decodeLynxCSSScopeMetadata(previous[LYNX_CSS_SCOPE_PROP]);
+	const nextScope = decodeLynxCSSScopeMetadata(next[LYNX_CSS_SCOPE_PROP]);
+	if (!sameScope(previousScope, nextScope)) {
+		if (nextScope === null) patch.requiresRecreate = previousScope !== null;
+		else patch.cssScope = Object.freeze({ value: nextScope });
+	}
+	return Object.freeze(patch);
+}
+
 /** Build a semantic prop diff for the public Lynx Element PAPI channels. */
 export function planLynxHostPropPatch(
 	type: string,
 	previous: Readonly<Record<string, unknown>>,
 	next: Readonly<Record<string, unknown>>,
 ): LynxHostPropPatch {
+	const previousNames = Object.keys(previous);
+	const nextNames = Object.keys(next);
+	if (
+		(type === 'view' || type === 'text') &&
+		previousNames.length === 0 &&
+		(nextNames.length === 0 ||
+			(nextNames.length === 1 &&
+				(nextNames[0] === 'class' || nextNames[0] === 'className') &&
+				typeof next[nextNames[0]] === 'string')) &&
+		localPlainPropBag(previous) &&
+		localPlainPropBag(next)
+	) {
+		return nextNames.length === 0
+			? EMPTY_HOST_PROP_PATCH
+			: classHostPropPatch(next[nextNames[0]!] as string);
+	}
 	if (type === '#text' || type === 'raw-text') {
-		const directProp = [...Object.keys(previous), ...Object.keys(next)].find(
-			(name) => name === 'main-thread:ref' || parseLynxMainThreadEventProp(name) !== null,
-		);
+		let directProp: string | undefined;
+		for (const name of previousNames) {
+			if (name !== 'main-thread:ref' && parseLynxMainThreadEventProp(name) === null) continue;
+			directProp = name;
+			break;
+		}
+		if (directProp === undefined) {
+			for (const name of nextNames) {
+				if (name !== 'main-thread:ref' && parseLynxMainThreadEventProp(name) === null) continue;
+				directProp = name;
+				break;
+			}
+		}
 		if (directProp !== undefined) {
 			throw propError(
 				`raw-text hosts cannot own direct main-thread prop ${JSON.stringify(directProp)}.`,
 			);
+		}
+		if (type === '#text' && textOnlyPropNames(previousNames) && textOnlyPropNames(nextNames)) {
+			return planTextOnlyHostPropPatch(previous, next);
 		}
 	}
 	if (hasOwn(next, LYNX_NODES_REF_ATTRIBUTE)) {
@@ -509,8 +615,8 @@ export function planLynxHostPropPatch(
 			`${JSON.stringify(LYNX_NODES_REF_ATTRIBUTE)} is reserved for generation-scoped query handles.`,
 		);
 	}
-	for (const name of Object.keys(next)) {
-		if (classifyLynxHostPropName(name) === 'reserved' && name.includes(':')) {
+	for (const name of nextNames) {
+		if (name.includes(':') && classifyLynxHostPropName(name) === 'reserved') {
 			throw propError(
 				`namespaced prop ${JSON.stringify(name)} is not a supported Lynx host capability.`,
 			);
@@ -522,13 +628,19 @@ export function planLynxHostPropPatch(
 		inlineStyles?: LynxValuePatch<string>;
 		dataset?: LynxDatasetPatch;
 		cssScope?: LynxValuePatch<NormalizedLynxCSSScope>;
-		mainThreadEvents: LynxMainThreadEventPatch[];
+		mainThreadEvents: readonly LynxMainThreadEventPatch[];
 		mainThreadRef?: LynxValuePatch<LynxMainThreadRefDescriptor | null>;
-		attributes: LynxAttributePatch[];
+		attributes: readonly LynxAttributePatch[];
 		requiresRecreate: boolean;
-	} = { attributes: [], mainThreadEvents: [], requiresRecreate: false };
+	} = {
+		attributes: NO_ATTRIBUTE_PATCHES,
+		mainThreadEvents: NO_MAIN_THREAD_EVENT_PATCHES,
+		requiresRecreate: false,
+	};
+	let attributes: LynxAttributePatch[] | undefined;
+	let mainThreadEvents: LynxMainThreadEventPatch[] | undefined;
 
-	for (const name of mainThreadEventPropNames(previous, next)) {
+	for (const name of mainThreadEventPropNames(previousNames, nextNames)) {
 		const binding = parseLynxMainThreadEventProp(name)!;
 		const previousValue = decodeMainThreadWorklet(previous[name], name);
 		const nextValue = decodeMainThreadWorklet(next[name], name);
@@ -539,7 +651,7 @@ export function planLynxHostPropPatch(
 			);
 		}
 		if (!sameStructuredValue(previousValue, nextValue)) {
-			patch.mainThreadEvents.push(Object.freeze({ binding, value: nextValue }));
+			(mainThreadEvents ??= []).push(Object.freeze({ binding, value: nextValue }));
 		}
 	}
 
@@ -561,8 +673,8 @@ export function planLynxHostPropPatch(
 	const nextStyle = normalizeLynxInlineStyle(next.style) ?? '';
 	if (previousStyle !== nextStyle) patch.inlineStyles = Object.freeze({ value: nextStyle });
 
-	const previousDataset = normalizeLynxDataset(previous);
-	const nextDataset = normalizeLynxDataset(next);
+	const previousDataset = normalizeLynxDatasetFromNames(previous, previousNames);
+	const nextDataset = normalizeLynxDatasetFromNames(next, nextNames);
 	if (!sameDataset(previousDataset, nextDataset)) {
 		const removed = Object.keys(previousDataset).filter((name) => !hasOwn(nextDataset, name));
 		patch.dataset = Object.freeze({ value: nextDataset, removed: Object.freeze(removed) });
@@ -575,24 +687,24 @@ export function planLynxHostPropPatch(
 		else patch.cssScope = Object.freeze({ value: nextScope });
 	}
 
-	for (const name of Object.keys(next)) {
+	for (const name of nextNames) {
 		if (classifyLynxHostPropName(name) !== 'attribute') continue;
 		const nextValue = attributeValue(type, name, next[name]);
 		const previousValue = hasOwn(previous, name)
 			? attributeValue(type, name, previous[name])
 			: null;
 		if (!Object.is(previousValue, nextValue)) {
-			patch.attributes.push(Object.freeze({ name, value: nextValue }));
+			(attributes ??= []).push(Object.freeze({ name, value: nextValue }));
 		}
 	}
-	for (const name of Object.keys(previous)) {
+	for (const name of previousNames) {
 		if (hasOwn(next, name) || classifyLynxHostPropName(name) !== 'attribute') continue;
 		if (attributeValue(type, name, previous[name]) !== null) {
-			patch.attributes.push(Object.freeze({ name, value: null }));
+			(attributes ??= []).push(Object.freeze({ name, value: null }));
 		}
 	}
 
-	Object.freeze(patch.attributes);
-	Object.freeze(patch.mainThreadEvents);
+	if (attributes !== undefined) patch.attributes = Object.freeze(attributes);
+	if (mainThreadEvents !== undefined) patch.mainThreadEvents = Object.freeze(mainThreadEvents);
 	return Object.freeze(patch);
 }

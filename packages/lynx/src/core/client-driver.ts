@@ -3,6 +3,7 @@ import type {
 	UniversalHostBatch,
 	UniversalHostDriver,
 	UniversalHostPropCodecContext,
+	UniversalHostTemplateProgram,
 	UniversalPortalTargetContext,
 	UniversalPortalTargetRegistration,
 	UniversalSerializableValue,
@@ -11,6 +12,9 @@ import type {
 import {
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
+	LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS,
+	countLynxCompactAcknowledgementHosts,
+	type LynxMainThreadCapabilities,
 	type LynxPublicHandleDelta,
 	type LynxHostAttachmentChange,
 } from './protocol.js';
@@ -80,7 +84,7 @@ interface LynxHandleEntry {
 	listDescendant: boolean;
 	attachmentEpoch: number;
 	/** Acknowledged snapshot, still owned by the inbound message. */
-	rawSnapshot: UniversalSerializableValue;
+	rawSnapshot: UniversalSerializableValue | undefined;
 	/** Cached defensive clone handed to consumers; built on first read. */
 	clonedSnapshot: UniversalSerializableValue | undefined;
 	facade: LynxPublicHandle | null;
@@ -95,7 +99,7 @@ interface LynxHandleStateSnapshot {
 	readonly attached: boolean;
 	readonly listDescendant: boolean;
 	readonly attachmentEpoch: number;
-	readonly rawSnapshot: UniversalSerializableValue;
+	readonly rawSnapshot: UniversalSerializableValue | undefined;
 	readonly clonedSnapshot: UniversalSerializableValue | undefined;
 }
 
@@ -194,7 +198,16 @@ function handleFacade(entry: LynxHandleEntry): LynxPublicHandle {
 			return entry.attached;
 		},
 		get snapshot(): UniversalSerializableValue {
-			return (entry.clonedSnapshot ??= cloneSnapshot(entry.rawSnapshot));
+			const snapshot = (entry.rawSnapshot ??= Object.freeze({
+				$$kind: 'octane.lynx.element',
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: entry.root,
+				id: entry.id,
+				type: entry.type,
+				generation: entry.generation,
+				selector: createLynxNodesRefSelector(entry.root, entry.id, entry.generation),
+			}));
+			return (entry.clonedSnapshot ??= cloneSnapshot(snapshot));
 		},
 		invoke<Result extends UniversalSerializableValue = UniversalSerializableValue>(
 			method: string,
@@ -225,7 +238,7 @@ function createHandleEntry(
 	id: number,
 	type: string,
 	generation: number,
-	snapshot: UniversalSerializableValue,
+	snapshot: UniversalSerializableValue | undefined,
 	createSelectorQuery: LynxCreateSelectorQuery,
 ): LynxHandleEntry {
 	return {
@@ -248,10 +261,65 @@ function createHandleEntry(
 
 interface LynxClientContainerState {
 	handles: Map<number, LynxHandleEntry>;
-	readonly generations: Map<number, number>;
+	generations: Map<number, number>;
+	compactHosts: LynxCompactHostMetadata | null;
 	readonly worklets?: LynxBackgroundFunctionRegistry;
 	readonly createSelectorQuery: LynxCreateSelectorQuery;
 	readonly attachmentSubscribers: Set<(batch: UniversalHostAttachmentBatch) => void>;
+	templateMount: boolean;
+	templateProgramMount: boolean;
+	templateProgramRuns: boolean;
+	lazyPublicInstances: boolean;
+}
+
+/** One dense typed range owns every untouched generation-one compact host. */
+interface LynxCompactHostMetadata {
+	readonly root: number;
+	readonly base: number;
+	readonly types: Uint16Array | null;
+	readonly sparse: Map<number, number> | null;
+	readonly names: readonly string[];
+	active: boolean;
+}
+
+function compactHostCode(metadata: LynxCompactHostMetadata, id: number): number {
+	if (!metadata.active || !Number.isSafeInteger(id)) return 0;
+	if (metadata.sparse !== null) return metadata.sparse.get(id) ?? 0;
+	const offset = id - metadata.base;
+	return offset >= 0 && offset < metadata.types!.length ? metadata.types![offset]! : 0;
+}
+
+function setCompactHostCode(metadata: LynxCompactHostMetadata, id: number, code: number): void {
+	if (metadata.sparse !== null) {
+		if (code === 0) metadata.sparse.delete(id);
+		else metadata.sparse.set(id, code);
+		return;
+	}
+	const offset = id - metadata.base;
+	if (offset >= 0 && offset < metadata.types!.length) metadata.types![offset] = code;
+}
+
+function compactHandle(state: LynxClientContainerState, id: number): LynxHandleEntry | undefined {
+	const existing = state.handles.get(id);
+	if (existing !== undefined) return existing;
+	const metadata = state.compactHosts;
+	if (metadata === null) return undefined;
+	const code = compactHostCode(metadata, id);
+	if (code === 0) return undefined;
+	const entry = createHandleEntry(
+		metadata.root,
+		id,
+		metadata.names[code - 1]!,
+		1,
+		undefined,
+		state.createSelectorQuery,
+	);
+	entry.active = true;
+	entry.attached = true;
+	entry.attachmentEpoch = 1;
+	state.handles.set(id, entry);
+	state.generations.set(id, 1);
+	return entry;
 }
 
 const CONTAINER_STATE = new WeakMap<LynxClientContainer, LynxClientContainerState>();
@@ -283,18 +351,35 @@ export function createLynxClientContainer(
 	const container: LynxClientContainer = Object.freeze({
 		renderer: LYNX_TRANSPORT_RENDERER,
 		getPublicHandle(id: number) {
-			const entry = CONTAINER_STATE.get(container)!.handles.get(id);
+			const entry = compactHandle(CONTAINER_STATE.get(container)!, id);
 			return entry === undefined ? null : handleFacade(entry);
 		},
 	});
 	CONTAINER_STATE.set(container, {
 		handles: new Map(),
 		generations: new Map(),
+		compactHosts: null,
 		worklets: options.worklets,
 		createSelectorQuery,
 		attachmentSubscribers: new Set(),
+		templateMount: false,
+		templateProgramMount: false,
+		templateProgramRuns: false,
+		lazyPublicInstances: false,
 	});
 	return container;
+}
+
+/** @internal Publish capabilities only from this container's correlated ready reply. */
+export function setLynxClientCapabilities(
+	container: LynxClientContainer,
+	capabilities: LynxMainThreadCapabilities | undefined,
+): void {
+	const state = containerState(container);
+	state.templateMount = capabilities?.templateMount === 1;
+	state.templateProgramMount = state.templateMount && capabilities?.templateProgram === 1;
+	state.templateProgramRuns = state.templateProgramMount && capabilities?.templateRuns === 1;
+	state.lazyPublicInstances = state.templateProgramMount && capabilities?.lazyPublicInstances === 1;
 }
 
 function collectWorkletExecutionIds(
@@ -313,6 +398,19 @@ function collectWorkletExecutionIds(
 	for (const entry of Object.values(value)) collectWorkletExecutionIds(entry, output, seen);
 }
 
+/** Background-only ownership recorded without adding fields to the cross-thread batch. */
+const PREPARED_WORKLET_EXECUTIONS = new WeakMap<
+	UniversalHostBatch,
+	ReadonlyMap<number, ReadonlySet<string>>
+>();
+
+/** @internal Background execution ownership for commands that actually retained callbacks. */
+export function getLynxClientWorkletBatchExecutions(
+	batch: UniversalHostBatch,
+): ReadonlyMap<number, ReadonlySet<string>> | undefined {
+	return PREPARED_WORKLET_EXECUTIONS.get(batch);
+}
+
 /** Bind background closures only after a complete render reaches the transport boundary. */
 export function prepareLynxClientWorkletBatch(
 	container: LynxClientContainer,
@@ -320,17 +418,20 @@ export function prepareLynxClientWorkletBatch(
 ): UniversalHostBatch {
 	const worklets = containerState(container).worklets;
 	if (worklets === undefined) return batch;
-	const retained = new Set<string>();
+	let retained: Set<string> | undefined;
+	let executions: Map<number, ReadonlySet<string>> | undefined;
+	let commands: Array<UniversalHostBatch['commands'][number]> | undefined;
 	try {
-		const commands = batch.commands.map((command) => {
+		for (let index = 0; index < batch.commands.length; index++) {
+			const command = batch.commands[index]!;
 			if (command.op !== 'create' && command.op !== 'update' && command.op !== 'recreate') {
-				return command;
+				continue;
 			}
-			let changed = false;
-			const props: Record<string, unknown> = { ...command.props };
-			for (const name of Object.keys(props)) {
+			let props: Record<string, unknown> | undefined;
+			let commandExecutions: Set<string> | undefined;
+			for (const name of Object.keys(command.props)) {
 				if (!name.startsWith('main-thread:') || name === 'main-thread:ref') continue;
-				const value = props[name];
+				const value = command.props[name];
 				if (value === null || value === undefined) continue;
 				const descriptor = getThreadFunctionDescriptor(value);
 				if (!isLynxMainThreadWorkletDescriptor(descriptor)) {
@@ -339,15 +440,27 @@ export function prepareLynxClientWorkletBatch(
 					);
 				}
 				const bound = worklets.retain(descriptor as LynxWorkletValue);
-				collectWorkletExecutionIds(bound, retained);
-				props[name] = bound;
-				changed = true;
+				collectWorkletExecutionIds(bound, (commandExecutions ??= new Set()));
+				for (const execution of commandExecutions) (retained ??= new Set()).add(execution);
+				(props ??= { ...command.props })[name] = bound;
 			}
-			return changed ? Object.freeze({ ...command, props: Object.freeze(props) }) : command;
-		});
-		return Object.freeze({ ...batch, commands: Object.freeze(commands) });
+			if (props === undefined) continue;
+			(commands ??= [...batch.commands])[index] = Object.freeze({
+				...command,
+				props: Object.freeze(props),
+			});
+			if (commandExecutions !== undefined && commandExecutions.size !== 0) {
+				(executions ??= new Map()).set(index, commandExecutions);
+			}
+		}
+		if (commands === undefined) return batch;
+		const prepared = Object.freeze({ ...batch, commands: Object.freeze(commands) });
+		if (executions !== undefined) PREPARED_WORKLET_EXECUTIONS.set(prepared, executions);
+		return prepared;
 	} catch (error) {
-		for (const execution of retained) worklets.release(execution);
+		if (retained !== undefined) {
+			for (const execution of retained) worklets.release(execution);
+		}
 		throw error;
 	}
 }
@@ -385,6 +498,10 @@ function cloneSnapshot(value: UniversalSerializableValue): UniversalSerializable
 	return Object.freeze(output);
 }
 
+function foreignSnapshotIdentity(id: number, name: string): never {
+	throw new Error(`Octane Lynx acknowledgement snapshot has foreign ${name} for handle ${id}.`);
+}
+
 function validateSnapshotIdentity(
 	snapshot: UniversalSerializableValue,
 	identity: UniversalTransportIdentity,
@@ -400,19 +517,14 @@ function validateSnapshotIdentity(
 	// allocated two objects and an array of pairs per node, and the selector
 	// string was built even when the snapshot already carried a matching one.
 	const value = snapshot as Record<string, UniversalSerializableValue>;
-	const foreign = (name: string): never => {
-		throw new Error(
-			`Octane Lynx acknowledgement snapshot has foreign ${name} for handle ${delta.id}.`,
-		);
-	};
-	if (value.$$kind !== 'octane.lynx.element') foreign('$$kind');
-	if (value.renderer !== LYNX_TRANSPORT_RENDERER) foreign('renderer');
-	if (value.root !== identity.root) foreign('root');
-	if (value.id !== delta.id) foreign('id');
-	if (value.type !== delta.type) foreign('type');
-	if (value.generation !== delta.generation) foreign('generation');
+	if (value.$$kind !== 'octane.lynx.element') foreignSnapshotIdentity(delta.id, '$$kind');
+	if (value.renderer !== LYNX_TRANSPORT_RENDERER) foreignSnapshotIdentity(delta.id, 'renderer');
+	if (value.root !== identity.root) foreignSnapshotIdentity(delta.id, 'root');
+	if (value.id !== delta.id) foreignSnapshotIdentity(delta.id, 'id');
+	if (value.type !== delta.type) foreignSnapshotIdentity(delta.id, 'type');
+	if (value.generation !== delta.generation) foreignSnapshotIdentity(delta.id, 'generation');
 	if (value.selector !== createLynxNodesRefSelector(identity.root, delta.id, delta.generation)) {
-		foreign('selector');
+		foreignSnapshotIdentity(delta.id, 'selector');
 	}
 }
 
@@ -438,6 +550,236 @@ function expectedHandleDelta(transition: LynxHandleTransition): LynxExpectedHand
 	return transition.snapshotChanged ? 'update' : 'none';
 }
 
+/**
+ * Derive initial, fully attached identities from the background's own trusted
+ * batch. No main-owned snapshot crosses the wire; public snapshots/selectors
+ * are reconstructed only when a ref or query actually observes one.
+ */
+export function prepareLynxCompactHandleDeltas(
+	container: LynxClientContainer,
+	batch: UniversalHostBatch,
+	count: number,
+	identity: UniversalTransportIdentity,
+	knownHostCount?: number,
+): LynxPreparedHandleDeltas {
+	const state = containerState(container);
+	if (
+		identity.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION ||
+		identity.renderer !== LYNX_TRANSPORT_RENDERER ||
+		batch.renderer !== LYNX_TRANSPORT_RENDERER ||
+		identity.version !== batch.version ||
+		!Number.isSafeInteger(identity.root) ||
+		identity.root <= 0
+	) {
+		throw new Error('Octane Lynx compact acknowledgement has a foreign transport identity.');
+	}
+	if (state.handles.size !== 0 || state.generations.size !== 0 || state.compactHosts !== null) {
+		throw new Error('Octane Lynx compact acknowledgement requires a fresh client container.');
+	}
+	if (
+		!Number.isSafeInteger(count) ||
+		count < LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS ||
+		(knownHostCount === undefined
+			? countLynxCompactAcknowledgementHosts(batch) !== count
+			: knownHostCount !== count)
+	) {
+		throw new Error('Octane Lynx compact acknowledgement has a mismatched host count or batch.');
+	}
+
+	const originalHandles = state.handles;
+	const originalGenerations = state.generations;
+	const originalCompactHosts = state.compactHosts;
+	const stagedHandles = new Map<number, LynxHandleEntry>();
+	const stagedGenerations = new Map<number, number>();
+	const names: string[] = [];
+	const codes = new Map<string, number>();
+	let base = 0;
+	let dense: Uint16Array | null = null;
+	let sparse: Map<number, number> | null = null;
+	let stagedCount = 0;
+	const patterns = new WeakMap<UniversalHostTemplateProgram, Uint16Array>();
+	const typeCode = (type: string): number => {
+		if (typeof type !== 'string' || type.length === 0) {
+			throw new Error('Octane Lynx compact acknowledgement contains an invalid host identity.');
+		}
+		let code = codes.get(type);
+		if (code === undefined) {
+			code = names.push(type);
+			codes.set(type, code);
+		}
+		return code;
+	};
+	const initializeDense = (id: number): void => {
+		base = id;
+		// Logical owner/range IDs share the allocator with physical hosts. A
+		// keyed row therefore leaves ordinary holes; twice the host count
+		// keeps that common near-contiguous layout dense without allocating
+		// across an attacker-sized sparse ID range.
+		dense = new Uint16Array(count * 2);
+	};
+	const stage = (id: number, type: string): void => {
+		if (!Number.isSafeInteger(id) || id <= 0) {
+			throw new Error('Octane Lynx compact acknowledgement contains an invalid host identity.');
+		}
+		const code = typeCode(type);
+		if (stagedCount === 0) {
+			initializeDense(id);
+		}
+		const offset = id - base;
+		if (sparse === null && (offset < 0 || offset >= dense!.length || code > 0xffff)) {
+			sparse = new Map<number, number>();
+			for (let index = 0; index < dense!.length; index++) {
+				const prior = dense![index]!;
+				if (prior !== 0) sparse.set(base + index, prior);
+			}
+			dense = null;
+		}
+		if (sparse !== null) {
+			if (sparse.has(id)) {
+				throw new Error(`Octane Lynx compact acknowledgement repeats handle ${id}.`);
+			}
+			sparse.set(id, code);
+		} else {
+			if (dense![offset] !== 0) {
+				throw new Error(`Octane Lynx compact acknowledgement repeats handle ${id}.`);
+			}
+			dense![offset] = code;
+		}
+		stagedCount++;
+	};
+	const stageProgramRange = (firstId: number, program: UniversalHostTemplateProgram): void => {
+		const length = program.nodes.length;
+		if (
+			!Number.isSafeInteger(firstId) ||
+			firstId <= 0 ||
+			length === 0 ||
+			firstId > Number.MAX_SAFE_INTEGER - (length - 1)
+		) {
+			throw new Error('Octane Lynx compact acknowledgement contains an invalid host identity.');
+		}
+		let pattern = patterns.get(program);
+		if (pattern === undefined) {
+			pattern = new Uint16Array(length);
+			let immutable = Object.isFrozen(program) && Object.isFrozen(program.nodes);
+			for (let index = 0; index < length; index++) {
+				const node = program.nodes[index]!;
+				if (immutable && !Object.isFrozen(node)) immutable = false;
+				const code = typeCode(node.type);
+				if (code > 0xffff) {
+					for (let fallback = 0; fallback < length; fallback++) {
+						stage(firstId + fallback, program.nodes[fallback]!.type);
+					}
+					return;
+				}
+				pattern[index] = code;
+			}
+			if (immutable) patterns.set(program, pattern);
+		}
+		if (stagedCount === 0) initializeDense(firstId);
+		const offset = firstId - base;
+		if (sparse === null && offset >= 0 && offset <= dense!.length - length) {
+			for (let index = 0; index < length; index++) {
+				if (dense![offset + index] !== 0) {
+					throw new Error(`Octane Lynx compact acknowledgement repeats handle ${firstId + index}.`);
+				}
+			}
+			dense!.set(pattern, offset);
+			stagedCount += length;
+			return;
+		}
+		for (let index = 0; index < length; index++) {
+			stage(firstId + index, program.nodes[index]!.type);
+		}
+	};
+	for (let index = 0; index < batch.commands.length; index++) {
+		const command = batch.commands[index]!;
+		if (command.op === 'create') {
+			stage(command.id, command.type);
+		} else if (command.op === 'mount-template') {
+			for (let node = 0; node < command.nodes.length; node++) {
+				stage(command.nodes[node]!.id, command.shape[node]!.type);
+			}
+		} else if (command.op === 'mount-template-range') {
+			stageProgramRange(command.firstId, command.program);
+		} else if (command.op === 'mount-template-run') {
+			const length = command.program.nodes.length;
+			const hosts = command.count * length;
+			if (
+				!Number.isSafeInteger(command.count) ||
+				command.count <= 0 ||
+				!Number.isSafeInteger(hosts) ||
+				command.firstId > Number.MAX_SAFE_INTEGER - (hosts - 1)
+			) {
+				throw new Error('Octane Lynx compact acknowledgement contains an invalid host identity.');
+			}
+			stageProgramRange(command.firstId, command.program);
+			if (command.count === 1) continue;
+			const offset = command.firstId - base;
+			if (sparse === null && offset >= 0 && offset <= dense!.length - hosts) {
+				for (let node = length; node < hosts; node++) {
+					if (dense![offset + node] !== 0) {
+						throw new Error(
+							`Octane Lynx compact acknowledgement repeats handle ${command.firstId + node}.`,
+						);
+					}
+				}
+				let written = length;
+				while (written < hosts) {
+					const next = Math.min(written, hosts - written);
+					dense!.copyWithin(offset + written, offset, offset + next);
+					written += next;
+				}
+				stagedCount += hosts - length;
+				continue;
+			}
+			for (let instance = 1; instance < command.count; instance++) {
+				stageProgramRange(command.firstId + instance * length, command.program);
+			}
+		}
+	}
+	if (stagedCount !== count) {
+		throw new Error('Octane Lynx compact acknowledgement omitted an accepted host.');
+	}
+	const stagedCompactHosts: LynxCompactHostMetadata = {
+		root: identity.root,
+		base,
+		types: dense,
+		sparse,
+		names,
+		active: true,
+	};
+
+	let applied = false;
+	let rolledBack = false;
+	return {
+		apply() {
+			if (applied || rolledBack) return;
+			applied = true;
+			state.handles = stagedHandles;
+			state.generations = stagedGenerations;
+			state.compactHosts = stagedCompactHosts;
+		},
+		rollback() {
+			if (!applied || rolledBack) return;
+			rolledBack = true;
+			stagedCompactHosts.active = false;
+			state.handles = originalHandles;
+			state.generations = originalGenerations;
+			state.compactHosts = originalCompactHosts;
+			for (const handle of stagedHandles.values()) {
+				handle.active = false;
+				handle.attached = false;
+				if (handle.facade !== null || handle.binding !== null) {
+					invalidateHandleBinding(
+						handle,
+						new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was rolled back.`),
+					);
+				}
+			}
+		},
+	};
+}
+
 /** @internal Used by the background transport immediately before core ACK. */
 export function prepareLynxHandleDeltas(
 	container: LynxClientContainer,
@@ -459,14 +801,14 @@ export function prepareLynxHandleDeltas(
 	const originalHandles = state.handles;
 	const stagedHandles = new Map<number, LynxHandleEntry | null>();
 	const finalHandle = (id: number): LynxHandleEntry | undefined => {
-		if (!stagedHandles.has(id)) return originalHandles.get(id);
+		if (!stagedHandles.has(id)) return compactHandle(state, id);
 		return stagedHandles.get(id) ?? undefined;
 	};
 	const transitions = new Map<number, LynxHandleTransition>();
 	const transitionFor = (id: number): LynxHandleTransition => {
 		let transition = transitions.get(id);
 		if (transition !== undefined) return transition;
-		const initial = originalHandles.get(id);
+		const initial = compactHandle(state, id);
 		transition = {
 			initial,
 			present: initial !== undefined,
@@ -478,6 +820,49 @@ export function prepareLynxHandleDeltas(
 		return transition;
 	};
 	for (const command of batch.commands) {
+		if (command.op === 'mount-template-run') {
+			const length = command.program.nodes.length;
+			for (let instance = 0; instance < command.count; instance++) {
+				const firstId = command.firstId + instance * length;
+				for (let index = 0; index < length; index++) {
+					const id = firstId + index;
+					const transition = transitionFor(id);
+					if (transition.present) {
+						throw new Error(`Octane Lynx batch creates existing handle ${id}.`);
+					}
+					transition.present = true;
+					transition.type = command.program.nodes[index]!.type;
+					transition.snapshotChanged = true;
+				}
+			}
+			continue;
+		}
+		if (command.op === 'mount-template-range') {
+			for (let index = 0; index < command.program.nodes.length; index++) {
+				const id = command.firstId + index;
+				const transition = transitionFor(id);
+				if (transition.present) {
+					throw new Error(`Octane Lynx batch creates existing handle ${id}.`);
+				}
+				transition.present = true;
+				transition.type = command.program.nodes[index]!.type;
+				transition.snapshotChanged = true;
+			}
+			continue;
+		}
+		if (command.op === 'mount-template') {
+			for (let index = 0; index < command.nodes.length; index++) {
+				const node = command.nodes[index]!;
+				const transition = transitionFor(node.id);
+				if (transition.present) {
+					throw new Error(`Octane Lynx batch creates existing handle ${node.id}.`);
+				}
+				transition.present = true;
+				transition.type = command.shape[index]!.type;
+				transition.snapshotChanged = true;
+			}
+			continue;
+		}
 		if (
 			command.op !== 'create' &&
 			command.op !== 'update' &&
@@ -524,9 +909,7 @@ export function prepareLynxHandleDeltas(
 	// Main owns the accepted host topology and publishes this derived bit. The
 	// command gate prevents ancestry state from changing on a non-structural ACK;
 	// identity, generation, transition, and change checks guard its lifecycle.
-	const hasTopologyMutation = batch.commands.some(
-		(command) => command.op === 'insert' || command.op === 'move' || command.op === 'remove',
-	);
+	let hasTopologyMutation: boolean | undefined;
 	const stageGeneration = (id: number, generation: number) => {
 		if (!priorGenerations.has(id)) priorGenerations.set(id, state.generations.get(id));
 		nextGenerations.set(id, generation);
@@ -539,7 +922,10 @@ export function prepareLynxHandleDeltas(
 		const transition = transitions.get(delta.id);
 		const expected = transition === undefined ? 'none' : expectedHandleDelta(transition);
 		if (delta.op === 'list-ancestry') {
-			const handle = originalHandles.get(delta.id);
+			hasTopologyMutation ??= batch.commands.some(
+				(command) => command.op === 'insert' || command.op === 'move' || command.op === 'remove',
+			);
+			const handle = compactHandle(state, delta.id);
 			if (
 				!hasTopologyMutation ||
 				expected !== 'none' ||
@@ -672,6 +1058,7 @@ export function prepareLynxHandleDeltas(
 		}
 	}
 
+	const removedCompactHosts = new Map<number, number>();
 	let applied = false;
 	let rolledBack = false;
 	return {
@@ -697,14 +1084,30 @@ export function prepareLynxHandleDeltas(
 			// result and a two-element entry array per step, and a mount walks one
 			// entry per accepted node.
 			stagedHandles.forEach((handle, id) => {
-				if (handle === null) originalHandles.delete(id);
-				else originalHandles.set(id, handle);
+				if (handle === null) {
+					originalHandles.delete(id);
+					const metadata = state.compactHosts;
+					if (metadata !== null) {
+						const code = compactHostCode(metadata, id);
+						if (code !== 0) {
+							removedCompactHosts.set(id, code);
+							setCompactHostCode(metadata, id, 0);
+						}
+					}
+				} else {
+					originalHandles.set(id, handle);
+				}
 			});
 			nextGenerations.forEach((generation, id) => state.generations.set(id, generation));
 		},
 		rollback() {
 			if (!applied || rolledBack) return;
 			rolledBack = true;
+			if (state.compactHosts !== null) {
+				for (const [id, code] of removedCompactHosts) {
+					setCompactHostCode(state.compactHosts, id, code);
+				}
+			}
 			for (const id of stagedHandles.keys()) {
 				const previous = transitions.get(id)?.initial;
 				if (previous === undefined) originalHandles.delete(id);
@@ -745,19 +1148,27 @@ export function isLynxClientEventTarget(
 	id: number,
 	generation: number,
 ): boolean {
-	const entry = containerState(container).handles.get(id);
+	const state = containerState(container);
+	const entry = state.handles.get(id);
+	if (entry !== undefined) {
+		return entry.active && entry.attached && entry.root === root && entry.generation === generation;
+	}
+	const metadata = state.compactHosts;
 	return (
-		entry !== undefined &&
-		entry.active &&
-		entry.attached &&
-		entry.root === root &&
-		entry.generation === generation
+		metadata !== null &&
+		metadata.root === root &&
+		generation === 1 &&
+		compactHostCode(metadata, id) !== 0
 	);
 }
 
 /** @internal Releases query handles when their background transport closes. */
 export function invalidateLynxClientContainer(container: LynxClientContainer): void {
 	const state = containerState(container);
+	if (state.compactHosts !== null) {
+		state.compactHosts.active = false;
+		state.compactHosts = null;
+	}
 	const handles = [...state.handles.values()];
 	const subscribers = [...state.attachmentSubscribers];
 	const detached: number[] = [];
@@ -829,7 +1240,7 @@ export function applyLynxHostAttachments(
 			throw new Error(`Octane Lynx host attachment repeats handle ${change.id}.`);
 		}
 		seen.add(change.id);
-		const handle = state.handles.get(change.id);
+		const handle = compactHandle(state, change.id);
 		if (
 			handle === undefined ||
 			!handle.active ||
@@ -879,13 +1290,30 @@ const DISCRETE_EVENTS = new Set([
 	'touchstart',
 ]);
 const CONTINUOUS_EVENTS = new Set(['layoutchange', 'scroll', 'touchmove', 'wheel']);
-export function createLynxClientDriver(): UniversalHostDriver<
-	LynxClientContainer,
-	LynxPublicHandle
-> {
+export function createLynxClientDriver(
+	container?: LynxClientContainer,
+): UniversalHostDriver<LynxClientContainer, LynxPublicHandle> {
+	const negotiatedState = container === undefined ? null : containerState(container);
 	const driver: UniversalHostDriver<LynxClientContainer, LynxPublicHandle> = {
 		id: LYNX_TRANSPORT_RENDERER,
-		capabilities: Object.freeze({ text: 'host' as const, visibility: true }),
+		capabilities: Object.freeze({
+			text: 'host' as const,
+			visibility: true,
+			stableStaticHostProps: true,
+			collapsedTemplateMount: true,
+			get templateMount() {
+				return negotiatedState?.templateMount === true;
+			},
+			get templateProgramMount() {
+				return negotiatedState?.templateProgramMount === true;
+			},
+			get templateProgramRuns() {
+				return negotiatedState?.templateProgramRuns === true;
+			},
+			get lazyPublicInstances() {
+				return negotiatedState?.lazyPublicInstances === true;
+			},
+		}),
 		portals: Object.freeze({
 			prepareTarget({
 				container,
@@ -955,7 +1383,10 @@ export function createLynxClientDriver(): UniversalHostDriver<
 				let active = true;
 				return Object.freeze({
 					isAttached(id: number) {
-						return state.handles.get(id)?.attached ?? false;
+						const materialized = state.handles.get(id);
+						return materialized === undefined
+							? state.compactHosts !== null && compactHostCode(state.compactHosts, id) !== 0
+							: materialized.attached;
 					},
 					unsubscribe() {
 						if (!active) return;
@@ -1021,7 +1452,7 @@ export function createLynxClientDriver(): UniversalHostDriver<
 			);
 		},
 		getPublicInstance(container: LynxClientContainer, id: number) {
-			const entry = containerState(container).handles.get(id);
+			const entry = compactHandle(containerState(container), id);
 			return entry === undefined ? null : handleFacade(entry);
 		},
 	};

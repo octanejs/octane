@@ -589,15 +589,13 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
-		// Native Lynx dual-thread render cost (Node-only): drives the real
-		// background root, async transport, main receiver, and host driver through
-		// a cheap fake Element PAPI, so the milliseconds are Octane's own per-node
-		// CPU cost. It also gates that a native tap reaches its background handler
-		// through the engine's own `publishEvent` receiver. No device timing claim.
+		// Compiled Octane and pinned ReactLynx dual-thread render cost (Node-only)
+		// on the same cheap Element PAPI. Both visible trees and real native taps
+		// must match; three quick samples keep same-run ratio guards stable.
 		name: 'lynx-render',
 		cwd: 'lynx-render',
 		servers: [],
-		iter: { normal: 5, quick: 1 },
+		iter: { normal: 5, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

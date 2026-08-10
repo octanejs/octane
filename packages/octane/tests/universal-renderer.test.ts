@@ -1996,6 +1996,87 @@ export function Scene() @{
 		root.unmount();
 	});
 
+	it('elides proven intrinsic tree owners while retaining keyed getter hooks and event captures', () => {
+		const source = `
+			export function Scene({items, select}) @{
+				@for (const item of items; key item.id) {
+					<node id={item.id}>
+						<leaf bindtap={() => select(item.id)}>{item.label as string}</leaf>
+					</node>
+				}
+			}
+		`;
+		const supported = { ...renderer, capabilities: ['template-program-mount'] } as const;
+		let output = compile(source, '/src/ProgramTree.object.tsrx', {
+			renderer: supported,
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/,\s*null,\s*false,\s*false,\s*true\s*\)/);
+		expect(
+			compile(source, '/src/ProgramTree.object.tsrx', { renderer, hmr: false }).code,
+		).not.toMatch(/,\s*null,\s*false,\s*false,\s*true\s*\)/);
+		expect(
+			compile(source, '/src/ProgramTree.object.tsrx', { renderer: supported, hmr: true }).code,
+		).not.toMatch(/,\s*null,\s*false,\s*false,\s*true\s*\)/);
+
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const ProgramTree = new Function('__universal', `${output}\nreturn Scene;`)(
+			UniversalRuntime,
+		) as (props: unknown) => unknown;
+		const container = createObjectContainer();
+		const base = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...base,
+			capabilities: { ...base.capabilities, templateProgramMount: true },
+			events: {
+				classify(name) {
+					return name === 'bindtap'
+						? { type: 'tap', priority: 'discrete' as const }
+						: (base.events?.classify(name) ?? null);
+				},
+			},
+		});
+		const selected: string[] = [];
+		let setLabel!: (value: string) => void;
+		const first = { id: 'a', label: 'plain' };
+		const second = {
+			id: 'b',
+			get label() {
+				const [value, update] = UniversalRuntime.useState('hooked', 'program-getter');
+				setLabel = update;
+				return value;
+			},
+		};
+
+		root.render(ProgramTree as any, {
+			items: [first, second],
+			select: (id: string) => selected.push(`first:${id}`),
+		});
+		const [plainHost, hookedHost] = container.children;
+		expect(plainHost.children[0].children[0].props.value).toBe('plain');
+		expect(hookedHost.children[0].children[0].props.value).toBe('hooked');
+		container.dispatchEvent(hookedHost.children[0], 'tap', undefined);
+		expect(selected).toEqual(['first:b']);
+
+		UniversalRuntime.flushUniversalSync(() => setLabel('updated'));
+		expect(container.children).toEqual([plainHost, hookedHost]);
+		expect(hookedHost.children[0].children[0].props.value).toBe('updated');
+
+		root.render(ProgramTree as any, {
+			items: [second, first],
+			select: (id: string) => selected.push(`second:${id}`),
+		});
+		expect(container.children).toEqual([hookedHost, plainHost]);
+		container.dispatchEvent(plainHost.children[0], 'tap', undefined);
+		expect(selected).toEqual(['first:b', 'second:a']);
+		root.unmount();
+	});
+
 	it('classifies each stable leaf once when one retained host must be recreated', () => {
 		const container = createObjectContainer();
 		const classified: string[] = [];

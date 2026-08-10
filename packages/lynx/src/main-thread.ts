@@ -40,10 +40,17 @@ import {
 } from './core/native-events.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
+	LYNX_CAPABILITY_READY_REQUEST_BASE,
+	LYNX_COMPACT_ACKNOWLEDGEMENT,
+	LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS,
+	LYNX_LAZY_PUBLIC_INSTANCES,
+	LYNX_LAZY_PUBLIC_INSTANCE_READY_REQUEST_BASE,
+	LYNX_TEMPLATE_RUN_READY_REQUEST_BASE,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
 	LYNX_READY_ANNOUNCEMENT_REQUEST,
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
+	countLynxCompactAcknowledgementHosts,
 	sameLynxTransportIdentity,
 	selfCheckLynxBackgroundInboundMessage,
 	validateLynxBackgroundInboundMessage,
@@ -60,6 +67,7 @@ import {
 	type LynxHostAttachmentMessage,
 	type LynxHostFaultMessage,
 	type LynxMainCallPublicationMessage,
+	type LynxMainThreadCapabilities,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
 	type LynxPageDataMessage,
@@ -162,6 +170,7 @@ interface LynxQueuedNativeEventDelivery {
 interface ActiveLynxMainRoot<Node extends LynxElementRef> {
 	readonly root: number;
 	readonly container: LynxHostContainer<Node>;
+	readonly capabilities?: LynxMainThreadCapabilities;
 	acceptedVersion: number;
 	lastMainCall: number;
 	lastMainCallPublication: number;
@@ -411,38 +420,34 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 	prepared: LynxPreparedHostBatch,
 	batch: UniversalHostBatch,
 ): readonly LynxPublicHandleDelta[] {
-	const handles = new Map<number, LynxPublicHandleDelta>();
+	const handles: LynxPublicHandleDelta[] = [];
+	let publishedIds: Set<number> | null = null;
+	const alreadyPublished = (id: number): boolean => {
+		if (publishedIds === null) {
+			publishedIds = new Set(handles.map((handle) => handle.id));
+		}
+		return publishedIds.has(id);
+	};
 	for (const delta of prepared.handleDelta) {
 		if (delta.op === 'destroy') {
-			handles.set(
-				delta.id,
-				Object.freeze({
-					op: 'remove',
-					id: delta.id,
-					generation: delta.generation,
-				}),
-			);
+			handles.push(Object.freeze({ op: 'remove', id: delta.id, generation: delta.generation }));
 		} else {
-			handles.set(
-				delta.handle.id,
+			handles.push(
 				publicHandleUpsert(delta.handle, getLynxHostPublicState(container, delta.handle.id)),
 			);
 		}
 	}
 	for (const command of batch.commands) {
-		if (command.op !== 'update' || handles.has(command.id)) continue;
+		if (command.op !== 'update' || alreadyPublished(command.id)) continue;
 		const handle = driver.getPublicInstance(container, command.id);
 		if (handle !== null) {
-			handles.set(
-				command.id,
-				publicHandleUpsert(handle, getLynxHostPublicState(container, command.id)),
-			);
+			handles.push(publicHandleUpsert(handle, getLynxHostPublicState(container, command.id)));
+			publishedIds!.add(command.id);
 		}
 	}
 	for (const delta of prepared.listAncestryDelta) {
-		if (handles.has(delta.id)) continue;
-		handles.set(
-			delta.id,
+		if (alreadyPublished(delta.id)) continue;
+		handles.push(
 			Object.freeze({
 				op: 'list-ancestry',
 				id: delta.id,
@@ -450,8 +455,9 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 				listDescendant: delta.listDescendant,
 			}),
 		);
+		publishedIds!.add(delta.id);
 	}
-	return Object.freeze([...handles.values()]);
+	return Object.freeze(handles);
 }
 
 /**
@@ -557,6 +563,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let readyAnnouncementInProgress = false;
 	let dispatchingReadyRequest: number | null = null;
 	let correlatedReadySent = false;
+	let negotiatedCapabilities: LynxMainThreadCapabilities | undefined;
 	let firstTreeSnapshotSent = false;
 	let uninstallFirstScreenHost: (() => void) | null = null;
 	const queuedCommits: LynxCommitMessage[] = [];
@@ -1237,6 +1244,35 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			type: 'main-ready',
 			request,
 			...(snapshot == null ? null : { firstTree: snapshot }),
+			...(request < LYNX_CAPABILITY_READY_REQUEST_BASE
+				? null
+				: {
+						capabilities: {
+							compactAck: 1 as const,
+							...(driver.capabilities?.templateMount === true
+								? { templateMount: 1 as const }
+								: null),
+							...(firstTree === null &&
+							snapshot === null &&
+							driver.capabilities?.templateProgramMount === true
+								? { templateProgram: 1 as const }
+								: null),
+							...(request >= LYNX_LAZY_PUBLIC_INSTANCE_READY_REQUEST_BASE &&
+							firstTree === null &&
+							snapshot === null &&
+							driver.capabilities?.templateProgramMount === true &&
+							driver.capabilities?.lazyPublicInstances === true
+								? { lazyPublicInstances: 1 as const }
+								: null),
+							...(request >= LYNX_TEMPLATE_RUN_READY_REQUEST_BASE &&
+							firstTree === null &&
+							snapshot === null &&
+							driver.capabilities?.templateProgramMount === true &&
+							driver.capabilities?.templateProgramRuns === true
+								? { templateRuns: 1 as const }
+								: null),
+						},
+					}),
 		};
 		if (request !== LYNX_READY_ANNOUNCEMENT_REQUEST && !correlatedReadySent) {
 			correlatedReadySent = true;
@@ -1244,6 +1280,11 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 		if (lifecycleClosed) return false;
 		dispatch(reply);
+		if (request !== LYNX_READY_ANNOUNCEMENT_REQUEST) {
+			// Delivery must succeed before an inbound commit can exercise any optional
+			// wire behavior. First-tree peers deliberately discard every capability.
+			negotiatedCapabilities = snapshot === null ? reply.capabilities : undefined;
+		}
 		if (snapshot !== null) firstTreeSnapshotSent = true;
 		return true;
 	};
@@ -1929,6 +1970,32 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			);
 			return;
 		}
+		const peerCapabilities = active === null ? negotiatedCapabilities : active.capabilities;
+		if (
+			message.instances === LYNX_LAZY_PUBLIC_INSTANCES &&
+			peerCapabilities?.lazyPublicInstances !== 1
+		) {
+			reject(identity, new Error('Octane Lynx rejected unnegotiated lazy public instances.'));
+			return;
+		}
+		if (peerCapabilities?.templateProgram !== 1 || peerCapabilities.templateRuns !== 1) {
+			for (const command of message.batch.commands) {
+				if (command.op === 'mount-template-range' && peerCapabilities?.templateProgram !== 1) {
+					reject(
+						identity,
+						new Error('Octane Lynx rejected an unnegotiated intrinsic template program.'),
+					);
+					return;
+				}
+				if (command.op === 'mount-template-run' && peerCapabilities?.templateRuns !== 1) {
+					reject(
+						identity,
+						new Error('Octane Lynx rejected an unnegotiated intrinsic template run.'),
+					);
+					return;
+				}
+			}
+		}
 
 		let record = active;
 		const provisional = record === null;
@@ -1936,6 +2003,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			try {
 				record = {
 					root: message.root,
+					...(peerCapabilities === undefined ? null : { capabilities: peerCapabilities }),
 					container: createLynxHostContainer(papi, {
 						root: message.root,
 						page,
@@ -1965,7 +2033,11 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				record.container,
 				message.batch,
 				candidateFirstTree === null
-					? undefined
+					? provisional && message.ack === LYNX_COMPACT_ACKNOWLEDGEMENT
+						? message.instances === LYNX_LAZY_PUBLIC_INSTANCES
+							? { compact: true, lazyPublicInstances: true }
+							: { compact: true }
+						: undefined
 					: {
 							firstTree: candidateFirstTree,
 							onMismatch(error) {
@@ -2023,17 +2095,48 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			}
 		}
 		const startedAck = LYNX_PROFILE ? performance.now() : 0;
-		const handles = acknowledgementHandles(driver, record.container, prepared, message.batch);
-		const acknowledgement: LynxTransportAcknowledgement = {
-			...identity,
-			type: 'ack',
-			handles,
-			...(prepared.firstTreeAction === 'none'
-				? null
+		let compactCount: number | null =
+			message.ack === LYNX_COMPACT_ACKNOWLEDGEMENT &&
+			provisional &&
+			!applyFailed &&
+			prepared.firstTreeAction === 'none' &&
+			prepared.listAncestryDelta.length === 0
+				? (prepared.compactHostCount ?? countLynxCompactAcknowledgementHosts(message.batch))
+				: null;
+		if (compactCount !== null && compactCount < LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS) {
+			compactCount = null;
+		}
+		if (compactCount !== null && prepared.compactHostCount !== compactCount) {
+			if (prepared.handleDelta.length !== compactCount) {
+				compactCount = null;
+			} else {
+				for (let index = 0; index < prepared.handleDelta.length; index++) {
+					const delta = prepared.handleDelta[index]!;
+					if (delta.op !== 'create' || delta.handle.generation !== 1) {
+						compactCount = null;
+						break;
+					}
+				}
+			}
+		}
+		const acknowledgement: LynxTransportAcknowledgement =
+			compactCount === null
+				? {
+						...identity,
+						type: 'ack',
+						handles: acknowledgementHandles(driver, record.container, prepared, message.batch),
+						...(prepared.firstTreeAction === 'none'
+							? null
+							: {
+									adoption: prepared.firstTreeAction === 'adopt' ? 'adopted' : 'repaired',
+								}),
+					}
 				: {
-						adoption: prepared.firstTreeAction === 'adopt' ? 'adopted' : 'repaired',
-					}),
-		};
+						...identity,
+						type: 'ack',
+						encoding: LYNX_COMPACT_ACKNOWLEDGEMENT,
+						count: compactCount,
+					};
 		try {
 			dispatch(acknowledgement);
 			if (LYNX_PROFILE) lynxWireProfile().ackMs += performance.now() - startedAck;

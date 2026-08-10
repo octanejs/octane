@@ -9,6 +9,7 @@ import type { LynxComponent } from './intrinsics.js';
 import {
 	createLynxClientContainer,
 	createLynxClientDriver,
+	getLynxClientWorkletBatchExecutions,
 	prepareLynxClientWorkletBatch,
 	type LynxClientContainer,
 	type LynxPublicHandle,
@@ -132,32 +133,6 @@ function identityAdvanced(
 	);
 }
 
-function collectBackgroundExecutionIds(
-	value: unknown,
-	output: Set<string>,
-	seen: Set<object> = new Set(),
-): void {
-	if (value === null || typeof value !== 'object' || seen.has(value)) return;
-	seen.add(value);
-	if (Array.isArray(value)) {
-		for (const entry of value) collectBackgroundExecutionIds(entry, output, seen);
-		return;
-	}
-	const execution = (value as { readonly _execId?: unknown })._execId;
-	if (typeof execution === 'string' && execution.length !== 0) output.add(execution);
-	for (const entry of Object.values(value)) collectBackgroundExecutionIds(entry, output, seen);
-}
-
-function batchBackgroundExecutionIds(batch: UniversalHostBatch): Set<string> {
-	const ids = new Set<string>();
-	for (const command of batch.commands) {
-		if (command.op === 'create' || command.op === 'update' || command.op === 'recreate') {
-			collectBackgroundExecutionIds(command.props, ids);
-		}
-	}
-	return ids;
-}
-
 /** Create one background-owned root and its isolated async transport state. */
 export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 	const target = readBackgroundGlobals(options.target ?? defaultBackgroundTarget());
@@ -177,41 +152,53 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 		else acceptedExecutionCounts.set(execution, count - 1);
 	};
 	const acceptWorkletBatch = (batch: UniversalHostBatch): void => {
-		const releaseCandidates = new Set<string>();
-		for (const command of batch.commands) {
+		const executions = getLynxClientWorkletBatchExecutions(batch);
+		if (executions === undefined && acceptedWorklets.size === 0) return;
+		let releaseCandidates: Set<string> | undefined;
+		for (let index = 0; index < batch.commands.length; index++) {
+			const command = batch.commands[index]!;
 			if (command.op === 'create' || command.op === 'update' || command.op === 'recreate') {
 				const previous = acceptedWorklets.get(command.id);
 				if (previous !== undefined) {
 					for (const execution of previous) {
 						releaseAcceptedExecution(execution);
-						releaseCandidates.add(execution);
+						(releaseCandidates ??= new Set()).add(execution);
 					}
 				}
-				const ids = new Set<string>();
-				collectBackgroundExecutionIds(command.props, ids);
-				acceptedWorklets.set(command.id, ids);
-				for (const execution of ids) {
-					retainAcceptedExecution(execution);
-					releaseCandidates.add(execution);
+				const ids = executions?.get(index);
+				if (ids === undefined) {
+					if (previous !== undefined) acceptedWorklets.delete(command.id);
+				} else {
+					acceptedWorklets.set(command.id, ids);
+					for (const execution of ids) {
+						retainAcceptedExecution(execution);
+						(releaseCandidates ??= new Set()).add(execution);
+					}
 				}
 			} else if (command.op === 'destroy') {
 				const previous = acceptedWorklets.get(command.id);
 				if (previous !== undefined) {
 					for (const execution of previous) {
 						releaseAcceptedExecution(execution);
-						releaseCandidates.add(execution);
+						(releaseCandidates ??= new Set()).add(execution);
 					}
+					acceptedWorklets.delete(command.id);
 				}
-				acceptedWorklets.delete(command.id);
 			}
 		}
-		for (const execution of releaseCandidates) {
-			if (!acceptedExecutionCounts.has(execution)) worklets.release(execution);
+		if (releaseCandidates !== undefined) {
+			for (const execution of releaseCandidates) {
+				if (!acceptedExecutionCounts.has(execution)) worklets.release(execution);
+			}
 		}
 	};
 	const rejectWorkletBatch = (batch: UniversalHostBatch): void => {
-		for (const execution of batchBackgroundExecutionIds(batch)) {
-			if (!acceptedExecutionCounts.has(execution)) worklets.release(execution);
+		const executions = getLynxClientWorkletBatchExecutions(batch);
+		if (executions === undefined) return;
+		for (const ids of executions.values()) {
+			for (const execution of ids) {
+				if (!acceptedExecutionCounts.has(execution)) worklets.release(execution);
+			}
 		}
 	};
 	const container = createLynxClientContainer({
@@ -255,7 +242,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 		try {
 			const root = createUniversalRoot<LynxClientContainer, LynxPublicHandle>(
 				container,
-				createLynxClientDriver(),
+				createLynxClientDriver(container),
 				{ scheduleMicrotask, transport },
 			);
 			transport.bindRoot(root);
