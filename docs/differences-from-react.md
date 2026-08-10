@@ -215,7 +215,7 @@ assumption.
 ```tsx
 const labels = formatRows(rows); // Cached on [rows]: imported projection.
 const items = virtualizer.getVirtualItems(); // Not cached: member call.
-const visible = todos.filter((todo) => !todo.completed); // Not cached.
+const visible = todos.filter((todo) => !todo.completed); // Cached only for proven state snapshots.
 let freshLabels = formatRows(rows); // Not cached: `let` is an escape hatch.
 ```
 
@@ -225,9 +225,22 @@ of seeing a new array or object on every render.
 
 The same callee rule governs declaration caching. The virtualizer call must stay
 live because its window can move while the virtualizer object keeps the same
-identity. The `filter` call is a genuine optimization miss—the compiler cannot
-yet distinguish it from the live-object case—so both fail closed. Use an
-explicit `useMemo` when the identity matters.
+identity. Most member calls, including arbitrary `items.filter(...)` calls,
+therefore remain uncached.
+
+The production `.tsrx` compiler admits one narrow exception: a native `filter`
+projection over a state value created by a genuine `useState([])` call when every
+setter use remains private and produces a fresh, provably ordinary array
+snapshot. The predicate must only inspect an own data property, and a runtime
+guard verifies the array's dense entries, item properties, native methods,
+constructor, and species before reusing an unchanged snapshot. Unknown aliases,
+mutable receivers, getters, proxies, sparse arrays, overridden methods, custom
+species, and unproven predicates retain the existing live path. Use an explicit
+`useMemo` when an otherwise unsupported identity needs caching.
+
+Within the same proven component, a single-token class object driven by primitive
+state can reuse its existing per-binding change guard. Controlled `value` and
+`checked` bindings still reassert their values on every commit.
 
 Also never cached:
 

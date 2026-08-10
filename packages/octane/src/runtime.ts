@@ -18451,6 +18451,7 @@ function isPortalTarget(block: Block, domParent: Node): boolean {
 }
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
+const NATIVE_ARRAY_FILTER = /* @__PURE__ */ (() => Array.prototype.filter)();
 const NATIVE_REFLECT_APPLY = Reflect.apply;
 const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
 // Components hand the reconciler immutable array snapshots. Memoizing indexed
@@ -18462,6 +18463,7 @@ const NATIVE_ARRAY_ACCESSORS = new WeakMap<
 	object,
 	{ length: number; accessor: boolean; renderable?: boolean }
 >();
+let IMMUTABLE_FILTER_ARRAYS: WeakMap<object, Map<string, number>> | undefined;
 
 /**
  * Compiler ABI for a safely reusable value-position array. A plain dense array
@@ -18525,6 +18527,58 @@ export function compilerCacheArray(value: unknown, previous: unknown): boolean {
 	// record and still needs its accessor verdict to cover every array index.
 	NATIVE_ARRAY_ACCESSORS.set(value, { length, accessor, renderable });
 	return renderable;
+}
+
+/**
+ * Reuse a native filter projection from a compiler-proven state snapshot.
+ *
+ * Generated code calls this only after its ordinary dependency comparisons
+ * prove a possible cache hit, so fresh snapshots never pay a classification
+ * scan. Intrinsics are rechecked on every hit without invoking user getters;
+ * dense array entries and the predicate's own data property are inspected
+ * once per immutable snapshot and property.
+ * @internal
+ */
+export function compilerCacheImmutableArrayFilter(value: unknown, property: string): boolean {
+	if (
+		Object.getOwnPropertyDescriptor(Array.prototype, 'filter')?.value !== NATIVE_ARRAY_FILTER ||
+		Object.getOwnPropertyDescriptor(Array.prototype, 'map')?.value !== NATIVE_ARRAY_MAP ||
+		Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
+		Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER ||
+		!Array.isArray(value) ||
+		Object.getPrototypeOf(value) !== Array.prototype ||
+		hasOwnProp.call(value, 'filter') ||
+		hasOwnProp.call(value, 'map') ||
+		hasOwnProp.call(value, 'constructor')
+	) {
+		return false;
+	}
+
+	const length = value.length;
+	let properties = IMMUTABLE_FILTER_ARRAYS?.get(value);
+	if (properties?.get(property) === length) return true;
+
+	for (let index = 0; index < length; index++) {
+		const entry = Object.getOwnPropertyDescriptor(value, index);
+		if (entry === undefined || entry.get !== undefined || entry.set !== undefined) return false;
+		const item = entry.value;
+		if (
+			item === null ||
+			typeof item !== 'object' ||
+			Object.getPrototypeOf(item) !== Object.prototype
+		) {
+			return false;
+		}
+		const member = Object.getOwnPropertyDescriptor(item, property);
+		if (member === undefined || member.get !== undefined || member.set !== undefined) return false;
+	}
+
+	if (properties === undefined) {
+		properties = new Map();
+		(IMMUTABLE_FILTER_ARRAYS ??= new WeakMap()).set(value, properties);
+	}
+	properties.set(property, length);
+	return true;
 }
 
 /**

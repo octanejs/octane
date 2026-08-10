@@ -64,3 +64,19 @@ uncontrolled edit fields, keyed todo identity, and DOM-only harness contract.
 node benchmarks/bench.mjs todomvc            # via the suite runner (starts servers)
 node benchmarks/bench.mjs --quick todomvc    # reduced smoke pass
 ```
+
+The untimed production-work gate also drives the existing Octane app through
+editing, filter changes, and immutable todo updates. Chromium precise coverage
+counts the original filter-predicate calls without changing array methods;
+browser mutation records verify that unchanged filter classes are not rewritten.
+Every interaction checks keyed row identity, the selected filter, footer counts,
+editor behavior, and controlled-checkbox restoration:
+
+```bash
+pnpm --filter octane-tsrx-todomvc exec vite build --minify false
+pnpm --filter octane-tsrx-todomvc preview
+pnpm --dir benchmarks/todomvc bench:work
+```
+
+`TARGET_URL` overrides the preview address, and `WORK_JSON` saves the measured
+counts. Normal TodoMVC timings continue to use the minified production build.

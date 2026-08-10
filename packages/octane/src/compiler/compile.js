@@ -2398,7 +2398,358 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx, invariant) {
 // reads (memoizing a value nothing renders only adds cells), and whose
 // dependencies are all component locals. Bodies that already went through Pass
 // A′ arrive with hook-shaped inits and are skipped.
-function rewriteAutoCalculation(stmt, componentLocals, renderReadNames, ctx) {
+function immutableArrayDatum(node, item, allowUpdates = true) {
+	node = unwrapTsExpr(node);
+	if (!node) return false;
+	if (node.type === 'Identifier' || node.type === 'Literal') return true;
+	if (node.type === 'UpdateExpression') return allowUpdates && node.argument?.type === 'Identifier';
+	if (node.type === 'UnaryExpression')
+		return node.operator === '!' && immutableArrayDatum(node.argument, item, allowUpdates);
+	if (node.type === 'BinaryExpression') {
+		return (
+			['===', '!=='].includes(node.operator) &&
+			immutableArrayDatum(node.left, item, allowUpdates) &&
+			immutableArrayDatum(node.right, item, allowUpdates)
+		);
+	}
+	if (node.type === 'LogicalExpression') {
+		return (
+			immutableArrayDatum(node.left, item, allowUpdates) &&
+			immutableArrayDatum(node.right, item, allowUpdates)
+		);
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			immutableArrayDatum(node.test, item, allowUpdates) &&
+			immutableArrayDatum(node.consequent, item, allowUpdates) &&
+			immutableArrayDatum(node.alternate, item, allowUpdates)
+		);
+	}
+	return (
+		node.type === 'MemberExpression' &&
+		!node.optional &&
+		!node.computed &&
+		node.object?.type === 'Identifier' &&
+		node.object.name === item &&
+		node.property?.type === 'Identifier' &&
+		node.property.name !== 'current'
+	);
+}
+
+function immutableArrayRecord(node, item) {
+	if (node?.type !== 'ObjectExpression') return false;
+	for (const property of node.properties || []) {
+		if (property.type === 'SpreadElement') {
+			if (
+				item === null ||
+				property.argument?.type !== 'Identifier' ||
+				property.argument.name !== item
+			)
+				return false;
+			continue;
+		}
+		if (
+			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
+			property.computed ||
+			property.method ||
+			(property.kind !== undefined && property.kind !== 'init')
+		)
+			return false;
+		const key = property.key;
+		if (key?.type !== 'Identifier' && !(key?.type === 'Literal' && typeof key.value === 'string'))
+			return false;
+		if ((key.type === 'Identifier' ? key.name : key.value) === '__proto__') return false;
+		if (!immutableArrayDatum(property.value, item)) return false;
+	}
+	return true;
+}
+
+function immutableArrayResult(node, previous) {
+	node = unwrapTsExpr(node);
+	if (node?.type === 'ArrayExpression') {
+		return node.elements.every(
+			(element) =>
+				element !== null &&
+				(element.type === 'SpreadElement'
+					? previous !== null &&
+						element.argument?.type === 'Identifier' &&
+						element.argument.name === previous
+					: immutableArrayRecord(element, null)),
+		);
+	}
+	if (
+		previous === null ||
+		node?.type !== 'CallExpression' ||
+		node.optional ||
+		node.arguments.length !== 1
+	)
+		return false;
+	const callee = node.callee;
+	if (
+		callee?.type !== 'MemberExpression' ||
+		callee.optional ||
+		callee.computed ||
+		callee.object?.type !== 'Identifier' ||
+		callee.object.name !== previous ||
+		callee.property?.type !== 'Identifier' ||
+		!['map', 'filter'].includes(callee.property.name)
+	)
+		return false;
+	const callback = unwrapTsExpr(node.arguments[0]);
+	if (
+		callback?.type !== 'ArrowFunctionExpression' ||
+		callback.async ||
+		callback.params?.length !== 1 ||
+		callback.params[0]?.type !== 'Identifier'
+	)
+		return false;
+	const item = callback.params[0].name;
+	const body = unwrapTsExpr(callback.body);
+	if (callee.property.name === 'filter') return immutableArrayDatum(body, item);
+	if (body?.type === 'ConditionalExpression') {
+		return (
+			immutableArrayDatum(body.test, item) &&
+			[body.consequent, body.alternate].every(
+				(arm) =>
+					(arm?.type === 'Identifier' && arm.name === item) || immutableArrayRecord(arm, item),
+			)
+		);
+	}
+	return immutableArrayRecord(body, item);
+}
+
+function immutableStateSetterCall(call, setter) {
+	if (
+		call?.type !== 'CallExpression' ||
+		call.optional ||
+		call.callee?.type !== 'Identifier' ||
+		call.callee.name !== setter ||
+		call.arguments.length !== 1
+	)
+		return false;
+	const argument = unwrapTsExpr(call.arguments[0]);
+	if (argument?.type === 'ArrayExpression') return immutableArrayResult(argument, null);
+	if (
+		argument?.type !== 'ArrowFunctionExpression' ||
+		argument.async ||
+		argument.params?.length !== 1 ||
+		argument.params[0]?.type !== 'Identifier'
+	)
+		return false;
+	return immutableArrayResult(argument.body, argument.params[0].name);
+}
+
+function collectImmutableStateProvenance(statements, jsxNodes, ctx) {
+	const arrays = new Map();
+	const primitives = new Set();
+	for (const statement of statements) {
+		if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') continue;
+		for (const declaration of statement.declarations || []) {
+			const init = unwrapTsExpr(declaration.init);
+			if (
+				init?.type !== 'CallExpression' ||
+				init.callee?.type !== 'Identifier' ||
+				ctx.octaneImportLocals?.get(init.callee.name) !== 'useState' ||
+				stableHookCallName(init) !== 'useState' ||
+				init.arguments.length !== 1 ||
+				declaration.id?.type !== 'ArrayPattern' ||
+				declaration.id.elements?.length !== 2 ||
+				declaration.id.elements.some((element) => element?.type !== 'Identifier')
+			)
+				continue;
+			const [value, setter] = declaration.id.elements;
+			const initial = unwrapTsExpr(init.arguments[0]);
+			if (initial?.type === 'ArrayExpression' && initial.elements.length === 0) {
+				arrays.set(value.name, { setter: setter.name, declaration });
+			} else if (
+				initial?.type === 'Literal' &&
+				(initial.value === null || ['string', 'number', 'boolean'].includes(typeof initial.value))
+			) {
+				primitives.add(value.name);
+			}
+		}
+	}
+	for (const [state, candidate] of arrays) {
+		let safe = true;
+		const visited = new WeakSet();
+		const derived = new Map();
+		for (const statement of statements) {
+			if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') continue;
+			for (const declaration of statement.declarations || []) {
+				if (declaration.id?.type !== 'Identifier') continue;
+				const initial = unwrapTsExpr(declaration.init);
+				if (
+					initial?.type === 'MemberExpression' &&
+					!initial.computed &&
+					initial.property?.name === 'length'
+				)
+					continue;
+				if (immutableArrayProjection(initial, { arrays })?.receiver === state) {
+					derived.set(declaration.id.name, declaration);
+				}
+			}
+		}
+		function visit(node, parent = null, key = null, grandparent = null) {
+			if (!safe || node === null || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) visit(child, parent, key, grandparent);
+				return;
+			}
+			if (visited.has(node)) return;
+			visited.add(node);
+			if (node.type === 'Identifier') {
+				if (node.name === candidate.setter) {
+					if (parent === candidate.declaration.id) return;
+					if (
+						parent?.type !== 'CallExpression' ||
+						key !== 'callee' ||
+						!immutableStateSetterCall(parent, candidate.setter)
+					)
+						safe = false;
+				} else if (node.name === state) {
+					if (parent === candidate.declaration.id) return;
+					if (
+						parent?.type === 'MemberExpression' &&
+						key === 'object' &&
+						!parent.computed &&
+						parent.property?.type === 'Identifier'
+					) {
+						if (parent.property.name === 'length') return;
+						if (
+							parent.property.name === 'filter' &&
+							grandparent?.type === 'CallExpression' &&
+							grandparent.callee === parent &&
+							immutableArrayProjection(grandparent, { arrays })?.receiver === state
+						)
+							return;
+					}
+					if (
+						parent?.type === 'ConditionalExpression' &&
+						(key === 'consequent' || key === 'alternate') &&
+						immutableArrayProjection(parent, { arrays })?.receiver === state
+					)
+						return;
+					safe = false;
+				} else if (derived.has(node.name)) {
+					if (parent === derived.get(node.name) && key === 'id') return;
+					if (parent?.type === 'JSXForExpression' && key === 'right') return;
+					if (
+						parent?.type === 'MemberExpression' &&
+						key === 'object' &&
+						!parent.computed &&
+						parent.property?.name === 'length'
+					)
+						return;
+					safe = false;
+				}
+				return;
+			}
+			if (node !== candidate.declaration && node.type === 'VariableDeclarator') {
+				const names = new Set();
+				collectBindings(node.id, names);
+				if (names.has(state) || names.has(candidate.setter)) {
+					safe = false;
+					return;
+				}
+			}
+			if (FN_TYPES.has(node.type)) {
+				const names = new Set();
+				for (const parameter of node.params || []) collectBindings(parameter, names);
+				if (names.has(state) || names.has(candidate.setter)) {
+					safe = false;
+					return;
+				}
+			}
+			for (const field in node) {
+				if (AST_WALK_SKIP_KEYS.has(field)) continue;
+				if (
+					(node.type === 'Property' || node.type === 'ObjectProperty') &&
+					field === 'key' &&
+					!node.computed
+				)
+					continue;
+				if (node.type === 'MemberExpression' && field === 'property' && !node.computed) continue;
+				visit(node[field], node, field, parent);
+			}
+		}
+		visit(statements);
+		visit(jsxNodes);
+		if (!safe) arrays.delete(state);
+	}
+	return arrays.size === 0 ? null : { arrays, primitives };
+}
+
+function immutableArrayProjection(node, provenance) {
+	if (provenance === null) return null;
+	let found = null;
+	function walk(value) {
+		value = unwrapTsExpr(value);
+		if (!value) return false;
+		if (value.type === 'ConditionalExpression') {
+			return (
+				walk(value.consequent) &&
+				walk(value.alternate) &&
+				immutableArrayDatum(value.test, null, false)
+			);
+		}
+		if (value.type === 'Identifier') return provenance.arrays.has(value.name);
+		if (
+			value.type === 'MemberExpression' &&
+			!value.computed &&
+			!value.optional &&
+			value.property?.name === 'length'
+		) {
+			return walk(value.object);
+		}
+		if (value.type !== 'CallExpression' || value.optional || value.arguments.length !== 1)
+			return false;
+		const member = value.callee;
+		if (
+			member?.type !== 'MemberExpression' ||
+			member.computed ||
+			member.optional ||
+			member.object?.type !== 'Identifier' ||
+			member.property?.name !== 'filter' ||
+			!provenance.arrays.has(member.object.name)
+		)
+			return false;
+		const predicate = unwrapTsExpr(value.arguments[0]);
+		if (
+			predicate?.type !== 'ArrowFunctionExpression' ||
+			predicate.async ||
+			predicate.params?.length !== 1 ||
+			predicate.params[0]?.type !== 'Identifier'
+		)
+			return false;
+		let body = unwrapTsExpr(predicate.body);
+		if (body?.type === 'UnaryExpression' && body.operator === '!')
+			body = unwrapTsExpr(body.argument);
+		if (
+			body?.type !== 'MemberExpression' ||
+			body.computed ||
+			body.optional ||
+			body.object?.type !== 'Identifier' ||
+			body.object.name !== predicate.params[0].name ||
+			body.property?.type !== 'Identifier' ||
+			body.property.name === 'current'
+		)
+			return false;
+		const proof = { receiver: member.object.name, property: body.property.name };
+		if (found !== null && (found.receiver !== proof.receiver || found.property !== proof.property))
+			return false;
+		found = proof;
+		return true;
+	}
+	return walk(node) && found !== null ? found : null;
+}
+
+function rewriteAutoCalculation(
+	stmt,
+	componentLocals,
+	renderReadNames,
+	ctx,
+	immutableStates = null,
+) {
 	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
 	if (stmt.declarations?.length !== 1) return stmt;
 	const decl = stmt.declarations[0];
@@ -2410,7 +2761,8 @@ function rewriteAutoCalculation(stmt, componentLocals, renderReadNames, ctx) {
 	if (!isPropCreationExpr(init, ctx)) return stmt;
 	// Every call reached during render must be a proven value projection — the
 	// same admission the region cache uses. A member call fails closed.
-	if (containsRenderCall([init], ctx)) return stmt;
+	const immutableProjection = immutableArrayProjection(init, immutableStates);
+	if (immutableProjection === null && containsRenderCall([init], ctx)) return stmt;
 	const deps = [];
 	const seen = new Set();
 	for (const name of collectFreeIdentifiers(init, [])) {
@@ -2439,7 +2791,13 @@ function rewriteAutoCalculation(stmt, componentLocals, renderReadNames, ctx) {
 				...decl,
 				init: inheritOriginLoc(
 					b.call(
-						{ ...b.id('useMemo'), _octaneGenerated: true },
+						{
+							...b.id('useMemo'),
+							_octaneGenerated: true,
+							...(immutableProjection === null
+								? null
+								: { _octaneImmutableArrayFilter: immutableProjection }),
+						},
 						b.arrow([], init),
 						b.array(deps.map((n) => b.id(n))),
 					),
@@ -7590,6 +7948,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		nextHookMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
+		currentDirtyBindingStates: null, // proven primitive state identities inherited by JSX arms
 		currentBodyIsComponentScope: false, // planning the component body itself, not a nested arm
 		currentProfileComponentId: null,
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
@@ -12152,6 +12511,19 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	let workingStatements = statements;
 	let mountCallbackSinks = new Map();
 	let bodyInvariantLocals = null;
+	const immutableStateProvenance =
+		options?.autoCallback === true &&
+		!returnedOutput &&
+		ctx.autoMemo === true &&
+		ctx.inlineHookMemo === true &&
+		ctx.mode !== 'server' &&
+		!ctx.dev &&
+		!ctx.hmr &&
+		!ctx.profile &&
+		ctx._universalRuntimeUnit == null
+			? collectImmutableStateProvenance(statements, jsxNodes, ctx)
+			: null;
+	let hasImmutableArrayProjection = false;
 	if (options && options.autoCallback && ctx.currentComponentLocals) {
 		const stableSet = computeStableLocals(statements, ctx.currentComponentLocals);
 		bodyInvariantLocals = computeInvariantLocals(statements, ctx.currentComponentLocals, true);
@@ -12224,7 +12596,14 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 						ctx.currentComponentLocals,
 						renderReadNames,
 						ctx,
+						immutableStateProvenance,
 					);
+					if (
+						rewritten !== statement &&
+						rewritten.declarations[0].init.callee._octaneImmutableArrayFilter !== undefined
+					) {
+						hasImmutableArrayProjection = true;
+					}
 					if (ctx.autoMemo && rewritten !== statement) {
 						(autoCalculatedDeclarations ??= new Map()).set(
 							statement.declarations[0].id.name,
@@ -12303,6 +12682,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// Nested hoisted helpers derive a filtered inherited set in hoistBodyHelper.
 	const prevInvariantLocals = ctx.currentInvariantLocals;
 	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
+	const prevDirtyBindingStates = ctx.currentDirtyBindingStates;
+	if (hasImmutableArrayProjection) {
+		ctx.currentDirtyBindingStates = immutableStateProvenance.primitives;
+	}
 	const invariantLocals = new Set(prevInvariantLocals || []);
 	const eventInvariantLocals = new Set(prevEventInvariantLocals || []);
 	if (ctx.currentComponentLocals) {
@@ -12383,6 +12766,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
+	ctx.currentDirtyBindingStates = prevDirtyBindingStates;
 	ctx.currentBodyIsComponentScope = prevBodyIsComponentScope;
 	ctx._inheritBody = prevInheritBody;
 	ctx._fnOrigin = prevFnOrigin;
@@ -13010,6 +13394,49 @@ function isFreshBindingExpr(node) {
 		value?.type === 'ArrayExpression' ||
 		value?.type === 'ArrowFunctionExpression' ||
 		value?.type === 'FunctionExpression'
+	);
+}
+
+// One plain clsx token is equivalent to its conditional string. Keeping that
+// string in the existing binding cell supplies an exact dependency dirty mask
+// without skipping controlled fields, observing getters, or allocating objects.
+function scalarStateClass(node, ctx) {
+	if (
+		ctx.currentDirtyBindingStates == null ||
+		node?.type !== 'ObjectExpression' ||
+		node.properties?.length !== 1
+	)
+		return null;
+	const property = node.properties[0];
+	if (
+		(property?.type !== 'Property' && property?.type !== 'ObjectProperty') ||
+		property.computed ||
+		property.method ||
+		(property.kind !== undefined && property.kind !== 'init')
+	)
+		return null;
+	const key = property.key;
+	if (key?.type !== 'Identifier' && !(key?.type === 'Literal' && typeof key.value === 'string'))
+		return null;
+	const token = key.type === 'Identifier' ? key.name : key.value;
+	if (token === '' || token === '__proto__') return null;
+	const condition = unwrapTsExpr(property.value);
+	if (condition?.type !== 'BinaryExpression' || !['===', '!=='].includes(condition.operator))
+		return null;
+	const left = unwrapTsExpr(condition.left);
+	const right = unwrapTsExpr(condition.right);
+	const state = left?.type === 'Identifier' ? left : right?.type === 'Identifier' ? right : null;
+	const literal = state === left ? right : left;
+	if (
+		state === null ||
+		!ctx.currentDirtyBindingStates.has(state.name) ||
+		literal?.type !== 'Literal' ||
+		!(literal.value === null || ['string', 'number', 'boolean'].includes(typeof literal.value))
+	)
+		return null;
+	return inheritOriginLoc(
+		b.conditional(condition, inheritOriginLoc(b.literal(token), key), b.literal('')),
+		node,
 	);
 }
 
@@ -14845,6 +15272,7 @@ function authoredHookMemoOf(stmt) {
 		kind: stmt.kind,
 		fn,
 		deps,
+		immutableArrayFilter: callee._octaneImmutableArrayFilter ?? null,
 		generatedInvariant:
 			name === 'useCallback' &&
 			callee._octaneGenerated === true &&
@@ -14978,6 +15406,21 @@ function lowerAuthoredHookMemo(stmt, ctx) {
 			'||',
 			missTest,
 			b.unary('!', hkObjectIs(cellRef(base + 1 + i), b.id(hookMemoTemp(ctx, i)))),
+		);
+	}
+	if (entry.immutableArrayFilter !== null) {
+		const { receiver, property } = entry.immutableArrayFilter;
+		missTest = b.logical(
+			'||',
+			missTest,
+			b.unary(
+				'!',
+				b.call(
+					requireRuntimeForContext(ctx, 'compilerCacheImmutableArrayFilter'),
+					b.id(receiver),
+					b.literal(property),
+				),
+			),
 		);
 	}
 	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
@@ -22118,13 +22561,14 @@ function emitElementHtml(
 			}
 		} else if (attrName === 'class') {
 			// (`className` was already normalized to `class` above.)
+			const scalar = firstSpreadIdx === -1 ? scalarStateClass(inner, ctx) : null;
 			bindings.push({
 				id: bindings.length,
 				kind: 'class',
-				expr,
+				expr: scalar === null ? expr : tsrxExprNode(scalar, ctx, componentName, inlinedSubs),
 				path,
 				ns: hostNs,
-				fresh: isFreshBindingExpr(inner),
+				fresh: scalar === null && isFreshBindingExpr(inner),
 				nameOrigin: attr.name,
 			});
 		} else if (

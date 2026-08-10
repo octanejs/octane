@@ -202,6 +202,7 @@ export {
 	componentSlotVoid,
 	componentSlotLite,
 	compilerCacheArray,
+	compilerCacheImmutableArrayFilter,
 	compilerCacheMappedArray,
 	compilerCacheContext,
 	compilerOwnsContextProvider,

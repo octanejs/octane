@@ -165,6 +165,630 @@ function loadReturnedProviderComponentMapFixture() {
 	});
 }
 
+const STATE_FILTER_SOURCE = `
+	import { useState } from 'octane';
+
+	export function App(props) @{
+		const [todos, setTodos] = useState([]);
+		const [filter, setFilter] = useState('all');
+		const [editing, setEditing] = useState(false);
+		const visible = filter === 'active'
+			? todos.filter((todo) => !todo.completed)
+			: filter === 'completed'
+				? todos.filter((todo) => todo.completed)
+				: todos;
+		const remaining = todos.filter((todo) => !todo.completed).length;
+
+		<section id="state-filter-app" data-editing={editing ? 'yes' : 'no'}>
+			<button
+				id="state-filter-load"
+				onClick={() => setTodos([
+					{ id: 1, label: 'first', completed: false },
+					{ id: 2, label: 'second', completed: true },
+				])}
+			>{'load'}</button>
+			<button id="state-filter-edit" onClick={() => setEditing(!editing)}>{'edit'}</button>
+			<button
+				id="state-filter-replace"
+				onClick={() => setTodos((current) => current.map((todo) => todo.id === 1
+					? { ...todo, label: 'updated', completed: true }
+					: todo))}
+			>{'replace'}</button>
+			<button
+				id="state-filter-add"
+				onClick={() => setTodos((current) => [
+					...current,
+					{ id: 3, label: 'third', completed: false },
+				])}
+			>{'add'}</button>
+			<button
+				id="state-filter-all"
+				class={{ selected: filter === 'all' }}
+				onClick={() => setFilter('all')}
+			>{'all'}</button>
+			<button
+				id="state-filter-active"
+				class={{ selected: filter === 'active' }}
+				onClick={() => setFilter('active')}
+			>{'active'}</button>
+			<button
+				id="state-filter-completed"
+				class={{ selected: filter === 'completed' }}
+				onClick={() => setFilter('completed')}
+			>{'completed'}</button>
+			<input id="state-filter-value" value={props.value} onInput={() => {}} />
+			<input
+				id="state-filter-toggle-all"
+				type="checkbox"
+				checked={remaining === 0}
+				onClick={() => {}}
+			/>
+			<output id="state-filter-remaining">{'' + remaining}</output>
+			<ul id="state-filter-rows">
+				@for (const todo of visible; key todo.id) {
+					<li class={{ editing: editing && todo.id === 1 }} data-id={todo.id}>
+						<input
+							class="state-filter-row-check"
+							type="checkbox"
+							checked={todo.completed}
+							onClick={() => {}}
+						/>
+						<span>{todo.label as string}</span>
+					</li>
+				}
+			</ul>
+		</section>
+	}
+`;
+
+function loadStateFilterFixture(source = STATE_FILTER_SOURCE, id = 'state-filter-provenance.tsrx') {
+	return loadCompiledFixtureSource(source, {
+		id,
+		mode: 'client',
+		compileOptions: { hmr: false, dev: false },
+	});
+}
+
+describe('state-derived collections and independent host bindings', () => {
+	it('keeps filtered state, keyed rows, filter classes, and controlled fields synchronized', () => {
+		const client = loadStateFilterFixture();
+		const root = mount(client.App, { value: 'locked' });
+
+		try {
+			expect(root.find('#state-filter-remaining').textContent).toBe('0');
+			root.click('#state-filter-load');
+			const first = root.find('#state-filter-rows li');
+			const input = root.find('#state-filter-value') as HTMLInputElement;
+			const toggleAll = root.find('#state-filter-toggle-all') as HTMLInputElement;
+			const firstToggle = root.find('.state-filter-row-check') as HTMLInputElement;
+			expect(root.find('#state-filter-remaining').textContent).toBe('1');
+			expect(first.textContent).toBe('first');
+			expect(input.value).toBe('locked');
+			expect(toggleAll.checked).toBe(false);
+			expect(firstToggle.checked).toBe(false);
+
+			input.value = 'drifted';
+			toggleAll.checked = true;
+			firstToggle.checked = true;
+			root.click('#state-filter-edit');
+			expect(root.find('#state-filter-rows li')).toBe(first);
+			expect(root.find('#state-filter-app').getAttribute('data-editing')).toBe('yes');
+			expect(input.value).toBe('locked');
+			expect(toggleAll.checked).toBe(false);
+			expect(firstToggle.checked).toBe(false);
+			expect(root.find('#state-filter-all').className).toBe('selected');
+
+			root.click('#state-filter-active');
+			expect(root.findAll('#state-filter-rows li')).toEqual([first]);
+			expect(root.find('#state-filter-active').className).toBe('selected');
+			expect(root.find('#state-filter-all').className).toBe('');
+
+			root.click('#state-filter-completed');
+			expect(root.find('#state-filter-rows li').textContent).toBe('second');
+			expect(root.find('#state-filter-completed').className).toBe('selected');
+			expect(root.find('#state-filter-active').className).toBe('');
+
+			root.click('#state-filter-all');
+			const restoredFirst = root.find('#state-filter-rows li');
+			root.click('#state-filter-replace');
+			expect(root.find('#state-filter-rows li')).toBe(restoredFirst);
+			expect(restoredFirst.textContent).toBe('updated');
+			expect(root.find('#state-filter-remaining').textContent).toBe('0');
+			expect(toggleAll.checked).toBe(true);
+
+			root.click('#state-filter-active');
+			expect(root.findAll('#state-filter-rows li')).toEqual([]);
+			root.click('#state-filter-add');
+			expect(root.find('#state-filter-rows li').textContent).toBe('third');
+			expect(root.find('#state-filter-remaining').textContent).toBe('1');
+			expect(toggleAll.checked).toBe(false);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('observes an Array.prototype.filter override installed after a state snapshot mounts', () => {
+		const client = loadStateFilterFixture();
+		const root = mount(client.App, { value: 'locked' });
+		root.click('#state-filter-load');
+		root.click('#state-filter-active');
+		const original = Array.prototype.filter;
+		const events: string[] = [];
+
+		try {
+			Array.prototype.filter = function <Item, Result extends Item>(
+				this: Item[],
+				predicate: (value: Item, index: number, array: Item[]) => value is Result,
+				thisArg?: unknown,
+			): Result[] {
+				const first = this[0] as { id?: number; label?: string } | undefined;
+				if (this.length === 2 && first?.id === 1 && first.label === 'first') {
+					events.push('filter');
+					return [this[1]!] as Result[];
+				}
+				return original.call(this, predicate, thisArg) as Result[];
+			};
+
+			root.click('#state-filter-edit');
+			expect(events).toEqual(['filter', 'filter']);
+			expect(root.find('#state-filter-rows li').textContent).toBe('second');
+			expect(root.find('#state-filter-remaining').textContent).toBe('1');
+		} finally {
+			Array.prototype.filter = original;
+			root.unmount();
+		}
+	});
+
+	it('honors an Array.prototype.map override when a state updater creates its next snapshot', () => {
+		const client = loadStateFilterFixture();
+		const root = mount(client.App, { value: 'locked' });
+		root.click('#state-filter-load');
+		const original = Array.prototype.map;
+		const events: string[] = [];
+
+		try {
+			Array.prototype.map = function <Item, Result>(
+				this: Item[],
+				callback: (value: Item, index: number, array: Item[]) => Result,
+				thisArg?: unknown,
+			): Result[] {
+				const first = this[0] as { id?: number; label?: string } | undefined;
+				if (this.length === 2 && first?.id === 1 && first.label === 'first') {
+					events.push('map');
+					return [{ id: 1, label: 'mapped override', completed: false }, this[1]] as Result[];
+				}
+				return original.call(this, callback, thisArg) as Result[];
+			};
+
+			root.click('#state-filter-replace');
+			expect(events).toEqual(['map']);
+			expect(root.find('#state-filter-rows li').textContent).toBe('mapped override');
+			expect(root.find('#state-filter-remaining').textContent).toBe('1');
+
+			root.click('#state-filter-edit');
+			expect(root.find('#state-filter-rows li').textContent).toBe('mapped override');
+			expect(root.find('#state-filter-remaining').textContent).toBe('1');
+		} finally {
+			Array.prototype.map = original;
+			root.unmount();
+		}
+	});
+
+	it.each([
+		'own filter getter',
+		'inherited filter getter',
+		'sparse indexed getter',
+		'item completed getter',
+		'custom array species',
+		'proxy receiver',
+	] as const)('preserves observable state-array behavior for an %s', (shape) => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App(props) @{
+				const [todos, setTodos] = useState([]);
+				const [tick, setTick] = useState(0);
+				const remaining = todos.filter((todo) => !todo.completed).length;
+				<section>
+					<button id="state-filter-unsafe-load" onClick={() => setTodos(props.items)}>
+						{'load'}
+					</button>
+					<button id="state-filter-unsafe-update" onClick={() => setTick(tick + 1)}>
+						{tick as number}
+					</button>
+					<output id="state-filter-unsafe-remaining">{'' + remaining}</output>
+				</section>
+			}
+		`;
+		const client = loadStateFilterFixture(source, `state-filter-unsafe-${shape}.tsrx`);
+		const events: string[] = [];
+		let completed = false;
+		const item: { id: number; completed: boolean } = { id: 1, completed: false };
+		let items: Array<typeof item> = [item];
+		let expectedEvents: string[];
+
+		if (shape === 'own filter getter' || shape === 'inherited filter getter') {
+			const owner = shape === 'own filter getter' ? items : Object.create(Array.prototype);
+			Object.defineProperty(owner, 'filter', {
+				configurable: true,
+				get() {
+					events.push('get:filter');
+					return function (
+						this: typeof items,
+						predicate: (value: typeof item, index: number, values: typeof items) => unknown,
+					) {
+						events.push('call:filter');
+						return Array.prototype.filter.call(this, predicate);
+					};
+				},
+			});
+			if (shape === 'inherited filter getter') Object.setPrototypeOf(items, owner);
+			expectedEvents = ['get:filter', 'call:filter'];
+		} else if (shape === 'sparse indexed getter') {
+			items = [];
+			items.length = 2;
+			Object.defineProperty(items, '1', {
+				configurable: true,
+				enumerable: true,
+				get() {
+					events.push('get:index');
+					return item;
+				},
+			});
+			expectedEvents = ['get:index'];
+		} else if (shape === 'item completed getter') {
+			Object.defineProperty(item, 'completed', {
+				configurable: true,
+				get() {
+					events.push('get:completed');
+					return completed;
+				},
+			});
+			expectedEvents = ['get:completed'];
+		} else if (shape === 'custom array species') {
+			Object.defineProperty(items, 'constructor', {
+				configurable: true,
+				value: {
+					get [Symbol.species]() {
+						events.push('get:species');
+						return function (length: number) {
+							events.push('new:species');
+							return new Array(length);
+						};
+					},
+				},
+			});
+			expectedEvents = ['get:species', 'new:species'];
+		} else {
+			items = new Proxy(items, {
+				get(target, property, receiver) {
+					if (property === 'filter') events.push('get:filter');
+					if (property === '0') events.push('get:index');
+					return Reflect.get(target, property, receiver);
+				},
+				getPrototypeOf(target) {
+					events.push('get:prototype');
+					return Reflect.getPrototypeOf(target);
+				},
+				getOwnPropertyDescriptor(target, property) {
+					if (property === 'filter' || property === '0') events.push('get:descriptor');
+					return Reflect.getOwnPropertyDescriptor(target, property);
+				},
+			});
+			expectedEvents = ['get:filter', 'get:index'];
+		}
+
+		const root = mount(client.App, { items });
+
+		try {
+			root.click('#state-filter-unsafe-load');
+			expect(events).toEqual(expectedEvents);
+			expect(root.find('#state-filter-unsafe-remaining').textContent).toBe('1');
+
+			events.length = 0;
+			completed = true;
+			if (shape !== 'item completed getter') item.completed = true;
+			root.click('#state-filter-unsafe-update');
+			expect(events).toEqual(expectedEvents);
+			expect(root.find('#state-filter-unsafe-remaining').textContent).toBe('0');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps a mutable state snapshot live when it escapes into an event callback', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App() @{
+				const [todos, setTodos] = useState([]);
+				const [tick, setTick] = useState(0);
+				const alias = todos;
+				const remaining = todos.filter((todo) => !todo.completed).length;
+				<section>
+					<button
+						id="state-filter-escape-load"
+						onClick={() => setTodos([{ id: 1, completed: false }])}
+					>{'load'}</button>
+					<button
+						id="state-filter-escape-mutate"
+						onClick={() => {
+							alias[0].completed = true;
+							setTick(tick + 1);
+						}}
+					>{'mutate'}</button>
+					<output id="state-filter-escape-remaining">{'' + remaining}</output>
+				</section>
+			}
+		`;
+		const client = loadStateFilterFixture(source, 'state-filter-escaped-alias.tsrx');
+		const root = mount(client.App);
+
+		try {
+			root.click('#state-filter-escape-load');
+			expect(root.find('#state-filter-escape-remaining').textContent).toBe('1');
+			root.click('#state-filter-escape-mutate');
+			expect(root.find('#state-filter-escape-remaining').textContent).toBe('0');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('recomputes a filtered state snapshot when its predicate captures changed state', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App() @{
+				const [todos, setTodos] = useState([]);
+				const [completed, setCompleted] = useState(false);
+				const visible = todos.filter((todo) => todo.completed === completed);
+				<section>
+					<button
+						id="state-filter-capture-load"
+						onClick={() => setTodos([
+							{ id: 1, label: 'first', completed: false },
+							{ id: 2, label: 'second', completed: true },
+						])}
+					>{'load'}</button>
+					<button id="state-filter-capture-change" onClick={() => setCompleted(!completed)}>
+						{'change'}
+					</button>
+					<ul id="state-filter-capture-rows">
+						@for (const todo of visible; key todo.id) {
+							<li>{todo.label as string}</li>
+						}
+					</ul>
+				</section>
+			}
+		`;
+		const client = loadStateFilterFixture(source, 'state-filter-predicate-capture.tsrx');
+		const root = mount(client.App);
+
+		try {
+			root.click('#state-filter-capture-load');
+			expect(root.find('#state-filter-capture-rows li').textContent).toBe('first');
+			root.click('#state-filter-capture-change');
+			expect(root.find('#state-filter-capture-rows li').textContent).toBe('second');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		{ mode: 'development', dev: true },
+		{ mode: 'production', dev: false },
+	])('re-evaluates observable coercion in $mode state-filter conditions', ({ mode, dev }) => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App(props) @{
+				const [todos, setTodos] = useState([]);
+				const [filter, setFilter] = useState('all');
+				const [tick, setTick] = useState(0);
+				const visible = filter == 'active' ? todos.filter((todo) => !todo.completed) : todos;
+				<section>
+					<button
+						id="state-filter-coercion-load"
+						onClick={() => setTodos([
+							{ id: 1, completed: false },
+							{ id: 2, completed: true },
+						])}
+					>{'load'}</button>
+					<button id="state-filter-coercion-set" onClick={() => setFilter(props.filter)}>
+						{'set'}
+					</button>
+					<button id="state-filter-coercion-update" onClick={() => setTick(tick + 1)}>
+						{'update'}
+					</button>
+					<output id="state-filter-coercion-visible">{'' + visible.length}</output>
+				</section>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: `state-filter-observable-coercion-${mode}.tsrx`,
+			mode: 'client',
+			compileOptions: { hmr: false, dev },
+		});
+		const events: string[] = [];
+		let active = true;
+		const filter = {
+			[Symbol.toPrimitive]() {
+				events.push('coerce');
+				return active ? 'active' : 'all';
+			},
+		};
+		const root = mount(client.App, { filter });
+
+		try {
+			root.click('#state-filter-coercion-load');
+			root.click('#state-filter-coercion-set');
+			expect(root.find('#state-filter-coercion-visible').textContent).toBe('1');
+
+			events.length = 0;
+			active = false;
+			root.click('#state-filter-coercion-update');
+			expect(events).toEqual(['coerce']);
+			expect(root.find('#state-filter-coercion-visible').textContent).toBe('2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps filtered state live when an earlier predicate mutates the same snapshot', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App() @{
+				const [todos, setTodos] = useState([]);
+				const [tick, setTick] = useState(0);
+				todos.filter((todo) => {
+					todo.completed = !todo.completed;
+					return true;
+				});
+				const remaining = todos.filter((todo) => !todo.completed).length;
+				<section>
+					<button
+						id="state-filter-mutating-load"
+						onClick={() => setTodos([{ id: 1, completed: false }])}
+					>{'load'}</button>
+					<button id="state-filter-mutating-update" onClick={() => setTick(tick + 1)}>
+						{'update'}
+					</button>
+					<output id="state-filter-mutating-remaining">{'' + remaining}</output>
+				</section>
+			}
+		`;
+		const client = loadStateFilterFixture(source, 'state-filter-mutating-predicate.tsrx');
+		const root = mount(client.App);
+
+		try {
+			root.click('#state-filter-mutating-load');
+			expect(root.find('#state-filter-mutating-remaining').textContent).toBe('0');
+			root.click('#state-filter-mutating-update');
+			expect(root.find('#state-filter-mutating-remaining').textContent).toBe('1');
+			root.click('#state-filter-mutating-update');
+			expect(root.find('#state-filter-mutating-remaining').textContent).toBe('0');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('re-evaluates side-effecting conditions around filtered state snapshots', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App() @{
+				const [todos, setTodos] = useState([]);
+				const [tick, setTick] = useState(0);
+				let reads = 0;
+				const visible = ++reads ? todos.filter((todo) => !todo.completed) : todos;
+				<section>
+					<button
+						id="state-filter-update-load"
+						onClick={() => setTodos([{ id: 1, completed: false }])}
+					>{'load'}</button>
+					<button id="state-filter-update-again" onClick={() => setTick(tick + 1)}>
+						{'update'}
+					</button>
+					<output id="state-filter-update-visible">{reads + ':' + visible.length}</output>
+				</section>
+			}
+		`;
+		const client = loadStateFilterFixture(source, 'state-filter-side-effect-condition.tsrx');
+		const root = mount(client.App);
+
+		try {
+			root.click('#state-filter-update-load');
+			expect(root.find('#state-filter-update-visible').textContent).toBe('1:1');
+			root.click('#state-filter-update-again');
+			expect(root.find('#state-filter-update-visible').textContent).toBe('1:1');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('observes item mutations made through an escaped filtered state collection', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			export function App(props) @{
+				const [todos, setTodos] = useState([]);
+				const [tick, setTick] = useState(0);
+				const visible = todos.filter((todo) => !todo.completed);
+				props.observe(visible);
+				const remaining = todos.filter((todo) => !todo.completed).length;
+				<section>
+					<button
+						id="state-filter-derived-escape-load"
+						onClick={() => setTodos([{ id: 1, completed: false }])}
+					>{'load'}</button>
+					<button
+						id="state-filter-derived-escape-update"
+						onClick={() => setTick(tick + 1)}
+					>{'update'}</button>
+					<output id="state-filter-derived-escape-remaining">{'' + remaining}</output>
+				</section>
+			}
+		`;
+		const client = loadStateFilterFixture(source, 'state-filter-derived-escape.tsrx');
+		let completed = false;
+		const root = mount(client.App, {
+			observe(rows: Array<{ completed: boolean }>) {
+				if (rows[0] !== undefined) rows[0].completed = completed;
+			},
+		});
+
+		try {
+			root.click('#state-filter-derived-escape-load');
+			expect(root.find('#state-filter-derived-escape-remaining').textContent).toBe('1');
+			completed = true;
+			root.click('#state-filter-derived-escape-update');
+			expect(root.find('#state-filter-derived-escape-remaining').textContent).toBe('0');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('hydrates state-derived filter controls in place and keeps later snapshots reactive', () => {
+		const id = 'state-filter-provenance-hydration.tsrx';
+		const server = loadCompiledFixtureSource(STATE_FILTER_SOURCE, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadStateFilterFixture(STATE_FILTER_SOURCE, id);
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, { value: 'locked' }).html;
+		document.body.appendChild(container);
+		const app = container.querySelector('#state-filter-app');
+		const input = container.querySelector('#state-filter-value') as HTMLInputElement;
+		const all = container.querySelector('#state-filter-all');
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+
+		try {
+			root = hydrateRoot(container, client.App, { value: 'locked' });
+			flushSync(() => {});
+			expect(container.querySelector('#state-filter-app')).toBe(app);
+			expect(container.querySelector('#state-filter-value')).toBe(input);
+			expect(container.querySelector('#state-filter-all')).toBe(all);
+			expect(input.value).toBe('locked');
+
+			flushSync(() => (container.querySelector('#state-filter-load') as HTMLElement).click());
+			expect(container.querySelector('#state-filter-remaining')?.textContent).toBe('1');
+			expect(container.querySelectorAll('#state-filter-rows li')).toHaveLength(2);
+
+			flushSync(() => (container.querySelector('#state-filter-active') as HTMLElement).click());
+			expect(container.querySelector('#state-filter-rows li')?.textContent).toBe('first');
+			expect(container.querySelector('#state-filter-active')?.className).toBe('selected');
+			expect(container.querySelector('#state-filter-app')).toBe(app);
+			expect(container.querySelector('#state-filter-value')).toBe(input);
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+});
+
 describe('compiler-owned component-region memoization', () => {
 	it('preserves an independently updating pure hookful child under its hookful parent', () => {
 		const source = `

@@ -6,6 +6,7 @@
   "description": "TodoMVC benchmark umbrella - drives each framework's TodoMVC app through Speedometer-style scripted interactions via Playwright.",
   "scripts": {
     "bench": "node run.mjs",
+    "bench:work": "node work.mjs",
     "bench:long": "node run.mjs 16"
   },
   "dependencies": {
