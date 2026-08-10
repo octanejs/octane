@@ -23,6 +23,9 @@ describe('the shipped catalog', () => {
 		expect(resolveBinding('@octanejs/zustand')).toMatchObject({ via: 'binding' });
 		expect(resolveBinding('zustand')?.binding.name).toBe('@octanejs/zustand');
 		expect(resolveBinding('@tanstack/react-query')?.binding.name).toBe('@octanejs/tanstack-query');
+		expect(resolveBinding('react-textarea-autosize')?.binding.name).toBe(
+			'@octanejs/textarea-autosize',
+		);
 		expect(resolveBinding('react-select')).toBe(null);
 	});
 

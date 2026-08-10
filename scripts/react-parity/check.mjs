@@ -51,6 +51,9 @@ import { verifyVisxTypes } from './visx-types-lib.mjs';
 import { verifyMotionTypes } from './motion-types-lib.mjs';
 import { verifyNuqsTypes } from './nuqs-types-lib.mjs';
 import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
+import { verifyReactTextareaAutosizeTestClassifications } from './react-textarea-autosize-classifications-lib.mjs';
+import { verifyReactTextareaAutosizeCrosswalk } from './react-textarea-autosize-crosswalk-lib.mjs';
+import { verifyReactTextareaAutosizeTypes } from './react-textarea-autosize-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -316,6 +319,19 @@ try {
 	verifyReactMarkdownTestClassifications(REPO);
 } catch (error) {
 	errors.push(`react-markdown test classifications are invalid: ${error.message}`);
+	verifyReactTextareaAutosizeTestClassifications(REPO);
+} catch (error) {
+	errors.push(`react-textarea-autosize test classifications are invalid: ${error.message}`);
+}
+try {
+	verifyReactTextareaAutosizeCrosswalk(REPO);
+} catch (error) {
+	errors.push(`react-textarea-autosize upstream crosswalk is invalid: ${error.message}`);
+}
+try {
+	verifyReactTextareaAutosizeTypes(REPO);
+} catch (error) {
+	errors.push(`react-textarea-autosize type evidence is invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

@@ -1,14 +1,33 @@
 import { realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { configDefaults, defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
 import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
+
+const requireReactTextareaAutosize = createRequire(
+	resolve(import.meta.dirname, 'packages/textarea-autosize/package.json'),
+);
+const requireFromUseLatest = createRequire(requireReactTextareaAutosize.resolve('use-latest'));
+function reactTextareaAutosizeEsm(resolvedCjs) {
+	return resolvedCjs.replace(/\.cjs\.js$/, '.esm.js');
+}
+const REACT_TEXTAREA_AUTOSIZE_USE_COMPOSED_REF = reactTextareaAutosizeEsm(
+	requireReactTextareaAutosize.resolve('use-composed-ref'),
+);
+const REACT_TEXTAREA_AUTOSIZE_USE_LATEST = reactTextareaAutosizeEsm(
+	requireReactTextareaAutosize.resolve('use-latest'),
+);
+const REACT_TEXTAREA_AUTOSIZE_USE_ISOMORPHIC_LAYOUT_EFFECT = reactTextareaAutosizeEsm(
+	requireFromUseLatest.resolve('use-isomorphic-layout-effect'),
+);
 
 // Parser-AST immutability enforcement (see adoptParserAst in compile.js):
 // every vitest invocation — including ad-hoc single-file and IDE runs — deep-
@@ -6431,6 +6450,48 @@ export default defineConfig({
 						{
 							find: /^octane$/,
 							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+				// Upstream-adapted inventory owns tests/upstream/**; behavior,
+				// measurement, and hydration stay in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/textarea-autosize/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'textarea-autosize',
+					include: ['packages/textarea-autosize/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/textarea-autosize/tests/browser/**/*.test.ts',
+						'packages/textarea-autosize/tests/ssr/**/*.test.ts',
+						'packages/textarea-autosize/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					server: {
+						deps: {
+							inline: ['use-composed-ref', 'use-isomorphic-layout-effect', 'use-latest'],
+						},
+					},
+				},
+				plugins: [octane({ requireDirective: true }), react()],
+				resolve: {
+					dedupe: ['react', 'react-dom'],
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^use-composed-ref$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_COMPOSED_REF,
+						},
+						{
+							find: /^use-isomorphic-layout-effect$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_ISOMORPHIC_LAYOUT_EFFECT,
+						},
+						{
+							find: /^use-latest$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_LATEST,
 						},
 					],
 				},
@@ -6461,6 +6522,37 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/input-otp$/,
 							replacement: resolve(import.meta.dirname, 'packages/input-otp/src/index.ts'),
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'textarea-autosize-differential',
+					include: ['packages/textarea-autosize/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					server: {
+						deps: {
+							inline: ['use-composed-ref', 'use-isomorphic-layout-effect', 'use-latest'],
+						},
+					},
+				},
+				plugins: [octane({ requireDirective: true }), react()],
+				resolve: {
+					dedupe: ['react', 'react-dom'],
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^use-composed-ref$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_COMPOSED_REF,
+						},
+						{
+							find: /^use-isomorphic-layout-effect$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_ISOMORPHIC_LAYOUT_EFFECT,
+						},
+						{
+							find: /^use-latest$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_LATEST,
 						},
 					],
 				},
@@ -6496,6 +6588,26 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				plugins: [octane({ ssr: true })],
 				resolve: {
+				// The React server-visible contract is parity evidence; the
+				// Octane-only browser-global/server assertion stays ordinary.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/textarea-autosize/tests/ssr/react-contract.test.ts'],
+				},
+				test: {
+					name: 'textarea-autosize-ssr',
+					include: ['packages/textarea-autosize/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					server: {
+						deps: {
+							inline: ['use-composed-ref', 'use-isomorphic-layout-effect', 'use-latest'],
+						},
+					},
+				},
+				plugins: [octane({ requireDirective: true, ssr: true }), react()],
+				resolve: {
+					dedupe: ['react', 'react-dom'],
 					alias: [
 						{
 							find: /^octane$/,
@@ -6504,6 +6616,16 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/input-otp$/,
 							replacement: resolve(import.meta.dirname, 'packages/input-otp/src/index.ts'),
+							find: /^use-composed-ref$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_COMPOSED_REF,
+						},
+						{
+							find: /^use-isomorphic-layout-effect$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_ISOMORPHIC_LAYOUT_EFFECT,
+						},
+						{
+							find: /^use-latest$/,
+							replacement: REACT_TEXTAREA_AUTOSIZE_USE_LATEST,
 						},
 					],
 				},
@@ -6528,6 +6650,15 @@ export default defineConfig({
 					globals: false,
 				},
 				plugins: [octane()],
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'textarea-autosize-browser',
+					include: ['packages/textarea-autosize/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
 			},
 			{
 				test: {

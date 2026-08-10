@@ -82,6 +82,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.31` | 1 |
 | `@octanejs/tauri` | [`packages/tauri`](../packages/tauri) | framework binding | `0.0.17` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.31` | 2 |
+| `@octanejs/textarea-autosize` | [`packages/textarea-autosize`](../packages/textarea-autosize) | framework binding | `0.1.0` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.27` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.28` | 2 |
 | `@octanejs/transition-group` | [`packages/transition-group`](../packages/transition-group) | framework binding | `0.1.0` | 7 |

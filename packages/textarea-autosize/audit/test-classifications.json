@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/textarea-autosize/audit/type-probes/public-api.test-d.ts",
+      "disposition": "pristine-type-suite",
+      "oracle": "Repo-authored React declaration probes against the pinned upstream public typings."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/behavior.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane lifecycle, ref composition, and native input contracts unpaired against the two-case upstream Jest suite."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/browser/browser.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Same-process Chromium/Firefox React vs Octane pixel, callback, resize, and reset observations."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Deterministic same-fixture React vs Octane measurement and native edit ordering."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane server-host adoption and hydration; not compared with React hydration."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/measurement.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Shared hidden-node measurement helpers and hostile style overrides for Octane; unpaired from upstream Jest."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/package-contract.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Published package namespace and exact React oracle catalog pin; not React behavior evidence."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/ssr/react-contract.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Normalized server markup compared against the pristine React render for the same props."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane server-host smoke and browser-global guards; not a React SSR oracle."
+    },
+    {
+      "path": "packages/textarea-autosize/tests/upstream/adapted.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Case-for-case Octane adaptation of pinned upstream/src/__tests__/index.test.js with per-case citations."
+    },
+    {
+      "path": "packages/textarea-autosize/typetests/public-api.test-d.ts",
+      "disposition": "adapted-type-suite",
+      "oracle": "Structurally equivalent Octane public probes after permitted import-root transformations."
+    }
+  ]
+}

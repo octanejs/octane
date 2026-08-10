@@ -19,6 +19,7 @@ import { KeyedList } from './demos/KeyedList.tsrx';
 import { ReactSpringDemo } from './demos/ReactSpring.tsrx';
 import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
 import { LiveStoreDemo } from './demos/LiveStore.tsrx';
+import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
 import { MobxDemo } from './demos/Mobx.tsrx';
 import { PhosphorIconsDemo } from './demos/PhosphorIcons.tsrx';
@@ -52,6 +53,7 @@ import keyedListSource from './demos/KeyedList.tsrx?raw';
 import reactSpringSource from './demos/ReactSpring.tsrx?raw';
 import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
 import liveStoreSource from './demos/LiveStore.tsrx?raw';
+import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
 import mobxSource from './demos/Mobx.tsrx?raw';
 import phosphorIconsSource from './demos/PhosphorIcons.tsrx?raw';
@@ -284,6 +286,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Error boundary',
 				Component: ErrorBoundaryDemo,
 				source: errorBoundarySource,
+			},
+			{
+				id: 'react-textarea-autosize',
+				title: 'React Textarea Autosize',
+				Component: ReactTextareaAutosizeDemo,
+				source: reactTextareaAutosizeSource,
 			},
 		],
 	},

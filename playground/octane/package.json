@@ -41,6 +41,7 @@
     "@octanejs/react-error-boundary": "workspace:*",
     "@octanejs/react-dropzone": "workspace:*",
     "@octanejs/markdown": "workspace:*",
+    "@octanejs/textarea-autosize": "workspace:*",
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",

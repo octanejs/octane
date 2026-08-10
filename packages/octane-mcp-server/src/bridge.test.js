@@ -280,6 +280,10 @@ describe('KNOWN_BINDINGS', () => {
 		expect(KNOWN_VANILLA_CORES['react-alien-signals']).toBe('alien-signals');
 	});
 
+	it('maps react-textarea-autosize to the exact Octane binding', () => {
+		expect(KNOWN_BINDINGS['react-textarea-autosize']).toBe('@octanejs/textarea-autosize');
+	});
+
 	it('maps Streamdown and every official plugin package to the consolidated binding', () => {
 		const upstreamPackages = [
 			'streamdown',

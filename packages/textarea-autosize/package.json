@@ -1,0 +1,134 @@
+{
+	"name": "@octanejs/textarea-autosize",
+	"version": "0.1.0",
+	"description": "react-textarea-autosize for Octane with matching measurement and lifecycle behavior.",
+	"license": "MIT",
+	"type": "module",
+	"author": {
+		"name": "Octane contributors"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/octanejs/octane.git",
+		"directory": "packages/textarea-autosize"
+	},
+	"main": "src/index.tsrx",
+	"module": "src/index.tsrx",
+	"types": "src/index.tsrx",
+	"files": [
+		"src",
+		"README.md",
+		"UPSTREAM.md",
+		"LICENSE"
+	],
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"types": {
+				"import": "./src/index.tsrx",
+				"default": "./src/index.tsrx"
+			},
+			"development": {
+				"edge-light": {
+					"module": "./src/index.tsrx",
+					"import": "./src/index.tsrx",
+					"default": "./src/index.tsrx"
+				},
+				"worker": {
+					"module": "./src/index.tsrx",
+					"import": "./src/index.tsrx",
+					"default": "./src/index.tsrx"
+				},
+				"workerd": {
+					"module": "./src/index.tsrx",
+					"import": "./src/index.tsrx",
+					"default": "./src/index.tsrx"
+				},
+				"browser": {
+					"module": "./src/index.tsrx",
+					"import": "./src/index.tsrx",
+					"default": "./src/index.tsrx"
+				},
+				"module": "./src/index.tsrx",
+				"import": "./src/index.tsrx",
+				"default": "./src/index.tsrx"
+			},
+			"edge-light": {
+				"module": "./src/index.tsrx",
+				"import": "./src/index.tsrx",
+				"default": "./src/index.tsrx"
+			},
+			"worker": {
+				"module": "./src/index.tsrx",
+				"import": "./src/index.tsrx",
+				"default": "./src/index.tsrx"
+			},
+			"workerd": {
+				"module": "./src/index.tsrx",
+				"import": "./src/index.tsrx",
+				"default": "./src/index.tsrx"
+			},
+			"browser": {
+				"module": "./src/index.tsrx",
+				"import": "./src/index.tsrx",
+				"default": "./src/index.tsrx"
+			},
+			"module": "./src/index.tsrx",
+			"import": "./src/index.tsrx",
+			"default": "./src/index.tsrx"
+		},
+		"./package.json": "./package.json"
+	},
+	"imports": {
+		"#is-development": {
+			"development": "./src/conditions/true.ts",
+			"default": "./src/conditions/false.ts"
+		},
+		"#is-browser": {
+			"edge-light": "./src/conditions/false.ts",
+			"workerd": "./src/conditions/false.ts",
+			"worker": "./src/conditions/false.ts",
+			"browser": "./src/conditions/true.ts",
+			"default": "./src/conditions/is-browser.ts"
+		}
+	},
+	"engines": {
+		"node": ">=22.22.2"
+	},
+	"scripts": {
+		"test": "vitest run --root ../.. --project textarea-autosize --project textarea-autosize-ssr",
+		"test:browser": "vitest run --root ../.. --project textarea-autosize-browser",
+		"test:pristine": "CI=true jest --config jest.pristine.config.cjs --runInBand",
+		"test:types": "tsc -p audit/type-probes/tsconfig.pristine.json --noEmit && tsrx-tsc -p typetests/tsconfig.json --noEmit",
+		"verify:upstream": "node scripts/verify-upstream.mjs"
+	},
+	"peerDependencies": {
+		"octane": "workspace:*"
+	},
+	"devDependencies": {
+		"@babel/preset-env": "7.29.7",
+		"@babel/preset-react": "7.29.7",
+		"@babel/preset-typescript": "7.29.7",
+		"@testing-library/jest-dom": "catalog:default",
+		"@testing-library/react": "16.3.2",
+		"@types/node": "catalog:default",
+		"@types/react": "catalog:react-textarea-autosize-react-oracle",
+		"@types/react-dom": "catalog:react-textarea-autosize-react-oracle",
+		"@vitejs/plugin-react": "6.0.3",
+		"babel-jest": "30.4.1",
+		"jest": "30.4.2",
+		"jest-environment-jsdom": "30.4.1",
+		"octane": "workspace:*",
+		"playwright": "catalog:default",
+		"react": "catalog:react-textarea-autosize-react-oracle",
+		"react-dom": "catalog:react-textarea-autosize-react-oracle",
+		"use-composed-ref": "1.3.0",
+		"use-latest": "1.2.1",
+		"typescript": "catalog:default",
+		"vite": "catalog:default",
+		"vitest": "catalog:default"
+	}
+}

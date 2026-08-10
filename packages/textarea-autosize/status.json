@@ -1,0 +1,17 @@
+{
+  "upstream": {
+    "package": "react-textarea-autosize",
+    "version": "8.5.9"
+  },
+  "surface": "Complete against the published react-textarea-autosize 8.5.9 default component and named TextareaAutosizeProps and TextareaHeightChangeMeta types, including native textarea props, row clamps, measurement caching, height callbacks, refs, environmental listeners, form reset, SSR, and browser sizing.",
+  "divergences": [
+    "onChange and onChangeCapture receive the native InputEvent rather than a React SyntheticEvent; target and currentTarget are the textarea during dispatch.",
+    "Programmatic value assignment does not synthesize a public change callback; dispatch a native input event when that behavior is required."
+  ],
+  "ssr": "Server rendering emits one plain textarea without accessing browser measurement globals; Octane hydration adopts the existing host and preserves pre-hydration uncontrolled edits.",
+  "docs": [
+    "packages/textarea-autosize/README.md",
+    "packages/textarea-autosize/UPSTREAM.md"
+  ],
+  "verified": "2026-08-03"
+}

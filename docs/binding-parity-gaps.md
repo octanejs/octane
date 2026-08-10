@@ -76,6 +76,7 @@ surface and evidence.
 | `@octanejs/tanstack-virtual` | 0 |
 | `@octanejs/tauri` | 0 |
 | `@octanejs/testing-library` | 0 |
+| `@octanejs/textarea-autosize` | 0 |
 | `@octanejs/three` | 0 |
 | `@octanejs/tiptap` | 0 |
 | `@octanejs/transition-group` | 0 |

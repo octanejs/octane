@@ -60,6 +60,7 @@ export const KNOWN_BINDINGS = {
 	'react-day-picker': '@octanejs/day-picker',
 	vaul: '@octanejs/vaul',
 	'react-markdown': '@octanejs/markdown',
+	'react-textarea-autosize': '@octanejs/textarea-autosize',
 	streamdown: '@octanejs/streamdown',
 	// The official plugins are consolidated as subpaths of the same package.
 	// The bundled bridge skill documents each exact import rewrite.

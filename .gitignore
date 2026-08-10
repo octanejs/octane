@@ -75,3 +75,7 @@ packages/tanstack-hotkeys/.vite-pristine/
 
 packages/react-spring/.pristine-vite-cache/
 packages/react-spring/.pristine-upstream-*/
+# Published declaration trees vendored for binding pristine type probes.
+# Root `dist` would otherwise ignore packages/*/upstream/dist/.
+!packages/textarea-autosize/upstream/dist/
+!packages/textarea-autosize/upstream/dist/**
