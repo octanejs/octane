@@ -526,6 +526,224 @@ describe('parallel use() — adjacent async component trees', () => {
 		root.unmount();
 	});
 
+	it.each([
+		['destructured props', '{ label }', 'label'],
+		['aliased destructured props', '{ label: name }', 'name'],
+		['direct prop access', 'props', 'props.label'],
+	])(
+		'does not read a synchronous child with %s before an earlier sibling resolves',
+		async (description, parameter, label) => {
+			const source = `
+				import { use, useState } from 'octane';
+
+				function SynchronousChild(${parameter}) @{
+					const [revision] = useState(0);
+					<span class="synchronous-profile">{${label} + revision as string}</span>
+				}
+
+				function AsyncSibling(props) @{
+					const value = use(props.load('profile-sibling', props.version));
+					<span class="profile-sibling">{value as string}</span>
+				}
+
+				function Branches(props) @{
+					<main>
+						<AsyncSibling load={props.load} version={props.version} />
+						<SynchronousChild label={props.profile.label} />
+					</main>
+				}
+
+				export function App(props) @{
+					<>
+						@try {
+							<Branches load={props.load} version={props.version} profile={props.profile} />
+						} @pending {
+							<span class="profile-pending">loading</span>
+						}
+					</>
+				}
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `${description.replace(/\W+/g, '-')}-synchronous-child.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const resources = resourceFetcher();
+			const reads: string[] = [];
+			const profile = new Proxy(
+				{ label: 'Ada' },
+				{
+					get(target, property, receiver) {
+						if (property === 'label') reads.push(property);
+						return Reflect.get(target, property, receiver);
+					},
+				},
+			);
+			const root = mount(client.App, { load: resources.load, version: 0, profile });
+
+			expect(resources.calls).toEqual(['profile-sibling:0']);
+			expect(root.find('.profile-pending').textContent).toBe('loading');
+			expect(reads).toEqual([]);
+
+			await act(() => resources.settle('profile-sibling', 0));
+
+			expect(root.find('.profile-sibling').textContent).toBe('profile-sibling-v0');
+			expect(root.find('.synchronous-profile').textContent).toBe('Ada0');
+			expect(reads).toEqual(['label']);
+			root.unmount();
+		},
+	);
+
+	it.each([
+		['key', 'key="stable"', ''],
+		['ref', 'ref={props.capture}', ' ref={props.ref}'],
+	])(
+		'does not read a synchronous child with a %s before an earlier sibling resolves',
+		async (kind, componentAttribute, hostAttribute) => {
+			const source = `
+				import { use } from 'octane';
+
+				function SynchronousChild(props) @{
+					<span class="decorated-profile"${hostAttribute}>{props.label as string}</span>
+				}
+
+				function Wrapper(props) @{
+					<SynchronousChild ${componentAttribute} label={props.label} />
+				}
+
+				function AsyncSibling(props) @{
+					const value = use(props.load('decorated-sibling', props.version));
+					<span class="decorated-sibling">{value as string}</span>
+				}
+
+				function Branches(props) @{
+					<main>
+						<AsyncSibling load={props.load} version={props.version} />
+						<Wrapper label={props.profile.label} capture={props.capture} />
+					</main>
+				}
+
+				export function App(props) @{
+					<>
+						@try {
+							<Branches
+								load={props.load}
+								version={props.version}
+								profile={props.profile}
+								capture={props.capture}
+							/>
+						} @pending {
+							<span class="decorated-pending">loading</span>
+						}
+					</>
+				}
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `${kind}-synchronous-child.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const resources = resourceFetcher();
+			const reads: string[] = [];
+			const attachments: (Element | null)[] = [];
+			const capture = (node: Element | null) => {
+				attachments.push(node);
+			};
+			const profile = new Proxy(
+				{ label: 'Ada' },
+				{
+					get(target, property, receiver) {
+						if (property === 'label') reads.push(property);
+						return Reflect.get(target, property, receiver);
+					},
+				},
+			);
+			const root = mount(client.App, { load: resources.load, version: 0, profile, capture });
+
+			expect(resources.calls).toEqual(['decorated-sibling:0']);
+			expect(root.find('.decorated-pending').textContent).toBe('loading');
+			expect(reads).toEqual([]);
+			expect(attachments).toEqual([]);
+
+			await act(() => resources.settle('decorated-sibling', 0));
+
+			const child = root.find('.decorated-profile');
+			expect(child.textContent).toBe('Ada');
+			expect(root.find('.decorated-sibling').textContent).toBe('decorated-sibling-v0');
+			expect(attachments).toEqual(kind === 'ref' ? [child] : []);
+			root.unmount();
+			expect(attachments).toEqual(kind === 'ref' ? [child, null] : []);
+		},
+	);
+
+	it.each([
+		['destructured props', '{ load, version }', 'load', 'version'],
+		['aliased destructured props', '{ load: fetch, version: revision }', 'fetch', 'revision'],
+		['direct prop access', 'props', 'props.load', 'props.version'],
+	])(
+		'starts an async descendant through a stateful wrapper with %s',
+		async (description, parameter, load, version) => {
+			const source = `
+				import { use, useState } from 'octane';
+
+				function Wrapper(${parameter}) @{
+					const [count] = useState(0);
+					<section data-count={count}>
+						<AsyncLeaf load={${load}} version={${version}} />
+					</section>
+				}
+
+				function AsyncLeaf(props) @{
+					const value = use(props.load('prop-wrapper-leaf', props.version));
+					<span class="prop-wrapper-leaf">{value as string}</span>
+				}
+
+				function AsyncSibling(props) @{
+					const value = use(props.load('prop-wrapper-sibling', props.version));
+					<span class="prop-wrapper-sibling">{value as string}</span>
+				}
+
+				function Branches(props) @{
+					<main>
+						<AsyncSibling load={props.load} version={props.version} />
+						<Wrapper load={props.load} version={props.version} />
+					</main>
+				}
+
+				export function App(props) @{
+					<>
+						@try {
+							<Branches load={props.load} version={props.version} />
+						} @pending {
+							<span class="prop-wrapper-pending">loading</span>
+						}
+					</>
+				}
+			`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `${description.replace(/\W+/g, '-')}-async-wrapper.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const resources = resourceFetcher();
+			const root = mount(client.App, { load: resources.load, version: 0 });
+			const expected = ['prop-wrapper-leaf:0', 'prop-wrapper-sibling:0'];
+
+			expect([...resources.calls].sort()).toEqual(expected);
+			expect(root.find('.prop-wrapper-pending').textContent).toBe('loading');
+
+			await act(() => {
+				resources.settle('prop-wrapper-leaf', 0);
+				resources.settle('prop-wrapper-sibling', 0);
+			});
+
+			expect(root.find('.prop-wrapper-leaf').textContent).toBe('prop-wrapper-leaf-v0');
+			expect(root.find('.prop-wrapper-sibling').textContent).toBe('prop-wrapper-sibling-v0');
+			expect([...resources.calls].sort()).toEqual(expected);
+			root.unmount();
+		},
+	);
+
 	it('starts async work hidden behind a reassigned same-module component before its sibling resolves', async () => {
 		const source = `
 			import { use } from 'octane';
