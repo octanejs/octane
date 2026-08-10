@@ -9,9 +9,10 @@ reactivity (Solid, Ripple, Svelte, Vue Vapor) over hook-based reactivity
 (React, Preact, Octane). When state changes at a mid-chain node, signal frameworks
 re-evaluate **only the text expression that read the signal** — they don't
 re-render any component bodies. Hook frameworks re-render the owning component;
-without memoization, that cascades through every descendant. React Compiler
-caches eligible unchanged child elements automatically, so the React column can
-skip descendant work even though its stateful owner still re-renders.
+without memoization, that cascades through every descendant. Octane's TSRX
+compiler skips provably stable descendant call sites. React Compiler caches
+eligible unchanged child elements automatically, so the React column can skip
+descendant work even though its stateful owner still re-renders.
 
 The point of the bench is not to declare a winner — it's to **quantify how much
 the cascade, compiler-assisted avoidance, or fine-grained update actually costs**
@@ -53,7 +54,7 @@ Each stateful component owns its own counter via the framework's native primitiv
 
 | framework        | primitive                | what a `setN(v+1)` triggers                                            |
 | ---------------- | ------------------------ | ---------------------------------------------------------------------- |
-| **octane-tsrx**  | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
+| **octane-tsrx**  | `useState` (React-shape) | re-render of `CN`; compiler skips stable descendant call sites         |
 | **octane-jsx**   | `useState` (React-shape) | re-render of `CN`, cascade through `CN+1 .. C100`                      |
 | **react**        | `useState`               | re-render of `CN`; React Compiler skips eligible unchanged descendants |
 | **solid**      | `createSignal`           | re-evaluate the `{v()}` text expression in `CN`; descendants untouched |
@@ -85,10 +86,10 @@ recreating descendants.
 
 - **MOUNT** — initial render of all 100 components.
 - **BUMP_SHALLOW** — `__bumpAt1()`. An uncached hook cascade can visit 99
-  descendants; React Compiler can reuse eligible child elements, while signal
-  frameworks update one text node without re-rendering its component.
+  descendants; compiled Octane TSRX skips provably stable child calls, while
+  signal frameworks update one text node without re-rendering its component.
 - **BUMP_MIDDLE** — `__bumpAt51()`. An uncached hook cascade can visit ~50
-  descendants; compiled React can again skip unchanged children.
+  descendants; compiled Octane TSRX again skips unchanged child calls.
 - **BUMP_DEEP** — `__bumpAt91()`. An uncached hook cascade can visit ~10
   descendants. As the depth approaches the leaf, less descendant work remains
   for either compiler memoization or fine-grained reactivity to avoid.
@@ -175,6 +176,12 @@ fall. It also forbids fetch-warming registrations in this fully synchronous
 component tree. Every row requires live production-bundle coverage. C1/C51/C91
 must still perform exactly one text write, and the ancestor-first batch exactly
 ten.
+
+Each individual TSRX update renders only its owning block, dispatches no
+component slots, and writes exactly one text node. A batched sweep renders its
+ten owning blocks, dispatches no component slots, and writes exactly ten text
+nodes. Mount and teardown ceilings remain unchanged; the TSX twin remains the
+unchanged cascade control.
 
 The TSX chain's private, hookless components reuse their existing compiled host
 renderers through lightweight component slots. Its shallow update is limited to

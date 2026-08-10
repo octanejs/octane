@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { compile } from '../src/compiler/compile.js';
-import { createElement, flushSync, hydrateRoot } from '../src/index.js';
-import { flushEffects, mount } from './_helpers';
+import { createContext, createElement, flushSync, hydrateRoot } from '../src/index.js';
+import { act, flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
@@ -125,6 +125,671 @@ function loadMappedComponentHydrationComponents() {
 }
 
 describe('compiler-owned component-region memoization', () => {
+	it('preserves an independently updating pure hookful child under its hookful parent', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			function Child(props) @{
+				const [own, setOwn] = useState(0);
+				<button id="hookful-pure-child" onClick={() => setOwn(own + 1)}>
+					{props.label + ':' + own}
+				</button>
+			}
+
+			function Parent(props) @{
+				const [tick, setTick] = useState(0);
+				<section id="hookful-pure-parent" data-tick={tick as number}>
+					<button id="hookful-pure-parent-update" onClick={() => setTick(tick + 1)}>
+						{'parent'}
+					</button>
+					<Child label={props.label} />
+				</section>
+			}
+
+			export function App(props) @{
+				<Parent label={props.label} />
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-pure-parent-child.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const root = mount(client.App, { label: 'initial' });
+		const parent = root.find('#hookful-pure-parent');
+		const child = root.find('#hookful-pure-child');
+		expect(child.textContent).toBe('initial:0');
+
+		root.click('#hookful-pure-parent-update');
+		expect(root.find('#hookful-pure-parent')).toBe(parent);
+		expect(parent.getAttribute('data-tick')).toBe('1');
+		expect(root.find('#hookful-pure-child')).toBe(child);
+		expect(child.textContent).toBe('initial:0');
+
+		root.click('#hookful-pure-child');
+		expect(child.textContent).toBe('initial:1');
+		root.click('#hookful-pure-parent-update');
+		expect(parent.getAttribute('data-tick')).toBe('2');
+		expect(root.find('#hookful-pure-child')).toBe(child);
+		expect(child.textContent).toBe('initial:1');
+
+		root.update(client.App, { label: 'changed' });
+		expect(root.find('#hookful-pure-child')).toBe(child);
+		expect(child.textContent).toBe('changed:1');
+		root.unmount();
+	});
+
+	it('preserves hookful child setters, context, effects, and changed props', () => {
+		const source = `
+			import { useContext, useEffect, useState } from 'octane';
+
+			let parentSetter = null;
+			let childSetter = null;
+
+			export function bumpParent() {
+				if (parentSetter) parentSetter((value) => value + 1);
+			}
+
+			export function bumpChild() {
+				if (childSetter) childSetter((value) => value + 1);
+			}
+
+			function Child(props) @{
+				const [own, setOwn] = useState(0);
+				childSetter = setOwn;
+				<button id="hookful-child-own" onClick={() => setOwn(own + 1)}>
+					{props.label + ':' + own}
+				</button>
+			}
+
+			function ContextReader(props) @{
+				const theme = useContext(props.context);
+				<output id="hookful-child-context">{theme as string}</output>
+			}
+
+			function EffectChild(props) @{
+				useEffect(() => {
+					props.onEffect('mount:' + props.label);
+					return () => props.onEffect('cleanup:' + props.label);
+				}, [props.label, props.onEffect]);
+				<span id="hookful-child-effect">{props.label as string}</span>
+			}
+
+			function Parent(props) @{
+				const [tick, setTick] = useState(0);
+				parentSetter = setTick;
+				<section id="hookful-child-parent" data-tick={tick as number}>
+					<Child label={props.label} />
+					<ContextReader context={props.context} />
+					<EffectChild label={props.label} onEffect={props.onEffect} />
+				</section>
+			}
+
+			export function App(props) @{
+				const [theme, setTheme] = useState('light');
+				const Theme = props.context;
+				<main>
+					<button id="hookful-child-theme" onClick={() => setTheme('dark')}>{'theme'}</button>
+					<Theme.Provider value={theme}>
+						<Parent label={props.label} context={Theme} onEffect={props.onEffect} />
+					</Theme.Provider>
+				</main>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-child-state-context-effects.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const effects: string[] = [];
+		const context = createContext('default');
+		const props = {
+			context,
+			label: 'first',
+			onEffect: (event: string) => effects.push(event),
+		};
+		const root = mount(client.App, props);
+		flushEffects();
+		const parent = root.find('#hookful-child-parent');
+		const child = root.find('#hookful-child-own');
+		expect(child.textContent).toBe('first:0');
+		expect(root.find('#hookful-child-context').textContent).toBe('light');
+		expect(effects).toEqual(['mount:first']);
+
+		flushSync(() => client.bumpParent());
+		expect(root.find('#hookful-child-parent')).toBe(parent);
+		expect(parent.getAttribute('data-tick')).toBe('1');
+		expect(root.find('#hookful-child-own')).toBe(child);
+
+		flushSync(() => client.bumpChild());
+		expect(child.textContent).toBe('first:1');
+		root.click('#hookful-child-own');
+		expect(child.textContent).toBe('first:2');
+
+		root.click('#hookful-child-theme');
+		expect(root.find('#hookful-child-context').textContent).toBe('dark');
+		expect(root.find('#hookful-child-own')).toBe(child);
+		expect(child.textContent).toBe('first:2');
+
+		root.update(client.App, { ...props, label: 'changed' });
+		flushEffects();
+		expect(root.find('#hookful-child-own')).toBe(child);
+		expect(child.textContent).toBe('changed:2');
+		expect(root.find('#hookful-child-effect').textContent).toBe('changed');
+		expect(effects).toEqual(['mount:first', 'cleanup:first', 'mount:changed']);
+
+		root.unmount();
+		flushEffects();
+		expect(effects).toEqual(['mount:first', 'cleanup:first', 'mount:changed', 'cleanup:changed']);
+	});
+
+	it('preserves hookful child external-store updates and subscription ownership', () => {
+		const source = `
+			import { useState, useSyncExternalStore } from 'octane';
+
+			function StoreChild(props) @{
+				const value = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot);
+				<output id="hookful-store-value">{value as number}</output>
+			}
+
+			export function App(props) @{
+				const [tick, setTick] = useState(0);
+				<section data-tick={tick as number}>
+					<button id="hookful-store-parent" onClick={() => setTick(tick + 1)}>{'parent'}</button>
+					<StoreChild store={props.store} />
+				</section>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-child-external-store.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const createStore = (initial: number) => {
+			let value = initial;
+			const listeners = new Set<() => void>();
+			return {
+				getSnapshot: () => value,
+				subscribe(listener: () => void) {
+					listeners.add(listener);
+					return () => listeners.delete(listener);
+				},
+				set(next: number) {
+					value = next;
+					for (const listener of listeners) listener();
+				},
+				listenerCount: () => listeners.size,
+			};
+		};
+		const first = createStore(1);
+		const second = createStore(10);
+		const root = mount(client.App, { store: first });
+		flushEffects();
+		const output = root.find('#hookful-store-value');
+		expect(output.textContent).toBe('1');
+		expect(first.listenerCount()).toBe(1);
+
+		root.click('#hookful-store-parent');
+		expect(root.find('#hookful-store-value')).toBe(output);
+		flushSync(() => first.set(2));
+		expect(output.textContent).toBe('2');
+
+		root.update(client.App, { store: second });
+		flushEffects();
+		expect(root.find('#hookful-store-value')).toBe(output);
+		expect(output.textContent).toBe('10');
+		expect(first.listenerCount()).toBe(0);
+		expect(second.listenerCount()).toBe(1);
+
+		flushSync(() => first.set(99));
+		expect(output.textContent).toBe('10');
+		flushSync(() => second.set(11));
+		expect(output.textContent).toBe('11');
+
+		root.unmount();
+		flushEffects();
+		expect(second.listenerCount()).toBe(0);
+	});
+
+	it('repoints a hookful child setter to the most recently rerendered root', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			let childSetter = null;
+
+			export function bumpChild() {
+				if (childSetter) childSetter((value) => value + 1);
+			}
+
+			function Child(props) @{
+				const [own, setOwn] = useState(0);
+				childSetter = setOwn;
+				<output class="hookful-shared-child">{props.label + ':' + own}</output>
+			}
+
+			function Parent(props) @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button class="hookful-shared-parent" onClick={() => setTick(tick + 1)}>
+						{tick as number}
+					</button>
+					<Child label={props.label} />
+				</section>
+			}
+
+			export function App(props) @{
+				<Parent label={props.label} />
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-child-multi-root-publication.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const first = mount(client.App, { label: 'first' });
+		const second = mount(client.App, { label: 'second' });
+		const firstChild = first.find('.hookful-shared-child');
+		const secondChild = second.find('.hookful-shared-child');
+
+		flushSync(() => client.bumpChild());
+		expect(firstChild.textContent).toBe('first:0');
+		expect(secondChild.textContent).toBe('second:1');
+
+		first.click('.hookful-shared-parent');
+		flushSync(() => client.bumpChild());
+		expect(first.find('.hookful-shared-child')).toBe(firstChild);
+		expect(firstChild.textContent).toBe('first:1');
+		expect(secondChild.textContent).toBe('second:1');
+
+		second.click('.hookful-shared-parent');
+		flushSync(() => client.bumpChild());
+		expect(firstChild.textContent).toBe('first:1');
+		expect(second.find('.hookful-shared-child')).toBe(secondChild);
+		expect(secondChild.textContent).toBe('second:2');
+		first.unmount();
+		second.unmount();
+	});
+
+	it('preserves hookful child setter publication through an observable Proxy', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			function Child(props) @{
+				const [value, setValue] = useState(0);
+				props.target.setter = setValue;
+				<output id="hookful-proxy-value">{value as number}</output>
+			}
+
+			export function App(props) @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button id="hookful-proxy-parent" onClick={() => setTick(tick + 1)}>
+						{tick as number}
+					</button>
+					<Child target={props.target} />
+				</section>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-child-proxy-publication.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		let wasPublished = false;
+		let update: ((next: (value: number) => number) => void) | undefined;
+		const target = new Proxy<Record<string, unknown>>(
+			{},
+			{
+				set(_target, key, value) {
+					if (key !== 'setter') return false;
+					wasPublished = true;
+					update = value as (next: (current: number) => number) => void;
+					return true;
+				},
+			},
+		);
+		const root = mount(client.App, { target });
+		const output = root.find('#hookful-proxy-value');
+		expect(wasPublished).toBe(true);
+		expect(output.textContent).toBe('0');
+
+		wasPublished = false;
+		root.click('#hookful-proxy-parent');
+		expect(wasPublished).toBe(true);
+		expect(root.find('#hookful-proxy-value')).toBe(output);
+
+		flushSync(() => update?.((value) => value + 1));
+		expect(output.textContent).toBe('1');
+		root.unmount();
+	});
+
+	it('retries a suspended hookful child before preserving its own state', async () => {
+		const source = `
+			import { Suspense, use, useState } from 'octane';
+
+			function AwaitingChild(props) @{
+				const [own, setOwn] = useState(0);
+				const value = use(props.promise);
+				<button id="hookful-suspense-value" onClick={() => setOwn(own + 1)}>
+					{value + ':' + own}
+				</button>
+			}
+
+			export function App(props) @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button id="hookful-suspense-parent" onClick={() => setTick(tick + 1)}>
+						{tick as number}
+					</button>
+					<Suspense fallback={<span id="hookful-suspense-pending">{'loading'}</span>}>
+						<AwaitingChild promise={props.promise} />
+					</Suspense>
+				</section>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-child-suspense-retry.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((complete) => {
+			resolve = complete;
+		});
+		const root = mount(client.App, { promise });
+		expect(root.find('#hookful-suspense-pending').textContent).toBe('loading');
+		root.click('#hookful-suspense-parent');
+		expect(root.find('#hookful-suspense-pending').textContent).toBe('loading');
+
+		await act(() => resolve('ready'));
+		const child = root.find('#hookful-suspense-value');
+		expect(child.textContent).toBe('ready:0');
+		root.click('#hookful-suspense-value');
+		expect(child.textContent).toBe('ready:1');
+		root.click('#hookful-suspense-parent');
+		expect(root.find('#hookful-suspense-value')).toBe(child);
+		expect(child.textContent).toBe('ready:1');
+		root.unmount();
+	});
+
+	it('preserves hookful child custom comparisons, refs, effects, and key resets', () => {
+		const source = `
+			import { memo, useEffect, useState } from 'octane';
+
+			function Child(props) @{
+				const [own, setOwn] = useState(0);
+				useEffect(() => {
+					props.onEffect('mount:' + props.label);
+					return () => props.onEffect('cleanup:' + props.label);
+				}, [props.label, props.onEffect]);
+				<button id="hookful-keyed-value" ref={props.ref} onClick={() => setOwn(own + 1)}>
+					{props.label + ':' + own}
+				</button>
+			}
+
+			const Compared = memo(
+				Child,
+				(previous, next) => previous.label.toLowerCase() === next.label.toLowerCase()
+					&& previous.ref === next.ref,
+			);
+
+			export function App(props) @{
+				const [tick, setTick] = useState(0);
+				<section>
+					<button id="hookful-keyed-parent" onClick={() => setTick(tick + 1)}>
+						{tick as number}
+					</button>
+					<Compared
+						key={props.identity}
+						label={props.label}
+						ref={props.onRef}
+						onEffect={props.onEffect}
+					/>
+				</section>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'hookful-child-keys-refs-comparator.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const effects: string[] = [];
+		const refs: string[] = [];
+		const makeRef = (label: string) => (element: Element | null) => {
+			if (element !== null) {
+				refs.push('attach:' + label);
+				return () => refs.push('detach:' + label);
+			}
+		};
+		const firstRef = makeRef('first');
+		const secondRef = makeRef('second');
+		const onEffect = (event: string) => effects.push(event);
+		const root = mount(client.App, {
+			identity: 'a',
+			label: 'first',
+			onRef: firstRef,
+			onEffect,
+		});
+		flushEffects();
+		const original = root.find('#hookful-keyed-value');
+		expect(refs).toEqual(['attach:first']);
+		expect(effects).toEqual(['mount:first']);
+		root.click('#hookful-keyed-value');
+		expect(original.textContent).toBe('first:1');
+
+		root.update(client.App, {
+			identity: 'a',
+			label: 'FIRST',
+			onRef: firstRef,
+			onEffect,
+		});
+		expect(root.find('#hookful-keyed-value')).toBe(original);
+		expect(original.textContent).toBe('first:1');
+
+		root.update(client.App, {
+			identity: 'a',
+			label: 'second',
+			onRef: secondRef,
+			onEffect,
+		});
+		flushEffects();
+		expect(root.find('#hookful-keyed-value')).toBe(original);
+		expect(original.textContent).toBe('second:1');
+		expect(refs).toEqual(['attach:first', 'detach:first', 'attach:second']);
+		expect(effects).toEqual(['mount:first', 'cleanup:first', 'mount:second']);
+
+		root.update(client.App, {
+			identity: 'b',
+			label: 'third',
+			onRef: secondRef,
+			onEffect,
+		});
+		flushEffects();
+		const replacement = root.find('#hookful-keyed-value');
+		expect(replacement).not.toBe(original);
+		expect(replacement.textContent).toBe('third:0');
+		expect(refs).toEqual([
+			'attach:first',
+			'detach:first',
+			'attach:second',
+			'detach:second',
+			'attach:second',
+		]);
+		expect(effects).toEqual([
+			'mount:first',
+			'cleanup:first',
+			'mount:second',
+			'cleanup:second',
+			'mount:third',
+		]);
+
+		root.unmount();
+		flushEffects();
+		expect(refs.at(-1)).toBe('detach:second');
+		expect(effects.at(-1)).toBe('cleanup:third');
+	});
+
+	it('hydrates hookful child setters and preserves state and provider updates', () => {
+		const source = `
+			import { createContext, useContext, useState } from 'octane';
+
+			let parentSetter = null;
+			let childSetter = null;
+			export const Theme = createContext('default');
+
+			export function bumpParent() {
+				if (parentSetter) parentSetter((value) => value + 1);
+			}
+
+			export function bumpChild() {
+				if (childSetter) childSetter((value) => value + 1);
+			}
+
+			function Child(props) @{
+				const [own, setOwn] = useState(0);
+				childSetter = setOwn;
+				<button id="hookful-hydrated-child">{props.label + ':' + own}</button>
+			}
+
+			function ContextReader(props) @{
+				const theme = useContext(props.context);
+				<span id="hookful-hydrated-context">{theme as string}</span>
+			}
+
+			function Parent(props) @{
+				const [tick, setTick] = useState(0);
+				parentSetter = setTick;
+				<section id="hookful-hydrated-parent" data-tick={tick as number}>
+					<Child label={props.label} />
+					<ContextReader context={props.context} />
+				</section>
+			}
+
+			export function App(props) @{
+				const Context = props.context;
+				<Context.Provider value={props.theme}>
+					<Parent label={props.label} context={Context} />
+				</Context.Provider>
+			}
+		`;
+		const id = 'hookful-child-hydration.tsrx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, {
+			context: server.Theme,
+			label: 'server',
+			theme: 'light',
+		}).html;
+		const originalParent = container.querySelector('#hookful-hydrated-parent');
+		const originalChild = container.querySelector('#hookful-hydrated-child');
+		const originalContext = container.querySelector('#hookful-hydrated-context');
+		const root = hydrateRoot(container, client.App, {
+			context: client.Theme,
+			label: 'server',
+			theme: 'light',
+		});
+		expect(container.querySelector('#hookful-hydrated-parent')).toBe(originalParent);
+		expect(container.querySelector('#hookful-hydrated-child')).toBe(originalChild);
+		expect(container.querySelector('#hookful-hydrated-context')).toBe(originalContext);
+		expect(originalChild?.textContent).toBe('server:0');
+		expect(originalContext?.textContent).toBe('light');
+
+		flushSync(() => client.bumpParent());
+		expect(originalParent?.getAttribute('data-tick')).toBe('1');
+		expect(container.querySelector('#hookful-hydrated-child')).toBe(originalChild);
+
+		flushSync(() => client.bumpChild());
+		expect(originalChild?.textContent).toBe('server:1');
+
+		flushSync(() =>
+			root.render(client.App, {
+				context: client.Theme,
+				label: 'changed',
+				theme: 'dark',
+			}),
+		);
+		expect(container.querySelector('#hookful-hydrated-parent')).toBe(originalParent);
+		expect(container.querySelector('#hookful-hydrated-child')).toBe(originalChild);
+		expect(container.querySelector('#hookful-hydrated-context')).toBe(originalContext);
+		expect(originalChild?.textContent).toBe('changed:1');
+		expect(originalContext?.textContent).toBe('dark');
+		root.unmount();
+	});
+
+	it('hydrates a pure hookful child and preserves both independent state updates', () => {
+		const source = `
+			import { useState } from 'octane';
+
+			function Child(props) @{
+				const [own, setOwn] = useState(0);
+				<button id="hookful-pure-hydrated-child" onClick={() => setOwn(own + 1)}>
+					{props.label + ':' + own}
+				</button>
+			}
+
+			function Parent(props) @{
+				const [tick, setTick] = useState(0);
+				<section id="hookful-pure-hydrated-parent" data-tick={tick as number}>
+					<button id="hookful-pure-hydrated-parent-update" onClick={() => setTick(tick + 1)}>
+						{'parent'}
+					</button>
+					<Child label={props.label} />
+				</section>
+			}
+
+			export function App(props) @{
+				<Parent label={props.label} />
+			}
+		`;
+		const id = 'hookful-pure-parent-child-hydration.tsrx';
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, { label: 'initial' }).html;
+		const parent = container.querySelector('#hookful-pure-hydrated-parent');
+		const child = container.querySelector('#hookful-pure-hydrated-child');
+		const parentUpdate = container.querySelector(
+			'#hookful-pure-hydrated-parent-update',
+		) as HTMLButtonElement;
+		const root = hydrateRoot(container, client.App, { label: 'initial' });
+		expect(container.querySelector('#hookful-pure-hydrated-parent')).toBe(parent);
+		expect(container.querySelector('#hookful-pure-hydrated-child')).toBe(child);
+		expect(child?.textContent).toBe('initial:0');
+
+		flushSync(() => parentUpdate.click());
+		expect(parent?.getAttribute('data-tick')).toBe('1');
+		expect(container.querySelector('#hookful-pure-hydrated-child')).toBe(child);
+
+		flushSync(() => (child as HTMLButtonElement).click());
+		expect(child?.textContent).toBe('initial:1');
+		flushSync(() => parentUpdate.click());
+		expect(parent?.getAttribute('data-tick')).toBe('2');
+		expect(child?.textContent).toBe('initial:1');
+
+		flushSync(() => root.render(client.App, { label: 'changed' }));
+		expect(container.querySelector('#hookful-pure-hydrated-parent')).toBe(parent);
+		expect(container.querySelector('#hookful-pure-hydrated-child')).toBe(child);
+		expect(child?.textContent).toBe('changed:1');
+		root.unmount();
+	});
+
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);

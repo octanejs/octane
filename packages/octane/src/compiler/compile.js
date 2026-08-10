@@ -4180,6 +4180,250 @@ function classifySameModuleWarmPotential(ctx) {
 	}
 }
 
+// A synchronous same-module subtree may still own independent state Blocks.
+// Skipping its parent call is safe only when every setup operation is a real
+// primitive-initialized useState or the publication of that hook's stable
+// setter into one private module binding. Those publications are observable
+// across multiple roots, so each cached edge witnesses the complete transitive
+// set AFTER rendering and misses whenever another owner changes one.
+function stableHookfulStateSetter(statement, ctx) {
+	if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') return null;
+	if (statement.declarations?.length !== 1) return null;
+	const declaration = statement.declarations[0];
+	const init = unwrapTsExpr(declaration.init);
+	const setter = declaration.id?.elements?.[1];
+	if (
+		declaration.id?.type !== 'ArrayPattern' ||
+		declaration.id.elements.length !== 2 ||
+		declaration.id.elements[0]?.type !== 'Identifier' ||
+		setter?.type !== 'Identifier' ||
+		init?.type !== 'CallExpression' ||
+		init.callee?.type !== 'Identifier' ||
+		ctx.octaneImportLocals?.get(init.callee.name) !== 'useState' ||
+		stableHookCallName(init) !== 'useState' ||
+		init.arguments.length > 1 ||
+		(init.arguments.length === 1 && !isInvariantLiteral(unwrapTsExpr(init.arguments[0])))
+	) {
+		return null;
+	}
+	return setter.name;
+}
+
+function classifyStableHookfulChildCalls(moduleBody, ctx) {
+	let stateOwner = false;
+	for (const info of ctx.componentInfo.values()) {
+		if (info.warmPotential !== false || info.voidOutput !== true) continue;
+		for (const statement of info.node.body.body || []) {
+			if (stableHookfulStateSetter(statement, ctx) !== null) {
+				stateOwner = true;
+				break;
+			}
+		}
+		if (stateOwner) break;
+	}
+	if (!stateOwner) return;
+
+	const privateLets = new Set();
+	for (const statement of moduleBody) {
+		if (statement.type !== 'VariableDeclaration' || statement.kind !== 'let') continue;
+		for (const declaration of statement.declarations || []) {
+			if (declaration.id?.type === 'Identifier') privateLets.add(declaration.id.name);
+		}
+	}
+	for (const statement of moduleBody) {
+		if (statement.type !== 'ExportNamedDeclaration' || statement.source != null) continue;
+		for (const specifier of statement.specifiers || []) {
+			if (specifier.local?.type === 'Identifier') privateLets.delete(specifier.local.name);
+		}
+	}
+
+	const writes = new Map();
+	if (privateLets.size !== 0) {
+		const visited = new WeakSet();
+		function recordWrite(pattern, node) {
+			if (pattern?.type === 'Identifier') {
+				if (!privateLets.has(pattern.name)) return;
+				let entries = writes.get(pattern.name);
+				if (entries === undefined) writes.set(pattern.name, (entries = []));
+				entries.push(node);
+				return;
+			}
+			const names = new Set();
+			collectBindings(pattern, names);
+			for (const name of names) {
+				if (!privateLets.has(name)) continue;
+				let entries = writes.get(name);
+				if (entries === undefined) writes.set(name, (entries = []));
+				entries.push(node);
+			}
+		}
+		(function scanWrites(node) {
+			if (!node || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) scanWrites(child);
+				return;
+			}
+			if (visited.has(node)) return;
+			visited.add(node);
+			if (node.type === 'AssignmentExpression') recordWrite(node.left, node);
+			else if (node.type === 'UpdateExpression') recordWrite(node.argument, node);
+			else if (node.type === 'ForOfStatement' || node.type === 'ForInStatement') {
+				if (node.left?.type !== 'VariableDeclaration') recordWrite(node.left, node);
+			}
+			for (const key in node) {
+				if (AST_WALK_SKIP_KEYS.has(key)) continue;
+				scanWrites(node[key]);
+			}
+		})(moduleBody);
+	}
+
+	const candidates = new Map();
+	for (const [name, info] of ctx.componentInfo) {
+		if (info.warmPotential !== false || info.voidOutput !== true) continue;
+		const component = info.node;
+		const statements = component.body.body || [];
+		const render = component.body.render;
+		if (
+			render === null ||
+			containsRenderCall([render], ctx) ||
+			containsAutoMemoUnsafeStructure([render]) ||
+			containsImportedMemberRead(render, ctx.importedNames)
+		) {
+			continue;
+		}
+		const locals = collectComponentLocals(component);
+		const setters = new Set();
+		const hookBindings = new Set();
+		const publications = new Set();
+		let safe = true;
+		for (const statement of statements) {
+			if (statement.type === 'VariableDeclaration') {
+				const setter = stableHookfulStateSetter(statement, ctx);
+				if (setter === null) {
+					safe = false;
+					break;
+				}
+				setters.add(setter);
+				hookBindings.add(unwrapTsExpr(statement.declarations[0].init).callee.name);
+				continue;
+			}
+			const assignment = statement.expression;
+			const target = assignment?.left?.name;
+			if (
+				statement.type !== 'ExpressionStatement' ||
+				assignment?.type !== 'AssignmentExpression' ||
+				assignment.operator !== '=' ||
+				assignment.left?.type !== 'Identifier' ||
+				!privateLets.has(target) ||
+				locals.has(target) ||
+				assignment.right?.type !== 'Identifier' ||
+				!setters.has(assignment.right.name) ||
+				publications.has(target) ||
+				writes.get(target)?.length !== 1 ||
+				writes.get(target)?.[0] !== assignment
+			) {
+				safe = false;
+				break;
+			}
+			publications.add(target);
+		}
+		if (!safe) continue;
+
+		const root = b.block([...statements, render]);
+		const captures = new Set();
+		for (const free of collectFreeIdentifiers(root, locals)) {
+			if (hookBindings.has(free) || publications.has(free)) continue;
+			if (ctx.importNamespaceNames.has(free) || ctx._octaneBoundaryNames.has(free)) {
+				safe = false;
+				break;
+			}
+			if (ctx.importedNames.has(free)) captures.add(free);
+			else if (!ctx.componentInfo.has(free) && !ctx.moduleFunctionDeclarations.has(free)) {
+				safe = false;
+				break;
+			}
+		}
+		if (!safe) continue;
+		candidates.set(name, {
+			ownsState: setters.size !== 0,
+			captures,
+			publications,
+			dependencies: info.warmDependencies,
+		});
+	}
+
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const [name, candidate] of candidates) {
+			for (const edge of candidate.dependencies) {
+				if (!candidates.has(tagBindingName(edge))) {
+					candidates.delete(name);
+					changed = true;
+					break;
+				}
+			}
+		}
+	}
+	changed = true;
+	while (changed) {
+		changed = false;
+		for (const candidate of candidates.values()) {
+			for (const edge of candidate.dependencies) {
+				const child = candidates.get(tagBindingName(edge));
+				for (const capture of child.captures) {
+					if (!candidate.captures.has(capture)) {
+						candidate.captures.add(capture);
+						changed = true;
+					}
+				}
+				for (const publication of child.publications) {
+					if (!candidate.publications.has(publication)) {
+						candidate.publications.add(publication);
+						changed = true;
+					}
+				}
+			}
+		}
+	}
+	for (const [name, candidate] of candidates) {
+		ctx.componentInfo.get(name).stableHookfulChild = {
+			ownsState: candidate.ownsState,
+			cacheOwner: false,
+			captures: [...candidate.captures].sort(),
+			publications: [...candidate.publications].sort(),
+		};
+	}
+	for (const [name, candidate] of candidates) {
+		if (!candidate.ownsState) continue;
+		const parent = ctx.componentInfo.get(name);
+		for (const edge of candidate.dependencies) {
+			const child = ctx.componentInfo.get(tagBindingName(edge));
+			if (
+				child.stableHookfulChild === undefined ||
+				child.stableHookfulChild.publications.length > 16 ||
+				(parent.autoMemoCallsitesSafe !== false && child.autoMemoSafe === true) ||
+				(edge.children?.length ?? 0) !== 0
+			) {
+				continue;
+			}
+			const attrs = edge.openingElement?.attributes ?? edge.attributes ?? [];
+			if (
+				attrs.some(
+					(attribute) =>
+						(attribute.type !== 'Attribute' && attribute.type !== 'JSXAttribute') ||
+						['key', 'ref', 'children', '__proto__'].includes(jsxAttrRawName(attribute)),
+				) ||
+				!warmCallsiteOwnsRequiredProps(child, attrs)
+			) {
+				continue;
+			}
+			parent.stableHookfulChild.cacheOwner = true;
+			break;
+		}
+	}
+}
+
 // Omitting a JSX descriptor also omits its live `Component.defaultProps` read.
 // Only private declarations whose every reference is an immediately rendered,
 // attribute-free host child can therefore bypass descriptor construction. JSX
@@ -7672,6 +7916,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			}
 		}
 	}
+	if (ctx.autoMemo) classifyStableHookfulChildCalls(ast.body, ctx);
 	// Single-root output is transitive across same-module `@if` arms (see
 	// collectSingleRootIfDeps): flip false → true until stable so declaration
 	// order and recursion through a proven base case don't matter. Pessimistic —
@@ -11620,8 +11865,17 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const prevAutoMemoOffset = ctx.currentAutoMemoOffset;
 	const prevAutoMemoCacheName = ctx.currentAutoMemoCacheName;
 	const prevAutoMemoCommittedName = ctx.currentAutoMemoCommittedName;
-	const autoMemoCacheName = allocCompilerName(ctx, '__memoCache');
-	const autoMemoCommittedName = allocCompilerName(ctx, '__memoCommitted');
+	const compactStateOwnerCache =
+		options?.autoCallback === true &&
+		ctx.componentInfo.get(name)?.stableHookfulChild?.cacheOwner === true;
+	const autoMemoCacheName = allocCompilerName(
+		ctx,
+		compactStateOwnerCache ? `_mc${ctx.nextAutoMemoCacheId}` : '__memoCache',
+	);
+	const autoMemoCommittedName = allocCompilerName(
+		ctx,
+		compactStateOwnerCache ? `_mp${ctx.nextAutoMemoCacheId}` : '__memoCommitted',
+	);
 	const autoMemoCacheProperty = `_m$${ctx.nextAutoMemoCacheId++}`;
 	ctx.currentAutoMemoOffset = 0;
 	ctx.currentAutoMemoCacheName = autoMemoCacheName;
@@ -17854,9 +18108,12 @@ function emitAutoMemoRegion(
 	depNode,
 	initValue = null,
 	restoreCachedContext = false,
+	publicationWitnesses = null,
 ) {
-	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0));
+	const witnessCount = publicationWitnesses?.length ?? 0;
+	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0) + witnessCount);
 	const contextIndex = contextAware ? cell.base + dependencies.length : null;
+	const witnessBase = cell.base + dependencies.length + (contextAware ? 1 : 0);
 	const cache = ctx.currentAutoMemoCacheName;
 	const cacheAt = (i) => b.member(b.id(cache), b.literal(i), true);
 	// Evaluate every dependency exactly once per render, before the miss test.
@@ -17881,10 +18138,20 @@ function emitAutoMemoRegion(
 	for (let index = 0; index < depNames.length; index++) {
 		misses.push(b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])));
 	}
-	const publish = () =>
-		depNames.map((name, index) =>
+	for (let index = 0; index < witnessCount; index++) {
+		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
+	}
+	const publish = () => [
+		...depNames.map((name, index) =>
 			b.stmt(b.assignment('=', cacheAt(cell.base + index), b.id(name))),
-		);
+		),
+		...(publicationWitnesses ?? []).map((name, index) =>
+			// A child may publish a different root's setter while this call runs.
+			// Sampling the binding before the call would cache the OLD owner and
+			// make the next equal-props render miss or skip the wrong publication.
+			b.stmt(b.assignment('=', cacheAt(witnessBase + index), b.id(name))),
+		),
+	];
 	const writable = () =>
 		b.if(
 			b.binary('===', b.id(cache), b.id(ctx.currentAutoMemoCommittedName)),
@@ -19281,14 +19548,21 @@ function planJsx(
 		// Compiler-owned whole-component region cache. The flat array belongs to
 		// this compiled scope; the ordinary component runtime never sees memo deps.
 		if (cc.autoMemoDeps !== null) {
-			const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
-			ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
+			const liteMemo = cc.autoMemoLite === true && !cc.inheritRange;
+			const componentHelper = liteMemo
+				? '_$componentSlotLite'
+				: cc.voidComponent
+					? '_$componentSlotVoid'
+					: '_$componentSlot';
+			ctx.runtimeNeeded.add(
+				liteMemo ? 'componentSlotLite' : cc.voidComponent ? 'componentSlotVoid' : 'componentSlot',
+			);
 			const memoAnchor = anchorNodeFor(cc, 'compAnchor');
 			const trailing = memoAnchor ? [memoAnchor] : [];
-			if (cc.inheritRange) {
+			if (!liteMemo && cc.inheritRange) {
 				if (trailing.length === 0) trailing.push(undefinedNode());
 				trailing.push(undefinedNode(), undefinedNode(), b.literal(true));
-			} else if (cc.singleRoot) {
+			} else if (!liteMemo && cc.singleRoot) {
 				if (trailing.length === 0) trailing.push(undefinedNode());
 				trailing.push(undefinedNode(), b.literal(true));
 			}
@@ -19316,6 +19590,9 @@ function planJsx(
 					witnessMiss,
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
+					null,
+					false,
+					cc.autoMemoPublicationWitnesses,
 				),
 			);
 			continue;
@@ -22844,6 +23121,8 @@ function makeCompCall(
 	let autoMemoDepNodes = null;
 	let autoMemoWitnesses = [];
 	let autoMemoContextAware = false;
+	let autoMemoLite = false;
+	let autoMemoPublicationWitnesses = null;
 	// A same-module compiled callee whose JavaScript return is provably void can
 	// use a Block that omits generic return-value reconciliation. HMR deliberately
 	// keeps the generic path: an update can replace the implementation with a
@@ -22872,18 +23151,29 @@ function makeCompCall(
 			if (keyExpr == null) {
 				if (calleeInfo.eligible) liteEligible = callSiteOk;
 				else if (calleeInfo.singleRoot) singleRoot = callSiteOk;
+				const ordinaryMemoSafe =
+					ctx.currentAutoMemoCallsitesSafe !== false && calleeInfo.autoMemoSafe === true;
+				const stableHookful =
+					!ordinaryMemoSafe &&
+					ctx.currentBodyIsComponentScope === true &&
+					ctx._universalRuntimeUnit == null &&
+					ctx.componentInfo.get(componentName)?.stableHookfulChild?.ownsState === true &&
+					calleeInfo.stableHookfulChild !== undefined &&
+					calleeInfo.stableHookfulChild.publications.length <= 16 &&
+					warmCallsiteOwnsRequiredProps(calleeInfo, attrs);
 				if (
 					ctx.autoMemo &&
 					ctx.currentComponentLocals &&
-					ctx.currentAutoMemoCallsitesSafe !== false &&
 					callSiteOk &&
-					calleeInfo.autoMemoSafe === true &&
+					(ordinaryMemoSafe || stableHookful) &&
 					!containsRenderCall([node], ctx) &&
 					!containsAutoMemoUnsafeStructure([node]) &&
 					!containsImportedMemberRead(node, ctx.importedNames)
 				) {
 					const free = collectFreeIdentifiers(node, []);
-					const calleeCaptures = calleeInfo.autoMemoCaptures || [];
+					const calleeCaptures = stableHookful
+						? calleeInfo.stableHookfulChild.captures
+						: calleeInfo.autoMemoCaptures || [];
 					const deps = new Set(calleeCaptures);
 					const callsiteDeps = collectAutoMemoDependencyExpressions(propDependencyNodes);
 					for (const dependency of callsiteDeps.dependencies) deps.add(dependency);
@@ -22898,6 +23188,11 @@ function makeCompCall(
 					}
 					for (const witness of calleeInfo.autoMemoImportedComponents || []) {
 						if (ctx.currentComponentLocals.has(witness)) depsSafe = false;
+					}
+					if (stableHookful) {
+						for (const publication of calleeInfo.stableHookfulChild.publications) {
+							if (ctx.currentComponentLocals.has(publication)) depsSafe = false;
+						}
 					}
 					for (const name of free) {
 						if (name === compName) continue;
@@ -22930,12 +23225,18 @@ function makeCompCall(
 							return leftOrder < rightOrder ? -1 : leftOrder > rightOrder ? 1 : 0;
 						});
 						autoMemoDepNodes = callsiteDeps.dependencyNodes;
-						autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
-						autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
-						// The cache needs a real context-stamping Block. Preserve the
-						// same-module single-root proof, but never use componentSlotLite.
-						liteEligible = false;
-						singleRoot = calleeInfo.singleRoot === true;
+						if (stableHookful) {
+							autoMemoLite = liteEligible;
+							autoMemoPublicationWitnesses = calleeInfo.stableHookfulChild.publications;
+						} else {
+							autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
+							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
+							// The ordinary cache may need a context-stamping Block. The
+							// proven synchronous state-only path keeps its existing lite
+							// representation and therefore adds no mount boundaries.
+							liteEligible = false;
+							singleRoot = calleeInfo.singleRoot === true;
+						}
 					}
 				}
 			}
@@ -22988,6 +23289,8 @@ function makeCompCall(
 		autoMemoDepNodes,
 		autoMemoWitnesses,
 		autoMemoContextAware,
+		autoMemoLite,
+		autoMemoPublicationWitnesses,
 		voidComponent,
 		singleRoot,
 		maybeSingleRoot,
