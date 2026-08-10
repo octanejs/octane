@@ -39,6 +39,7 @@ const ROOT_KEYS = new Set([
 	'provenance',
 	'environments',
 	'lanes',
+	'ordinaryEvidence',
 	'divergences',
 	'upstreamSuites',
 	'adaptedRoots',
@@ -47,6 +48,7 @@ const ROOT_KEYS = new Set([
 const PROVENANCE_KEYS = new Set([...PROVENANCE_FIELDS, 'verification']);
 const ENVIRONMENT_KEYS = new Set(ENVIRONMENT_FIELDS);
 const FILE_KEYS = new Set(['path', 'role', 'sha256', 'cases']);
+const ORDINARY_EVIDENCE_FILE_KEYS = new Set(['path', 'sha256', 'cases']);
 const CASE_KEYS = new Set(['id', 'testName', 'fullName']);
 const LANE_KEYS = new Set([
 	'id',
@@ -425,6 +427,27 @@ export function validateManifest(manifest) {
 		if (laneCaseCount === 0 && !FULL_RUNTIME_EXECUTIONS.has(lane.execution?.kind))
 			fail(`lane ${lane.id} must declare at least one executable case`);
 	}
+	if (manifest.ordinaryEvidence !== undefined) {
+		if (!Array.isArray(manifest.ordinaryEvidence)) fail('ordinaryEvidence must be an array');
+		for (const file of manifest.ordinaryEvidence) {
+			for (const key of Object.keys(file))
+				if (!ORDINARY_EVIDENCE_FILE_KEYS.has(key))
+					fail(`ordinaryEvidence file has unknown key "${key}"`);
+			exactPath(file.path, 'ordinaryEvidence file path');
+			if (!/^[a-f0-9]{64}$/.test(file.sha256)) fail('ordinaryEvidence file sha256 is invalid');
+			if (!Array.isArray(file.cases) || file.cases.length === 0)
+				fail(`ordinaryEvidence ${file.path} cases must be non-empty`);
+			for (const parityCase of file.cases) {
+				for (const key of Object.keys(parityCase))
+					if (!CASE_KEYS.has(key)) fail(`ordinaryEvidence case has unknown key "${key}"`);
+				requiredString(parityCase.id, `ordinaryEvidence ${file.path} case id`);
+				requiredString(parityCase.testName, `ordinaryEvidence case ${parityCase.id} testName`);
+				requiredString(parityCase.fullName, `ordinaryEvidence case ${parityCase.id} fullName`);
+				if (caseIds.has(parityCase.id)) fail(`duplicate case id "${parityCase.id}"`);
+				caseIds.add(parityCase.id);
+			}
+		}
+	}
 	if (manifest.provenance.verification === 'verified') {
 		const requiredFullRuntime = (type, evidenceOrigin) =>
 			manifest.lanes.some(
@@ -575,46 +598,15 @@ export async function verifyManifestFiles(manifest, root) {
 			validateJestRuntimeInventory(inventory, lane);
 		}
 		for (const file of lane.files) {
-			const absolute = resolve(absoluteRoot, file.path);
-			if (relative(absoluteRoot, absolute).startsWith('..'))
-				fail(`file escapes repository: ${file.path}`);
-			let contents;
-			try {
-				contents = await readFile(absolute);
-			} catch (error) {
-				if (error.code === 'ENOENT') throw new Error(`missing evidence file: ${file.path}`);
-				throw error;
-			}
-			const actual = createHash('sha256').update(contents).digest('hex');
-			if (actual !== file.sha256) {
-				throw new Error(`integrity mismatch for evidence file: ${file.path}`);
-			}
+			const contents = await readEvidenceFile(absoluteRoot, file);
 			if (file.role === 'test' && lane.execution?.kind !== 'typescript') {
-				const source = contents.toString('utf8');
-				for (const parityCase of file.cases) {
-					const marker = `@parity-case ${parityCase.id}`;
-					const escapedId = parityCase.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-					const matches = [
-						...source.matchAll(new RegExp(`^\\s*//\\s*@parity-case\\s+${escapedId}\\s*$`, 'gm')),
-					];
-					if (matches.length !== 1)
-						throw new Error(`${file.path}: ${marker} must appear exactly once`);
-					const markerEnd = matches[0].index + matches[0][0].length;
-					const tail = source.slice(markerEnd).trimStart();
-					const declaration = /^(?:it|test)(?:\.(skip|todo))?\s*\(\s*/.exec(tail);
-					const exactTitle = declaration
-						? sourceStringLiterals(parityCase.testName).some((literal) =>
-								tail.slice(declaration[0].length).startsWith(literal),
-							)
-						: false;
-					if (!declaration || declaration[1] || !exactTitle) {
-						throw new Error(
-							`${file.path}: ${marker} must immediately precede one active test named ${JSON.stringify(parityCase.testName)}`,
-						);
-					}
-				}
+				assertParityCaseBindings(file.path, contents.toString('utf8'), file.cases);
 			}
 		}
+	}
+	for (const file of manifest.ordinaryEvidence ?? []) {
+		const contents = await readEvidenceFile(absoluteRoot, file);
+		assertParityCaseBindings(file.path, contents.toString('utf8'), file.cases);
 	}
 	const discoveredTests = await discoverAdaptedFiles(absoluteRoot, manifest.adaptedRoots.tests);
 	const inventoried = new Set();
@@ -715,7 +707,7 @@ export async function verifyManifestFiles(manifest, root) {
 					!ordinaryCaseIds.has(match[2]))
 			)
 				throw new Error(
-					`${path}: divergence marker "${match[1]}" is not bound to required executed case "${match[2]}"`,
+					`${path}: divergence marker "${match[1]}" is not bound to a declared case "${match[2]}"`,
 				);
 			markerCounts.set(match[1], (markerCounts.get(match[1]) ?? 0) + 1);
 		}
@@ -730,11 +722,55 @@ export async function verifyManifestFiles(manifest, root) {
 }
 
 function caseIdsForManifest(manifest) {
-	return new Set(
-		manifest.lanes
-			.filter((lane) => lane.oracle === 'required' && lane.available !== false)
-			.flatMap((lane) => lane.files.flatMap((file) => (file.cases ?? []).map((entry) => entry.id))),
+	const laneCaseIds = manifest.lanes
+		.filter((lane) => lane.oracle === 'required' && lane.available !== false)
+		.flatMap((lane) => lane.files.flatMap((file) => (file.cases ?? []).map((entry) => entry.id)));
+	const ordinaryCaseIds = (manifest.ordinaryEvidence ?? []).flatMap((file) =>
+		file.cases.map((entry) => entry.id),
 	);
+	return new Set([...laneCaseIds, ...ordinaryCaseIds]);
+}
+
+async function readEvidenceFile(absoluteRoot, file) {
+	const absolute = resolve(absoluteRoot, file.path);
+	if (relative(absoluteRoot, absolute).startsWith('..'))
+		fail(`file escapes repository: ${file.path}`);
+	let contents;
+	try {
+		contents = await readFile(absolute);
+	} catch (error) {
+		if (error.code === 'ENOENT') throw new Error(`missing evidence file: ${file.path}`);
+		throw error;
+	}
+	const actual = createHash('sha256').update(contents).digest('hex');
+	if (actual !== file.sha256) {
+		throw new Error(`integrity mismatch for evidence file: ${file.path}`);
+	}
+	return contents;
+}
+
+function assertParityCaseBindings(path, source, cases) {
+	for (const parityCase of cases) {
+		const marker = `@parity-case ${parityCase.id}`;
+		const escapedId = parityCase.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const matches = [
+			...source.matchAll(new RegExp(`^\\s*//\\s*@parity-case\\s+${escapedId}\\s*$`, 'gm')),
+		];
+		if (matches.length !== 1) throw new Error(`${path}: ${marker} must appear exactly once`);
+		const markerEnd = matches[0].index + matches[0][0].length;
+		const tail = source.slice(markerEnd).trimStart();
+		const declaration = /^(?:it|test)(?:\.(skip|todo))?\s*\(\s*/.exec(tail);
+		const exactTitle = declaration
+			? sourceStringLiterals(parityCase.testName).some((literal) =>
+					tail.slice(declaration[0].length).startsWith(literal),
+				)
+			: false;
+		if (!declaration || declaration[1] || !exactTitle) {
+			throw new Error(
+				`${path}: ${marker} must immediately precede one active test named ${JSON.stringify(parityCase.testName)}`,
+			);
+		}
+	}
 }
 
 function validateRuntimeInventory(inventory, lane, expectedRoots) {

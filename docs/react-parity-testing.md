@@ -115,6 +115,12 @@ though they are not selected through a Vitest project. A Vitest wrapper around
 an already-executed pristine Jest suite is not another oracle and should not be
 run again in the ordinary shards.
 
+Structured divergences that pin unpaired Octane-only ordinary-shard cases must
+not invent a required parity lane for identity alone. Declare those cases under
+optional `ordinaryEvidence` (path, sha256, and `@parity-case` identities) so the
+ledger can bind `divergences[].caseIds` without counting them as React evidence
+or re-executing them under `react-parity:check`.
+
 ## CI execution
 
 The always-on lint job covers the cheap control plane, including lightweight

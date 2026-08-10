@@ -2165,20 +2165,95 @@ export default defineConfig({
 				},
 			},
 			{
+				// Ordinary package suite: nested-flush and other Octane-only contracts
+				// stay here. Provenance is recorded-unverified, so nothing is
+				// react-parity-owned until a verified harness can execute it.
 				test: {
 					name: 'tanstack-virtual',
 					include: ['packages/tanstack-virtual/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					exclude: [
+						'packages/tanstack-virtual/tests/differential/**/*.test.ts',
+						'packages/tanstack-virtual/tests/ssr/**/*.test.ts',
+					],
+					// jsdom affordances virtual-core needs (no-op ResizeObserver,
+					// Element.scrollTo shim, MAX_SAFE_INTEGER scroll dimensions).
+					setupFiles: ['packages/tanstack-virtual/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/tanstack-virtual` is the package under test; alias the
+				// public name (and subpaths) to source so fixtures import it exactly as
+				// a consumer would (and the differential React side rewrites the same
+				// specifiers to `@tanstack/react-virtual`).
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-virtual$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-virtual/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-virtual\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-virtual/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Octane-only SSR contract — no React SSR counterpart, so it stays in
+				// ordinary shards rather than react-parity ownership.
+				test: {
+					name: 'tanstack-virtual-ssr',
+					include: ['packages/tanstack-virtual/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-virtual$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-virtual/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-virtual\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-virtual/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Compiler-control unit tests for the differential harness. Ordinary
+				// project: not differential React/Octane evidence.
+				test: {
+					name: 'tanstack-virtual-differential-setup',
+					include: ['packages/tanstack-virtual/tests/differential/setup.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				// Same-fixture React/Octane scenarios — parity-owned regardless of
+				// provenance status. Compiler-control and Octane-only SSR stay ordinary.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-virtual-differential',
+					include: ['packages/tanstack-virtual/tests/differential/parity.test.ts'],
 					environment: 'jsdom',
 					// Same differential precompile, but for virtualizer fixtures: also
 					// rewrites `@octanejs/tanstack-virtual` → `@tanstack/react-virtual` so
 					// the React side runs the real react-virtual adapter over the SAME
 					// virtual-core.
 					globalSetup: ['packages/tanstack-virtual/tests/differential/_setup.ts'],
+					setupFiles: ['packages/tanstack-virtual/tests/_setup.ts'],
 					// jsdom affordances virtual-core needs (no-op ResizeObserver,
 					// Element.scrollTo shim, MAX_SAFE_INTEGER scroll dimensions) —
 					// installed once for the whole project so BOTH differential sides
 					// share them.
-					setupFiles: ['packages/tanstack-virtual/tests/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

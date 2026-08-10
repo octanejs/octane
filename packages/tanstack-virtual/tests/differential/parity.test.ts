@@ -24,6 +24,7 @@ const CACHE = resolve(__dirname, '.react-cache');
 const settle = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
 describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual', () => {
+	// @parity-case differential:tanstack-virtual-basic
 	it('BasicList: scroll windows + count clamp + scrollToIndex, byte-identical', async () => {
 		const d = await mountDifferential(BASIC, 'BasicList', undefined, CACHE);
 		await d.step('mount', async () => {
@@ -62,6 +63,7 @@ describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtu
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-virtual-horizontal
 	it('HorizontalList: scrollLeft windowing, byte-identical', async () => {
 		const d = await mountDifferential(HORIZONTAL, 'HorizontalList', undefined, CACHE);
 		await d.step('mount', async () => {
@@ -80,6 +82,7 @@ describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtu
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-virtual-dynamic
 	it('DynamicList: measureElement + resizeItem + measure(), byte-identical', async () => {
 		const d = await mountDifferential(DYNAMIC, 'DynamicList', undefined, CACHE);
 		await d.step('mount (initial ref-measure pass)', async () => {
@@ -108,6 +111,7 @@ describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtu
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-virtual-window
 	it('WindowList: window scroll windowing, byte-identical', async () => {
 		const d = await mountDifferential(WINDOW, 'WindowList', undefined, CACHE);
 		await d.step('mount', async () => {

@@ -856,7 +856,7 @@
         "octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test."
       ],
       "ssr": "SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` without `document`; the first paint windows from `initialRect`/`initialOffset` exactly as upstream. No dedicated SSR tests.",
-      "verified": "2026-07-12"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/tauri",
