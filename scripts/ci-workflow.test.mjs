@@ -354,6 +354,38 @@ describe('CI workflow aggregation', () => {
 		assert.deepEqual(projects[1].test.exclude, ['beta/generated/**', 'beta/parity/**/*.test.ts']);
 		assert.equal(projects[1].testExecution, undefined);
 	});
+
+	test('runs required differential evidence only in its owning CI lane', () => {
+		const baseProjects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		const shardedProjects = new Map(
+			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
+		);
+		for (const project of [
+			'mobx-differential',
+			'phosphor-icons-differential',
+			'rainbowkit-differential',
+			'recharts-differential',
+			'rxjs-differential',
+			'usehooks-ts-differential',
+			'wagmi-differential',
+		]) {
+			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
+			assert.equal(shardedProjects.has(project), false);
+		}
+
+		const mixedProject = baseProjects.get('react-error-boundary-differential');
+		const parityFile = 'packages/react-error-boundary/tests/differential/parity.test.ts';
+		assert.deepEqual(mixedProject.testExecution, {
+			group: 'react-parity',
+			include: [parityFile],
+		});
+		assert.equal(
+			shardedProjects.get('react-error-boundary-differential').test.exclude.includes(parityFile),
+			true,
+		);
+	});
 });
 
 describe('Publish workflow validation', () => {
