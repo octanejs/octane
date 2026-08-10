@@ -54,6 +54,7 @@
       "@octanejs/react-spring",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
+      "@octanejs/react-draggable",
       "@octanejs/react-error-boundary",
       "@octanejs/transition-group",
       "@octanejs/day-picker",

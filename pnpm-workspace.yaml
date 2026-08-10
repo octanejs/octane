@@ -176,6 +176,7 @@ catalogs:
   # move the React oracle under the same UPSTREAM.md claim.
   dnd-kit-react-oracle:
   tanstack-devtools-react-oracle:
+  react-draggable-react-oracle:
     '@types/react': 19.2.17
     '@types/react-dom': 19.2.3
     react: 19.2.7

@@ -515,6 +515,17 @@
       ],
       "ssr": "Supported and tested — server rendering and hydration preserve the hidden input and getter-provided root contract without browser-global access during render.",
       "verified": "2026-08-02"
+      "name": "@octanejs/react-draggable",
+      "version": "0.1.20",
+      "category": "UI and interaction",
+      "upstream": { "package": "react-draggable", "version": "4.7.1" },
+      "surface": "Complete against the published react-draggable 4.7.1 root runtime and type surface: default Draggable, named DraggableCore, controlled and uncontrolled positioning, bounds, grid, axis, offsets, mouse and touch gestures, and all eight public types.",
+      "divergences": [
+        "React component instance, lifecycle, React.Component assignability, findDOMNode fallback, and instance refs are unavailable; use the structural nodeRef prop with an Octane host ref.",
+        "React-specific node and synthetic-event types are represented by OctaneNode and native mouse/touch events while retaining the observable callback and data contract."
+      ],
+      "ssr": "Draggable and DraggableCore render deterministically without browser globals, adopt their existing HTML or SVG child during hydration, and become interactive after hydration.",
+      "verified": "2026-08-03"
     },
     {
       "name": "@octanejs/react-error-boundary",
@@ -1233,6 +1244,7 @@
     "react-aria": "@octanejs/aria",
     "react-aria-components": "@octanejs/aria",
     "react-day-picker": "@octanejs/day-picker",
+    "react-draggable": "@octanejs/react-draggable",
     "react-error-boundary": "@octanejs/react-error-boundary",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",

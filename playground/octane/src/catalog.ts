@@ -22,6 +22,7 @@ import { LiveStoreDemo } from './demos/LiveStore.tsrx';
 import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
 import { ReactSyntaxHighlighterDemo } from './demos/ReactSyntaxHighlighter.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
+import { ReactDraggableDemo } from './demos/ReactDraggable.tsrx';
 import { MobxDemo } from './demos/Mobx.tsrx';
 import { PhosphorIconsDemo } from './demos/PhosphorIcons.tsrx';
 import { RxJSDemo } from './demos/RxJS.tsrx';
@@ -58,6 +59,7 @@ import liveStoreSource from './demos/LiveStore.tsrx?raw';
 import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
 import reactSyntaxHighlighterSource from './demos/ReactSyntaxHighlighter.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
+import reactDraggableSource from './demos/ReactDraggable.tsrx?raw';
 import mobxSource from './demos/Mobx.tsrx?raw';
 import phosphorIconsSource from './demos/PhosphorIcons.tsrx?raw';
 import rxjsSource from './demos/RxJS.tsrx?raw';
@@ -126,6 +128,10 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'react-markdown',
 				Component: ReactMarkdownDemo,
 				source: reactMarkdownSource,
+				id: 'react-draggable',
+				title: 'React Draggable',
+				Component: ReactDraggableDemo,
+				source: reactDraggableSource,
 			},
 			{
 				id: 'counter',

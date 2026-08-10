@@ -10,6 +10,7 @@ import {
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
+	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
@@ -20,6 +21,7 @@ describe('packed CommonJS consumer', () => {
 		'@octanejs/base-ui': 'file:/tmp/base-ui.tgz',
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
+		'@octanejs/react-draggable': 'file:/tmp/react-draggable.tgz',
 		octane: 'file:/tmp/octane.tgz',
 	};
 
@@ -31,17 +33,19 @@ describe('packed CommonJS consumer', () => {
 		);
 	});
 
-	test('requires all four packages and executes Octane SSR', () => {
+	test('requires every CommonJS package and executes Octane SSR', () => {
 		const source = renderPackedCommonjsConsumerSource();
 		assert.match(source, /require\('octane'\)/);
 		assert.match(source, /require\('octane\/server'\)/);
 		assert.match(source, /require\('@octanejs\/floating-ui'\)/);
 		assert.match(source, /require\('@octanejs\/base-ui'\)/);
 		assert.match(source, /require\('@octanejs\/radix'\)/);
+		assert.match(source, /require\('@octanejs\/react-draggable'\)/);
+		assert.match(source, /draggable\.default, draggable/);
 		assert.match(source, /renderToString/);
 	});
 
-	test('imports the same four-package graph for the ESM parity probe', () => {
+	test('imports the same package graph for the ESM parity probe', () => {
 		const source = renderPackedEsmConsumerSource();
 		assert.match(source, /from 'octane'/);
 		assert.match(source, /from 'octane\/server'/);
@@ -49,6 +53,12 @@ describe('packed CommonJS consumer', () => {
 		assert.match(source, /from '@octanejs\/base-ui'/);
 		assert.match(source, /from '@octanejs\/radix'/);
 		assert.match(source, /renderToString/);
+	});
+
+	test('compiles the TSRX draggable ESM entry through the Octane toolchain', () => {
+		const source = renderPackedDraggableEsmConsumerSource();
+		assert.match(source, /from '@octanejs\/react-draggable'/);
+		assert.match(source, /draggable\.DraggableCore/);
 	});
 });
 

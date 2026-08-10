@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "react-draggable",
+    "version": "4.7.1"
+  },
+  "surface": "Complete against the published react-draggable 4.7.1 root runtime and type surface: default Draggable, named DraggableCore, controlled and uncontrolled positioning, bounds, grid, axis, offsets, mouse and touch gestures, and all eight public types.",
+  "divergences": [
+    "React component instance, lifecycle, React.Component assignability, findDOMNode fallback, and instance refs are unavailable; use the structural nodeRef prop with an Octane host ref.",
+    "React-specific node and synthetic-event types are represented by OctaneNode and native mouse/touch events while retaining the observable callback and data contract."
+  ],
+  "ssr": "Draggable and DraggableCore render deterministically without browser globals, adopt their existing HTML or SVG child during hydration, and become interactive after hydration.",
+  "verified": "2026-08-03"
+}

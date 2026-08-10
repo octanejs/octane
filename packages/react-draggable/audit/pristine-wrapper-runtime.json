@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "react-draggable-pristine",
+  "roots": ["packages/react-draggable/tests"],
+  "files": ["packages/react-draggable/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:f87ed9b6d5098a4c",
+      "file": "packages/react-draggable/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned react-draggable 4.7.1 suite unchanged"
+    }
+  ]
+}

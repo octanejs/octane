@@ -44,6 +44,7 @@
     "@octanejs/textarea-autosize": "workspace:*",
     "@octanejs/syntax-highlighter": "workspace:*",
     "@octanejs/window": "workspace:*",
+    "@octanejs/react-draggable": "workspace:*",
     "@octanejs/rxjs": "workspace:*",
     "@octanejs/shadcn": "workspace:*",
     "@octanejs/sonner": "workspace:*",

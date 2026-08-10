@@ -62,6 +62,7 @@ export const KNOWN_BINDINGS = {
 	vaul: '@octanejs/vaul',
 	'react-markdown': '@octanejs/markdown',
 	'react-textarea-autosize': '@octanejs/textarea-autosize',
+	'react-draggable': '@octanejs/react-draggable',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.

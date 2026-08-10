@@ -54,6 +54,8 @@ import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
 import { verifyReactTextareaAutosizeTestClassifications } from './react-textarea-autosize-classifications-lib.mjs';
 import { verifyReactTextareaAutosizeCrosswalk } from './react-textarea-autosize-crosswalk-lib.mjs';
 import { verifyReactTextareaAutosizeTypes } from './react-textarea-autosize-types-lib.mjs';
+import { verifyReactDraggableTestClassifications } from './react-draggable-classifications-lib.mjs';
+import { verifyReactDraggableTypes } from './react-draggable-types-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
 import {
 	loadManifest,
@@ -332,6 +334,14 @@ try {
 	verifyReactTextareaAutosizeTypes(REPO);
 } catch (error) {
 	errors.push(`react-textarea-autosize type evidence is invalid: ${error.message}`);
+	verifyReactDraggableTypes(REPO);
+} catch (error) {
+	errors.push(`react-draggable type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyReactDraggableTestClassifications(REPO);
+} catch (error) {
+	errors.push(`react-draggable test classifications are invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

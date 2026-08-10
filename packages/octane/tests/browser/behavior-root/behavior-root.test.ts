@@ -32,7 +32,12 @@ for (const [name, engine] of [
 	['Chromium', chromium],
 	['WebKit', webkit],
 ] as const) {
-	describe.sequential(`${name} externally owned behavior lifecycle`, () => {
+	const selected = process.env.PLAYWRIGHT_BROWSER;
+	// Heavy-integration browser matrix selects chromium or firefox. This suite
+	// proves Chromium + WebKit ownership; skip it on the Firefox matrix job so
+	// missing Chromium/WebKit binaries are not fatal there.
+	const enabled = selected === undefined || selected === 'chromium';
+	describe.sequential.skipIf(!enabled)(`${name} externally owned behavior lifecycle`, () => {
 		let browser: Browser;
 		let page: Page | undefined;
 		let failures: string[] = [];

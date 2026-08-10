@@ -363,6 +363,17 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'playwright-browser-selector',
+					include: [
+						'test-utils/playwright-browser.test.ts',
+						'test-utils/three-playwright-launch.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'octane',
 					// The individual cases here run in milliseconds; the 5s default was
 					// being tripped by machine contention, not by the code under test
@@ -1398,6 +1409,11 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 					sequence: { groupOrder: 1 },
+					name: 'react-draggable-pristine',
+					include: ['packages/react-draggable/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
 					testTimeout: 120_000,
 					hookTimeout: 120_000,
 				},
@@ -1414,6 +1430,19 @@ export default defineConfig({
 						'packages/intersection-observer/tests/upstream/**/*.test.tsx',
 						'packages/intersection-observer/tests/upstream-original.test.ts',
 						'packages/intersection-observer/tests/upstream-browser-original.test.ts',
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-draggable/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'react-draggable',
+					include: [
+						'packages/react-draggable/tests/upstream/**/*.test.ts',
+						'packages/react-draggable/tests/runtime/**/*.test.ts',
+					],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/react-draggable/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -1467,6 +1496,35 @@ export default defineConfig({
 								import.meta.dirname,
 								'packages/intersection-observer/src/test-utils.ts',
 							),
+					name: 'react-draggable-differential',
+					include: ['packages/react-draggable/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'react-draggable-hydration',
+					include: ['packages/react-draggable/tests/hydration/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'react-draggable-ssr',
+					include: ['packages/react-draggable/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
 						},
 					],
 				},
@@ -1502,6 +1560,44 @@ export default defineConfig({
 								import.meta.dirname,
 								'packages/intersection-observer/src/test-utils.ts',
 							),
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-draggable/tests/browser/parity.browser.test.ts'],
+				},
+				test: {
+					name: 'react-draggable-browser',
+					include: ['packages/react-draggable/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
+					name: 'react-draggable-feasibility',
+					include: [
+						'packages/react-draggable/tests/feasibility/**/*.test.ts',
+						'!packages/react-draggable/tests/feasibility/ssr.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
+				test: {
+					name: 'react-draggable-feasibility-ssr',
+					include: ['packages/react-draggable/tests/feasibility/ssr.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
 						},
 					],
 				},

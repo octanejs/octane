@@ -31,6 +31,7 @@ import {
 	PACKED_TSRX_CONSUMER_PACKAGES,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
+	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
@@ -1141,6 +1142,10 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 	);
 	writeFileSync(path.join(consumerDirectory, 'require.cjs'), renderPackedCommonjsConsumerSource());
 	writeFileSync(path.join(consumerDirectory, 'import.mjs'), renderPackedEsmConsumerSource());
+	writeFileSync(
+		path.join(consumerDirectory, 'draggable-import.mjs'),
+		renderPackedDraggableEsmConsumerSource(),
+	);
 
 	execFileSync(
 		'pnpm',
@@ -1215,9 +1220,33 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 			timeout: 30_000,
 		}),
 	);
+	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
+	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
+	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);
+	await viteBuild({
+		root: consumerDirectory,
+		configFile: false,
+		logLevel: 'silent',
+		plugins: [octane({ hmr: false })],
+		build: {
+			emptyOutDir: true,
+			outDir: 'dist',
+			rollupOptions: { output: { entryFileNames: 'draggable-import.mjs' } },
+			ssr: 'draggable-import.mjs',
+			target: 'node22',
+		},
+	});
+	esmSurface.draggable = JSON.parse(
+		execFileSync(process.execPath, ['dist/draggable-import.mjs'], {
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			timeout: 30_000,
+		}),
+	);
 	assertRequiredPublicValueExports('.', commonjsSurface.octane);
 	assertRequiredPublicValueExports('.', esmSurface.octane);
-	for (const packageName of ['base', 'floating', 'radix']) {
+	for (const packageName of ['base', 'draggable', 'floating', 'radix']) {
 		if (!Array.isArray(commonjsSurface[packageName]) || commonjsSurface[packageName].length === 0) {
 			throw new Error(`packed CommonJS ${packageName} surface is empty`);
 		}
@@ -1225,7 +1254,7 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 			throw new Error(`packed ESM ${packageName} surface is empty`);
 		}
 	}
-	for (const packageName of ['base', 'floating', 'octane', 'radix']) {
+	for (const packageName of ['base', 'draggable', 'floating', 'octane', 'radix']) {
 		if (
 			JSON.stringify([...commonjsSurface[packageName]].sort()) !==
 			JSON.stringify([...esmSurface[packageName]].sort())
@@ -1237,7 +1266,7 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 		throw new Error('packed ESM and CommonJS SSR output differs');
 	}
 	console.log(
-		'installed packed Octane, Floating UI, Base UI, and Radix without React; CommonJS require and bundled ESM surfaces and SSR matched',
+		'installed packed Octane, Floating UI, Base UI, Radix, and React Draggable without React; CommonJS require and bundled ESM surfaces and SSR matched',
 	);
 }
 

@@ -1,0 +1,79 @@
+{
+  "name": "@octanejs/react-draggable",
+  "version": "0.1.20",
+  "description": "Octane port of react-draggable 4.7.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "commonjsCallableDefault": true,
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/react-draggable"
+  },
+  "main": "./src/index.tsrx",
+  "module": "./src/index.tsrx",
+  "types": "./src/index.tsrx",
+  "files": [
+    "src",
+    "dist/cjs",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.tsrx",
+      "import": "./src/index.tsrx",
+      "require": "./dist/cjs/root.cjs",
+      "default": "./src/index.tsrx"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
+    "prepack": "pnpm build:cjs",
+    "test": "vitest run --root ../.. --project react-draggable --project react-draggable-ssr --project react-draggable-hydration --project react-draggable-differential --project react-draggable-pristine",
+    "upstream:verify": "node audit/upstream-inventory.mjs",
+    "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
+    "test:pristine": "node scripts/run-pristine-upstream.mjs"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:react-draggable-react-oracle",
+    "@types/react-dom": "catalog:react-draggable-react-oracle",
+    "octane": "workspace:*",
+    "react": "catalog:react-draggable-react-oracle",
+    "react-dom": "catalog:react-draggable-react-oracle",
+    "playwright": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/react": "16.3.2",
+    "@vitejs/plugin-react": "catalog:default",
+    "prop-types": "15.8.1",
+    "@types/prop-types": "15.7.15"
+  }
+}

@@ -606,18 +606,10 @@ jobs:
             specs: packages/octane-evals/tests/user-app-corpus.test.ts
           - lane: browser
             playwright_browser: chromium
-            specs: >-
-              packages/octane/tests/browser
-              packages/dexie/tests/browser
-              packages/tiptap/tests/browser
-              packages/three/tests/browser
+            specs: discovered
           - lane: browser
             playwright_browser: firefox
-            specs: >-
-              packages/octane/tests/browser
-              packages/dexie/tests/browser
-              packages/tiptap/tests/browser
-              packages/three/tests/browser
+            specs: discovered
           - lane: astro
             chromium: true
             specs: packages/astro/tests/astro.e2e.test.ts
@@ -671,7 +663,13 @@ jobs:
       - name: Run ${{ matrix.lane }} integration tests
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.playwright_browser }}
-        run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
+        run: |
+          if [ "${{ matrix.lane }}" = "browser" ]; then
+            SPECS="$(node scripts/discover-heavy-browser-specs.mjs)"
+            pnpm vitest run ${SPECS} --maxWorkers=1
+          else
+            pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
+          fi
 
       - name: Run Bun compiler-preload integration test
         if: ${{ matrix.bun }}
