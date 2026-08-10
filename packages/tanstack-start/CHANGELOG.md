@@ -1,5 +1,28 @@
 # @octanejs/tanstack-start
 
+## 0.1.22
+
+### Patch Changes
+
+- 677182d: Preserve compiler-hook registration and TanStack Start client hydration when
+  their bootstrap entrypoints are imported for side effects in production bundles,
+  while keeping unrelated package modules tree-shakeable.
+- Updated dependencies [1fe297e]
+- Updated dependencies [db0d495]
+- Updated dependencies [677182d]
+- Updated dependencies [3fb96df]
+- Updated dependencies [677182d]
+- Updated dependencies [4653a2e]
+- Updated dependencies [7282555]
+- Updated dependencies [3d09348]
+- Updated dependencies [8cb40df]
+- Updated dependencies [677182d]
+- Updated dependencies [fc1c146]
+- Updated dependencies [a84fcaa]
+- Updated dependencies [217a0b5]
+  - octane@0.1.33
+  - @octanejs/tanstack-router@0.1.32
+
 ## 0.1.21
 
 ### Patch Changes

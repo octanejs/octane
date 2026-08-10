@@ -1,9 +1,10 @@
-# @octanejs/animejs
+# @octanejs/gsap
 
-## 0.0.3
+## 0.0.2
 
 ### Patch Changes
 
+- a5900bd: Add the Octane binding for GSAP's `useGSAP` lifecycle hook.
 - Updated dependencies [1fe297e]
 - Updated dependencies [db0d495]
 - Updated dependencies [677182d]
@@ -18,16 +19,3 @@
 - Updated dependencies [a84fcaa]
 - Updated dependencies [217a0b5]
   - octane@0.1.33
-
-## 0.0.2
-
-### Patch Changes
-
-- 3a812d0: Add Anime.js 4.5 bindings with an Octane-scoped lifecycle hook, the official
-  Three.js adapter subpath, behavioral and SSR coverage, and a playground demo.
-- Updated dependencies [d453832]
-- Updated dependencies [3152f0b]
-- Updated dependencies [1c44117]
-- Updated dependencies [cbd55ca]
-- Updated dependencies [cdb501c]
-  - octane@0.1.32

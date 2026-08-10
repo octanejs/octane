@@ -1,9 +1,12 @@
-# @octanejs/animejs
+# @octanejs/inertia
 
-## 0.0.3
+## 0.0.2
 
 ### Patch Changes
 
+- e1fe41d: Add the Inertia.js 3 binding foundation with framework-neutral core exports,
+  Octane-native page and lifecycle hooks, form state, router submissions, direct
+  HTTP submissions, precognition, and server-safe initialization.
 - Updated dependencies [1fe297e]
 - Updated dependencies [db0d495]
 - Updated dependencies [677182d]
@@ -18,16 +21,3 @@
 - Updated dependencies [a84fcaa]
 - Updated dependencies [217a0b5]
   - octane@0.1.33
-
-## 0.0.2
-
-### Patch Changes
-
-- 3a812d0: Add Anime.js 4.5 bindings with an Octane-scoped lifecycle hook, the official
-  Three.js adapter subpath, behavioral and SSR coverage, and a playground demo.
-- Updated dependencies [d453832]
-- Updated dependencies [3152f0b]
-- Updated dependencies [1c44117]
-- Updated dependencies [cbd55ca]
-- Updated dependencies [cdb501c]
-  - octane@0.1.32

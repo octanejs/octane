@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.30",
-    "@octanejs/lucide@0.1.27"
+    "@octanejs/base-ui@0.1.31",
+    "@octanejs/lucide@0.1.28"
   ],
   "registryDependencies": [
     "@octane/utils"

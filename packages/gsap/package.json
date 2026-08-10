@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/gsap",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "GSAP lifecycle bindings for Octane \u2014 the useGSAP hook over the framework-agnostic GSAP core.",
+  "description": "GSAP lifecycle bindings for Octane — the useGSAP hook over the framework-agnostic GSAP core.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

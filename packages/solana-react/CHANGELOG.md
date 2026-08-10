@@ -1,9 +1,11 @@
-# @octanejs/animejs
+# @octanejs/solana-react
 
-## 0.0.3
+## 0.0.2
 
 ### Patch Changes
 
+- 677182d: Add the Solana Kit 7 client, wallet discovery, query, and explicit transaction binding for Octane.
+- 677182d: Align `useRequestQuery` with upstream Kit sources, reject thenable `ClientProvider` clients at mount, and expand pristine/adapted runtime and type parity to one-for-one selected identities plus wallet/transaction type dispositions.
 - Updated dependencies [1fe297e]
 - Updated dependencies [db0d495]
 - Updated dependencies [677182d]
@@ -18,16 +20,4 @@
 - Updated dependencies [a84fcaa]
 - Updated dependencies [217a0b5]
   - octane@0.1.33
-
-## 0.0.2
-
-### Patch Changes
-
-- 3a812d0: Add Anime.js 4.5 bindings with an Octane-scoped lifecycle hook, the official
-  Three.js adapter subpath, behavioral and SSR coverage, and a playground demo.
-- Updated dependencies [d453832]
-- Updated dependencies [3152f0b]
-- Updated dependencies [1c44117]
-- Updated dependencies [cbd55ca]
-- Updated dependencies [cdb501c]
-  - octane@0.1.32
+  - @octanejs/tanstack-query@0.1.32
