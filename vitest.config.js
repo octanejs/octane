@@ -2744,6 +2744,43 @@ export default defineConfig({
 					name: 'lexical',
 					include: ['packages/lexical/tests/**/*.test.ts', 'packages/lexical/tests/**/*.test.tsx'],
 					environment: 'jsdom',
+					exclude: ['packages/lexical/tests/differential/**/*.test.ts'],
+					// Precompiles `.tsrx` fixtures → real @lexical/react for the differential
+					// oracle (rewrites `@octanejs/lexical/X` → `@lexical/react/X`).
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					// `.tsrx` is added so extensionless subpath imports
+					// (`@octanejs/lexical/LexicalComposer`) resolve to a `.tsrx` component
+					// OR a `.ts` hook — mirroring @lexical/react's per-subpath module layout.
+					extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
+					alias: [
+						{
+							find: /^@octanejs\/lexical$/,
+							replacement: resolve(import.meta.dirname, 'packages/lexical/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/lexical\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/lexical/src') + '/$1',
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/floating-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'lexical-differential',
+					include: ['packages/lexical/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
 					// Precompiles `.tsrx` fixtures → real @lexical/react for the differential
 					// oracle (rewrites `@octanejs/lexical/X` → `@lexical/react/X`).
 					globalSetup: ['packages/lexical/tests/differential/_setup.ts'],

@@ -21,6 +21,7 @@ const LIST_FIXTURE = resolve(__dirname, '../_fixtures/list-editor.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 describe('differential: @octanejs/lexical vs real @lexical/react', () => {
+	// @parity-case differential:lexical-rich-text
 	it('a rich-text editor renders byte-identical DOM on mount and after an edit', async () => {
 		const editors: any[] = [];
 		const d = await mountDifferential(
@@ -50,6 +51,7 @@ describe('differential: @octanejs/lexical vs real @lexical/react', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:lexical-list
 	it('a bullet list renders byte-identical via ListPlugin', async () => {
 		const editors: any[] = [];
 		const d = await mountDifferential(
