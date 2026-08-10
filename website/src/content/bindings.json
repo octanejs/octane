@@ -44,6 +44,7 @@
       "@octanejs/base-ui",
       "@octanejs/aria",
       "@octanejs/mantine-hooks",
+      "@octanejs/embla-carousel",
       "@octanejs/floating-ui",
       "@octanejs/animejs",
       "@octanejs/gsap",

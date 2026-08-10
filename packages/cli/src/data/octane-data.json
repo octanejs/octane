@@ -169,6 +169,20 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/embla-carousel",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "embla-carousel-react",
+        "version": "8.6.0",
+        "core": "embla-carousel@8.6.0"
+      },
+      "surface": "Complete package-root adapter: default useEmblaCarousel hook, its viewport-ref and tuple types, and globalOptions; the framework-neutral Embla core and reactive equality utilities are reused unchanged.",
+      "divergences": [],
+      "ssr": "The hook constructs no carousel without DOM globals; client attachment initializes the core.",
+      "verified": "2026-08-02"
+    },
+    {
       "name": "@octanejs/floating-ui",
       "version": "0.1.33",
       "category": "UI and interaction",
@@ -1051,6 +1065,7 @@
     "animejs": "@octanejs/animejs",
     "cmdk": "@octanejs/cmdk",
     "dexie-react-hooks": "@octanejs/dexie",
+    "embla-carousel-react": "@octanejs/embla-carousel",
     "framer-motion": "@octanejs/motion",
     "jotai": "@octanejs/jotai",
     "lucide-react": "@octanejs/lucide",

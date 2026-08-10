@@ -17,6 +17,7 @@ import { verifyIntersectionObserverTestClassifications } from './intersection-ob
 import { verifyIntersectionObserverTypes } from './intersection-observer-types-lib.mjs';
 import { verifyIntersectionObserverUpstream } from './intersection-observer-upstream-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
+import { verifyEmblaCarouselTestClassifications } from './embla-carousel-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
 import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
@@ -140,6 +141,34 @@ try {
 	verifyZagRuntimeCrosswalk(REPO);
 } catch (error) {
 	errors.push(`zag runtime inventory crosswalk is invalid: ${error.message}`);
+	verifyEmblaCarouselTestClassifications(REPO);
+} catch (error) {
+	errors.push(`embla-carousel test classifications are invalid: ${error.message}`);
+}
+try {
+	const { verifyCommittedTypeParity } = await import(
+		path.join(REPO, 'packages/embla-carousel/audit/type-parity.mjs')
+	);
+	await verifyCommittedTypeParity();
+} catch (error) {
+	errors.push(`embla-carousel type parity is invalid: ${error.message}`);
+}
+if (!validateOnly) {
+	try {
+		execFileSync(
+			process.execPath,
+			[
+				'node_modules/vitest/vitest.mjs',
+				'run',
+				'--project',
+				'embla-carousel-audit',
+				'packages/embla-carousel/tests/audit/parity-negative-controls.test.ts',
+			],
+			{ cwd: REPO, stdio: 'inherit' },
+		);
+	} catch (error) {
+		errors.push(`embla-carousel parity negative controls failed: ${error.message}`);
+	}
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

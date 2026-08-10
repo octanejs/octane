@@ -25,6 +25,7 @@ surface and evidence.
 | `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |
 | `@octanejs/electron` | 0 |
+| `@octanejs/embla-carousel` | 0 |
 | `@octanejs/floating-ui` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |

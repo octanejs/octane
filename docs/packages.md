@@ -28,6 +28,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.29` | 4 |
 | `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | framework integration | `0.0.18` | 8 |
 | `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.12` | 6 |
+| `@octanejs/embla-carousel` | [`packages/embla-carousel`](../packages/embla-carousel) | framework binding | `0.1.0` | 2 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.33` | 1 |
 | `@octanejs/gsap` | [`packages/gsap`](../packages/gsap) | framework binding | `0.0.3` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.31` | 1 |

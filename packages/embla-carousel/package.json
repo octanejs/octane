@@ -1,0 +1,53 @@
+{
+  "name": "@octanejs/embla-carousel",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "Embla Carousel bindings for Octane, API-compatible with embla-carousel-react 8.6.0.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/embla-carousel"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node audit/type-parity.mjs && vitest run --root ../.. --project embla-carousel --project embla-carousel-pristine-utils --project embla-carousel-differential --project embla-carousel-hydration --project embla-carousel-ssr --project embla-carousel-audit --project embla-carousel-browser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsc --noEmit -p typetests/pristine.tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+  },
+  "dependencies": {
+    "embla-carousel": "8.6.0",
+    "embla-carousel-reactive-utils": "8.6.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@types/react": "19.2.17",
+    "embla-carousel-react": "8.6.0",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

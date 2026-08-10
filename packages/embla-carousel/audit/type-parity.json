@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "pristine": "packages/embla-carousel/typetests/pristine.test-d.ts",
+  "adapted": "packages/embla-carousel/typetests/public.test-d.ts",
+  "projects": {
+    "pristine": "packages/embla-carousel/typetests/pristine.tsconfig.json",
+    "adapted": "packages/embla-carousel/typetests/tsconfig.json"
+  },
+  "assertions": ["positive:tuple", "positive:global-options", "negative:unknown-option"],
+  "assertionGroups": [
+    "d9694bfd9d54e7ce1ccd40d077792b6ced259c9bdb2787d68b10c25d4f2ddd21",
+    "fbf3758fc238bf3ebb3b33e0a1e880090f99f889b9a9704eebd83a9459625727",
+    "c6b3cb72e08fda3dc75b4950382a2930a57af11f0c2eb35267c4c863375e3274"
+  ],
+  "allowedTransformations": ["import root embla-carousel-react -> @octanejs/embla-carousel"]
+}

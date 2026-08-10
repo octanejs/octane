@@ -149,6 +149,41 @@ describe('CI workflow aggregation', () => {
 		}
 	});
 
+	test('keeps Embla parity projects group-owned and browser on the heavy lane', () => {
+		assert.doesNotMatch(jobSource('test_shard'), /embla-carousel/);
+		assert.doesNotMatch(jobSource('heavy_integration'), /embla-carousel/);
+		assert.match(jobSource('heavy_integration'), /run-heavy-browser\.mjs/);
+		assert.match(jobSource('heavy_integration'), /discover: heavy-browser/);
+		const baseProjects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		for (const project of [
+			'embla-carousel-pristine-utils',
+			'embla-carousel-audit',
+			'embla-carousel-differential',
+		]) {
+			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
+		}
+		assert.equal(baseProjects.get('embla-carousel').testExecution, undefined);
+		assert.equal(baseProjects.get('embla-carousel-browser').testExecution.group, 'heavy-browser');
+		for (const project of [
+			'octane-events-browser',
+			'dexie-browser',
+			'tiptap-browser',
+			'three-browser',
+			'embla-carousel-browser',
+		]) {
+			assert.equal(baseProjects.get(project).testExecution.group, 'heavy-browser');
+		}
+		// Reserved install for future parity browser oracles; unpaired browser
+		// coverage opts into heavy-browser metadata and runs under heavy_integration.
+		const parity = jobSource('react_parity_checks');
+		const install = parity.indexOf('Install Playwright Chromium');
+		const check = parity.indexOf('Check React parity inventories and execute required lanes');
+		assert.ok(install >= 0 && install < check);
+		assert.doesNotMatch(jobSource('lint_checks'), /Install Playwright Chromium/);
+	});
+
 	test('skips expensive jobs only after the committed scope classifier opts out', () => {
 		assert.match(
 			jobSource('release_change'),

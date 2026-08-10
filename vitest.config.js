@@ -422,6 +422,7 @@ export default defineConfig({
 				],
 			},
 			{
+				testExecution: { group: 'heavy-browser' },
 				test: {
 					name: 'octane-events-browser',
 					include: ['packages/octane/tests/browser/**/*.test.ts'],
@@ -641,6 +642,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'heavy-browser' },
 				test: {
 					name: 'dexie-browser',
 					include: ['packages/dexie/tests/browser/**/*.test.ts'],
@@ -2811,6 +2813,7 @@ export default defineConfig({
 				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
 			},
 			{
+				testExecution: { group: 'heavy-browser' },
 				test: {
 					name: 'three-browser',
 					include:
@@ -3504,6 +3507,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'heavy-browser' },
 				test: {
 					name: 'tiptap-browser',
 					include: ['packages/tiptap/tests/browser/**/*.test.ts'],
@@ -4695,6 +4699,91 @@ export default defineConfig({
 				},
 			},
 			{
+				// Package-authored Octane-only conformance (ordinary shards). Paired
+				// React scenarios live in embla-carousel-differential.
+				test: {
+					name: 'embla-carousel',
+					include: ['packages/embla-carousel/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/embla-carousel$/,
+							replacement: resolve(import.meta.dirname, 'packages/embla-carousel/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'embla-carousel-pristine-utils',
+					include: [
+						'packages/embla-carousel/upstream/embla-carousel-reactive-utils/src/__tests__/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: true,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'embla-carousel-audit',
+					include: ['packages/embla-carousel/tests/audit/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				// Unpaired Octane browser harness. Owned by heavy-browser metadata so
+				// ordinary shards omit it and heavy_integration discovers it without a
+				// package-specific ci.yml path.
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'embla-carousel-browser',
+					include: ['packages/embla-carousel/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'embla-carousel-differential',
+					include: ['packages/embla-carousel/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^embla-carousel-react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/embla-carousel/upstream/embla-carousel-react/src/index.ts',
+							),
+						},
+						{
+							find: /^embla-carousel$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/embla-carousel/tests/test-support/mock-embla.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/embla-carousel$/,
+							replacement: resolve(import.meta.dirname, 'packages/embla-carousel/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'gsap-ssr',
 					include: ['packages/gsap/tests/ssr/**/*.test.ts'],
@@ -4732,6 +4821,44 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/mantine-hooks$/,
 							replacement: resolve(import.meta.dirname, 'packages/mantine-hooks/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'embla-carousel-hydration',
+					include: ['packages/embla-carousel/tests/hydration/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/embla-carousel$/,
+							replacement: resolve(import.meta.dirname, 'packages/embla-carousel/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'embla-carousel-ssr',
+					include: ['packages/embla-carousel/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/embla-carousel$/,
+							replacement: resolve(import.meta.dirname, 'packages/embla-carousel/src/index.ts'),
 						},
 					],
 				},
