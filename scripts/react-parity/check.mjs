@@ -400,6 +400,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// other bindings with classifications use the shared verifier.
 		// Livestore keeps a dedicated disposition set and verifier; the shared
 		// port classifications path would reject its adapted-upstream-suite entries.
+		// Livestore uses a dedicated classifier (adapted-upstream-suite + pristine
+		// path filters); shared binding classifications cover hook-form / RTL.
 		if (
 			binding !== 'livestore' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
@@ -411,10 +413,16 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
+		// Always execute required lanes. `verified` vs `recorded-unverified`
+		// gates full-suite provenance schema requirements in validateManifest,
+		// not whether declared required evidence runs in CI. Parity-owned
+		// Vitest files are excluded from ordinary shards via testExecution,
+		// so check must run them or they become CI orphans.
 		if (!validateOnly) {
 			// Required lanes must execute even when provenance is still
 			// recorded-unverified; verification completeness must not suppress them.
 			const action = selectHarnessAction(manifest);
+			const action = 'run-required';
 			execFileSync(process.execPath, [HARNESS_PATH, action, '--manifest', relativeFile], {
 				cwd: REPO,
 				stdio: 'inherit',
