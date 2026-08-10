@@ -1,5 +1,23 @@
 # octane
 
+## 0.1.34
+
+### Patch Changes
+
+- 78316b4: Publish executable CommonJS conditions for Octane core, Floating UI, Base UI, and Radix while preserving their existing ESM and source-first entry points. Source-package discovery still recognizes those packages when the CommonJS build has not been generated yet.
+- 4e53ef4: Complete React Fragment ref parity across JSX aliases and spreads, direct element descriptors, server rendering and hydration, strongly typed refs, text and portal ownership, events, observers, focus, geometry, document positioning, and scrolling.
+- 4cc7840: Reuse server-provided hydration data before creating compiler-owned async
+  requests, preventing duplicate client fetches while preserving Suspense and
+  external hydration ownership.
+- 39b3e19: Reuse proven stable returned-JSX component regions inside context providers while
+  preserving context updates, component state, and server-rendered DOM adoption.
+- 8c29020: Reuse unchanged derived JSX descriptor arrays inside context providers, avoiding
+  unnecessary keyed reconciliation and memo comparisons while preserving context
+  updates, component state, and hydration.
+- 97e65b9: Skip compiler-proven stable hookful child component call sites during unchanged
+  parent updates while preserving independently scheduled child state, context,
+  refs, effects, and hydration.
+
 ## 0.1.33
 
 ### Patch Changes

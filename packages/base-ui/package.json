@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/base-ui",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -14,7 +14,7 @@
       ]
     }
   },
-  "description": "Base UI (@base-ui/react) for the octane renderer \u2014 headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
+  "description": "Base UI (@base-ui/react) for the octane renderer — headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
