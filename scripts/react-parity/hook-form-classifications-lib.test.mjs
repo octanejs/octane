@@ -56,25 +56,30 @@ test('rejects a stale divergence classification', async (t) => {
 	assert.throws(() => verifyPortTestClassifications(root), /not present in the parity manifest/);
 });
 
-test('verifies an arbitrary binding classification ledger', async (t) => {
-	const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));
-	t.after(() => rm(root, { recursive: true, force: true }));
-	await cp(
-		new URL('../../packages/lexical/tests', import.meta.url),
-		join(root, 'packages/lexical/tests'),
-		{ recursive: true },
-	);
-	for (const file of ['test-classifications.json', 'react-parity.json']) {
+for (const [binding, testCount] of [
+	['lexical', 16],
+	['lucide', 6],
+]) {
+	test(`verifies the ${binding} classification ledger`, async (t) => {
+		const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));
+		t.after(() => rm(root, { recursive: true, force: true }));
 		await cp(
-			new URL(`../../packages/lexical/audit/${file}`, import.meta.url),
-			join(root, `packages/lexical/audit/${file}`),
+			new URL(`../../packages/${binding}/tests`, import.meta.url),
+			join(root, `packages/${binding}/tests`),
 			{ recursive: true },
 		);
-	}
-	assert.deepEqual(verifyPortTestClassifications(root, 'lexical'), { tests: 16 });
-	await writeFile(join(root, 'packages/lexical/tests/unclassified.test.ts'), 'export {};\n');
-	assert.throws(
-		() => verifyPortTestClassifications(root, 'lexical'),
-		/every port-authored lexical test must have exactly one classification/,
-	);
-});
+		for (const file of ['test-classifications.json', 'react-parity.json']) {
+			await cp(
+				new URL(`../../packages/${binding}/audit/${file}`, import.meta.url),
+				join(root, `packages/${binding}/audit/${file}`),
+				{ recursive: true },
+			);
+		}
+		assert.deepEqual(verifyPortTestClassifications(root, binding), { tests: testCount });
+		await writeFile(join(root, `packages/${binding}/tests/unclassified.test.ts`), 'export {};\n');
+		assert.throws(
+			() => verifyPortTestClassifications(root, binding),
+			new RegExp(`every port-authored ${binding} test must have exactly one classification`),
+		);
+	});
+}

@@ -2398,10 +2398,12 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'lucide-differential',
 					include: ['packages/lucide/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
 					globalSetup: ['packages/lucide/tests/differential/_setup.ts'],
 					globals: false,
 				},

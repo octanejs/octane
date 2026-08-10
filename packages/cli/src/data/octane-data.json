@@ -267,7 +267,7 @@
         "Event callbacks receive native DOM events rather than React synthetic events."
       ],
       "ssr": "Supported and tested: icons and provider defaults render through `octane/server`, and client hydration adopts the server-rendered SVG element.",
-      "verified": "2026-07-13"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/mantine-hooks",

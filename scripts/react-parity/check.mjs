@@ -142,8 +142,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
 		const binding = relativeFile.split('/')[1];
-		// hook-form and livestore use dedicated classification verifiers above;
-		// the generic disposition set rejects livestore's adapted-upstream-suite.
+		// hook-form and livestore have dedicated verifiers above with their own
+		// disposition sets; the shared helper covers the generic binding ledgers.
 		if (
 			binding !== 'hook-form' &&
 			binding !== 'livestore' &&
