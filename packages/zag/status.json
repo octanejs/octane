@@ -1,0 +1,22 @@
+{
+  "upstream": {
+    "package": "@zag-js/react",
+    "version": "1.42.0"
+  },
+  "surface": "Complete port of the @zag-js/react@1.42.0 public adapter surface: useMachine, normalizeProps, Portal, the @zag-js/core mergeProps re-export, and the framework useSyncExternalStore re-export. The framework-agnostic @zag-js/core, @zag-js/store, @zag-js/types, and @zag-js/utils packages are reused unchanged.",
+  "divergences": [
+    "normalizeProps rewrites React-style text-entry onChange to native onInput for input (non-checkbox/radio) and textarea hosts; select and checkbox/radio keep native onChange. Upstream normalizeProps is an identity transform and has no suite coverage for this export.",
+    "Portal container refs use Octane's structural `{ current: HTMLElement | null }` ref shape rather than React.RefObject; runtime behavior is unchanged.",
+    "Compiled Octane children are portalled as one lazy children block so their component scope is preserved; ordinary value children retain upstream's per-child portal behavior.",
+    "React StrictMode double-invoke suite cases stay pristine-only; Octane does not double-invoke effects, so those identities are not adapted one-for-one."
+  ],
+  "ssr": "Supported and tested: useMachine exposes its initial state and bindable context during server rendering, effects remain deferred, and Portal renders children in place without browser globals.",
+  "verified": "2026-08-09",
+  "parityEvidence": "packages/zag/audit/react-parity.json",
+  "docs": ["packages/zag/UPSTREAM.md"],
+  "notes": [
+    "Ported from chakra-ui/zag commit df65e4c87c75a1c84eb6eb08a8e30dac0e1bb77f, the source commit for @zag-js/react@1.42.0.",
+    "Vendored upstream adapter source and Vitest suite under packages/zag/upstream with pristine and one-for-one adapted lanes; the differential machine-trace case remains supplementary evidence.",
+    "Published dependencies and source contain no React or react-dom imports."
+  ]
+}

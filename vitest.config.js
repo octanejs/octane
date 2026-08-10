@@ -1394,6 +1394,92 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/zag/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'zag',
+					include: [
+						'packages/zag/tests/conformance/**/*.test.ts',
+						'packages/zag/tests/upstream/**/*.test.ts',
+					],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/zag/tests/differential/**/*.test.ts',
+						'packages/zag/tests/upstream-original.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/zag$/,
+							replacement: resolve(import.meta.dirname, 'packages/zag/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'zag-pristine',
+					include: ['packages/zag/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'zag-differential',
+					include: ['packages/zag/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/zag$/,
+							replacement: resolve(import.meta.dirname, 'packages/zag/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'zag-ssr',
+					include: ['packages/zag/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/zag$/,
+							replacement: resolve(import.meta.dirname, 'packages/zag/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'tanstack-store-ssr',
 					include: ['packages/tanstack-store/tests/ssr/**/*.test.ts'],

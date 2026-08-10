@@ -64,6 +64,8 @@ benchmarks/lynx-table/results/
 website/public/lynx-examples
 website/public/lynx-runtime
 
+# React-parity pristine suite scratch copies
+packages/*/.pristine-upstream-*/
 # Pristine vitest cache for tanstack-hotkeys upstream suite
 packages/tanstack-hotkeys/.vite-pristine/
 

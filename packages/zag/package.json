@@ -1,0 +1,71 @@
+{
+  "name": "@octanejs/zag",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Zag state-machine bindings for Octane, backed by the framework-agnostic @zag-js core packages.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/zag"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project zag --project zag-differential --project zag-ssr --project zag-pristine",
+    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs"
+  },
+  "dependencies": {
+    "@zag-js/core": "catalog:default",
+    "@zag-js/store": "catalog:default",
+    "@zag-js/types": "catalog:default",
+    "@zag-js/utils": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:zag-react-oracle",
+    "@types/react-dom": "catalog:zag-react-oracle",
+    "@zag-js/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:zag-react-oracle",
+    "react-dom": "catalog:zag-react-oracle",
+    "vitest": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:zag-react-oracle",
+    "@vitejs/plugin-react": "catalog:default",
+    "jsdom": "catalog:zag-react-oracle"
+  }
+}

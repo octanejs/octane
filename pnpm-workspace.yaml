@@ -136,6 +136,16 @@ catalogs:
     react-dom: 19.2.3
     react-window: 1.8.11
     vite: 7.3.1
+  # Exact React/RTL/jsdom oracle for the Zag pristine Vitest lane. Versions track
+  # @zag-js/react@1.42.0's declared test environment (RTL ^16.3.2, jsdom ^29.0.1,
+  # React 19.2.7) rather than the LiveStore or workspace-default catalogs.
+  zag-react-oracle:
+    '@testing-library/react': 16.3.2
+    '@types/react': 19.2.7
+    '@types/react-dom': 19.2.3
+    jsdom: 29.0.1
+    react: 19.2.7
+    react-dom: 19.2.7
   lynx:
     '@lynx-js/css-extract-webpack-plugin': 0.9.0
     '@lynx-js/qrcode-rsbuild-plugin': 0.6.0
@@ -243,6 +253,11 @@ catalogs:
     '@tanstack/react-query': ^5.101.3
     '@tanstack/react-router': 1.170.18
     '@tanstack/react-store': ^0.11.0
+    '@zag-js/core': 1.42.0
+    '@zag-js/react': 1.42.0
+    '@zag-js/store': 1.42.0
+    '@zag-js/types': 1.42.0
+    '@zag-js/utils': 1.42.0
     '@tanstack/react-table': 8.21.3
     '@tanstack/react-virtual': 3.14.5
     '@tanstack/router-core': 1.171.15
@@ -453,7 +468,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 60 `@octanejs/*` framework bindings.
+The central status table for the 61 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -77,6 +77,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/valtio`](#octanejsvaltio) | `valtio@2.3.2` | The framework-agnostic `valtio/vanilla` core and `valtio/vanilla/utils` are re-exported verbatim; `useSnapshot` and the `useProxy` utility are ported to Octane. | React DevTools affected-path debug labels are omitted because Octane's `useDebugValue` is currently a no-op | The server snapshot path uses `snapshot(proxyObject)`; no dedicated SSR rendering test is included yet. | 2026-07-27 |
 | [`@octanejs/visx`](#octanejsvisx) | `@visx/visx@4.0.0 + master@485c035` | Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies. | Interaction callbacks receive native DOM events through Octane's delegated event system instead of React synthetic events; All React class controllers and class-instance refs are replaced by native functional TSRX hooks; Brush intentionally omits upstream's legacy innerRef instance handle; Deterministic text metrics and annotation bounds, pure SplitLinePath SVG sampling, and collision-aware estimated wordcloud rectangles replace browser-only measurement/canvas paths so fixed-size output is identical during SSR and first hydration. Font-specific wrapping, browser-specific path length rounding, and pixel-exact d3-cloud packing can differ; The react-spring entry point uses a deterministic requestAnimationFrame numeric interpolator rather than spring-physics timing, and Zoom uses native wheel/pointer/touch listeners rather than @use-gesture/react at runtime. Their public Visx props and exports are retained; Zoom imports framework-neutral @use-gesture/core types only; Props upstream types as React.ReactNode are octane renderables (octane's OctaneNode = unknown): octane elements are nominal, so ReactNode-typed props would reject them. Render-prop signatures keep their parameters and return octane renderables | Fixed-dimension primitives, wrapped XYChart series, annotations, text, and wordclouds emit complete deterministic SVG on the server. Real hydrateRoot adoption preserves the same SVG/definition/axis/text/series/annotation/wordcloud nodes without warnings, replacement, or post-effect markup changes; generated IDs, measurement fallbacks, portals, and responsive initial sizes are covered. | 2026-07-14 |
 | [`@octanejs/wagmi`](#octanejswagmi) | `wagmi@3.7.4` | WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks. | The binding targets Wagmi v3 names. Deprecated v2 useAccount/useSwitchAccount aliases and hooks outside the documented representative inventory are not exported; Privileged mutation hooks force retry:false, require a current live connector, cancel before dispatch when the displayed wallet context changed, and quarantine a late success as ActionContextChangedError when account, chain, or connector changed after dispatch; RainbowKit 2.2.x declares Wagmi v2 peers. Its defining provider/custom-button/modal contracts can be implemented over this v3 surface, proven by the deterministic disconnected-to-connecting-to-connected gate, but the downstream binding must document that peer-range divergence; The connectors subpath exposes the dependency-free injected and deterministic mock connectors. Vendor connectors and their optional SDKs remain direct application dependencies; EIP-1193 event validation, duplicate coalescing, and connector-generation invalidation are delegated unchanged to @wagmi/core 3.6.4. This binding does not add a second provider-event layer or claim independent normalization behavior | WagmiProvider supports ssr:true and initialState through @wagmi/core hydrate. parseHydratedState accepts only a versioned, 16 KiB-bounded public-state hint and rejects malformed or privileged material; a hydrated connection is never authority for signing or submission. | 2026-08-02 |
+| [`@octanejs/zag`](#octanejszag) | `@zag-js/react@1.42.0` | Complete port of the @zag-js/react@1.42.0 public adapter surface: useMachine, normalizeProps, Portal, the @zag-js/core mergeProps re-export, and the framework useSyncExternalStore re-export. The framework-agnostic @zag-js/core, @zag-js/store, @zag-js/types, and @zag-js/utils packages are reused unchanged. | normalizeProps rewrites React-style text-entry onChange to native onInput for input (non-checkbox/radio) and textarea hosts; select and checkbox/radio keep native onChange. Upstream normalizeProps is an identity transform and has no suite coverage for this export; Portal container refs use Octane's structural `{ current: HTMLElement \| null }` ref shape rather than React.RefObject; runtime behavior is unchanged; Compiled Octane children are portalled as one lazy children block so their component scope is preserved; ordinary value children retain upstream's per-child portal behavior; React StrictMode double-invoke suite cases stay pristine-only; Octane does not double-invoke effects, so those identities are not adapted one-for-one | Supported and tested: useMachine exposes its initial state and bindable context during server rendering, effects remain deferred, and Portal renders children in place without browser globals. | 2026-08-09 |
 | [`@octanejs/zustand`](#octanejszustand) | `zustand@5.0.14` | Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux). | Unstable selectors (a new reference every render) settle after a bounded number of re-renders instead of hitting React's `useSyncExternalStore` warning loop — still prefer `useShallow` | No SSR-specific surface; no dedicated SSR tests. | 2026-07-20 |
 
 ## @octanejs/animejs
@@ -1197,6 +1198,29 @@ Known divergences:
 SSR / hydration: WagmiProvider supports ssr:true and initialState through @wagmi/core hydrate. parseHydratedState accepts only a versioned, 16 KiB-bounded public-state hint and rejects malformed or privileged material; a hydrated connection is never authority for signing or submission.
 
 Scope/evidence last checked: 2026-08-02.
+
+## @octanejs/zag
+
+[`packages/zag`](../packages/zag) `0.0.1` — ports `@zag-js/react@1.42.0`. Status data: [`packages/zag/status.json`](../packages/zag/status.json).
+
+Complete port of the @zag-js/react@1.42.0 public adapter surface: useMachine, normalizeProps, Portal, the @zag-js/core mergeProps re-export, and the framework useSyncExternalStore re-export. The framework-agnostic @zag-js/core, @zag-js/store, @zag-js/types, and @zag-js/utils packages are reused unchanged.
+
+Known divergences:
+
+- normalizeProps rewrites React-style text-entry onChange to native onInput for input (non-checkbox/radio) and textarea hosts; select and checkbox/radio keep native onChange. Upstream normalizeProps is an identity transform and has no suite coverage for this export.
+- Portal container refs use Octane's structural `{ current: HTMLElement | null }` ref shape rather than React.RefObject; runtime behavior is unchanged.
+- Compiled Octane children are portalled as one lazy children block so their component scope is preserved; ordinary value children retain upstream's per-child portal behavior.
+- React StrictMode double-invoke suite cases stay pristine-only; Octane does not double-invoke effects, so those identities are not adapted one-for-one.
+
+SSR / hydration: Supported and tested: useMachine exposes its initial state and bindable context during server rendering, effects remain deferred, and Portal renders children in place without browser globals.
+
+Scope/evidence last checked: 2026-08-09.
+
+- Ported from chakra-ui/zag commit df65e4c87c75a1c84eb6eb08a8e30dac0e1bb77f, the source commit for @zag-js/react@1.42.0.
+- Vendored upstream adapter source and Vitest suite under packages/zag/upstream with pristine and one-for-one adapted lanes; the differential machine-trace case remains supplementary evidence.
+- Published dependencies and source contain no React or react-dom imports.
+
+See also: [`packages/zag/UPSTREAM.md`](../packages/zag/UPSTREAM.md)
 
 ## @octanejs/zustand
 

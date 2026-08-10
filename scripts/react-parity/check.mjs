@@ -15,6 +15,10 @@ import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
 import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
+import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
+import { verifyZagTypes } from './zag-types-lib.mjs';
+import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
+import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
@@ -71,6 +75,26 @@ try {
 	verifyReactSpringUpstream(REPO);
 } catch (error) {
 	errors.push(`react-spring upstream evidence is invalid: ${error.message}`);
+}
+try {
+	verifyZagUpstream(path.join(REPO, 'packages/zag'));
+} catch (error) {
+	errors.push(`zag upstream evidence is invalid: ${error.message}`);
+}
+try {
+	verifyZagTypes(REPO);
+} catch (error) {
+	errors.push(`zag type evidence is invalid: ${error.message}`);
+}
+try {
+	verifyZagTestClassifications(REPO);
+} catch (error) {
+	errors.push(`zag test classifications are invalid: ${error.message}`);
+}
+try {
+	verifyZagRuntimeCrosswalk(REPO);
+} catch (error) {
+	errors.push(`zag runtime inventory crosswalk is invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components

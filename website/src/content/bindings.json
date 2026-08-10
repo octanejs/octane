@@ -39,6 +39,7 @@
     "description": "Primitives, browser hooks, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
     "packages": [
       "@octanejs/radix",
+      "@octanejs/zag",
       "@octanejs/base-ui",
       "@octanejs/aria",
       "@octanejs/mantine-hooks",
