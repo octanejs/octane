@@ -1,0 +1,11 @@
+{
+  "upstream": { "package": "@react-three/drei", "version": "10.7.7" },
+  "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 104 test files.",
+  "divergences": [
+    "View: inline Canvas views are ported. Calling View from an Octane DOM root fails with the universal renderer-boundary diagnostic, and View.Port is a callable no-op. Octane components are statically renderer-owned, so one component cannot switch between DOM and Three renderers or transport authored Three children between independent roots as React Drei does with tunnel-rat."
+  ],
+  "ssr": "Browser-dependent helpers remain client-only; server-safe behavior is verified per export.",
+  "verified": "2026-08-02",
+  "parityEvidence": "packages/drei/audit/react-parity.json",
+  "docs": ["packages/drei/README.md", "packages/drei/UPSTREAM.md"]
+}

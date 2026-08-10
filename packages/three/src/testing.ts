@@ -25,6 +25,8 @@ export interface CreateThreeTestRendererOptions {
 	readonly width?: number;
 	/** Logical canvas height. Defaults to 800. */
 	readonly height?: number;
+	/** Optional camera used by the configured root. Defaults to a perspective camera. */
+	readonly camera?: THREE.Camera;
 }
 
 /** Renderer recorder injected into a deterministic Three test root. */
@@ -37,6 +39,14 @@ export interface TestingRenderer extends Renderer {
 	readonly lastCamera: THREE.Camera | null;
 	/** Whether root teardown disposed the recorder. */
 	readonly disposed: boolean;
+	/** The currently selected render target, matching WebGLRenderer state. */
+	readonly renderTarget: THREE.WebGLRenderTarget | THREE.WebGLCubeRenderTarget | null;
+	/** Scene/camera pairs submitted for eager shader compilation. */
+	readonly compileCalls: readonly (readonly [THREE.Object3D, THREE.Camera])[];
+	/** Scene/camera pairs submitted for rendering. */
+	readonly renderCalls: readonly (readonly [THREE.Scene, THREE.Camera])[];
+	/** WebGLRenderer-compatible automatic clearing flag. */
+	autoClear: boolean;
 }
 
 /** Additional values copied onto a directly-fired testing event. */
@@ -75,10 +85,20 @@ export interface ThreeTestRenderer {
 class FrameRecorder implements TestingRenderer {
 	readonly domElement: CanvasLike;
 	readonly renderLists = { dispose() {} };
+	readonly shadowMap: NonNullable<Renderer['shadowMap']> = {
+		enabled: false,
+		type: 1 as THREE.ShadowMapType,
+		autoUpdate: true,
+		needsUpdate: false,
+	};
 	#frameCount = 0;
 	#lastScene: THREE.Scene | null = null;
 	#lastCamera: THREE.Camera | null = null;
 	#disposed = false;
+	#renderTarget: THREE.WebGLRenderTarget | THREE.WebGLCubeRenderTarget | null = null;
+	readonly compileCalls: Array<readonly [THREE.Object3D, THREE.Camera]> = [];
+	readonly renderCalls: Array<readonly [THREE.Scene, THREE.Camera]> = [];
+	autoClear = true;
 
 	constructor(canvas: CanvasLike) {
 		this.domElement = canvas;
@@ -100,15 +120,37 @@ class FrameRecorder implements TestingRenderer {
 		return this.#disposed;
 	}
 
+	get renderTarget(): THREE.WebGLRenderTarget | THREE.WebGLCubeRenderTarget | null {
+		return this.#renderTarget;
+	}
+
 	render(scene: THREE.Scene, camera: THREE.Camera): void {
 		this.#frameCount++;
 		this.#lastScene = scene;
 		this.#lastCamera = camera;
+		this.renderCalls.push([scene, camera]);
+	}
+
+	compile(scene: THREE.Object3D, camera: THREE.Camera): void {
+		this.compileCalls.push([scene, camera]);
 	}
 
 	setPixelRatio(_dpr: number): void {}
 
 	setSize(_width: number, _height: number, _updateStyle?: boolean): void {}
+
+	setRenderTarget(target: THREE.WebGLRenderTarget | THREE.WebGLCubeRenderTarget | null): void {
+		this.#renderTarget = target;
+	}
+
+	getRenderTarget(): THREE.WebGLRenderTarget | THREE.WebGLCubeRenderTarget | null {
+		return this.#renderTarget;
+	}
+
+	clearDepth(): void {}
+
+	/** Mirrors WebGLRenderer's eager texture-upload hook for loader integrations. */
+	initTexture(_texture: THREE.Texture): void {}
 
 	forceContextLoss(): void {}
 
@@ -205,6 +247,7 @@ export async function createThreeTestRenderer<P>(
 	try {
 		await root.configure({
 			gl: renderer,
+			camera: options.camera,
 			size: { width, height, top: 0, left: 0 },
 			dpr: 1,
 			frameloop: 'never',

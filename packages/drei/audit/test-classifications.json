@@ -1,0 +1,525 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/drei/tests/accumulative-shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/adaptive-performance.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/ascii-renderer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/basic-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/bounds.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/box-projected-env.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/bvh.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/camera-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/camera-shake.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/cameras.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/catalog-textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/caustics.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/center.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/clone.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/cloud.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/config.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates the Octane renderer-boundary preset, which has no React counterpart."
+    },
+    {
+      "path": "packages/drei/tests/contact-shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/context-bridge.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/core-utilities.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/crosswalk-guard.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates repository audit machinery; it is not React behavioral evidence."
+    },
+    {
+      "path": "packages/drei/tests/curve-modifier.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/cycle-raycast.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/decal.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/depth-buffer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/detect-gpu.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/differential/view.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/drag-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/effects-utils.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/effects.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/environment-components.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/environment.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/example.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/face-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/face-landmarker.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/facemesh.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/fbo.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/fisheye.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/font.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/gizmo-helper.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/gizmo-widgets.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/grid.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/helper.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/hooks.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/html.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/hud.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/image.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/instances.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/keyboard-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/lightformer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/lines.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/loader.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/marching-cubes.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-portal-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-reflector-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-refraction-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-transmission-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/models.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/motion-materials.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/motion-path.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/outlines.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/performance-monitor.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/pivot-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/pointer-lock.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/points.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/positional-audio.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/preload.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/presentation-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/progress.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/react-parity-guard.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates repository audit machinery; it is not React behavioral evidence."
+    },
+    {
+      "path": "packages/drei/tests/render-textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/resize.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/rounded-box.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sampler.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/scene-helpers.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/scene-motion.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/screen-sizer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/scroll-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/segments.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/select.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/shapes.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/simple-materials.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sky.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/soft-shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sparkles.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/splat.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/spot-light.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sprite-animator.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sprite-loader-utils.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sprite-loader.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/stage.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/stars.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/stats.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/svg.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/text.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/text3d.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/trail-texture.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/trail.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/transform-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/use-animations.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/use-cursor.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/video-textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/wireframe.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    }
+  ]
+}

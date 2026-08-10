@@ -163,6 +163,13 @@ public `advance()` loop as an application. Its awaitable `fireEvent()` helper
 directly invokes the latest committed handler and settles scheduled work when
 raycasting itself is not under test.
 
+Renderer bindings that project opaque component children into an ordered host
+array can set `__octaneAutoAttachArray` on the parent host object to that array's
+property name. Unattached child host objects are then assigned to indexed slots
+in authored order. This is the universal-renderer equivalent of React bindings
+that clone opaque children to add `attach="passes-N"`; authored `attach` props
+still take precedence.
+
 `Canvas` installs the default web event manager. Use `eventSource` to subscribe
 through another element and `eventPrefix` (`offset`, `client`, `page`, `layer`,
 or `screen`) to choose the coordinate pair. Programmatic roots can supply a

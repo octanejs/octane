@@ -25,6 +25,7 @@ surface and evidence.
 | `@octanejs/devtools` | 0 |
 | `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |
+| `@octanejs/drei` | 0 |
 | `@octanejs/electron` | 0 |
 | `@octanejs/embla-carousel` | 0 |
 | `@octanejs/floating-ui` | 0 |

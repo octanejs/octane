@@ -26,6 +26,7 @@
     "@octanejs/cmdk": "workspace:*",
     "@octanejs/gsap": "workspace:*",
     "@octanejs/intersection-observer": "workspace:*",
+    "@octanejs/drei": "workspace:*",
     "@octanejs/livestore": "workspace:*",
     "@octanejs/lucide": "workspace:*",
     "@octanejs/mantine-hooks": "workspace:*",

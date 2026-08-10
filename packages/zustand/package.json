@@ -35,6 +35,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./universal": "./src/universal.ts",
     "./vanilla": "./src/vanilla.ts",
     "./shallow": "./src/shallow.ts",
     "./middleware": "./src/middleware.ts",

@@ -317,6 +317,7 @@ catalogs:
     '@vitejs/plugin-react': ^6.0.3
     '@juggle/resize-observer': ^3.4.0
     '@react-three/fiber': 9.6.1
+    '@react-three/drei': 10.7.7
     '@react-spring/web': ^10.1.2
     '@visx/chord': 4.0.0
     '@visx/annotation': 4.0.0

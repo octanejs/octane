@@ -27,6 +27,7 @@ function resolveTarget(target: DOMRegionTarget): HTMLElement | null {
 
 /** Package-private owner for the one DOM root materialized by a DOMRegion. */
 export interface DOMRegionBinding {
+	readonly container: HTMLDivElement;
 	attach(): () => void;
 	commit(target: DOMRegionTarget, region: RendererRegion | undefined): void;
 }
@@ -73,6 +74,7 @@ export function createDOMRegionBinding(): DOMRegionBinding {
 	};
 
 	return {
+		container: host,
 		attach() {
 			attached = true;
 			let active = true;

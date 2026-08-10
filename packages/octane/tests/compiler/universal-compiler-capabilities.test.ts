@@ -73,6 +73,18 @@ function compiledUniversalForArguments(source: string, options: Record<string, a
 }
 
 describe('universal compiler renderer capabilities', () => {
+	it('passes a sole component expression child with value semantics', () => {
+		const output = compile(
+			`function Consumer({ children }) @{ children('payload'); null; }
+			 export function Scene({ render }) @{ <Consumer>{render}</Consumer> }`,
+			'/src/RenderProp.object.tsrx',
+			{ renderer: { ...baseRenderer, text: 'host' }, hmr: false },
+		).code;
+
+		expect(output).toContain('__octaneUniversalProps([], render)');
+		expect(output).not.toContain("__octaneUniversalChildren('object'");
+	});
+
 	it('requires an explicit policy for authored host text', () => {
 		expect(() =>
 			compile(

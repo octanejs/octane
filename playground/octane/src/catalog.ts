@@ -9,6 +9,7 @@ import { AnimeJsDemo } from './demos/AnimeJs.tsrx';
 import { Conditional } from './demos/Conditional.tsrx';
 import { Counter } from './demos/Counter.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
+import { DreiDemo } from './demos/Drei.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { GSAPDemo } from './demos/GSAP.tsrx';
 import { IntersectionObserverDemo } from './demos/IntersectionObserver.tsrx';
@@ -33,6 +34,7 @@ import animeJsSource from './demos/AnimeJs.tsrx?raw';
 import conditionalSource from './demos/Conditional.tsrx?raw';
 import counterSource from './demos/Counter.tsrx?raw';
 import dynamicSource from './demos/Dynamic.tsrx?raw';
+import dreiSource from './demos/Drei.tsrx?raw';
 import inputsSource from './demos/Inputs.tsrx?raw';
 import gsapSource from './demos/GSAP.tsrx?raw';
 import intersectionObserverSource from './demos/IntersectionObserver.tsrx?raw';
@@ -148,6 +150,10 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Intersection Observer',
 				Component: IntersectionObserverDemo,
 				source: intersectionObserverSource,
+				id: 'drei',
+				title: 'Drei',
+				Component: DreiDemo,
+				source: dreiSource,
 			},
 			{
 				id: 'cmdk',

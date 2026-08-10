@@ -78,6 +78,15 @@ const THREE_ALIASES = [
 		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
 	},
 ];
+const DREI_RENDERERS = {
+	...THREE_RENDERERS,
+	boundaries: {
+		...THREE_RENDERERS.boundaries,
+		'@octanejs/drei': {
+			Html: { ownerRenderer: 'three', childRenderer: 'dom', prop: 'children' },
+		},
+	},
+};
 const LYNX_SOURCE = resolve(import.meta.dirname, 'packages/lynx/src');
 const LYNX_ALIASES = [
 	{
@@ -2855,6 +2864,79 @@ export default defineConfig({
 				},
 				plugins: [octane({ renderers: THREE_RENDERERS })],
 				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'drei',
+					include: ['packages/drei/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/drei/tests/config.test.ts',
+						'packages/drei/tests/crosswalk-guard.test.ts',
+						'packages/drei/tests/react-parity-guard.test.ts',
+						'packages/drei/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					server: { deps: { inline: ['@react-three/drei', '@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: DREI_RENDERERS })],
+				resolve: {
+					alias: [
+						...THREE_ALIASES,
+						{
+							find: /^@octanejs\/drei$/,
+							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
+						},
+					],
+					dedupe: ['react', 'react-dom', 'three'],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'drei-differential',
+					include: ['packages/drei/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					server: { deps: { inline: ['@react-three/drei', '@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: DREI_RENDERERS })],
+				resolve: {
+					alias: [
+						...THREE_ALIASES,
+						{
+							find: /^@octanejs\/drei$/,
+							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
+						},
+					],
+					dedupe: ['react', 'react-dom', 'three'],
+				},
+			},
+			{
+				test: {
+					name: 'drei-guards',
+					include: [
+						'packages/drei/tests/config.test.ts',
+						'packages/drei/tests/crosswalk-guard.test.ts',
+						'packages/drei/tests/react-parity-guard.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+					server: { deps: { inline: ['@react-three/drei', '@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: DREI_RENDERERS })],
+				resolve: {
+					alias: [
+						...THREE_ALIASES,
+						{
+							find: /^@octanejs\/drei$/,
+							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
+						},
+					],
+					dedupe: ['react', 'react-dom', 'three'],
+				},
 			},
 			{
 				test: {

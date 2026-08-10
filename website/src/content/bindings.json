@@ -94,7 +94,7 @@
   {
     "title": "Web 3D",
     "description": "Technical-preview, React Three Fiber-style scene graphs on Octane's universal renderer.",
-    "packages": ["@octanejs/three"]
+    "packages": ["@octanejs/three", "@octanejs/drei"]
   },
   {
     "title": "Desktop",

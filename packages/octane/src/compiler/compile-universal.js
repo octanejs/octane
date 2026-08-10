@@ -3165,10 +3165,20 @@ function compileComponentElementAst(node, context, state) {
 	const component = jsxNameExpressionAst(node, state);
 	const providerContext = contextProviderExpressionAst(node, state);
 	const childNodes = node.children ?? [];
+	const meaningfulChildren = childNodes.filter(
+		(child) => child.type !== 'JSXText' || normalizeJsxText(child.value) !== '',
+	);
 	let childrenExpression = null;
 	if (
-		childNodes.some((child) => child.type !== 'JSXText' || normalizeJsxText(child.value) !== '')
+		meaningfulChildren.length === 1 &&
+		meaningfulChildren[0].type === 'JSXExpressionContainer' &&
+		meaningfulChildren[0].expression?.type !== 'JSXEmptyExpression'
 	) {
+		// A sole expression child has React value semantics: pass the value itself.
+		// This is required for function-as-child APIs and scalar consumers. Nested
+		// JSX inside the expression is still lowered by dynamicExpressionAst.
+		childrenExpression = dynamicExpressionAst(meaningfulChildren[0].expression, state);
+	} else if (meaningfulChildren.length > 0) {
 		const body = compileBlockValueAst(childNodes, state, [], node);
 		childrenExpression = generatedCall(
 			state.helpers.children,

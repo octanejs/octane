@@ -75,6 +75,7 @@ export const KNOWN_BINDINGS = {
 	'react-map-gl/mapbox': '@octanejs/react-map-gl',
 	'@vis.gl/react-mapbox': '@octanejs/react-map-gl',
 	'@react-three/fiber': '@octanejs/three',
+	'@react-three/drei': '@octanejs/drei',
 	'@visx/visx': '@octanejs/visx',
 	'@visx/a11y': '@octanejs/visx',
 	'@visx/a11y/react': '@octanejs/visx',

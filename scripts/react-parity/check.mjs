@@ -42,6 +42,9 @@ import {
 	verifyLaneEnvironment,
 	verifyManifestFiles,
 } from './harness-lib.mjs';
+import { verifyDreiTypes } from './drei-types-lib.mjs';
+import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
+import { verifyDreiReactParity } from './drei-parity-lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -207,6 +210,14 @@ try {
 	verifyVaulAdaptedRuntimeStructure(REPO);
 } catch (error) {
 	errors.push(`vaul adapted runtime structural evidence is invalid: ${error.message}`);
+	verifyDreiReactParity(REPO);
+} catch (error) {
+	errors.push(`drei React-parity evidence is invalid: ${error.message}`);
+}
+try {
+	verifyDreiTypes(REPO);
+} catch (error) {
+	errors.push(`drei type evidence is invalid: ${error.message}`);
 }
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components
@@ -290,6 +301,8 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		// those ledgers, so never route livestore through verifyPortTestClassifications.
 		if (
 			binding !== 'livestore' &&
+		if (
+			binding !== 'hook-form' &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		) {
 			verifyPortTestClassifications(REPO, binding);

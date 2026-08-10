@@ -14,6 +14,7 @@ interface SceneProps {
 	effectToken: 'idle' | 'increment';
 	rejectedObject: THREE.Object3D;
 	buttonRef?: { current: HTMLButtonElement | null };
+	containerRef?: { current: HTMLDivElement | null };
 	captureEffectToken?: (update: (token: 'idle' | 'increment') => void) => void;
 	onLayout?: () => void;
 	onCleanup?: () => void;
@@ -121,16 +122,19 @@ describe('DOMRegion', () => {
 		secondTarget.append(unrelated);
 		const targetRef = { current: firstTarget as HTMLElement | null };
 		const buttonRef = { current: null as HTMLButtonElement | null };
+		const containerRef = { current: null as HTMLDivElement | null };
 		const layouts: Array<HTMLButtonElement | null> = [];
 		let cleanups = 0;
 		const initial = props({
 			target: targetRef,
 			buttonRef,
+			containerRef,
 			onLayout: () => layouts.push(buttonRef.current),
 			onCleanup: () => cleanups++,
 		});
 		const root = await render(initial);
 		const ownedContainer = firstTarget.firstElementChild as HTMLDivElement;
+		expect(containerRef.current).toBe(ownedContainer);
 		const button = ownedContainer.querySelector('.dom-region-counter') as HTMLButtonElement;
 		expect(buttonRef.current).toBe(button);
 		expect(layouts).toEqual([button]);
@@ -160,6 +164,7 @@ describe('DOMRegion', () => {
 		expect([...secondTarget.children]).toEqual([unrelated]);
 		expect(button.isConnected).toBe(false);
 		expect(buttonRef.current).toBeNull();
+		expect(containerRef.current).toBeNull();
 		expect(cleanups).toBe(1);
 
 		await update(root, { ...initial, target: targetRef, show: true });

@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "upstreamRuntimeSuite": "absent",
+  "upstreamTypeSuite": "absent",
+  "typeSuiteAudit": {
+    "searchedRoots": [
+      "test",
+      "tests",
+      "src/__tests__",
+      "src/__typetest__",
+      "type-tests",
+      "typetests"
+    ],
+    "result": "No upstream type-test suite or @ts-expect-error assertion exists at the pinned tag."
+  },
+  "allowedTransformations": [],
+  "upstreamSourceExpectErrors": [
+    {
+      "path": "packages/drei/upstream/src/core/ComputedAttribute.tsx",
+      "line": 21,
+      "sha256": "d787815b76710e7138f86ce22af4bf0af22b8fab8722b5f565d2a98a63c5b871"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 235,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 240,
+      "sha256": "79f6497e1a02da7f7874859cc760d99ca3a2c3626f36445c377d21086675c0e3"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 243,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 245,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 250,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 310,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/Instances.tsx",
+      "line": 334,
+      "sha256": "8a8c6b37093fa0809867b082b87bc0cc43737520204a1bdf4849c62db5128526"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/useEnvironment.tsx",
+      "line": 69,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/useEnvironment.tsx",
+      "line": 73,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/core/useEnvironment.tsx",
+      "line": 123,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/web/Select.tsx",
+      "line": 41,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    },
+    {
+      "path": "packages/drei/upstream/src/web/Select.tsx",
+      "line": 46,
+      "sha256": "1cec0f19bc1b9da0a4b29c5a0e1ad1912cb5d729bbd2873a8470dd2bf1e52f1d"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "packages/drei/upstream/test/e2e/App.tsx",
+      "disposition": "out-of-scope",
+      "reason": "Whole-gallery Playwright fixture retained as pin evidence; excluded from Vitest/Jest parity execution because the upstream runner packs a release tarball and boots Vite/Next apps outside the repository harness.",
+      "sha256": "4499b3c92227b0dce656e3bfdbcaa2e2048994e0f7e507575e59da1678f4d2af"
+    },
+    {
+      "path": "packages/drei/upstream/test/e2e/e2e.sh",
+      "disposition": "out-of-scope",
+      "reason": "Upstream e2e shell creates temporary Vite/Next apps and runs Playwright against a packed artifact; that workflow is outside the Vitest/Jest parity execution kinds.",
+      "sha256": "d94ef08ba11fd3d5dd1650793d182731ebc82bc7ff4c341d4746226bde8dd6f2"
+    },
+    {
+      "path": "packages/drei/upstream/test/e2e/snapshot.test.ts",
+      "disposition": "out-of-scope",
+      "reason": "Sole upstream runtime case is a whole-gallery screenshot. Recorded out of scope for export-level Vitest parity; repo-authored differential tests cover export behavior.",
+      "sha256": "dea9f23926e17c55f1ee1623a5b3ba1d466db725c644d0d9671fd4a8644da69b"
+    },
+    {
+      "path": "packages/drei/upstream/test/e2e/snapshot.test.ts-snapshots/should-match-previous-one-1-linux.png",
+      "disposition": "out-of-scope",
+      "reason": "Screenshot oracle for the out-of-scope Playwright gallery case.",
+      "sha256": "16217caa801c0d1bc62ce0ca07ceae43432f592d4b4b89bdaf94fadba25c9d21"
+    }
+  ]
+}
