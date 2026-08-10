@@ -1,3 +1,4 @@
+// Package contract (ordinary test evidence, not parity-counted):
 // Octane adaptation: upstream detects styled() calls made during render by
 // probing the React hook dispatcher (monkey-patching console.error around a
 // throwaway useState call). Octane has no equivalent probe, so this uses a
@@ -5,7 +6,7 @@
 // displayName is the observable signature of in-render creation. The
 // threshold matches warnTooManyClasses so both warnings describe the same
 // runaway pattern.
-const CREATION_LIMIT = 200;
+import { LIMIT as CREATION_LIMIT } from './createWarnTooManyClasses';
 
 const creationCounts: Map<string, number> = new Map();
 const warned: Set<string> = new Set();

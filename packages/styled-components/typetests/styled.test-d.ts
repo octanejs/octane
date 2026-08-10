@@ -36,6 +36,10 @@ Button({ $depth: 1, $variant: 'primary' });
 Button({ $depth: 1, $variant: 'loud' });
 // …while the permissive bag admits arbitrary DOM props and ref/as
 Button({ $depth: 2, id: 'b', onClick: () => {}, ref: (el: Element | null) => {}, as: 'a' });
+// Host-tag polymorphism deliberately admits props from the selected target
+// because Octane has no JSX.IntrinsicElements map to narrow them per tag.
+Button({ $depth: 2, as: 'a', href: '/permissive', madeUpHostProp: 123 });
+Button({ $depth: 2, forwardedAs: 'a', href: '/forwarded' });
 
 // --- css / keyframes primitives ---
 const rule: RuleSet<{ $on?: boolean }> = css<{ $on?: boolean }>`

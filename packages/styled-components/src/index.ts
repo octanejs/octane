@@ -21,6 +21,9 @@ import ThemeProvider, { ThemeConsumer, ThemeContext, useTheme } from './models/T
 import styled from './constructors/styled';
 import isStyledComponent from './utils/isStyledComponent';
 
+// Package contract (ordinary test evidence, not parity-counted):
+// This runtime package intentionally exposes no Babel css-prop transform.
+
 export * from './secretInternals';
 export type {
 	Attrs,

@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/styled-components/tests/adapted/api-divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane factory adaptations without a pinned React oracle; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/styled-components/tests/adapted/ref-prop.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane ref-as-prop attachment without a pinned React oracle; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/styled-components/tests/adapted/unnamed-stylis-plugin.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane unnamed-stylis rejection without a pinned React oracle; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/api.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/attrs.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/basic.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/component-selector.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/global-style.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/interpolation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/keyframes.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/polymorphic.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/sheet.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/theming.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/conformance/transient-props.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane styled-components framework contract; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs six exact same-fixture cases against styled-components 6.4.3 on React with per-engine stylesheet isolation, comparing container HTML and sheet output after every step."
+    },
+    {
+      "path": "packages/styled-components/tests/divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates distribution and dynamic-warning Octane contracts without a pinned React oracle; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/styled-components/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hydration adoption; it is not compared with React hydration."
+    },
+    {
+      "path": "packages/styled-components/tests/ssr/adapted-divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates Octane automatic CSS/stream contracts without a pinned React SSR oracle; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/styled-components/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane SSR isolation and streaming order; it is not a React oracle."
+    },
+    {
+      "path": "packages/styled-components/typetests/styled.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Port-authored Octane public type-conformance probes for the styled factory surface; not a React oracle or adapted upstream type suite."
+    }
+  ]
+}

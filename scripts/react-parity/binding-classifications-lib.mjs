@@ -6,21 +6,37 @@ const DISPOSITIONS = new Set([
 	'react-octane-differential',
 	'octane-only-divergence',
 	'octane-only-framework-contract',
+	'octane-only-type-conformance',
 ]);
+
+function discoverPortAuthoredFiles(root, relativeRoot, filePattern) {
+	const absoluteRoot = resolve(root, relativeRoot);
+	if (!existsSync(absoluteRoot)) return [];
+	return readdirSync(absoluteRoot, { recursive: true, withFileTypes: true })
+		.filter(function (entry) {
+			return entry.isFile() && filePattern.test(entry.name);
+		})
+		.map(function (entry) {
+			return relative(root, resolve(entry.parentPath ?? entry.path, entry.name))
+				.split(sep)
+				.join('/');
+		})
+		.filter(function (path) {
+			return !path.includes('/tests/upstream/') && !path.includes('/typetests/__fixtures__/');
+		});
+}
 
 export function verifyPortTestClassifications(root, binding = 'hook-form') {
 	const configPath = `packages/${binding}/audit/test-classifications.json`;
 	const manifestPath = `packages/${binding}/audit/react-parity.json`;
-	const testsRoot = resolve(root, `packages/${binding}/tests`);
-	const discovered = readdirSync(testsRoot, { recursive: true, withFileTypes: true })
-		.filter((entry) => entry.isFile() && /\.test\.(?:ts|tsx|tsrx)$/.test(entry.name))
-		.map((entry) =>
-			relative(root, resolve(entry.parentPath ?? entry.path, entry.name))
-				.split(sep)
-				.join('/'),
-		)
-		.filter((path) => !path.includes('/tests/upstream/'))
-		.sort();
+	const discovered = [
+		...discoverPortAuthoredFiles(root, `packages/${binding}/tests`, /\.test\.(?:ts|tsx|tsrx)$/),
+		...discoverPortAuthoredFiles(
+			root,
+			`packages/${binding}/typetests`,
+			/\.test-d\.ts$|\.test\.(?:ts|tsx)$/,
+		),
+	].sort();
 	const absoluteConfigPath = resolve(root, configPath);
 	if (!existsSync(absoluteConfigPath))
 		throw new Error(`missing port-test classifications: ${configPath}`);
@@ -28,8 +44,9 @@ export function verifyPortTestClassifications(root, binding = 'hook-form') {
 	const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), 'utf8'));
 	const divergenceIds = new Set(manifest.divergences.map((entry) => entry.id));
 	const declared = config.tests.map((entry) => entry.path).sort();
-	if (JSON.stringify(discovered) !== JSON.stringify(declared))
+	if (JSON.stringify(discovered) !== JSON.stringify(declared)) {
 		throw new Error(`every port-authored ${binding} test must have exactly one classification`);
+	}
 	for (const entry of config.tests) {
 		if (!DISPOSITIONS.has(entry.disposition))
 			throw new Error(`${entry.path}: unknown test disposition`);

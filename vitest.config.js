@@ -4243,6 +4243,8 @@ export default defineConfig({
 				},
 			},
 			{
+				// Package-authored Styled Components contracts stay ordinary. Parity
+				// owns only the dedicated differential project below.
 				test: {
 					name: 'styled-components',
 					include: [
@@ -4251,6 +4253,7 @@ export default defineConfig({
 						'!packages/styled-components/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
+
 					globals: false,
 				},
 				plugins: [octane()],
@@ -4264,12 +4267,14 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'styled-components-differential',
 					include: ['packages/styled-components/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					// Rewrites @octanejs/styled-components to the published React
 					// package before the differential tests load.
+
 					globalSetup: ['packages/styled-components/tests/differential/_setup.ts'],
 					globals: false,
 				},

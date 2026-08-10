@@ -98,25 +98,6 @@ describe('StyleSheetManager / sheet', () => {
 		m.unmount();
 	});
 
-	it('throws error 15 for unnamed stylis plugins', () => {
-		const Anon = styled.div`
-			color: black;
-		`;
-		const anonymousPlugin = (
-			() => () =>
-				undefined
-		)();
-		Object.defineProperty(anonymousPlugin, 'name', { value: '' });
-		expect(() =>
-			mount(() =>
-				createElement(StyleSheetManager as any, {
-					stylisPlugins: [anonymousPlugin as any],
-					children: createElement(Anon as any, {}),
-				}),
-			),
-		).toThrow();
-	});
-
 	it('rehydrates upstream data-styled server tags into a fresh sheet and removes them', () => {
 		const tag = document.createElement('style');
 		tag.setAttribute('data-styled', '');

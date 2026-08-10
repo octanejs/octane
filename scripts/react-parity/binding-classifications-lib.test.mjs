@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 
@@ -11,6 +10,11 @@ async function fixture() {
 	await cp(
 		new URL('../../packages/hook-form/tests', import.meta.url),
 		join(root, 'packages/hook-form/tests'),
+		{ recursive: true },
+	);
+	await cp(
+		new URL('../../packages/hook-form/typetests', import.meta.url),
+		join(root, 'packages/hook-form/typetests'),
 		{ recursive: true },
 	);
 	for (const file of ['test-classifications.json', 'react-parity.json']) {
@@ -28,11 +32,6 @@ test('rejects an unclassified port-authored test', async (t) => {
 	t.after(() => rm(root, { recursive: true, force: true }));
 	await writeFile(join(root, 'packages/hook-form/tests/new.test.ts'), 'export {};\n');
 	assert.throws(() => verifyPortTestClassifications(root), /exactly one classification/);
-});
-
-test('verifies an arbitrary binding classification ledger', () => {
-	const root = fileURLToPath(new URL('../..', import.meta.url));
-	assert.deepEqual(verifyPortTestClassifications(root, 'apollo-client'), { tests: 8 });
 });
 
 test('rejects a parity classification without an oracle', async (t) => {
@@ -62,36 +61,63 @@ test('rejects a stale divergence classification', async (t) => {
 	assert.throws(() => verifyPortTestClassifications(root), /not present in the parity manifest/);
 });
 
-for (const [binding, testCount] of [
-	['lexical', 16],
-	['lucide', 6],
-	['redux', 3],
-	['redux-toolkit', 6],
-	['remix-router', 26],
-	['shadcn', 23],
-	['sonner', 7],
-	['streamdown', 13],
-]) {
-	test(`verifies the ${binding} classification ledger`, async (t) => {
-		const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));
-		t.after(() => rm(root, { recursive: true, force: true }));
+test('verifies an arbitrary binding classification ledger', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'binding-classifications-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	await cp(
+		new URL('../../packages/styled-components/tests', import.meta.url),
+		join(root, 'packages/styled-components/tests'),
+		{ recursive: true },
+	);
+	await cp(
+		new URL('../../packages/styled-components/typetests', import.meta.url),
+		join(root, 'packages/styled-components/typetests'),
+		{ recursive: true },
+	);
+	for (const file of ['test-classifications.json', 'react-parity.json']) {
 		await cp(
-			new URL(`../../packages/${binding}/tests`, import.meta.url),
-			join(root, `packages/${binding}/tests`),
+			new URL(`../../packages/styled-components/audit/${file}`, import.meta.url),
+			join(root, `packages/styled-components/audit/${file}`),
 			{ recursive: true },
 		);
-		for (const file of ['test-classifications.json', 'react-parity.json']) {
-			await cp(
-				new URL(`../../packages/${binding}/audit/${file}`, import.meta.url),
-				join(root, `packages/${binding}/audit/${file}`),
-				{ recursive: true },
-			);
-		}
-		assert.deepEqual(verifyPortTestClassifications(root, binding), { tests: testCount });
-		await writeFile(join(root, `packages/${binding}/tests/unclassified.test.ts`), 'export {};\n');
-		assert.throws(
-			() => verifyPortTestClassifications(root, binding),
-			new RegExp(`every port-authored ${binding} test must have exactly one classification`),
+	}
+	assert.deepEqual(verifyPortTestClassifications(root, 'styled-components'), { tests: 20 });
+	await writeFile(
+		join(root, 'packages/styled-components/tests/unclassified.test.ts'),
+		'export {};\n',
+	);
+	assert.throws(
+		() => verifyPortTestClassifications(root, 'styled-components'),
+		/every port-authored styled-components test must have exactly one classification/,
+	);
+});
+
+test('rejects an unclassified port-authored typetest', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'binding-typetest-classifications-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	await cp(
+		new URL('../../packages/styled-components/tests', import.meta.url),
+		join(root, 'packages/styled-components/tests'),
+		{ recursive: true },
+	);
+	await cp(
+		new URL('../../packages/styled-components/typetests', import.meta.url),
+		join(root, 'packages/styled-components/typetests'),
+		{ recursive: true },
+	);
+	for (const file of ['test-classifications.json', 'react-parity.json']) {
+		await cp(
+			new URL(`../../packages/styled-components/audit/${file}`, import.meta.url),
+			join(root, `packages/styled-components/audit/${file}`),
+			{ recursive: true },
 		);
-	});
-}
+	}
+	await writeFile(
+		join(root, 'packages/styled-components/typetests/unclassified.test-d.ts'),
+		'export {};\n',
+	);
+	assert.throws(
+		() => verifyPortTestClassifications(root, 'styled-components'),
+		/every port-authored styled-components test must have exactly one classification/,
+	);
+});

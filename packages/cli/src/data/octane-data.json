@@ -684,7 +684,7 @@
         "Interpolation-position styled components are recognized by an octane brand symbol rather than React's forward-ref `$$typeof` (octane styled components are plain functions)."
       ],
       "ssr": "Supported and tested: zero-config collection into `RenderResult.css` via octane's `injectStyle` channel (styled rules, keyframes, and globals, with content-derived immutable chunk ids that make streaming dedup sound), repeat-render and dynamic-global request isolation through a stateless server output backend, hydration adoption of server chunks (removed after adoption, no duplicate rules), and the `ServerStyleSheet` compat surface.",
-      "verified": "2026-07-18"
+      "verified": "2026-08-02"
     },
     {
       "name": "@octanejs/stylex",

@@ -186,6 +186,7 @@ export interface IStyledStatics<
 }
 
 /**
+ * Package contract (ordinary typetest evidence, not parity-counted):
  * The pragmatic octane polymorphic call surface: declared own props are fully
  * typed; `as`/`forwardedAs` retarget rendering; all remaining DOM/`as`-target
  * props flow through a permissive prop bag (octane has no per-tag

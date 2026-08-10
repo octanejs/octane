@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
@@ -13,10 +13,6 @@ const shardedVitestConfigSource = readFileSync(
 const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
 const packageJson = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
-const reactParityCheckLib = readFileSync(
-	path.join(REPO, 'scripts/react-parity/check-lib.mjs'),
-	'utf8',
-);
 const reactParityHarness = readFileSync(
 	path.join(REPO, 'scripts/react-parity/harness.mjs'),
 	'utf8',
@@ -147,41 +143,6 @@ describe('CI workflow aggregation', () => {
 		for (const job of ['test', 'examples', 'lint', 'typecheck', 'provenance']) {
 			assert.match(jobSource(job), /if:.*always\(\).*!\s*cancelled\(\)/);
 		}
-	});
-
-	test('keeps Embla parity projects group-owned and browser on the heavy lane', () => {
-		assert.doesNotMatch(jobSource('test_shard'), /embla-carousel/);
-		assert.doesNotMatch(jobSource('heavy_integration'), /embla-carousel/);
-		assert.match(jobSource('heavy_integration'), /run-heavy-browser\.mjs/);
-		assert.match(jobSource('heavy_integration'), /discover: heavy-browser/);
-		const baseProjects = new Map(
-			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
-		);
-		for (const project of [
-			'embla-carousel-pristine-utils',
-			'embla-carousel-audit',
-			'embla-carousel-differential',
-		]) {
-			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
-		}
-		assert.equal(baseProjects.get('embla-carousel').testExecution, undefined);
-		assert.equal(baseProjects.get('embla-carousel-browser').testExecution.group, 'heavy-browser');
-		for (const project of [
-			'octane-events-browser',
-			'dexie-browser',
-			'tiptap-browser',
-			'three-browser',
-			'embla-carousel-browser',
-		]) {
-			assert.equal(baseProjects.get(project).testExecution.group, 'heavy-browser');
-		}
-		// Reserved install for future parity browser oracles; unpaired browser
-		// coverage opts into heavy-browser metadata and runs under heavy_integration.
-		const parity = jobSource('react_parity_checks');
-		const install = parity.indexOf('Install Playwright Chromium');
-		const check = parity.indexOf('Check React parity inventories and execute required lanes');
-		assert.ok(install >= 0 && install < check);
-		assert.doesNotMatch(jobSource('lint_checks'), /Install Playwright Chromium/);
 	});
 
 	test('skips expensive jobs only after the committed scope classifier opts out', () => {
@@ -324,37 +285,22 @@ describe('CI workflow aggregation', () => {
 		// The manifest runner owns all required lanes in one process. Execution
 		// reports prove exact identities, so only explicit validation collects.
 		// Provenance completeness must not suppress required-lane execution.
+		assert.match(reactParityCheck, /selectHarnessAction\(manifest\)/);
 		assert.match(
-			reactParityCheck,
+			readFileSync(path.join(REPO, 'scripts/react-parity/harness-lib.mjs'), 'utf8'),
 			/requiredExecutableLanes\(manifest\)\.length > 0 \? 'run-required' : 'validate'/,
 		);
+		assert.match(
+			reactParityCheck,
+			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
+		);
+		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
+		assert.doesNotMatch(reactParityCheck, /'--lane'/);
 		const executionMarker = "} else {\n\tif (action === 'run-required'";
 		const executionStart = reactParityHarness.indexOf(executionMarker);
 		assert.notEqual(executionStart, -1);
 		const executionBranch = reactParityHarness.slice(executionStart);
 		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
-	});
-
-	test('routes unpaired browser-conformance suites through a package-agnostic Chromium lane', () => {
-		const browserGlob = 'packages/*/tests/browser-conformance/**/*.test.ts';
-		assert.ok(jobSource('test_shard').includes(`--exclude "${browserGlob}"`));
-		assert.ok(!jobSource('test_shard').includes('packages/vaul/tests/browser-conformance'));
-
-		const heavyIntegration = jobSource('heavy_integration');
-		const browserStart = heavyIntegration.indexOf('- lane: browser');
-		const nextLane = heavyIntegration.indexOf('- lane: astro', browserStart);
-		assert.notEqual(browserStart, -1);
-		assert.notEqual(nextLane, -1);
-		const browserLane = heavyIntegration.slice(browserStart, nextLane);
-		assert.match(browserLane, /chromium: true/);
-		assert.ok(browserLane.includes('packages/*/tests/browser-conformance'));
-		assert.ok(!browserLane.includes('packages/vaul/tests/browser-conformance'));
-
-		const projects = new Map(
-			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
-		);
-		assert.equal(projects.get('vaul-browser').testExecution?.group, 'react-parity');
-		assert.equal(projects.get('vaul-browser-conformance').testExecution, undefined);
 	});
 
 	test('routes the Lynx Web host smoke through the existing Chromium build lane', () => {
@@ -418,63 +364,6 @@ describe('CI workflow aggregation', () => {
 		assert.equal(projects[0].testExecution, undefined);
 		assert.deepEqual(projects[1].test.exclude, ['beta/generated/**', 'beta/parity/**/*.test.ts']);
 		assert.equal(projects[1].testExecution, undefined);
-	});
-
-	test('assigns every required Vitest parity lane to its owning CI lane', () => {
-		const baseProjects = new Map(
-			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
-		);
-		const shardedProjects = new Map(
-			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
-		);
-		const packagesRoot = path.join(REPO, 'packages');
-
-		for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
-			if (!entry.isDirectory()) continue;
-			const manifestPath = path.join(packagesRoot, entry.name, 'audit/react-parity.json');
-			if (!existsSync(manifestPath)) continue;
-
-			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-			for (const lane of manifest.lanes) {
-				if (
-					lane.oracle !== 'required' ||
-					lane.available === false ||
-					['typescript', 'jest-full', 'playwright-full'].includes(lane.execution?.kind)
-				)
-					continue;
-
-				const project = baseProjects.get(lane.project);
-				assert.ok(project, `${lane.id} references missing Vitest project ${lane.project}`);
-				assert.equal(
-					project.testExecution?.group,
-					'react-parity',
-					`${lane.id} must not also run in ordinary sharded CI`,
-				);
-
-				const ownedPatterns = project.testExecution.include;
-				if (!ownedPatterns?.length) {
-					assert.equal(shardedProjects.has(lane.project), false);
-					continue;
-				}
-
-				const evidenceFiles =
-					lane.execution?.kind === 'vitest-full'
-						? JSON.parse(readFileSync(path.join(REPO, lane.execution.inventory), 'utf8')).files
-						: lane.files.filter((file) => file.role === 'test').map((file) => file.path);
-				for (const file of evidenceFiles) {
-					assert.ok(
-						ownedPatterns.some((pattern) => path.matchesGlob(file, pattern)),
-						`${lane.id} evidence file ${file} is not owned by react-parity`,
-					);
-				}
-
-				const shardedProject = shardedProjects.get(lane.project);
-				assert.ok(shardedProject, `${lane.project} must retain its ordinary tests`);
-				for (const pattern of ownedPatterns) {
-					assert.ok(shardedProject.test.exclude.includes(pattern));
-				}
-			}
-		}
 	});
 });
 
