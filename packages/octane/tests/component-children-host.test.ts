@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import * as ServerRuntime from 'octane/server';
+import { flushSync, hydrateRoot } from '../src/index.js';
 import { mount, flushEffects, act, nextPaint, type MountResult } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	WideTrio,
 	WidePanels,
@@ -13,6 +16,159 @@ import {
 	FragmentTrio,
 	SuspendingPair,
 } from './_fixtures/component-children-host.tsrx';
+
+const SWITCH_CHILD_SOURCE = `
+	import { useState } from 'octane';
+
+	function SwitchLeaf(props) @{
+		<span class="switch-leaf">{props.label as string}</span>
+	}
+
+	function SwitchPanel(props) @{
+		const [count, setCount] = useState(0);
+		@switch (props.kind) {
+			@case 'large': {
+				<button class="switch-large" onClick={() => setCount(count + 1)}>
+					{props.label + ':' + count as string}
+				</button>
+			}
+			@case 'middle': {
+				<strong class="switch-middle">{props.label as string}</strong>
+			}
+			@default: {
+				<SwitchLeaf label={props.label} />
+			}
+		}
+	}
+
+	export function SwitchPair(props) @{
+		<section class="switch-host">
+			<SwitchPanel kind={props.first} label="A" />
+			<SwitchPanel kind={props.second} label="B" />
+		</section>
+	}
+
+	function HooklessSwitchPanel(props) @{
+		@switch (props.kind) {
+			@case 'large': {
+				<strong class="switch-middle">{props.label as string}</strong>
+			}
+			@default: {
+				<SwitchLeaf label={props.label} />
+			}
+		}
+	}
+
+	export function HooklessSwitchPair(props) @{
+		<section class="switch-host">
+			<HooklessSwitchPanel kind={props.first} label="A" />
+			<HooklessSwitchPanel kind={props.second} label="B" />
+		</section>
+	}
+
+	function OptionalSwitchPanel(props) @{
+		@switch (props.kind) {
+			@case 'large': {
+				<strong class="switch-middle">{props.label as string}</strong>
+			}
+		}
+	}
+
+	export function OptionalSwitchPair(props) @{
+		<section class="switch-host">
+			<OptionalSwitchPanel kind={props.first} label="A" />
+			<SwitchLeaf label="B" />
+		</section>
+	}
+
+	function ShadowedOptional(props) @{
+		@if (props.visible) {
+			<strong class="switch-middle">{props.label as string}</strong>
+		}
+	}
+
+	function ShadowedSwitchPanel(props) @{
+		@switch (props.kind) {
+			@case 'shadow': {
+				const SwitchLeaf = props.component;
+				<SwitchLeaf label={props.label} visible={props.visible} />
+			}
+			@default: {
+				<strong class="switch-middle">{props.label as string}</strong>
+			}
+		}
+	}
+
+	export function ShadowedSwitchPair(props) @{
+		<section class="switch-host">
+			<ShadowedSwitchPanel
+				kind="shadow"
+				component={ShadowedOptional}
+				visible={props.visible}
+				label="A"
+			/>
+			<SwitchLeaf label="B" />
+		</section>
+	}
+
+	function NestedShadowedSwitchPanel(props) @{
+		@switch (props.kind) {
+			@case 'shadow': {
+				@if (props.nested) {
+					const SwitchLeaf = props.component;
+					<SwitchLeaf label={props.label} visible={props.visible} />
+				} @else {
+					<strong class="switch-middle">{props.label as string}</strong>
+				}
+			}
+			@default: {
+				<strong class="switch-middle">{props.label as string}</strong>
+			}
+		}
+	}
+
+	export function NestedShadowedSwitchPair(props) @{
+		<section class="switch-host">
+			<NestedShadowedSwitchPanel
+				kind="shadow"
+				nested={true}
+				component={ShadowedOptional}
+				visible={props.visible}
+				label="A"
+			/>
+			<SwitchLeaf label="B" />
+		</section>
+	}
+
+	function WideSwitchPanel(props) @{
+		@switch (props.kind) {
+			@case 'large': {
+				<>
+					<strong class="switch-middle">{props.label as string}</strong>
+					<em class="switch-tail">{props.label as string}</em>
+				</>
+			}
+			@default: {
+				<SwitchLeaf label={props.label} />
+			}
+		}
+	}
+
+	export function WideSwitchPair(props) @{
+		<section class="switch-host">
+			<WideSwitchPanel kind={props.first} label="A" />
+			<SwitchLeaf label="B" />
+		</section>
+	}
+`;
+
+function loadSwitchChildren(mode: 'client' | 'server') {
+	return loadCompiledFixtureSource(SWITCH_CHILD_SOURCE, {
+		id: 'switch-component-children.tsrx',
+		mode,
+		compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+	});
+}
 
 // A host element whose children are ALL components mounts each child slot in
 // source order. The contract pinned here is sibling ORDER: a component child
@@ -330,5 +486,169 @@ describe('host with only component children (@if-root components)', () => {
 		);
 		expect(m.findAll('.big')[1]).toBe(b);
 		m.unmount();
+	});
+});
+
+describe('host with only component children (@switch-root components)', () => {
+	it('exposes each complete stateful switch child as the host’s actual first and last child', () => {
+		const client = loadSwitchChildren('client');
+		const root = mount(client.SwitchPair, { first: 'large', second: 'other' });
+
+		try {
+			const host = root.find('.switch-host');
+			const first = root.find('.switch-large');
+			const second = root.find('.switch-leaf');
+
+			expect(host.firstChild).toBe(first);
+			expect(host.lastChild).toBe(second);
+			expect(host.textContent).toBe('A:0B');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('exposes complete hookless switch children in source order', () => {
+		const client = loadSwitchChildren('client');
+		const root = mount(client.HooklessSwitchPair, { first: 'large', second: 'other' });
+
+		try {
+			const host = root.find('.switch-host');
+			const first = root.find('.switch-middle');
+			const second = root.find('.switch-leaf');
+
+			expect(host.firstChild).toBe(first);
+			expect(host.lastChild).toBe(second);
+			expect(Array.from(host.children)).toEqual([first, second]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('preserves switch-child state and its sibling’s identity across every case', () => {
+		const client = loadSwitchChildren('client');
+		const root = mount(client.SwitchPair, { first: 'large', second: 'other' });
+
+		try {
+			const sibling = root.find('.switch-leaf');
+			root.click('.switch-large');
+			expect(root.find('.switch-large').textContent).toBe('A:1');
+
+			root.update(client.SwitchPair, { first: 'middle', second: 'other' });
+			expect(root.find('.switch-host').textContent).toBe('AB');
+			expect(root.find('.switch-leaf')).toBe(sibling);
+
+			root.update(client.SwitchPair, { first: 'other', second: 'other' });
+			expect(root.findAll('.switch-leaf').map((node) => node.textContent)).toEqual(['A', 'B']);
+			expect(root.findAll('.switch-leaf')[1]).toBe(sibling);
+
+			root.update(client.SwitchPair, { first: 'large', second: 'other' });
+			expect(root.find('.switch-large').textContent).toBe('A:1');
+			expect(root.find('.switch-leaf')).toBe(sibling);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps an incomplete switch in its source position when its empty case becomes visible', () => {
+		const client = loadSwitchChildren('client');
+		const root = mount(client.OptionalSwitchPair, { first: 'other' });
+
+		try {
+			const sibling = root.find('.switch-leaf');
+			expect(root.find('.switch-host').textContent).toBe('B');
+
+			root.update(client.OptionalSwitchPair, { first: 'large' });
+			expect(root.find('.switch-host').textContent).toBe('AB');
+			expect(root.find('.switch-leaf')).toBe(sibling);
+			expect(root.find('.switch-host').children[0]).toBe(root.find('.switch-middle'));
+
+			root.update(client.OptionalSwitchPair, { first: 'other' });
+			expect(root.find('.switch-host').textContent).toBe('B');
+			expect(root.find('.switch-leaf')).toBe(sibling);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('preserves a multi-root case and the following component across case changes', () => {
+		const client = loadSwitchChildren('client');
+		const root = mount(client.WideSwitchPair, { first: 'large' });
+
+		try {
+			const sibling = root.find('.switch-leaf');
+			expect(
+				Array.from(root.find('.switch-host').children).map((node) => node.textContent),
+			).toEqual(['A', 'A', 'B']);
+
+			root.update(client.WideSwitchPair, { first: 'other' });
+			expect(root.find('.switch-host').textContent).toBe('AB');
+			expect(root.findAll('.switch-leaf')[1]).toBe(sibling);
+
+			root.update(client.WideSwitchPair, { first: 'large' });
+			expect(root.find('.switch-host').textContent).toBe('AAB');
+			expect(root.find('.switch-leaf')).toBe(sibling);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		['direct', 'ShadowedSwitchPair'],
+		['nested', 'NestedShadowedSwitchPair'],
+	])(
+		'keeps a %s case-local component shadow in source order when it first becomes visible',
+		(_, name) => {
+			const client = loadSwitchChildren('client');
+			const component = client[name];
+			const root = mount(component, { visible: false });
+
+			try {
+				const sibling = root.find('.switch-leaf');
+				expect(root.find('.switch-host').textContent).toBe('B');
+
+				root.update(component, { visible: true });
+				expect(
+					Array.from(root.find('.switch-host').children).map((node) => node.textContent),
+				).toEqual(['A', 'B']);
+				expect(root.find('.switch-leaf')).toBe(sibling);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('hydrates the original switch-child elements and keeps sibling identity after case changes', () => {
+		const client = loadSwitchChildren('client');
+		const server = loadSwitchChildren('server');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.SwitchPair, {
+			first: 'large',
+			second: 'other',
+		}).html;
+		document.body.appendChild(container);
+
+		const first = container.querySelector('.switch-large');
+		const second = container.querySelector('.switch-leaf');
+		const root = hydrateRoot(container, client.SwitchPair, { first: 'large', second: 'other' });
+
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('.switch-large')).toBe(first);
+			expect(container.querySelector('.switch-leaf')).toBe(second);
+
+			flushSync(() => (first as HTMLButtonElement).click());
+			expect(first?.textContent).toBe('A:1');
+
+			flushSync(() => root.render(client.SwitchPair, { first: 'middle', second: 'other' }));
+			expect(container.querySelector('.switch-middle')?.textContent).toBe('A');
+			expect(container.querySelector('.switch-leaf')).toBe(second);
+
+			flushSync(() => root.render(client.SwitchPair, { first: 'large', second: 'other' }));
+			expect(container.querySelector('.switch-large')?.textContent).toBe('A:1');
+			expect(container.querySelector('.switch-leaf')).toBe(second);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 });

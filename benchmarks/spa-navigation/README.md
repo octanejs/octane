@@ -69,6 +69,21 @@ bodies or fell back to the runtime de-opt renderer (`createElement` / `childSlot
 / `deoptItemBody` / `reconcileKeyed`), and how much of the surviving shell was
 rebuilt.
 
+### Exhaustive switch-root marker elision
+
+The TSRX fixture expresses the recursive `Node` through an exhaustive
+`@switch`/`@default`: interior nodes return one host and terminal nodes return the
+same single-root `Leaf` component as before. Without the transitive switch-root
+proof, that equivalent application accumulates 4,093 comment nodes on the deep
+route and 126 on the nested route. The proof restores the existing budgets of
+one and two comments respectively without changing rendered content.
+
+`work.mjs` checks the actual production DOM: the deep route must contain exactly
+2,052 elements and 1,025 text nodes, and the nested route must contain 70
+elements and 33 text nodes. Its comment ceilings are one and two for TSRX and
+zero for the unchanged JSX control. The same gate preserves the surviving shell
+and outlet by identity and retains every existing precise-work assertion.
+
 ## Resolved finding: the JSX dialect no longer de-opts on navigation
 
 The two Octane fixtures are the same app over the same core, authored twice.

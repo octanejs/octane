@@ -1,7 +1,7 @@
 # Comment-Marker Elision Plan — fewer `<!--[-->`s when they carry no information
 
-Status: M0-M7 LANDED (M0-M6 2026-07-13, M7 2026-08-09; see each phase's
-note). Follow-up to the
+Status: M0-M8 LANDED (M0-M6 2026-07-13, M7 2026-08-09, M8 2026-08-11; see
+each phase's note). Follow-up to the
 website Elements-panel report
 (a 40-deep run of `<!--[-->` before `.shell`, ~2,100 comment nodes on the home
 page). Companion to docs/compiled-output-optimization-plan.md — this is the
@@ -524,14 +524,40 @@ proof to cross-module `2`-sentinel call sites for free.
   lite has no range and the inner `@if`'s insertion anchor is null. Tracked
   as a spawned fix task; prod is unaffected (autoMemo forces the slot path).
 
+### M8 — Exhaustive switch-root single-root proof
+
+**M8 LANDED 2026-08-11 — compiler-only.** The existing definition-site
+single-root and hookless append-safety proofs now also recognize an exhaustive
+`@switch` whose explicit `@default` and every case produce exactly one plain
+host or an already-proven same-module component. The existing fixed point
+resolves nested exhaustive directives and transitive component dependencies;
+missing defaults, empty or multiple roots, fragments, unproven component
+identities, and case-local declarations remain conservatively anchored.
+
+Qualifying components reuse the existing client-only `$$singleRoot`, component
+slot, and anchorless-host machinery. No marker protocol, runtime ownership,
+streaming output, server rendering, or hydration adoption changes. Stateful
+case changes retain their hooks and following sibling; incomplete and
+multi-root switches retain their existing insertion boundaries.
+
+- An equivalent exhaustive-switch version of the existing spa-navigation tree
+  previously created **4,093** deep-route comments and **126** nested-route
+  comments. The widened proof restores the original **1** and **2** comment
+  ceilings while preserving exactly **2,052 elements / 1,025 text nodes** on
+  the deep route and **70 elements / 33 text nodes** on the nested route.
+- The existing JSX control, navigation work gates, route-shell/outlet identity,
+  server output, and adoption of original server-rendered elements remain
+  unchanged. Exact comment counts stay in the deterministic production work
+  benchmark; package tests assert visible sibling boundaries, state, order,
+  identity, and hydration behavior.
+
 **Still open (small or order-constrained — diminishing returns):**
 
 1. Multi-hole hosts: the remaining ~684 empty anchors on `/` are
    order-bearing (`<g>{a}{b}</g>` — siblings need stable positions); eliding
    them needs per-hole neighbor bookkeeping. Biggest remaining bucket for
-   VALUE holes; static component children are M7-covered when the callee
-   proof holds. `@switch`-root bodies and optimistic self-recursive arms are
-   natural M7 extensions.
+   VALUE holes; static component children are M7/M8-covered when the callee
+   proof holds. Optimistic self-recursive arms remain a possible extension.
 2. Component-bearing `it` pairs (145 on `/`) — required borrow ranges today.
 3. Sole-root `@switch` construct inherit + children-render-fn /
    value-position sole roots (M3 leftovers).
@@ -542,8 +568,8 @@ proof to cross-module `2`-sentinel call sites for free.
 
 ### Ordering & measured effect
 
-M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7. M1-M5 and M7 remove ranges at the
-compiler/runtime source for client-created content; M6 complements them by
+M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8. M1-M5, M7, and M8 remove
+ranges at the compiler/runtime source for client-created content; M6 complements them by
 compacting redundant ranges that must remain explicit in the SSR wire format.
 The original home-page report's 40-opening wrapper prefix fell to 19 before
 M6 and now occupies five opening comments while preserving all 19 logical
