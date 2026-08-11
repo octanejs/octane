@@ -18,6 +18,7 @@ import {
 	CaughtEffectHost,
 	UncaughtEffectHost,
 	MountThrower,
+	ClickCounter,
 	triggerRenderThrow,
 	triggerEffectThrow,
 } from './_fixtures/root-error-callbacks.tsrx';
@@ -133,7 +134,7 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		expect(container.textContent).toBe('');
 	});
 
-	it('onUncaughtError consumes a hydration render error (unowned root)', () => {
+	it('onUncaughtError consumes a hydration render error (unowned root)', async () => {
 		container.innerHTML = '<div>server</div>';
 		const onUncaughtError = vi.fn();
 		let root!: ReturnType<typeof hydrateRoot>;
@@ -142,10 +143,29 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		}).not.toThrow();
 		expect(onUncaughtError).toHaveBeenCalledTimes(1);
 		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('mount-boom');
-		// The failed adoption was released; the returned root stays usable.
+		// The failed adoption was discarded; the returned root stays usable.
 		expect(container.textContent).toBe('');
-		expect(() => flushSync(() => root.render(CaughtHost, {}))).not.toThrow();
-		expect(container.textContent).toBe('ok');
+		await act(() => root.render(ClickCounter, {}));
+		expect(container.textContent).toBe('n:0');
+		// The recovered root keeps the container's event delegation — a click on
+		// freshly rendered content must still reach its handler.
+		await act(() => {
+			(container.querySelector('#counter') as HTMLElement).click();
+		});
+		expect(container.textContent).toBe('n:1');
+		root.unmount();
+	});
+
+	it('a consumed sync-mount error keeps event delegation on the recovered root', async () => {
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		expect(() => root.render(MountThrower, {})).not.toThrow();
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		await act(() => root.render(ClickCounter, {}));
+		await act(() => {
+			(container.querySelector('#counter') as HTMLElement).click();
+		});
+		expect(container.textContent).toBe('n:1');
 		root.unmount();
 	});
 

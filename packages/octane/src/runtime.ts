@@ -27498,9 +27498,30 @@ export function hydrateRoot(
 		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
 		// retry client-remounts). Unowned hydration failures keep their existing
 		// behavior and rethrow untouched — unless this root's onUncaughtError
-		// consumes the report, which changes only the reporting: the failed
-		// adoption is released identically and the caller gets a reusable root.
-		const releaseFailedHydration = (): void => {
+		// consumes the report. Consumption changes only the reporting: the failed
+		// adoption is discarded like createRoot's sync-mount failure, and the
+		// returned root KEEPS this pass's container claim and delegation
+		// registration because the caller renders into it directly — there is no
+		// host retry to re-register them.
+		if (rendererRegionOwnerForBlock(rootBlock) === null) {
+			if (!reportUncaughtError(rootBlock, error)) throw error;
+			unmountBlock(rootBlock, false);
+			drainRefDetaches();
+			container.textContent = '';
+			return makeRoot(
+				container,
+				null,
+				null,
+				null,
+				idState,
+				renderReturnedValue,
+				ownerToken,
+				rootOptions,
+			);
+		}
+		try {
+			handleRenderError(rootBlock, error);
+		} finally {
 			DOM_ROOT_DISPOSERS.delete(rootBlock);
 			unmountBlock(rootBlock, false);
 			drainRefDetaches();
@@ -27511,16 +27532,6 @@ export function hydrateRoot(
 			// its listeners past the island's final teardown.
 			unregisterDelegationTarget(container);
 			releaseRootContainer(container, ownerToken);
-		};
-		if (rendererRegionOwnerForBlock(rootBlock) === null) {
-			if (!reportUncaughtError(rootBlock, error)) throw error;
-			releaseFailedHydration();
-			return makeRoot(container, null, null, null, idState, renderReturnedValue, null, rootOptions);
-		}
-		try {
-			handleRenderError(rootBlock, error);
-		} finally {
-			releaseFailedHydration();
 		}
 		// Routed: hand back an empty lazy root owning NO claim or delegation
 		// registration (both released above); the owner's retry recreates.

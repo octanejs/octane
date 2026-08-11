@@ -43,6 +43,13 @@ function throwOnMount(): string {
 	throw new Error('mount-boom');
 }
 
+// Interactive recovery probe: a recovered root must keep its container's event
+// delegation, so a click on freshly rendered content still reaches handlers.
+export function ClickCounter() @{
+	const [n, setN] = useState(0);
+	<button id="counter" onClick={() => setN(n + 1)}>{'n:' + n}</button>
+}
+
 let bumpEffect: (() => void) | null = null;
 export function triggerEffectThrow(): void {
 	bumpEffect!();
