@@ -20,6 +20,8 @@ const profilerGlobal = '__OCTANE_PROFILER__';
 const runGlobal = '__octane_rspack_profile_bundle_runs__';
 const productionErrorGlobal = '__octane_rspack_production_error__';
 const transpileGlobal = '__octane_rspack_transpiled_value__';
+const lynxWorkletFeatureGlobal = '__octane_rspack_lynx_worklet_feature__';
+const lynxWorkletHelperGlobal = '__octane_rspack_lynx_worklet_helper__';
 
 function write(root: string, relativePath: string, content: string) {
 	const file = join(root, relativePath);
@@ -187,7 +189,53 @@ export function App() @{
 		Reflect.deleteProperty(globalThis, runGlobal);
 		Reflect.deleteProperty(globalThis, productionErrorGlobal);
 		Reflect.deleteProperty(globalThis, transpileGlobal);
+		Reflect.deleteProperty(globalThis, lynxWorkletFeatureGlobal);
+		Reflect.deleteProperty(globalThis, lynxWorkletHelperGlobal);
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	});
+
+	it('retains Lynx worklet feature installation through a production re-export', async () => {
+		const lynxPackage = join(repositoryRoot, 'packages/lynx');
+		const featureEntry = join(lynxPackage, 'src/core/main-thread-worklet-feature.ts');
+		mkdirSync(join(root, 'node_modules/@octanejs'), { recursive: true });
+		symlinkSync(lynxPackage, join(root, 'node_modules/@octanejs/lynx'), 'dir');
+		write(
+			root,
+			'src/lynx-worklet-re-export.js',
+			`import { runOnMainThread } from '@octanejs/lynx/main-worklets';
+import { subscribeLynxMainThreadWorkletFeature } from ${JSON.stringify(featureEntry)};
+globalThis.${lynxWorkletHelperGlobal} = runOnMainThread;
+subscribeLynxMainThreadWorkletFeature(() => { globalThis.${lynxWorkletFeatureGlobal} = true; });
+`,
+		);
+		const outputPath = join(root, 'dist-lynx-worklet-re-export');
+		await compile({
+			context: root,
+			mode: 'production',
+			target: 'node',
+			entry: './src/lynx-worklet-re-export.js',
+			resolve: { extensionAlias: { '.js': ['.ts', '.js'] } },
+			module: {
+				rules: [
+					{
+						test: /\.ts$/,
+						use: [
+							{
+								loader: 'builtin:swc-loader',
+								options: { jsc: { parser: { syntax: 'typescript' } } },
+							},
+						],
+					},
+				],
+			},
+			optimization: { minimize: true },
+			output: { path: outputPath, filename: 'bundle.cjs' },
+		});
+
+		await import(`${pathToFileURL(join(outputPath, 'bundle.cjs')).href}?worklet-feature`);
+
+		expect(globalThis[lynxWorkletHelperGlobal as keyof typeof globalThis]).toBeTypeOf('function');
+		expect(globalThis[lynxWorkletFeatureGlobal as keyof typeof globalThis]).toBe(true);
 	});
 
 	function installRealProfileFixture(includeRawBinding: boolean) {

@@ -47,7 +47,11 @@ import {
 	applyHookDependencies,
 	isInvariantLiteral,
 } from './hook-deps.js';
-import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
+import {
+	compileUniversal,
+	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
+	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
+} from './compile-universal.js';
 import {
 	expandDomRendererRegionsAst,
 	prepareRendererBoundaryRegions,
@@ -7862,6 +7866,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
 						__runtimeImportRoutes: [
 							...(options?.__runtimeImportRoutes ?? []),
+							...(renderer.threadFunctionsModule === undefined
+								? []
+								: [
+										{
+											module: renderer.threadFunctionsModule,
+											imported: UNIVERSAL_THREAD_RUNTIME_IMPORTS,
+										},
+									]),
 							{
 								module: renderer.module,
 								imported: UNIVERSAL_COMPILER_RUNTIME_IMPORTS,

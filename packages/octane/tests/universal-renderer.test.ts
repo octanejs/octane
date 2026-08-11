@@ -503,6 +503,31 @@ export function onTap(value) {
 		);
 	});
 
+	it('routes thread-function helpers through a renderer-owned cold module', () => {
+		const result = compile(
+			`export const onTap = () => { 'main thread'; return 1; };`,
+			'/src/ColdThreadFunction.object.ts',
+			{
+				hmr: false,
+				renderer: {
+					...renderer,
+					capabilities: ['thread-functions'],
+					threadFunctionsModule: 'octane/universal/thread-functions',
+				},
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			},
+		);
+
+		expect(
+			callsByImportedName(result.code, 'octane/universal/thread-functions').get(
+				'registerThreadFunction',
+			),
+		).toHaveLength(1);
+		expect(result.code).not.toMatch(
+			/import\s*\{[^}]*registerThreadFunction[^}]*\}\s*from\s*["']octane\/universal["']/,
+		);
+	});
+
 	it('registers active thread implementations before authored calls and defers captures', () => {
 		const source = `
 export const immediate = () => {

@@ -3802,6 +3802,17 @@ export const UNIVERSAL_COMPILER_RUNTIME_IMPORTS = new Set([
 	'withSlot',
 ]);
 
+export const UNIVERSAL_THREAD_RUNTIME_IMPORTS = new Set([
+	'attachThreadFunction',
+	'bindThreadFunction',
+	'invokeThreadFunction',
+	'registerThreadFunction',
+	'runOnBackground',
+	'runOnMainThread',
+	'unregisterThreadFunction',
+	'useMainThreadRef',
+]);
+
 function threadHelperImportPairs(state) {
 	return [
 		['registerThreadFunction', state.helpers.registerThreadFunction],
@@ -3812,7 +3823,9 @@ function threadHelperImportPairs(state) {
 	].filter(([, local]) => local !== undefined);
 }
 
-function universalHelperImportAst(state, extraPairs = [], origin = null) {
+function universalHelperImportAsts(state, extraPairs = [], origin = null) {
+	const threadPairs = threadHelperImportPairs(state);
+	const threadModule = state.renderer.threadFunctionsModule ?? state.renderer.module;
 	const pairs = [
 		['defineUniversalComponent', state.helpers.component],
 		['universalPlan', state.helpers.plan],
@@ -3835,7 +3848,6 @@ function universalHelperImportAst(state, extraPairs = [], origin = null) {
 		...(state.helpers.firstScreenEvent === undefined
 			? []
 			: [['firstScreenEvent', state.helpers.firstScreenEvent]]),
-		...threadHelperImportPairs(state),
 		...(state.hmr
 			? [
 					['hmrUniversalComponent', state.helpers.hmr],
@@ -3843,8 +3855,13 @@ function universalHelperImportAst(state, extraPairs = [], origin = null) {
 				]
 			: []),
 		...extraPairs,
+		...(threadModule === state.renderer.module ? threadPairs : []),
 	];
-	return inheritGeneratedOrigin(b.imports(pairs, state.renderer.module), origin);
+	const imports = [inheritGeneratedOrigin(b.imports(pairs, state.renderer.module), origin)];
+	if (threadPairs.length !== 0 && threadModule !== state.renderer.module) {
+		imports.push(inheritGeneratedOrigin(b.imports(threadPairs, threadModule), origin));
+	}
+	return imports;
 }
 
 function threeHostIntrinsicStatementsAst(state, origin = null) {
@@ -4449,7 +4466,7 @@ export function lowerUniversalRendererRegionAst(
 			...(universalRuntime === undefined ? null : { universalRuntime }),
 		}),
 		statements: Object.freeze([
-			universalHelperImportAst(state, helperImportPairs, origin),
+			...universalHelperImportAsts(state, helperImportPairs, origin),
 			...threeHostIntrinsics.imports,
 			...(profileImport === null ? [] : [profileImport]),
 			...hmrBlocks.prelude,
@@ -4588,7 +4605,7 @@ export function compileUniversal(
 	const program = {
 		...ast,
 		body: [
-			universalHelperImportAst(state, [], moduleOrigin),
+			...universalHelperImportAsts(state, [], moduleOrigin),
 			...threeHostIntrinsics.imports,
 			...(profileImport === null ? [] : [profileImport]),
 			...hmrBlocks.prelude,

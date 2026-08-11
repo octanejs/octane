@@ -4,6 +4,7 @@ import * as firstScreenApi from '../src/first-screen.js';
 import * as rootApi from '../src/index.js';
 import * as mainRendererApi from '../src/main-renderer.js';
 import * as mainThreadApi from '../src/main-thread.js';
+import * as mainWorkletApi from '../src/main-worklets.js';
 import * as platformApi from '../src/platform.js';
 import * as testingApi from '../src/testing.js';
 
@@ -24,6 +25,7 @@ describe('@octanejs/lynx Milestone 8 private surface', () => {
 			'./config',
 			'./renderer',
 			'./main-renderer',
+			'./main-worklets',
 			'./first-screen',
 			'./intrinsics',
 			'./intrinsics/jsx-runtime',
@@ -65,17 +67,19 @@ describe('@octanejs/lynx Milestone 8 private surface', () => {
 		expect(mainRendererApi.renderLynxFirstScreen).toBeTypeOf('function');
 		expect(mainRendererApi.firstScreenEvent).toBeTypeOf('symbol');
 		expect(mainRendererApi.lazy).toBeTypeOf('function');
-		expect(mainRendererApi.useMainThreadRef).toBeTypeOf('function');
-		expect(mainRendererApi.registerThreadFunction).toBeTypeOf('function');
+		expect(mainRendererApi).not.toHaveProperty('useMainThreadRef');
+		expect(mainRendererApi).not.toHaveProperty('registerThreadFunction');
 		expect(firstScreenApi.runOnBackground).toBe(rootApi.runOnBackground);
 		expect(firstScreenApi.runOnMainThread).toBe(rootApi.runOnMainThread);
+		expect(mainWorkletApi.runOnBackground).toBe(rootApi.runOnBackground);
+		expect(mainWorkletApi.runOnMainThread).toBe(rootApi.runOnMainThread);
 		expect(rootApi.createLynxRoot).toBeTypeOf('function');
 		expect(rootApi.useMainThreadRef).toBeTypeOf('function');
 		expect(rootApi.runOnBackground).toBeTypeOf('function');
 		expect(rootApi.runOnMainThread).toBeTypeOf('function');
 		expect(rootApi.createLynxNativeResource).toBeTypeOf('function');
 		expect(mainThreadApi.installLynxMainThread).toBeTypeOf('function');
-		expect(mainThreadApi.runOnBackground).toBe(rootApi.runOnBackground);
+		expect(mainThreadApi).not.toHaveProperty('runOnBackground');
 		expect(platformApi.useInitData).toBeTypeOf('function');
 		expect(platformApi.useGlobalProps).toBeTypeOf('function');
 		expect(platformApi.getNativeModules).toBeTypeOf('function');

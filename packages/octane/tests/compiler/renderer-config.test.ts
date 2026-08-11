@@ -171,6 +171,30 @@ describe('renderer configuration', () => {
 		expect(differentPatterns.signature).not.toBe(config.signature);
 	});
 
+	it('keeps an optional thread-function runtime module in renderer identity', () => {
+		const config = normalizeRendererConfig({
+			registry: {
+				native: {
+					module: '@octanejs/native/renderer',
+					threadFunctionsModule: '@octanejs/native/thread-functions',
+				},
+			},
+		});
+
+		expect(config.registry.native.threadFunctionsModule).toBe('@octanejs/native/thread-functions');
+		expect(normalizeRendererConfig(config).signature).toBe(config.signature);
+		expect(
+			normalizeRendererConfig({
+				registry: {
+					native: {
+						module: '@octanejs/native/renderer',
+						threadFunctionsModule: '@octanejs/native/other-thread-functions',
+					},
+				},
+			}).signature,
+		).not.toBe(config.signature);
+	});
+
 	it('normalizes renderer-owned child regions by stable module and export identity', () => {
 		const config = normalizeRendererConfig({
 			registry: { three: '@octanejs/three/renderer' },

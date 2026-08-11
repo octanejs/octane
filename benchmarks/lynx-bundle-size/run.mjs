@@ -43,6 +43,16 @@ const PREVIEW_RECEIVER_NAME = 'main__preview_receiver';
 const BUNDLE_NAME = 'main.lynx.bundle';
 const FORBIDDEN_RUNTIME = /(?:^|[^$\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\w]|$)/i;
 const FORBIDDEN_DOM = /\b(?:document|window|HTMLElement|MutationObserver)\b/;
+// Frozen from upstream main 9b147781. The main caps are the largest integer
+// values that still prove the issue's >=2% gzip reduction. The background
+// program has no source change; its raw-byte budget prevents optional worklet
+// code from leaking onto that thread while tolerating minifier-symbol changes
+// caused by the independently optimized main graph.
+const NO_WORKLET_BUDGET = Object.freeze({
+	previewMainGzip: 75_376,
+	ifrMainGzip: 80_355,
+	backgroundRaw: 271_737,
+});
 
 function packageEntry(packageName) {
 	const packageRoot = path.join(RSPEEDY_MODULES, ...packageName.split('/'));
@@ -378,6 +388,18 @@ try {
 			`preview and IFR ${operation} differ`,
 		);
 	}
+	gate(
+		preview.ops.main_gzip.score <= NO_WORKLET_BUDGET.previewMainGzip,
+		`preview main gzip ${preview.ops.main_gzip.score} exceeds ${NO_WORKLET_BUDGET.previewMainGzip}`,
+	);
+	gate(
+		ifr.ops.main_gzip.score <= NO_WORKLET_BUDGET.ifrMainGzip,
+		`IFR main gzip ${ifr.ops.main_gzip.score} exceeds ${NO_WORKLET_BUDGET.ifrMainGzip}`,
+	);
+	gate(
+		preview.ops.background_raw.score === NO_WORKLET_BUDGET.backgroundRaw,
+		`background raw ${preview.ops.background_raw.score} differs from ${NO_WORKLET_BUDGET.backgroundRaw}`,
+	);
 } catch (error) {
 	failed = error instanceof Error ? error.stack || error.message : String(error);
 	console.error(failed);

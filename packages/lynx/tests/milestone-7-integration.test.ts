@@ -24,6 +24,7 @@ import {
 	type LynxContextProxy,
 } from '../src/core/protocol.js';
 import * as firstScreenApi from '../src/first-screen.js';
+import * as mainWorkletApi from '../src/main-worklets.js';
 import * as rootApi from '../src/index.js';
 import * as mainRenderer from '../src/main-renderer.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
@@ -287,6 +288,7 @@ function installEnvironment(
 	prepareMainThread?.(target);
 	const mainLayer = evaluateCompiledLayer(mainCode, {
 		'@octanejs/lynx/main-renderer': mainRenderer,
+		'@octanejs/lynx/main-worklets': mainWorkletApi,
 		'@octanejs/lynx': firstScreenApi,
 		'./main-observer.js': {
 			markMainCancelled() {
@@ -441,7 +443,7 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		const firstDescriptor = capturedBackground(firstListener!);
 
 		globalThis.lynxTestingEnv.switchToMainThread();
-		const firstCall = firstScreenApi.runOnBackground<[string], { thread: string; value: string }>(
+		const firstCall = mainWorkletApi.runOnBackground<[string], { thread: string; value: string }>(
 			firstDescriptor,
 		);
 		await expect(firstCall('before replacement')).resolves.toEqual({
@@ -458,7 +460,7 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 
 		globalThis.lynxTestingEnv.switchToMainThread();
 		await expect(firstCall('stale replacement')).rejects.toThrow(/stale or foreign/);
-		const replacementCall = firstScreenApi.runOnBackground<
+		const replacementCall = mainWorkletApi.runOnBackground<
 			[string],
 			{ thread: string; value: string }
 		>(replacementDescriptor);
@@ -636,7 +638,7 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		cancelledMain.cancel('cancel main before adoption');
 
 		globalThis.lynxTestingEnv.switchToMainThread();
-		const backgroundEcho = firstScreenApi.runOnBackground<
+		const backgroundEcho = mainWorkletApi.runOnBackground<
 			[string],
 			{ thread: string; value: string }
 		>(
@@ -644,12 +646,12 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 				environment.mainLayer.backgroundEcho,
 			) as LynxBackgroundFunctionDescriptor,
 		);
-		const backgroundThrow = firstScreenApi.runOnBackground<[], never>(
+		const backgroundThrow = mainWorkletApi.runOnBackground<[], never>(
 			unwrapThreadFunctionDescriptor(
 				environment.mainLayer.backgroundThrow,
 			) as LynxBackgroundFunctionDescriptor,
 		);
-		const backgroundCancelled = firstScreenApi.runOnBackground<[], string>(
+		const backgroundCancelled = mainWorkletApi.runOnBackground<[], string>(
 			unwrapThreadFunctionDescriptor(
 				environment.mainLayer.backgroundCancelled,
 			) as LynxBackgroundFunctionDescriptor,
