@@ -1251,6 +1251,36 @@
       "message": "Unclosed server-rendered Fragment descriptor.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "51": {
+      "message": "Hydration mismatch: the server-rendered node did not match the client render; the mismatched subtree was rebuilt on the client.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "52": {
+      "message": "Hydration mismatch: root adoption was abandoned after a server/client shape divergence; the root was rebuilt on the client.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "53": {
+      "message": "Hydration mismatch: the server rendered more root content than the client; the stale remainder was discarded.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "54": {
+      "message": "Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "55": {
+      "message": "Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "56": {
+      "message": "Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.",
+      "runtime": ["client"],
+      "status": "active"
     }
   }
 }

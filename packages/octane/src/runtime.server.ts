@@ -188,10 +188,25 @@ let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // `<head>` when present, else prepended).
 interface HeadBuffer {
 	html: string;
-	/** Resource-hint dedupe keys emitted into `html` during this pass. */
+	/** Resource-hint + Float-resource dedupe keys emitted during this pass. */
 	hints: Set<string>;
+	/**
+	 * React Float stylesheet resources, grouped by precedence: precedence →
+	 * concatenated `<link>` html. Map insertion order IS group order
+	 * (first-encounter), and groups fold after `html` at capture time. Null
+	 * until the first stylesheet resource so ordinary passes pay nothing.
+	 */
+	sheets: Map<string, string> | null;
 	/** Precomputed caller root namespace, unaffected by streamed useId subspaces. */
 	rootSuffix: string;
+}
+
+/** Fold order: hoisted head elements + hints first, then grouped stylesheets. */
+function headHtmlWithSheets(buf: HeadBuffer): string {
+	if (buf.sheets === null) return buf.html;
+	let out = buf.html;
+	for (const group of buf.sheets.values()) out += group;
+	return out;
 }
 let HEAD: HeadBuffer | null = null;
 
@@ -2818,6 +2833,7 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		head,
 		headLength: head !== null ? head.html.length : 0,
 		headHints: head === null ? null : new Set(head.hints),
+		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -2881,6 +2897,14 @@ function rewindComponentReplayState(
 		snapshot.head.html = snapshot.head.html.slice(0, snapshot.headLength);
 		snapshot.head.hints.clear();
 		for (const key of snapshot.headHints) snapshot.head.hints.add(key);
+		if (snapshot.headSheets === null) snapshot.head.sheets = null;
+		else {
+			// Restore INTO a live map (the snapshot map itself stays pristine so a
+			// second rewind from the same snapshot restores identically).
+			const sheets = (snapshot.head.sheets ??= new Map());
+			sheets.clear();
+			for (const [precedence, group] of snapshot.headSheets) sheets.set(precedence, group);
+		}
 	}
 	if (snapshot.serial !== null) snapshot.serial.length = snapshot.serialLength;
 	if (snapshot.susp !== null) snapshot.susp.length = snapshot.suspLength;
@@ -5471,8 +5495,9 @@ function runFullFramedPass(
 	const headBuf = (HEAD = {
 		html: '',
 		hints: new Set(),
+		sheets: null,
 		rootSuffix: markers ? headOwnershipSuffix(identifierPrefix) : '',
-	});
+	} as HeadBuffer);
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
@@ -5529,7 +5554,7 @@ function runFullFramedPass(
 	}
 	return {
 		body,
-		head: headBuf.html,
+		head: headHtmlWithSheets(headBuf),
 		css,
 		serial,
 		suspended,
@@ -5564,7 +5589,12 @@ function runDiscoveryRound(
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	CSS = new Map();
-	HEAD = { html: '', hints: new Set(), rootSuffix: headOwnershipSuffix(identifierPrefix) };
+	HEAD = {
+		html: '',
+		hints: new Set(),
+		sheets: null,
+		rootSuffix: headOwnershipSuffix(identifierPrefix),
+	};
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);
@@ -6488,6 +6518,7 @@ export function ssrTry(
 			const head = HEAD;
 			const headHtml = head?.html;
 			const headHints = head === null ? null : new Set(head.hints);
+			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
 			const vtStack = VT_SSR_STACK.map((candidate) => ({
@@ -6513,6 +6544,12 @@ export function ssrTry(
 					head.html = headHtml!;
 					head.hints.clear();
 					for (const hint of headHints) head.hints.add(hint);
+					if (headSheets === null) head.sheets = null;
+					else {
+						const sheets = (head.sheets ??= new Map());
+						sheets.clear();
+						for (const [precedence, group] of headSheets) sheets.set(precedence, group);
+					}
 				}
 				VT_SSR_TRY_SEQ = vtTrySeq;
 				VT_SSR_HAS_CANDIDATES = vtHasCandidates;
@@ -7933,5 +7970,103 @@ export function prefetchDNS(href: string): void {
 			'" data-oct-hint="' +
 			escapeAttr(key) +
 			'">',
+	);
+}
+
+/** Attribute serialization for Float resources; href/src/rel/async/precedence are owned by the emit. */
+function resourceAttrs(attrs: Record<string, unknown>, tag: 'link' | 'script'): string {
+	let out = '';
+	for (const k in attrs) {
+		if (k === 'precedence' || k === 'href' || k === 'src' || k === 'rel' || k === 'async') continue;
+		const v = (attrs as any)[k];
+		if (v == null || v === false || typeof v === 'function') continue;
+		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
+		if (v === true) out += ' ' + name;
+		else out += ' ' + name + '="' + escapeAttr(sanitizeURLAttribute(tag, name, String(v))) + '"';
+	}
+	return out;
+}
+
+/**
+ * Compiler target for `<link rel="stylesheet" href precedence>` (React Float).
+ * Dedupes by href across the pass; groups by precedence in first-encounter
+ * order (the HeadBuffer.sheets Map), folded after the ordinary head content.
+ */
+export function ssrStylesheetResource(attrs: Record<string, unknown> | null): void {
+	if (HEAD === null || attrs == null) return;
+	const href = attrs.href;
+	if (typeof href !== 'string' || href === '') return;
+	const key = 'sheet:' + href;
+	if (HEAD.hints.has(key)) return;
+	HEAD.hints.add(key);
+	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const tag =
+		'<link rel="stylesheet" href="' +
+		escapeAttr(sanitizeURL(href)) +
+		'" data-precedence="' +
+		escapeAttr(precedence) +
+		'"' +
+		resourceAttrs(attrs, 'link') +
+		'>';
+	const sheets = (HEAD.sheets ??= new Map());
+	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
+}
+
+/** Compiler target for `<script async src>` resources (React Float). */
+export function ssrScriptResource(attrs: Record<string, unknown> | null): void {
+	if (HEAD === null || attrs == null) return;
+	const src = attrs.src;
+	if (typeof src !== 'string' || src === '') return;
+	const key = 'script:' + src;
+	if (HEAD.hints.has(key)) return;
+	HEAD.hints.add(key);
+	HEAD.html +=
+		'<script src="' +
+		escapeAttr(sanitizeURL(src)) +
+		'" async data-oct-res=""' +
+		resourceAttrs(attrs, 'script') +
+		'></script>';
+}
+
+/** React DOM `preloadModule(href, options?)` — `<link rel="modulepreload">`, keyed by href. */
+export function preloadModule(href: string, options?: Record<string, unknown>): void {
+	const value = coerceHintHref(href);
+	if (value === null) return;
+	const key = 'modulepreload:' + value;
+	const safeHref = sanitizeURL(value);
+	emitHeadHint(
+		key,
+		'<link rel="modulepreload" href="' +
+			escapeAttr(safeHref) +
+			'"' +
+			hintAttrs(options, false, 'link') +
+			' data-oct-hint="' +
+			escapeAttr(key) +
+			'">',
+	);
+}
+
+/**
+ * React DOM `preinitModule(href, options?)` — `<script type="module" async src>`.
+ * Only the `script` destination exists for module preinit; others fail closed.
+ */
+export function preinitModule(
+	href: string,
+	options?: { as?: string } & Record<string, unknown>,
+): void {
+	const value = coerceHintHref(href);
+	if (value === null) return;
+	if ((options?.as ?? 'script') !== 'script') return;
+	const key = 'module:' + value;
+	const safeHref = sanitizeURL(value);
+	emitHeadHint(
+		key,
+		'<script type="module" src="' +
+			escapeAttr(safeHref) +
+			'" async' +
+			hintAttrs(options, true, 'script') +
+			' data-oct-hint="' +
+			escapeAttr(key) +
+			'"></script>',
 	);
 }

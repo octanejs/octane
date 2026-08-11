@@ -13,6 +13,7 @@ import {
 	SuspenseInActivity,
 	TextActivityHost,
 } from './_fixtures/activity.tsrx';
+import { UnstableActivityHost } from './_fixtures/unstable-activity.tsrx';
 
 // Parity with React 19 <Activity mode="hidden"|"visible"> — the portable subset
 // of React's Activity-test.js / ReactDOMActivity-test.js (DOM + effect lifecycle
@@ -464,5 +465,22 @@ describe('<Activity> — insertion effects stay connected while hidden (conforma
 		// already current for n=1.
 		expect(t.log).toEqual(['layout mount']);
 		t.r.unmount();
+	});
+});
+
+describe('unstable_Activity alias', () => {
+	it('compiles and hides/reveals like Activity (React experimental-channel ports)', () => {
+		const r = mount(UnstableActivityHost, { mode: 'visible' });
+		const child = () => r.container.querySelector('#ua-child') as HTMLElement | null;
+		expect(child()).not.toBeNull();
+		expect(child()!.style.display).toBe('');
+		r.update(UnstableActivityHost, { mode: 'hidden' });
+		flushEffects();
+		expect(child()).not.toBeNull(); // state/DOM preserved...
+		expect(child()!.style.display).toBe('none'); // ...just visually hidden
+		r.update(UnstableActivityHost, { mode: 'visible' });
+		flushEffects();
+		expect(child()!.style.display).toBe('');
+		r.unmount();
 	});
 });

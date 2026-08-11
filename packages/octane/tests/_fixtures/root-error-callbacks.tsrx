@@ -1,0 +1,59 @@
+// Fixtures for the React 19 root error-callback options (onCaughtError /
+// onUncaughtError on createRoot/hydrateRoot). Each host pairs a thrower with
+// (or without) a boundary so the tests can drive both report channels through
+// the render and passive-effect paths.
+import { ErrorBoundary, useEffect, useState } from 'octane';
+
+let bumpRender: (() => void) | null = null;
+export function triggerRenderThrow(): void {
+	bumpRender!();
+}
+
+function RenderThrower() @{
+	const [bang, setBang] = useState(false);
+	bumpRender = () => setBang(true);
+	if (bang) {
+		throw new Error('render-boom');
+	}
+	<span id="ok">ok</span>
+}
+
+export function CaughtHost() @{
+	<ErrorBoundary fallback={(e) => 'caught:' + (e as Error).message}>
+		<RenderThrower />
+	</ErrorBoundary>
+}
+
+export function UncaughtHost() @{
+	<main>
+		<RenderThrower />
+	</main>
+}
+
+let bumpEffect: (() => void) | null = null;
+export function triggerEffectThrow(): void {
+	bumpEffect!();
+}
+
+function EffectThrower() @{
+	const [bang, setBang] = useState(false);
+	bumpEffect = () => setBang(true);
+	useEffect(() => {
+		if (bang) {
+			throw new Error('effect-boom');
+		}
+	}, [bang]);
+	<span id="eok">eok</span>
+}
+
+export function CaughtEffectHost() @{
+	<ErrorBoundary fallback="effect-caught">
+		<EffectThrower />
+	</ErrorBoundary>
+}
+
+export function UncaughtEffectHost() @{
+	<main>
+		<EffectThrower />
+	</main>
+}

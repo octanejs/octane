@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 51,
+  "nextCode": 57,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -81,7 +81,7 @@
       "status": "active"
     },
     "14": {
-      "message": "act(): scheduler did not stabilize after %s iterations — likely an infinite render loop",
+      "message": "act(): scheduler did not stabilize after %s iterations \u2014 likely an infinite render loop",
       "argumentCount": 1,
       "runtime": ["client"],
       "status": "active"
@@ -147,7 +147,7 @@
       "status": "active"
     },
     "25": {
-      "message": "Octane: internal — a component descriptor reached the de-opt host reconciler (should have been routed through a Block via hostElementBody/componentSlot).",
+      "message": "Octane: internal \u2014 a component descriptor reached the de-opt host reconciler (should have been routed through a Block via hostElementBody/componentSlot).",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
@@ -195,7 +195,7 @@
       "status": "active"
     },
     "33": {
-      "message": "octane SSR: exceeded %s suspense passes — a use(thenable) never resolved.",
+      "message": "octane SSR: exceeded %s suspense passes \u2014 a use(thenable) never resolved.",
       "argumentCount": 1,
       "runtime": ["server"],
       "status": "retired"
@@ -219,7 +219,7 @@
       "status": "active"
     },
     "37": {
-      "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved.",
+      "message": "octane SSR: %s consecutive streaming passes completed no boundary \u2014 a use(thenable) never resolved.",
       "argumentCount": 1,
       "runtime": ["server"],
       "status": "retired"
@@ -279,13 +279,13 @@
       "status": "active"
     },
     "47": {
-      "message": "octane SSR: exceeded %s suspense passes — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
+      "message": "octane SSR: exceeded %s suspense passes \u2014 a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
       "argumentCount": 1,
       "runtime": ["server"],
       "status": "active"
     },
     "48": {
-      "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
+      "message": "octane SSR: %s consecutive streaming passes completed no boundary \u2014 a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
       "argumentCount": 1,
       "runtime": ["server"],
       "status": "active"
@@ -298,6 +298,42 @@
     },
     "50": {
       "message": "Unclosed server-rendered Fragment descriptor.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "51": {
+      "message": "Hydration mismatch: the server-rendered node did not match the client render; the mismatched subtree was rebuilt on the client.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "52": {
+      "message": "Hydration mismatch: root adoption was abandoned after a server/client shape divergence; the root was rebuilt on the client.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "53": {
+      "message": "Hydration mismatch: the server rendered more root content than the client; the stale remainder was discarded.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "54": {
+      "message": "Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "55": {
+      "message": "Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "56": {
+      "message": "Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
