@@ -20,6 +20,8 @@ import {
 	PlainLink,
 	AsyncScript,
 	AsyncScriptDuplicate,
+	ReturnScript,
+	ReturnSheet,
 	ToggleHost,
 	setSheetVisible,
 } from './_fixtures/float-resources.tsrx';
@@ -92,6 +94,21 @@ describe('Float resources — client', () => {
 		c.remove();
 	});
 
+	it('return-position (value-body) trees classify resources like @{} bodies', async () => {
+		await act(() => {
+			mountInto(ReturnScript);
+			mountInto(ReturnSheet);
+		});
+		const script = document.head.querySelector('script[src="/return-script.js"]');
+		expect(script).not.toBeNull();
+		expect((script as HTMLScriptElement).async).toBe(true);
+		expect(document.body.querySelector('script')).toBeNull();
+		expect(sheetHrefs()).toEqual(['/return.css']);
+		expect(document.body.querySelector('link')).toBeNull();
+		expect(document.body.textContent).toContain('RS');
+		expect(document.body.textContent).toContain('RL');
+	});
+
 	it('async scripts hoist to head, dedupe by src, and persist', async () => {
 		await act(() => {
 			mountInto(AsyncScript);
@@ -116,9 +133,10 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		resetFloatResourceState();
 	});
 
-	const srv = loadServerFixture(
-		'packages/octane/tests/_fixtures/float-resources.tsrx',
-	) as Record<string, any>;
+	const srv = loadServerFixture('packages/octane/tests/_fixtures/float-resources.tsrx') as Record<
+		string,
+		any
+	>;
 
 	it('SSR folds deduped, precedence-grouped resources into the head output', async () => {
 		const App = () =>

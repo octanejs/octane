@@ -27227,8 +27227,13 @@ function makeRoot(
 					// before surfacing the error, but keep the public root reusable for a
 					// later recovery render. In particular, effects registered before the
 					// throw belong to an aborted render and must never reach a later flush.
+					// A root created with onUncaughtError consumes its own report here
+					// too — the synchronous first mount is still "the flush" for this
+					// render, so the option must not behave differently from a scheduled
+					// render's unhandled error.
 					if (!mountedRoot.disposed) unmountBlock(mountedRoot);
-					throw unhandled;
+					if (!reportUncaughtError(mountedRoot, unhandled)) throw unhandled;
+					return;
 				}
 				root.unmount();
 				return;
@@ -27492,11 +27497,10 @@ export function hydrateRoot(
 		// to the owner, unmount the failed root, and release the container so a
 		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
 		// retry client-remounts). Unowned hydration failures keep their existing
-		// behavior and rethrow untouched.
-		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
-		try {
-			handleRenderError(rootBlock, error);
-		} finally {
+		// behavior and rethrow untouched — unless this root's onUncaughtError
+		// consumes the report, which changes only the reporting: the failed
+		// adoption is released identically and the caller gets a reusable root.
+		const releaseFailedHydration = (): void => {
 			DOM_ROOT_DISPOSERS.delete(rootBlock);
 			unmountBlock(rootBlock, false);
 			drainRefDetaches();
@@ -27507,6 +27511,16 @@ export function hydrateRoot(
 			// its listeners past the island's final teardown.
 			unregisterDelegationTarget(container);
 			releaseRootContainer(container, ownerToken);
+		};
+		if (rendererRegionOwnerForBlock(rootBlock) === null) {
+			if (!reportUncaughtError(rootBlock, error)) throw error;
+			releaseFailedHydration();
+			return makeRoot(container, null, null, null, idState, renderReturnedValue, null, rootOptions);
+		}
+		try {
+			handleRenderError(rootBlock, error);
+		} finally {
+			releaseFailedHydration();
 		}
 		// Routed: hand back an empty lazy root owning NO claim or delegation
 		// registration (both released above); the owner's retry recreates.

@@ -16316,6 +16316,14 @@ function requiresTemplateNormalization(
 		(tag !== 'link' || isHoistableHeadElementNode(node))
 	)
 		return true;
+	// Float SCRIPT resources normalize like hoistable metadata, so a
+	// value-position (`return <jsx>`) tree carrying `<script async src>` enters
+	// template normalization and headResourceKind can partition it (precedence
+	// links are already admitted through the hoistable-link branch above). Gate
+	// on allowHeadHoists like `<title>`: `<script>` is equally ambiguous across
+	// an opaque component boundary (SVG scripting vs a document resource).
+	if (selfNs !== 'svg' && allowHeadHoists && tag === 'script' && headResourceKind(node) !== null)
+		return true;
 
 	const childNs =
 		typeof tag === 'string' && !isComponentTag(node) ? nsForChildren(tag, parentNs) : parentNs;

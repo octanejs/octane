@@ -55,6 +55,22 @@ export function AsyncScriptDuplicate() @{
 	</>
 }
 
+// Return-position (React-style `.tsx` value body) forms: resources must
+// classify through requiresTemplateNormalization exactly like `@{}` bodies.
+export function ReturnScript() {
+	return <>
+		<script async src="/return-script.js" />
+		<div class="rs">{'RS' as string}</div>
+	</>;
+}
+
+export function ReturnSheet() {
+	return <>
+		<link rel="stylesheet" href="/return.css" precedence="default" />
+		<div class="rl">{'RL' as string}</div>
+	</>;
+}
+
 let toggleSheet: ((on: boolean) => void) | null = null;
 export function setSheetVisible(on: boolean): void {
 	toggleSheet!(on);

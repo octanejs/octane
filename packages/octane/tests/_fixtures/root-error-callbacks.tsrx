@@ -30,6 +30,19 @@ export function UncaughtHost() @{
 	</main>
 }
 
+// Throws during the FIRST render — exercises the synchronous initial-mount
+// error path (the first root.render() mounts synchronously in Octane) and the
+// hydration render path, both of which must honor onUncaughtError.
+export function MountThrower() @{
+	{
+		throwOnMount() as string;
+	}
+}
+
+function throwOnMount(): string {
+	throw new Error('mount-boom');
+}
+
 let bumpEffect: (() => void) | null = null;
 export function triggerEffectThrow(): void {
 	bumpEffect!();

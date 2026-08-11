@@ -11,12 +11,13 @@
 // Roots created WITHOUT the options keep today's behavior byte-for-byte; the
 // control tests below pin that.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, createRoot, flushSync } from '../src/index.js';
+import { act, createRoot, hydrateRoot, flushSync } from '../src/index.js';
 import {
 	CaughtHost,
 	UncaughtHost,
 	CaughtEffectHost,
 	UncaughtEffectHost,
+	MountThrower,
 	triggerRenderThrow,
 	triggerEffectThrow,
 } from './_fixtures/root-error-callbacks.tsrx';
@@ -111,6 +112,46 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		// The callback's own throw is reported through console.error, not rethrown.
 		expect(errSpy).toHaveBeenCalled();
 		expect(container.textContent).toBe('');
+	});
+
+	it('onUncaughtError consumes a SYNCHRONOUS first-mount error (first render() mounts sync)', () => {
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		expect(() => root.render(MountThrower, {})).not.toThrow();
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('mount-boom');
+		// The failed tree was discarded and the root stays reusable.
+		expect(container.textContent).toBe('');
+		expect(() => flushSync(() => root.render(CaughtHost, {}))).not.toThrow();
+		expect(container.textContent).toBe('ok');
+		root.unmount();
+	});
+
+	it('control: a synchronous first-mount error without the option still throws', () => {
+		const root = createRoot(container);
+		expect(() => root.render(MountThrower, {})).toThrow('mount-boom');
+		expect(container.textContent).toBe('');
+	});
+
+	it('onUncaughtError consumes a hydration render error (unowned root)', () => {
+		container.innerHTML = '<div>server</div>';
+		const onUncaughtError = vi.fn();
+		let root!: ReturnType<typeof hydrateRoot>;
+		expect(() => {
+			root = hydrateRoot(container, MountThrower, {}, { onUncaughtError });
+		}).not.toThrow();
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('mount-boom');
+		// The failed adoption was released; the returned root stays usable.
+		expect(container.textContent).toBe('');
+		expect(() => flushSync(() => root.render(CaughtHost, {}))).not.toThrow();
+		expect(container.textContent).toBe('ok');
+		root.unmount();
+	});
+
+	it('control: a hydration render error without the option still throws', () => {
+		container.innerHTML = '<div>server</div>';
+		expect(() => hydrateRoot(container, MountThrower, {})).toThrow('mount-boom');
 	});
 
 	// ── Controls: roots WITHOUT the options keep the existing contract ──────────
