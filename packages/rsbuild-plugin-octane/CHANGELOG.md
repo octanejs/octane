@@ -1,5 +1,26 @@
 # @octanejs/rsbuild-plugin
 
+## 0.1.30
+
+### Patch Changes
+
+- 2d06817: Preserve active IME composition and focus through controlled-input updates,
+  keyed reorders, and deferred hydration; improve Samsung Internet and Android
+  browser compatibility, scheduling, and browser build targets.
+- Updated dependencies [50b7988]
+- Updated dependencies [6daa380]
+- Updated dependencies [d2c9e1c]
+- Updated dependencies [01240e6]
+- Updated dependencies [59a35ae]
+- Updated dependencies [a8b432b]
+- Updated dependencies [910c240]
+- Updated dependencies [db5687e]
+- Updated dependencies [e2466a5]
+- Updated dependencies [2d06817]
+  - octane@0.1.35
+  - @octanejs/app-core@0.0.31
+  - @octanejs/rspack-plugin@0.1.30
+
 ## 0.1.29
 
 ### Patch Changes

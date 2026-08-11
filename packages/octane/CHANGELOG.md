@@ -1,5 +1,37 @@
 # octane
 
+## 0.1.35
+
+### Patch Changes
+
+- 50b7988: Cache proven immutable state-array filter projections and skip redundant
+  single-token class updates while preserving controlled field restoration.
+- 6daa380: Start independent asynchronous children in proven bounded keyed lists during
+  the same discovery wave while preserving existing suspense and request reuse.
+- d2c9e1c: Reuse delegated-event accessors and capture paths, and omit redundant component
+  markers for proven exhaustive switch-root components.
+- 01240e6: Speed up universal and Lynx rendering with shared compiled host-template
+  programs, range-based host and listener identities, compiler-proven ownership
+  elision, capability-negotiated compact transport acknowledgements, lazy public
+  handles and query selectors, and lower-allocation reconciliation. Preserve
+  native events, late refs, worklets, lists, portals, first-screen adoption,
+  public handles, and rendered output.
+- 59a35ae: Batch component-owned universal host templates after Lynx first-screen adoption,
+  preserving component hooks, effects, keyed identity, native events, and safe
+  cross-thread public handles while reducing large-list creation overhead.
+- a8b432b: Retain unchanged keyed component subtrees for asynchronous universal renderers,
+  avoiding redundant Lynx row renders while preserving context updates, native
+  listeners, host identity, effect lifetimes, and accepted-commit ordering.
+- 910c240: Specialize proven mixed inline styles so static declarations enter the template
+  and only changed dynamic properties update the DOM.
+- db5687e: Start provably reachable lazy component imports alongside independent suspended
+  work without eagerly loading dormant deferred-hydration islands.
+- e2466a5: Reuse already-warmed asynchronous resources across promoted transition retries
+  without duplicating request creators or exposing partially committed screens.
+- 2d06817: Preserve active IME composition and focus through controlled-input updates,
+  keyed reorders, and deferred hydration; improve Samsung Internet and Android
+  browser compatibility, scheduling, and browser build targets.
+
 ## 0.1.34
 
 ### Patch Changes

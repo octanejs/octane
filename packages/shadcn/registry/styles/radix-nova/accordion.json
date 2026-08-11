@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.29",
-    "@octanejs/radix@0.1.33"
+    "@octanejs/lucide@0.1.30",
+    "@octanejs/radix@0.1.34"
   ],
   "registryDependencies": [
     "@octane/utils"
