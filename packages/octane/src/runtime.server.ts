@@ -5095,8 +5095,10 @@ export function ssrHeadEl(
 	tag: string,
 	attrs: Record<string, unknown> | null,
 	text: unknown,
-): void {
-	if (HEAD === null) return;
+): string {
+	// Returns '' so a NESTED hoist can sit in an html expression (the head write
+	// happens at the authored position; the body markup gains nothing).
+	if (HEAD === null) return '';
 	// Paired ownership comments bound the exact adoption interval; static markup
 	// is non-hydratable, so both are omitted there.
 	const rootSuffix = HEAD.rootSuffix;
@@ -5117,6 +5119,7 @@ export function ssrHeadEl(
 	}
 	if (MARKERS) s += '<!--/' + ownershipKey + '-->';
 	HEAD.html += s;
+	return '';
 }
 
 interface NamespaceHeadProps {
@@ -6053,6 +6056,47 @@ export async function prerender(
 		nonceAttr,
 		options?.headChannel === 'separate',
 	);
+}
+
+/**
+ * Stream variant of {@link prerender}, mirroring React's `prerenderToNodeStream`
+ * semantics: the promise resolves only after the await-everything render fully
+ * completes, and `prelude` is the transport for the COMPLETE document bytes —
+ * the deduped scoped-style tags first, then the folded html (the order a
+ * streamed shell serves). There is no `postponed` field: Octane has no
+ * postpone/resume protocol (a documented non-goal). `node:stream` loads
+ * lazily on call, so edge bundles that never invoke this pay nothing.
+ * `headChannel: 'separate'` has no channel to land in here and is ignored
+ * (the head folds), with a development diagnostic.
+ */
+export async function prerenderToNodeStream(
+	entryComponent: ServerEntryComponent,
+	props?: any,
+	options?: RenderOptions,
+): Promise<{ prelude: import('node:stream').Readable }> {
+	let resolved = options;
+	if (options?.headChannel === 'separate') {
+		if (process.env.NODE_ENV !== 'production') {
+			console.error(
+				"prerenderToNodeStream() streams one document and has no separate head channel; headChannel: 'separate' was ignored. Use prerender() for a split head.",
+			);
+		}
+		resolved = { ...options, headChannel: undefined };
+	}
+	const result = await prerender(entryComponent, props, resolved);
+	// The server runtime must bundle for platform-neutral (edge) targets — see
+	// ssr-production-bundle.test.ts — so the node-only dependency resolves at
+	// RUNTIME through process.getBuiltinModule (a plain call no bundler follows,
+	// evaluated only when this node-only API is actually invoked).
+	const getBuiltin = (globalThis as any).process?.getBuiltinModule as
+		((id: string) => any) | undefined;
+	if (getBuiltin === undefined) throw new Error(formatServerError(57));
+	const { Readable } = getBuiltin('node:stream');
+	const chunks: Uint8Array[] = [];
+	const encoder = new TextEncoder();
+	if (result.css !== '') chunks.push(encoder.encode(result.css));
+	chunks.push(encoder.encode(result.html));
+	return { prelude: Readable.from(chunks, { objectMode: false }) };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7959,10 +8003,36 @@ function coerceHintHref(href: unknown): string | null {
 }
 
 /** React DOM `preload(href, {as, …})`. */
+/** Malformed-hint diagnostics (dev only; the call stays a no-op either way). */
+function warnHintUsage(message: string): void {
+	if (process.env.NODE_ENV !== 'production') console.error(message);
+}
+
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
 	const value = coerceHintHref(href);
-	if (value === null || !options?.as) return;
-	const key = 'preload:' + options.as + ':' + value;
+	if (value === null) {
+		warnHintUsage('preload() requires a non-empty string href; the call was ignored.');
+		return;
+	}
+	if (!options?.as || typeof options.as !== 'string') {
+		warnHintUsage(
+			'preload() requires a string `as` option (e.g. "style", "script", "font", "image"); ' +
+				'the call was ignored.',
+		);
+		return;
+	}
+	const as = options.as;
+	// Mirror the client's one-way upgrade: once the matching resource is live in
+	// this pass (Float resource or preinit), the preload adds nothing.
+	if (HEAD !== null) {
+		if (as === 'style' && HEAD.hints.has('sheet:' + value)) return;
+		if (as === 'script' && HEAD.hints.has('script:' + value)) return;
+	}
+	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
+	const key =
+		typeof imageSrcSet === 'string' && imageSrcSet !== ''
+			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
+			: 'preload:' + as + ':' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(
 		key,
@@ -7977,28 +8047,37 @@ export function preload(href: string, options: { as: string } & Record<string, u
 }
 
 /** React DOM `preinit(href, {as: 'style'|'script', …})`. */
+/**
+ * React DOM `preinit(href, {as, …})` — routes through the Float resource emits
+ * so preinit and the rendered resource forms share ONE identity per pass
+ * (stylesheets join the precedence groups; scripts dedupe against
+ * `<script async src>`), mirroring the client.
+ */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
 	const value = coerceHintHref(href);
-	if (value === null || !options?.as) return;
-	const key = 'preinit:' + options.as + ':' + value;
-	const safeHref = sanitizeURL(value);
-	const hint = ' data-oct-hint="' + escapeAttr(key) + '"';
-	emitHeadHint(
-		key,
-		options.as === 'style'
-			? '<link rel="stylesheet" href="' +
-					escapeAttr(safeHref) +
-					'"' +
-					hintAttrs(options, true, 'link') +
-					hint +
-					'>'
-			: '<script src="' +
-					escapeAttr(safeHref) +
-					'" async' +
-					hintAttrs(options, true, 'script') +
-					hint +
-					'></script>',
-	);
+	if (value === null) {
+		warnHintUsage('preinit() requires a non-empty string href; the call was ignored.');
+		return;
+	}
+	const as = options?.as;
+	if (as !== 'style' && as !== 'script') {
+		warnHintUsage(
+			'preinit() supports only as: "style" or "script" (got ' +
+				JSON.stringify(as) +
+				'); the call was ignored. Use preload() for other destinations.',
+		);
+		return;
+	}
+	if (as === 'style') {
+		ssrStylesheetResource({
+			...options,
+			as: undefined,
+			href: value,
+			precedence: (options as any).precedence ?? 'default',
+		});
+	} else {
+		ssrScriptResource({ ...options, as: undefined, href: undefined, src: value });
+	}
 }
 
 /** React DOM `preconnect(href, {crossOrigin?})`. */
@@ -8054,12 +8133,12 @@ function resourceAttrs(attrs: Record<string, unknown>, tag: 'link' | 'script'): 
  * Dedupes by href across the pass; groups by precedence in first-encounter
  * order (the HeadBuffer.sheets Map), folded after the ordinary head content.
  */
-export function ssrStylesheetResource(attrs: Record<string, unknown> | null): void {
-	if (HEAD === null || attrs == null) return;
+export function ssrStylesheetResource(attrs: Record<string, unknown> | null): string {
+	if (HEAD === null || attrs == null) return '';
 	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
+	if (typeof href !== 'string' || href === '') return '';
 	const key = 'sheet:' + href;
-	if (HEAD.hints.has(key)) return;
+	if (HEAD.hints.has(key)) return '';
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -8072,6 +8151,7 @@ export function ssrStylesheetResource(attrs: Record<string, unknown> | null): vo
 		'>';
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
+	return '';
 }
 
 /**
@@ -8081,10 +8161,10 @@ export function ssrStylesheetResource(attrs: Record<string, unknown> | null): vo
  * not decode inside style raw text), so content that could close the tag fails
  * closed with a dev diagnostic instead of truncating the document.
  */
-export function ssrStyleResource(attrs: Record<string, unknown> | null, css: string): void {
-	if (HEAD === null || attrs == null) return;
+export function ssrStyleResource(attrs: Record<string, unknown> | null, css: string): string {
+	if (HEAD === null || attrs == null) return '';
 	const href = attrs.href;
-	if (typeof href !== 'string' || href === '') return;
+	if (typeof href !== 'string' || href === '') return '';
 	if (/<\/style/i.test(css)) {
 		if (process.env.NODE_ENV !== 'production') {
 			console.error(
@@ -8092,10 +8172,10 @@ export function ssrStyleResource(attrs: Record<string, unknown> | null, css: str
 					'serialized safely; the resource was skipped. Load it as a stylesheet link instead.',
 			);
 		}
-		return;
+		return '';
 	}
 	const key = 'sheet:' + href;
-	if (HEAD.hints.has(key)) return;
+	if (HEAD.hints.has(key)) return '';
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -8110,15 +8190,16 @@ export function ssrStyleResource(attrs: Record<string, unknown> | null, css: str
 		'</style>';
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
+	return '';
 }
 
 /** Compiler target for `<script async src>` resources (React Float). */
-export function ssrScriptResource(attrs: Record<string, unknown> | null): void {
-	if (HEAD === null || attrs == null) return;
+export function ssrScriptResource(attrs: Record<string, unknown> | null): string {
+	if (HEAD === null || attrs == null) return '';
 	const src = attrs.src;
-	if (typeof src !== 'string' || src === '') return;
+	if (typeof src !== 'string' || src === '') return '';
 	const key = 'script:' + src;
-	if (HEAD.hints.has(key)) return;
+	if (HEAD.hints.has(key)) return '';
 	HEAD.hints.add(key);
 	HEAD.html +=
 		'<script src="' +
@@ -8126,12 +8207,15 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): void {
 		'" async data-oct-res=""' +
 		resourceAttrs(attrs, 'script') +
 		'></script>';
+	return '';
 }
 
 /** React DOM `preloadModule(href, options?)` — `<link rel="modulepreload">`, keyed by href. */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
 	const value = coerceHintHref(href);
 	if (value === null) return;
+	// A module that preinitModule already executed in this pass needs no preload.
+	if (HEAD !== null && HEAD.hints.has('module:' + value)) return;
 	const key = 'modulepreload:' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(

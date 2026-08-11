@@ -9,11 +9,18 @@
  * `renderToString` (single sync pass, fallbacks for suspended boundaries) and
  * the streaming APIs.
  *
- * `prerenderToNodeStream` is not implemented yet (tracked as planned work in the
- * React-parity ledger). React 19.2's partial pre-rendering — `resume`,
- * `resumeAndPrerender`, and the postpone/prelude protocol — is a documented
- * non-goal: that request protocol is not part of Octane's public SSR surface,
- * and `prerender` here resolves `{ html, css }` rather than React's
- * `{ prelude: ReadableStream }`.
+ * `prerenderToNodeStream` mirrors React's shape: it resolves only after the
+ * await-everything render completes, and `prelude` streams the COMPLETE
+ * document bytes (scoped-style tags, then the folded html). React 19.2's
+ * partial pre-rendering — `resume`, `resumeAndPrerender`, and the
+ * postpone/prelude-with-holes protocol — is a documented non-goal: that
+ * request protocol is not part of Octane's public SSR surface, so there is no
+ * `postponed` field and the buffered `prerender` resolves `{ html, css }`
+ * rather than React's `{ prelude: ReadableStream }`.
  */
-export { prerender, type RenderResult, type RenderOptions } from '../runtime.server.js';
+export {
+	prerender,
+	prerenderToNodeStream,
+	type RenderResult,
+	type RenderOptions,
+} from '../runtime.server.js';

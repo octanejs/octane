@@ -1281,6 +1281,11 @@
       "message": "Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "57": {
+      "message": "prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

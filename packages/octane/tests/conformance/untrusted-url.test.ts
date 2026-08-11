@@ -344,11 +344,16 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 			as: 'image',
 			src: UNSAFE_URL,
 		});
-		const coercionClientHints = Array.from(
-			document.head.querySelectorAll('[data-oct-hint]'),
-		).filter((element) =>
-			element.getAttribute('data-oct-hint')?.includes('https://safe.example/client-'),
-		);
+		const coercionClientHints = [
+			...Array.from(document.head.querySelectorAll('[data-oct-hint]')).filter((element) =>
+				element.getAttribute('data-oct-hint')?.includes('https://safe.example/client-'),
+			),
+			// preinit(as: 'style') is a stylesheet RESOURCE (it shares the Float
+			// identity model), so its tag carries data-precedence, not a hint key.
+			...Array.from(
+				document.head.querySelectorAll('link[rel="stylesheet"][data-precedence]'),
+			).filter((element) => element.getAttribute('href')?.includes('https://safe.example/client-')),
+		];
 		try {
 			expect(clientPreload.calls()).toBe(1);
 			expect(clientPreinit.calls()).toBe(1);

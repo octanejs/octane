@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 57,
+  "nextCode": 58,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -336,6 +336,12 @@
       "message": "Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.",
       "argumentCount": 0,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "57": {
+      "message": "prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.",
+      "argumentCount": 0,
+      "runtime": ["server"],
       "status": "active"
     }
   }

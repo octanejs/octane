@@ -34,6 +34,7 @@ type ServerErrorArguments = {
 	45: [];
 	47: [unknown];
 	48: [unknown];
+	57: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -150,6 +151,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 48:
 				return formatDevErrorMessage(
 					'octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.',
+					args,
+				);
+			case 57:
+				return formatDevErrorMessage(
+					'prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.',
 					args,
 				);
 			default:
