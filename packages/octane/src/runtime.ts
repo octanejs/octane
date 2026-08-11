@@ -2921,21 +2921,25 @@ function drainQueue(): { err: any } | null {
 				// No tryBlock claimed this error. Don't let it abandon the rest of
 				// the queue or skip commit — that would strand unrelated roots
 				// batched into the same flush and drop their already-rendered
-				// effects. Collect them all; a multi-root flush with several
-				// unhandled errors surfaces an AggregateError (React parity), a
-				// single one rethrows as-is.
-				if (pendingError === null) pendingError = { err: unhandled, all: [unhandled] };
-				else {
-					pendingError.all.push(unhandled);
-					pendingError.err =
-						typeof AggregateError === 'function'
-							? new AggregateError(pendingError.all, formatClientError(13))
-							: pendingError.all[0];
+				// effects. A root created with onUncaughtError consumes its own
+				// report; otherwise collect them all — a multi-root flush with
+				// several unhandled errors surfaces an AggregateError (React
+				// parity), a single one rethrows as-is.
+				if (!reportUncaughtError(block, unhandled)) {
+					if (pendingError === null) pendingError = { err: unhandled, all: [unhandled] };
+					else {
+						pendingError.all.push(unhandled);
+						pendingError.err =
+							typeof AggregateError === 'function'
+								? new AggregateError(pendingError.all, formatClientError(13))
+								: pendingError.all[0];
+					}
 				}
 				// React 19 contract: an error no boundary handles unmounts the
 				// ENTIRE tree of the failed root — known-broken UI never stays on
 				// screen (ReactIncrementalErrorHandling:1338/:712). Only the
 				// offending root is torn down; unrelated roots keep draining.
+				// onUncaughtError replaces the report, not the recovery.
 				let root: Block = block;
 				while (root.parentBlock !== null) root = root.parentBlock;
 				if (root.kind === 'root' && !root.disposed) unmountBlock(root);
@@ -3823,8 +3827,10 @@ function drainRefAttaches(): void {
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(r.block);
-			if (handler) handler(err);
-			else console.error(err);
+			if (handler) {
+				handler(err);
+				reportCaughtError(r.block, err);
+			} else if (!reportUncaughtError(r.block, err)) console.error(err);
 		}
 	}
 }
@@ -4174,8 +4180,10 @@ function fireEffectCleanup(e: PendingEffect): void {
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(e.scope.block);
-			if (handler) handler(err);
-			else console.error(err);
+			if (handler) {
+				handler(err);
+				reportCaughtError(e.scope.block, err);
+			} else if (!reportUncaughtError(e.scope.block, err)) console.error(err);
 		}
 	}
 }
@@ -4203,8 +4211,10 @@ function runEffectBody(e: PendingEffect): void {
 		if (err instanceof MaximumUpdateDepthError) throw err;
 		// Route effect errors to the nearest enclosing tryBlock, if any.
 		const handler = findTryHandler(e.scope.block);
-		if (handler) handler(err);
-		else console.error(err);
+		if (handler) {
+			handler(err);
+			reportCaughtError(e.scope.block, err);
+		} else if (!reportUncaughtError(e.scope.block, err)) console.error(err);
 		return;
 	}
 	if (typeof cleanup === 'function') {
@@ -10228,6 +10238,7 @@ class HydrationCapability {
 
 	/** Give up root adoption after an unframed return/fragment mismatch. */
 	abandonRoot(expected: string, actual: string, loc?: string): void {
+		noteRecoverableHydrationError(() => new Error(formatClientError(52)));
 		if (loc) warnHydrationStructuralMismatch(loc, expected, actual);
 		let node = this.node;
 		while (node !== null) {
@@ -10304,6 +10315,7 @@ class HydrationCapability {
 				? !hydrationNodeMatches(cursor, template, partialStyles)
 				: !lazyRootMatches(cursor, lazy!))
 		) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (template === null) template = resolveLazyTemplate(lazy!);
 			if (process.env.NODE_ENV !== 'production' && loc)
 				warnHydrationStructuralMismatch(
@@ -10352,6 +10364,7 @@ class HydrationCapability {
 		)
 			remainder = remainder.nextSibling;
 		if (remainder === null) return;
+		noteRecoverableHydrationError(() => new Error(formatClientError(53)), this.rootBlock);
 		warnHydrationStructuralMismatch(
 			componentSourceLoc(this.rootBlock.body),
 			'the end of the root',
@@ -10407,12 +10420,15 @@ class HydrationCapability {
 		// text so recovery succeeds, but publish the normal dev diagnostic. A
 		// suppressed host keeps the absent server value by installing only an empty
 		// tracking node; later real commits can update that node normally.
-		if (text !== '' && !suppressed && process.env.NODE_ENV !== 'production') {
-			warnHydrationStructuralMismatch(
-				host && (host as any).__oct_loc,
-				`text ${JSON.stringify(text)}`,
-				describeHydrationNode(posNode),
-			);
+		if (text !== '' && !suppressed) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(54)));
+			if (process.env.NODE_ENV !== 'production') {
+				warnHydrationStructuralMismatch(
+					host && (host as any).__oct_loc,
+					`text ${JSON.stringify(text)}`,
+					describeHydrationNode(posNode),
+				);
+			}
 		}
 		const created = document.createTextNode(suppressed ? '' : text);
 		if (posNode !== null && posNode.parentNode !== null) {
@@ -16730,6 +16746,7 @@ function componentSlotImpl(
 				// rather than adopting an unrelated sibling.
 				const stale = hydrationCursor;
 				const loc = siteLoc(parentScope, slotKey);
+				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
 				if (process.env.NODE_ENV !== 'production' && loc) {
 					warnHydrationStructuralMismatch(loc, 'a component range', describeHydrationNode(stale));
 				}
@@ -18667,6 +18684,7 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 			// STRUCTURAL mismatch — mirror hostElementBody's recovery: warn, discard
 			// the divergent server node/range, then build fresh with hydration
 			// SUSPENDED for the subtree (children client-mount, not mis-adopt).
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (process.env.NODE_ENV !== 'production') {
 				const mmLoc = (hydration.node.parentNode as any)?.__oct_loc;
 				if (mmLoc) hydration.warnStructural(mmLoc, `<${tag}>`, hydration.describe(hydration.node));
@@ -23527,8 +23545,10 @@ function handleRenderError(block: Block, err: any): void {
 		throw err;
 	}
 	const h = findTryHandler(block);
-	if (h) h(err);
-	else throw err;
+	if (h) {
+		h(err);
+		reportCaughtError(block, err);
+	} else throw err;
 }
 
 // ---------------------------------------------------------------------------
@@ -25273,6 +25293,7 @@ export function fastMapSlot(
 function discardLeftoverHydrationItems(end: Node, hydration: HydrationCapability): void {
 	const n = hydration.node;
 	if (n === null || n === end || n.parentNode !== end.parentNode) return;
+	noteRecoverableHydrationError(() => new Error(formatClientError(56)));
 	removeRange(n, end);
 }
 
@@ -26833,6 +26854,123 @@ export interface RootOptions {
 	 * client-root namespace; hydrateRoot uses it verbatim to match server output.
 	 */
 	identifierPrefix?: string;
+	/**
+	 * React 19 parity, reporting only: called after an error boundary
+	 * (`@try`/`@catch` or `<ErrorBoundary>`) claims an error from this root's
+	 * render, passive-effect, or ref-attach channel. Octane passes only the
+	 * error — there is no `errorInfo`/`componentStack` second argument (owner
+	 * stacks are not part of Octane's API, matching the SSR `onError` shape).
+	 * Deletion-phase teardown errors keep their existing boundary routing and
+	 * default report; they do not reach this callback.
+	 */
+	onCaughtError?: (error: unknown) => void;
+	/**
+	 * React 19 parity: called for an error no boundary claims. When provided it
+	 * REPLACES the default report for this root (render errors stop rethrowing
+	 * out of the flush; effect-channel errors stop reaching console.error).
+	 * Recovery semantics are unchanged either way — an uncaught render error
+	 * still unmounts the failed root's entire tree.
+	 */
+	onUncaughtError?: (error: unknown) => void;
+	/**
+	 * React 19 parity, hydration only: called (dev AND prod) after hydration
+	 * recovered from a structural server/client mismatch — a rebuilt subtree or
+	 * a discarded stale server range — coalesced to one report per root per
+	 * microtask burst. Attribute-level value patches do not report: production
+	 * React hydration does not detect those at all, so Octane's finer-grained
+	 * recovery stays quiet to keep the report channel comparable.
+	 */
+	onRecoverableError?: (error: unknown) => void;
+}
+
+/**
+ * Handlers live OFF the Block shape: registered only for roots created with at
+ * least one callback, so every other root pays a single null check on the
+ * (already cold) error paths and Block's monomorphic layout is untouched.
+ */
+interface RootErrorHandlers {
+	onCaughtError: ((error: unknown) => void) | undefined;
+	onUncaughtError: ((error: unknown) => void) | undefined;
+	onRecoverableError: ((error: unknown) => void) | undefined;
+}
+
+let ROOT_ERROR_HANDLERS: WeakMap<Block, RootErrorHandlers> | null = null;
+
+function registerRootErrorHandlers(root: Block, options: RootOptions | undefined): void {
+	if (options === undefined) return;
+	const { onCaughtError, onUncaughtError, onRecoverableError } = options;
+	if (
+		onCaughtError === undefined &&
+		onUncaughtError === undefined &&
+		onRecoverableError === undefined
+	) {
+		return;
+	}
+	(ROOT_ERROR_HANDLERS ??= new WeakMap()).set(root, {
+		onCaughtError,
+		onUncaughtError,
+		onRecoverableError,
+	});
+}
+
+function rootErrorHandlersFor(block: Block | null): RootErrorHandlers | null {
+	if (ROOT_ERROR_HANDLERS === null || block === null) return null;
+	let b: Block = block;
+	while (b.parentBlock !== null) b = b.parentBlock;
+	return ROOT_ERROR_HANDLERS.get(b) ?? null;
+}
+
+/** A throwing report callback must not corrupt recovery — report it and move on. */
+function invokeRootErrorHandler(handler: (error: unknown) => void, err: unknown): void {
+	try {
+		handler(err);
+	} catch (handlerErr) {
+		console.error(handlerErr);
+	}
+}
+
+/** Report a boundary-claimed error to the owning root's onCaughtError, if any. */
+function reportCaughtError(block: Block | null, err: unknown): void {
+	const h = rootErrorHandlersFor(block)?.onCaughtError;
+	if (h !== undefined) invokeRootErrorHandler(h, err);
+}
+
+/** True when the owning root's onUncaughtError consumed the report (callers skip their default). */
+function reportUncaughtError(block: Block | null, err: unknown): boolean {
+	const h = rootErrorHandlersFor(block)?.onUncaughtError;
+	if (h === undefined) return false;
+	invokeRootErrorHandler(h, err);
+	return true;
+}
+
+/** Roots with a recoverable-error report already queued for this microtask burst. */
+let RECOVERABLE_REPORTED: WeakSet<Block> | null = null;
+
+/**
+ * Note a structural hydration recovery for onRecoverableError. Runs at the
+ * recovery sites themselves (dev AND prod), so it must stay near-free when no
+ * root registered the callback: one module-null check. Call sites pass a thunk
+ * constructing `new Error(formatClientError(<literal>))` so the production
+ * error-code audit holds and no Error is allocated unless a report actually
+ * fires. `block` defaults to the currently rendering block — hydration
+ * recovery always runs under the mount that discovered the mismatch — and the
+ * report is delivered on a microtask so a user callback can never re-enter the
+ * in-progress hydration walk.
+ */
+function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
+	if (ROOT_ERROR_HANDLERS === null) return;
+	const from = block ?? CURRENT_BLOCK;
+	const h = rootErrorHandlersFor(from)?.onRecoverableError;
+	if (h === undefined) return;
+	let root = from!;
+	while (root.parentBlock !== null) root = root.parentBlock;
+	const reported = (RECOVERABLE_REPORTED ??= new WeakSet());
+	if (reported.has(root)) return;
+	reported.add(root);
+	queueMicrotask(() => {
+		reported.delete(root);
+		invokeRootErrorHandler(h, makeError());
+	});
 }
 
 // One live public root owns a container at a time. React still returns a second
@@ -26943,6 +27081,7 @@ function makeRoot(
 	idState: RootIdState,
 	outputHandler: OutputHandler | null,
 	ownerToken: object | null,
+	errorOptions?: RootOptions,
 ): Root {
 	let root!: Root;
 	let unmounted = false;
@@ -27053,6 +27192,7 @@ function makeRoot(
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
+			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 				__devtoolsSetNameResolver(componentName);
@@ -27087,8 +27227,13 @@ function makeRoot(
 					// before surfacing the error, but keep the public root reusable for a
 					// later recovery render. In particular, effects registered before the
 					// throw belong to an aborted render and must never reach a later flush.
+					// A root created with onUncaughtError consumes its own report here
+					// too — the synchronous first mount is still "the flush" for this
+					// render, so the option must not behave differently from a scheduled
+					// render's unhandled error.
 					if (!mountedRoot.disposed) unmountBlock(mountedRoot);
-					throw unhandled;
+					if (!reportUncaughtError(mountedRoot, unhandled)) throw unhandled;
+					return;
 				}
 				root.unmount();
 				return;
@@ -27181,6 +27326,7 @@ function createRootWithOutputHandler(
 		},
 		outputHandler,
 		ownerToken,
+		options,
 	);
 }
 
@@ -27279,6 +27425,7 @@ export function hydrateRoot(
 		next: 0,
 	};
 	rootBlock.idState = idState;
+	registerRootErrorHandlers(rootBlock, rootOptions);
 	let hydrationCompleted = false;
 	let seeds: unknown[] | null = null;
 	// The root-local counter starts at zero, matching the server render carrying
@@ -27350,8 +27497,28 @@ export function hydrateRoot(
 		// to the owner, unmount the failed root, and release the container so a
 		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
 		// retry client-remounts). Unowned hydration failures keep their existing
-		// behavior and rethrow untouched.
-		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
+		// behavior and rethrow untouched — unless this root's onUncaughtError
+		// consumes the report. Consumption changes only the reporting: the failed
+		// adoption is discarded like createRoot's sync-mount failure, and the
+		// returned root KEEPS this pass's container claim and delegation
+		// registration because the caller renders into it directly — there is no
+		// host retry to re-register them.
+		if (rendererRegionOwnerForBlock(rootBlock) === null) {
+			if (!reportUncaughtError(rootBlock, error)) throw error;
+			unmountBlock(rootBlock, false);
+			drainRefDetaches();
+			container.textContent = '';
+			return makeRoot(
+				container,
+				null,
+				null,
+				null,
+				idState,
+				renderReturnedValue,
+				ownerToken,
+				rootOptions,
+			);
+		}
 		try {
 			handleRenderError(rootBlock, error);
 		} finally {
@@ -27368,7 +27535,7 @@ export function hydrateRoot(
 		}
 		// Routed: hand back an empty lazy root owning NO claim or delegation
 		// registration (both released above); the owner's retry recreates.
-		return makeRoot(container, null, null, null, idState, renderReturnedValue, null);
+		return makeRoot(container, null, null, null, idState, renderReturnedValue, null, rootOptions);
 	} finally {
 		currentHydration = previousHydration;
 	}
@@ -27382,7 +27549,16 @@ export function hydrateRoot(
 	// the root behaves exactly like a `createRoot` root — a `.render()` with the
 	// same component updates props on the adopted DOM (same-body fast path), a
 	// different component tears down and remounts.
-	return makeRoot(container, rootBlock, body, rootKey, idState, renderReturnedValue, ownerToken);
+	return makeRoot(
+		container,
+		rootBlock,
+		body,
+		rootKey,
+		idState,
+		renderReturnedValue,
+		ownerToken,
+		rootOptions,
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -27485,4 +27661,165 @@ export function prefetchDNS(href: string): void {
 		l.href = safeHref;
 		return l;
 	});
+}
+
+/**
+ * React DOM `preloadModule(href, options?)` — `<link rel="modulepreload">`.
+ * Module preloads dedupe by href alone (React's resource identity for modules);
+ * options apply as attributes through the shared lenient pass-through.
+ */
+export function preloadModule(href: string, options?: Record<string, unknown>): void {
+	if (!href) return;
+	const rawHref = typeof href === 'string' ? href : String(href);
+	const safeHref = sanitizeURL(rawHref);
+	insertHeadHint('modulepreload:' + rawHref, () => {
+		const l = document.createElement('link');
+		l.rel = 'modulepreload';
+		l.href = safeHref;
+		applyHintAttrs(l, options);
+		return l;
+	});
+}
+
+/**
+ * React DOM `preinitModule(href, options?)` — `<script type="module" async src>`.
+ * Only the `script` destination exists for module preinit (React's contract);
+ * any other `as` fails closed as a no-op rather than executing the module.
+ */
+export function preinitModule(
+	href: string,
+	options?: { as?: string } & Record<string, unknown>,
+): void {
+	if (!href) return;
+	if ((options?.as ?? 'script') !== 'script') return;
+	const rawHref = typeof href === 'string' ? href : String(href);
+	const safeHref = sanitizeURL(rawHref);
+	insertHeadHint('module:' + rawHref, () => {
+		const s = document.createElement('script');
+		s.type = 'module';
+		(s as HTMLScriptElement).src = safeHref;
+		(s as HTMLScriptElement).async = true;
+		applyHintAttrs(s, options ? { ...options, as: undefined } : undefined);
+		return s;
+	});
+}
+
+// ---------------------------------------------------------------------------
+// React Float resources — `<link rel="stylesheet" href precedence>` and
+// `<script async src>` rendered at a component's body root. Unlike per-site
+// hoisted head elements (headBlock), a resource is GLOBAL: keyed by href/src,
+// deduped across the whole page, stylesheet groups ordered by precedence
+// (first-encounter group order, appended within a group), and RETAINED after
+// unmount — unloading a stylesheet or re-running a script is never safe, so
+// React never removes resources and neither does Octane. Suspend-until-loaded
+// ("suspensey" commit) is deliberately out of scope. The first client call
+// seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
+// so hydration never duplicates.
+// ---------------------------------------------------------------------------
+
+interface ResourceState {
+	sheets: Set<string>;
+	scripts: Set<string>;
+	/** Last live element of each stylesheet precedence group. */
+	tails: Map<string, Element>;
+	/** Tail of the LAST group in document order — where a new group starts. */
+	lastTail: Element | null;
+}
+
+let _resourceState: ResourceState | null = null;
+
+function resourceState(): ResourceState {
+	if (_resourceState !== null) return _resourceState;
+	const state: ResourceState = {
+		sheets: new Set(),
+		scripts: new Set(),
+		tails: new Map(),
+		lastTail: null,
+	};
+	if (typeof document !== 'undefined') {
+		const links = document.querySelectorAll('link[rel="stylesheet"][data-precedence]');
+		for (let i = 0; i < links.length; i++) {
+			const el = links[i];
+			const href = el.getAttribute('href');
+			if (href !== null) state.sheets.add(href);
+			state.tails.set(el.getAttribute('data-precedence') as string, el);
+			state.lastTail = el;
+		}
+		const scripts = document.querySelectorAll('script[data-oct-res]');
+		for (let i = 0; i < scripts.length; i++) {
+			const src = scripts[i].getAttribute('src');
+			if (src !== null) state.scripts.add(src);
+		}
+	}
+	return (_resourceState = state);
+}
+
+/** Handled by the resource insert itself; everything else applies as an attribute. */
+const RESOURCE_OWN_ATTRS = new Set(['precedence', 'href', 'src', 'rel', 'async']);
+
+function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
+	for (const k in attrs) {
+		if (RESOURCE_OWN_ATTRS.has(k)) continue;
+		const v = (attrs as any)[k];
+		if (v == null || v === false || typeof v === 'function') continue;
+		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
+		el.setAttribute(name, sanitizeURLAttribute(el.localName, name, v === true ? '' : String(v)));
+	}
+}
+
+/** Compiler target for `<link rel="stylesheet" href precedence>` (React Float). */
+export function stylesheetResource(attrs: Record<string, unknown> | null): void {
+	if (typeof document === 'undefined' || attrs == null) return;
+	const href = attrs.href;
+	if (typeof href !== 'string' || href === '') return;
+	const state = resourceState();
+	// First instance wins, including its non-key props — matching React's
+	// resource identity (later differing props do not retarget a live sheet).
+	if (state.sheets.has(href)) return;
+	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const l = document.createElement('link');
+	l.rel = 'stylesheet';
+	l.href = sanitizeURL(href);
+	l.setAttribute('data-precedence', precedence);
+	applyResourceAttrs(l, attrs);
+	const tail = state.tails.get(precedence);
+	if (tail !== undefined && tail.isConnected) {
+		// Existing group: append after its current tail.
+		tail.after(l);
+		if (state.lastTail === tail) state.lastTail = l;
+	} else if (state.lastTail !== null && state.lastTail.isConnected) {
+		// New group: starts after the last existing group, keeping groups
+		// contiguous in first-encounter order.
+		state.lastTail.after(l);
+		state.lastTail = l;
+	} else {
+		document.head.appendChild(l);
+		state.lastTail = l;
+	}
+	state.tails.set(precedence, l);
+	state.sheets.add(href);
+}
+
+/**
+ * TEST-ONLY: forget all Float resource identity (this repo's test isolation).
+ * Resources are page-global by contract — a real page never resets them.
+ */
+export function resetFloatResourceState(): void {
+	_resourceState = null;
+}
+
+/** Compiler target for `<script async src>` resources (React Float). */
+export function scriptResource(attrs: Record<string, unknown> | null): void {
+	if (typeof document === 'undefined' || attrs == null) return;
+	const src = attrs.src;
+	if (typeof src !== 'string' || src === '') return;
+	const state = resourceState();
+	if (state.scripts.has(src)) return;
+	const s = document.createElement('script');
+	(s as HTMLScriptElement).src = sanitizeURL(src);
+	(s as HTMLScriptElement).async = true;
+	s.setAttribute('data-oct-res', '');
+	applyResourceAttrs(s, attrs);
+	document.head.appendChild(s);
+	state.scripts.add(src);
 }

@@ -1454,6 +1454,7 @@ function collectOctaneBoundaryNames(astBody) {
 				(imported === 'Suspense' ||
 					imported === 'ErrorBoundary' ||
 					imported === 'Activity' ||
+					imported === 'unstable_Activity' ||
 					imported === 'Hydrate' ||
 					imported === 'ViewTransition' ||
 					imported === 'unstable_ViewTransition') &&
@@ -5493,7 +5494,8 @@ function containsAutoMemoUnsafeStructure(stmts) {
 				name === 'Suspense' ||
 				name === 'ErrorBoundary' ||
 				name === 'ViewTransition' ||
-				name === 'Activity'
+				name === 'Activity' ||
+				name === 'unstable_Activity'
 			) {
 				found = true;
 				return;
@@ -16326,6 +16328,14 @@ function requiresTemplateNormalization(
 		(tag !== 'link' || isHoistableHeadElementNode(node))
 	)
 		return true;
+	// Float SCRIPT resources normalize like hoistable metadata, so a
+	// value-position (`return <jsx>`) tree carrying `<script async src>` enters
+	// template normalization and headResourceKind can partition it (precedence
+	// links are already admitted through the hoistable-link branch above). Gate
+	// on allowHeadHoists like `<title>`: `<script>` is equally ambiguous across
+	// an opaque component boundary (SVG scripting vs a document resource).
+	if (selfNs !== 'svg' && allowHeadHoists && tag === 'script' && headResourceKind(node) !== null)
+		return true;
 
 	const childNs =
 		typeof tag === 'string' && !isComponentTag(node) ? nsForChildren(tag, parentNs) : parentNs;
@@ -18202,6 +18212,64 @@ function isHoistableHeadElementNode(n) {
 	return true;
 }
 
+// React Float RESOURCES: `<link rel="stylesheet" href precedence>` (no
+// load/error handlers) and `<script async src>` (no children/handlers) are not
+// per-site head elements but GLOBAL, href/src-keyed resources — hoisted,
+// deduped, precedence-ordered (stylesheets), and never removed on unmount.
+// Classification is static, like the rest of the head-hoist model: a
+// spread-carried `precedence`/`async` keeps the ordinary element path.
+/** @param {any} n @returns {'stylesheet'|'script'|null} */
+function headResourceKind(n) {
+	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return null;
+	const tag = jsxTagName(n) || elementTagName(n);
+	if (tag !== 'link' && tag !== 'script') return null;
+	const attrs = n.attributes || n.openingElement?.attributes || [];
+	let hasPrecedence = false;
+	let relStylesheet = false;
+	let hasHref = false;
+	let hasAsync = false;
+	let hasSrc = false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		const name = jsxAttrRawName(attr);
+		// Handlers keep the element per-site (matching React: a load/error
+		// listener needs an owned instance); markup injection disqualifies too.
+		if (name === 'onLoad' || name === 'onError' || name === 'dangerouslySetInnerHTML') return null;
+		if (name === 'precedence') hasPrecedence = true;
+		else if (name === 'href') hasHref = true;
+		else if (name === 'async') {
+			// A statically-false `async={false}` is not an async script; any other
+			// form (bare, true, or a dynamic expression) classifies as a resource.
+			const val = attr.value;
+			const inner = val && val.type === 'JSXExpressionContainer' ? val.expression : val;
+			hasAsync = !(
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'BooleanLiteral') &&
+				inner.value === false
+			);
+		} else if (name === 'src') hasSrc = true;
+		else if (name === 'rel') {
+			const val = attr.value;
+			const inner = val && val.type === 'JSXExpressionContainer' ? val.expression : val;
+			relStylesheet =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === 'stylesheet';
+		}
+	}
+	if (tag === 'link') return relStylesheet && hasPrecedence && hasHref ? 'stylesheet' : null;
+	if (!hasAsync || !hasSrc) return null;
+	// An inline body (raw script text or non-whitespace children) keeps the
+	// script in its authored position — only external async scripts hoist.
+	if (typeof n.content === 'string' && n.content.trim() !== '') return null;
+	for (const child of n.children || []) {
+		if ((child.type === 'JSXText' || child.type === 'Text') && /^\s*$/.test(child.value ?? ''))
+			continue;
+		return null;
+	}
+	return 'script';
+}
+
 // Deterministic per-element key bridging the client `headBlock` (its scope-state
 // key + SSR-marker adoption) and the server `ssrHeadEl` marker. Bundlers pass a
 // canonical root-relative module id; direct compiler callers already need to
@@ -18428,10 +18496,9 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 // object-literal expression (dynamic values stay live expressions, so the
 // metadata is reactive); a `<title>`'s text becomes a string-concat expression;
 // void tags (`<meta>`/`<link>`) pass `null` for text.
-/** @param {any} node @param {number} index @param {any} ctx @returns {string} */
-function headElementArgNodes(node, index, ctx) {
-	const el = node.element;
-	const tag = jsxTagName(el);
+/** Attribute object-literal expression for a hoisted head element or resource. */
+/** @param {any} el @returns {any} */
+function headAttrsExpression(el) {
 	const attrProps = [];
 	for (const a of el.openingElement.attributes || []) {
 		if (a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute') {
@@ -18464,7 +18531,14 @@ function headElementArgNodes(node, index, ctx) {
 			attrProps.push(b.prop('init', b.literal(attrName), inner));
 		}
 	}
-	const attrsExpr = attrProps.length ? b.object(attrProps) : b.literal(null);
+	return attrProps.length ? b.object(attrProps) : b.literal(null);
+}
+
+/** @param {any} node @param {number} index @param {any} ctx @returns {string} */
+function headElementArgNodes(node, index, ctx) {
+	const el = node.element;
+	const tag = jsxTagName(el);
+	const attrsExpr = headAttrsExpression(el);
 	const textExpr = VOID_ELEMENTS.has(tag) ? b.literal(null) : headTextExpression(el);
 	return [
 		b.literal(headKey(el, index, ctx), undefined, el),
@@ -18479,11 +18553,24 @@ function headElementArgNodes(node, index, ctx) {
 /** @param {any[]} headNodes @param {any} ctx @param {number} slotBase */
 function emitHeadClient(headNodes, ctx, slotBase) {
 	if (!headNodes.length) return [];
-	ctx.runtimeNeeded.add('headBlock');
 	// Each hoisted head element gets a dense scope slot (after the body's constructs);
-	// the content `key` stays as a later arg for SSR-adoption matching.
-	return headNodes.map((h, i) =>
-		inheritOriginLoc(
+	// the content `key` stays as a later arg for SSR-adoption matching. RESOURCE
+	// elements (stylesheet precedence links, async scripts) are global and
+	// scope-free: they dedupe by href/src at runtime, so their call carries only
+	// the attrs object. Their slot index is left unoccupied to keep the numbering
+	// of neighbouring headBlock slots stable regardless of classification.
+	return headNodes.map((h, i) => {
+		const kind = headResourceKind(h.element);
+		if (kind !== null) {
+			const fn = kind === 'stylesheet' ? 'stylesheetResource' : 'scriptResource';
+			ctx.runtimeNeeded.add(fn);
+			return inheritOriginLoc(
+				b.stmt(b.call('_$' + fn, inheritOriginLoc(headAttrsExpression(h.element), h.element))),
+				h.element ?? h,
+			);
+		}
+		ctx.runtimeNeeded.add('headBlock');
+		return inheritOriginLoc(
 			b.stmt(
 				b.call(
 					'_$headBlock',
@@ -18493,8 +18580,8 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 				),
 			),
 			h.element ?? h,
-		),
-	);
+		);
+	});
 }
 
 // Build the SERVER `ssrHeadEl(…)` statement nodes for a component's hoisted
@@ -18502,13 +18589,24 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 /** @param {any[]} headNodes @param {any} ctx @returns {any[]} */
 function emitHeadServer(headNodes, ctx) {
 	if (!headNodes.length) return [];
-	ctx.runtimeNeeded.add('ssrHeadEl');
-	return headNodes.map((head, index) =>
-		inheritOriginLoc(
+	return headNodes.map((head, index) => {
+		const kind = headResourceKind(head.element);
+		if (kind !== null) {
+			const fn = kind === 'stylesheet' ? 'ssrStylesheetResource' : 'ssrScriptResource';
+			ctx.runtimeNeeded.add(fn);
+			return inheritOriginLoc(
+				b.stmt(
+					b.call('_$' + fn, inheritOriginLoc(headAttrsExpression(head.element), head.element)),
+				),
+				head.element ?? head,
+			);
+		}
+		ctx.runtimeNeeded.add('ssrHeadEl');
+		return inheritOriginLoc(
 			b.stmt(b.call('_$ssrHeadEl', ...headElementArgNodes(head, index, ctx))),
 			head.element ?? head,
-		),
-	);
+		);
+	});
 }
 
 /**
@@ -18655,7 +18753,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			// body DOM). Kept in `out` as a synthetic node so planJsx / ssrCompileBody
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
 			// (server). SVG `<title>` and explicit resource-handler links stay inline.
-			if (isHoistableHeadElementNode(n) && !(inSvg && jsxTagName(n) === 'title')) {
+			if (
+				(isHoistableHeadElementNode(n) || (!inSvg && headResourceKind(n) !== null)) &&
+				!(inSvg && jsxTagName(n) === 'title')
+			) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
@@ -23747,7 +23848,9 @@ function isActivityLongForm(node) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type !== 'Identifier' && name.type !== 'JSXIdentifier') return false;
-	return name.name === 'Activity';
+	// `unstable_Activity` mirrors the unstable_ViewTransition alias so React
+	// experimental-channel ports compile unchanged.
+	return name.name === 'Activity' || name.name === 'unstable_Activity';
 }
 
 // ===========================================================================

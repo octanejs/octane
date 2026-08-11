@@ -1,0 +1,117 @@
+// React 19 root option parity: hydrateRoot's onRecoverableError. Octane recovers
+// hydration mismatches per site (patch/rebuild in place) rather than client-
+// rendering a whole boundary, so the callback contract is: fire (dev AND prod)
+// after hydration recovered from a STRUCTURAL server/client divergence —
+// rebuilt subtrees, discarded stale server ranges — coalesced to one report per
+// root per microtask burst. Attribute-level value patches do not report: React
+// production hydration does not detect those at all, so reporting them would
+// make Octane's extra detection a behavioral difference.
+// The callback receives only the error (no errorInfo/componentStack), matching
+// the documented SSR onError shape.
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { compile } from 'octane/compiler';
+import * as ClientRT from '../../src/index.js';
+import { hydrateRoot, flushSync } from '../../src/index.js';
+import * as ServerRT from 'octane/server';
+
+const SWAP = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/swap.tsrx');
+
+function serverModule(fixture: string, file: string): Record<string, any> {
+	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'server' });
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
+	);
+	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+}
+
+function clientModule(fixture: string, file: string, dev: boolean): Record<string, any> {
+	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'client', dev });
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
+	);
+	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
+	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
+}
+
+describe('hydrateRoot — onRecoverableError', () => {
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+	afterEach(() => {
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	const srv = serverModule(SWAP, 'swap.tsrx');
+	const cliDev = clientModule(SWAP, 'swap.tsrx', true);
+	const cliProd = clientModule(SWAP, 'swap.tsrx', false);
+
+	it('fires after a structural mismatch recovery (dev compile)', async () => {
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		const onRecoverableError = vi.fn();
+		hydrateRoot(container, cliDev.Swap, { host: false }, { onRecoverableError });
+		flushSync(() => {});
+		// Recovery itself is synchronous; the report is delivered post-burst.
+		await Promise.resolve();
+		expect(container.querySelector('b.inner')).not.toBeNull();
+		expect(container.querySelector('p.host')).toBeNull();
+		expect(onRecoverableError).toHaveBeenCalledTimes(1);
+		expect(String((onRecoverableError.mock.calls[0][0] as Error).message)).toMatch(/hydration/i);
+	});
+
+	it('fires in PROD compile too (recovery runs everywhere; only the warning is dev-only)', async () => {
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		const onRecoverableError = vi.fn();
+		hydrateRoot(container, cliProd.Swap, { host: false }, { onRecoverableError });
+		flushSync(() => {});
+		await Promise.resolve();
+		expect(container.querySelector('b.inner')).not.toBeNull();
+		expect(onRecoverableError).toHaveBeenCalledTimes(1);
+	});
+
+	it('coalesces to one report per root per burst', async () => {
+		// Server renders BOTH divergent spots (host branch); the client flips the
+		// branch AND the inner label — still a single report for the burst.
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		const onRecoverableError = vi.fn();
+		hydrateRoot(container, cliDev.Swap, { host: false }, { onRecoverableError });
+		flushSync(() => {});
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(onRecoverableError).toHaveBeenCalledTimes(1);
+	});
+
+	it('control: a MATCHED hydration never fires the callback', async () => {
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		const onRecoverableError = vi.fn();
+		hydrateRoot(container, cliDev.Swap, { host: true }, { onRecoverableError });
+		flushSync(() => {});
+		await Promise.resolve();
+		expect(onRecoverableError).not.toHaveBeenCalled();
+	});
+
+	it('control: mismatch recovery without the option keeps current behavior', async () => {
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		hydrateRoot(container, cliDev.Swap, { host: false });
+		flushSync(() => {});
+		expect(container.querySelector('b.inner')).not.toBeNull();
+		const warns = errSpy.mock.calls.map((c) => String(c[0]));
+		expect(warns.some((m) => m.includes('hydration mismatch'))).toBe(true);
+	});
+});
