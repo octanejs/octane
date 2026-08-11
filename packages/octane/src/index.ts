@@ -188,8 +188,9 @@ export {
 	queueRefDetach,
 	injectStyle,
 	headBlock,
-	// React Float resources (stylesheet precedence links, async scripts)
+	// React Float resources (stylesheet precedence links, style resources, async scripts)
 	stylesheetResource,
+	styleResource,
 	scriptResource,
 	namespaceHead,
 	namespaceHeadElement,

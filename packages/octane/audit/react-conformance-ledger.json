@@ -4605,7 +4605,7 @@
     },
     {
       "caseId": "react-case-v1:0dcc8820994994919dfd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "consumers bail out if context value is the same",
@@ -4613,7 +4613,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the same-value bailout outcome is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-bailout.test.ts",
+          "testName": "a consumer bails out when the new context value is Object.is-equal",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0dcd4521f908ef05bd17",
@@ -14653,7 +14660,7 @@
     },
     {
       "caseId": "react-case-v1:31933070492ac17cb002",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactContextPropagation-test.js",
       "title": "finds context consumers in multiple sibling branches",
@@ -14661,7 +14668,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); propagation into every sibling branch is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "a context change reaches readers in every sibling branch",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3195073a8576c0df35b4",
@@ -21023,15 +21037,15 @@
     },
     {
       "caseId": "react-case-v1:459daa25325aaa93242a",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can emit multiple style rules into a single style tag for a given precedence",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Octane emits one <style> tag per style resource instead of merging same-precedence rules into a single tag; grouping, ordering, and href identity are preserved (documented in differences-from-react.md)."
     },
     {
       "caseId": "react-case-v1:45a0485599e201c541c3",
@@ -26785,7 +26799,7 @@
     },
     {
       "caseId": "react-case-v1:5993920d622001de5ba2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "multiple consumers in different branches",
@@ -26793,7 +26807,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); multi-branch reader updates are asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "readers in different branches all track the provider value",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5995e2f6573089a8a1ee",
@@ -37662,7 +37683,7 @@
     },
     {
       "caseId": "react-case-v1:7f239bd3f8c62773ee9e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist <link rel=\"stylesheet\" .../> and <style /> tags together, respecting order of discovery",
@@ -37670,7 +37691,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: link and style resources share one identity namespace and one precedence-group ordering, in discovery order within a group.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "<style href precedence> is a style resource: hoisted, deduped, precedence-grouped with links",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7f250da531de34121105",
@@ -43754,7 +43782,7 @@
     },
     {
       "caseId": "react-case-v1:935bc9dd8bd1188d99c3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactContextPropagation-test.js",
       "title": "context consumer bails out if context hasn't changed",
@@ -43762,7 +43790,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the unchanged-context bailout outcome is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "a same-value provider re-commit does not re-render the reader",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:935d579359bec3cf4772",
@@ -44661,7 +44696,7 @@
     },
     {
       "caseId": "react-case-v1:96ada5b3062b63f998d3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "treats <style href=\"...\" precedence=\"...\"> elements as a style resource when server rendering",
@@ -44669,7 +44704,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: <style href precedence> serializes as a deduped, precedence-grouped style resource in SSR head output and the hydrating client seeds identity from data-href.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "SSR folds style resources into precedence groups; hydration seeds from data-href",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:96af21da33a1e8b5be5c",
@@ -48203,15 +48245,15 @@
     },
     {
       "caseId": "react-case-v1:a3d9401e746b6f396ad3",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "can read other contexts inside consumer render prop",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Octane has no render-prop Context.Consumer (modern callable context + slot-keyed hooks; issue #711 decision) and accessing .Consumer has its own development diagnostic. This case exists only to exercise the render-prop API surface."
     },
     {
       "caseId": "react-case-v1:a3dd1503d956da2af435",
@@ -51223,7 +51265,7 @@
     },
     {
       "caseId": "react-case-v1:ae3e15d7688bb8c5510c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "stylesheet resources are inserted according to precedence order on the client",
@@ -51231,7 +51273,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: client insertion orders precedence groups by first encounter and appends within a group.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "groups order by first encounter; later same-precedence sheets append to their group",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ae46ab96c371b49d856b",
@@ -55692,7 +55741,7 @@
     },
     {
       "caseId": "react-case-v1:bd1720ad06b9f2b30d80",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "context consumer doesn't bail out inside hidden subtree",
@@ -55700,7 +55749,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the hidden-subtree no-bailout outcome is asserted via Activity.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "a context change updates a reader inside a hidden Activity subtree",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:bd26a320b22c502030ad",
@@ -57027,7 +57083,7 @@
     },
     {
       "caseId": "react-case-v1:c1eda66a00b1d5638bc3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js",
       "title": "updates context consumer within child of suspended suspense component when context updates",
@@ -57035,7 +57091,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the suspended-boundary context-update outcome is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "a context update while suspended reaches the reader on reveal",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c1edbdea7f9272fdbb5a",
@@ -57708,7 +57771,7 @@
     },
     {
       "caseId": "react-case-v1:c3d2783b1ad4816cd74a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "hoists stylesheet resources to the correct precedence",
@@ -57716,7 +57779,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: resources land in their precedence group regardless of mount order.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "groups order by first encounter; later same-precedence sheets append to their group",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c3d39ad33e0043e7240e",
@@ -64154,7 +64224,7 @@
     },
     {
       "caseId": "react-case-v1:d7d3803f64367db645fe",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "consumer does not bail out if there were no bailouts above it",
@@ -64162,7 +64232,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the no-bailouts-above re-render outcome is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "a memo-free chain re-renders through to the reader on every change",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d7d5eca8e8e3ed481708",
@@ -66182,7 +66259,7 @@
     },
     {
       "caseId": "react-case-v1:de950c5617a92d80bcfc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "consumer bails out if value is unchanged and something above bailed out",
@@ -66190,7 +66267,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the bailed-ancestor propagation outcome is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-bailout.test.ts",
+          "testName": "a same-value re-render with a bailed-out memo subtree skips the consumers",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:de9954ea3403e7aa88fb",
@@ -66752,15 +66836,15 @@
     },
     {
       "caseId": "react-case-v1:e09c751f03372ab1fe07",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "warns when passed a consumer",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Octane has no render-prop Context.Consumer (modern callable context + slot-keyed hooks; issue #711 decision) and accessing .Consumer has its own development diagnostic. This case exists only to exercise the render-prop API surface."
     },
     {
       "caseId": "react-case-v1:e0af1d4161364fae7a23",
@@ -67127,7 +67211,7 @@
     },
     {
       "caseId": "react-case-v1:e1b78307e367ad2ffae6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "treats stylesheet links with a precedence as a resource",
@@ -67135,7 +67219,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: a precedence link is a global resource \u2014 hoisted, href-deduped, retained after unmount.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "a precedence stylesheet hoists to head and dedupes by href across components",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e1b7d99fc6ebff22cc1d",
@@ -67395,7 +67486,7 @@
     },
     {
       "caseId": "react-case-v1:e2953f4f6182dfbfc4c3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
       "title": "should provide the correct (default) values to consumers outside of a provider",
@@ -67403,7 +67494,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapted executable evidence: the render-prop Consumer is replaced by a useContext-reading component (issue #711 decision); the default-value outcome is asserted directly.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/context-consumer-adapted.test.ts",
+          "testName": "a reader outside every provider sees the default value",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e29aee1e4d42f62a6ad1",

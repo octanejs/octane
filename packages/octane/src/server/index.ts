@@ -162,8 +162,9 @@ export {
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,
-	// React Float resources (stylesheet precedence links, async scripts)
+	// React Float resources (stylesheet precedence links, style resources, async scripts)
 	ssrStylesheetResource,
+	ssrStyleResource,
 	ssrScriptResource,
 	namespaceHead,
 	namespaceHeadElement,

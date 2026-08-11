@@ -553,10 +553,18 @@ attribute; an empty string writes `class=""`.
 `createContext` returns a context that is itself the provider component —
 React 19's `<MyContext value={…}>` form is the native shape, and
 `MyContext.Provider` is retained as an identity alias for React-18-shaped
-libraries. The render-prop `<MyContext.Consumer>` does not exist: Octane's
-slot-keyed hooks make `use(MyContext)`/`useContext` legal behind any condition,
-which is the pattern Consumer existed to work around. Read the context in the
-child (or an inline component) instead.
+libraries. The render-prop `<MyContext.Consumer>` does not exist and will not
+be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext` legal
+behind any condition, which is the pattern Consumer existed to work around.
+Read the context in the child (or an inline component) instead.
+
+In development, accessing `.Consumer` logs a one-time migration diagnostic and
+still returns `undefined`, so feature probes (`MyContext.Consumer || fallback`)
+behave exactly as in production. The upstream Consumer test scenarios that
+protect observable behavior (defaults, propagation, bailout, hidden subtrees,
+suspended boundaries) are ported with `useContext`-reading components; the
+scenarios that exist only to exercise the render-prop API surface are recorded
+as non-goals in the parity ledger.
 
 ## Document metadata and Float resources
 
@@ -586,6 +594,15 @@ React Float **resources** are supported with React's semantics:
   not retarget a live sheet.
 - `<script async src>` (no children/handlers) hoists and dedupes by src, and
   is likewise never removed.
+- `<style href precedence>` is a STYLE RESOURCE: its plain CSS ships by href
+  identity, sharing the stylesheet dedupe namespace and precedence-group
+  ordering with link resources (`data-precedence`/`data-href` mark the tags).
+  The CSS is NOT scoped — every other `<style>` in a component still belongs
+  to Octane's scoped-CSS system. Two adaptations: Octane emits one `<style>`
+  tag per resource rather than merging same-precedence rules into a single tag
+  (grouping and order are preserved), and CSS containing `</style` fails
+  closed in SSR with a development diagnostic (raw-text serialization cannot
+  escape it; the client inserts via `textContent`, which is always safe).
 - `preloadModule`/`preinitModule` join `preload`/`preinit`/`preconnect`/
   `prefetchDNS`.
 - Classification is static: a spread-carried `precedence`/`async` keeps the
@@ -593,9 +610,7 @@ React Float **resources** are supported with React's semantics:
 
 Out of scope, deliberately: **suspensey commits** (React's
 suspend-until-the-stylesheet-loads behavior; Octane inserts the sheet and
-continues) and **`<style href precedence>` style resources** — `<style>` inside
-a component belongs to Octane's scoped-CSS system; use a stylesheet link
-resource or `preinit` for shared CSS. Resource-hint options apply as a lenient
+continues). Resource-hint options apply as a lenient
 attribute pass-through (`fetchPriority`, `imageSrcSet`, `imageSizes`, `media`,
 `integrity`, … all serialize correctly) without React's option validation, and
 `preload` + `preinit` of the same href are two entries rather than React's
