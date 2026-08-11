@@ -3770,6 +3770,25 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.Provider = ctx;
+	if (process.env.NODE_ENV !== 'production') {
+		// Mirror of the client's Consumer diagnostic (see runtime.ts): warn once
+		// per context on access, return undefined so probes behave as in prod.
+		let consumerWarned = false;
+		Object.defineProperty(ctx, 'Consumer', {
+			configurable: true,
+			get() {
+				if (!consumerWarned) {
+					consumerWarned = true;
+					console.error(
+						'Octane has no Context.Consumer. Read the context directly with use(Context) or ' +
+							'useContext(Context) in the child component — Octane hooks are call-site keyed, ' +
+							'so the read is legal behind any condition the render-prop form was working around.',
+					);
+				}
+				return undefined;
+			},
+		});
+	}
 	return ctx;
 }
 
@@ -8051,6 +8070,44 @@ export function ssrStylesheetResource(attrs: Record<string, unknown> | null): vo
 		'"' +
 		resourceAttrs(attrs, 'link') +
 		'>';
+	const sheets = (HEAD.sheets ??= new Map());
+	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
+}
+
+/**
+ * Compiler target for `<style href precedence>` (React Float style resource).
+ * Shares the stylesheet dedupe namespace and precedence grouping with link
+ * resources; the CSS is raw `<style>` text (never HTML-escaped — entities do
+ * not decode inside style raw text), so content that could close the tag fails
+ * closed with a dev diagnostic instead of truncating the document.
+ */
+export function ssrStyleResource(attrs: Record<string, unknown> | null, css: string): void {
+	if (HEAD === null || attrs == null) return;
+	const href = attrs.href;
+	if (typeof href !== 'string' || href === '') return;
+	if (/<\/style/i.test(css)) {
+		if (process.env.NODE_ENV !== 'production') {
+			console.error(
+				'octane SSR: a <style href precedence> resource contains "</style" and cannot be ' +
+					'serialized safely; the resource was skipped. Load it as a stylesheet link instead.',
+			);
+		}
+		return;
+	}
+	const key = 'sheet:' + href;
+	if (HEAD.hints.has(key)) return;
+	HEAD.hints.add(key);
+	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	const tag =
+		'<style data-precedence="' +
+		escapeAttr(precedence) +
+		'" data-href="' +
+		escapeAttr(href) +
+		'"' +
+		resourceAttrs(attrs, 'link') +
+		'>' +
+		css +
+		'</style>';
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
 }

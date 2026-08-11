@@ -6686,6 +6686,28 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
 	ctx.Provider = ctx;
+	if (process.env.NODE_ENV !== 'production') {
+		// Octane deliberately has no render-prop Consumer (slot-keyed hooks make
+		// use()/useContext legal behind any condition — the pattern Consumer
+		// existed to work around). Accessing it warns once per context and still
+		// returns undefined, so behavior matches production and feature probes
+		// (`Ctx.Consumer || fallback`) keep working.
+		let consumerWarned = false;
+		Object.defineProperty(ctx, 'Consumer', {
+			configurable: true,
+			get() {
+				if (!consumerWarned) {
+					consumerWarned = true;
+					console.error(
+						'Octane has no Context.Consumer. Read the context directly with use(Context) or ' +
+							'useContext(Context) in the child component — Octane hooks are call-site keyed, ' +
+							'so the read is legal behind any condition the render-prop form was working around.',
+					);
+				}
+				return undefined;
+			},
+		});
+	}
 	return ctx;
 }
 
@@ -27753,10 +27775,15 @@ function resourceState(): ResourceState {
 		lastTail: null,
 	};
 	if (typeof document !== 'undefined') {
-		const links = document.querySelectorAll('link[rel="stylesheet"][data-precedence]');
-		for (let i = 0; i < links.length; i++) {
-			const el = links[i];
-			const href = el.getAttribute('href');
+		// Stylesheet links and style resources share one identity namespace and
+		// one precedence-group ordering; querySelectorAll returns document order,
+		// so tails/lastTail land on each group's last member.
+		const sheets = document.querySelectorAll(
+			'link[rel="stylesheet"][data-precedence], style[data-precedence]',
+		);
+		for (let i = 0; i < sheets.length; i++) {
+			const el = sheets[i];
+			const href = el.getAttribute('href') ?? el.getAttribute('data-href');
 			if (href !== null) state.sheets.add(href);
 			state.tails.set(el.getAttribute('data-precedence') as string, el);
 			state.lastTail = el;
@@ -27768,6 +27795,25 @@ function resourceState(): ResourceState {
 		}
 	}
 	return (_resourceState = state);
+}
+
+/** Insert a sheet-family resource into its precedence group (shared ordering). */
+function insertPrecedenced(state: ResourceState, el: Element, precedence: string): void {
+	const tail = state.tails.get(precedence);
+	if (tail !== undefined && tail.isConnected) {
+		// Existing group: append after its current tail.
+		tail.after(el);
+		if (state.lastTail === tail) state.lastTail = el;
+	} else if (state.lastTail !== null && state.lastTail.isConnected) {
+		// New group: starts after the last existing group, keeping groups
+		// contiguous in first-encounter order.
+		state.lastTail.after(el);
+		state.lastTail = el;
+	} else {
+		document.head.appendChild(el);
+		state.lastTail = el;
+	}
+	state.tails.set(precedence, el);
 }
 
 /** Handled by the resource insert itself; everything else applies as an attribute. */
@@ -27798,21 +27844,38 @@ export function stylesheetResource(attrs: Record<string, unknown> | null): void 
 	l.href = sanitizeURL(href);
 	l.setAttribute('data-precedence', precedence);
 	applyResourceAttrs(l, attrs);
-	const tail = state.tails.get(precedence);
-	if (tail !== undefined && tail.isConnected) {
-		// Existing group: append after its current tail.
-		tail.after(l);
-		if (state.lastTail === tail) state.lastTail = l;
-	} else if (state.lastTail !== null && state.lastTail.isConnected) {
-		// New group: starts after the last existing group, keeping groups
-		// contiguous in first-encounter order.
-		state.lastTail.after(l);
-		state.lastTail = l;
-	} else {
-		document.head.appendChild(l);
-		state.lastTail = l;
+	insertPrecedenced(state, l, precedence);
+	state.sheets.add(href);
+}
+
+/**
+ * Compiler target for `<style href precedence>` (React Float style resource).
+ * Plain CSS keyed by href identity — shares the stylesheet dedupe namespace and
+ * precedence-group ordering with link resources; the CSS ships as the tag's
+ * text content and is NOT scoped (scoped CSS owns every other `<style>`).
+ */
+export function styleResource(attrs: Record<string, unknown> | null, css: string): void {
+	if (typeof document === 'undefined' || attrs == null) return;
+	const href = attrs.href;
+	if (typeof href !== 'string' || href === '') return;
+	const state = resourceState();
+	if (state.sheets.has(href)) return;
+	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
+	// textContent makes any CSS safe to insert client-side, but the SSR twin
+	// must fail closed on "</style" (raw-text serialization) — surface the same
+	// authoring diagnostic here so SPA-only development still sees it.
+	if (process.env.NODE_ENV !== 'production' && /<\/style/i.test(css)) {
+		console.error(
+			'A <style href precedence> resource contains "</style"; server rendering will skip it. ' +
+				'Load it as a stylesheet link instead.',
+		);
 	}
-	state.tails.set(precedence, l);
+	const s = document.createElement('style');
+	s.setAttribute('data-precedence', precedence);
+	s.setAttribute('data-href', href);
+	applyResourceAttrs(s, attrs);
+	s.textContent = css;
+	insertPrecedenced(state, s, precedence);
 	state.sheets.add(href);
 }
 

@@ -18,6 +18,54 @@ export function SheetADuplicate() @{
 	</>
 }
 
+// `<style href precedence>` = a Float STYLE RESOURCE: plain CSS shipped by
+// href identity, sharing the stylesheet dedupe/precedence model with links.
+export function StyleRes() @{
+	<>
+		<style href="inline-tokens" precedence="default">
+			.tokens {
+				color: teal;
+			}
+		</style>
+		<div class="sr">{'SR' as string}</div>
+	</>
+}
+
+export function StyleResDuplicate() @{
+	<>
+		<style href="inline-tokens" precedence="default">
+			.tokens {
+				color: teal;
+			}
+		</style>
+		<div class="sr2">{'SR2' as string}</div>
+	</>
+}
+
+export function StyleResHigh() @{
+	<>
+		<style href="inline-high" precedence="high" media="screen">
+			.hi-tokens {
+				color: crimson;
+			}
+		</style>
+		<div class="srh">{'SRH' as string}</div>
+	</>
+}
+
+// Control: a bare `<style>` (no href/precedence) stays with SCOPED CSS — its
+// selectors scope to the component hash and no head resource appears.
+export function ScopedControl() @{
+	<>
+		<style>
+			.scoped {
+				color: rebeccapurple;
+			}
+		</style>
+		<div class="scoped" id="scoped-control">{'SC' as string}</div>
+	</>
+}
+
 export function SheetHigh() @{
 	<>
 		<link rel="stylesheet" href="/high.css" precedence="high" crossOrigin="anonymous" />

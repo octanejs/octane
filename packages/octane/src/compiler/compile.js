@@ -12063,7 +12063,9 @@ function annotateRootWithHash(node, hash, classAttrName) {
 		}
 		return working;
 	}
-	if (node.type === 'JSXStyleElement') return null;
+	// Scoped-CSS styles leave the render tree here; Float style resources stay —
+	// the HeadHoist partition (normalizeChildren) owns removing them from body DOM.
+	if (node.type === 'JSXStyleElement') return headResourceKind(node) === 'style' ? node : null;
 	let out = null;
 	for (const key of Object.keys(node)) {
 		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata' || key === 'css') {
@@ -12184,6 +12186,9 @@ function applyCssScoping(componentNode, ctx) {
 			return;
 		}
 		if (node.type === 'JSXStyleElement') {
+			// A Float style resource ships its plain CSS by href identity — it
+			// neither contributes to the component's scope hash nor gets scoped.
+			if (headResourceKind(node) === 'style') return;
 			const sheet = (node.children || []).find((c) => c && c.type === 'StyleSheet');
 			if (sheet) {
 				styles.push({ node, sheet });
@@ -16391,6 +16396,13 @@ function requiresTemplateNormalization(
 			requiresTemplateNormalization(child, parentNs, allowHeadHoists, ctx),
 		);
 	}
+	// A Float style resource (`<style href precedence>`) must enter template
+	// normalization so the HeadHoist partition claims it; scoped-CSS styles are
+	// invisible to the value-position tree and keep returning false. Gated on
+	// allowHeadHoists like `<title>`/`<script>`: SVG has its own `<style>`.
+	if (t === 'JSXStyleElement') {
+		return parentNs !== 'svg' && allowHeadHoists && headResourceKind(node) === 'style';
+	}
 	if (t !== 'Element' && t !== 'JSXElement') return false;
 	if (isLongFormTemplateSentinel(node, parentNs, allowHeadHoists, ctx)) return true;
 
@@ -18298,9 +18310,25 @@ function isHoistableHeadElementNode(n) {
 // deduped, precedence-ordered (stylesheets), and never removed on unmount.
 // Classification is static, like the rest of the head-hoist model: a
 // spread-carried `precedence`/`async` keeps the ordinary element path.
-/** @param {any} n @returns {'stylesheet'|'script'|null} */
+/** @param {any} n @returns {'stylesheet'|'script'|'style'|null} */
 function headResourceKind(n) {
-	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return null;
+	if (n == null) return null;
+	// `<style href precedence>` is a React Float STYLE RESOURCE: plain CSS keyed
+	// by href identity, sharing the stylesheet dedupe/precedence model. Every
+	// other `<style>` stays with Octane's scoped-CSS pipeline.
+	if (n.type === 'JSXStyleElement') {
+		let hasHref = false;
+		let hasPrecedence = false;
+		for (const attr of n.openingElement?.attributes || []) {
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+			const name = jsxAttrRawName(attr);
+			if (name === 'dangerouslySetInnerHTML') return null;
+			if (name === 'href') hasHref = true;
+			else if (name === 'precedence') hasPrecedence = true;
+		}
+		return hasHref && hasPrecedence ? 'style' : null;
+	}
+	if (n.type !== 'JSXElement' && n.type !== 'Element') return null;
 	const tag = jsxTagName(n) || elementTagName(n);
 	if (tag !== 'link' && tag !== 'script') return null;
 	const attrs = n.attributes || n.openingElement?.attributes || [];
@@ -18628,6 +18656,26 @@ function headElementArgNodes(node, index, ctx) {
 	];
 }
 
+// A Float style resource ships its authored CSS verbatim-by-meaning: the parsed
+// StyleSheet re-renders WITHOUT the scoping pipeline (no analyze/prepare), so
+// selectors and rules come out unscoped. Serialization normalizes whitespace,
+// which is invisible to the resource contract (identity is the href).
+/** @param {any} el @returns {any} */
+function styleResourceCssExpression(el) {
+	const sheet = (el.children || []).find((c) => c && c.type === 'StyleSheet');
+	if (!sheet) return b.literal('');
+	const css = renderStylesheets([cloneAstNode(sheet)]);
+	return b.literal(css, JSON.stringify(css), el);
+}
+
+/** Shared resource-call argument list for the head emitters. */
+/** @param {any} el @param {'stylesheet'|'script'|'style'} kind @returns {any[]} */
+function headResourceArgNodes(el, kind) {
+	const args = [inheritOriginLoc(headAttrsExpression(el), el)];
+	if (kind === 'style') args.push(inheritOriginLoc(styleResourceCssExpression(el), el));
+	return args;
+}
+
 // Build the CLIENT `headBlock(__s, …)` statement NODES for a component's
 // hoisted head elements (one per `HeadHoist`). Returns [] when there are none.
 /** @param {any[]} headNodes @param {any} ctx @param {number} slotBase */
@@ -18635,17 +18683,23 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 	if (!headNodes.length) return [];
 	// Each hoisted head element gets a dense scope slot (after the body's constructs);
 	// the content `key` stays as a later arg for SSR-adoption matching. RESOURCE
-	// elements (stylesheet precedence links, async scripts) are global and
-	// scope-free: they dedupe by href/src at runtime, so their call carries only
-	// the attrs object. Their slot index is left unoccupied to keep the numbering
-	// of neighbouring headBlock slots stable regardless of classification.
+	// elements (stylesheet precedence links, style resources, async scripts) are
+	// global and scope-free: they dedupe by href/src at runtime, so their call
+	// carries only the attrs object (plus the CSS text for style resources).
+	// Their slot index is left unoccupied to keep the numbering of neighbouring
+	// headBlock slots stable regardless of classification.
 	return headNodes.map((h, i) => {
 		const kind = headResourceKind(h.element);
 		if (kind !== null) {
-			const fn = kind === 'stylesheet' ? 'stylesheetResource' : 'scriptResource';
+			const fn =
+				kind === 'stylesheet'
+					? 'stylesheetResource'
+					: kind === 'style'
+						? 'styleResource'
+						: 'scriptResource';
 			ctx.runtimeNeeded.add(fn);
 			return inheritOriginLoc(
-				b.stmt(b.call('_$' + fn, inheritOriginLoc(headAttrsExpression(h.element), h.element))),
+				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind))),
 				h.element ?? h,
 			);
 		}
@@ -18672,12 +18726,15 @@ function emitHeadServer(headNodes, ctx) {
 	return headNodes.map((head, index) => {
 		const kind = headResourceKind(head.element);
 		if (kind !== null) {
-			const fn = kind === 'stylesheet' ? 'ssrStylesheetResource' : 'ssrScriptResource';
+			const fn =
+				kind === 'stylesheet'
+					? 'ssrStylesheetResource'
+					: kind === 'style'
+						? 'ssrStyleResource'
+						: 'ssrScriptResource';
 			ctx.runtimeNeeded.add(fn);
 			return inheritOriginLoc(
-				b.stmt(
-					b.call('_$' + fn, inheritOriginLoc(headAttrsExpression(head.element), head.element)),
-				),
+				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(head.element, kind))),
 				head.element ?? head,
 			);
 		}
@@ -18863,6 +18920,12 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
 			out.push(...normalizeChildren(n.children || [], inSvg, ctx));
 		} else if (n.type === 'JSXStyleElement') {
+			// `<style href precedence>` is a Float style resource, not scoped CSS —
+			// partition it to the head channel like precedence links.
+			if (!inSvg && headResourceKind(n) === 'style') {
+				out.push({ type: 'HeadHoist', element: n });
+				continue;
+			}
 			// Drop a `<style>` block at child position — its CSS gets registered
 			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
 			// it contributes no DOM here.

@@ -7,7 +7,7 @@
 // Suspend-until-loaded ("suspensey" commit) is intentionally NOT part of this
 // contract — Octane documents that as out of scope.
 // Links WITHOUT precedence keep the existing per-site head-element behavior.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, createRoot, resetFloatResourceState } from '../src/index.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
@@ -22,6 +22,10 @@ import {
 	AsyncScriptDuplicate,
 	ReturnScript,
 	ReturnSheet,
+	StyleRes,
+	StyleResDuplicate,
+	StyleResHigh,
+	ScopedControl,
 	ToggleHost,
 	setSheetVisible,
 } from './_fixtures/float-resources.tsrx';
@@ -92,6 +96,48 @@ describe('Float resources — client', () => {
 		root.unmount();
 		expect(document.head.querySelector('link[href="/feed.xml"]')).toBeNull();
 		c.remove();
+	});
+
+	it('<style href precedence> is a style resource: hoisted, deduped, precedence-grouped with links', async () => {
+		await act(() => {
+			mountInto(SheetA); // default group (link)
+			mountInto(StyleRes); // default group (style, appends after the link)
+			mountInto(StyleResDuplicate); // deduped by href identity
+			mountInto(StyleResHigh); // high group (new)
+		});
+		const styles = document.head.querySelectorAll('style[data-href="inline-tokens"]');
+		expect(styles).toHaveLength(1);
+		expect(styles[0].getAttribute('data-precedence')).toBe('default');
+		expect(styles[0].textContent).toContain('.tokens');
+		expect(styles[0].textContent).toContain('teal');
+		// Unscoped: the CSS ships verbatim-by-meaning, no component hash class.
+		expect(styles[0].textContent).not.toMatch(/\.tokens\.[a-z0-9]/i);
+		// Group order: default (link then style, discovery order) then high.
+		const ordered = Array.from(
+			document.head.querySelectorAll('[data-precedence]'),
+			(el) => el.getAttribute('href') ?? el.getAttribute('data-href'),
+		);
+		expect(ordered).toEqual(['/base.css', 'inline-tokens', 'inline-high']);
+		const high = document.head.querySelector('style[data-href="inline-high"]')!;
+		expect(high.getAttribute('media')).toBe('screen');
+		expect(document.body.querySelector('style')).toBeNull();
+		// Persistence: style resources survive unmount like link resources.
+		await act(() => {
+			for (const r of roots.splice(0)) r.unmount();
+		});
+		expect(document.head.querySelectorAll('style[data-href="inline-tokens"]')).toHaveLength(1);
+	});
+
+	it('control: a bare <style> keeps scoped-CSS behavior (no head resource)', async () => {
+		await act(() => mountInto(ScopedControl));
+		expect(document.head.querySelector('style[data-href]')).toBeNull();
+		expect(document.head.querySelector('style[data-precedence]')).toBeNull();
+		// Scoped CSS injected its hashed sheet and stamped the hash class.
+		const scoped = document.querySelector('#scoped-control')!;
+		expect(scoped.className).not.toBe('scoped'); // hash class added
+		const injected = document.head.querySelector('style[data-octane]');
+		expect(injected).not.toBeNull();
+		expect(injected!.textContent).toContain('.scoped.');
 	});
 
 	it('return-position (value-body) trees classify resources like @{} bodies', async () => {
@@ -179,6 +225,51 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		expect(html.match(/\/base\.css/g) || []).toHaveLength(1);
 		expect(html.match(/\/analytics\.js/g) || []).toHaveLength(1);
 		expect(html).toContain('data-precedence="default"');
+	});
+
+	it('SSR folds style resources into precedence groups; hydration seeds from data-href', async () => {
+		const App = () =>
+			Server.createElement(
+				'div',
+				null,
+				Server.createElement(srv.SheetA, null),
+				Server.createElement(srv.StyleRes, null),
+				Server.createElement(srv.StyleResDuplicate, null),
+			) as any;
+		const r = await Server.renderToString(App as any);
+		expect(r.html.match(/data-href="inline-tokens"/g) || []).toHaveLength(1);
+		expect(r.html).toContain('.tokens');
+		// Same default group, discovery order: the link precedes the style tag.
+		expect(r.html.indexOf('/base.css')).toBeLessThan(r.html.indexOf('inline-tokens'));
+
+		// SSR head lands in the document; the hydrating client's render dedupes.
+		document.head.insertAdjacentHTML('afterbegin', r.html.slice(0, r.html.indexOf('<div')));
+		const c = document.createElement('div');
+		document.body.appendChild(c);
+		const root = createRoot(c);
+		await act(() => root.render(StyleRes, {}));
+		expect(document.head.querySelectorAll('style[data-href="inline-tokens"]')).toHaveLength(1);
+		root.unmount();
+		c.remove();
+	});
+
+	it('SSR fails closed on style content that could close the tag', async () => {
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const App = () => {
+				Server.ssrStyleResource(
+					{ href: 'evil', precedence: 'default' },
+					'.x{}</style><script>alert(1)</script>',
+				);
+				return Server.createElement('div', null, 'x') as any;
+			};
+			const r = await Server.renderToString(App as any);
+			expect(r.html).not.toContain('alert(1)');
+			expect(r.html).not.toContain('data-href="evil"');
+			expect(errSpy.mock.calls.some((c) => String(c[0]).includes('</style'))).toBe(true);
+		} finally {
+			errSpy.mockRestore();
+		}
 	});
 
 	it('a hydrating client call dedupes against SSR-emitted resources', async () => {
