@@ -140,9 +140,7 @@ describe('Context.Consumer access diagnostic', () => {
 			const Ctx = createContext(0);
 			expect((Ctx as any).Consumer).toBeUndefined();
 			expect((Ctx as any).Consumer).toBeUndefined();
-			const warns = errSpy.mock.calls.filter((c) =>
-				String(c[0]).includes('no Context.Consumer'),
-			);
+			const warns = errSpy.mock.calls.filter((c) => String(c[0]).includes('no Context.Consumer'));
 			expect(warns).toHaveLength(1);
 			// A second context warns independently.
 			const Other = createContext(1);
