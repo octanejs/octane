@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { constants, gzipSync } from 'node:zlib';
+import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import { JSDOM } from 'jsdom';
 import {
 	getFreePort,
@@ -165,7 +165,20 @@ function semanticSnapshot(route, response, target) {
 			key: element.getAttribute('data-tsr-managed-key'),
 		}),
 	);
-	return { snapshot, managedAssets };
+	let comments = 0;
+	let commentBytes = 0;
+	let headOwnershipComments = 0;
+	const commentWalker = document.createTreeWalker(
+		document,
+		document.defaultView.NodeFilter.SHOW_COMMENT,
+	);
+	while (commentWalker.nextNode()) {
+		const data = commentWalker.currentNode.data;
+		comments++;
+		commentBytes += Buffer.byteLength('<!--' + data + '-->');
+		if (data.startsWith('rnh-') || data.startsWith('/rnh-')) headOwnershipComments++;
+	}
+	return { snapshot, managedAssets, comments, commentBytes, headOwnershipComments };
 }
 
 const servers = [];
@@ -178,7 +191,8 @@ try {
 		let reference;
 		for (const server of servers) {
 			const response = await timedGet(server.baseURL + route.path);
-			const { snapshot, managedAssets } = semanticSnapshot(route, response, server.name);
+			const { snapshot, managedAssets, comments, commentBytes, headOwnershipComments } =
+				semanticSnapshot(route, response, server.name);
 			if (reference === undefined) {
 				reference = snapshot;
 			} else {
@@ -193,6 +207,12 @@ try {
 				status: response.status,
 				rawBytes: contents.length,
 				gzipBytes: gzipSync(contents, { level: constants.Z_BEST_COMPRESSION }).length,
+				brotliBytes: brotliCompressSync(contents, {
+					params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+				}).length,
+				comments,
+				commentBytes,
+				headOwnershipComments,
 				chunks: response.chunks.length,
 				managedAssets: managedAssets.length,
 				maxManagedKeyLength: Math.max(0, ...managedAssets.map((asset) => asset.key.length)),
@@ -237,6 +257,8 @@ for (const [target, routes] of Object.entries(results)) {
 	for (const [route, result] of Object.entries(routes)) {
 		console.log(
 			`${target} ${route}: ${result.rawBytes} raw, ${result.gzipBytes} gzip, ` +
+				`${result.brotliBytes} brotli, ${result.comments} comments ` +
+				`(${result.commentBytes} bytes), ` +
 				`${result.managedAssets} managed assets, maximum key ${result.maxManagedKeyLength}`,
 		);
 	}

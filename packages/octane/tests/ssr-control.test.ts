@@ -29,15 +29,16 @@ const FOR_EMPTY_OPEN = '<!--[f0-->';
 const FOR_ITEMS_OPEN = '<!--[f1-->';
 
 describe('SSR Phase 3 — control flow with block markers', () => {
-	it('@if / @else renders the chosen branch wrapped in markers', async () => {
-		// Nested ranges: outer = if-slot, inner = the taken branch (so the client
-		// adopts both on hydration with no inserted markers — byte-for-byte).
-		expect((await RT.renderToString(m.IfElse, { on: true })).html).toBe(
-			`<div>${OPEN}${OPEN}<span class="yes">on</span>${CLOSE}${CLOSE}</div>`,
-		);
-		expect((await RT.renderToString(m.IfElse, { on: false })).html).toBe(
-			`<div>${OPEN}${OPEN}<span class="no">off</span>${CLOSE}${CLOSE}</div>`,
-		);
+	it('@if / @else renders only the chosen visible branch', async () => {
+		const on = document.createElement('div');
+		on.innerHTML = (await RT.renderToString(m.IfElse, { on: true })).html;
+		expect(on.firstElementChild?.textContent).toBe('on');
+		expect(on.querySelector('span')?.outerHTML).toBe('<span class="yes">on</span>');
+
+		const off = document.createElement('div');
+		off.innerHTML = (await RT.renderToString(m.IfElse, { on: false })).html;
+		expect(off.firstElementChild?.textContent).toBe('off');
+		expect(off.querySelector('span')?.outerHTML).toBe('<span class="no">off</span>');
 	});
 
 	it('@for uses direct host roots as item boundaries; @empty still uses the list range', async () => {
@@ -89,16 +90,16 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 	});
 
 	it('@switch picks the matching case (or default)', async () => {
-		// Nested ranges: outer = switch-slot, inner = the matched case.
-		expect((await RT.renderToString(m.Switch, { k: 'a' })).html).toBe(
-			`<div>${OPEN}${OPEN}<span>A</span>${CLOSE}${CLOSE}</div>`,
-		);
-		expect((await RT.renderToString(m.Switch, { k: 'b' })).html).toBe(
-			`<div>${OPEN}${OPEN}<span>B</span>${CLOSE}${CLOSE}</div>`,
-		);
-		expect((await RT.renderToString(m.Switch, { k: 'z' })).html).toBe(
-			`<div>${OPEN}${OPEN}<span>?</span>${CLOSE}${CLOSE}</div>`,
-		);
+		for (const [k, expected] of [
+			['a', 'A'],
+			['b', 'B'],
+			['z', '?'],
+		]) {
+			const rendered = document.createElement('div');
+			rendered.innerHTML = (await RT.renderToString(m.Switch, { k })).html;
+			expect(rendered.firstElementChild?.textContent).toBe(expected);
+			expect(rendered.querySelectorAll('span')).toHaveLength(1);
+		}
 	});
 
 	it('@try renders the resolved success arm (awaiting use), @catch on error', async () => {

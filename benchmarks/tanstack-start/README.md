@@ -49,8 +49,11 @@ node ../bench.mjs --quick tanstack-start   # via the unified runner
   and Octane Nitro. It verifies their visible navigation, loader content, 404
   status, initial state, and genuinely streamed deferred values before applying
   deterministic raw/gzip HTML budgets and compact, unique managed-asset key
-  limits to both Octane deployments. Set `START_WORK_TARGET_DIR` to run the
-  gate against an immutable copy of the three production outputs.
+  limits to both Octane deployments. Each response also reports Brotli size,
+  parsed HTML comment count and bytes, and renderer head-ownership comment
+  count, so hydration-marker costs remain visible next to the React control.
+  Set `START_WORK_TARGET_DIR` to run the gate against an immutable copy of the
+  three production outputs.
 
 Both correctness gates are fully green, including DOM-identity preservation
 across client child navigation (verified by `remount-probe.mjs`; an earlier

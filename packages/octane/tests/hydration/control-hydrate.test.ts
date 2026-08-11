@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync } from '../../src/index.js';
+import { hydrateRoot, flushSync, startTransition } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { FragmentIfRows, Toggle, Pick } from './_fixtures/control.tsrx';
 
@@ -85,6 +85,67 @@ describe('hydrateRoot — @if (SSR Phase 6 / M3)', () => {
 		expect(container.querySelector('.off')).toBe(off); // adopted
 		root.unmount();
 	});
+
+	it('preserves adopted owner identity, state, and events across urgent and transition arm swaps', () => {
+		const { html } = ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = html;
+		const owner = container.querySelector('#toggle');
+		const adopted = container.querySelector('#hit') as HTMLButtonElement;
+		const root = hydrateRoot(container, Toggle, { on: true });
+		flushSync(() => {});
+
+		expect(container.querySelector('#toggle')).toBe(owner);
+		expect(container.querySelector('#hit')).toBe(adopted);
+		flushSync(() => adopted.click());
+		expect(adopted.textContent).toBe('on:1');
+
+		startTransition(() => root.render(Toggle, { on: false }));
+		flushSync(() => {});
+		expect(container.querySelector('#toggle')).toBe(owner);
+		expect(container.querySelector('.off')?.textContent).toBe('off');
+		expect(container.querySelector('#hit')).toBeNull();
+
+		root.render(Toggle, { on: true });
+		flushSync(() => {});
+		const reentered = container.querySelector('#hit') as HTMLButtonElement;
+		expect(container.querySelector('#toggle')).toBe(owner);
+		expect(reentered.textContent).toBe('on:1');
+		expect(container.querySelector('.off')).toBeNull();
+		flushSync(() => reentered.click());
+		expect(reentered.textContent).toBe('on:2');
+
+		startTransition(() => root.render(Toggle, { on: false }));
+		flushSync(() => {});
+		expect(container.querySelector('#toggle')).toBe(owner);
+		expect(container.querySelector('.off')?.textContent).toBe('off');
+		expect(container.querySelector('#hit')).toBeNull();
+		root.unmount();
+	});
+
+	it('recovers when the server selected the opposite host arm and remains interactive', () => {
+		const { html } = ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = html;
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		let root;
+		try {
+			root = hydrateRoot(container, Toggle, { on: false });
+			flushSync(() => {});
+		} finally {
+			errorSpy.mockRestore();
+			warnSpy.mockRestore();
+		}
+
+		expect(container.querySelector('.off')?.textContent).toBe('off');
+		expect(container.querySelector('#hit')).toBeNull();
+		root.render(Toggle, { on: true });
+		flushSync(() => {});
+		const button = container.querySelector('#hit') as HTMLButtonElement;
+		expect(button.textContent).toBe('on:0');
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('on:1');
+		root.unmount();
+	});
 });
 
 describe('hydrateRoot — @switch (SSR Phase 6 / M3)', () => {
@@ -97,6 +158,31 @@ describe('hydrateRoot — @switch (SSR Phase 6 / M3)', () => {
 		flushSync(() => {});
 		expect(container.querySelector('.b')).toBe(span); // adopted, not rebuilt
 		expect((container.querySelector('.b') as HTMLElement).textContent).toBe('BBB');
+		root.unmount();
+	});
+
+	it('adopts its default host and repeatedly swaps cases without replacing the owner', () => {
+		const { html } = ServerRT.renderToString(server.Pick, { k: 'other' });
+		container.innerHTML = html;
+		const owner = container.querySelector('#pick');
+		const defaultSpan = container.querySelector('.d');
+		const root = hydrateRoot(container, Pick, { k: 'other' });
+		flushSync(() => {});
+		expect(container.querySelector('#pick')).toBe(owner);
+		expect(container.querySelector('.d')).toBe(defaultSpan);
+
+		for (const [k, selector, content] of [
+			['a', '.a', 'AAA'],
+			['b', '.b', 'BBB'],
+			['other', '.d', '???'],
+			['a', '.a', 'AAA'],
+		]) {
+			root.render(Pick, { k });
+			flushSync(() => {});
+			expect(container.querySelector('#pick')).toBe(owner);
+			expect(container.querySelector(selector)?.textContent).toBe(content);
+			expect(container.querySelectorAll('#pick > span')).toHaveLength(1);
+		}
 		root.unmount();
 	});
 });
