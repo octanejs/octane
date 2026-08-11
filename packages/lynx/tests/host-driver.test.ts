@@ -3718,6 +3718,175 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(papi.calls).toEqual([]);
 	});
 
+	it('retires a complete compact run without disturbing its shell, events, or generations', () => {
+		const { container, driver, page } = createHost(64);
+		const program: UniversalHostTemplateProgram = Object.freeze({
+			nodes: Object.freeze([
+				Object.freeze({ type: 'view', parent: -1, props: Object.freeze({ class: 'row' }) }),
+				Object.freeze({ type: 'text', parent: 0, props: Object.freeze({}) }),
+				Object.freeze({ type: '#text', parent: 1, props: Object.freeze({ value: 'ready' }) }),
+			]),
+			events: Object.freeze([
+				Object.freeze({ node: 0, type: 'bindtap', priority: 'default' as const }),
+			]),
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'shell' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'rows' } },
+				{
+					op: 'mount-template-run',
+					parent: 2,
+					before: null,
+					program,
+					firstId: 10,
+					firstListenerId: 100,
+					count: 2,
+					values: Object.freeze([]),
+				},
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+			{ compact: true, lazyPublicInstances: true },
+		).apply();
+		const shell = page.children[0]!;
+		const rows = shell.children[0]!;
+		const first = rows.children[0]!;
+		const second = rows.children[1]!;
+		const firstEvent = first.events.get('bindEvent:tap')!;
+		const secondEvent = second.events.get('bindEvent:tap')!;
+		const teardownCommands: UniversalHostCommand[] = [
+			{ op: 'event', id: 10, type: 'bindtap', listener: null },
+			{ op: 'event', id: 13, type: 'bindtap', listener: null },
+			{ op: 'remove', parent: 2, id: 10 },
+			{ op: 'remove', parent: 2, id: 13 },
+			{ op: 'destroy', id: 12 },
+			{ op: 'destroy', id: 11 },
+			{ op: 'destroy', id: 10 },
+			{ op: 'destroy', id: 15 },
+			{ op: 'destroy', id: 14 },
+			{ op: 'destroy', id: 13 },
+		];
+
+		const abandoned = prepareLynxHostBatch(container, batch(2, teardownCommands));
+		abandoned.abort();
+		abandoned.apply();
+		expect(rows.children).toEqual([first, second]);
+		expect(resolveLynxHostNativeEvent(container, firstEvent)).toEqual({
+			listener: 100,
+			priority: 'default',
+		});
+
+		const teardown = prepareLynxHostBatch(container, batch(2, teardownCommands));
+		expect(teardown.handleDelta.map((delta) => (delta.op === 'destroy' ? delta.id : -1))).toEqual([
+			12, 11, 10, 15, 14, 13,
+		]);
+		teardown.apply();
+		expect(page.children).toEqual([shell]);
+		expect(shell.children).toEqual([rows]);
+		expect(rows.children).toEqual([]);
+		expect(first.events.size).toBe(0);
+		expect(second.events.size).toBe(0);
+		expect(resolveLynxHostNativeEvent(container, firstEvent)).toBeNull();
+		expect(resolveLynxHostNativeEvent(container, secondEvent)).toBeNull();
+		expect(container.instanceCount).toBe(2);
+		expect(driver.getPublicInstance(container, 10)).toBeNull();
+
+		const remount = prepareLynxHostBatch(
+			container,
+			batch(3, [
+				{
+					op: 'mount-template-run',
+					parent: 2,
+					before: null,
+					program,
+					firstId: 10,
+					firstListenerId: 200,
+					count: 2,
+					values: Object.freeze([]),
+				},
+			]),
+			{ compact: true, incrementalCompact: true, lazyPublicInstances: true },
+		);
+		expect(remount.compactHostCount).toBeUndefined();
+		remount.apply();
+		expect(rows.children).toHaveLength(2);
+		prepareLynxHostBatch(container, batch(4, [])).apply();
+		const repeatedTeardown = prepareLynxHostBatch(
+			container,
+			batch(5, [
+				{ op: 'event', id: 10, type: 'bindtap', listener: null },
+				{ op: 'event', id: 13, type: 'bindtap', listener: null },
+				{ op: 'remove', parent: 2, id: 10 },
+				{ op: 'remove', parent: 2, id: 13 },
+				{ op: 'destroy', id: 12 },
+				{ op: 'destroy', id: 11 },
+				{ op: 'destroy', id: 10 },
+				{ op: 'destroy', id: 15 },
+				{ op: 'destroy', id: 14 },
+				{ op: 'destroy', id: 13 },
+			]),
+		);
+		expect(
+			repeatedTeardown.handleDelta.every(
+				(delta) => delta.op === 'destroy' && delta.generation === 2,
+			),
+		).toBe(true);
+		repeatedTeardown.apply();
+		expect(rows.children).toEqual([]);
+
+		prepareLynxHostBatch(
+			container,
+			batch(6, [
+				{ op: 'create', id: 10, type: 'view', props: { id: 'replacement' } },
+				{ op: 'insert', parent: 2, id: 10, before: null },
+			]),
+		).apply();
+		expect(driver.getPublicInstance(container, 10)?.generation).toBe(3);
+		expect(rows.children.map((node) => node.id)).toEqual(['replacement']);
+	});
+
+	it('retains compact-run ownership for terminal cleanup when fast teardown faults', () => {
+		const { container, page, papi } = createHost(65);
+		const program: UniversalHostTemplateProgram = Object.freeze({
+			nodes: Object.freeze([Object.freeze({ type: 'view', parent: -1, props: Object.freeze({}) })]),
+			events: Object.freeze([]),
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{
+					op: 'mount-template-run',
+					parent: null,
+					before: null,
+					program,
+					firstId: 10,
+					firstListenerId: null,
+					count: 2,
+					values: Object.freeze([]),
+				},
+			]),
+			{ compact: true, lazyPublicInstances: true },
+		).apply();
+		const failure = new Error('fast teardown remove failed');
+		papi.failNext('remove', 'before', failure);
+		const teardown = prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{ op: 'remove', parent: null, id: 10 },
+				{ op: 'remove', parent: null, id: 11 },
+				{ op: 'destroy', id: 10 },
+				{ op: 'destroy', id: 11 },
+			]),
+		);
+		expect(() => teardown.apply()).toThrow(failure);
+		expect(teardown.mutationStarted).toBe(true);
+		expect(container.acceptedVersion).toBe(2);
+		expect(disposeLynxHostContainer(container).complete).toBe(true);
+		expect(page.children).toEqual([]);
+	});
+
 	it('preserves compact generation tombstones across destroy, identity reuse, and recreation', () => {
 		const { container, driver, page } = createHost(41);
 		const program: UniversalHostTemplateProgram = Object.freeze({
