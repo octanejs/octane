@@ -19613,7 +19613,9 @@ export function childSlot(
 		}
 		const fastFlags = compiledMapFlags || 0;
 		const ssrMarkerless =
-			compiledMapBody === undefined ? markerlessMappedFallback : (fastFlags & 16) !== 0;
+			compiledMapBody === undefined
+				? markerlessMappedFallback || body === deoptItemBody
+				: (fastFlags & 16) !== 0;
 		let pure = (fastFlags & 1) !== 0;
 		let lite = false;
 		if (compiledMapBody !== undefined) {
@@ -26139,8 +26141,9 @@ function mountItem<T>(
 	// component-bearing) keeps the `it` pair. A later shape flip promotes the
 	// self-marked block to a minted pair in place (see deoptItemBody).
 	singleRoot: boolean | 2,
-	// True only for compiled direct-host items whose SSR output omitted the item
-	// pair. Hydration can therefore adopt the existing host as start === end.
+	// True for compiled direct-host items and generic descriptor lists. A pure
+	// descriptor host self-delimits; component/text/empty descriptor items retain
+	// their explicit pair and continue through the marked hydration branch.
 	ssrMarkerless: boolean,
 	// Pure-host → blocks upgrade adoption: an existing raw child node this item
 	// should take over IN PLACE (self-marked directly, or markers minted around
@@ -26150,12 +26153,24 @@ function mountItem<T>(
 ): Block {
 	const hydration = activeHydration();
 	if (hydration !== null) {
-		if (ssrMarkerless && !hydration.isOpen(hydration.node)) {
+		if (
+			ssrMarkerless &&
+			!hydration.isOpen(hydration.node) &&
+			(singleRoot !== 2 ||
+				body !== deoptItemBody ||
+				(isHostDescriptor(item) && !descNeedsBlocks(item)))
+		) {
 			// The outer @for pair is the only list framing on the wire. Each proven
 			// direct-host item self-delimits, exactly like the existing client-mount
 			// singleRoot path. If the client has more items than the server, the
 			// cursor has reached the outer close; fall through to a fresh mount.
-			if (hydration.node !== null && hydration.node !== forSlot.end) {
+			if (
+				hydration.node !== null &&
+				hydration.node !== forSlot.end &&
+				(singleRoot !== 2 ||
+					body !== deoptItemBody ||
+					(hydration.node.nodeType === 1 && hydration.node.parentNode === parentNode))
+			) {
 				const root = hydration.node;
 				const block = createBlock(
 					'control-flow',
@@ -26169,6 +26184,7 @@ function mountItem<T>(
 				);
 				block.forSlot = forSlot;
 				block.itemIndex = index;
+				if (singleRoot === 2 && body === deoptItemBody) block.deoptNode = root;
 				renderBlock(block);
 				hydration.node = block.endMarker?.nextSibling ?? root.nextSibling;
 				return block;

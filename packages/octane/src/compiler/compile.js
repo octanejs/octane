@@ -5955,6 +5955,22 @@ function isPlainHostRoot(node) {
 	);
 }
 
+/**
+ * A direct body host can adopt its enclosing control-flow range on hydration.
+ *
+ * Keep this narrower than the general single-root proof: setup statements,
+ * components, nested directives, and head-hoisted hosts cannot guarantee that
+ * the range's first child is the branch's own hydratable element.
+ */
+function canBorrowSsrHostBranchRange(statements) {
+	if (statements == null || statements.length !== 1 || !isPlainHostRoot(statements[0])) {
+		return false;
+	}
+	const host = statements[0];
+	const tag = host.id?.name ?? host.openingElement?.name?.name;
+	return tag !== 'title' && tag !== 'meta' && tag !== 'link';
+}
+
 function statementsOf(node) {
 	if (node == null) return [];
 	return node.type === 'BlockStatement' ? node.body || [] : [node];
@@ -6152,6 +6168,44 @@ function isSsrMarkerlessForItem(node) {
 	const body = node?.body?.body || [];
 	const jsxChildren = body.filter((s) => isJsxNode(s));
 	return jsxChildren.length === 1 && isPlainHostRoot(jsxChildren[0]);
+}
+
+/**
+ * A same-module, single-host component already supplies a complete SSR range.
+ *
+ * The keyed item can adopt that existing component pair instead of wrapping it
+ * again. Its component call then adopts the host through the established
+ * singleRoot path. Explicit keys, spread/children overrides, imported or
+ * dynamic callees, and additional item statements cannot use that proof.
+ */
+function canShareSsrComponentItemRange(node, ctx) {
+	const body = node?.body?.body || [];
+	if (body.length !== 1) return false;
+	const component = body[0];
+	if (
+		(component?.type !== 'Element' && component?.type !== 'JSXElement') ||
+		!isComponentTag(component)
+	) {
+		return false;
+	}
+
+	const tag = component.openingElement?.name || component.id || component.name;
+	if (
+		(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
+		!ctx.ssrSingleRootComponents?.has(tag.name) ||
+		(component.children || []).length !== 0
+	) {
+		return false;
+	}
+
+	const attributes = component.attributes || component.openingElement?.attributes || [];
+	return !attributes.some((attribute) => {
+		if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
+			return true;
+		}
+		const name = attribute.name?.name || attribute.name;
+		return name === 'key' || name === 'children';
+	});
 }
 
 // Direct host-row mounting skips component-render bookkeeping. Keep the proof
@@ -9236,6 +9290,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		nextFragId: 0,
 		nextHelperId: 0,
 		componentInfo: new Map(),
+		ssrSingleRootComponents: new Set(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		// Scaffolding without a more precise authored construct maps here.
@@ -9275,6 +9330,22 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
+	// Mirror the client's same-module shape proof without populating its richer
+	// componentInfo records on the independent server codegen path. Register all
+	// declarations before emitting any body so forward references stay eligible.
+	for (const node of ast.body) {
+		const component =
+			node.type === 'ExportDefaultDeclaration' || node.type === 'ExportNamedDeclaration'
+				? node.declaration
+				: node;
+		if (
+			component?.id &&
+			(isComponentFunction(component) || isReturnJsxFunction(component)) &&
+			singleHostComponentRoot(component)
+		) {
+			ctx.ssrSingleRootComponents.add(component.id.name);
+		}
+	}
 
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
 	for (const node of ast.body) {
@@ -11172,11 +11243,11 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	if (thenSub) inlinedSubs.push(thenSub.fn);
 	let elseCall = ssrHtmlTemplate([], node, ctx);
 	let elseFnName = null;
+	let elseStmts = null;
 	if (node.alternate) {
 		// An `else if` arrives as an IfStatement; wrap it so it recurses through
 		// ssrEmitNode and gets its own marker.
-		const elseStmts =
-			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
+		elseStmts = node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
 		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
 		elseFnName = elseSub.fnName;
 		inlinedSubs.push(elseSub.fn);
@@ -11196,21 +11267,20 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 		thenSub ? thenSub.fnName : null,
 		elseFnName,
 	]);
-	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
-	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
-	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
-	// like @for. The not-taken arm emits no inner range (just `''`).
+	// A guaranteed direct host in every arm can borrow the outer slot range;
+	// otherwise retain the inner branch range required by opaque/multi-node arms.
+	const borrowBranchRange =
+		canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts);
+	const thenCall = thenSub
+		? ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)
+		: null;
 	const thenInner = thenSub
 		? ssrCall(
 				'ssrArm',
 				[
 					b.literal('then', '"then"'),
 					ssrThunk(
-						ssrCall(
-							'ssrBlock',
-							[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
-							node.consequent,
-						),
+						borrowBranchRange ? thenCall : ssrCall('ssrBlock', [thenCall], node.consequent),
 						node.consequent,
 					),
 				],
@@ -11222,7 +11292,10 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 				'ssrArm',
 				[
 					b.literal('else', '"else"'),
-					ssrThunk(ssrCall('ssrBlock', [elseCall], node.alternate), node.alternate),
+					ssrThunk(
+						borrowBranchRange ? elseCall : ssrCall('ssrBlock', [elseCall], node.alternate),
+						node.alternate,
+					),
 				],
 				node.alternate,
 			)
@@ -11389,7 +11462,10 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
 		node,
 	);
-	const itemHtml = markerlessItem ? itemCall : ssrCall('ssrBlock', [itemCall], node);
+	const itemHtml =
+		markerlessItem || canShareSsrComponentItemRange(node, ctx)
+			? itemCall
+			: ssrCall('ssrBlock', [itemCall], node);
 	const renderItem = itemNeedsIdentity
 		? ssrCall('ssrArm', [itemKey, ssrThunk(itemHtml, node)], node)
 		: itemHtml;
@@ -11464,10 +11540,14 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
+	const cases = node.cases || [];
+	const borrowBranchRange =
+		cases.some((arm) => arm.test == null) &&
+		cases.every((arm) => canBorrowSsrHostBranchRange(arm.consequent));
 	const arms = [];
 	let defaultCall = ssrHtmlTemplate([], node, ctx);
 	let caseIndex = 0;
-	for (const c of node.cases || []) {
+	for (const c of cases) {
 		const sub = ssrCompileSub(
 			c.consequent || [],
 			ctx,
@@ -11482,14 +11562,14 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 		// itself starts before it, so anchor the arm on the keyword when known.
 		const armOrigin = c.keyword ?? c;
 		registerClauseOrigin(ctx, c.keyword, [sub.fnName]);
-		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
-		// client adopts it as the branch range during hydration (no inserted markers).
+		// Direct-host cases can borrow the outer slot range, just like @if arms.
+		const armCall = ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin);
 		const renderedArm = ssrCall(
 			'ssrArm',
 			[
 				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
 				ssrThunk(
-					ssrCall('ssrBlock', [ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin)], armOrigin),
+					borrowBranchRange ? armCall : ssrCall('ssrBlock', [armCall], armOrigin),
 					armOrigin,
 				),
 			],

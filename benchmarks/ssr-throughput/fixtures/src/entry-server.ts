@@ -1,9 +1,11 @@
 import { prerender } from 'octane/static';
+import { renderToStaticMarkup } from 'octane/server';
 import { WaterfallApp } from './Waterfall.tsrx';
 import { ParallelApp, NestedApp } from './Parallel.tsrx';
 import { DeoptPageFast } from './DeoptFast.tsrx';
 import { DeoptPagePlain } from './deopt-plain';
 import { EscapeApp } from './Escape.tsrx';
+import { ControlFlowPage } from './ControlFlow.tsrx';
 
 // SSR entry for the Part-2 fixtures — the harness (../run.mjs) imports the
 // BUILT bundle of this module and times these render fns (crib of the
@@ -39,6 +41,14 @@ export async function renderDeoptPlain(): Promise<BodyResult> {
 	// prerender normalizes a descriptor-returning root through ssrChild (same as
 	// ssrComponent does for children), so the plain-.ts page renders directly.
 	return toBody(await prerender(DeoptPagePlain as any));
+}
+
+export async function renderControlFlow(): Promise<BodyResult> {
+	return toBody(await prerender(ControlFlowPage));
+}
+
+export function renderControlFlowStatic(): BodyResult {
+	return toBody(renderToStaticMarkup(ControlFlowPage));
 }
 
 export async function renderEscapeHeavy(): Promise<BodyResult> {

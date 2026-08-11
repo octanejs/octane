@@ -18,6 +18,7 @@ benchmarks/ssr-throughput/
 ├── fixtures/       # octane-only SSR fixtures (waterfall / deopt-page / escape-heavy)
 │   └── src/        # .tsrx + plain-.ts twins + deterministic seeded data modules
 ├── run.mjs         # builds bundles into dist/, times them, prints tables + BENCH_JSON
+├── payload.mjs     # production HTML, compression, marker, and stream-carrier audit
 ├── package.json    # harness deps (vite + externalized framework runtimes)
 └── README.md
 ```
@@ -99,6 +100,29 @@ time-budgeted; per-op sample counts are reported). `BENCH_JSON` follows the
 shared contract: ms stats under `ops.render` (plus `opsPerSec`), payload
 bytes / marker counts / memory growth under `meta`, a top-level `failed` on any
 gate failure (and a non-zero exit).
+
+## Production HTML payload audit
+
+`pnpm --dir benchmarks/ssr-throughput bench:payload` builds only the Octane and
+React fixtures needed to compare four production response shapes:
+
+- the same 50-card news page through Octane TSRX, Octane JSX, and React;
+- the same 300-card component-heavy page through compiled TSRX and generic
+  `createElement` descriptors, with its identical comment-free markup as a
+  control;
+- 300 fully specified host-only `@if` and `@switch` branches, compared with
+  their byte-identical non-hydratable visible markup; and
+- the same 10-boundary streaming Suspense page through Octane and React.
+
+Each response reports its raw, gzip, and Brotli size, hydration-comment count
+and bytes, script bytes, and the number, size, and JSON-encoding expansion of
+Octane's streamed segment carriers. The audit first proves byte-identical
+visible HTML for the buffered scenarios and applies the shared streaming
+correctness gate before reporting wire size.
+
+Run `node benchmarks/ssr-throughput/payload.mjs --no-build` to reuse the
+previous production outputs, or set `BENCH_JSON=/tmp/ssr-payload.json` to save
+the full compressed-size and marker-category breakdown.
 
 ## Caveats / bias notes
 

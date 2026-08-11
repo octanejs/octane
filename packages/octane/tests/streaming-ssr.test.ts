@@ -24,6 +24,7 @@ import {
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
 import { DeferredWithPermanentStaticStream } from './_fixtures/ssr-permanent-static-stream.tsrx';
+import { RawTemplateBoundary } from './conformance/_fixtures/fizz-streaming.tsrx';
 
 // Streaming SSR — renderToPipeableStream / renderToReadableStream: shell with
 // fallbacks + <template data-oct-b> sentinels, out-of-order hidden segments
@@ -57,6 +58,9 @@ const server = serverModule();
 const permanentStaticServer = loadServerFixture<{
 	DeferredWithPermanentStaticStream: typeof DeferredWithPermanentStaticStream;
 }>('packages/octane/tests/_fixtures/ssr-permanent-static-stream.tsrx');
+const rawTemplateServer = loadServerFixture<{
+	RawTemplateBoundary: typeof RawTemplateBoundary;
+}>('packages/octane/tests/conformance/_fixtures/fizz-streaming.tsrx');
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;
@@ -632,6 +636,58 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		// segment has been activated.
 		expect((window as any).$OCTS[id]).toContain('streamed!');
 		expect(shell).not.toContain('streamed!');
+	});
+
+	it('streams ordinary markup compactly while safely revealing and hydrating script-shaped raw HTML', async () => {
+		const source =
+			'<!--authored-comment-->' +
+			'<span id="carrier-live" data-open="<!--<script>" ' +
+			'data-close="</ScRiPt><ScRiPt data-pwn=carrier>">visible</span>' +
+			'</template><button id="carrier-button">ready</button>';
+		const serverValue = deferred<string>();
+		const output = collector();
+		ServerRT.renderToPipeableStream(rawTemplateServer.RawTemplateBoundary, {
+			promise: serverValue.promise,
+		}).pipe(output.dest);
+
+		serverValue.resolve(source);
+		await output.ended;
+		const segment = output.chunks.slice(1).join('');
+
+		// Ordinary HTML remains compact on the public response while script-shaped
+		// user input cannot terminate the JSON carrier or enter double-escaped mode.
+		expect(segment).toContain('<!--authored-comment-->');
+		expect(segment).toContain('<span id=');
+		expect(segment).toContain('</template><button id=');
+
+		container.innerHTML = output.chunks.join('');
+		const carrier = container.querySelector('[data-oct-s] > script[type="application/json"]');
+		expect(carrier).not.toBeNull();
+		expect(JSON.parse(carrier!.textContent!)).toContain(source);
+		expect(container.querySelector('[data-pwn]')).toBeNull();
+
+		activate(container);
+		const content = container.querySelector('#raw-template-content') as HTMLDivElement;
+		const live = container.querySelector('#carrier-live') as HTMLSpanElement;
+		const button = container.querySelector('#carrier-button') as HTMLButtonElement;
+		expect(live.textContent).toBe('visible');
+		expect(live.getAttribute('data-open')).toBe('<!--<script>');
+		expect(live.getAttribute('data-close')).toBe('</ScRiPt><ScRiPt data-pwn=carrier>');
+		expect(button.textContent).toBe('ready');
+		expect(container.querySelector('#raw-template-loading')).toBeNull();
+		expect(container.querySelector('[data-pwn]')).toBeNull();
+
+		const clientValue = new Promise<string>(() => {});
+		const root = hydrateRoot(container, RawTemplateBoundary, { promise: clientValue });
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#raw-template-content')).toBe(content);
+			expect(container.querySelector('#carrier-live')).toBe(live);
+			expect(container.querySelector('#carrier-button')).toBe(button);
+			expect(container.querySelector('[data-pwn]')).toBeNull();
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('balances canonical counted markers in the inline segment swap runtime', async () => {

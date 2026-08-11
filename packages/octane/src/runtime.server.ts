@@ -1229,7 +1229,12 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	return ssrChildValue(v, scope, true);
 }
 
-function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean): string {
+function ssrChildValue(
+	v: unknown,
+	scope: SSRScope,
+	includeKeyedSingle: boolean,
+	selfMarkItem: boolean = false,
+): string {
 	// Every renderable hole serializes to ONE `<!--[-->…<!--]-->` range so the
 	// client's childSlot adopts a uniform marker pair on hydration regardless of
 	// whether the value is a component, an element, a primitive, or empty — and
@@ -1264,7 +1269,7 @@ function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean)
 			for (let i = 0; i < preparedList.items.length; i++) {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
-				out += withAsyncIdentity('item', key, () => ssrChildValue(item, scope, false));
+				out += withAsyncIdentity('item', key, () => ssrChildValue(item, scope, false, true));
 			}
 			return ssrBlock(out);
 		});
@@ -1283,8 +1288,16 @@ function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean)
 			// so only the outer marker pair must line up). COMPONENT descriptor →
 			// ssrComponent, passing `children` through (don't drop them).
 			const render = (): string => {
-				if (typeof d.type === 'string')
-					return ssrBlock(ssrHostElement(d.type, d.props, d.children, scope));
+				if (typeof d.type === 'string') {
+					// Keep the established argument evaluation order and read each
+					// public descriptor field exactly once. Only the ACTUAL children
+					// handed to the serializer can prove a self-delimiting host.
+					const type = d.type;
+					const props = d.props;
+					const children = d.children;
+					const html = ssrHostElement(type, props, children, scope);
+					return selfMarkItem && serverHostHasPrimitiveChildren(children) ? html : ssrBlock(html);
+				}
 				return ssrComponentDescriptor(d, scope);
 			};
 			const renderType = () => withAsyncIdentity('child-type', d.type, render);
@@ -1501,14 +1514,15 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 				const item = preparedList.items[i];
 				const key = preparedList.keys[i];
 				out += withAsyncIdentity('item', key, () => {
-					// The de-opt list's own item range is sufficient for pure host/text
-					// values: deoptItemBody adopts/reconciles the node directly inside it.
+					// A pure host is its own keyed-item boundary. Text and empty values
+					// still need an explicit movable range because they do not provide
+					// one stable Element root.
 					// A component-bearing value already contributes the coextensive range
 					// borrowed by its nested childSlot; wrapping it again would make hydration
 					// mount a duplicate beside the server content.
 					return serverDescNeedsBlocks(item)
 						? ssrChildValue(item, scope, false)
-						: ssrBlock(ssrDescriptorContent(item, scope));
+						: ssrDeoptItemContent(item, scope);
 				});
 			}
 			return ssrBlock(out);
@@ -1561,6 +1575,32 @@ function scriptDescriptorText(v: unknown): string | null {
 	}
 	if (typeof v === 'object' || typeof v === 'function') return null;
 	return String(v);
+}
+
+// A host with a primitive or empty actual child stays on the client's raw-host
+// reconciliation path and therefore provides one stable Element boundary. Any
+// object, array, iterable, portal, or render function remains conservatively
+// marked. Classify the very value already read for serialization so public
+// getters and forwarding Proxies cannot lie or be evaluated an extra time.
+function serverHostHasPrimitiveChildren(children: unknown): boolean {
+	return children === null || (typeof children !== 'object' && typeof children !== 'function');
+}
+
+// Serialize one de-opt keyed item after its established serverDescNeedsBlocks
+// routing. Capture descriptor fields in exactly ssrDescriptorContent's ordinary
+// evaluation order, then decide whether the actual rendered host can self-mark.
+function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
+	if (value !== null && typeof value === 'object' && (value as any).$$kind === ELEMENT_TAG) {
+		const descriptor = value as ElementDescriptor;
+		if (typeof descriptor.type === 'string') {
+			const type = descriptor.type;
+			const props = descriptor.props;
+			const children = descriptor.children;
+			const html = ssrHostElement(type, props, children, scope);
+			return serverHostHasPrimitiveChildren(children) ? html : ssrBlock(html);
+		}
+	}
+	return ssrBlock(ssrDescriptorContent(value, scope));
 }
 
 // Serialize the CONTENT inside a host descriptor (a `createElement(...)` child
@@ -6932,8 +6972,11 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	// Putting it directly inside the protocol carrier would let the HTML parser
 	// terminate that carrier early and strand nodes outside the revealed content.
 	// Store the complete markup as script-safe JSON and parse it into a detached
-	// template in $OCTRC instead; `<` escaping makes the data script uncloseable.
-	const payload = JSON.stringify(content).replace(/</g, '\\u003c');
+	// template in $OCTRC instead. Escape both script-token directions: a closing
+	// token could terminate the carrier, while `<!--<script` could otherwise enter
+	// the HTML tokenizer's double-escaped state and swallow its real closing tag.
+	// Ordinary markup and hydration comments need no expansion.
+	const payload = JSON.stringify(content).replace(/<(?=\/?script)/gi, '\\u003c');
 	return (
 		'<div hidden ' +
 		STREAM_SEGMENT_ATTR +
