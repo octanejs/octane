@@ -1,4 +1,4 @@
-import { Camera } from '@octanejs/phosphor-icons';
+import { Camera } from '@octanejs/phosphor-icons/icons/camera';
 
 export function CameraFixture() {
 	return <Camera id="camera" size={32} color="purple" weight="duotone" mirrored alt="Camera" />;

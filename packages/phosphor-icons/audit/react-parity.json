@@ -68,12 +68,12 @@
         {
           "path": "packages/phosphor-icons/tests/_fixtures/parity.tsrx",
           "role": "support",
-          "sha256": "0e554c695d1148e5b672e7063863295f9de34d6a035b56226c60b89c0de1d54d"
+          "sha256": "bc1ae966c15bc002cf281d3e19a02bd07337040fe790c7b0747e1496b2beb8e9"
         },
         {
           "path": "packages/phosphor-icons/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "e9e9273cf6a61879d4c7b4c2805435c359c6d988b4708aca8be01af67d40f47a"
+          "sha256": "228c105f2b3781308f964c3395cae260be91b3a1c40962480b7cd2da8e359460"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
