@@ -580,9 +580,9 @@ differences:
 - **`<title>` accepts any children Octane can stringify** — multiple children
   and expressions concatenate. React 19 errors on non-string title children.
 
-Additionally, metadata and resources classify at a component's **body root**
-(beside the output node), the same placement the head-hoist model has always
-used — a `<title>` nested inside a host element is not hoisted.
+Metadata and resources hoist from ANY depth, matching React: an element
+nested inside a host partitions out of the body on both the client and the
+server, and a hoist inside an `@if` arm registers only while that arm renders.
 
 React Float **resources** are supported with React's semantics:
 
@@ -610,11 +610,20 @@ React Float **resources** are supported with React's semantics:
 
 Out of scope, deliberately: **suspensey commits** (React's
 suspend-until-the-stylesheet-loads behavior; Octane inserts the sheet and
-continues). Resource-hint options apply as a lenient
+continues).
+
+Resource hints share the Float identity model: `preinit(href, {as: 'style'})`
+IS a stylesheet resource (it honors a `precedence` option, default
+`"default"`, joins the precedence groups, and dedupes against
+`<link rel="stylesheet" precedence>`), `preinit(as: 'script')` dedupes against
+`<script async src>`, and a `preload`/`preloadModule` issued after the
+matching init is a no-op (the upgrade is one-way: preload-then-init keeps both
+tags). Image preloads carrying `imageSrcSet` key on the srcset+sizes pair
+rather than the fallback href. Malformed calls (missing/invalid `as`, empty
+href) warn in development and stay no-ops. Options serialize through a lenient
 attribute pass-through (`fetchPriority`, `imageSrcSet`, `imageSizes`, `media`,
-`integrity`, … all serialize correctly) without React's option validation, and
-`preload` + `preinit` of the same href are two entries rather than React's
-unified resource map.
+`integrity`, … all emit their canonical attributes); unknown option keys are
+passed through as attributes rather than dropped.
 
 ## Reconciler: LIS moves, identical results
 
@@ -826,8 +835,11 @@ errors; the failed root's tree still unmounts), and `onRecoverableError`
 (hydration recovered from a structural mismatch — see the hydration section).
 Each callback receives only the error: there is no `errorInfo`/`componentStack`
 second argument, matching the documented SSR `onError` shape (owner stacks are
-not part of Octane's API). Deletion-phase teardown errors keep their existing
-boundary routing and default report; they do not reach these callbacks.
+not part of Octane's API). Deletion-phase teardown errors (effect cleanups and
+ref detaches thrown while a subtree unmounts) keep their existing boundary
+routing and report through the same callbacks: boundary-claimed →
+`onCaughtError`, unclaimed → `onUncaughtError` (else the default
+`console.error`).
 
 ## Refs are props
 

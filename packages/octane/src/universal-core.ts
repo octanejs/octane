@@ -746,6 +746,26 @@ export interface UniversalRootOptions<Container> {
 	 * the standard global `queueMicrotask` (for example Lynx PrimJS).
 	 */
 	scheduleMicrotask?: (callback: () => void) => void;
+	/**
+	 * React 19 parity, reporting only: called after a `universalTry` catch arm
+	 * claims an error from this root — a render-time throw its arm catches, or
+	 * an effect/host-callback error routed to it between renders. Mirrors the
+	 * DOM runtime's `createRoot` option: only the error is passed (no
+	 * `errorInfo`/`componentStack` second argument).
+	 */
+	onCaughtError?: (error: unknown) => void;
+	/**
+	 * React 19 parity: called for an error no boundary claims. When provided it
+	 * REPLACES the default report for this root's scheduler-owned work — a
+	 * scheduled render error stops rethrowing out of the microtask flush (or,
+	 * on a transported root, out of `flushTransport()`), and an unrouted
+	 * effect/host-callback error stops rethrowing out of the commit or passive
+	 * flush. Direct `prepare()`/`render()`/`commit()` calls still throw: the
+	 * thrown attempt is that API's documented result channel. Recovery
+	 * semantics are unchanged either way — the failed attempt is discarded and
+	 * committed content is retained exactly as without the option.
+	 */
+	onUncaughtError?: (error: unknown) => void;
 }
 
 export interface UniversalTransaction {
@@ -1374,7 +1394,8 @@ class UniversalRendererRegionOwnerBridge implements RendererRegionOwnerBridge {
 			try {
 				dispose();
 			} catch (error) {
-				if (!routeUniversalOwnerError(this.owner, error)) console.error(error);
+				if (routeUniversalOwnerError(this.owner, error)) continue;
+				if (!reportUniversalUncaughtError(this.owner.root, error)) console.error(error);
 			}
 		}
 		cell.disposing = false;
@@ -3521,6 +3542,10 @@ function materializeValue(
 			resetDraftChildren(owner);
 			owner.hasBoundaryError = true;
 			owner.boundaryError = error;
+			// The catch arm claims this render error here, in the throwing attempt
+			// itself. Replays of an already-claimed error (the hasBoundaryError
+			// branch above) do not re-report.
+			reportUniversalCaughtError(owner.record.root, error);
 			const nodes = materializeScoped(owner, [...path, 'try-arm'], 'catch', () =>
 				boundary.catch!(error, () => {
 					owner.record.hasBoundaryError = false;
@@ -6369,6 +6394,61 @@ function runEffectCleanup(hook: EffectHook): void {
 	cleanup?.();
 }
 
+/**
+ * Root error-callback handlers live OFF the root's shape (mirroring the DOM
+ * runtime's Block-keyed WeakMap): registered only for roots created with at
+ * least one callback, so every other root pays a single module-null check on
+ * the (already cold) error paths and UniversalRootImpl's layout is untouched.
+ */
+interface UniversalRootErrorHandlers {
+	onCaughtError: ((error: unknown) => void) | undefined;
+	onUncaughtError: ((error: unknown) => void) | undefined;
+}
+
+let UNIVERSAL_ROOT_ERROR_HANDLERS: WeakMap<
+	UniversalRootImpl<any, any>,
+	UniversalRootErrorHandlers
+> | null = null;
+
+function registerUniversalRootErrorHandlers(
+	root: UniversalRootImpl<any, any>,
+	options: UniversalRootOptions<any>,
+): void {
+	const { onCaughtError, onUncaughtError } = options;
+	if (onCaughtError === undefined && onUncaughtError === undefined) return;
+	(UNIVERSAL_ROOT_ERROR_HANDLERS ??= new WeakMap()).set(root, { onCaughtError, onUncaughtError });
+}
+
+function universalRootErrorHandlersFor(
+	root: UniversalRootImpl<any, any>,
+): UniversalRootErrorHandlers | null {
+	if (UNIVERSAL_ROOT_ERROR_HANDLERS === null) return null;
+	return UNIVERSAL_ROOT_ERROR_HANDLERS.get(root) ?? null;
+}
+
+/** A throwing report callback must not corrupt recovery — report it and move on. */
+function invokeUniversalRootErrorHandler(handler: (error: unknown) => void, err: unknown): void {
+	try {
+		handler(err);
+	} catch (handlerErr) {
+		console.error(handlerErr);
+	}
+}
+
+/** Report a boundary-claimed error to the owning root's onCaughtError, if any. */
+function reportUniversalCaughtError(root: UniversalRootImpl<any, any>, err: unknown): void {
+	const h = universalRootErrorHandlersFor(root)?.onCaughtError;
+	if (h !== undefined) invokeUniversalRootErrorHandler(h, err);
+}
+
+/** True when the owning root's onUncaughtError consumed the report (callers skip their default). */
+function reportUniversalUncaughtError(root: UniversalRootImpl<any, any>, err: unknown): boolean {
+	const h = universalRootErrorHandlersFor(root)?.onUncaughtError;
+	if (h === undefined) return false;
+	invokeUniversalRootErrorHandler(h, err);
+	return true;
+}
+
 function routeUniversalOwnerError(owner: UniversalOwnerRecord, error: unknown): boolean {
 	for (let current = owner.parent; current !== null; current = current.parent) {
 		if (!current.isBoundary || current.disposed) continue;
@@ -6376,6 +6456,9 @@ function routeUniversalOwnerError(owner: UniversalOwnerRecord, error: unknown): 
 		current.boundaryError = error;
 		current.hasBoundaryError = true;
 		current.root.schedule();
+		// The boundary took ownership of the error episode; its catch-arm replay
+		// deliberately does not re-report, so this is the claim's single report.
+		reportUniversalCaughtError(current.root, error);
 		return true;
 	}
 	return false;
@@ -6406,7 +6489,8 @@ function runOwnedEffectCreate(hook: EffectHook): void {
 	try {
 		runEffectCreate(hook);
 	} catch (error) {
-		if (!routeUniversalOwnerError(hook.owner, error)) throw error;
+		if (routeUniversalOwnerError(hook.owner, error)) return;
+		if (!reportUniversalUncaughtError(hook.owner.root, error)) throw error;
 	}
 }
 
@@ -6414,7 +6498,8 @@ function runOwnedEffectCleanup(hook: EffectHook): void {
 	try {
 		runEffectCleanup(hook);
 	} catch (error) {
-		if (!routeUniversalOwnerError(hook.owner, error)) throw error;
+		if (routeUniversalOwnerError(hook.owner, error)) return;
+		if (!reportUniversalUncaughtError(hook.owner.root, error)) throw error;
 	}
 }
 
@@ -6422,7 +6507,9 @@ function runOwnedCommit(owner: UniversalOwnerRecord | null, work: () => void): v
 	try {
 		work();
 	} catch (error) {
-		if (owner === null || !routeUniversalOwnerError(owner, error)) throw error;
+		if (owner === null) throw error;
+		if (routeUniversalOwnerError(owner, error)) return;
+		if (!reportUniversalUncaughtError(owner.root, error)) throw error;
 	}
 }
 
@@ -7661,7 +7748,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				if (this.unmounted) return;
 				const input = this.scheduledRenderInput();
 				if (input === null) return;
-				const attempt = this.__prepareScheduled(input[0], input[1]);
+				let attempt: UniversalPreparedAttempt;
+				try {
+					attempt = this.__prepareScheduled(input[0], input[1]);
+				} catch (error) {
+					// Scheduled work has no direct caller to observe the throw — without
+					// a handler it surfaces through flushTransport()'s async-work error.
+					// A root created with onUncaughtError consumes its own report; the
+					// failed attempt is already discarded and recovery is unchanged.
+					if (!reportUniversalUncaughtError(this, error)) throw error;
+					return;
+				}
 				if (attempt.status === 'prepared') {
 					try {
 						await attempt.commitAsync();
@@ -7674,7 +7771,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		} else {
 			const input = this.scheduledRenderInput();
 			if (input === null) return;
-			const attempt = this.__prepareScheduled(input[0], input[1]);
+			let attempt: UniversalPreparedAttempt;
+			try {
+				attempt = this.__prepareScheduled(input[0], input[1]);
+			} catch (error) {
+				// Scheduled work has no direct caller to observe the throw — without a
+				// handler it escapes into the host's microtask channel. A root created
+				// with onUncaughtError consumes its own report; the failed attempt is
+				// already discarded and recovery is unchanged.
+				if (!reportUniversalUncaughtError(this, error)) throw error;
+				return;
+			}
 			if (attempt.status === 'prepared') attempt.commit();
 		}
 	}
@@ -7936,7 +8043,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						const batches = new Set(replay.transitionBatches);
 						for (const batch of this.takeScheduledTransitionBatches()) batches.add(batch);
 						this.finishTransitionBatches(batches);
-						throw error;
+						// A resumed replay is scheduler-owned work like any other scheduled
+						// render — a root created with onUncaughtError consumes its report.
+						if (!reportUniversalUncaughtError(this, error)) throw error;
+						return;
 					}
 					// Commit errors have transaction-owned acceptance semantics. In
 					// particular, do not cancel unrelated blocked transitions after a
@@ -7974,7 +8084,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const batches = new Set(replay.transitionBatches);
 			for (const batch of this.takeScheduledTransitionBatches()) batches.add(batch);
 			this.finishTransitionBatches(batches);
-			throw error;
+			// A resumed replay is scheduler-owned work like any other scheduled
+			// render — a root created with onUncaughtError consumes its report.
+			if (!reportUniversalUncaughtError(this, error)) throw error;
+			return;
 		}
 		if (attempt.status === 'prepared') attempt.commit();
 		else this.ensureScheduledTransitionWork();
@@ -12020,7 +12133,14 @@ export function createUniversalRoot<Container, PublicInstance>(
 			'Universal roots require options.scheduleMicrotask when the host has no global queueMicrotask.',
 		);
 	}
-	return new UniversalRootImpl(container, driver, options.transport ?? null, scheduleMicrotask);
+	const root = new UniversalRootImpl(
+		container,
+		driver,
+		options.transport ?? null,
+		scheduleMicrotask,
+	);
+	registerUniversalRootErrorHandlers(root, options);
+	return root;
 }
 
 function readGlobalMicrotaskScheduler(): ((callback: () => void) => void) | undefined {

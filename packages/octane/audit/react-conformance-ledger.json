@@ -20636,7 +20636,7 @@
     },
     {
       "caseId": "react-case-v1:446d3e80f94d2ab1a5aa",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFizzStaticNode-test.js",
       "title": "should call prerenderToNodeStream",
@@ -20644,7 +20644,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: prerenderToNodeStream resolves after the await-everything render completes and streams the complete document bytes; Octane has no postponed field (postpone/resume is a documented non-goal).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/static-prerender-stream.test.ts",
+          "testName": "resolves only after every use(thenable) settles; prelude carries the full document",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:44754ada20cf24bd6baa",

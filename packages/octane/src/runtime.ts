@@ -3743,7 +3743,7 @@ export function queueRefDetach(ref: any, el: Element | FragmentInstance | null):
 	// Capture the active teardown boundary (if we're inside an unmount walk) so a
 	// throwing detach at drain time routes there — React's safelyDetachRef →
 	// captureCommitPhaseError (ReactErrorBoundaries:2782).
-	refDetachQueue.push(ref, el, TEARDOWN_HANDLER);
+	refDetachQueue.push(ref, el, TEARDOWN_HANDLER, TEARDOWN_BLOCK);
 }
 
 interface RefDetachSuppression {
@@ -3784,7 +3784,7 @@ function withRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () 
 function drainRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
 	const q = refDetachQueue.splice(0);
-	for (let i = 0; i < q.length; i += 3) {
+	for (let i = 0; i < q.length; i += 4) {
 		try {
 			REF_CALLBACK_DEPTH++;
 			try {
@@ -3795,10 +3795,14 @@ function drainRefDetaches(): void {
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			// A throwing ref detach must not abort the commit (the remaining detaches
-			// + attaches still run) — route to the deletion's boundary like React.
+			// + attaches still run) — route to the deletion's boundary like React,
+			// reporting through the owning root's callbacks either way.
 			const handler = q[i + 2] as ((e: any) => void) | null;
-			if (handler !== null) handler(err);
-			else console.error(err);
+			const owner = q[i + 3] as Block | null;
+			if (handler !== null) {
+				handler(err);
+				reportCaughtError(owner, err);
+			} else if (!reportUncaughtError(owner, err)) console.error(err);
 		}
 	}
 }
@@ -4354,23 +4358,26 @@ function drainEffectEventCommitActions(): void {
 
 // Passive destroys of DELETED scopes, deferred past the sync phase (React
 // defers them to flushPassiveEffects — commitPassiveUnmountEffects). Flat
-// [cleanup, boundary-handler] pairs, pushed by unmountScope's effect-slot walk
+// [cleanup, boundary-handler, owner-block] triples, pushed by unmountScope's effect-slot walk
 // in deletion-walk order (parent→child, declaration order within a scope);
 // the captured handler routes a late throw to the try boundary that enclosed
 // the deletion — the same routing reportTeardownError gave the sync destroys.
-const pendingPassiveUnmounts: Array<Cleanup | ((err: any) => void) | null> = [];
+const pendingPassiveUnmounts: Array<Cleanup | ((err: any) => void) | Block | null> = [];
 
 function drainDeferredPassiveUnmounts(): void {
 	if (pendingPassiveUnmounts.length === 0) return;
 	const q = pendingPassiveUnmounts.splice(0);
-	for (let i = 0; i < q.length; i += 2) {
+	for (let i = 0; i < q.length; i += 3) {
 		try {
 			runEffectCleanupCallback(q[i] as Cleanup);
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = q[i + 1] as ((err: any) => void) | null;
-			if (handler !== null) handler(err);
-			else console.error(err);
+			const owner = q[i + 2] as Block | null;
+			if (handler !== null) {
+				handler(err);
+				reportCaughtError(owner, err);
+			} else if (!reportUncaughtError(owner, err)) console.error(err);
 		}
 	}
 }
@@ -5226,20 +5233,27 @@ export function componentSlotLite<P>(
 // detach throw (drainRefDetaches) routes to the same boundary.
 let TEARDOWN_DEPTH = 0;
 let TEARDOWN_HANDLER: ((err: any) => void) | null = null;
+/** The outermost deleted block — root-callback routing for teardown errors. */
+let TEARDOWN_BLOCK: Block | null = null;
 let TEARDOWN_ERRORS: any[] | null = null;
 
 function reportTeardownError(err: any): void {
 	if (TEARDOWN_HANDLER !== null) (TEARDOWN_ERRORS ??= []).push(err);
-	else console.error(err);
+	else if (!reportUncaughtError(TEARDOWN_BLOCK, err)) console.error(err);
 }
 
 function dispatchTeardownErrors(): void {
 	const errs = TEARDOWN_ERRORS;
 	const h = TEARDOWN_HANDLER;
+	const blk = TEARDOWN_BLOCK;
 	TEARDOWN_ERRORS = null;
 	TEARDOWN_HANDLER = null;
+	TEARDOWN_BLOCK = null;
 	if (errs !== null && h !== null) {
-		for (let i = 0; i < errs.length; i++) h(errs[i]);
+		for (let i = 0; i < errs.length; i++) {
+			h(errs[i]);
+			reportCaughtError(blk, errs[i]);
+		}
 	}
 }
 
@@ -5247,6 +5261,7 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 	if (block.disposed) return;
 	if (TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
 	try {
@@ -5364,7 +5379,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 			if (cleanup === undefined) continue;
 			slot.cleanup = undefined;
 			if (slot.phase === PASSIVE) {
-				pendingPassiveUnmounts.push(cleanup, TEARDOWN_HANDLER);
+				pendingPassiveUnmounts.push(cleanup, TEARDOWN_HANDLER, TEARDOWN_BLOCK);
 				// Arm the post-paint drain for unmounts OUTSIDE a commit
 				// (root.unmount()); a commit-driven unmount would re-arm in
 				// commitEffects anyway, deduped by the flag.
@@ -6929,6 +6944,7 @@ function promoteHmrBlockRange(block: Block): void {
 function resetHmrBlock(block: Block): void {
 	if (TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
 	let abortedRefs: SuspenseRefEntry[] | null = null;
@@ -7000,6 +7016,7 @@ function resetScopeChildren(scope: Scope): void {
 	const block = scope.block;
 	if (TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
 	// The bracket spans the WHOLE reset, not just the teardown call: a queued error is dispatched
@@ -26898,8 +26915,8 @@ export interface RootOptions {
 	 * render, passive-effect, or ref-attach channel. Octane passes only the
 	 * error — there is no `errorInfo`/`componentStack` second argument (owner
 	 * stacks are not part of Octane's API, matching the SSR `onError` shape).
-	 * Deletion-phase teardown errors keep their existing boundary routing and
-	 * default report; they do not reach this callback.
+	 * Deletion-phase teardown errors report here too once their enclosing
+	 * boundary claims them (the routing itself is unchanged).
 	 */
 	onCaughtError?: (error: unknown) => void;
 	/**
@@ -27607,8 +27624,10 @@ export function hydrateRoot(
 
 const _resourceHints = new Set<string>();
 
-function insertHeadHint(key: string, build: () => Element): void {
-	if (typeof document === 'undefined' || _resourceHints.has(key)) return;
+/** Known-hint check shared by insertHeadHint and cross-family suppression. */
+function hasHeadHint(key: string): boolean {
+	if (_resourceHints.has(key)) return true;
+	if (typeof document === 'undefined') return false;
 	// SSR dedupe: compare exact attribute VALUES rather than interpolating an
 	// href-derived key into a CSS selector. Quotes/brackets are valid URL text;
 	// treating them as selector syntax could throw before the hint is inserted.
@@ -27616,15 +27635,25 @@ function insertHeadHint(key: string, build: () => Element): void {
 	for (let i = 0; i < existing.length; i++) {
 		if (existing[i].getAttribute('data-oct-hint') === key) {
 			_resourceHints.add(key);
-			return;
+			return true;
 		}
 	}
+	return false;
+}
+
+function insertHeadHint(key: string, build: () => Element): void {
+	if (typeof document === 'undefined' || hasHeadHint(key)) return;
 	const el = build();
 	el.setAttribute('data-oct-hint', key);
 	document.head.appendChild(el);
 	// Publish dedupe state only after every DOM operation succeeds, so a failed
 	// build/append cannot poison the key and suppress a later valid retry.
 	_resourceHints.add(key);
+}
+
+/** Malformed-hint diagnostics (dev only; the call stays a no-op either way). */
+function warnHintUsage(message: string): void {
+	if (process.env.NODE_ENV !== 'production') console.error(message);
 }
 
 function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined): void {
@@ -27640,10 +27669,33 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 
 /** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (!href || !options?.as) return;
+	if (!href) {
+		warnHintUsage('preload() requires a non-empty string href; the call was ignored.');
+		return;
+	}
+	if (!options?.as || typeof options.as !== 'string') {
+		warnHintUsage(
+			'preload() requires a string `as` option (e.g. "style", "script", "font", "image"); ' +
+				'the call was ignored.',
+		);
+		return;
+	}
+	const as = options.as;
 	const rawHref = typeof href === 'string' ? href : String(href);
+	// After the matching resource is already live (a Float resource or preinit),
+	// a preload adds nothing — React's resource map has the same one-way
+	// upgrade: preload-then-init keeps both tags, init-then-preload no-ops.
+	if (as === 'style' && resourceState().sheets.has(rawHref)) return;
+	if (as === 'script' && resourceState().scripts.has(rawHref)) return;
+	// Image preloads with a srcset are keyed by the srcset+sizes pair, not the
+	// fallback href — two responsive preloads for one href stay distinct.
+	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
+	const key =
+		typeof imageSrcSet === 'string' && imageSrcSet !== ''
+			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
+			: 'preload:' + as + ':' + rawHref;
 	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint('preload:' + options.as + ':' + rawHref, () => {
+	insertHeadHint(key, () => {
 		const l = document.createElement('link');
 		l.rel = 'preload';
 		l.href = safeHref;
@@ -27652,26 +27704,39 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	});
 }
 
-/** React DOM `preinit(href, {as: 'style'|'script', …})` — executes/applies the resource. */
+/**
+ * React DOM `preinit(href, {as: 'style'|'script', …})` — executes/applies the
+ * resource. Routes through the Float resource inserts so preinit and the
+ * rendered resource forms share ONE identity: a preinit'd stylesheet joins the
+ * precedence groups (`precedence` option honored, default `'default'`) and
+ * dedupes against `<link rel="stylesheet" precedence>`; a preinit'd script
+ * dedupes against `<script async src>`.
+ */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (!href || !options?.as) return;
-	const as = options.as;
+	if (!href) {
+		warnHintUsage('preinit() requires a non-empty string href; the call was ignored.');
+		return;
+	}
+	const as = options?.as;
+	if (as !== 'style' && as !== 'script') {
+		warnHintUsage(
+			'preinit() supports only as: "style" or "script" (got ' +
+				JSON.stringify(as) +
+				'); the call was ignored. Use preload() for other destinations.',
+		);
+		return;
+	}
 	const rawHref = typeof href === 'string' ? href : String(href);
-	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint('preinit:' + as + ':' + rawHref, () => {
-		if (as === 'style') {
-			const l = document.createElement('link');
-			l.rel = 'stylesheet';
-			l.href = safeHref;
-			applyHintAttrs(l, { ...options, as: undefined });
-			return l;
-		}
-		const s = document.createElement('script');
-		(s as HTMLScriptElement).src = safeHref;
-		(s as HTMLScriptElement).async = true;
-		applyHintAttrs(s, { ...options, as: undefined });
-		return s;
-	});
+	if (as === 'style') {
+		stylesheetResource({
+			...options,
+			as: undefined,
+			href: rawHref,
+			precedence: (options as any).precedence ?? 'default',
+		});
+	} else {
+		scriptResource({ ...options, as: undefined, href: undefined, src: rawHref });
+	}
 }
 
 /** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
@@ -27709,6 +27774,8 @@ export function prefetchDNS(href: string): void {
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
 	if (!href) return;
 	const rawHref = typeof href === 'string' ? href : String(href);
+	// A module that preinitModule already executed needs no preload.
+	if (hasHeadHint('module:' + rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('modulepreload:' + rawHref, () => {
 		const l = document.createElement('link');
