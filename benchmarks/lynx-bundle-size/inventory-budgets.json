@@ -1,0 +1,59 @@
+{
+  "artifacts": {
+    "web": { "raw": 485345, "gzip": 132334 },
+    "lynx": { "raw": 474618, "gzip": 159077 }
+  },
+  "sections": {
+    "main": { "raw": 203712, "gzip": 57563 },
+    "background": { "raw": 277505, "gzip": 74381 }
+  },
+  "owners": {
+    "web": {
+      "compiler-output-app": 140155,
+      "build-wrapper-main": 90775,
+      "universal-runtime": 78258,
+      "host-driver-papi": 37599,
+      "protocol-transport": 34427,
+      "lynx-runtime-other": 32786,
+      "first-screen-adoption": 30773,
+      "public-state-worklets": 28191,
+      "fixture-app": 11420,
+      "generated-wrapper": 256,
+      "octane-runtime-other": 515,
+      "third-party-runtime": 191
+    },
+    "lynx": {
+      "compiler-output-app": 137057,
+      "build-wrapper-main": 88768,
+      "universal-runtime": 76528,
+      "host-driver-papi": 36768,
+      "protocol-transport": 33666,
+      "lynx-runtime-other": 32061,
+      "first-screen-adoption": 30093,
+      "public-state-worklets": 27568,
+      "fixture-app": 11167,
+      "generated-wrapper": 250,
+      "octane-runtime-other": 503,
+      "third-party-runtime": 189
+    }
+  },
+  "controlledLedger": [
+    {
+      "owner": "#706 compact teardown constants",
+      "status": "pending upstream",
+      "controlledGzipDelta": { "web": "+1.38%", "lynx": "+1.45%" },
+      "decision": "accepted performance-earned size tax"
+    },
+    {
+      "owner": "#707 optional worklet installer",
+      "status": "pending upstream",
+      "controlledGzipDelta": {
+        "previewMain": "76915 -> 75024 (-2.46%)",
+        "ifrMain": "81995 -> 79980 (-2.46%)",
+        "previewComplete": "150079 -> 148183",
+        "ifrComplete": "155075 -> 152968"
+      },
+      "decision": "accepted child; deltas are not additive with rows-0 artifacts"
+    }
+  ]
+}

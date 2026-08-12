@@ -30,3 +30,21 @@ node benchmarks/bench.mjs --ratios lynx-bundle-size
 This is source/build evidence only. Decoding a production artifact does not
 execute a Lynx engine and makes no native startup, first-paint, adoption,
 latency, memory, or device-lifecycle claim.
+
+## Complete rows-0 inventory
+
+`inventory.mjs` additionally builds the exact rows-0 table fixture used by the
+cross-framework runtime benchmark in both Web and Lynx production modes. It
+records hashes and raw/gzip/Brotli totals, captures the encoded Lynx artifact's
+pre-encode main/background programs, and attributes 100% of final raw bytes by
+the production reachable-module owner weights. That proportional raw
+attribution is for prioritization; only an isolated production build delta may
+be described as gzip ownership.
+
+`inventory-budgets.json` freezes total, thread-section, and owner-slice raw
+budgets plus total gzip budgets on the integrated #706/#707 stack. The ledger
+keeps #706's accepted size tax and #707's controlled optional-worklet saving
+separate because compressed deltas are not additive.
+
+The checked execution report is
+[`results/production-inventory.md`](results/production-inventory.md).
