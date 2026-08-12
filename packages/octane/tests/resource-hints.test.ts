@@ -167,13 +167,17 @@ describe('resource hints — client', () => {
 		preconnect('https://x.example');
 		preconnect('https://x.example', { crossOrigin: 'anonymous' });
 		preconnect('https://x.example', { crossOrigin: 'use-credentials' });
+		// An omitted crossOrigin (no CORS) and crossOrigin: '' (anonymous) are
+		// distinct browser connection modes — four identities in total.
+		preconnect('https://x.example', { crossOrigin: '' });
 		expect(
 			document.head.querySelectorAll('link[rel="preconnect"][href="https://x.example"]'),
-		).toHaveLength(3);
+		).toHaveLength(4);
 		preconnect('https://x.example', { crossOrigin: 'anonymous' }); // deduped
+		preconnect('https://x.example'); // deduped
 		expect(
 			document.head.querySelectorAll('link[rel="preconnect"][href="https://x.example"]'),
-		).toHaveLength(3);
+		).toHaveLength(4);
 	});
 
 	it('responsive image preloads omit the fallback href', () => {

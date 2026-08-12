@@ -18371,8 +18371,10 @@ function headResourceKind(n) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const name = jsxAttrRawName(attr);
 		// Handlers keep the element per-site (matching React: a load/error
-		// listener needs an owned instance); markup injection disqualifies too.
+		// listener needs an owned instance); markup injection disqualifies too,
+		// and microdata belongs to its itemScope host — never a resource.
 		if (name === 'onLoad' || name === 'onError' || name === 'dangerouslySetInnerHTML') return null;
+		if (name === 'itemProp' || name === 'itemprop') return null;
 		if (name === 'precedence') hasPrecedence = true;
 		else if (name === 'href') hasHref = true;
 		else if (name === 'async') {

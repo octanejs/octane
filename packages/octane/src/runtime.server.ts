@@ -8168,7 +8168,9 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
 	const value = coerceHintHref(href);
 	if (value === null) return;
-	const key = 'preconnect:' + String((options as any)?.crossOrigin ?? '') + ':' + value;
+	const corsMode =
+		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
+	const key = 'preconnect:' + corsMode + ':' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(
 		key,

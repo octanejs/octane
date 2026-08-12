@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRoot, hydrateRoot, flushSync, resetFloatResourceState } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
-import { Microdata, NoscriptMeta } from './_fixtures/hoist-exclusions.tsrx';
+import { Microdata, MicrodataResources, NoscriptMeta } from './_fixtures/hoist-exclusions.tsrx';
 
 const srv = loadServerFixture(
 	'packages/octane/tests/hydration/_fixtures/hoist-exclusions.tsrx',
@@ -63,6 +63,25 @@ describe('document-metadata hoist exclusions (itemProp + noscript)', () => {
 		const warns = errSpy.mock.calls.map((c) => String(c[0]));
 		expect(warns.filter((m) => m.includes('hydration mismatch'))).toEqual([]);
 		expect(container.querySelector('#md meta[itemprop="name"]')).not.toBeNull();
+	});
+
+	it('client + server: itemProp disqualifies the Float RESOURCE forms too', async () => {
+		const root = createRoot(container);
+		root.render(MicrodataResources, {});
+		flushSync(() => {});
+		const host = container.querySelector('#mdr')!;
+		expect(host.querySelector('link[itemprop="sheet"]')).not.toBeNull();
+		expect(host.querySelector('script[itemprop="loader"]')).not.toBeNull();
+		expect(document.head.querySelector('link[href="/mdr.css"]')).toBeNull();
+		expect(document.head.querySelector('script[src="/mdr.js"]')).toBeNull();
+		root.unmount();
+
+		const r = await ServerRT.renderToString(srv.MicrodataResources, {});
+		const hostStart = r.html.indexOf('<section');
+		expect(r.html.slice(0, hostStart)).not.toContain('/mdr.');
+		const hostHtml = r.html.slice(hostStart);
+		expect(hostHtml).toContain('/mdr.css');
+		expect(hostHtml).toContain('/mdr.js');
 	});
 
 	// Per ReactDOMFloat-test.js — 'does not hoist inside noscript context'

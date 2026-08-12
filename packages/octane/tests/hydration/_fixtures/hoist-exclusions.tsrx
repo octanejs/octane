@@ -19,3 +19,12 @@ export function NoscriptMeta() @{
 		<p class="ns-p">{'ns' as string}</p>
 	</div>
 }
+
+// Float RESOURCE forms carrying itemProp: microdata wins — no resource, no hoist.
+export function MicrodataResources() @{
+	<section id="mdr" itemScope itemType="https://schema.org/Thing">
+		<link itemProp="sheet" rel="stylesheet" href="/mdr.css" precedence="default" />
+		<script itemProp="loader" async src="/mdr.js" />
+		<span class="mdr-body">{'mdr' as string}</span>
+	</section>
+}

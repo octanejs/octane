@@ -27808,16 +27808,15 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 	const rawHref = guardHintHref('preconnect', href);
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint(
-		'preconnect:' + String((options as any)?.crossOrigin ?? '') + ':' + rawHref,
-		() => {
-			const l = document.createElement('link');
-			l.rel = 'preconnect';
-			l.href = safeHref;
-			applyHintAttrs(l, options);
-			return l;
-		},
-	);
+	const corsMode =
+		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
+	insertHeadHint('preconnect:' + corsMode + ':' + rawHref, () => {
+		const l = document.createElement('link');
+		l.rel = 'preconnect';
+		l.href = safeHref;
+		applyHintAttrs(l, options);
+		return l;
+	});
 }
 
 /** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
