@@ -1272,11 +1272,29 @@ describe('universal prepared host SDK', () => {
 		container.dispatchEvent(third.children[0], 'select', undefined);
 		expect(selected).toEqual(['first:b', 'first:c']);
 
+		const append = root.prepare(Scene, { ids: ['a', 'b', 'c', 'd', 'e'], label: 'first' });
+		if (append.status !== 'prepared') throw new Error('Expected an append transaction.');
+		const appendRuns = append.batch.commands.filter(
+			(command) => command.op === 'mount-template-run',
+		);
+		expect(appendRuns).toHaveLength(1);
+		expect(appendRuns[0]).toMatchObject({ count: 2, before: null });
+		append.commit();
+
 		root.render(Scene, { ids: ['c', 'a'], label: 'next' });
 		expect(container.children).toEqual([third, first]);
 		expect(third.children[0].children[0].props.value).toBe('next-c');
 		container.dispatchEvent(first.children[0], 'select', undefined);
 		expect(selected).toEqual(['first:b', 'first:c', 'next:a']);
+
+		const replace = root.prepare(Scene, { ids: ['x', 'y', 'z'], label: 'replace' });
+		if (replace.status !== 'prepared') throw new Error('Expected a replacement transaction.');
+		const replaceRuns = replace.batch.commands.filter(
+			(command) => command.op === 'mount-template-run',
+		);
+		expect(replaceRuns).toHaveLength(1);
+		expect(replaceRuns[0]).toMatchObject({ count: 3, before: null });
+		replace.commit();
 		root.unmount();
 	});
 

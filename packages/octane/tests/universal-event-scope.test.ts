@@ -1121,6 +1121,42 @@ describe('universal event scopes', () => {
 		root.unmount();
 	});
 
+	it('moves only the displaced keyed hosts in a distant swap', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const itemPlan = universalPlan('object', { kind: 'host', type: 'item', propsSlot: 0 });
+		const updated: number[] = [];
+		const Item = defineUniversalComponent('object', ({ id }: { id: number }) =>
+			universalValue(itemPlan, [
+				universalProps([
+					['set', 'id', id],
+					['set', 'onPress', () => updated.push(id)],
+					['set', 'onUpdate', () => updated.push(-id)],
+				]),
+			]),
+		);
+		let apply!: (ids: number[]) => void;
+		const initial = Array.from({ length: 1_000 }, (_, index) => index + 1);
+		const App = defineUniversalComponent('object', () => {
+			const [ids, setIds] = useState(initial, 'ids');
+			apply = setIds;
+			return ids.map((id) => universalComponent('object', Item, { id }, id));
+		});
+
+		root.render(App, undefined);
+		const survivors = container.children.slice();
+		updated.length = 0;
+		const swapped = initial.slice();
+		[swapped[1], swapped[998]] = [swapped[998]!, swapped[1]!];
+		flushUniversalSync(() => apply(swapped));
+
+		expect(container.children).toEqual(swapped.map((id) => survivors[id - 1]));
+		expect(updated).toEqual([-999, -2]);
+		container.dispatchEvent(container.children[1], 'press', undefined);
+		expect(updated).toEqual([-999, -2, 999]);
+		root.unmount();
+	});
+
 	it('reveals initially suspended stateless content beside retained siblings on resolve', async () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

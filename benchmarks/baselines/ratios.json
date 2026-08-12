@@ -1449,6 +1449,30 @@
   },
   {
     "suite": "lynx-table",
+    "op": "swap_wire_bytes_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "A keyed swap preserves every row and moves only two top-level survivors. The complete bidirectional ContextProxy traffic must stay within the issue's absolute 2 KiB budget instead of scaling with the retained table."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "swap_item_renders_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 0.01,
+    "note": "The model's value of one is a denominator sentinel: the observed keyed swap must remain exactly zero Row body renders because no row props changed."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "swap_handle_deltas_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "At most the two physically moved top-level survivors may publish handle state; unchanged retained rows must not republish attachment or list-ancestry state."
+  },
+  {
+    "suite": "lynx-table",
     "op": "select_commands_1k",
     "target": "octane-lynx",
     "reference": "changed-rows-model",
@@ -1518,6 +1542,30 @@
     "reference": "changed-rows-model",
     "maxRatio": 1,
     "note": "All 10,000 freshly inserted component-owned rows share one compiled intrinsic template, so creation must remain one contiguous template-run command rather than scaling with row count."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "swap_wire_bytes_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "The same two-survivor keyed swap at 10,000 rows must remain within 2 KiB; a larger packet means topology or public state still scales with retained rows."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "swap_item_renders_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 0.01,
+    "note": "The denominator sentinel pins the observed keyed swap to zero Row renders at 10,000 rows."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "swap_handle_deltas_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "Handle/list-ancestry publication must scale with the two moved survivors, not the 10,000 retained rows."
   },
   {
     "suite": "lynx-table",

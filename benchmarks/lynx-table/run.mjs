@@ -123,6 +123,19 @@ try {
 				create: [result.create.commands, result.create.itemRenders],
 				update10th: [result.update10th.commands, result.update10th.itemRenders],
 				select: [result.select.commands, result.select.bytes, result.select.itemRenders],
+				swap: {
+					commands: result.swap.commands,
+					itemRenders: result.swap.itemRenders,
+					wireToMainBytes: result.swap.wireToMainBytes,
+					wireToBackgroundBytes: result.swap.wireToBackgroundBytes,
+					wireToMainMessages: result.swap.wireToMainMessages,
+					wireToBackgroundMessages: result.swap.wireToBackgroundMessages,
+					commandOps: result.swap.commandOps,
+					handleOps: result.swap.handleOps,
+					messageTypes: result.swap.messageTypes,
+					identityChecksum: result.swapIdentityChecksum,
+					eventSurvived: result.swapEventSurvived,
+				},
 				updateStorm: [
 					result.updateStorm.commits,
 					result.updateStorm.commands,
@@ -143,6 +156,12 @@ try {
 			}
 		}
 		if (result === null || result.diagnostics.length !== 0) continue;
+		if (result.swap.itemRenders !== 0) {
+			failures.push(`rows=${rows}: swap re-rendered ${result.swap.itemRenders} unchanged rows.`);
+		}
+		if (!result.swapEventSurvived) {
+			failures.push(`rows=${rows}: a moved survivor lost its delegated event.`);
+		}
 
 		octaneOps[`create_commands_${suffix}`] = countStat(result.create.commands, iterations);
 		octaneOps[`update10th_commands_${suffix}`] = countStat(result.update10th.commands, iterations);
@@ -153,6 +172,23 @@ try {
 		octaneOps[`select_commands_${suffix}`] = countStat(result.select.commands, iterations);
 		octaneOps[`select_bytes_${suffix}`] = countStat(result.select.bytes, iterations);
 		octaneOps[`select_item_renders_${suffix}`] = countStat(result.select.itemRenders, iterations);
+		octaneOps[`swap_wire_bytes_${suffix}`] = countStat(
+			result.swap.wireToMainBytes + result.swap.wireToBackgroundBytes,
+			iterations,
+		);
+		octaneOps[`swap_wire_to_main_bytes_${suffix}`] = countStat(
+			result.swap.wireToMainBytes,
+			iterations,
+		);
+		octaneOps[`swap_wire_to_background_bytes_${suffix}`] = countStat(
+			result.swap.wireToBackgroundBytes,
+			iterations,
+		);
+		octaneOps[`swap_item_renders_${suffix}`] = countStat(result.swap.itemRenders, iterations);
+		octaneOps[`swap_handle_deltas_${suffix}`] = countStat(
+			Object.values(result.swap.handleOps).reduce((total, count) => total + count, 0),
+			iterations,
+		);
 		octaneOps[`update_storm_commits_${suffix}`] = countStat(result.updateStorm.commits, iterations);
 		octaneOps[`update_storm_commands_${suffix}`] = countStat(
 			result.updateStorm.commands,
@@ -181,6 +217,11 @@ try {
 		modelOps[`select_commands_${suffix}`] = countStat(2, iterations);
 		modelOps[`select_bytes_${suffix}`] = countStat(2048, iterations);
 		modelOps[`select_item_renders_${suffix}`] = countStat(2, iterations);
+		modelOps[`swap_wire_bytes_${suffix}`] = countStat(2048, iterations);
+		modelOps[`swap_wire_to_main_bytes_${suffix}`] = countStat(1024, iterations);
+		modelOps[`swap_wire_to_background_bytes_${suffix}`] = countStat(1024, iterations);
+		modelOps[`swap_item_renders_${suffix}`] = countStat(1, iterations);
+		modelOps[`swap_handle_deltas_${suffix}`] = countStat(2, iterations);
 		modelOps[`update_storm_commits_${suffix}`] = countStat(workload.STORM_UPDATE_TICKS, iterations);
 		modelOps[`update_storm_commands_${suffix}`] = countStat(
 			workload.STORM_UPDATE_TICKS * changed,
@@ -202,12 +243,31 @@ try {
 			updateStormItemRenders: result.updateStorm.itemRenders,
 			selectStormBytes: result.selectStorm.bytes,
 			selectStormItemRenders: result.selectStorm.itemRenders,
+			swap: {
+				commands: result.swap.commands,
+				commandOps: result.swap.commandOps,
+				handleOps: result.swap.handleOps,
+				messageTypes: result.swap.messageTypes,
+				wireToMainMessages: result.swap.wireToMainMessages,
+				wireToBackgroundMessages: result.swap.wireToBackgroundMessages,
+				identityChecksum: result.swapIdentityChecksum,
+				eventSurvived: result.swapEventSurvived,
+				stagesMs: {
+					selfcheck: result.swap.selfcheckMs,
+					dispatch: result.swap.dispatchMs,
+					validate: result.swap.validateMs,
+					prepare: result.swap.prepareMs,
+					apply: result.swap.applyMs,
+					ack: result.swap.ackMs,
+				},
+			},
 		};
 
 		console.log(
 			`rows=${String(rows).padStart(5)}  create=${result.create.commands} (${result.create.itemRenders}r)  ` +
 				`update10th=${result.update10th.commands} (${result.update10th.itemRenders}r)  ` +
 				`select=${result.select.commands} (${result.select.bytes}B, ${result.select.itemRenders}r)  ` +
+				`swap=${result.swap.commands} (${result.swap.wireToMainBytes + result.swap.wireToBackgroundBytes}B, ${result.swap.itemRenders}r)  ` +
 				`updateStorm=${result.updateStorm.commits}c/${result.updateStorm.commands} (${result.updateStorm.itemRenders}r)  ` +
 				`selectStorm=${result.selectStorm.commits}c/${result.selectStorm.commands} (${result.selectStorm.itemRenders}r)`,
 		);

@@ -4252,6 +4252,39 @@ function physicalDrafts(drafts: readonly DraftRecord[]): LogicalRecord[] {
 	return output;
 }
 
+/**
+ * Mark the new-order positions belonging to a longest increasing sequence of
+ * old physical positions. Entries of -1 are fresh hosts and never participate.
+ * The caller first proves that the survivor order is not already increasing,
+ * keeping the predecessor/tail allocations off append and filtered-list paths.
+ */
+function stableUniversalPlacementPositions(sources: Int32Array): Uint8Array {
+	const predecessors = new Int32Array(sources.length);
+	const tails = new Int32Array(sources.length);
+	let size = 0;
+	for (let index = 0; index < sources.length; index++) {
+		const source = sources[index];
+		if (source === -1) continue;
+		let low = 0;
+		let high = size;
+		while (low < high) {
+			const middle = (low + high) >> 1;
+			if (sources[tails[middle]] < source) low = middle + 1;
+			else high = middle;
+		}
+		predecessors[index] = low === 0 ? -1 : tails[low - 1];
+		tails[low] = index;
+		if (low === size) size++;
+	}
+	const stable = new Uint8Array(sources.length);
+	let index = size === 0 ? -1 : tails[size - 1];
+	while (index !== -1) {
+		stable[index] = 1;
+		index = predecessors[index];
+	}
+	return stable;
+}
+
 const UNIVERSAL_HOST_TEMPLATE_SHAPES = new WeakMap<
 	UniversalHostPlan,
 	readonly UniversalHostTemplateShapeNode[] | null
@@ -10208,45 +10241,55 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			if (oldPhysical.length === 0 && newPhysical.length === 0) return;
 			const desiredIds = new Set<number>();
 			for (const entry of newPhysical) desiredIds.add(entry.id);
-			const previousIds = new Set<number>();
-			for (const old of oldPhysical) {
-				previousIds.add(old.id);
+			const previousPositions = new Map<number, number>();
+			for (let index = 0; index < oldPhysical.length; index++) {
+				const old = oldPhysical[index];
+				previousPositions.set(old.id, index);
 				if (!desiredIds.has(old.id)) {
 					removes.push({ op: 'remove', parent: sourceParentId, id: old.id });
 				}
 			}
-			let oldIndex = 0;
-			const movedIds = new Set<number>();
-			// Unplaced survivors retain their original order. Advance through that
-			// suffix instead of searching and splicing an ever-growing placed prefix.
-			for (let index = 0; index < newPhysical.length; index++) {
-				const id = newPhysical[index].id;
-				let currentId: number | undefined;
-				if (!forceMove) {
-					while (oldIndex < oldPhysical.length) {
-						const candidate = oldPhysical[oldIndex].id;
-						if (desiredIds.has(candidate) && !movedIds.has(candidate)) {
-							currentId = candidate;
-							break;
-						}
-						oldIndex++;
-					}
-					if (currentId === id) {
-						oldIndex++;
-						continue;
-					}
+			if (forceMove) {
+				for (const record of newPhysical) {
+					placements.push({
+						op: previousPositions.has(record.id) ? 'move' : 'insert',
+						parent: parentId,
+						id: record.id,
+						before: endAnchor,
+					});
 				}
-				const before = currentId ?? endAnchor;
-				if (previousIds.has(id)) {
-					placements.push({ op: 'move', parent: parentId, id, before });
-					if (!forceMove) movedIds.add(id);
+				return;
+			}
+			const sources = new Int32Array(newPhysical.length);
+			let previousSource = -1;
+			let reordered = false;
+			for (let index = 0; index < newPhysical.length; index++) {
+				const source = previousPositions.get(newPhysical[index].id) ?? -1;
+				sources[index] = source;
+				if (source === -1) continue;
+				if (source < previousSource) reordered = true;
+				previousSource = source;
+			}
+			const stable = reordered ? stableUniversalPlacementPositions(sources) : null;
+			const isStable = (index: number): boolean =>
+				stable === null ? sources[index] !== -1 : stable[index] === 1;
+			let nextStable = 0;
+			while (nextStable < newPhysical.length && !isStable(nextStable)) nextStable++;
+			for (let index = 0; index < newPhysical.length; index++) {
+				if (index === nextStable) {
+					nextStable++;
+					while (nextStable < newPhysical.length && !isStable(nextStable)) nextStable++;
+					continue;
+				}
+				const record = newPhysical[index];
+				const id = record.id;
+				const before = nextStable < newPhysical.length ? newPhysical[nextStable].id : endAnchor;
+				if (sources[index] === -1) {
+					const template = templateMounts.get(record);
+					if (template !== undefined) placeTemplate(template, parentId, before);
+					else placements.push({ op: 'insert', parent: parentId, id, before });
 				} else {
-					const template = templateMounts.get(newPhysical[index]);
-					if (template !== undefined && !forceMove) {
-						placeTemplate(template, parentId, before);
-					} else {
-						placements.push({ op: 'insert', parent: parentId, id, before });
-					}
+					placements.push({ op: 'move', parent: parentId, id, before });
 				}
 			}
 		};
