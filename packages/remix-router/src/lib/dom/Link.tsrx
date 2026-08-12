@@ -28,7 +28,11 @@ type LinkProps = {
 	preventScrollReset?: boolean;
 	viewTransition?: boolean;
 	defaultShouldRevalidate?: boolean;
-	ref?: { current: HTMLAnchorElement | null } | ((node: HTMLAnchorElement | null) => void);
+	// `| null` (and the `ref = null` default below) because octane composes a
+	// forwarded ref with any `ref` inside the host spread as `ref={[a, b]}`, and
+	// an array member must be a ref — `undefined` is not one. `attachRef` treats
+	// null and undefined identically, so an omitted ref stays a no-op.
+	ref?: { current: HTMLAnchorElement | null } | ((node: HTMLAnchorElement | null) => void) | null;
 	[key: string]: unknown;
 };
 
@@ -47,7 +51,7 @@ export function Link(props: LinkProps) @{
 		preventScrollReset,
 		viewTransition,
 		defaultShouldRevalidate,
-		ref,
+		ref = null,
 		children,
 		...rest
 	} = props;
