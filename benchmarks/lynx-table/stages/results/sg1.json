@@ -1,0 +1,688 @@
+{
+  "meta": {
+    "date": "2026-08-10T00:01:42.807Z",
+    "node": "v22.22.2",
+    "cpus": 32,
+    "cpuModel": "Intel(R) Xeon(R) Platinum 8336C CPU @ 2.30GHz",
+    "platform": "linux",
+    "release": "5.15.120.bsk.3-amd64",
+    "chromium": "149.0.7827.55",
+    "repetitions": 5,
+    "rows": 10000,
+    "reportable": true,
+    "loadStart": [0.84, 1.29, 2.53],
+    "loadEnd": [1.68, 1.49, 2.48],
+    "protocol": "fresh page per sample; control/profile order alternates AB/BA; one vue-vdom create sample follows each pair; no other benchmark process ran in this window"
+  },
+  "fcp": {
+    "attribution": {
+      "total": {
+        "median": 2290.199951171875,
+        "min": 2230.39990234375,
+        "max": 2374,
+        "spread": 143.60009765625,
+        "n": 5
+      },
+      "stages": {
+        "mt_slice_eval": {
+          "median": 17.699951171875,
+          "min": 17,
+          "max": 22.300048828125,
+          "spread": 5.300048828125,
+          "n": 5,
+          "share": 0.00772856150084978
+        },
+        "plan_interpretation": {
+          "median": 124.40000009536743,
+          "min": 119.70000004768372,
+          "max": 127.70000004768372,
+          "spread": 8,
+          "n": 5,
+          "share": 0.0543184013394608
+        },
+        "papi_element_creation": {
+          "median": 496.7999951839447,
+          "min": 487.19999408721924,
+          "max": 517.0000050067902,
+          "spread": 29.800010919570923,
+          "n": 5,
+          "share": 0.2169242886105803
+        },
+        "layout_flush_residual": {
+          "median": 1659.6999998092651,
+          "min": 1605.799957036972,
+          "max": 1709.499957561493,
+          "spread": 103.70000052452087,
+          "n": 5,
+          "share": 0.7246965484214648
+        }
+      },
+      "ratios": {}
+    },
+    "rawControl": {
+      "median": 2311.2999999523163,
+      "min": 2203.199999809265,
+      "max": 2329.399999856949,
+      "spread": 126.20000004768372,
+      "n": 5
+    },
+    "rawProfile": {
+      "median": 2319.5,
+      "min": 2257.5,
+      "max": 2402.800000190735,
+      "spread": 145.30000019073486,
+      "n": 5
+    }
+  },
+  "create": {
+    "attribution": {
+      "total": {
+        "median": 2701.7999999523163,
+        "min": 2635.100000143051,
+        "max": 2806.2999999523163,
+        "spread": 171.19999980926514,
+        "n": 5
+      },
+      "stages": {
+        "bg_replay": {
+          "median": 648.2999999523163,
+          "min": 620,
+          "max": 670.2000000476837,
+          "spread": 50.200000047683716,
+          "n": 5,
+          "share": 0.23995114366857578
+        },
+        "wire_clone_transfer": {
+          "median": 27.09999990463257,
+          "min": 26.799999952316284,
+          "max": 27.799999952316284,
+          "spread": 1,
+          "n": 5,
+          "share": 0.010030350101825024
+        },
+        "mt_expand": {
+          "median": 68.60000014305115,
+          "min": 66.29999995231628,
+          "max": 89.09999990463257,
+          "spread": 22.799999952316284,
+          "n": 5,
+          "share": 0.025390480473855156
+        },
+        "papi_element_creation": {
+          "median": 551.900007724762,
+          "min": 535.3999974727631,
+          "max": 597.5999965667725,
+          "spread": 62.1999990940094,
+          "n": 5,
+          "share": 0.20427122945240297
+        },
+        "layout_flush_residual": {
+          "median": 1406.099992275238,
+          "min": 1386.4000027179718,
+          "max": 1434.9000010490417,
+          "spread": 48.499998331069946,
+          "n": 5,
+          "share": 0.5204308210452492
+        }
+      },
+      "ratios": {
+        "control": 1.0164785552868008,
+        "reference": 1.972836801717646
+      }
+    },
+    "rawControl": {
+      "median": 2658,
+      "min": 2576.2999999523163,
+      "max": 2793.4000000953674,
+      "spread": 217.10000014305115,
+      "n": 5
+    },
+    "rawProfile": {
+      "median": 2701.7999999523163,
+      "min": 2635.100000143051,
+      "max": 2806.2999999523163,
+      "spread": 171.19999980926514,
+      "n": 5
+    },
+    "vueVdom": {
+      "median": 1369.5,
+      "min": 1329.7000000476837,
+      "max": 1422,
+      "spread": 92.29999995231628,
+      "n": 5
+    }
+  },
+  "verdicts": [
+    {
+      "step": "s2-2 (#18)",
+      "verdict": "NO-GO",
+      "reason": "plan interpretation is 5.4% of attributed FCP and instantiate expansion is 2.5% of create; neither clears the 10% direct-share gate."
+    },
+    {
+      "step": "s2-3 (#19)",
+      "verdict": "NO-GO from this instrument",
+      "reason": "This issue measures mount/FCP, not slot-update routing; the roadmap already records point updates inside the target band, so no measured mount share justifies updater staging here."
+    },
+    {
+      "step": "s2-4 (#20)",
+      "verdict": "NO-GO",
+      "reason": "receiver slice evaluation plus plan interpretation is 6.2% of attributed FCP and wire is 1.0% of create; neither clears the 10% direct-share gate, and the create residual is deliberately not attributed to receiver code."
+    }
+  ],
+  "samples": {
+    "fcp": {
+      "control": [
+        {
+          "rawMs": 2203.199999809265
+        },
+        {
+          "rawMs": 2329.399999856949
+        },
+        {
+          "rawMs": 2319.300000190735
+        },
+        {
+          "rawMs": 2211
+        },
+        {
+          "rawMs": 2311.2999999523163
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 2257.5,
+          "attribution": {
+            "totalMs": 2230.39990234375,
+            "stages": {
+              "mt_slice_eval": 17.699951171875,
+              "plan_interpretation": 119.70000004768372,
+              "papi_element_creation": 487.19999408721924,
+              "layout_flush_residual": 1605.799957036972
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.19999980926513672,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 487.19999408721924,
+              "mtSliceStartEpochMs": 1786320015314.9001,
+              "mtSliceEvalMs": 17.699951171875,
+              "firstScreenPlanMs": 119.70000004768372
+            }
+          }
+        },
+        {
+          "rawMs": 2367.0999999046326,
+          "attribution": {
+            "totalMs": 2339.7001953125,
+            "stages": {
+              "mt_slice_eval": 17.800048828125,
+              "plan_interpretation": 126.60000014305115,
+              "papi_element_creation": 517.0000050067902,
+              "layout_flush_residual": 1678.3001413345337
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.20000028610229492,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 517.0000050067902,
+              "mtSliceStartEpochMs": 1786320026543.7,
+              "mtSliceEvalMs": 17.800048828125,
+              "firstScreenPlanMs": 126.60000014305115
+            }
+          }
+        },
+        {
+          "rawMs": 2319.5,
+          "attribution": {
+            "totalMs": 2290.199951171875,
+            "stages": {
+              "mt_slice_eval": 17.199951171875,
+              "plan_interpretation": 122.10000014305115,
+              "papi_element_creation": 491.2000000476837,
+              "layout_flush_residual": 1659.6999998092651
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 491.2000000476837,
+              "mtSliceStartEpochMs": 1786320053734.9,
+              "mtSliceEvalMs": 17.199951171875,
+              "firstScreenPlanMs": 122.10000014305115
+            }
+          }
+        },
+        {
+          "rawMs": 2283.2000000476837,
+          "attribution": {
+            "totalMs": 2257.599853515625,
+            "stages": {
+              "mt_slice_eval": 17,
+              "plan_interpretation": 124.40000009536743,
+              "papi_element_creation": 496.7999951839447,
+              "layout_flush_residual": 1619.3998582363129
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.19999980926513672,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 496.7999951839447,
+              "mtSliceStartEpochMs": 1786320064895.2002,
+              "mtSliceEvalMs": 17,
+              "firstScreenPlanMs": 124.40000009536743
+            }
+          }
+        },
+        {
+          "rawMs": 2402.800000190735,
+          "attribution": {
+            "totalMs": 2374,
+            "stages": {
+              "mt_slice_eval": 22.300048828125,
+              "plan_interpretation": 127.70000004768372,
+              "papi_element_creation": 514.4999935626984,
+              "layout_flush_residual": 1709.499957561493
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.2999999523162842,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 514.4999935626984,
+              "mtSliceStartEpochMs": 1786320091421.6,
+              "mtSliceEvalMs": 22.300048828125,
+              "firstScreenPlanMs": 127.70000004768372
+            }
+          }
+        }
+      ]
+    },
+    "create": {
+      "control": [
+        {
+          "rawMs": 2576.2999999523163
+        },
+        {
+          "rawMs": 2793.4000000953674
+        },
+        {
+          "rawMs": 2692.9000000953674
+        },
+        {
+          "rawMs": 2658
+        },
+        {
+          "rawMs": 2644.7000000476837
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 2693.600000143051,
+          "attribution": {
+            "totalMs": 2693.600000143051,
+            "stages": {
+              "bg_replay": 651.2999999523163,
+              "wire_clone_transfer": 26.799999952316284,
+              "mt_expand": 68.60000014305115,
+              "papi_element_creation": 550.2000052928925,
+              "layout_flush_residual": 1396.699994802475
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "pacedCommits": 1,
+              "commands": 10000,
+              "bytes": 3297868,
+              "selfcheckMs": 0,
+              "dispatchMs": 26.799999952316284,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "bgReplayMs": 651.2999999523163
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10000,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.09999990463256836,
+              "prepareMs": 458.2999999523163,
+              "prepareCheckMs": 0,
+              "applyMs": 1358.5,
+              "ackMs": 0.09999990463256836,
+              "papiCreateMs": 550.2000052928925,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 68.60000014305115
+            }
+          }
+        },
+        {
+          "rawMs": 2701.7999999523163,
+          "attribution": {
+            "totalMs": 2701.7999999523163,
+            "stages": {
+              "bg_replay": 648.2999999523163,
+              "wire_clone_transfer": 27.799999952316284,
+              "mt_expand": 67.70000004768372,
+              "papi_element_creation": 551.900007724762,
+              "layout_flush_residual": 1406.099992275238
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "pacedCommits": 1,
+              "commands": 10000,
+              "bytes": 3297903,
+              "selfcheckMs": 0,
+              "dispatchMs": 27.799999952316284,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "bgReplayMs": 648.2999999523163
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10000,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 462.7999999523163,
+              "prepareCheckMs": 0,
+              "applyMs": 1360.7000000476837,
+              "ackMs": 0.10000014305114746,
+              "papiCreateMs": 551.900007724762,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 67.70000004768372
+            }
+          }
+        },
+        {
+          "rawMs": 2635.100000143051,
+          "attribution": {
+            "totalMs": 2635.100000143051,
+            "stages": {
+              "bg_replay": 620,
+              "wire_clone_transfer": 27,
+              "mt_expand": 66.29999995231628,
+              "papi_element_creation": 535.3999974727631,
+              "layout_flush_residual": 1386.4000027179718
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "pacedCommits": 1,
+              "commands": 10000,
+              "bytes": 3297710,
+              "selfcheckMs": 0,
+              "dispatchMs": 27,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "bgReplayMs": 620
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10000,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.20000004768371582,
+              "prepareMs": 456.7000000476837,
+              "prepareCheckMs": 0,
+              "applyMs": 1331.6000001430511,
+              "ackMs": 0.09999990463256836,
+              "papiCreateMs": 535.3999974727631,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 66.29999995231628
+            }
+          }
+        },
+        {
+          "rawMs": 2740.4000000953674,
+          "attribution": {
+            "totalMs": 2740.4000000953674,
+            "stages": {
+              "bg_replay": 639.9000000953674,
+              "wire_clone_transfer": 27.09999990463257,
+              "mt_expand": 81.09999990463257,
+              "papi_element_creation": 557.3999991416931,
+              "layout_flush_residual": 1434.9000010490417
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "pacedCommits": 1,
+              "commands": 10000,
+              "bytes": 3298301,
+              "selfcheckMs": 0,
+              "dispatchMs": 27.09999990463257,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "bgReplayMs": 639.9000000953674
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10000,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.10000014305114746,
+              "prepareMs": 508.2999999523163,
+              "prepareCheckMs": 0,
+              "applyMs": 1345.1000001430511,
+              "ackMs": 0.19999980926513672,
+              "papiCreateMs": 557.3999991416931,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 81.09999990463257
+            }
+          }
+        },
+        {
+          "rawMs": 2806.2999999523163,
+          "attribution": {
+            "totalMs": 2806.2999999523163,
+            "stages": {
+              "bg_replay": 670.2000000476837,
+              "wire_clone_transfer": 27.399999856948853,
+              "mt_expand": 89.09999990463257,
+              "papi_element_creation": 597.5999965667725,
+              "layout_flush_residual": 1422.0000035762787
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "pacedCommits": 1,
+              "commands": 10000,
+              "bytes": 3298049,
+              "selfcheckMs": 0,
+              "dispatchMs": 27.399999856948853,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "bgReplayMs": 670.2000000476837
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10000,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.10000014305114746,
+              "prepareMs": 469,
+              "prepareCheckMs": 0,
+              "applyMs": 1393.2000000476837,
+              "ackMs": 0.09999990463256836,
+              "papiCreateMs": 597.5999965667725,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 89.09999990463257
+            }
+          }
+        }
+      ],
+      "vueVdom": [
+        {
+          "rawMs": 1369.5
+        },
+        {
+          "rawMs": 1422
+        },
+        {
+          "rawMs": 1329.7000000476837
+        },
+        {
+          "rawMs": 1412
+        },
+        {
+          "rawMs": 1358.5
+        }
+      ]
+    }
+  }
+}

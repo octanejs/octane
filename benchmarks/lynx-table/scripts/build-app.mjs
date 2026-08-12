@@ -13,6 +13,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { instrumentLynxStageSources } from '../stages/instrument-source.mjs';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(root, '../..');
 
@@ -31,15 +33,20 @@ export function buildTableApp({ silent = false } = {}) {
 		fs.copyFileSync(path.join(src, 'src', file), path.join(stage, 'src', file));
 	}
 
-	if (!silent) console.log('[lynx-table] building octane table app (production)…');
-	execFileSync('npx', ['rspeedy', 'build', '--root', `examples/${STAGE_NAME}`], {
-		cwd: pluginDir,
-		stdio: silent ? 'pipe' : 'inherit',
-		env: { ...process.env, NODE_ENV: 'production' },
-	});
-
 	const autoRows = Number(process.env.BENCH_AUTOROWS ?? '0') || 0;
 	const profile = process.env.OCTANE_LYNX_PROFILE === '1';
+	const restore = profile ? instrumentLynxStageSources(repo) : () => {};
+	if (!silent) console.log('[lynx-table] building octane table app (production)…');
+	try {
+		execFileSync('npx', ['rspeedy', 'build', '--root', `examples/${STAGE_NAME}`], {
+			cwd: pluginDir,
+			stdio: silent ? 'pipe' : 'inherit',
+			env: { ...process.env, NODE_ENV: 'production' },
+		});
+	} finally {
+		restore();
+	}
+
 	const suffix = (autoRows > 0 ? `-rows${autoRows}` : '') + (profile ? '-profile' : '');
 	const from = path.join(stage, `dist${suffix}`);
 	const to = path.join(src, `dist${suffix}`);
