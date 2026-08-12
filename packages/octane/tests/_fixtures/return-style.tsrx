@@ -1,7 +1,7 @@
 // React-style returned JSX uses the same component-scoped CSS contract as an
 // `@{}` body. Splitting rules across two style blocks must still produce one
 // canonical scope hash on every element and selector.
-export function ReturnedScopedMailbox(props) {
+export function ReturnedScopedMailbox(props: { active: boolean; title: string }) {
 	return <>
 		<section id="returned-scoped-mailbox" class={['mailbox', { active: props.active }]}>
 			<h2 class="mailbox-title">{props.title as string}</h2>
