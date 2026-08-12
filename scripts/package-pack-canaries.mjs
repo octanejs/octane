@@ -62,6 +62,7 @@ export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/floating-ui',
 	'@octanejs/input-otp',
 	'@octanejs/radix',
+	'@octanejs/recharts',
 	'@octanejs/spring',
 	'@octanejs/sonner',
 	'@octanejs/syntax-highlighter',
@@ -248,6 +249,7 @@ export function renderPackedTsrxSourceImports(packageNames) {
 
 export function renderPackedTsrxConsumerSource() {
 	return `import { Command } from '@octanejs/cmdk';
+import { Bar, BarChart, XAxis, YAxis } from '@octanejs/recharts';
 import { animated, useSpring } from '@octanejs/spring';
 import { Parallax, ParallaxLayer } from '@octanejs/spring/parallax';
 import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
@@ -284,6 +286,11 @@ export function PublishedSourceConsumer() @{
 	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
+		<BarChart width={320} height={160} data={[{ name: 'Packed', value: 1 }]}>
+			<XAxis dataKey="name" />
+			<YAxis />
+			<Bar dataKey="value" fill="#8884d8" />
+		</BarChart>
 		<animated.div style={springStyles}>Packed spring</animated.div>
 		<div style={{ height: 120 }}>
 			<Parallax pages={2}>
@@ -338,6 +345,7 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
+import { Bar, BarChart, type BarProps } from '@octanejs/recharts';
 import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/spring';
 import type { IParallax, ParallaxProps } from '@octanejs/spring/parallax';
 import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
@@ -358,6 +366,9 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
 type AssertNotAny<T> = IsAny<T> extends false ? true : never;
 
 const commandPropsArePrecise: AssertNotAny<CommandProps> = true;
+const rechartsBarPropsArePrecise: AssertNotAny<BarProps> = true;
+const rechartsBarComponentPropsArePrecise: AssertNotAny<Parameters<typeof Bar>[0]> = true;
+const rechartsChartComponentPropsArePrecise: AssertNotAny<Parameters<typeof BarChart>[0]> = true;
 const springValueIsPrecise: AssertNotAny<SpringValue<number>> = true;
 const controllerUpdateIsPrecise: AssertNotAny<ControllerUpdate<{ x: number }>> = true;
 const parallaxPropsArePrecise: AssertNotAny<ParallaxProps> = true;
@@ -426,6 +437,9 @@ export const verifiedPublishedTypes = {
 	invalidToaster,
 	providerComponentPropsArePrecise,
 	providerPropsArePrecise,
+	rechartsBarComponentPropsArePrecise,
+	rechartsBarPropsArePrecise,
+	rechartsChartComponentPropsArePrecise,
 	parallaxApiIsPrecise,
 	parallaxPropsArePrecise,
 	springController,

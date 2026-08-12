@@ -162,6 +162,7 @@ describe('packed TSRX source consumers', () => {
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/input-otp': 'file:/tmp/input-otp.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
+		'@octanejs/recharts': 'file:/tmp/recharts.tgz',
 		'@octanejs/spring': 'file:/tmp/react-spring.tgz',
 		'@octanejs/sonner': 'file:/tmp/sonner.tgz',
 		'@octanejs/syntax-highlighter': 'file:/tmp/syntax-highlighter.tgz',
@@ -256,6 +257,7 @@ describe('packed TSRX source consumers', () => {
 
 		assert.match(source, /from '@octanejs\/cmdk'/);
 		assert.match(source, /from '@octanejs\/input-otp'/);
+		assert.match(source, /from '@octanejs\/recharts'/);
 		assert.match(source, /from '@octanejs\/sonner'/);
 		assert.match(source, /from '@octanejs\/spring'/);
 		assert.match(source, /from '@octanejs\/spring\/parallax'/);
@@ -264,6 +266,7 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /from '@octanejs\/tiptap'/);
 		assert.match(source, /<Command\b/);
 		assert.match(source, /<OTPInput\b/);
+		assert.match(source, /<BarChart\b/);
 		assert.match(source, /<Toaster\b/);
 		assert.match(source, /<animated\.div\b/);
 		assert.match(source, /<Parallax\b/);
@@ -278,6 +281,9 @@ describe('packed TSRX source consumers', () => {
 
 		assert.match(source, /type IsAny<T>/);
 		assert.match(source, /AssertNotAny<CommandProps>/);
+		assert.match(source, /AssertNotAny<BarProps>/);
+		assert.match(source, /AssertNotAny<Parameters<typeof Bar>\[0\]>/);
+		assert.match(source, /AssertNotAny<Parameters<typeof BarChart>\[0\]>/);
 		assert.match(source, /AssertNotAny<OTPInputProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof Command>\[0\]>/);
 		assert.match(source, /AssertNotAny<ToasterProps>/);
