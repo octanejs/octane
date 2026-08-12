@@ -40,7 +40,16 @@ function sourceFilesInDirectory(directory) {
 	for (const entry of entries) {
 		if (entry.isFile() && SOURCE_FILE_PATTERN.test(entry.name)) {
 			files.push(path.join(directory, entry.name));
-		} else if (entry.isDirectory() && !IGNORED_DIRECTORIES.has(entry.name)) {
+		} else if (
+			entry.isDirectory() &&
+			!IGNORED_DIRECTORIES.has(entry.name) &&
+			// Hidden directories hold tool state, not repository source: the
+			// differential rig's `.react-cache/` compiled output would otherwise
+			// enter the sweep as JS roots and flip `allowJs` for the whole
+			// program, and this script's own `.typecheck-files-*` temp configs
+			// live beside the projects they extend.
+			!entry.name.startsWith('.')
+		) {
 			files.push(...sourceFilesInDirectory(path.join(directory, entry.name)));
 		}
 	}

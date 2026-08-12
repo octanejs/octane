@@ -1,0 +1,68 @@
+diff --git a/src/transform/jsx/index.js b/src/transform/jsx/index.js
+index 636ee666f44026e2667d5d99638d920a202d6abb..d511941201808d40a7923bc98c1f1f7719a80ffd 100644
+--- a/src/transform/jsx/index.js
++++ b/src/transform/jsx/index.js
+@@ -2281,19 +2281,20 @@ function node_contains_native_tsrx_template(node) {
+ 
+ /**
+  * @param {AST.NativeTSRXNode} node
+- * @returns {AST.CSS.StyleSheet | null}
++ * @param {boolean} allow_multiple
++ * @returns {AST.CSS.StyleSheet[] | null}
+  */
+-function collect_tsrx_stylesheet(node) {
++function collect_tsrx_stylesheets(node, allow_multiple) {
+ 	/** @type {AST.CSS.StyleSheet[]} */
+ 	const styles = [];
+ 	collect_style_elements(node_children(node), styles);
+ 
+ 	if (styles.length === 0) return null;
+-	if (styles.length > 1) {
++	if (styles.length > 1 && !allow_multiple) {
+ 		throw new Error('TSRX fragments can only have one style tag');
+ 	}
+ 
+-	return styles[0];
++	return styles;
+ }
+ 
+ /**
+@@ -2302,14 +2303,31 @@ function collect_tsrx_stylesheet(node) {
+  * @returns {JsxStyleContext | null}
+  */
+ function prepare_tsrx_fragment_styles(node, transform_context) {
+-	const css = collect_tsrx_stylesheet(node);
+-	if (!css) return null;
+-
++	// Type-only output must stay analyzable: a throw here makes language hosts
++	// (tsrx-tsc, editors) fall back to presenting the RAW source as the virtual
++	// TSX, so every CSS brace in the file becomes a TSX parse error. Platforms
++	// whose runtime dialect allows one scope to split its CSS across several
++	// `<style>` tags (octane's compiler rebases them onto one canonical hash)
++	// are valid input here, and platforms that forbid it still report the rule
++	// through their own runtime compiler.
++	const sheets = collect_tsrx_stylesheets(node, transform_context.typeOnly);
++	if (!sheets) return null;
++
++	const css = sheets[0];
+ 	const style_refs = collect_style_ref_attributes(node);
+-	// `prune_css` inside marks the matching selectors as used/scoped; selectors
+-	// that match no element render commented out, like the Ripple target.
+-	apply_css_definition_metadata(node, css, transform_context, style_refs.length > 0);
+-	transform_context.stylesheets.push(css);
++	// A component scope keeps ONE hash even when its CSS is split across
++	// several `<style>` tags: rebase every sheet onto the first sheet's hash
++	// before scoping, so selector rewriting and the DOM hash annotation below
++	// agree. `apply_css_definition_metadata` accumulates into the component's
++	// `styleClasses`/`topScopedClasses` metadata, so per-sheet calls compose
++	// into one class map for style refs.
++	for (const sheet of sheets) {
++		sheet.hash = css.hash;
++		// `prune_css` inside marks the matching selectors as used/scoped; selectors
++		// that match no element render commented out, like the Ripple target.
++		apply_css_definition_metadata(node, sheet, transform_context, style_refs.length > 0);
++		transform_context.stylesheets.push(sheet);
++	}
+ 	const fragment = annotate_tsrx_with_hash(
+ 		node,
+ 		css.hash,

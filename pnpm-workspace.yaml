@@ -533,5 +533,16 @@ minimumReleaseAgeExclude:
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
+#
+# @tsrx/core 0.1.56: the shared JSX transform hard-throws "TSRX fragments can
+# only have one style tag", which in type-only mode makes tsrx-tsc/editors
+# fall back to the raw source as the virtual TSX — every CSS brace then
+# surfaces as a TSX parse error (TS1381/TS1005). Octane components may split
+# scoped CSS across several <style> blocks under one canonical hash (see
+# packages/octane/src/compiler/compile.js applyCssScoping), so the patch makes
+# the TYPE-ONLY path accept multiple sheets and rebase them onto the first
+# sheet's hash; runtime transforms keep the throw. Remove once @tsrx/core
+# ships the equivalent fix upstream.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
+  '@tsrx/core@0.1.56': patches/@tsrx__core@0.1.56.patch
