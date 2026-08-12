@@ -44,7 +44,7 @@ function value(id = 'value') {
 afterEach(() => {
 	root?.unmount();
 	container?.remove();
-	cache.clear();
+	for (const key of [...cache.keys()]) cache.delete(key);
 });
 
 describe('SWR U3 root lifecycle', () => {

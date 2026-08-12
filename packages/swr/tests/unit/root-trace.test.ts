@@ -49,6 +49,6 @@ describe('SWR U3 Octane root request-state oracle', () => {
 		expect(callbacks).toEqual(['success']);
 		expect(fetcher).toHaveBeenCalledOnce();
 		root.unmount();
-		cache.clear();
+		for (const key of [...cache.keys()]) cache.delete(key);
 	});
 });

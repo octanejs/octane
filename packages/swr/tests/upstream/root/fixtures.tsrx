@@ -1,10 +1,18 @@
 import useSWR, { SWRConfig } from '../../../src/index/index';
+import type { BareFetcher, Key, SWRConfiguration } from '../../../src/index/index';
 import { Suspense } from 'octane';
+
+type ReaderProps = {
+	id?: string;
+	cacheKey: Key;
+	fetcher: BareFetcher<unknown> | null;
+	config?: SWRConfiguration;
+};
 
 export const captured: { mutate?: (...args: any[]) => any } = {};
 export const renderTrace: unknown[] = [];
 
-export function SWRReader(props) @{
+export function SWRReader(props: ReaderProps) @{
 	const state = useSWR(props.cacheKey, props.fetcher, props.config);
 	captured.mutate = state.mutate;
 	renderTrace.push({
@@ -21,7 +29,7 @@ export function SWRReader(props) @{
 	})}</output>
 }
 
-export function SWRSiblings(props) @{
+export function SWRSiblings(props: ReaderProps) @{
 	<div>
 		<SWRReader id="first" cacheKey={props.cacheKey} fetcher={props.fetcher} config={props.config} />
 		<SWRReader
@@ -33,13 +41,13 @@ export function SWRSiblings(props) @{
 	</div>
 }
 
-export function SWRSuspense(props) @{
+export function SWRSuspense(props: ReaderProps) @{
 	<Suspense fallback={<span data-testid="fallback">loading</span>}>
 		<SWRReader cacheKey={props.cacheKey} fetcher={props.fetcher} config={{ suspense: true }} />
 	</Suspense>
 }
 
-export function SWRProviderProbe(props) @{
+export function SWRProviderProbe(props: { provider: NonNullable<SWRConfiguration['provider']> }) @{
 	<SWRConfig value={{ provider: props.provider }}>
 		<output data-testid="provider">configured</output>
 	</SWRConfig>
