@@ -8,6 +8,7 @@ import {
 	createPackedTsrxConsumerManifest,
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
+	findPackedWorkspaceDependencyClosure,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
@@ -261,6 +262,20 @@ describe('packed TSRX source consumers', () => {
 		assert.deepEqual(
 			findPackedTsrxSourceConsumerPackages(packages, packedFiles, new Set(['@octanejs/source'])),
 			['octane'],
+		);
+	});
+
+	test('installs the complete packed workspace dependency closure', () => {
+		const manifests = new Map([
+			['@octanejs/source', { dependencies: { '@octanejs/helper': '1.0.0' } }],
+			['@octanejs/helper', { optionalDependencies: { '@octanejs/optional': '1.0.0' } }],
+			['@octanejs/optional', { peerDependencies: { octane: '1.0.0', redux: '5.0.0' } }],
+			['octane', {}],
+		]);
+
+		assert.deepEqual(
+			findPackedWorkspaceDependencyClosure(manifests, ['@octanejs/source', 'octane']),
+			['@octanejs/helper', '@octanejs/optional', '@octanejs/source', 'octane'],
 		);
 	});
 

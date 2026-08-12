@@ -28,6 +28,7 @@ import {
 	isWithinDirectory,
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
+	findPackedWorkspaceDependencyClosure,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
@@ -1085,8 +1086,12 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			}),
 	);
 	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
+	const installedPackages = findPackedWorkspaceDependencyClosure(
+		packedManifests,
+		validatedPackages,
+	);
 	const archiveSpecs = Object.fromEntries(
-		validatedPackages.map((packageName) => [packageName, fileArchiveSpec(archives, packageName)]),
+		installedPackages.map((packageName) => [packageName, fileArchiveSpec(archives, packageName)]),
 	);
 	const manifest = createPackedTsrxConsumerManifest(
 		archiveSpecs,
@@ -1096,7 +1101,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			tsrxTypeScriptPlugin: tsrxTypeScriptPluginVersion,
 			typescript: typescriptVersion,
 		},
-		validatedPackages,
+		installedPackages,
 	);
 
 	writeFileSync(
@@ -1130,13 +1135,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 
 	execFileSync(
 		'pnpm',
-		[
-			'install',
-			'--prefer-offline',
-			'--ignore-scripts',
-			'--no-frozen-lockfile',
-			'--config.auto-install-peers=false',
-		],
+		['install', '--prefer-offline', '--ignore-scripts', '--no-frozen-lockfile'],
 		{
 			cwd: consumerDirectory,
 			encoding: 'utf8',

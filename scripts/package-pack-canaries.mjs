@@ -212,6 +212,25 @@ export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, fi
 	return specifiers;
 }
 
+export function findPackedWorkspaceDependencyClosure(manifests, rootPackageNames) {
+	const packageNames = new Set(rootPackageNames);
+	const pending = [...rootPackageNames];
+
+	while (pending.length > 0) {
+		const packageName = pending.pop();
+		const manifest = manifests.get(packageName);
+		for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+			for (const dependencyName of Object.keys(manifest?.[field] ?? {})) {
+				if (!manifests.has(dependencyName) || packageNames.has(dependencyName)) continue;
+				packageNames.add(dependencyName);
+				pending.push(dependencyName);
+			}
+		}
+	}
+
+	return [...packageNames].sort();
+}
+
 export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions, packageNames) {
 	const dependencies = {};
 
