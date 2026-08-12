@@ -41,7 +41,7 @@ function value(id: string) {
 afterEach(() => {
 	root?.unmount();
 	root = undefined;
-	cache.clear();
+	for (const key of [...cache.keys()]) cache.delete(key);
 	for (const key of Object.keys(controls)) delete controls[key];
 });
 
@@ -123,7 +123,7 @@ describe('SWR U4 specialized entrypoints', () => {
 		mount(MutationReader, {
 			cacheKey: 'mutation-race',
 			fetcher,
-			config: { onSuccess: (data) => successes.push(data) },
+			config: { onSuccess: (data: string) => successes.push(data) },
 		});
 		const older = controls.trigger('older');
 		const newer = controls.trigger('newer');
@@ -180,7 +180,7 @@ describe('SWR U4 specialized entrypoints', () => {
 		let next!: (error?: Error, data?: string) => void;
 		mount(SubscriptionReader, {
 			cacheKey: 'subscription-error',
-			subscribe: (_key, options) => {
+			subscribe: (_key: string, options: { next: (error?: Error, data?: string) => void }) => {
 				next = options.next;
 				return () => undefined;
 			},

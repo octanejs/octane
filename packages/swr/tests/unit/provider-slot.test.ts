@@ -12,7 +12,7 @@ let root: ReturnType<typeof createRoot> | undefined;
 afterEach(() => {
 	root?.unmount();
 	container?.remove();
-	cache.clear();
+	for (const key of [...cache.keys()]) cache.delete(key);
 });
 
 describe('SWRConfig Octane provider slot', () => {

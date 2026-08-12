@@ -11,6 +11,7 @@ import {
 	withMiddleware,
 } from '../../src/_internal/index';
 import { readDevtoolsMiddleware, setupOctaneDevtools } from '../../src/_internal/devtools-contract';
+import type { Middleware } from '../../src/_internal/index';
 import { middleware as preloadMiddleware } from '../../src/_internal/utils/preload';
 
 describe('SWR U2 framework-neutral core', () => {
@@ -42,8 +43,8 @@ describe('SWR U2 framework-neutral core', () => {
 			{ revalidateOnFocus: false },
 		]);
 
-		const first = () => undefined;
-		const second = () => undefined;
+		const first: Middleware = (useSWRNext) => useSWRNext;
+		const second: Middleware = (useSWRNext) => useSWRNext;
 		expect(
 			mergeConfigs(
 				{ use: [first], fallback: { parent: 1, shared: 'parent' } },

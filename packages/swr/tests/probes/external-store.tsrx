@@ -1,6 +1,12 @@
 import { startTransition, useState, useSyncExternalStore } from 'octane';
 
-export function ExternalStoreProbe(props) @{
+type SnapshotStore = {
+	subscribe: (onStoreChange: () => void) => () => void;
+	getSnapshot: () => string;
+	getServerSnapshot: () => string;
+};
+
+export function ExternalStoreProbe(props: { store: SnapshotStore }) @{
 	const value = useSyncExternalStore(
 		props.store.subscribe,
 		props.store.getSnapshot,
