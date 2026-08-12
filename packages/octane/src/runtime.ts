@@ -27856,7 +27856,14 @@ export function preinitModule(
 ): void {
 	const rawHref = guardHintHref('preinitModule', href);
 	if (rawHref === null) return;
-	if ((options?.as ?? 'script') !== 'script') return;
+	if ((options?.as ?? 'script') !== 'script') {
+		warnHintUsage(
+			'preinitModule() supports only as: "script" (got ' +
+				JSON.stringify(options?.as) +
+				'); the call was ignored. Use preloadModule() for other module destinations.',
+		);
+		return;
+	}
 	// One executable per src: a live Float script (SSR-seeded or client-
 	// discovered) already satisfies this init.
 	const state = resourceState();
@@ -27928,6 +27935,20 @@ function resourceState(): ResourceState {
 			if (hint !== null && !hint.startsWith('module:')) continue;
 			const src = el.getAttribute('src');
 			if (src !== null) state.scripts.add(src);
+		}
+		// Streaming SSR can deliver Float sheets AFTER this state seeded (a late
+		// boundary's wave carrier arriving mid-hydration). The stream's inline
+		// $OCTRH hands each tag to this registrar once it exists, so one live
+		// authority keeps deduping and precedence ordering in both directions;
+		// before any client Float call the inline path inserts directly and the
+		// DOM seeding above adopts what it placed.
+		if (typeof window !== 'undefined') {
+			(window as any).$OCTFR = (el: Element): void => {
+				const href = el.getAttribute('href') ?? el.getAttribute('data-href');
+				if (href === null || state.sheets.has(href)) return;
+				insertPrecedenced(state, el, el.getAttribute('data-precedence') ?? '');
+				state.sheets.add(href);
+			};
 		}
 	}
 	return (_resourceState = state);
@@ -28022,6 +28043,8 @@ export function styleResource(attrs: Record<string, unknown> | null, css: string
 export function resetFloatResourceState(): void {
 	_resourceState = null;
 	_preloadTransfer = null;
+	// The streamed-resource registrar closes over the discarded state.
+	if (typeof window !== 'undefined') delete (window as any).$OCTFR;
 }
 
 /** Compiler target for `<script async src>` resources (React Float). */

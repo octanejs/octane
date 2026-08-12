@@ -62,6 +62,11 @@
       "reason": "Negative controls for the port-authored test classification verifier; not React-parity runtime evidence."
     },
     {
+      "path": "scripts/react-parity/react-transition-group-timer-order.test.mjs",
+      "disposition": "audit-verifier-test",
+      "reason": "Regression control for deterministic zero-delay ordering in the pristine upstream Jest harness; not React-parity runtime evidence."
+    },
+    {
       "path": "scripts/react-parity/react-transition-group-types-lib.test.mjs",
       "disposition": "audit-verifier-test",
       "reason": "Negative controls for the type-parity inventory and tsconfig program verifier; not React-parity runtime evidence."
