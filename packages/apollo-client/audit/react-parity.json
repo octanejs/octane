@@ -108,11 +108,6 @@
           "sha256": "1f551a680b6cc19b91ecc2fc01ad561ac5ffe3db5663f6a93d32e1f57bb749b8"
         },
         {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
-        },
-        {
           "path": "packages/apollo-client/audit/test-classifications.json",
           "role": "support",
           "sha256": "118ca56781ad444a1782e54090deeb3ec3e6543641a564e626f79df9d55bde16"

@@ -2638,9 +2638,27 @@ export default defineConfig({
 					name: 'three-browser',
 					include:
 						process.env.OCTANE_THREE_COMPAT_VERSION === undefined
-							? ['packages/three/tests/browser/**/*.test.ts']
+							? ['packages/three/tests/browser/xr.test.ts']
 							: [],
 					environment: 'jsdom',
+					globalSetup: ['packages/three/tests/_react-setup.ts'],
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+					server: { deps: { inline: ['@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'three-browser-integration',
+					include: [
+						'packages/three/tests/browser/bundlers.test.ts',
+						'packages/three/tests/browser/canvas.test.ts',
+					],
+					environment: 'node',
 					globalSetup: ['packages/three/tests/_react-setup.ts'],
 					globals: false,
 					testTimeout: 60_000,
@@ -4925,7 +4943,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'embla-carousel-audit',
 					include: ['packages/embla-carousel/tests/audit/**/*.test.ts'],
@@ -5272,7 +5289,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'drei',
 					include: ['packages/drei/tests/**/*.test.ts'],
@@ -5554,7 +5570,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-query-differential',
 					include: ['packages/tanstack-query/tests/differential/**/*.test.ts'],

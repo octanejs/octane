@@ -79,7 +79,10 @@ import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
 import { parseShard } from './shard-lib.mjs';
 import { loadRequiredVitestLanes } from './vitest-batch-lib.mjs';
+import { validateVitestContracts } from './vitest-contract.mjs';
 import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
+import baseVitestConfig from '../../vitest.config.js';
+import shardedVitestConfig from '../../vitest.ci-sharded.config.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -117,6 +120,7 @@ const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
 // therefore uses the released runner capacity without competing schedulers.
 const NON_VITEST_MANIFEST_CONCURRENCY = availableParallelism();
 const NON_VITEST_BINDING_MANIFESTS = [];
+const LOADED_BINDING_MANIFESTS = [];
 const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set([
 	'alien-signals',
 	'colorful',
@@ -345,6 +349,7 @@ const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
+		LOADED_BINDING_MANIFESTS.push({ path: relativeFile, manifest });
 		if (requiredExecutableLanes(manifest).some((lane) => !isVitestLane(lane))) {
 			NON_VITEST_BINDING_MANIFESTS.push({ relativeFile, manifest });
 		}
@@ -362,6 +367,17 @@ for (const relativeFile of BINDING_MANIFESTS) {
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);
 	}
+}
+
+if (LOADED_BINDING_MANIFESTS.length === BINDING_MANIFESTS.length) {
+	await capture('Vitest React parity execution contract', () =>
+		validateVitestContracts({
+			manifestEntries: LOADED_BINDING_MANIFESTS,
+			baseProjects: baseVitestConfig.test.projects,
+			shardedProjects: shardedVitestConfig.test.projects,
+			root: REPO,
+		}),
+	);
 }
 
 if (!validateOnly && errors.length === 0) {

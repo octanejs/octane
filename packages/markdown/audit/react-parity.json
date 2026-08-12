@@ -133,11 +133,6 @@
           "path": "scripts/react-parity/react-markdown-crosswalk.mjs",
           "role": "support",
           "sha256": "e46c91d548e54b713de6d7664d314b7e6fba1d86fa1fd4b76e788997928e5705"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },

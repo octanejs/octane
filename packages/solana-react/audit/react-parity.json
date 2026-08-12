@@ -126,11 +126,6 @@
           "path": "packages/solana-react/audit/adapted-runtime.json",
           "role": "support",
           "sha256": "515cb0cdae172457eda29c799cc8cc5a1c9f9b997ccad45e82f8d195ad8be075"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },

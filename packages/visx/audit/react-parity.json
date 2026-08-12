@@ -241,11 +241,6 @@
           "sha256": "bd9d2c727852f5a0059e51575ec665471fc0f5962a9256955b3804c9bed5b0ed"
         },
         {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
-        },
-        {
           "path": "packages/visx/audit/oracle-environment.json",
           "role": "support",
           "sha256": "80c1d46b25a5e7950e4ed848ccabacebd29592fa86e4784f89b56a4daaa52f42"

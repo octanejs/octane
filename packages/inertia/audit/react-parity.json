@@ -71,11 +71,6 @@
           "path": "packages/inertia/tests/_fixtures/page-provider.tsrx",
           "role": "support",
           "sha256": "29f535ea46ee9bbdf505ecb9d712ed2181bf4f4eac651ad5ccbbd6d60f972c7f"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -114,11 +109,6 @@
           "path": "packages/inertia/tests/differential/_setup.ts",
           "role": "support",
           "sha256": "cac818480214c96c8f15a1fa0e2d18a4d8c16569fe7244930e5c3415adefeca9"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },

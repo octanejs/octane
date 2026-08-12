@@ -299,11 +299,6 @@
           "path": "scripts/react-parity/swr-runtime-inventory.mjs",
           "role": "support",
           "sha256": "185d862650fd217503e440f7c781367ed726df26839b67296709b2b6bcaf31e8"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -356,11 +351,6 @@
               "fullName": "SWR U4 exact specialized runtime oracles matches every pinned specialized runtime name"
             }
           ]
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }
