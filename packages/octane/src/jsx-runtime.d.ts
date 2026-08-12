@@ -10,7 +10,8 @@
  * attribute-interface list are derived mechanically from `@types/react`'s
  * `JSX.IntrinsicElements`.
  *
- * Octane's documented divergences are applied by the `Transformed` layer:
+ * Octane's documented divergences are applied by the attribute transform and
+ * final per-element prop composition:
  *
  *  - `class` / `className` compose clsx-style (strings, numbers, arrays,
  *    objects, nesting; falsy drops out) — both accept `ClassValue`.
@@ -23,6 +24,12 @@
  *  - `ref` accepts a callback (with optional React-19 cleanup return), a ref
  *    object, or an ARRAY of refs — nested arrays flatten (no `forwardRef`).
  *  - `for` is the native attribute (React's `htmlFor` alias also works).
+ *  - HTML accepts both React property names and their native lowercase
+ *    spellings (`tabIndex` / `tabindex`, `readOnly` / `readonly`); native
+ *    numeric attributes also accept numeric strings. Framework-only props and
+ *    aliases whose native name is not their lowercase form are excluded.
+ *  - SVG remains case-sensitive, with explicit support for `hidden` and the
+ *    native `tabindex` attribute.
  *  - `children` are octane renderables (`unknown`), not `ReactNode`.
  *  - `style` accepts a plain string as well as the object form (boolean
  *    property values clear the property, React-style).
@@ -81,6 +88,45 @@ type NativeEventHandlers<P, T> = {
 	[K in Extract<keyof P, ReactSyntheticProps>]?: NativeHandler<P[K], T>;
 };
 
+/** Props whose lowercase spelling is not a native attribute with equivalent behavior. */
+type NonNativeLowercaseProps =
+	| ReactSyntheticProps
+	| 'autoFocus'
+	| 'defaultValue'
+	| 'defaultChecked'
+	| 'dangerouslySetInnerHTML'
+	| 'className'
+	| 'suppressContentEditableWarning'
+	| 'suppressHydrationWarning'
+	| 'suppressNativeChangeWarning'
+	| '__octaneNativeChangeDiagnostic'
+	| 'acceptCharset'
+	| 'htmlFor'
+	| 'httpEquiv';
+
+/** Native HTML content attributes may express numeric property values as text. */
+type NativeAttributeValue<T> =
+	T | (Extract<T, number> extends never ? never : `${Extract<T, number>}`);
+
+/** Add actual lowercase HTML spellings without weakening the original prop types. */
+type NativeLowercaseAttributes<P> = {
+	[
+		K in Exclude<Extract<keyof P, string>, NonNativeLowercaseProps> as K extends
+			Lowercase<K> | `on${Capitalize<string>}`
+			? never
+			: Lowercase<K> extends keyof P
+				? never
+				: Lowercase<K>
+	]?: NativeAttributeValue<P[K]>;
+};
+
+/** Preserve a consumer's React button augmentation when the installed React types expose it. */
+type ExistingButtonAttribute<
+	T,
+	K extends PropertyKey,
+	Fallback,
+> = K extends keyof React.ButtonHTMLAttributes<T> ? React.ButtonHTMLAttributes<T>[K] : Fallback;
+
 /** Octane's attribute transform over one React attribute interface. */
 type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | 'children'> &
 	NativeEventHandlers<P, T & EventTarget> & {
@@ -104,14 +150,20 @@ declare namespace Octane {
 		ref?: Ref<T> | undefined;
 	}
 
-	type DetailedHTMLProps<E, T> = RefAttributes<T> & E;
+	type DetailedHTMLProps<E, T> = RefAttributes<T> & E & NativeLowercaseAttributes<E>;
 
 	interface AnchorHTMLAttributes<T> extends Transformed<React.AnchorHTMLAttributes<T>, T> {}
 	interface AreaHTMLAttributes<T> extends Transformed<React.AreaHTMLAttributes<T>, T> {}
 	interface AudioHTMLAttributes<T> extends Transformed<React.AudioHTMLAttributes<T>, T> {}
 	interface BaseHTMLAttributes<T> extends Transformed<React.BaseHTMLAttributes<T>, T> {}
 	interface BlockquoteHTMLAttributes<T> extends Transformed<React.BlockquoteHTMLAttributes<T>, T> {}
-	interface ButtonHTMLAttributes<T> extends Transformed<React.ButtonHTMLAttributes<T>, T> {}
+	interface ButtonHTMLAttributes<T> extends Omit<
+		Transformed<React.ButtonHTMLAttributes<T>, T>,
+		'command' | 'commandfor'
+	> {
+		command?: ExistingButtonAttribute<T, 'command', string> | undefined;
+		commandfor?: ExistingButtonAttribute<T, 'commandfor', string> | undefined;
+	}
 	interface CanvasHTMLAttributes<T> extends Transformed<React.CanvasHTMLAttributes<T>, T> {}
 	interface ColHTMLAttributes<T> extends Transformed<React.ColHTMLAttributes<T>, T> {}
 	interface ColgroupHTMLAttributes<T> extends Transformed<React.ColgroupHTMLAttributes<T>, T> {}
@@ -144,7 +196,10 @@ declare namespace Octane {
 	interface ParamHTMLAttributes<T> extends Transformed<React.ParamHTMLAttributes<T>, T> {}
 	interface ProgressHTMLAttributes<T> extends Transformed<React.ProgressHTMLAttributes<T>, T> {}
 	interface QuoteHTMLAttributes<T> extends Transformed<React.QuoteHTMLAttributes<T>, T> {}
-	interface SVGAttributes<T> extends Transformed<React.SVGAttributes<T>, T> {}
+	interface SVGAttributes<T> extends Transformed<React.SVGAttributes<T>, T> {
+		hidden?: React.HTMLAttributes<T>['hidden'];
+		tabindex?: NativeAttributeValue<React.SVGAttributes<T>['tabIndex']>;
+	}
 	interface ScriptHTMLAttributes<T> extends Transformed<React.ScriptHTMLAttributes<T>, T> {}
 	interface SelectHTMLAttributes<T> extends Transformed<React.SelectHTMLAttributes<T>, T> {}
 	interface SlotHTMLAttributes<T> extends Transformed<React.SlotHTMLAttributes<T>, T> {}
