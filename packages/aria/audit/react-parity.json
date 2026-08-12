@@ -353,11 +353,6 @@
           "path": "packages/aria/tests/_fixtures/aria-diff-tree-table.tsrx",
           "role": "support",
           "sha256": "aac296ea6fe592c3c69822aad592d209085b577d64f5df485da5b6b1dd5e7344"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     }

@@ -107,11 +107,6 @@
           "path": "scripts/react-parity/tanstack-devtools-controls.test.mjs",
           "role": "support",
           "sha256": "ea0a000cf73587f0ae6747234e830787363f16ae7236c628ce6f72caa96d4ee9"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     },

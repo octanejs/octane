@@ -51,7 +51,7 @@
       "environment": "workspace-node",
       "project": "tanstack-query-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs exact cached query, asynchronous query, and mutation scenarios against @tanstack/react-query@5.101.3. Optional while provenance remains recorded-unverified, but still executed under the shared react-parity ownership group.",
+      "notes": "Runs exact cached query, asynchronous query, and mutation scenarios against @tanstack/react-query@5.101.3. Optional while provenance remains recorded-unverified, so ordinary Vitest shards retain this project until the lane becomes required evidence.",
       "files": [
         {
           "path": "packages/tanstack-query/tests/differential/parity.test.ts",

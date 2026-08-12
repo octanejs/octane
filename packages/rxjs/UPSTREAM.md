@@ -16,6 +16,8 @@ The tagged upstream runtime and type suites are present but have not been
 vendored or adapted one-for-one. The manifest therefore remains
 `recorded-unverified`; its bounded differential lane proves only `bind`'s
 initial snapshot and later-emission rendering through one shared fixture.
-Until provenance is verified, that lane stays outside `testExecution` so
-ordinary sharded CI executes it (`react-parity:check` only validates the
-manifest while verification is `recorded-unverified`).
+The bounded differential lane is required and `react-parity`-owned even while
+the wider provenance claim remains `recorded-unverified`. The execution
+contract checks its live project selection, file ownership, and exact passing
+test identities; provenance status limits the breadth of the claim rather than
+whether declared evidence executes.
