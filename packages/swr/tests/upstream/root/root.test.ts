@@ -87,19 +87,31 @@ describe('SWR U3 root lifecycle', () => {
 	// Per use-swr-focus.test.tsx:15 — 'should revalidate on focus by default'.
 	// Per use-swr-reconnect.test.tsx:11 — 'should revalidate on reconnect by default'.
 	it('revalidates on focus and reconnect through the pinned environment adapters', async () => {
-		const fetcher = vi.fn(async () => `request-${fetcher.mock.calls.length}`);
-		mount(SWRReader, {
-			cacheKey: 'root-events',
-			fetcher,
-			config: { dedupingInterval: 0, focusThrottleInterval: 0 },
-		});
-		await settle();
-		window.dispatchEvent(new Event('focus'));
-		await settleTimers();
-		window.dispatchEvent(new Event('online'));
-		await settleTimers();
-		expect(fetcher).toHaveBeenCalledTimes(3);
-		expect(value().data).toBe('request-3');
+		// The mount effect arms the focus throttle at `Date.now() + focusThrottleInterval`
+		// and a focus event revalidates only at a strictly later timestamp, so even at
+		// interval 0 a focus landing in the mount millisecond is throttled (upstream
+		// behavior; its suite sleeps a real 1ms before focusing). Faking only `Date`
+		// advances that clock deterministically while real timers keep driving the
+		// environment adapters' deferred event callbacks.
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			const fetcher = vi.fn(async () => `request-${fetcher.mock.calls.length}`);
+			mount(SWRReader, {
+				cacheKey: 'root-events',
+				fetcher,
+				config: { dedupingInterval: 0, focusThrottleInterval: 0 },
+			});
+			await settle();
+			vi.setSystemTime(Date.now() + 1);
+			window.dispatchEvent(new Event('focus'));
+			await settleTimers();
+			window.dispatchEvent(new Event('online'));
+			await settleTimers();
+			expect(fetcher).toHaveBeenCalledTimes(3);
+			expect(value().data).toBe('request-3');
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	// Per use-swr-revalidate.test.tsx:64 — 'should respect sequences of revalidation calls
