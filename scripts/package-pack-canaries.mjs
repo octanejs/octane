@@ -345,7 +345,20 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
-import { Bar, BarChart, type BarProps } from '@octanejs/recharts';
+import {
+	Bar,
+	BarChart,
+	Cell,
+	ErrorBar,
+	Layer,
+	Surface,
+	useChartWidth,
+	type BarProps,
+} from '@octanejs/recharts';
+// @ts-expect-error Brush is not supported by the Octane runtime port.
+import { Brush } from '@octanejs/recharts';
+// @ts-expect-error Treemap is not supported by the Octane runtime port.
+import { Treemap } from '@octanejs/recharts';
 import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/spring';
 import type { IParallax, ParallaxProps } from '@octanejs/spring/parallax';
 import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
@@ -369,6 +382,11 @@ const commandPropsArePrecise: AssertNotAny<CommandProps> = true;
 const rechartsBarPropsArePrecise: AssertNotAny<BarProps> = true;
 const rechartsBarComponentPropsArePrecise: AssertNotAny<Parameters<typeof Bar>[0]> = true;
 const rechartsChartComponentPropsArePrecise: AssertNotAny<Parameters<typeof BarChart>[0]> = true;
+const rechartsCellIsTyped: AssertNotAny<typeof Cell> = true;
+const rechartsErrorBarIsTyped: AssertNotAny<typeof ErrorBar> = true;
+const rechartsLayerIsTyped: AssertNotAny<typeof Layer> = true;
+const rechartsSurfaceIsTyped: AssertNotAny<typeof Surface> = true;
+const rechartsWidthHookIsTyped: AssertNotAny<typeof useChartWidth> = true;
 const springValueIsPrecise: AssertNotAny<SpringValue<number>> = true;
 const controllerUpdateIsPrecise: AssertNotAny<ControllerUpdate<{ x: number }>> = true;
 const parallaxPropsArePrecise: AssertNotAny<ParallaxProps> = true;
@@ -440,6 +458,11 @@ export const verifiedPublishedTypes = {
 	rechartsBarComponentPropsArePrecise,
 	rechartsBarPropsArePrecise,
 	rechartsChartComponentPropsArePrecise,
+	rechartsCellIsTyped,
+	rechartsErrorBarIsTyped,
+	rechartsLayerIsTyped,
+	rechartsSurfaceIsTyped,
+	rechartsWidthHookIsTyped,
 	parallaxApiIsPrecise,
 	parallaxPropsArePrecise,
 	springController,

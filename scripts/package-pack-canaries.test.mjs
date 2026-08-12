@@ -284,6 +284,13 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /AssertNotAny<BarProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof Bar>\[0\]>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof BarChart>\[0\]>/);
+		assert.match(source, /AssertNotAny<typeof Cell>/);
+		assert.match(source, /AssertNotAny<typeof ErrorBar>/);
+		assert.match(source, /AssertNotAny<typeof Layer>/);
+		assert.match(source, /AssertNotAny<typeof Surface>/);
+		assert.match(source, /AssertNotAny<typeof useChartWidth>/);
+		assert.match(source, /@ts-expect-error Brush is not supported/);
+		assert.match(source, /@ts-expect-error Treemap is not supported/);
 		assert.match(source, /AssertNotAny<OTPInputProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof Command>\[0\]>/);
 		assert.match(source, /AssertNotAny<ToasterProps>/);
