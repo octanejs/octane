@@ -4945,6 +4945,7 @@ export default defineConfig({
 				},
 			},
 			{
+				// Audit checks are ordinary package tests, not required parity evidence.
 				test: {
 					name: 'embla-carousel-audit',
 					include: ['packages/embla-carousel/tests/audit/**/*.test.ts'],
@@ -5545,6 +5546,8 @@ export default defineConfig({
 				},
 			},
 			{
+				// This lane remains optional while its provenance is unverified, so ordinary
+				// shards must retain it until the manifest promotes it to required evidence.
 				test: {
 					name: 'tanstack-query-differential',
 					include: ['packages/tanstack-query/tests/differential/**/*.test.ts'],
