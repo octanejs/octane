@@ -146,7 +146,8 @@ shell is written and therefore before `onShellReady` and before
 `renderToReadableStream`'s promise resolves, so a host still has time to place
 the metadata in a template prefix it writes ahead of the render stream. It
 carries the shell's metadata only; head elements hoisted inside a boundary that
-streams later are still re-created client-side (see "Not built yet"). A recoverable error in
+streams later are still re-created client-side, while late-discovered Float
+sheet resources ride the stream itself (see "Not built yet"). A recoverable error in
 Suspense content reaches `onError`, preserves the emitted fallback, and marks
 only that boundary for client rendering. Calling `abort(reason)` reports the
 reason for each abandoned pending task, preserves emitted fallbacks for client
@@ -424,9 +425,14 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
 
 - **Selective / progressive hydration**: `hydrateRoot` adopts the whole tree in
   one synchronous pass (and there is no synthetic event replay, by design).
-- **Streamed head hoisting**: head elements hoisted from INSIDE a streamed
-  Suspense boundary don't ship in the stream (the shell already flushed); the
-  client re-creates them on hydration.
+- **Streamed head hoisting**: head elements and resource hints hoisted from
+  INSIDE a streamed Suspense boundary don't ship in the stream (the shell
+  already flushed); the client re-creates them on hydration. Float **sheet
+  resources** (`<link rel="stylesheet" href precedence>` and
+  `<style href precedence>`) are the exception: sheets discovered after the
+  shell ride the wave chunks as real tags and the inline stream runtime hoists
+  them into `document.head` with the client's precedence grouping, so late
+  content is styled before hydration and no-JS consumers still get the CSS.
 - **Framework-level data serialization**: only suspense seeds cross the boundary
   automatically; loader-style data APIs are app code today.
 - **Error digests**: `onError` and the shell callbacks exist, but there are no

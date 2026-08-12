@@ -8,11 +8,18 @@
 // contract — Octane documents that as out of scope.
 // Links WITHOUT precedence keep the existing per-site head-element behavior.
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { act, createRoot, resetFloatResourceState } from '../src/index.js';
+import { act, createRoot, flushSync, hydrateRoot, resetFloatResourceState } from '../src/index.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
-import { collectPipeableStream } from './_server-stream.js';
+import {
+	activateStreamedMarkup,
+	collectPipeableStream,
+	createPipeableCollector,
+	deferred,
+	resetStreamRuntimeGlobals,
+} from './_server-stream.js';
 import { preinitModule } from '../src/index.js';
+import { GatedSheetBoundary, GatedSheetContent } from './_fixtures/float-stream.tsrx';
 import {
 	SheetA,
 	ModuleScript,
@@ -331,5 +338,189 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		expect(sheetHrefs()).toEqual(['/base.css']);
 		root.unmount();
 		c.remove();
+	});
+});
+
+// A stylesheet resource discovered only AFTER the shell flushed (inside a
+// suspended @try arm, or with an href computed from a use() resolution) must
+// still reach the streamed response: the tags ride the wave chunks so no-JS
+// consumers get the CSS, and the inline stream runtime moves them into
+// document.head with the client's precedence grouping so late content is
+// styled before hydration and a hydrating client adopts without duplicating.
+describe('Float resources — streamed late boundaries', () => {
+	const containers: HTMLElement[] = [];
+	function streamContainer(): HTMLElement {
+		const c = document.createElement('div');
+		document.body.appendChild(c);
+		containers.push(c);
+		return c;
+	}
+	afterEach(() => {
+		for (const c of containers.splice(0)) c.remove();
+		document.head
+			.querySelectorAll('[data-precedence], [data-oct-res], [data-oct-hint]')
+			.forEach((el) => el.remove());
+		resetFloatResourceState();
+		resetStreamRuntimeGlobals();
+	});
+
+	const srvStream = loadServerFixture(
+		'packages/octane/tests/_fixtures/float-stream.tsrx',
+	) as Record<string, any>;
+
+	// Per ReactDOMFloat-test.js:1923 — 'will include child boundary stylesheet
+	// resources in the boundary reveal instruction'.
+	it('streams a use()-gated dynamic-href sheet late and moves it into document.head', async () => {
+		const d = deferred<string>();
+		const collector = createPipeableCollector();
+		const { pipe } = Server.renderToPipeableStream(
+			srvStream.GatedSheetBoundary,
+			{ promise: d.promise },
+			{ nonce: 'test-nonce' },
+		);
+		pipe(collector.destination);
+		// Nothing about the sheets is knowable at shell time — not even the href.
+		expect(collector.chunks.join('')).not.toContain('gated-x.css');
+		expect(collector.chunks.join('')).not.toContain('gated-tokens');
+		const shellChunkCount = collector.chunks.length;
+		d.resolve('x');
+		const html = await collector.ended;
+
+		// The late tags ship exactly once, in the post-shell stream (a no-JS
+		// consumer still receives working markup).
+		const tail = collector.chunks.slice(shellChunkCount).join('');
+		expect(tail.match(/\/gated-x\.css/g) || []).toHaveLength(1);
+		expect(tail).toContain('data-precedence="default"');
+		expect(tail.match(/data-href="gated-tokens"/g) || []).toHaveLength(1);
+		expect(tail).toContain('.gated-ready');
+		// CSP: every inline script the wave emits (the resource hoist included)
+		// carries the render nonce.
+		const scripts = tail.match(/<script[^>]*/g) ?? [];
+		expect(scripts.length).toBeGreaterThan(0);
+		for (const tag of scripts) expect(tag).toContain('nonce="test-nonce"');
+
+		// Browser simulation: the stream runtime hoists the tags into head.
+		const c = streamContainer();
+		c.innerHTML = html;
+		activateStreamedMarkup(c);
+		expect(
+			document.head.querySelectorAll('link[href="/gated-x.css"][data-precedence="default"]'),
+		).toHaveLength(1);
+		expect(document.head.querySelectorAll('style[data-href="gated-tokens"]')).toHaveLength(1);
+		// The revealed content is in place and no carrier markup remains behind.
+		expect(c.querySelector('.gated-ready')?.textContent).toBe('x');
+		expect(c.querySelector('link')).toBeNull();
+		expect(c.querySelector('style[data-href]')).toBeNull();
+
+		// Hydration adopts the streamed DOM and the head resources — no duplicates.
+		const revealed = c.querySelector('.gated-ready');
+		const root = hydrateRoot(c, GatedSheetBoundary as any, {
+			promise: new Promise<string>(() => {}),
+		});
+		flushSync(() => {});
+		expect(c.querySelector('.gated-ready')).toBe(revealed);
+		expect(document.head.querySelectorAll('link[href="/gated-x.css"]')).toHaveLength(1);
+		expect(document.head.querySelectorAll('style[data-href="gated-tokens"]')).toHaveLength(1);
+		root.unmount();
+	});
+
+	// Per ReactDOMFloat-test.js:2041 — 'will hoist resources of child boundaries
+	// emitted as part of a partial boundary to the parent boundary' (and :2350,
+	// the flushed-inline variant): the still-pending inner boundary's sheet
+	// rides the wave that reveals its parent.
+	it("hoists a nested pending boundary's sheet into the outer boundary's reveal wave", async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const collector = createPipeableCollector();
+		const { pipe } = Server.renderToPipeableStream(srvStream.NestedLateBoundaries, {
+			outer: outer.promise,
+			inner: inner.promise,
+		});
+		pipe(collector.destination);
+		const shell = collector.chunks.join('');
+		// Control: an arm-root sheet registers ahead of its arm's use(), so the
+		// outer boundary's sheet flushes with the shell head.
+		expect(shell.match(/\/outer-late\.css/g) || []).toHaveLength(1);
+		expect(shell).not.toContain('/inner-late.css');
+		const shellChunkCount = collector.chunks.length;
+
+		// The shell head belongs to the surrounding document; the body markup and
+		// stream scripts land in the hydration container.
+		const bodyStart = shell.indexOf('<div');
+		document.head.insertAdjacentHTML('afterbegin', shell.slice(0, bodyStart));
+		const c = streamContainer();
+		c.innerHTML = shell.slice(bodyStart);
+
+		outer.resolve('one');
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const outerWave = collector.chunks.slice(shellChunkCount).join('');
+		expect(outerWave).toContain('outer-ready');
+		// The inner boundary has NOT resolved, but its sheet was discovered while
+		// rendering toward it — it hoists into the parent's reveal wave.
+		expect(outerWave.match(/\/inner-late\.css/g) || []).toHaveLength(1);
+
+		inner.resolve('two');
+		const html = await collector.ended;
+		expect(html.match(/\/inner-late\.css/g) || []).toHaveLength(1);
+
+		c.insertAdjacentHTML('beforeend', collector.chunks.slice(shellChunkCount).join(''));
+		activateStreamedMarkup(c);
+		// The late sheet joins the precedence groups after the shell's (new group
+		// appends after the last existing group).
+		expect(sheetHrefs()).toEqual(['/outer-late.css', '/inner-late.css']);
+		expect(c.querySelector('.outer-ready')?.textContent).toBe('one');
+		expect(c.querySelector('.inner-ready')?.textContent).toBe('two');
+	});
+
+	it('does not re-ship a sheet already flushed with the shell', async () => {
+		const d = deferred<string>();
+		const collector = createPipeableCollector();
+		const { pipe } = Server.renderToPipeableStream(srvStream.SharedSheetBoundary, {
+			promise: d.promise,
+		});
+		pipe(collector.destination);
+		expect(collector.chunks.join('').match(/\/shared\.css/g) || []).toHaveLength(1);
+		d.resolve('go');
+		const html = await collector.ended;
+		// The late arm re-declares the same href; the whole response still
+		// carries exactly one copy.
+		expect(html.match(/\/shared\.css/g) || []).toHaveLength(1);
+		expect(html).toContain('shared-value');
+	});
+
+	// Live client resource state can exist BEFORE a late chunk arrives (the app
+	// hydrated and rendered a Float resource mid-stream). The streamed insert
+	// must then go through that state so both sides keep deduping.
+	it('routes late streamed sheets through live client resource state', async () => {
+		const d = deferred<string>();
+		const collector = createPipeableCollector();
+		const { pipe } = Server.renderToPipeableStream(srvStream.GatedSheetBoundary, {
+			promise: d.promise,
+		});
+		pipe(collector.destination);
+		const c = streamContainer();
+		c.innerHTML = collector.chunks.join('');
+		const shellChunkCount = collector.chunks.length;
+		activateStreamedMarkup(c);
+
+		// A client render creates live Float state while the boundary is pending.
+		const side = streamContainer();
+		const clientRoot = createRoot(side);
+		await act(() => clientRoot.render(SheetA, {}));
+		expect(sheetHrefs()).toEqual(['/base.css']);
+
+		d.resolve('x');
+		await collector.ended;
+		c.insertAdjacentHTML('beforeend', collector.chunks.slice(shellChunkCount).join(''));
+		activateStreamedMarkup(c);
+		// The streamed sheet appended into the live default precedence group…
+		expect(sheetHrefs()).toEqual(['/base.css', '/gated-x.css']);
+
+		// …and registered with client state: a client render of the same resource
+		// adopts instead of duplicating.
+		await act(() => clientRoot.render(GatedSheetContent, { name: 'x' }));
+		expect(sheetHrefs()).toEqual(['/base.css', '/gated-x.css']);
+		expect(document.head.querySelectorAll('style[data-href="gated-tokens"]')).toHaveLength(1);
+		clientRoot.unmount();
 	});
 });

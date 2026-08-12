@@ -198,8 +198,13 @@ describe('resource hints — client', () => {
 			expect(document.head.querySelector('link[href="/coerced.css"]')).toBeNull();
 			preloadModule(123 as any);
 			expect(document.head.querySelector('link[rel="modulepreload"]')).toBeNull();
+			preinitModule('/bad-dest.mjs', { as: 'style' }); // invalid module destination
+			expect(
+				document.head.querySelector('[href="/bad-dest.mjs"], [src="/bad-dest.mjs"]'),
+			).toBeNull();
 			const warns = errSpy.mock.calls.map((c) => String(c[0]));
 			expect(warns.some((m) => m.includes('href'))).toBe(true);
+			expect(warns.some((m) => m.includes('preinitModule'))).toBe(true);
 		} finally {
 			errSpy.mockRestore();
 		}
