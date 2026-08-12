@@ -303,3 +303,39 @@ test('tsconfig files with comments and trailing commas are read, not skipped', (
 		include: ['src/**/*.tsrx'],
 	});
 });
+
+test('a wildcard final segment matches one path segment, the way tsc treats it', () => {
+	// `src/*` reaches a file directly under src, so it drops shipped source.
+	const shallow = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/*'] } },
+		sources: { 'index.tsrx': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(
+		findSourcePublicationViolations(shallow.repo, shallow.packages).map(({ rule }) => rule),
+		[RULES.excluded],
+	);
+
+	// The same entry must NOT reach a nested file: `*` does not cross `/`. Only
+	// `src/**` spans directories, so the nested case stays silent here and is
+	// reported there.
+	const nested = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/*'] } },
+		sources: { 'deep/nested/index.tsrx': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(findSourcePublicationViolations(nested.repo, nested.packages), []);
+
+	const spanning = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/**'] } },
+		sources: { 'deep/nested/index.tsrx': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(
+		findSourcePublicationViolations(spanning.repo, spanning.packages).map(({ rule }) => rule),
+		[RULES.excluded],
+	);
+});

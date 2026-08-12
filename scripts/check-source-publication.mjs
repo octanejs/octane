@@ -326,8 +326,14 @@ function createSpecMatcher(spec) {
 			return index === segments.length - 1 ? escaped : `${escaped}/`;
 		})
 		.join('');
-	// The trailing `($|/)` is what makes a bare directory cover its contents.
-	const pattern = new RegExp(`^${source}(?:$|/)`);
+	// A bare directory name covers its contents, so a literal last segment gets a
+	// trailing `($|/)`. A wildcard last segment must NOT: `*` and `?` do not cross
+	// `/` in `tsc`, so `src/*` reaches `src/index.ts` and stops there, while `src/**`
+	// keeps spanning because its `.*` already does.
+	const segments = normalized.split('/');
+	const last = segments[segments.length - 1];
+	const spansDirectories = last === '**' || !/[*?]/.test(last);
+	const pattern = new RegExp(`^${source}${spansDirectories ? '(?:$|/)' : '$'}`);
 	return (file) => pattern.test(file);
 }
 
