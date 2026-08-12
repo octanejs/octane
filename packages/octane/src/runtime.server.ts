@@ -8299,7 +8299,14 @@ export function preinitModule(
 ): void {
 	const value = coerceHintHref(href);
 	if (value === null) return;
-	if ((options?.as ?? 'script') !== 'script') return;
+	if ((options?.as ?? 'script') !== 'script') {
+		warnHintUsage(
+			'preinitModule() supports only as: "script" (got ' +
+				JSON.stringify(options?.as) +
+				'); the call was ignored. Use preloadModule() for other module destinations.',
+		);
+		return;
+	}
 	if (HEAD !== null && HEAD.hints.has('script:' + value)) return;
 	const key = 'module:' + value;
 	const safeHref = sanitizeURL(value);
