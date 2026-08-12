@@ -13,7 +13,11 @@ import {
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
+	renderPackedTsrxNodeFreeConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
+	PACKED_TSRX_CONSUMER_PACKAGES,
+	PACKED_TSRX_NODE_FREE_CONSUMER_PACKAGES,
+	PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY,
 } from './package-pack-canaries.mjs';
 
 describe('packed JavaScript consumers', () => {
@@ -155,18 +159,12 @@ describe('renderPackedExampleWorkspace', () => {
 });
 
 describe('packed TSRX source consumers', () => {
-	const archiveSpecs = {
-		'@octanejs/cmdk': 'file:/tmp/cmdk.tgz',
-		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
-		'@octanejs/input-otp': 'file:/tmp/input-otp.tgz',
-		'@octanejs/radix': 'file:/tmp/radix.tgz',
-		'@octanejs/spring': 'file:/tmp/react-spring.tgz',
-		'@octanejs/sonner': 'file:/tmp/sonner.tgz',
-		'@octanejs/syntax-highlighter': 'file:/tmp/syntax-highlighter.tgz',
-		'@octanejs/textarea-autosize': 'file:/tmp/react-textarea-autosize.tgz',
-		'@octanejs/tiptap': 'file:/tmp/tiptap.tgz',
-		octane: 'file:/tmp/octane.tgz',
-	};
+	const archiveSpecs = Object.fromEntries(
+		PACKED_TSRX_CONSUMER_PACKAGES.map((packageName) => [
+			packageName,
+			`file:/tmp/${packageName.replace('@octanejs/', '')}.tgz`,
+		]),
+	);
 	const toolingVersions = {
 		nodeTypes: '24.13.3',
 		tsrxTypeScriptPlugin: '0.3.116',
@@ -227,6 +225,34 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /<TextareaAutosize\b/);
 		assert.match(source, /<EditorProvider\b/);
 		assert.match(source, /<Tiptap\b/);
+	});
+
+	test('compiles published source the way an application with no @types/node does', () => {
+		const config = createPackedTsrxConsumerConfig({ nodeTypes: false });
+
+		// Not an omitted `types`: the consumer installs @types/node for its own
+		// tooling, and inheriting it would hide every Node global our published
+		// source reads.
+		assert.deepEqual(config.compilerOptions.types, []);
+		assert.equal(config.compilerOptions.strict, true);
+		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
+		assert.deepEqual(config.include, [
+			`${PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY}/**/*.ts`,
+			`${PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY}/**/*.tsrx`,
+		]);
+		assert.deepEqual(createPackedTsrxConsumerConfig().compilerOptions.types, ['node']);
+	});
+
+	test('exercises every packed binding that must compile without Node globals', () => {
+		const source = renderPackedTsrxNodeFreeConsumerSource();
+
+		for (const packageName of PACKED_TSRX_NODE_FREE_CONSUMER_PACKAGES) {
+			assert.match(source, new RegExp(`from '${packageName.replace('/', '\\/')}'`));
+		}
+		// The no-@types/node lane may only name packages the consumer installs.
+		for (const packageName of PACKED_TSRX_NODE_FREE_CONSUMER_PACKAGES) {
+			assert.ok(PACKED_TSRX_CONSUMER_PACKAGES.includes(packageName), packageName);
+		}
 	});
 
 	test('rejects erased component props and invalid published consumer contracts', () => {

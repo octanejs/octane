@@ -30,11 +30,14 @@ import {
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PACKAGES,
+	PACKED_TSRX_NODE_FREE_CONSUMER_PACKAGES,
+	PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
+	renderPackedTsrxNodeFreeConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
 import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
@@ -1069,6 +1072,10 @@ function validatePackedTsrxConsumer(tempRoot, archives) {
 		`${JSON.stringify(createPackedTsrxConsumerConfig(), null, 2)}\n`,
 	);
 	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.no-node-types.json'),
+		`${JSON.stringify(createPackedTsrxConsumerConfig({ nodeTypes: false }), null, 2)}\n`,
+	);
+	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
 		renderPackedExampleWorkspace(archiveSpecs),
 	);
@@ -1079,6 +1086,15 @@ function validatePackedTsrxConsumer(tempRoot, archives) {
 	writeFileSync(
 		path.join(sourceDirectory, 'published-types.ts'),
 		renderPackedTsrxConsumerTypeProbe(),
+	);
+	const nodeFreeDirectory = path.join(
+		consumerDirectory,
+		PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY.split('/').join(path.sep),
+	);
+	mkdirSync(nodeFreeDirectory, { recursive: true });
+	writeFileSync(
+		path.join(nodeFreeDirectory, 'NodeFreeConsumer.tsrx'),
+		renderPackedTsrxNodeFreeConsumerSource(),
 	);
 
 	execFileSync(
@@ -1128,8 +1144,19 @@ function validatePackedTsrxConsumer(tempRoot, archives) {
 		timeout: 120_000,
 	});
 
+	// The same installed tarballs, compiled the way a scaffolded browser
+	// application compiles them: no @types/node in the program. A Node global
+	// read from published source fails here and nowhere else in this repository.
+	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.no-node-types.json'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 120_000,
+	});
+
 	console.log(
-		'strict tsrx-tsc validated packed Cmdk, Input OTP, Sonner, and Tiptap source with the installed Octane Volar compiler and precise consumer props',
+		'strict tsrx-tsc validated packed Cmdk, Input OTP, Sonner, and Tiptap source with the installed Octane Volar compiler and precise consumer props, and compiled ' +
+			`${PACKED_TSRX_NODE_FREE_CONSUMER_PACKAGES.length} packed package(s) with no @types/node`,
 	);
 }
 
