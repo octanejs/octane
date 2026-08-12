@@ -75,19 +75,39 @@ function resolveBunBinary() {
 	return 'bun';
 }
 
-function parseBunIdentities(stdout, repoRoot) {
+function decodeXmlAttribute(value) {
+	return value
+		.replaceAll('&lt;', '<')
+		.replaceAll('&gt;', '>')
+		.replaceAll('&quot;', '"')
+		.replaceAll('&apos;', "'")
+		.replaceAll('&amp;', '&');
+}
+
+// bun's console ledger is not a stable machine surface: bun 1.3 omits the
+// per-test `(pass)` lines entirely in some environments (for example when it
+// detects an AI-agent session via CLAUDECODE), so identities must come from
+// the JUnit report file instead.
+export function parseJUnitIdentities(xml) {
 	const identities = [];
 	const portableFile = 'packages/alien-signals/upstream/src/index.test.ts';
-	for (const line of stdout.split('\n')) {
-		const match = /^\(pass\)\s+(.+?)\s*(?:\[[^\]]+\])?\s*$/.exec(line.trim());
-		if (match === null) continue;
+	const testcasePattern = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+	for (const match of xml.matchAll(testcasePattern)) {
+		const attributes = match[1];
+		const body = match[2] ?? '';
+		const name = decodeXmlAttribute(/\bname="([^"]*)"/.exec(attributes)?.[1] ?? '');
+		const classname = decodeXmlAttribute(/\bclassname="([^"]*)"/.exec(attributes)?.[1] ?? '');
+		const status = /<failure\b|<error\b/.test(body)
+			? 'failed'
+			: /<skipped\b/.test(body)
+				? 'skipped'
+				: 'passed';
 		identities.push({
 			file: portableFile,
-			fullName: match[1].replaceAll(' > ', ' '),
-			status: 'passed',
+			fullName: `${classname} ${name}`.replaceAll(' > ', ' ').trim(),
+			status,
 		});
 	}
-	void repoRoot;
 	return identities.sort(compareTestIdentities);
 }
 
@@ -147,14 +167,20 @@ export function runPristineUpstreamSuite({ repoRoot = resolve(packageRoot, '../.
 		);
 		symlinkSync(join(packageRoot, 'node_modules'), join(runRoot, 'node_modules'), 'dir');
 		const bunBinary = resolveBunBinary();
-		const result = spawnSync(bunBinary, ['test', 'src/index.test.ts'], {
-			cwd: runRoot,
-			encoding: 'utf8',
-		});
+		const junitReport = join(runRoot, 'pristine-junit.xml');
+		const result = spawnSync(
+			bunBinary,
+			['test', 'src/index.test.ts', '--reporter=junit', `--reporter-outfile=${junitReport}`],
+			{
+				cwd: runRoot,
+				encoding: 'utf8',
+			},
+		);
 		const stdout = result.stdout ?? '';
 		const stderr = result.stderr ?? '';
-		// bun test prints the pass/fail ledger on stderr.
-		const identities = parseBunIdentities(`${stdout}\n${stderr}`, repoRoot);
+		const identities = parseJUnitIdentities(
+			existsSync(junitReport) ? readFileSync(junitReport, 'utf8') : '',
+		);
 		return {
 			status: result.status ?? 1,
 			stdout,

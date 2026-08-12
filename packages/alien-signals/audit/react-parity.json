@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+      "lockfileSha256": "0a3f2088ff253780087b79fb7c66031a5e8660ae1d334ad1a42b50cddffbf09a"
     }
   },
   "lanes": [
@@ -75,7 +75,7 @@
         {
           "path": "scripts/react-parity/alien-signals-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "8c4c7ac51ca2946f5094d7754c7a7b3eb7cf52aba083ac75aad2e7768fb3c4ac"
+          "sha256": "7a3ce432c7ece6ecf28f47180e9b89d344e1436277e73caf42d9f366b60e7e1e"
         },
         {
           "path": "packages/alien-signals/scripts/run-pristine-upstream.mjs",

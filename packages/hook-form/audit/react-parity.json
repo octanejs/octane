@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+      "lockfileSha256": "0a3f2088ff253780087b79fb7c66031a5e8660ae1d334ad1a42b50cddffbf09a"
     }
   },
   "lanes": [
@@ -92,7 +92,7 @@
         {
           "path": "packages/hook-form/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "a937a98725166887581e2d8a2f93ec0894b18e8b0af0b24724cc1290540626cf"
+          "sha256": "77e953eabc6a472cb2a1ab85e6a477ab40725f5ce26657f198bad27cc735bd45"
         },
         {
           "path": "packages/hook-form/tests/upstream-jest.setup.ts",

@@ -528,7 +528,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36
   - react-dropzone@20.0.0
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
